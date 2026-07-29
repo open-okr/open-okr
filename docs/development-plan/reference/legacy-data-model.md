@@ -1,5 +1,7 @@
 # legacy data model reference
 
+> **ARCHIVED (2026-07-08).** The OpenProject importer was cut from the plan (PLAN.md §14 decided log; REQUIREMENTS.md §6 — a generic CSV/XLSX importer replaced it, and an OpenProject importer is post-v1, demand-driven). Nothing in the current plan depends on this file. It is retained as background only; do not cite it as a spec source for any task.
+
 Ground truth for the data importer. This describes the **source** schema (the legacy system, Rails ~8.0, PostgreSQL) that `packages/importer` reads. This repo has no access to the legacy system's codebase, so this file is the authority.
 
 Extracted from `db/migrate/tables/*.rb` (99 core table definitions) and `modules/*/app/models` on the `dev` branch, July 2026. Column lists below are the load-bearing columns, not every column. Before writing importer code, always cross-check against a real `pg_dump --schema-only` of the target instance (see section 10). The legacy system versions differ; the dump is authoritative for a given customer.

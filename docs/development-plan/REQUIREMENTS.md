@@ -1,221 +1,139 @@
 # REQUIREMENTS.md
 
-Product authority for `OpenOKR`. Informed by analyses of two mature source systems (documented in `reference/`, used to scope parity and the importers) plus OpenOKR's own product goals: a legacy project tool scopes the work-management core; FlowyTeam scopes the strategy core (OKR, KPI, check-ins, tasks). Sections marked **[DECIDE]** need a human answer before the design gate that depends on them; the agent must ask, not invent.
+Product authority for `OpenOKR`. The competitive benchmark is **Operately** (the shipped open-source "company operating system"); the analysis behind this revision is OPERATELY-COMPARISON.md and the 142-item OPERATELY-GAP-REGISTER.md. One legacy system feeds an importer: **FlowyTeam** (Laravel/MySQL — `reference/flowyteam-okr-kpi-tasks-model.md`). The old OpenProject-parity scope and its importer were **cut** (decision 2026-07-08); the OpenProject reference docs are retained as archived background only.
 
-The product target is: **native OKR and KPI management connected to full-featured project and work management, on a modern stack, with importers that migrate data from both legacy tools.** Feature scope below is priced as P0 (must ship v1), P1 (fast follow), P2 (design for, do not build yet).
+Sections marked **[DECIDE]** need a human answer before the design gate that depends on them; the agent must ask, not invent.
+
+The product target: **an opinionated operating system for running a company on goals — native OKRs, KPIs and check-ins, a built-in operating rhythm with real accountability, an Operately-class execution core (projects, milestones, work items, boards, documents), and AI woven through it including autonomous AI teammates — on a modern TypeScript stack, self-hosted or (later) in the cloud.** Feature scope is priced P0 (must ship v1), P1 (fast follow inside v1), P2 (design for, do not build yet). Everything deferred beyond v1 lives in §6 (the power floor).
 
 ---
 
 ## 1. Product
 
-- **Name:** `OpenOKR` **[DECIDE]** (working name until chosen; see PLAN.md §12).
-- **One-liner:** An open source platform where teams set objectives and KPIs, plan the work that moves them, and track both in one place — self-hosted or in the cloud.
-- **The problem:** Strategy tools and work tools live apart: OKRs sit in a spreadsheet or a point solution while the actual work runs in a project tool, so goals and execution drift. Teams also need full-featured project management (work packages, gantt, boards, time tracking) without the weight of a legacy Rails/Angular stack, and a clean path to migrate their existing data. Institutions need it self-hostable, auditable, and able to pass a security review.
-- **Relationship to the source tools:** OpenOKR is a new product, not a fork of either. It provides one-way **importers** that read an existing legacy PostgreSQL database (the project tool) and an existing FlowyTeam MySQL database (see §4 and TECHNICAL-PLAN.md §7). It does not need to be API- or plugin-compatible with either tool.
+- **Name:** `OpenOKR` **[DECIDE]** (working name; it undersells the operating-system positioning — see PLAN.md §14 #1).
+- **One-liner:** An open source operating system for running a company on goals: OKRs, KPIs and check-ins joined to the work that delivers them, driven by a built-in weekly rhythm, real accountability, and AI teammates. Self-host it. Own it.
+- **The problem:** Strategy tools and work tools live apart, so goals and execution drift. Generic work tools give infinite flexibility and zero guidance — teams configure instead of executing. Operately proved the opinionated alternative works; OpenOKR takes the same stance further: a deeper OKR/KPI model, database-enforced isolation, genuine data portability, AI that is governed (bring your own key, local models, hard cost caps) and *accountable* (AI teammates that run on the same rhythm as people), on a stack the team owns end to end.
+- **How OpenOKR must beat Operately (the product bar):** everything in TECHNICAL-PLAN.md §15. Headlines: a real KPI module with calculated formulas (Operately has none); direction-aware, weighted key results with value history and trend forecasting; database-level tenant isolation (RLS) under a relationship access model; tamper-evident audit; self-serve workspace export/import; local/air-gapped AI with metering and caps; AI teammates that are sandboxable, cost-capped, and least-privilege; a generated CLI + OpenAPI from one contract.
+- **Relationship to the source tools:** OpenOKR is a new product, not a fork of anything. It ships a one-way **FlowyTeam importer** (MySQL, per-company: full strategy + tasks) and a **generic CSV/XLSX importer**. Operately is a benchmark, never a source: we study behavior, we do not copy code (TECHNICAL-PLAN §11).
 
 ## 2. Who uses it
 
 | Persona | What they need to get done | Tech comfort |
 |---|---|---|
-| Team member | See work assigned to them, update status, log time, comment, get notified | Low–Medium |
-| Project/team lead | Create projects, plan with gantt/boards, assign people, track progress, report | Medium |
-| PMO / operations manager | Run OKR cycles and KPI reviews, portfolio view across projects, dashboards, exports | Medium–High |
-| Org / IT admin | Manage users, roles, SSO/LDAP, backups, audit, prove compliance at scale | High |
-| Migrating admin | Move an existing install of either legacy tool onto OpenOKR without losing data | High |
+| Team member | See what they owe this week (check-ins, tasks, reviews), update in one place, get the right nudges | Low–Medium |
+| Team / project lead (champion) | Own goals and projects, post check-ins, keep milestones honest, see their team's work map | Medium |
+| Reviewer / manager | Review and acknowledge check-ins, spot stale or at-risk work early, coach via discussions | Medium |
+| PMO / operations manager | Run OKR cycles and KPI reviews, the company-wide work map, scorecards and exports | Medium–High |
+| Org / IT admin | Manage members, SSO, backups, audit, AI governance, pass a security review | High |
+| Migrating admin | Move FlowyTeam data (or CSV exports of anything else) in without loss | High |
+| AI teammate | An agent member with a persona and instructions that plans and executes on the cadence, within scoped permissions | — |
 
-## 3. Modules
+## 3. The operating model (P0 — the spine of the product)
 
-The product has two pillars. The **strategy pillar** (OKR, KPI, check-ins) is the namesake surface, scoped from FlowyTeam and specified in depth in [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) §4.12 (schema) and [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) Phase 4 (tasks); it is built in Phase 4. The **execution pillar** (work packages and everything around them) is scoped from the legacy project tool; within it, priorities reflect that tool's usage reality (work packages, projects, boards, gantt are the heart; forums/news/documents/BIM are edges — see `reference/legacy-feature-inventory.md`). The two pillars meet in the work package: work links to objectives, key results, and KPIs.
+This is what makes OpenOKR an operating system rather than a tracker. These are **not modules a user assembles**; they are defaults the product imposes (each changeable, never absent). All P0, built in Phases 2–4.
 
-### Module: Strategy / OKRs (P0)
+### 3.1 Cadence & staleness
 
-- **Problem it solves:** Connect day-to-day work to objectives and key results, cascaded across the org. This is the product's namesake surface, scoped from FlowyTeam's mature implementation (`reference/flowyteam-okr-kpi-tasks-model.md`).
-- **Key actions:** define objectives owned by the workspace / a team / a person, inside an OKR cycle; add key results as a numeric range (initial → target, direction-aware) with a unit and weight; set confidence; align objectives under a parent objective or key result; check in (value + confidence + remark + category); view the alignment tree; link work to objectives/key results.
-- **Data it owns:** objectives, key results, key-result value history, OKR cycles, alignment pointers, check-ins.
-- **Derived:** progress %, RAG color (from configurable thresholds), status bucket (from confidence). Recomputed by a scoring engine; scores cascade upward.
-- **Priority:** P0. Detailed schema in **[TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) §4.12**, tasks in **[IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) Phase 4**.
-- **Acceptance (sample):** *Given* a user with `manage_objectives` in an active cycle, *when* they create an objective with two weighted key results, *then* it appears in the OKR explorer at 0% / "not tracked", and its score recomputes when a key result value is checked in.
+Every goal and project has a check-in frequency (weekly by default, anchored to a company-chosen day; biweekly/monthly selectable). The system — not the user — computes and stores the next due date, honors the workspace timezone and a small on-time tolerance, and drives reminders and the review inbox from it. A goal or project whose check-in is missed beyond a configurable grace window becomes **`outdated`**: a derived state that *overrides* the last self-reported health everywhere it is shown.
+**Acceptance (sample):** *Given* a weekly goal last checked in 10 days ago, *when* any list, work map or dashboard renders it, *then* it shows `outdated` regardless of the last check-in's status, and its champion sees "Submit check-in — overdue by N days" in their review inbox.
 
-### Module: KPIs (P0)
+### 3.2 Champion & reviewer accountability
 
-- **Problem it solves:** Track recurring metrics against targets over time, independent of a single objective.
-- **Key actions:** define KPIs in a category, with a frequency (daily/weekly/monthly/quarterly/yearly), a unit, a direction (higher- or lower-is-better), a default target, and RAG thresholds; record target vs actual per period; build calculated KPIs from a formula over other KPIs (with cross-frequency aggregation); organize KPIs in a parent/child tree; link a KPI to a key result so a KR is measured by a KPI.
-- **Data it owns:** KPIs, KPI categories, per-period records, formula dependencies, KR↔KPI links.
-- **Priority:** P0. Detail in TECHNICAL-PLAN.md §4.12 and IMPLEMENTATION-PLAN.md Phase 4.
+Every goal and project carries exactly one **champion** (the accountable owner) and one **reviewer** — distinct from access roles. A published check-in enters `awaiting-acknowledgement`; the reviewer's acknowledgement (optionally with a comment) closes the loop and is itself tracked. Changing champion or reviewer atomically rebinds their access and reassigns pending obligations (a new reviewer is not asked to acknowledge history).
 
-### Module: Check-ins (P1)
+### 3.3 The review inbox ("what do I owe right now")
 
-- A lightweight recurring ritual to update OKRs and surface blockers: per-period sessions with confidence + remark + category on each objective/key result, plus a manager review step and a dated history. **Priority:** P1 (Phase 4).
+A per-person, server-computed list of obligations: check-ins due (as champion), acknowledgements owed (as reviewer), work items and milestones due — ranked overdue-first, with action labels and human due-status ("Overdue by 3 days"), a live badge count, and one-click actions. Distinct from the notifications inbox (§5.4): notifications say what happened; the review inbox says what you owe.
 
-### Module: Work packages (P0)
+### 3.4 Check-ins as narrative snapshots
 
-- **Problem it solves:** Teams lose track of who does what by when.
-- **Key actions:** create/edit/delete work packages; set type, status, priority, assignee, responsible, dates, version, parent; comment; watch; attach files; relate (blocks, precedes/follows, relates, parent/child); bulk edit; export (CSV/PDF/Excel).
-- **Data it owns:** work packages, relations, categories, watchers, comments (as journal notes), attachments links.
-- **Who can do what:** role-based. View / add / edit / delete / comment / change-status / manage-relations / manage-subtasks are distinct permissions (see feature inventory §2). Sharing a single work package with a user at view/comment/edit level (P1).
-- **Realtime needs:** live list updates and presence on boards (new capability, PLAN.md §7); co-edit of descriptions later (P2).
-- **AI needs:** summarise a work package thread, draft a work package, or decompose an objective into work packages on demand — through the in-app copilot or the user's own MCP agent (see the AI copilot & agents module below and AI-NATIVE-PLAN.md). Accelerators only; on where a provider is configured.
-- **Priority:** P0
-- **Tasks unification:** FlowyTeam's lighter "Tasks" (Kanban board, single assignee, subtasks-as-checklist, recurrence, OKR/KPI links) are **the same entity** here — they import into work packages, which gain `objective_id`/`key_result_id`/`kpi_id` link columns, a `checklist_items` child, and a recurrence rule. See TECHNICAL-PLAN.md §4.12.7.
-- **Acceptance (sample):** *Given* a member with `add_work_packages`, *when* they create a work package with subject and type, *then* it appears in the project list and an activity entry and notification are generated.
+A check-in is a first-class artifact, not a status dropdown: a small fixed status vocabulary (`on_track` / `caution` / `off_track`), an optional 0–10 confidence, a required written narrative, and an **immutable snapshot of every key result / target value at that moment** (with previous values, powering a diff view). Draft → publish lifecycle (drafts emit no activity, notifications or cadence advance), a time-boxed edit window, comments, reactions, and the acknowledgement. A goal's current health is derived from its latest published check-in (then overridden by staleness or a close outcome) — never edited directly.
 
-### Module: Types, statuses, workflow (P0)
+### 3.5 The Work Map
 
-- **Problem it solves:** Different work needs different fields and lifecycles.
-- **Key actions:** define work package types with attribute groups (form layout), statuses (open/closed/read-only), and a per-type per-role workflow (allowed status transitions).
-- **Data it owns:** types, statuses, workflows.
-- **Who can do what:** admin (`manage_types`, workflow admin).
-- **Priority:** P0 (workflow transitions are load-bearing; the importer carries them).
+One canonical, company-wide tree — goals → sub-goals → projects → work items — with a uniform derived contract at every node: status (including `outdated`), progress, next step, champion, timeframe. Filterable by space, person, status; every row deep-links. **This is the home screen.** Not a saved-query builder: one opinionated artifact.
 
-### Module: Projects & versions (P0)
+### 3.6 Spaces, closing rituals, and the feed
 
-- **Problem it solves:** Work needs a home and a hierarchy; releases need milestones.
-- **Key actions:** create projects (with identifier), nest sub-projects, archive, mark templated, copy from template, set status; manage versions (milestones) with sharing scope and effective date; enable/disable modules per project.
-- **Data it owns:** projects (tree), enabled modules, versions, categories, project attributes (custom fields on projects).
-- **Who can do what:** `add_project`, `edit_project`, `archive_project`, `manage_versions`, `select_project_modules`, `copy_projects`.
-- **Priority:** P0
+**Spaces** are team homes: each department's goals, projects, documents and discussions with its own membership and access scope. **Closing** a goal or project is a ritual: it requires an outcome (`achieved` / `missed`) and creates a retrospective (a short structured "what happened / what we learned" artifact, AI-draftable, human-edited); both are reopenable. Every meaningful event lands in a **typed, human-readable activity feed** (company / space / goal / project / profile scopes) that is permission-filtered, reactable and commentable — separate from the compliance audit log.
 
-### Module: Custom fields & project attributes (P0)
+## 4. Modules
 
-- **Problem it solves:** Every org tracks extra attributes.
-- **Key actions:** define custom fields (string, text, int, float, date, bool, single/multi list, user, version, link, hierarchy) on work packages, projects, users, versions, time entries; group into sections; mark required/searchable; activate per project/type.
-- **Data it owns:** custom fields, options, values, activation mappings, sections.
-- **Priority:** P0 (data importer depends on faithfully carrying custom values).
+### Pillar A — Strategy (P0; Phase 3)
 
-### Module: Queries & views (P0)
+- **Goals & key results (P0).** Objectives owned by the workspace, a space, or a person, inside a cycle, with an optional per-goal timeframe override (day/month/quarter/year granularity, human labels like "Q3 2026"). Key results as direction-aware numeric ranges (initial → target, increase/decrease) with unit, weight, confidence, value history, and links to the work that drives them. Alignment under a parent goal or a parent key result; cascade with cycle detection. Explicit close lifecycle (§3.6). Weighted scoring with a derived RAG color and the §3.1 status cascade. Discussions (titled threads), comments, reactions, watchers.
+  - *Acceptance:* *Given* a member with goal-edit access in an active cycle, *when* they create a goal with champion, reviewer and two weighted KRs, *then* it appears in the explorer and Work Map at 0% / `pending`, its first check-in is scheduled for the next cadence day, and checking in a KR value recomputes progress and health live.
+- **OKR cycles (P0).** Quarter/half/month/year cadences, auto-generated forward, an archive step, workspace thresholds (RAG bands, staleness grace, quotas) and label overrides ("objective" → your house term).
+- **Check-ins (P0).** §3.4.
+- **KPIs (P0).** Categories; per-KPI frequency (daily→yearly), unit, direction, targets and RAG thresholds; a keyboard-first grid of periods × KPIs; **calculated KPIs** from a typed formula over other KPIs with cross-frequency aggregation and cascade recompute; a parent/child tree; KPI↔KR links so a key result is measured by a live metric. *(This whole module is a differentiator: Operately has no KPI system.)*
+- **Scorecard & snapshots (P1).** Per-owner, per-cycle rollup on archive; trends across cycles; export. The optional points layer ships **off by default** and is human-gated.
 
-- **Problem it solves:** Everyone needs saved, filtered, sorted views of work.
-- **Key actions:** filter, sort, group, sum, choose columns, choose display (table/cards/gantt), save as public or private, pin to sidebar, star; baseline comparison (P2, enterprise in the legacy tool).
-- **Data it owns:** queries, views, per-user ordering.
-- **Priority:** P0. The new system needs its own query DSL; the importer translates the legacy system's serialized YAML filters into it.
+### Pillar B — Execution (P0/P1; Phase 4) — Operately-class core, opinionated, zero configuration engines
 
-### Module: Boards (P0)
+- **Projects (P0).** Lifecycle `active / paused / closed` with side effects (pausing pauses the cadence; closing requires a retrospective + outcome). Contributors with champion / reviewer / contributor roles and responsibility text. Health check-ins per §3.4 with acknowledgement and staleness. A description, resource hub, discussions, feed. A project may link to the goal(s) it serves.
+- **Milestones (P0).** First-class: title, timeframe (contextual granularity), description, comment thread, completion via a comment-with-action, per-milestone board, and a derived project **next step** (earliest-due open milestone, documented tie-break).
+- **Work items (P0).** The unit of work: title, rich description, **multiple assignees**, a fixed status vocabulary (`todo / in_progress / done / canceled`), due date (contextual), checklist, due-relative reminders (`before_due` / `on_due` / `overdue`), links to a key result / goal / KPI (progress flows upward), lightweight `blocks` relations with a cannot-complete-while-blocked guard, comments/reactions/watchers. FlowyTeam tasks import here.
+- **Boards (P0).** Kanban per milestone or project keyed on status, drag with optimistic updates and live presence, concurrency-safe ordering (normalized against deleted/closed items).
+- **Resource Hub (P0 docs/folders/files, P1 links polish).** Per space, project or goal: a browsable node tree of rich **documents** (draft → publish, version history with visual diff), **folders**, **files** (previews/thumbnails, quotas, optional virus scan), and typed external **links** (Google Doc / Figma / Notion, SSRF-safe metadata enrichment). Per-node comments, reactions, subscriptions; move/copy. *(Replaces both "wiki" and "documents" from the old plan.)*
 
-- **Problem it solves:** Visual, drag-and-drop work management.
-- **Key actions:** create boards; free boards and action boards keyed by status / assignee / version / subproject / parent; drag cards to change the keyed attribute; manual card order.
-- **Data it owns:** boards (as grids), widgets/columns referencing a query per column, manual order.
-- **Priority:** P0
+### Pillar C — Collaboration & platform (P0; Phase 2 spine, wired per module)
 
-### Module: Gantt / timeline (P0)
+- **Discussions & message boards (P0).** Titled rich-text threads per space (announcements) or anchored to a goal/project; draft → publish (drafts silent); one subscription model beneath all of it.
+- **Comments, reactions, mentions (P0).** Polymorphic comments everywhere; reactions on all major subjects (comments, check-ins, goals, work items, milestones, docs, discussions); @mentions auto-subscribe, deliver immediately when opted, and are re-diffed on edit (un-mentioning stops notifying); comment deep-links with unread highlight; a compose-time "will notify X and N others" preview.
+- **Subscriptions & notifications (P0).** Per-artifact subscriber lists (reason: invited/joined/mentioned) + per-user settings (per-reason routing, mention immediacy, digest window, daily-summary time in the user's own timezone). Delivery is **access-gated at send time** (losing access silently stops notifications). Email: immediate for direct mentions, otherwise coalesced into a per-user buffered batch or digest; a daily "your work today" assignments email; HTML+text per reason with a dev preview page. Suspended members, placeholders and AI principals are never notified.
+- **Activity feed (P0).** §3.6 — typed events, scoped feeds, aggregation of consecutive edits, live updates.
+- **People & org (P0).** Per-workspace member profiles (title, timezone, avatar, rich bio; self-vs-others edit rules), a **manager/reports-to chain** (cycle-safe), a people directory, suspend/restore, guest members with a convert-to-guest that strips prior access, invitations by email + reusable invite links (use counts, expiry, revoke, allowed domains) + trusted-domain auto-join.
+- **Search & command palette (P0).** ⌘K everywhere: entity jump, actions, full-text search across goals, projects, work items, docs, discussions — permission-filtered. (Semantic search arrives with the AI layer.)
+- **Exports & portability (P1).** CSV/XLSX export of any list; **workspace export/import** — a signed, encrypted, checksummed archive any admin can export and dry-run-import into any OpenOKR instance (self-host ↔ future cloud both ways).
+- **Admin & settings (P0).** Workspace settings, members & access, strategy settings (cadence, thresholds, labels), notifications defaults, security (auth policy, sessions), branding, audit log view, the freeze/read-only switch, backups, demo builder.
 
-- **Problem it solves:** See schedule and dependencies over time.
-- **Key actions:** timeline of work packages, dependency arrows (precedes/follows), milestones, zoom, drag to reschedule respecting manual/automatic scheduling and working days.
-- **Data it owns:** reuses work packages + query timeline settings.
-- **Priority:** P0
+### Pillar D — AI & agents (P0 native; Phase 5) — governed, local-capable, accountable
 
-### Module: Scheduling & working days (P0)
+- **AI assists (P0).** In every module, as ✨ propose-then-confirm accelerators: draft/improve/rate an objective; suggest KRs, metrics, alignment parents; **draft the overdue check-in from real activity** (linked work-item movement, KR history); draft retrospectives and cycle summaries; suggest KPIs, targets, formulas from plain language; narrate KPI trends and flag anomalies; draft work items from a sentence; decompose a goal into work; summarize threads; draft/expand/summarize documents; grounded Q&A; natural-language filters.
+- **Copilot (P0).** A side-panel assistant that answers grounded in workspace data (permission-filtered citations) and proposes actions for confirmation; long tool runs execute in the background and stream back.
+- **AI teammates (P0, the headline).** Agent members (`kind: ai`) with a persona, phased planning/execution instructions, a provider/tier choice, and a schedule. They run unattended on the cadence: plan tasks, execute step by step (durable, resumable runs with readable logs), post check-in drafts, comments and updates into the same feeds and review inbox as humans. Safety by construction: a **least-privilege principal** scoped to named spaces/goals, **sandbox mode** (end-to-end dry runs), a **batch-approval inbox** (the agent works overnight; a human approves its proposed writes in the morning) or scoped direct-write policy, **hard cost caps** that halt runs, and full audit. Runs on local models for air-gapped installs.
+- **MCP server (P0).** Any external agent (Claude, ChatGPT, Cursor, custom) drives OpenOKR as the authenticated user. **OAuth 2.1 is the primary auth** (authorization-code + PKCE, discovery, dynamic client registration/CIMD, refresh rotation with theft detection, consent + workspace picker); PATs remain for local stdio/scripts. Tool catalog spans both pillars with read/write/destructive safety classes, plus `search` + `fetch` for research connectors, resources and prompt templates.
+- **Bring your own AI (P0).** Anthropic / OpenAI / OpenRouter / **Ollama** / any OpenAI-compatible endpoint (Google fast-follow); keys at deployment, workspace, or per-user level, envelope-encrypted with cheap key rotation; a validated model catalog with capability tiers; per-feature toggles; **per-token cost metering, quotas, and hard caps**; versioned prompts; privacy/egress controls; zero-egress guarantee on local providers.
 
-- **Problem it solves:** Dates must respect dependencies and non-working days.
-- **Key actions:** automatic scheduling from follows-relations with lag; manual scheduling mode per work package; instance working days + holidays; per-user working hours/non-working time (P1); rollup of dates/progress/effort to parents.
-- **Priority:** P0 (this is the hardest core engine; see TECHNICAL-PLAN.md).
+## 5. Cross-cutting needs
 
-### Module: Calendar (P1)
+- **Importers (P0, hard requirement):** (1) a **generic CSV/XLSX importer** for objectives, key results, KPIs + records, projects, and work items — template downloads, dry-run preview, per-row error report; (2) the **FlowyTeam importer** — read-only MySQL, `--company` selection, covering org units→spaces, cycles, objectives, KRs, check-ins, KPIs + records + formula translation, and tasks→work items with comments, files, watchers and **time logs preserved losslessly** in a read-only table (the time-tracking UI itself is post-v1, §6). Idempotent re-runs on `(workspace_id, legacy_type, legacy_id)`; dry-run report + reconciliation; derived values recomputed, never trusted.
+- **UX quality bar (P0):** modern-tool feel — inline editing, optimistic updates with undo, ⌘K, dark mode, keyboard-first, responsive shell, live updates, stale-deploy reload toast. Binding spec: UIUX-PLAN.md; budgets: TECHNICAL-PLAN §13 (requirements, not aspirations).
+- **Languages:** English (P0) and Bahasa Melayu (P1); i18n-ready architecture from day one (ICU catalogs, pseudo-locale CI check).
+- **Accessibility:** WCAG 2.1 AA target; axe checks in CI on every screen spec; keyboard paths for all actions including drag alternatives. **[DECIDE]** whether a formal external audit is required.
+- **Compliance:** PDPA (Malaysia) / GDPR-style handling — data export, erasure as **anonymization preserving authorship** (placeholder identity, audit event, machine-readable export), last-owner / last-site-admin invariants, PII minimization in logs.
+- **Hosted SaaS (decided 2026-07-08): design now, build later.** The schema stays multi-tenant; the operator console (Phase 7) ships workspace inspect/suspend, feature flags, site messages, and **transparent, time-boxed support impersonation** (surfaced to the workspace owner). Billing/seat entitlements are designed behind a `BILLING_ENABLED` flag and built only if/when a cloud launches. Self-host is the v1 product and is never seat-limited.
 
-- View work packages on a month/week calendar; ICS subscription feed. **Priority:** P1.
+## 6. The power floor — out of v1, designed-for (decision 2026-07-08)
 
-### Module: Team planner (P1)
+Deferred to post-v1 phases; each keeps a design-for note in TECHNICAL-PLAN so v1 does not block it. In rough priority order:
 
-- Assignee swimlanes across a date range; drag to reschedule/reassign. **Priority:** P1.
+1. Serverless / zero-ops cloud profile (Vercel + Supabase drivers, dual-profile CI).
+2. Custom fields engine; configurable types/statuses/workflows; the saved-query DSL + view builder (table/board/calendar over one query).
+3. Gantt + the automatic scheduling engine (dependencies, working days, cascades) — **spike-gated**; v1 uses contextual dates + simple rollups, which Operately proves is sufficient.
+4. Time & cost tracking UI (v1 stores imported time logs read-only); budgets.
+5. Backlogs / Scrum (sprints, points, burndown); meetings; project phases & gates; portfolios.
+6. GitHub/GitLab integration; Slack/Teams notification channels; incoming email; calendar feeds.
+7. Billing/entitlements + the hosted cloud; an OpenProject importer (demand-driven); real-time co-editing (CRDT); native mobile apps.
 
-### Module: Backlogs / Scrum (P1)
+Also explicitly out of scope for v1: SCM/repository browsing, BIM, forums/news as separate modules (discussions + the Resource Hub cover them), byte-perfect legacy history import.
 
-- Sprints (versions), story points, sprint/product backlog ordering, task board, burndown. **Priority:** P1.
+## 7. Non-functional requirements
 
-### Module: Time & cost tracking (P1)
+- **Scale:** tens of thousands of members and ~1M work items + goals in one workspace. Keyset pagination, virtualization, and indexes-with-the-feature from day one (TECHNICAL-PLAN §13).
+- **Performance feel:** Work Map and primary lists interactive < 2 s on a mid-range laptop against the large seeded dataset; saves feel instant (optimistic).
+- **Data residency:** self-hosting satisfies in-country residency. No multi-region cloud requirement for v1.
+- **Offline / air-gapped:** fully supported — no feature may hard-depend on an external SaaS; AI points at a local model or is off; telemetry opt-in; assets self-hosted.
+- **Reliability:** scheduled encrypted backups with **CI-verified restore drills**; per-workspace logical restore via the portability engine; forward-only migrations + the data-change runner.
 
-- **Key actions:** log time against work packages with activity and comment; start/stop timer; cost entries with cost types; hourly rates with valid-from history; view own vs all rates by permission.
-- **Data it owns:** time entries, activities, cost entries, cost types, rates.
-- **Priority:** P1 (time tracking P1, cost/rates P1, cost reports P2).
+## 8. Success metrics
 
-### Module: Budgets (P2)
+- **Leading:** a new team completes setup and posts its first goal check-in within 15 minutes of `docker compose up`; a FlowyTeam admin runs a dry-run import and reads a correct reconciliation report within one session; the review inbox drives ≥70% of check-ins submitted on time in the demo cohort.
+- **Lagging:** N active self-hosted instances within 6 months of launch (**[DECIDE]** target N); at least a handful of real FlowyTeam/CSV migrations completed; at least one organisation running an AI teammate in batch-approval mode weekly.
 
-- Project budgets (labor + material items) vs actual spend. **Priority:** P2.
+## 9. Open questions (agent must raise, not guess)
 
-### Module: Wiki (P1)
-
-- Per-project wiki, page tree, versioning, links/macros, menu. **Priority:** P1.
-
-### Module: Meetings (P1)
-
-- Structured meetings: agenda items with duration/position, sections, participants (invited/attended), outcomes/minutes, recurring meetings (RRULE), ICS invites, agenda items linked to work packages. **Priority:** P1.
-
-### Module: News / Forums / Documents (P2)
-
-- Project news with comments; discussion forums; simple document register. **Priority:** P2 (low usage; wiki + comments cover most needs).
-
-### Module: Project lifecycle phases & gates (P2)
-
-- Stage/gate phases on projects (the legacy system 2026 feature: workspace-level phase definitions **with named start/finish gates**, per-project date ranges, work packages taggable to a phase, gates filterable in the project list). This is the backbone of PM²/PMflex/PRINCE2-style governance (see §4 Methodology support). **Priority:** P2, human-gated (IMPLEMENTATION-PLAN P3-T33); importer must recognize the tables either way.
-
-### Module: File storage integrations (P1)
-
-- Attachments (upload, virus scan optional); link external files from Nextcloud / OneDrive-SharePoint; per-project managed folders. **Priority:** attachments P0, external storages P1/P2. See §4 integrations.
-
-### Module: Notifications & reminders (P0)
-
-- In-app notification center + email; per-user, per-project notification settings (watched/involved/mentioned/assignee); mentions from rich text; date alerts (start/due/overdue) (enterprise in the legacy tool, P1 here); reminders on work packages; email digests. **Priority:** P0 (in-app + email), P1 (date alerts, digests).
-
-### Module: My page / dashboards (P1)
-
-- Personal configurable dashboard of widgets (assigned work, calendar, news). Project overview dashboard. **Priority:** P1.
-
-### Module: Operations (NEW) (P2)
-
-- **Problem it solves:** Recurring operational processes beyond projects (e.g. checklists, SOPs, tickets).
-- **Priority:** P2. **[DECIDE]** scope. Design-for, do not build in v1.
-
-### Module: AI copilot & agents (MCP) (P0, native)
-
-- **Problem it solves:** teams want help drafting and improving OKRs, breaking goals into work, summarizing threads and meetings, and querying their data in plain language — and they want to do this from their own AI agent, not only inside the app. Strategy tools that bolt AI on late feel like an afterthought; OpenOKR builds it in from day one.
-- **Key actions:** per-module AI **assists** (draft / rate / improve objectives and key results, suggest KPIs and targets, decompose objectives into work packages, summarize threads and meetings into action items, natural-language search and query); an in-app **copilot** that answers grounded in workspace data and takes actions the user confirms; an **MCP server** so an external agent (Claude, Cursor, a custom agent) manages OKRs and projects as the user, within the user's permissions; **bring-your-own AI key** at the deployment, workspace, or individual-user level, including local models (Ollama, any OpenAI-compatible endpoint) for air-gapped installs.
-- **Data it owns:** provider config, encrypted credentials, the model catalog and routing, per-feature settings, versioned prompts, copilot threads, tool-call and usage/cost logs, embeddings (AI-NATIVE-PLAN.md §7).
-- **Who can do what:** admins configure AI (`manage_ai`) and mint agent tokens; every AI action inherits the acting user's existing permissions — the agent is never a superuser.
-- **Constraints:** every assist is an accelerator over a complete manual path (nothing AI-only on a required path); on by default only where a provider is configured; every action is permission-checked, metered, capped, and audited.
-- **Priority:** P0 (native). Full spec in **[AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md)**; built in **Phase 5**.
-- **Acceptance (sample):** *Given* a workspace with a configured provider and a user with `manage_objectives`, *when* the user asks the copilot (or their own MCP agent) to draft next quarter's objectives for their team, *then* it proposes objectives with key results the user approves before anything is saved; *and* the same user with AI disabled can still create them by hand.
-
-## 4. Cross-cutting needs
-
-- **Reporting and exports:** work package lists to CSV, Excel (XLSX), PDF; project list export; gantt PDF (P2). REST API for programmatic access (P1). Audit export (P2, enterprise).
-- **Notifications:** in-app (P0) and email (P0); digests (P1); Slack/Teams webhooks (P2).
-- **Data importer (P0, hard requirement):** a CLI that reads an existing legacy database read-only and loads it into a clean `OpenOKR` schema. It supports **two sources**: the Rails project tool (PostgreSQL — `reference/legacy-data-model.md`) and **FlowyTeam** (MySQL, per-company — `reference/flowyteam-okr-kpi-tasks-model.md`), selected with `--from`. Must cover P0/P1 modules losslessly for current state and comments; see each reference's lossy list and TECHNICAL-PLAN.md §7 for architecture. Re-runnable/idempotent; both sources may load into one workspace without id collisions (`legacy_type`).
-- **Cutover approach (decided):** one-time migration during a maintenance window into a clean schema — the new app does **not** run on either legacy schema. For source 1, the default topology keeps the existing PostgreSQL instance and migrates schema-to-schema, leaving the old tables read-only for instant rollback; for source 2 (MySQL), the importer streams cross-engine and the old database is the rollback archive (TECHNICAL-PLAN.md §7.2).
-- **Integrations:** GitHub and GitLab (link PRs/MRs/issues/pipelines to work packages, inbound webhook) — P1. Nextcloud / OneDrive-SharePoint file links — P1/P2. Incoming email to create/update work packages — P2. Calendar ICS feeds — P1.
-- **AI & agents (P0, native):** AI assists in every module, an in-app copilot, and an **MCP server** that lets any AI agent manage OKRs and projects as the user; multi-provider with bring-your-own key and local-model (Ollama / OpenAI-compatible) support; on where a provider is configured, never on a required path. Full spec in AI-NATIVE-PLAN.md; see the AI copilot & agents module in §3.
-- **UX quality bar (P0):** the product must feel like a modern tool, not a faster the legacy system: inline editing, optimistic updates with undo, command palette (⌘K), favorites, dark mode, full keyboard support, responsive mobile shell, live updates. The binding spec is UIUX-PLAN.md; performance budgets are in TECHNICAL-PLAN.md §13 and are requirements, not aspirations.
-- **Methodology support (P1/P2):** the product must be usable under **PM², PMflex, PRINCE2, SAFe, Scrum and OKR** ways of working, delivered the way the legacy system does it (verified in feature inventory §"Methodology / standards support"): the enabling features (project templates + copy P0, phases with gates P2, portfolios/programs P2, sprint sharing P2, initiation wizard P2/enterprise) plus a **seeded methodology template gallery + guides** at launch (IMPLEMENTATION-PLAN P8-T06). No per-methodology code.
-- **Languages:** English (P0) and Bahasa Melayu (P1). Indonesian available as a bonus (both `ms` and `id` locale bases already exist in the legacy system to seed from). Architecture must be i18n-ready from day one.
-- **Accessibility:** WCAG 2.1 AA as a target; keyboard navigation and screen-reader labels on core flows. No stricter sector requirement stated. **[DECIDE]** if a formal audit is required.
-
-## 5. Non-functional requirements
-
-- **Scale expectations:** largest single deployment target — a university-scale org: order of **tens of thousands of users** and **millions of work packages** in one workspace. Design queries, indexes, and pagination for this from the start.
-- **Performance feel:** primary list/dashboard views load under ~2 seconds on a mid-range laptop with a realistic dataset (tens of thousands of work packages in a project). Work package save feels instant (optimistic UI).
-- **Compliance:** PDPA (Malaysia) and GDPR-style data handling: user data export and deletion, audit log, data-processing transparency. **[DECIDE]** any sector-specific rules (education, finance).
-- **Data residency:** self-hosting satisfies in-country residency for institutions that need it. No multi-region cloud requirement stated for v1.
-- **Offline / air-gapped installs:** yes — institutions may run fully air-gapped. Therefore: no feature may hard-depend on an external SaaS, AI is always optional and can point at a local model or be disabled (PLAN.md hard rule), and telemetry is opt-in.
-
-## 6. Out of scope for v1
-
-- **Native mobile apps.** Responsive web covers it; revisit after launch.
-- **SCM/repository browser** (SVN/Git changeset browsing). Git hosting is external; we keep the GitHub/GitLab *integration*, not a repo browser.
-- **BIM (IFC/BCF construction module).** Niche; design nothing for it in v1.
-- **Real-time co-editing (CRDT).** Design the data model so it can be added (structured JSON + version column), but do not build it.
-- **the legacy system API/plugin compatibility.** We provide a data importer, not a compatibility layer.
-- **Legacy cost-report builder and custom-action buttons.** Replace with saved queries/exports and (later) a rules engine.
-- **Full byte-perfect journal history import.** Import current state + comments + a simplified activity feed instead (see data-model §8).
-
-## 7. Success metrics
-
-- **Leading:** a new team completes setup and creates its first objective and work package within 15 minutes; an admin of either legacy tool runs a dry-run import and sees a correct summary within one session.
-- **Lagging:** N active self-hosted instances within 6 months of launch (**[DECIDE]** target N); at least a handful of real migrations (from either source) completed successfully.
-
-## 8. Open questions (agent must raise, not guess)
-
-- Product name, business model, SSO placement, license sign-off (PLAN.md §12).
-- Exact scope of the **Operations** module. (The Strategy/OKR scope is decided — see §3 and TECHNICAL-PLAN.md §12.)
-- How much the legacy system **journal history** to import (current-state-only vs simplified feed vs full).
-- Whether to ship a legacy system **`/api/v3` compatibility shim** or a clean new API only.
-- Whether **cost/budget** and **backlogs** are in the funded v1 or deferred.
-- Target scale numbers to design load tests against, and any formal accessibility/compliance audit.
-- AI default posture (on where configured vs off) and whether advanced AI (copilot, MCP server) is open or gated (PLAN.md §12 #7–#8, AI-NATIVE-PLAN.md §13).
+- Product name; business model; SSO placement; license sign-off; enterprise gating set (PLAN.md §14).
+- Formal accessibility audit? Target instance count N? Sector-specific compliance beyond PDPA/GDPR?
+- AI open decisions (AI-NATIVE-PLAN §13), confirmed at P5-T00 — including the default autonomy policy for AI teammates (batch-approval vs scoped direct writes).
+- Scorecard points layer: import FlowyTeam rewards/points history or start clean? (Points are off by default either way.)

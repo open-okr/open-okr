@@ -1,8 +1,8 @@
 # DATABASE.md
 
-The full OpenOKR database structure — every table, its key columns, foreign keys, enums, and relationships — in one place.
+The full OpenOKR database structure in one place — every table, its key columns, foreign keys, enums and relationships.
 
-**This is a consolidated reference view.** The authoritative schema definitions live in `TECHNICAL-PLAN.md §4` (platform + work management) and `TECHNICAL-PLAN.md §4.12` (strategy: OKR/KPI/check-ins). When those change, update this file in the same PR. The actual Drizzle schema in `packages/db` is generated from those authorities, not from this doc.
+**This is a consolidated reference view.** The authority is `TECHNICAL-PLAN.md §4` (platform + strategy + execution) and `AI-NATIVE-PLAN.md §7` (the AI domain). When those change, update this file in the same PR. The actual Drizzle schema in `packages/db` is generated from the authorities, not from this doc.
 
 ---
 
@@ -10,18 +10,20 @@ The full OpenOKR database structure — every table, its key columns, foreign ke
 
 | Rule | Detail |
 |---|---|
-| Primary key | `id uuid` (v7, time-ordered, app-generated). |
-| Tenancy | `workspace_id uuid` on every business table + a Row Level Security policy in the same migration, keyed on the `app.workspace_id` GUC. **Exceptions:** `workspaces` (it is the tenant root) and `users` (global to the deployment). |
+| Primary key | `id uuid` v7 (time-ordered, app-generated) — internal only. |
+| Public id | `short_id` (random base58, unique per workspace) on externally addressable aggregates — used in URLs/REST/MCP/CLI. Internal v7 ids are never exposed; a bad/unknown public id returns 404. |
+| Tenancy | `workspace_id uuid` on every business table + an RLS policy in the same migration, keyed on the `app.workspace_id` GUC (set `SET LOCAL` per transaction). **Exceptions:** `workspaces` (tenant root), `users` (global), `ai_models` (global catalog). |
 | Timestamps | `created_at`, `updated_at`. |
-| Import provenance | `legacy_id bigint?` + `legacy_type text?` (`openproject` / `flowyteam`), unique `(workspace_id, legacy_type, legacy_id)` so re-imports upsert and both sources coexist. |
-| Enums | TypeScript string unions stored as `text` with a `CHECK` constraint (not integer codes). Values listed per column below. |
-| Soft delete | `deleted_at timestamptz?` where the source has it or deletion must be reversible. |
-| Rich text | Markdown stored with a `format` tag + `version int` (co-edit-ready). Columns marked *(rich)*. |
-| Derived columns | Marked *(derived)*. Computed by an engine/job, recomputed on import — never trusted from source. |
-| Optimistic locking | `lock_version int` on user-editable aggregates (work packages). |
-| Credentials/sessions | Owned by **Better Auth** in its own tables (users' passwords, sessions, MFA, tokens). Not modeled here; `users` links to them by id. |
+| Import provenance | `legacy_id bigint?` + `legacy_type text?` (`flowyteam` / `csv`), unique `(workspace_id, legacy_type, legacy_id)`. Only on importable tables. |
+| Enums | TypeScript string unions stored as `text` with a `CHECK` constraint. |
+| Soft delete | `deleted_at timestamptz?` where deletion must be reversible; a **repo-wide default scope** injects `deleted_at IS NULL` (explicit `withDeleted()` opt-in; CI-linted). |
+| Rich text | ProseMirror/TipTap **JSON** in `jsonb` + `version int`. Columns marked *(rich)*. Never Markdown-as-storage. |
+| Derived | Marked *(derived)*. Computed by an engine/job via the outbox; recomputed on import; never trusted from source. |
+| Optimistic locking | `version int` on user-editable aggregates. |
+| Credentials/sessions | Owned by **Better Auth** (users' passwords, sessions [hashed], passkeys, TOTP). Not modeled here; `users` links by id. |
+| Every write | Goes through the Operation pipeline: mutation + `access_bindings` + `activities` + `audit_events` + `outbox` in one transaction (TECHNICAL-PLAN §8.1). |
 
-Column tables below list **domain columns only** — assume `id`, `workspace_id`, `created_at`, `updated_at`, `legacy_id`, `legacy_type` are present per the rules above. `→ table` means a foreign key. `?` means nullable.
+Column tables list **domain columns only** — assume `id`, `workspace_id`, `created_at`, `updated_at` (and `short_id`/`legacy_*`/`version` where noted). `→ table` is a foreign key; `?` is nullable.
 
 ---
 
@@ -29,27 +31,20 @@ Column tables below list **domain columns only** — assume `id`, `workspace_id`
 
 | # | Domain | Tables | Authority |
 |---|---|---|---|
-| A | Identity & access | `workspaces`, `users`, `groups`, `group_members`, `memberships`, `roles`, `membership_roles`, `role_permissions`, `audit_events` | TECHNICAL-PLAN §4.1 |
-| B | Org units (OKR/KPI owners) | `org_units`, `org_unit_members`, `org_unit_hierarchy` | TECHNICAL-PLAN §4.12.1 |
-| C | Projects & versions | `projects`, `project_enabled_modules`, `project_hierarchy`, `versions`, `categories` | TECHNICAL-PLAN §4.2 |
-| D | Work packages (incl. tasks) | `work_packages`, `work_package_versions`, `work_package_hierarchy`, `work_package_relations`, `work_package_watchers`, `types`, `statuses`, `workflows`, `priorities`, `checklist_items` | TECHNICAL-PLAN §4.3, TECHNICAL-PLAN §4.12.7 |
-| E | Custom fields | `custom_fields`, `custom_field_options`, `custom_field_values`, `custom_field_activations`, `custom_field_sections` | TECHNICAL-PLAN §4.4 |
-| F | Queries & views | `queries`, `views`, `query_orderings` | TECHNICAL-PLAN §4.5 |
-| G | History, comments, notifications | `comments`, `activities`, `reactions`, `notifications`, `notification_settings`, `reminders` | TECHNICAL-PLAN §4.6 |
-| H | Time, cost, budgets | `time_entries`, `time_entry_activities`, `cost_types`, `cost_entries`, `rates`, `budgets`, `budget_items` | TECHNICAL-PLAN §4.7 |
-| I | Collaboration | `wikis`, `wiki_pages`, `forums`, `messages`, `news`, `documents`, `meetings`, `meeting_sections`, `meeting_agenda_items`, `meeting_participants`, `recurring_meetings` | TECHNICAL-PLAN §4.8 |
-| J | Attachments & storages | `attachments`, `external_storages`, `project_storages`, `file_links` | TECHNICAL-PLAN §4.9 |
-| K | Boards & dashboards | `boards`, `board_columns`, `dashboards`, `dashboard_widgets` | TECHNICAL-PLAN §4.10 |
-| L | Integrations | `github_links`, `gitlab_links`, `webhooks`, `webhook_deliveries` | TECHNICAL-PLAN §4.11 |
-| M | Backlogs, favorites, phases | `sprints`, `sprint_goals`, `backlog_buckets`, `favorites`, `project_phases`, `project_phase_definitions` | IMPLEMENTATION-PLAN P3-T28/T31/T33 |
-| **N** | **OKR cycles & settings** | `okr_cycles`, `performance_settings` | TECHNICAL-PLAN §4.12.2 |
-| **O** | **Objectives & key results** | `objectives`, `key_results`, `key_result_values` | TECHNICAL-PLAN §4.12.3 |
-| **P** | **KPIs** | `kpi_categories`, `kpi`, `kpi_records`, `kpi_dependencies`, `key_result_kpis`, `kpi_shares` | TECHNICAL-PLAN §4.12.4 |
-| **Q** | **Check-ins** | `check_in_sessions`, `check_ins`, `check_in_reviews` | TECHNICAL-PLAN §4.12.5 |
-| **R** | **Scorecard** | `performance_snapshots`, `scorecard_settings`, `score_entries` | TECHNICAL-PLAN §4.12.6 |
-| **S** | **AI layer** | `ai_providers`, `ai_credentials`, `ai_models`, `ai_model_policies`, `ai_feature_settings`, `ai_prompts`, `ai_threads`, `ai_messages`, `ai_tool_calls`, `ai_usage_events`, `embeddings` | AI-NATIVE-PLAN §7 |
+| A | Identity & access | `workspaces`, `users`, `workspace_members`, `access_contexts`, `access_groups`, `access_group_memberships`, `access_bindings`, `invite_links`, `audit_events`, `outbox`, `system_settings` | TECHNICAL-PLAN §4.1 |
+| B | Spaces | `spaces`, `space_members` | §4.2 |
+| C | Strategy: cycles & goals | `okr_cycles`, `strategy_settings`, `goals`, `key_results`, `key_result_values`, `check_ins`, `goal_retrospectives` | §4.3 |
+| D | KPIs & scorecard | `kpi_categories`, `kpis`, `kpi_records`, `kpi_dependencies`, `kpi_shares`, `performance_snapshots`, `scorecard_settings`, `score_entries` | §4.4 |
+| E | Execution | `projects`, `project_contributors`, `project_check_ins`, `project_retrospectives`, `milestones`, `work_items`, `work_item_assignees`, `checklist_items`, `work_item_relations`, `reminders`, `time_entries` | §4.5 |
+| F | Resource Hub | `resource_hubs`, `resource_nodes`, `documents`, `files`, `links` | §4.6 |
+| G | Collaboration | `discussions`, `comments`, `reactions`, `subscription_lists`, `subscriptions` | §4.7 |
+| H | Feed & notifications | `activities`, `notifications`, `notification_email_batches`, `notification_settings` | §4.8 |
+| I | Attachments | `blobs` | §4.9 |
+| J | Importer & portability | `import_runs`, `export_runs`, `workspace_imports` | §4.10 |
+| M | AI | `ai_providers`, `ai_credentials`, `ai_models`*, `ai_model_policies`, `ai_feature_settings`, `ai_prompts`, `ai_threads`, `ai_messages`, `ai_tool_calls`, `ai_usage_events`, `embeddings`, `agents`, `agent_runs`, `proposed_changes` | AI-NATIVE-PLAN §7 |
+| N | MCP OAuth | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_access_tokens`, `oauth_refresh_tokens`, `mcp_sessions` | AI-NATIVE-PLAN §5.2/§7 |
 
-Domain S tables are **new (no legacy source)** — they carry no `legacy_id`/`legacy_type`. `ai_models` is a **global** catalog (no `workspace_id`); every other domain-S table is workspace-scoped with RLS. `ai_credentials` is never selected to the client. `embeddings` uses the **pgvector** Postgres extension, so no new service is added.
+`ai_models` is a **global** catalog (no `workspace_id`). Domain M/N tables carry no legacy provenance. `ai_credentials` and every token hash are never selected to the client. `embeddings` uses **pgvector** (a Postgres extension — no new service).
 
 ---
 
@@ -57,573 +52,312 @@ Domain S tables are **new (no legacy source)** — they carry no `legacy_id`/`le
 
 ```mermaid
 erDiagram
-    workspaces ||--o{ users : "members via memberships"
-    workspaces ||--o{ projects : has
-    workspaces ||--o{ org_units : has
+    workspaces ||--o{ users : "members via workspace_members"
+    workspaces ||--o{ spaces : has
     workspaces ||--o{ okr_cycles : has
 
-    org_units ||--o{ org_units : "parent_id (tree)"
-    org_units ||--o{ org_unit_members : has
+    workspace_members ||--o{ workspace_members : "manager_id (reports-to)"
+    access_contexts ||--o{ access_bindings : "grants on"
+    access_groups ||--o{ access_bindings : "granted to"
+    access_groups ||--o{ access_group_memberships : has
 
-    projects ||--o{ projects : "parent_id (tree)"
-    projects ||--o{ versions : has
-    projects ||--o{ work_packages : contains
-    projects ||--o{ boards : has
+    spaces ||--o{ goals : "owns (owner=space)"
+    spaces ||--o{ projects : contains
 
-    work_packages ||--o{ work_packages : "parent_id (tree)"
-    work_packages ||--o{ work_package_relations : "from/to"
-    work_packages ||--o{ checklist_items : has
-    work_packages }o--|| types : "type_id"
-    work_packages }o--|| statuses : "status_id"
-    work_packages }o--o| objectives : "objective_id"
-    work_packages }o--o| key_results : "key_result_id"
-    work_packages }o--o| kpi : "kpi_id"
-
-    okr_cycles ||--o{ objectives : bounds
-    objectives ||--o{ key_results : has
-    objectives ||--o{ objectives : "parent_objective_id (align)"
-    objectives }o--o| key_results : "parent_key_result_id (align)"
+    okr_cycles ||--o{ goals : bounds
+    goals ||--o{ key_results : has
+    goals ||--o{ goals : "parent_goal_id (align)"
+    goals }o--o| key_results : "parent_key_result_id (align)"
+    goals ||--o{ check_ins : "narrative + snapshot"
+    goals }o--|| workspace_members : "champion_id / reviewer_id"
     key_results ||--o{ key_result_values : history
-    key_results ||--o{ key_result_kpis : "measured by"
+    key_results }o--o| kpis : "kpi_id (KPI-backed)"
 
-    kpi_categories ||--o{ kpi : groups
-    kpi ||--o{ kpi : "parent_kpi_id (tree)"
-    kpi ||--o{ kpi_records : "per period"
-    kpi ||--o{ kpi_dependencies : "formula edges"
-    kpi ||--o{ key_result_kpis : "measures KR"
+    kpi_categories ||--o{ kpis : groups
+    kpis ||--o{ kpis : "parent_kpi_id (tree)"
+    kpis ||--o{ kpi_records : "per period"
+    kpis ||--o{ kpi_dependencies : "formula edges"
 
-    objectives ||--o{ check_ins : "subject"
-    key_results ||--o{ check_ins : "subject"
-    check_in_sessions ||--o{ check_ins : groups
+    projects ||--o{ milestones : has
+    projects ||--o{ project_check_ins : "health"
+    projects ||--o{ project_contributors : "champion/reviewer/contributor"
+    projects }o--o| goals : "goal_id (serves)"
+    milestones ||--o{ work_items : "on board"
+    work_items ||--o{ work_item_assignees : "multi-assignee"
+    work_items }o--o| key_results : "key_result_id (progress flows up)"
+    work_items }o--o| goals : "goal_id"
+    work_items }o--o| kpis : "kpi_id"
 
-    okr_cycles ||--o{ performance_snapshots : "per owner"
+    resource_hubs ||--o{ resource_nodes : "tree"
+    resource_nodes ||--o{ resource_nodes : "parent_id (folders)"
+
+    subscription_lists ||--o{ subscriptions : has
+    activities ||--o{ notifications : "fan-out"
+    agents ||--o{ agent_runs : "plan/execute"
+    oauth_grants ||--o{ oauth_access_tokens : issues
 ```
 
-Ownership shorthand used throughout the strategy domain: **`owner_type`** ∈ `workspace` / `team` / `user`, with nullable `team_id → org_units` and `user_id → users`. Exactly one of `team_id`/`user_id` is set for `team`/`user`; both null for `workspace`.
-
-The **join between the two pillars** is the work package: `work_packages.objective_id`, `.key_result_id`, `.kpi_id` link execution to strategy, and `key_results.work_package_id` lets a KR be driven by a single work package.
+The **two load-bearing joins:** ownership (`champion_id`/`reviewer_id` on goals & projects — the accountability contract, distinct from access roles) and the strategy↔execution link (`work_items.key_result_id`/`.goal_id`/`.kpi_id` + `key_results.kpi_id`, so closing work moves the goal). Ownership shorthand across strategy: **`owner`** ∈ `workspace` / `space` / `member`, with nullable `space_id → spaces` and `member_id → workspace_members`.
 
 ---
 
 ## 4. Identity & access (domain A)
 
-### workspaces  *(tenant root — no `workspace_id`)*
-| Column | Type | Notes |
-|---|---|---|
-| `name` | text | |
-| `slug` | text | unique |
-| `settings` | jsonb | brand color, defaults, feature flags |
+### workspaces *(tenant root — no workspace_id)*
+`name`, `slug` (unique), `state` (`active`/`read_only`/`frozen`), `settings jsonb` (brand color, trusted_email_domains, cadence defaults, storage bytes + quota).
 
-### users  *(global to the deployment — no `workspace_id`; Better Auth owns credentials)*
-| Column | Type | Notes |
-|---|---|---|
-| `email` | text | unique |
-| `name` | text | |
-| `kind` | text | `user` / `placeholder` |
-| `status` | text | `active` / `registered` / `locked` / `invited` |
-| `locale` | text | |
-| `timezone` | text | |
+### users *(global — no workspace_id; Better Auth owns credentials/sessions/passkeys/TOTP)*
+`email` (unique). Everything person-facing lives on `workspace_members`.
 
-### groups
-`name`. A principal that can hold memberships.
+### workspace_members
+`user_id? → users` (null for placeholders/agents pre-claim), `name`, `title?`, `avatar_blob_id?`, `timezone?`, `bio` *(rich)*, `manager_id? → workspace_members` (cycle-safe reports-to), `kind` (`human`/`guest`/`ai`/`placeholder`), `status` (`active`/`invited`/`suspended`), `suspended_at?`. All authorship/mentions/assignments/audit reference the member.
 
-### group_members
-`group_id → groups`, `user_id → users`.
+### access_contexts
+`resource_type` (`space`/`goal`/`project`/`resource_hub`/`discussion`/…), `resource_id`. One per protected aggregate.
 
-### memberships
-Grants a principal access to a scope.
-| Column | Type | Notes |
-|---|---|---|
-| `principal_id` | uuid | → users or groups |
-| `principal_kind` | text | `user` / `group` |
-| `project_id?` | uuid | → projects (project membership) |
-| `shared_entity_type?` | text | for object sharing (e.g. `work_package`) |
-| `shared_entity_id?` | uuid | the shared object |
+### access_groups
+`kind` (`member`/`workspace_standard`/`space_standard`/`anonymous`), `member_id? → workspace_members`, `space_id? → spaces`.
 
-### roles
-Roles are configurable data (permissions attached per role), not a fixed enum.
-| Column | Type | Notes |
-|---|---|---|
-| `name` | text | |
-| `scope` | text | `project` / `global` / `work_package` |
-| `builtin` | text | `none` / `non_member` / `anonymous` |
+### access_group_memberships
+`group_id → access_groups`, `member_id → workspace_members`.
 
-**Seeded defaults** (P2-T01): **Owner**, **Project admin**, **Member**, **Reader**, plus the builtin **Non-member** and **Anonymous** pseudo-roles. `work_package`-scope roles (view / comment / edit) back single-work-package sharing.
+### access_bindings
+`group_id → access_groups`, `context_id → access_contexts`, `level` (`view`=10/`comment`=40/`edit`=70/`full`=100), `tag?` (`champion`/`reviewer`). Effective access = max(level) over reachable bindings; privacy labels are derived from which group tiers hold a binding.
 
-### membership_roles
-`membership_id → memberships`, `role_id → roles`, `inherited_from_membership_id? → memberships` (group inheritance; recomputed, not imported).
+### invite_links
+`token_hash`, `mode` (`workspace`/`personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?`.
 
-### role_permissions
-`role_id → roles`, `permission text` (one row per permission). Permission catalogue in `reference/legacy-feature-inventory.md` §2 plus the OKR/KPI set in TECHNICAL-PLAN.md §4.12.8 (`view_objectives`, `manage_objectives`, `check_in_objectives`, `view_kpis`, `manage_kpis`, `record_kpi_values`, `manage_cycles`, …).
+### audit_events *(append-only; no UPDATE/DELETE grants)*
+`actor_member_id? → workspace_members`, `action`, `target_type`, `target_id`, `payload jsonb` (typed per action), `at`, `prev_hash`, `row_hash` (per-workspace hash chain). Written in the mutating transaction; reads are ACL-scoped.
 
-### audit_events  *(append-only; no UPDATE/DELETE grants)*
-`actor_id → users`, `action text`, `target_type text`, `target_id uuid`, `payload jsonb`, `at timestamptz`.
+### outbox
+`topic`, `payload jsonb`, `idempotency_key`, `created_at`, `delivered_at?`, `attempts`. The only legal enqueue on a write path; a relay drains committed rows to JobQueue/Realtime/Mailer.
+
+### system_settings *(singleton)*
+Email delivery config with encrypted secrets (AES-GCM envelope, key ring); instance flags. Admin-editable; env is bootstrap/override.
 
 ---
 
-## 5. Org units (domain B) — OKR/KPI owners
+## 5. Spaces (domain B)
 
-### org_units
-Teams and departments as one tree (maps FlowyTeam `teams`).
-| Column | Type | Notes |
-|---|---|---|
-| `name` | text | |
-| `kind` | text | `team` / `department` |
-| `parent_id?` | uuid | → org_units (tree) |
-| `lead_id?` | uuid | → users |
-| `settings` | jsonb | e.g. default check-in visibility |
+### spaces
+`name`, `mission?`, `settings jsonb`. Each owns an access context + a `space_standard` group.
 
-### org_unit_members
-`org_unit_id → org_units`, `user_id → users`, `role text` (`member` / `lead`).
-
-### org_unit_hierarchy  *(optional closure table)*
-`ancestor_id → org_units`, `descendant_id → org_units`, `depth int`.
+### space_members
+`space_id → spaces`, `member_id → workspace_members`, `role` (`member`/`manager`). Manager implies the space `full` binding.
 
 ---
 
-## 6. Projects & versions (domain C)
-
-### projects
-| Column | Type | Notes |
-|---|---|---|
-| `name` | text | |
-| `identifier` | text | unique slug |
-| `parent_id?` | uuid | → projects (tree) |
-| `public` | bool | |
-| `archived` | bool | |
-| `templated` | bool | is a template |
-| `status` | text | project status |
-| `status_explanation?` | text *(rich)* | |
-| `settings` | jsonb | |
-
-### project_enabled_modules
-`project_id → projects`, `module text` (feature toggle per project).
-
-### project_hierarchy  *(closure)*
-`ancestor_id → projects`, `descendant_id → projects`, `depth int`.
-
-### versions  *(milestones / release targets)*
-| Column | Type | Notes |
-|---|---|---|
-| `project_id` | uuid | → projects |
-| `name` | text | |
-| `status` | text | `open` / `locked` / `closed` |
-| `sharing` | text | `none` / `descendants` / `hierarchy` / `tree` / `system` |
-| `start_date?` | date | |
-| `effective_date?` | date | due date |
-
-### categories
-`project_id → projects`, `name text`, `default_assignee_id? → users`.
-
----
-
-## 7. Work packages (domain D) — includes tasks
-
-### work_packages
-The central execution object. FlowyTeam tasks import here (no separate tasks table).
-| Column | Type | Notes |
-|---|---|---|
-| `project_id` | uuid | → projects |
-| `type_id` | uuid | → types |
-| `subject` | text | |
-| `description?` | text *(rich)* | |
-| `status_id` | uuid | → statuses |
-| `priority_id?` | uuid | → priorities |
-| `assignee_id?` | uuid | → users (or groups) |
-| `responsible_id?` | uuid | → users |
-| `author_id` | uuid | → users |
-| `version_id?` | uuid | → versions (sole target version mirror) |
-| `category_id?` | uuid | → categories |
-| `parent_id?` | uuid | → work_packages (tree) |
-| `start_date?` | date | |
-| `due_date?` | date | |
-| `duration?` | int | working days |
-| `schedule_manually` | bool | manual vs automatic scheduling |
-| `ignore_non_working_days` | bool | |
-| `estimated_hours?` | numeric | |
-| `remaining_hours?` | numeric | |
-| `story_points?` | int | backlogs |
-| `done_ratio?` | int | % complete |
-| `lock_version` | int | optimistic lock |
-| **`objective_id?`** | uuid | **→ objectives (strategy link)** |
-| **`key_result_id?`** | uuid | **→ key_results (primary OKR link, from FlowyTeam)** |
-| **`kpi_id?`** | uuid | **→ kpi (KPI link)** |
-| **`recurrence?`** | jsonb | recurrence rule (interval + unit + count) |
-
-Derived rollups (`derived_start`, `derived_due`, `derived_done_ratio`, `derived_estimated_hours`, `derived_remaining_hours`) are computed by the scheduling engine, not stored authoritatively.
-
-### work_package_versions
-`work_package_id → work_packages`, `version_id → versions`, `kind text` (`target` / `observed_in`). Unique `(work_package_id, version_id, kind)`.
-
-### work_package_hierarchy  *(closure, rebuilt from `parent_id`)*
-`ancestor_id`, `descendant_id`, `depth int`.
-
-### work_package_relations
-`from_id → work_packages`, `to_id → work_packages`, `relation_type text` (`relates` / `duplicates` / `blocks` / `precedes` / `follows` / `includes` / `requires` / `partof`), `lag? int` (days, for precedes/follows), `description? text`. App prevents cycles.
-
-### work_package_watchers
-`work_package_id → work_packages`, `user_id → users`.
-
-### types
-`name`, `is_milestone bool`, `is_default bool`, `color text`, `form_config jsonb` (attribute groups / form layout).
-
-### statuses
-`name`, `is_closed bool`, `is_default bool`, `is_readonly bool`, `default_done_ratio int?`, `excluded_from_totals bool`, `color text`.
-
-### workflows  *(per type × role state machine)*
-`type_id → types`, `role_id → roles`, `old_status_id → statuses`, `new_status_id → statuses`, `author_only bool`, `assignee_only bool`. One row per allowed transition.
-
-### priorities
-`name`, `is_default bool`, `active bool`, `position int`.
-
-### checklist_items  *(lightweight subtasks; no rollup)*
-`work_package_id → work_packages`, `title text`, `assignee_id? → users`, `done bool`, `position int`.
-
----
-
-## 8. Custom fields (domain E)
-
-### custom_fields
-| Column | Type | Notes |
-|---|---|---|
-| `customized_type` | text | `work_package` / `project` / `user` / `version` / `time_entry` |
-| `name` | text | |
-| `field_format` | text | `string`/`text`/`int`/`float`/`date`/`bool`/`list`/`user`/`version`/`link`/`hierarchy` |
-| `is_required` | bool | |
-| `is_multi` | bool | |
-| `regexp?` / `min_length?` / `max_length?` | | validation |
-| `default_value?` | text | |
-| `searchable` | bool | |
-| `section_id?` | uuid | → custom_field_sections |
-
-### custom_field_options
-`custom_field_id → custom_fields`, `value text`, `position int` (list options).
-
-### custom_field_values
-`custom_field_id → custom_fields`, `customized_type text`, `customized_id uuid`, `value text` (+ typed sidecar columns `value_text`/`value_number`/`value_date`/`value_option_id` for filterability). Multi-value = many rows.
-
-### custom_field_activations
-`custom_field_id → custom_fields`, `scope_type text` (`project`/`type`/`role`), `scope_id uuid`.
-
-### custom_field_sections
-`name text`, `scope text`, `position int`.
-
----
-
-## 9. Queries & views (domain F)
-
-### queries
-`project_id? → projects`, `name text`, `definition jsonb` (filters + columns + sort + group + sums + display), `owner_id? → users`, `visibility text` (`private`/`public`), `starred bool`.
-
-### views
-`query_id → queries`, `type text` (`table`/`cards`/`gantt`/`calendar`/`team_planner`/`board`), `options jsonb`.
-
-### query_orderings
-`query_id → queries`, `work_package_id → work_packages`, `position int` (manual order).
-
----
-
-## 10. History, comments, notifications (domain G)
-
-### comments
-`subject_type text`, `subject_id uuid` (WP / wiki / meeting / news / **objective** / **key_result**), `author_id → users`, `body text (rich)`, `internal bool`.
-
-### activities  *(field-change feed, append-only)*
-`subject_type text`, `subject_id uuid`, `actor_id → users`, `kind text`, `changes jsonb` (from/to), `at timestamptz`.
-
-### reactions
-`subject_type text`, `subject_id uuid`, `user_id → users`, `emoji text` (on comments).
-
-### notifications
-`recipient_id → users`, `reason text`, `subject_type text`, `subject_id uuid`, `read_at? timestamptz`, `mailed_at? timestamptz`.
-
-### notification_settings
-`user_id → users`, `project_id? → projects` (null = global), `channel text`, `involved bool`, `watched bool`, `mentioned bool`, `assignee bool`, `date_alerts jsonb`.
-
-### reminders
-`work_package_id → work_packages`, `user_id → users`, `remind_at timestamptz`, `note? text`.
-
----
-
-## 11. Time, cost, budgets (domain H)
-
-### time_entries
-`work_package_id? → work_packages`, `project_id → projects`, `user_id → users`, `logged_by_id → users`, `activity_id → time_entry_activities`, `hours numeric`, `spent_on date`, `comment? text`, `ongoing bool` (running timer).
-
-### time_entry_activities
-`name`, `is_default bool`, `active bool`, `position int`.
-
-### cost_types
-`name`, `unit text`, `unit_plural text`, `default_rate numeric`.
-
-### cost_entries
-`work_package_id? → work_packages`, `project_id → projects`, `user_id → users`, `cost_type_id → cost_types`, `units numeric`, `spent_on date`, `comment? text`.
-
-### rates  *(valid-from history)*
-`kind text` (`hourly`/`default_hourly`/`cost`), `user_id? → users`, `cost_type_id? → cost_types`, `project_id? → projects`, `amount numeric`, `valid_from date`.
-
-### budgets
-`project_id → projects`, `subject text`, `fixed_date date`.
-
-### budget_items
-`budget_id → budgets`, `kind text` (`labor`/`material`), `units? numeric`, `amount? numeric`, `user_id? → users`, `cost_type_id? → cost_types`, `comment? text`.
-
----
-
-## 12. Collaboration (domain I)
-
-### wikis
-`project_id → projects`, `start_page text`. One per project.
-
-### wiki_pages
-`wiki_id → wikis`, `slug text`, `title text`, `parent_id? → wiki_pages` (tree), `body text (rich)`, `protected bool`.
-
-### forums / messages  *(P2)*
-`forums`: `project_id → projects`, `name`, `description`.
-`messages`: `forum_id → forums`, `parent_id? → messages`, `subject`, `body (rich)`, `author_id → users`, `sticky bool`, `locked bool`.
-
-### news / documents  *(P2)*
-`news`: `project_id → projects`, `title`, `summary`, `body (rich)`, `author_id → users`.
-`documents`: `project_id → projects`, `category_id`, `title`, `body (rich)`.
-
-### meetings
-`project_id → projects`, `title text`, `type text` (`structured`/`recurring_template`), `start_time timestamptz`, `duration int`, `location text`, `state text` (`open`/`closed`).
-
-### meeting_sections
-`meeting_id → meetings`, `title text`, `position int`.
-
-### meeting_agenda_items
-`meeting_id → meetings`, `section_id? → meeting_sections`, `title text`, `item_type text`, `duration? int`, `position int`, `work_package_id? → work_packages`, `notes text (rich)`.
-
-### meeting_participants
-`meeting_id → meetings`, `user_id → users`, `invited bool`, `attended bool`.
-
-### recurring_meetings
-`meeting_template_id → meetings`, `rrule text`, `next_occurrence timestamptz`.
-
----
-
-## 13. Attachments & storages (domain J)
-
-### attachments
-`container_type text`, `container_id uuid` (polymorphic; WP / wiki / meeting / KR check-in / …), `filename text`, `content_type text`, `filesize bigint`, `digest text`, `storage_key text`, `author_id → users`, `status text` (`ok`/`scanning`/`quarantined`). Bytes live behind the FileStorage adapter.
-
-### external_storages / project_storages / file_links  *(P1/P2)*
-`external_storages`: `provider text` (`nextcloud`/`onedrive`/`s3`), `name`, `config jsonb`.
-`project_storages`: `project_id → projects`, `external_storage_id → external_storages`, `folder_mode text`.
-`file_links`: `work_package_id → work_packages`, `external_storage_id → external_storages`, `origin_id text`, `origin_name text`, `mime text`.
-
----
-
-## 14. Boards & dashboards (domain K)
-
-### boards
-`project_id → projects`, `name text`, `board_type text` (`free`/`status`/`assignee`/`version`/`subproject`/`parent`).
-
-### board_columns
-`board_id → boards`, `position int`, `query_id → queries`, `action_value text` (the keyed attribute value).
-
-### dashboards
-`owner_type text` (`user`/`project`), `owner_id uuid`, `layout jsonb`.
-
-### dashboard_widgets
-`dashboard_id → dashboards`, `widget text`, `options jsonb`, `position int`. Widget set includes OKR/KPI widgets (P4-T10).
-
----
-
-## 15. Integrations (domain L)
-
-### github_links / gitlab_links
-`work_package_id → work_packages`, `kind text` (`pr`/`mr`/`issue`/`pipeline`), `origin_id text`, `state text`, `payload jsonb`.
-
-### webhooks / webhook_deliveries
-`webhooks`: `project_id? → projects`, `url text`, `events text[]`, `secret text`.
-`webhook_deliveries`: `webhook_id → webhooks`, `event text`, `status text`, `response text` (not imported).
-
----
-
-## 16. Backlogs, favorites, phases (domain M)
-
-### sprints / sprint_goals / backlog_buckets  *(P3-T28)*
-`sprints`: `name text`, `state text` (`in_planning`/…), `start_date date`, `finish_date date`, `goal text`, `sharing text` (cross-project sprint sharing), `project_id? → projects`.
-`sprint_goals`, `backlog_buckets`: sprint sub-structures.
-
-### favorites  *(P3-T31, polymorphic star)*
-`user_id → users`, `target_type text` (`project`/`query`), `target_id uuid`, `position int`.
-
-### project_phases / project_phase_definitions  *(P3-T33, optional)*
-`project_phase_definitions` (workspace-level): `name`, `position`, `color`, `start_gate bool`, `start_gate_name text?`, `finish_gate bool`, `finish_gate_name text?`.
-`project_phases` (per project): `project_id → projects`, `definition_id → project_phase_definitions`, `start_date`, `finish_date`, `active bool`. Work packages may carry `project_phase_id`.
-
----
-
-## 17. OKR cycles & settings (domain N)
+## 6. Strategy: cycles & goals (domain C)
 
 ### okr_cycles
+`name`, `cadence` (`annual`/`semiannual`/`quarterly`/`monthly`), `starts_on`, `ends_on`, `status` (`upcoming`/`active`/`closed`), `previous_cycle_id?`. Generated forward from the cadence.
+
+### strategy_settings *(one row per workspace)*
+`default_check_in_frequency` (`weekly`/`biweekly`/`monthly`), `check_in_anchor_day` (default Friday), `staleness_grace_days` (default 3), `rag_fail_pct` (50), `rag_pass_pct` (75), `max_goals_per_owner?`, `labels jsonb` (term overrides).
+
+### goals *(short_id; importable)*
 | Column | Type | Notes |
 |---|---|---|
-| `name` | text | e.g. "Q3 2026" |
-| `cadence` | text | `annual`/`semiannual`/`quarterly`/`monthly`/`biweekly`/`weekly` |
-| `starts_on` | date | |
-| `ends_on` | date | |
-| `previous_cycle_id?` | uuid | → okr_cycles |
-| `status` | text | `upcoming`/`active`/`closed` |
-| `locked` | bool | freezes the alignment diagram |
+| `title` | text | |
+| `description?` | jsonb *(rich)* | |
+| `cycle_id?` | uuid → okr_cycles | |
+| `timeframe?` | jsonb | `{start,end,granularity: day\|month\|quarter\|year, label}`; defaults to cycle bounds |
+| `owner` | text | `workspace`/`space`/`member` |
+| `space_id?` / `member_id?` | uuid | → spaces / workspace_members |
+| `champion_id` | uuid → workspace_members | required (accountable owner) |
+| `reviewer_id` | uuid → workspace_members | required (acknowledges check-ins) |
+| `parent_goal_id?` / `parent_key_result_id?` | uuid | alignment; at most one set; cycles prevented |
+| `weight` | numeric | 1–100 |
+| `check_in_frequency` | text | overrides the workspace default |
+| `next_check_in_at` | timestamptz | never null while open; advanced on publish |
+| `last_check_in_id?` | uuid → check_ins | |
+| `closed_at?` / `closed_by_id?` | | explicit close |
+| `success_status?` | text | `achieved`/`missed` |
+| `progress_pct` | numeric *(derived)* | weighted, incl. aligned children |
+| `health` | text *(derived)* | precedence cascade: success → outdated → last check-in → pending |
+| `ai_generated` / `ai_source_id?` | | AI provenance |
+| `position` | int | |
 
-Future cycles are generated from the cadence; the importer loads existing ones.
+### key_results *(importable)*
+`goal_id → goals`, `title`, `unit`, `direction` (`increase`/`decrease`), `initial_value numeric`, `target_value numeric`, `current_value numeric`, `progress_pct` *(derived, capped 0–100)*, `weight numeric`, `kpi_id? → kpis` (KPI-backed), `position`.
 
-### performance_settings  *(one row per workspace)*
-`default_cadence text`, `max_objectives_per_owner int`, `max_key_results_per_objective int`, `rag_fail_pct int` (default 50), `rag_pass_pct int` (default 75), `labels jsonb` (term overrides: okr/objective/keyresult/kpi/task/vision).
+### key_result_values *(history)*
+`key_result_id → key_results`, `value numeric`, `at`, `author_member_id → workspace_members`, `check_in_id? → check_ins`. Drives sparklines + trend forecast.
+
+### check_ins
+`goal_id → goals`, `author_member_id`, `state` (`draft`/`published`), `published_at?`, `status` (`on_track`/`caution`/`off_track`), `confidence smallint?` (0–10), `narrative jsonb (rich)` (required to publish), `snapshot jsonb` (immutable: every KR `{id,value,previous_value,progress_pct}` + checklist at publish), `acknowledged_by_id? → workspace_members`, `acknowledged_at?`. Drafts emit nothing and don't advance the cadence; publish advances `next_check_in_at`; delete rolls goal pointers back.
+
+### goal_retrospectives
+`goal_id → goals`, `body jsonb (rich)`, `author_member_id`. Created at close; kept on reopen.
 
 ---
 
-## 18. Objectives & key results (domain O)
-
-### objectives
-| Column | Type | Notes |
-|---|---|---|
-| `cycle_id` | uuid | → okr_cycles |
-| `title` | text | |
-| `description?` | text *(rich)* | |
-| `owner_type` | text | `workspace` / `team` / `user` |
-| `team_id?` | uuid | → org_units (when owner_type=team) |
-| `user_id?` | uuid | → users (when owner_type=user) |
-| `lead_id?` | uuid | → users (responsible lead) |
-| `parent_objective_id?` | uuid | → objectives (alignment) |
-| `parent_key_result_id?` | uuid | → key_results (alignment — the KR this objective rolls up into) |
-| `weight` | numeric | 1–100 |
-| `confidence` | smallint | 0–10 |
-| `result_percentage` | numeric *(derived)* | 0–100 weighted score |
-| `status` | text *(derived)* | `completed`/`on_track`/`at_risk`/`not_tracked` |
-| `position` | int | |
-
-Alignment invariant: at most one of `parent_objective_id` / `parent_key_result_id` is set. App prevents cycles. Scores cascade upward: KR → objective → parent KR → parent objective.
-
-### key_results
-| Column | Type | Notes |
-|---|---|---|
-| `objective_id` | uuid | → objectives |
-| `title` | text | |
-| `description?` | text *(rich)* | |
-| `unit` | text | free-text label (`%`, `$`, `pcs`, …) — no "type" enum |
-| `metric_direction` | text | `increase` / `decrease` |
-| `initial_value` | numeric | |
-| `target_value` | numeric | |
-| `current_value` | numeric | |
-| `progress_percentage` | numeric *(derived)* | direction-aware, capped 100 |
-| `weight` | numeric | 1–100 |
-| `confidence` | smallint | 0–10 |
-| `lead_id?` | uuid | → users |
-| `work_package_id?` | uuid | → work_packages (a KR driven by one work package) |
-| `position` | int | |
-
-### key_result_values  *(value history)*
-`key_result_id → key_results`, `value numeric`, `confidence? smallint`, `at timestamptz`, `author_id → users`. Maps FlowyTeam `key_result_records` + check-in value snapshots.
-
----
-
-## 19. KPIs (domain P)
+## 7. KPIs & scorecard (domain D)
 
 ### kpi_categories
-`name text` (maps FlowyTeam `indicator_types`).
+`name`.
 
-### kpi
-| Column | Type | Notes |
-|---|---|---|
-| `category_id` | uuid | → kpi_categories |
-| `title` | text | |
-| `description?` | text *(rich)* | |
-| `owner_type` | text | `workspace` / `team` / `user` |
-| `team_id?` / `user_id?` | uuid | → org_units / users |
-| `frequency` | text | `daily`/`weekly`/`monthly`/`quarterly`/`yearly` |
-| `unit` | text | |
-| `direction` | text | `higher_better` / `lower_better` |
-| `target_default?` | numeric | |
-| `target_locked` | bool | per-period target cannot be edited |
-| `aggregate` | text | `sum`/`avg`/`max`/`min`/`count` (roll-up across sub-periods) |
-| `is_calculated` | bool | formula over other KPIs |
-| `formula?` | jsonb | typed expression tree (no `eval`) |
-| `rag_fail_pct` / `rag_pass_pct` | int | thresholds |
-| `reward_points` | int | points on hitting target |
-| `parent_kpi_id?` | uuid | → kpi (tree) |
-| `starts_on?` / `ends_on?` | date | active window |
+### kpis *(short_id; importable)*
+`category_id → kpi_categories`, `title`, `description? (rich)`, `owner`/`space_id?`/`member_id?`, `frequency` (`daily`/`weekly`/`monthly`/`quarterly`/`yearly`), `unit`, `direction` (`higher_better`/`lower_better`), `target_default? numeric`, `aggregate` (`sum`/`avg`/`max`/`min`/`count`), `is_calculated bool`, `formula? jsonb` (typed expression tree, no eval), `rag_fail_pct`/`rag_pass_pct`, `parent_kpi_id?`, `starts_on?`/`ends_on?`.
 
-### kpi_records  *(target vs actual per period)*
-`kpi_id → kpi`, `period_start date` (normalized bucket start), `target_value? numeric`, `actual_value? numeric`, `remark? text`, `author_id → users`. **Unique `(workspace_id, kpi_id, period_start)`.**
+### kpi_records
+`kpi_id → kpis`, `period_start date` (normalized bucket), `target_value? numeric`, `actual_value? numeric`, `remark?`, `author_member_id`. **Unique `(workspace_id, kpi_id, period_start)`.**
 
-### kpi_dependencies  *(formula edges)*
-`kpi_id → kpi` (dependent), `depends_on_kpi_id → kpi` (source). Drives cascade recompute.
-
-### key_result_kpis  *(KR ↔ KPI link)*
-`key_result_id → key_results`, `kpi_id → kpi`. A KPI-backed KR reads its progress from the KPI's latest achievement.
+### kpi_dependencies
+`kpi_id → kpis`, `depends_on_kpi_id → kpis`. Formula edges; cascade recompute (cycle-checked).
 
 ### kpi_shares
-`kpi_id → kpi`, `user_id → users`, `access text` (`read`/`update`), `scope text` (`user`/`manager`/`team`/`everyone`).
+`kpi_id → kpis`, `member_id → workspace_members`, `access` (`read`/`update`).
+
+### performance_snapshots
+`owner`/`space_id?`/`member_id?`, `cycle_id → okr_cycles`, `result_value numeric`, per-bucket goal/KR counts (completed/on_track/at_risk/outdated). Recomputed on archive.
+
+### scorecard_settings / score_entries
+As before; **points off by default**, human-gated; only imported if funded.
 
 ---
 
-## 20. Check-ins (domain Q)
+## 8. Execution (domain E)
 
-### check_in_sessions
-`user_id → users`, `period_start date`, `period_end date`, `mood? smallint`, `submitted bool`, `reviewed bool`. Maps FlowyTeam `checkins`.
+### projects *(short_id; importable)*
+`space_id → spaces`, `name`, `description? (rich)`, `goal_id? → goals` (serves), `state` (`active`/`paused`/`closed`), `paused_at?`, `closed_at?`, `success_status?` (`achieved`/`missed`), `check_in_frequency`, `next_check_in_at`, `last_check_in_id?`, `health` *(derived)*, `next_step` *(derived: earliest-due open milestone)*.
 
-### check_ins  *(polymorphic snapshot per objective/KR)*
-| Column | Type | Notes |
-|---|---|---|
-| `session_id?` | uuid | → check_in_sessions |
-| `subject_type` | text | `objective` / `key_result` |
-| `subject_id` | uuid | → objectives / key_results |
-| `author_id` | uuid | → users |
-| `period_start` / `period_end` | date | |
-| `confidence` | smallint | 0–10 |
-| `value?` | numeric | KR value at this check-in |
-| `progress_percentage?` | numeric | |
-| `remark` | text *(rich)* | |
-| `category` | text | `challenge`/`blocker`/`risk`/`suggestion`/`solution`/`resource_request` |
+### project_contributors
+`project_id → projects`, `member_id → workspace_members`, `role` (`champion`/`reviewer`/`contributor`), `responsibility?`. Champion/reviewer unique per project; lockstep with tagged bindings; person-swap downgrades the outgoing holder.
 
-### check_in_reviews
-`session_id → check_in_sessions`, `reviewer_id → users`, `submitted bool`, `body text (rich)`.
+### project_check_ins
+`project_id → projects`, `author_member_id`, `state`, `published_at?`, `status` (`on_track`/`caution`/`off_track`), `narrative jsonb (rich)`, `snapshot jsonb` (milestone states), `acknowledged_by_id?`/`_at?`.
+
+### project_retrospectives
+`project_id → projects`, `body jsonb (rich)`, `author_member_id`. Required at close.
+
+### milestones
+`project_id → projects`, `title`, `description? (rich)`, `timeframe jsonb`, `status` (`open`/`done`), `completed_at?`, `position`, `ordering_state jsonb` (kanban order, normalized, row-locked on write).
+
+### work_items *(short_id; importable)*
+`project_id → projects`, `milestone_id? → milestones`, `title`, `description (rich)`, `status` (`todo`/`in_progress`/`done`/`canceled`), `due? jsonb` (contextual), `key_result_id? → key_results`, `goal_id? → goals`, `kpi_id? → kpis`, `position`, `version int`.
+
+### work_item_assignees
+`work_item_id → work_items`, `member_id → workspace_members`. Multi-assignee; assignment grants edit access.
+
+### checklist_items
+`work_item_id → work_items`, `title`, `assignee_id?`, `done bool`, `position`. No rollup.
+
+### work_item_relations
+`from_id → work_items`, `to_id → work_items`, `kind` (`blocks`). Cannot-complete-while-blocked guard.
+
+### reminders
+`work_item_id → work_items`, `member_id → workspace_members`, `kind` (`on_date`/`before_due`/`on_due`/`overdue`), `offset_days?`, `remind_at?`. Relative kinds require a due date; auto-stripped if due removed.
+
+### time_entries *(import-preservation only in v1)*
+`work_item_id? → work_items`, `project_id → projects`, `member_id`, `hours numeric`, `spent_on date`, `comment?`. Read-only display in v1; tracking UI is post-v1.
 
 ---
 
-## 21. Scorecard (domain R)
+## 9. Resource Hub (domain F)
 
-### performance_snapshots  *(per owner per cycle rollup)*
-`owner_type text`, `team_id? → org_units`, `user_id? → users`, `cycle_id → okr_cycles`, `result_value numeric`, `objectives_total int`, `objectives_completed/on_track/at_risk/not_tracked int`, `key_results_total int`, `key_results_completed/on_track/at_risk/not_tracked int`. Recomputed by the archive job on cycle close.
+### resource_hubs
+`owner_type` (`space`/`project`/`goal`), `owner_id`, `name`. Inherits the owner's access context.
 
-### scorecard_settings  *(one row per workspace; points off by default)*
-`include_okr bool`, `include_kpi bool`, `include_tasks bool`, `include_attendance bool`, `okr_weight numeric`, `kpi_min int`, `kpi_max int`, `weights jsonb`.
+### resource_nodes
+`hub_id → resource_hubs`, `parent_id? → resource_nodes` (folder tree), `type` (`document`/`folder`/`file`/`link`), `name`, `position`.
 
-### score_entries  *(points ledger — only when points enabled)*
-`owner_type text`, `user_id? → users`, `team_id? → org_units`, `cycle_id → okr_cycles`, `source_type text`, `source_id uuid`, `points int`, `reason? text`, `expires_at? date`, `status text` (`pending`/`approved`).
+### documents
+`node_id → resource_nodes`, `body jsonb (rich)`, `state` (`draft`/`published`), `published_at?`, `author_member_id`. Drafts author-private (enforced in the getter); publish emits the activity; version history + diff via `version` + activities.
+
+### files
+`node_id → resource_nodes`, `blob_id → blobs`, `preview_blob_id?`, `width?`, `height?`.
+
+### links
+`node_id → resource_nodes`, `url`, `provider` (`google_doc`/`google_sheet`/`google_slides`/`figma`/`notion`/`airtable`/`dropbox`/`other`), `description? (rich)`, `preview jsonb?` (SSRF-safe enrichment).
 
 ---
 
-## 22. Cross-domain relationship summary
+## 10. Collaboration (domain G)
 
-The load-bearing links that tie the schema together:
+### discussions *(short_id)*
+`space_id? → spaces` OR (`subject_type`, `subject_id`) anchor, `title`, `body jsonb (rich)`, `author_member_id`, `state` (`draft`/`published`), `published_at?`. Space-scoped = board/announcements; anchored = goal/project discussion. Drafts silent.
+
+### comments
+`subject_type`, `subject_id` (work_item/milestone/check_in/project_check_in/discussion/document/file/link/goal/retrospective), `author_member_id`, `body jsonb (rich)`, `edited_at?`, `action?` (`complete_milestone`/`reopen_milestone`). Deep-linkable (`#comment-<short_id>`).
+
+### reactions
+`subject_type`, `subject_id`, `member_id`, `emoji`. On all major subjects.
+
+### subscription_lists
+`subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact.
+
+### subscriptions
+`list_id → subscription_lists`, `member_id → workspace_members`, `reason` (`invited`/`joined`/`mentioned`), `canceled bool`. Unique (list, member). Authors auto-`joined`; mentions auto-`mentioned` and re-diffed on edit; suspended/placeholder/`ai` excluded at the join.
+
+---
+
+## 11. Feed & notifications (domain H)
+
+### activities
+`kind` (typed catalog: `goal.created`/`goal.checked_in`/`goal.closed`/`check_in.acknowledged`/`project.paused`/`milestone.completed`/`member.joined`/`document.published`/…), `payload jsonb` (Zod-validated per kind; snapshots human labels), `actor_member_id`, `subject_type`, `subject_id`, `space_id?`, `context_id → access_contexts` (feed access scope), `at`. Written in-transaction; feeds filter by the requester's access to `context_id`; consecutive same-actor edits aggregated; live via Realtime.
+
+### notifications
+`recipient_member_id → workspace_members`, `activity_id → activities`, `reason`, `read_at?`, `should_send_email bool`, `email_batch_id? → notification_email_batches`, `email_sent_at?`. Recipients resolved from subscriptions + assignment/mention/review reasons, **access-checked at send time**, author excluded.
+
+### notification_email_batches
+`member_id → workspace_members`, `status` (`scheduled`/`sending`/`sent`/`failed`/`skipped`), `window_minutes`, `send_at`, `sent_at?`, `error?`. Find-or-create under a row lock; idempotent worker.
+
+### notification_settings
+`member_id → workspace_members`, per-reason channel routing jsonb, `mention_immediate bool`, `email_window_minutes`, `send_daily_summary bool`, `daily_summary_time`. Daily summary fires in the member's own timezone (validated against `pg_timezone_names`, UTC fallback, DST-correct).
+
+---
+
+## 12. Attachments (domain I)
+
+### blobs
+`filename`, `content_type`, `filesize bigint`, `digest`, `storage_key`, `author_member_id`, `status` (`ok`/`scanning`/`quarantined`), `width?`, `height?`. Bytes behind the FileStorage adapter; prepare → upload → claim on save; orphan cleanup job. Per-workspace byte total + quota + once-at-90% warning enforced on upload-finish.
+
+---
+
+## 13. Importer & portability (domain J)
+
+### import_runs
+`source` (`flowyteam`/`csv`), `mode` (`dry_run`/`real`), `status`, `report jsonb` (counts, skips, lossy items, reconciliation), `started_at`, `finished_at?`.
+
+### export_runs / workspace_imports
+Archive manifest, checksum, status, progress for the workspace export/import portability engine (TECHNICAL-PLAN §7.3). Excludes secrets/sessions/tokens/audit chain.
+
+---
+
+## 14. AI (domain M) & MCP OAuth (domain N)
+
+Full detail in `AI-NATIVE-PLAN.md §7`. Summary:
+
+- **M:** `ai_providers`, `ai_credentials` (envelope-encrypted; never to client), `ai_models` *(global)*, `ai_model_policies` (tier→model), `ai_feature_settings`, `ai_prompts` (versioned; per feature or per agent+phase), `ai_threads`/`ai_messages`, `ai_tool_calls` (+ `run_id`), `ai_usage_events` (metering spine — drives quotas/caps), `embeddings` (pgvector/HNSW), `agents` (member_id, definition, planning/execution instructions, provider/tier, schedule, autonomy `sandbox`/`batch_approval`/`scoped_direct`), `agent_runs` (status machine, tasks jsonb, append-only logs, cost), `proposed_changes` (batch-approval envelopes: run_id, action, payload, status).
+- **N:** `oauth_clients` (registered + CIMD cache), `oauth_grants` (member+workspace+client, revoked_at), `oauth_codes` (hash, PKCE challenge, resource, consumed_at), `oauth_access_tokens`/`oauth_refresh_tokens` (hashes, resource/audience, expiry, rotation lineage), `mcp_sessions` (grant_id, protocol_version, closed_at).
+
+---
+
+## 15. Cross-domain relationship summary
 
 | From | Column | To | Meaning |
 |---|---|---|---|
-| everything | `workspace_id` | `workspaces` | tenant isolation (RLS) |
-| `work_packages` | `objective_id` | `objectives` | work contributes to an objective |
-| `work_packages` | `key_result_id` | `key_results` | work drives a key result (primary FlowyTeam link) |
-| `work_packages` | `kpi_id` | `kpi` | work drives a KPI |
-| `key_results` | `work_package_id` | `work_packages` | a KR measured by a single work package |
-| `key_result_kpis` | `key_result_id` + `kpi_id` | `key_results`, `kpi` | a KR measured by a KPI (many-to-many) |
-| `objectives` | `parent_objective_id` / `parent_key_result_id` | `objectives` / `key_results` | alignment cascade |
-| `objectives` | `cycle_id` | `okr_cycles` | cycle bounds the OKR set |
-| `objectives` / `kpi` | `owner_type` + `team_id` / `user_id` | `org_units` / `users` / (workspace) | ownership scope |
-| `check_ins` | `subject_type` + `subject_id` | `objectives` / `key_results` | dated progress snapshot |
-| `kpi_dependencies` | `kpi_id` + `depends_on_kpi_id` | `kpi` | calculated-KPI formula graph |
-| `comments` / `activities` / `reactions` | `subject_type` + `subject_id` | any subject | polymorphic history & discussion |
-| `attachments` | `container_type` + `container_id` | any container | polymorphic files |
+| everything | `workspace_id` | `workspaces` | tenant isolation (RLS floor) |
+| protected aggregates | via `access_contexts`+`access_bindings` | `access_groups` | object authorization (`can()`) |
+| `goals`/`projects` | `champion_id` / `reviewer_id` | `workspace_members` | the accountability contract |
+| `work_items` | `key_result_id` / `goal_id` / `kpi_id` | `key_results` / `goals` / `kpis` | execution drives strategy |
+| `key_results` | `kpi_id` | `kpis` | a KR measured by a live KPI |
+| `goals` | `parent_goal_id` / `parent_key_result_id` | `goals` / `key_results` | alignment cascade |
+| `goals`/`kpis` | `owner`+`space_id`/`member_id` | `spaces` / `workspace_members` / (workspace) | ownership scope |
+| `check_ins` | `goal_id` (+ snapshot) | `goals`, `key_results` | dated narrative + immutable value snapshot |
+| `activities` | `context_id` | `access_contexts` | permission-filtered feeds |
+| `notifications` | `recipient_member_id` + access check | `workspace_members` | access-gated fan-out |
+| `agents` | `member_id` | `workspace_members` | AI teammate as a first-class member |
 
 ---
 
-## 23. Notes for implementation
+## 16. Notes for implementation
 
-- **RLS everywhere.** A CI check greps migrations: any `CREATE TABLE` on a business table without a matching RLS policy in the same file fails the build (TECHNICAL-PLAN §8.1).
-- **Two engines compute derived values**, both pure and in `packages/core`: the **scheduling engine** (work-package dates/rollups, TECHNICAL-PLAN §6) and the **OKR scoring engine** (KR progress, objective score, RAG, status, KPI achievement, TECHNICAL-PLAN §6.2). Derived columns are invalidated by job, never computed per-row at render.
-- **Indexes ship with the feature** (TECHNICAL-PLAN §13.2): every filterable/sortable column and every FK gets its index in the same migration; composite `(workspace_id, project_id, common-filter)` where lists filter on it; `kpi_records` carries the unique `(workspace_id, kpi_id, period_start)`.
-- **Import provenance** lets both legacy sources load into one workspace: `legacy_type` distinguishes `openproject` from `flowyteam` rows in the same tables. Mapping tables: TECHNICAL-PLAN §7.4 (source 1) and TECHNICAL-PLAN §7.6 (source 2).
+- **RLS floor + relationship layer.** A CI check fails any `CREATE TABLE` on a business table without an RLS policy in the same file. RLS is the tenant boundary; object authorization is the §4.1 relationship model through one `can()` and one access-aware getter (not-found on forbidden; suspended excluded). Neither replaces the other (TECHNICAL-PLAN §8.1).
+- **Three pure engines** in `packages/core`: goal health & scoring (precedence cascade + weighted rollup + trend forecast, §6.1), cadence (§6.2), KPI formulas (§6.3). Derived columns are recomputed by outbox-driven jobs, never per-row at render.
+- **Every write is one transaction** through the Operation pipeline (mutation + bindings + activity + audit + outbox). Side effects are outbox-relayed after commit.
+- **Indexes ship with the feature** (TECHNICAL-PLAN §13.2): every filterable/sortable column and FK; composite `(workspace_id, space_id, common-filter)`; `kpi_records` unique `(workspace_id, kpi_id, period_start)`; `next_check_in_at` indexed for the review inbox and staleness sweeps.
+- **Import provenance** lets FlowyTeam and CSV rows coexist: `legacy_type` distinguishes them. Mapping: TECHNICAL-PLAN §7.2.
+- **Soft-delete default scope** and the **data-change runner** (frozen-schema backfills, separate from DDL) are repo-wide conventions in `packages/db`.

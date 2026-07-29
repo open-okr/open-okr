@@ -1,29 +1,25 @@
 # OpenOKR — Product Overview
 
-*An open source platform where teams set their goals, plan the work that moves them, and track both in one place. Self-hosted or in the cloud, AI-native, and yours to own.*
+*An open source operating system for running a company on goals: OKRs, KPIs and check-ins joined to the work that delivers them, driven by a built-in weekly rhythm, real accountability, and AI teammates. Self-host it. Own it.*
 
-This document is for the people who will use OpenOKR: team members, team leads, PMO and operations managers, and the admins who run it. It explains what OpenOKR is, who it is for, every module and what it does, and the benefit you get from each. For the engineering plan behind it, see the other documents in this folder.
+This document is for the people who will use OpenOKR: team members, champions and reviewers, PMO and operations managers, and the admins who run it. It explains what OpenOKR is, who it is for, every module and its benefit. For the engineering plan behind it, see the other documents in this folder.
 
 ---
 
 ## 1. What OpenOKR is
 
-Most organizations run their **strategy** in one tool and their **work** in another. Objectives and KPIs live in a spreadsheet or a dedicated OKR app, while the actual work runs in a separate project tool. The two drift apart. Nobody can answer the simple question: *is the work we are doing actually moving the goals we set?*
+Most organizations have two problems at once. Their **strategy** lives in one tool and their **work** in another, so nobody can answer "is the work we are doing actually moving the goals we set?" And their work tools give them **infinite flexibility with zero guidance** — endless custom fields, statuses and views, but no opinion about how to actually run a company.
 
-OpenOKR closes that gap. It is two products in one:
+OpenOKR fixes both, on purpose:
 
-- A **strategy platform** — objectives and key results (OKRs), key performance indicators (KPIs), and check-ins, cascaded across the whole organization.
-- A **work and project management platform** — work packages, boards, Gantt timelines, wikis, meetings, and time tracking.
-
-They meet at the level where work happens: a task can be linked to the key result it advances, so progress on the ground rolls up into progress on the goal. When a team closes work, the objective moves. That single connection is the heart of the product.
-
-On top of both pillars sits an **AI layer** that is built in from day one, not bolted on: AI helps you write and improve OKRs, break goals into work, summarize threads and meetings, and answer questions about your own data. You can also drive OpenOKR from your own AI agent through a built-in agent connection (MCP), and point the AI at your own provider key or a local model.
-
-And it is **open source**. You can run it on a shared cloud, on a single cheap server, or on your own enterprise infrastructure. Your data stays where you put it.
+- It is **one place for strategy and execution.** Objectives and key results (OKRs), the KPIs that measure them, and the projects and work items that deliver them all live together. Link a work item to a key result and progress flows upward automatically.
+- It is **opinionated.** OpenOKR ships with an operating rhythm built in: every goal and project gets a check-in cadence, a named accountable owner and a named reviewer, and a personal "what do I owe this week" inbox. A goal you stop updating goes visibly **stale** — it cannot quietly stay green. You can tune the rhythm; you cannot turn accountability off.
+- It is **AI-native, on your terms.** AI drafts your overdue check-in from what actually happened, decomposes goals into work, summarizes threads, and answers questions about your own data. You can hire **AI teammates** — agent members with a persona and a schedule that plan and do work on the same rhythm as people, safely (they propose, you approve in batch — or you scope them tightly and let them act). And you choose the brain: your own API key, or a fully local model so nothing ever leaves your servers.
+- It is **yours.** Open source, self-hosted in half an hour on a cheap server (or on your own Kubernetes), with your whole workspace exportable to an encrypted archive you can import anywhere. No lock-in, no per-seat rent, air-gap friendly.
 
 ### In one paragraph
 
-OpenOKR connects goals to the work that delivers them, gives every team a fast modern interface to run both, uses AI to remove the busywork of goal-setting and reporting, migrates your existing data in, and lets you own the whole thing.
+OpenOKR connects goals to the work that delivers them, imposes a light weekly rhythm that keeps both honest, uses AI to remove the busywork of goal-setting and reporting — including AI teammates that work the rhythm themselves — and lets you own the entire thing.
 
 ---
 
@@ -31,396 +27,184 @@ OpenOKR connects goals to the work that delivers them, gives every team a fast m
 
 | You are… | OpenOKR gives you… |
 |---|---|
-| **A team member** | A clear view of what is assigned to you, one place to update status, log time, comment, and get notified — plus visibility of how your work connects to team goals. |
-| **A team or project lead** | Planning tools (boards, Gantt, backlogs), the ability to assign people and track progress, and objectives your team can rally around. |
-| **A PMO or operations manager** | OKR cycles and KPI reviews, a portfolio view across projects, dashboards, scorecards, and exports for reporting. |
-| **An org or IT admin** | User and role management, single sign-on, audit trails, backups, and a system that can pass a security review at scale. |
-| **A team migrating from another tool** | A one-time importer that moves your existing OKRs, KPIs, projects, and work across without losing data. |
+| **A team member** | One place to see what you owe this week (check-ins, tasks, reviews), update it fast, and see how your work connects to the company's goals. |
+| **A champion (goal or project owner)** | A clear cadence: a check-in composer that pre-fills what changed, milestones that keep the plan honest, and a Work Map view of everything you own. |
+| **A reviewer / manager** | Every check-in from your people lands in your Review inbox for a one-click acknowledgement — with stale or at-risk work impossible to miss. |
+| **A PMO / operations manager** | OKR cycles, a real KPI module with calculated metrics, the company-wide Work Map, scorecards and exports. |
+| **An org / IT admin** | Member and access management, SSO, passkeys, backups with tested restores, a tamper-evident audit log, AI governance with hard cost caps, and a system built to pass a security review. |
+| **A team migrating** | A FlowyTeam importer (everything: OKRs, KPIs, check-ins, tasks) and CSV/XLSX importers with a dry-run preview, so you switch without losing data. |
+| **An AI teammate** | Yes, really: a seat at the table. An agent member with a name, instructions, scoped permissions and a schedule — accountable like everyone else. |
 
-**Organizations it fits:** universities and institutions that need to self-host and prove compliance; companies that want strategy and execution in one place; agencies and consultancies running many client projects; and any privacy-minded or budget-minded team that would rather own its tools than rent them.
+**Organizations it fits:** startups and scale-ups that want strategy and execution in one place; universities and institutions that must self-host and prove compliance; consultancies running many workstreams; and any privacy- or budget-minded team that would rather own its tools than rent them.
 
 ---
 
 ## 3. Why OpenOKR — the benefits at a glance
 
-1. **Goals and work in one place.** Link a task to a key result and progress flows upward automatically. No more reconciling a strategy spreadsheet against a project tool by hand.
-2. **AI-native, everywhere.** AI drafts and critiques OKRs, decomposes goals into work, summarizes threads and meetings, and answers plain-language questions about your data. It is an accelerator over everything you can already do by hand, never a black box you are forced to trust.
-3. **Use your own AI agent.** OpenOKR ships an agent connection (MCP), so you can manage your OKRs and projects from Claude, Cursor, or any AI agent you prefer — acting as you, within your permissions.
-4. **Own your data.** Open source under AGPL. Self-host it. Run it fully offline (air-gapped) if you must. Point AI at a local model or turn it off. No lock-in.
-5. **Fast and modern.** A Linear- or Notion-class interface: edit in place, jump anywhere with a command palette, dark mode, full keyboard control, a responsive mobile shell, and live updates. The network is invisible.
-6. **Migrate without losing data.** Importers bring your existing goals, KPIs, projects, and work across in a single maintenance window, with a full report and a rollback path.
-7. **Enterprise-ready by construction.** Database-level tenant isolation, single sign-on, an append-only audit log, scoped access tokens, and accessibility to WCAG 2.1 AA.
-8. **Deploy anywhere, same product.** A cloud deploy button, one Docker Compose file on a VPS, or a Helm chart on Kubernetes — all run the same release with the same behavior.
-9. **Works the way you work.** Ready-made templates and guides for PM², PMflex, PRINCE2, SAFe, Scrum, and OKR, without forcing any one method on you.
+1. **Goals and work in one place.** A work item links to a key result; closing it moves the goal. No more reconciling a strategy spreadsheet against a project tool.
+2. **A rhythm with teeth.** Weekly check-ins are scheduled for you, reviewed by a named person, and a missed check-in makes the goal visibly *stale*. Accountability is a product feature, not a meeting.
+3. **Honest progress.** Key results are real numbers (from → to, up or down), scored automatically, with the full value history — and a trend forecast that flags "this will miss" before anyone admits it.
+4. **A real KPI module.** Track the recurring metrics that matter on a period grid, build calculated KPIs from formulas over other KPIs, and measure a key result directly by a live metric.
+5. **AI that works your way.** Assists everywhere (draft, improve, summarize, answer), a copilot that acts with your approval, AI teammates that run on the cadence — powered by your own key or a local model, metered, and hard-capped so there are no surprise bills.
+6. **Connect your own agent.** A built-in agent connection (MCP) with a proper sign-in flow lets Claude, ChatGPT, Cursor or your custom agent manage your goals and projects as you, within your permissions.
+7. **Own your data — provably.** Self-host anywhere, export your whole workspace to an encrypted archive, restore it anywhere, verify the audit log hasn't been touched. Air-gap capable end to end.
+8. **Fast and modern.** Inline editing, a command palette (⌘K), dark mode, full keyboard control, live updates, a responsive shell. The network is invisible.
+9. **Simple by default, powerful later.** You start working in minutes with zero configuration. Advanced machinery (custom fields, custom workflows, Gantt, time tracking) arrives as an optional power layer after launch — it will never be a prerequisite.
 
 ---
 
-## 4. The modules in detail
+## 4. The operating rhythm (the heart of the product)
 
-OpenOKR is organized into four groups: the **Strategy** modules (your goals), the **Work & project management** modules (your execution), the **AI & agents** layer, and the **Platform** capabilities that everything shares.
+Everything else hangs off five ideas:
 
-A note on availability: OpenOKR is delivered in stages. Most of what follows is core to the first release. A few modules are fast-follow or planned; these are marked *(fast-follow)* or *(planned)* so the picture is honest. Everything is designed for from the start.
+### 4.1 Cadence
+Every goal and every project has a check-in frequency — **weekly by default**, anchored to a day your company picks (say, Friday). OpenOKR schedules the next check-in for you, reminds the right person, and rolls the schedule forward each time you post. Change the frequency per goal; there is no "never" setting.
 
----
+### 4.2 Champion & reviewer
+Every goal and project names exactly one **champion** (the accountable owner) and one **reviewer**. The champion posts the check-in; the reviewer **acknowledges** it (with a comment if they like). Until they do, it sits in their Review inbox. Two people are always on the hook — that is the whole trick.
 
-### Part A — Strategy: set and track your goals
+### 4.3 The Review inbox
+One page answers "what do I owe right now": check-ins due (you're the champion), acknowledgements owed (you're the reviewer), work items and milestones due — ranked overdue-first, with one-click actions. Notifications tell you what happened; Review tells you what's yours to do.
 
-#### 4.1 OKRs (Objectives & Key Results)
+### 4.4 Check-ins that mean something
+A check-in is not a status dropdown. It is a short ritual: pick a status (*on track / caution / off track*), optionally a 0–10 confidence, write a few honest sentences, and OpenOKR snapshots every key result value at that moment — so every check-in shows exactly what moved since the last one. Drafts are private; publishing notifies subscribers and starts the review clock. A goal's health is always *derived from its latest check-in* — nobody can hand-paint it green.
 
-**What it is for.** Turn ambition into something measurable and shared. An **objective** is what you want to achieve; **key results** are the numbers that prove you achieved it.
+### 4.5 Staleness ("outdated")
+Miss your check-in past a small grace window and the goal or project flips to **outdated** — everywhere: lists, the Work Map, dashboards. It overrides whatever the last check-in said. Neglect is visible by design, which is why it stays rare.
 
-**What you can do:**
-
-- Create objectives owned by the **whole company**, a **team or department**, or an **individual** — personal, team, and company OKRs all live together.
-- Add **key results** as a numeric range (from a starting value to a target) with a unit, so progress is a real percentage, not a guess. Key results can go **up** (grow signups) or **down** (cut response time); OpenOKR scores both correctly.
-- **Weight** objectives and key results so the important ones count for more.
-- Set a **confidence** level (how likely you are to hit it) that drives an at-a-glance status.
-- **Align** objectives: roll a team objective up under a company objective, or under a specific key result. This builds the cascade that connects the whole organization.
-- **Check in** on progress (update the value, confidence, a remark, and a category like "blocker" or "risk").
-- View the **alignment tree** — company to team to individual — and click any node to open it.
-- **Link work** (tasks and work packages) to a key result, so execution and strategy stay connected.
-- Move an OKR between cycles or owners, copy an OKR, and discuss it in a threaded conversation.
-
-**The benefit.** Everyone can see how their goals ladder up to the organization's goals, and progress is computed from real numbers instead of status-meeting optimism. A scoring engine recalculates progress, a red/amber/green health color, and a status (on track / at risk / and so on) automatically, and cascades changes upward the moment you check in.
-
-#### 4.2 OKR cycles
-
-**What it is for.** Time-box your goals. OKRs live inside a **cycle** (a quarter, half, month, or year).
-
-**What you can do:** run cycles on a cadence you choose; OpenOKR generates upcoming cycles automatically. Switch the active cycle from a single control shared across all your strategy screens. Archive a cycle when it closes and open the next one. Set limits (maximum objectives per owner), red/amber/green thresholds, and even rename the terminology ("OKR", "objective", "vision") to match your house language.
-
-**The benefit.** A predictable rhythm for goal-setting and review, without manual cycle admin every quarter.
-
-#### 4.3 KPIs (Key Performance Indicators)
-
-**What it is for.** Track the recurring metrics that matter — independent of any single objective. Revenue, uptime, NPS, tickets closed: the numbers you watch every period.
-
-**What you can do:**
-
-- Define KPIs inside a **category**, each with a **frequency** (daily, weekly, monthly, quarterly, yearly), a unit, a direction (higher-is-better or lower-is-better), a default target, and health thresholds.
-- Record **target vs actual** for each period, on a grid where KPIs are rows and periods are columns.
-- Build **calculated KPIs** from a formula over other KPIs — including rolling finer periods up into coarser ones (sum daily numbers into a monthly total). Change a source number and everything that depends on it recomputes.
-- Organize KPIs in a **parent/child tree**.
-- **Link a KPI to a key result**, so a key result is measured directly by a live metric.
-
-**The benefit.** One living scorecard of your operational health, with automatic achievement percentages and health colors, and metrics that feed straight into your OKRs.
-
-#### 4.4 Check-ins *(fast-follow)*
-
-**What it is for.** A light, regular ritual — usually weekly — to update goals and surface problems early.
-
-**What you can do:** open a check-in session for the period, optionally note your mood, then for each objective and key result update your confidence, the latest value, a remark, and a category (challenge, blocker, risk, suggestion, solution, resource request). Submit it; a manager can review it. Every check-in is kept as a dated snapshot, so you have a history of how confidence moved over time.
-
-**The benefit.** Blockers get raised while they are still small, and you get an honest, time-stamped record of momentum instead of a scramble at cycle-end.
-
-#### 4.5 Scorecard & performance snapshots *(fast-follow)*
-
-**What it is for.** A per-owner, per-cycle summary of how the OKRs and KPIs actually turned out.
-
-**What you can do:** when a cycle closes, archive it into a snapshot — the result value plus counts of objectives and key results in each health bucket (completed, on track, at risk, not tracked). See trends across cycles and export the scorecard. An **optional points layer** can combine OKR, KPI, task, and attendance results into a score with configurable weights; this is **off by default** and entirely opt-in.
-
-**The benefit.** A clean, exportable record of each cycle for reviews and reporting, without hand-building slides.
+### And one map of everything: the Work Map
+The home screen is a single company-wide tree — goals → sub-goals → projects → work items — with health, progress, champion and next step rolled up at every level. It is the answer to "what is the whole company working on, and is it healthy?", one click deep, live.
 
 ---
 
-### Part B — Work & project management: deliver the work
+## 5. Strategy: set and measure your goals
 
-#### 4.6 Work packages
+### 5.1 Goals & key results (OKRs)
+Create goals owned by the **company**, a **space** (team), or a **person**, inside a cycle — or with their own timeframe ("Q3 2026", "July", a custom range). Add **key results** as numeric ranges with a unit and direction (grow signups ↑, cut response time ↓ — both score correctly), weight the important ones, and **align** goals under a parent goal or key result to build the company cascade. Discuss in titled threads; watch, react, comment. Close a goal explicitly as **achieved or missed** — with a short retrospective — and reopen it if the world changes. Every key result keeps its full value history, drawn as a sparkline with a **trend forecast** that flags drift early.
 
-**What it is for.** The core unit of work. A work package is a task, a bug, a feature, a milestone — anything that needs to get done, with an owner and a due date.
+### 5.2 Cycles
+Quarters, halves, months or years — generated forward automatically, switched from one control, archived when done. Rename the terminology to your house language ("objective", "rock", "bet" — your call).
 
-**What you can do:**
+### 5.3 KPIs
+The recurring numbers you watch every period — revenue, uptime, NPS — on a grid of KPIs × periods with targets, actuals and health colors. Build **calculated KPIs** from formulas over other KPIs (daily numbers roll into monthly ones automatically; change a source and everything downstream recomputes). Link a KPI to a key result so the KR is measured by the live metric. Organize KPIs in a tree by category.
 
-- Create and edit work packages with a **type**, status, priority, assignee, responsible person, dates, target version, and parent.
-- Build **hierarchies** (parent and child work packages) and **relationships** between them (blocks, precedes/follows, relates).
-- **Comment**, **watch** for updates, and **attach files**.
-- **Bulk-edit** many at once, and **export** to CSV, Excel, or PDF.
-- Link a work package to an **objective, key result, or KPI** so your delivery is tied to your goals.
-- Add a lightweight **checklist** of subtasks, and set **recurrence** for work that repeats.
-
-**The benefit.** One flexible work item that scales from a personal to-do to a governed enterprise deliverable, and always knows which goal it serves. (OpenOKR unifies lighter "tasks" and heavier "work packages" into this single entity, so you never juggle two systems.)
-
-#### 4.7 Projects & versions
-
-**What it is for.** Give work a home and a hierarchy, and give releases their milestones.
-
-**What you can do:** create projects with a short identifier, nest sub-projects, archive old ones, and mark a project as a template to copy from. Manage **versions** (milestones or sprints) with sharing scope and dates. Turn modules on or off per project, so each project shows only what it needs.
-
-**The benefit.** A tidy structure for everything from a two-person effort to a multi-team program, with reusable templates so new projects start in seconds.
-
-#### 4.8 Types, statuses & workflows
-
-**What it is for.** Different kinds of work need different fields and different lifecycles. A bug is not a milestone.
-
-**What you can do:** define **work package types** with their own form layout, define **statuses** (open, closed, read-only), and set a **workflow** — which status transitions are allowed, for which type, for which role. You control who can move what, and where it can go next.
-
-**The benefit.** Your process is enforced by the tool, not by reminders, and each type of work behaves the way it should.
-
-#### 4.9 Custom fields
-
-**What it is for.** Every organization tracks a few extra attributes the standard fields do not cover.
-
-**What you can do:** add custom fields (text, number, date, yes/no, single- or multi-select lists, user, version, link, and more) to work packages, projects, users, versions, and time entries. Group them into sections, mark them required or searchable, and switch them on per project or per type.
-
-**The benefit.** The tool adapts to your data, not the other way around — and your custom values are carried across when you import from another system.
-
-#### 4.10 Views & saved queries
-
-**What it is for.** Everyone needs their own filtered, sorted slice of the work.
-
-**What you can do:** filter, sort, group, sum, and choose columns; then save the result as a **private** or **public** view, pin it to the sidebar, or star it. Switch the same data between a **table**, **board**, **Gantt**, or **calendar** without rebuilding your filters. Every view is deep-linkable, so sharing a URL shares the exact view.
-
-**The benefit.** One dataset, many perspectives. A new team member sees a clean task list; a PMO opens the same list with grouping and sums. Nobody re-creates the same filter twice.
-
-#### 4.11 Boards (Kanban)
-
-**What it is for.** Visual, drag-and-drop work management.
-
-**What you can do:** create boards keyed by status, assignee, version, sub-project, or parent — or a free board you arrange yourself. Drag a card between columns to change the underlying attribute (drag to "Done" and the status changes). Cards update live for everyone looking, and you can see who else is on the board.
-
-**The benefit.** The simplest way for a team to run its work day to day, with changes reflected everywhere instantly.
-
-#### 4.12 Gantt / timeline
-
-**What it is for.** See the schedule and the dependencies over time.
-
-**What you can do:** view work on a timeline with dependency arrows, milestones, and zoom from days to quarters. Drag a bar to reschedule; drag between bars to create a dependency. When a change would move other work, OpenOKR shows you a preview ("this moves 3 work packages") **before** it commits, so there are no silent surprises.
-
-**The benefit.** Classic project planning power, minus the heaviness — and honest about the ripple effects of every change.
-
-#### 4.13 Scheduling & working days
-
-**What it is for.** Dates that respect reality: dependencies, durations, and non-working days.
-
-**What you can do:** schedule work automatically from its dependencies (with lag), or pin dates manually per item. Define your organization's working days and holidays. Parent items roll up their children's dates and progress. Change a holiday and the affected work reschedules itself.
-
-**The benefit.** Realistic plans that keep themselves consistent, instead of a wall of dates that go stale the moment anything shifts.
-
-#### 4.14 Calendar & team planner *(fast-follow)*
-
-**What it is for.** See work by date, and see who is doing what.
-
-**What you can do:** view work on a month or week **calendar**, subscribe to a calendar feed, and use a **team planner** with a row per person to drag work between dates and assignees.
-
-**The benefit.** Capacity and timing at a glance, and effortless rebalancing when someone is overloaded.
-
-#### 4.15 Backlogs & Scrum *(fast-follow)*
-
-**What it is for.** Run agile the proper way.
-
-**What you can do:** manage a product backlog and sprint backlog, assign story points, rank by drag order, and track a burndown. Start and complete sprints. Sprints can be **shared across projects** for scaled-agile setups.
-
-**The benefit.** A full Scrum toolkit built on the same work items you already use, so agile and non-agile teams share one system.
-
-#### 4.16 Time & cost tracking *(fast-follow)*
-
-**What it is for.** Know where the hours and money go.
-
-**What you can do:** log time against work with an activity and a comment, start and stop a **timer**, and record costs with cost types. Define **hourly rates** with an effective-from history. Who can see whose rates is controlled by permission.
-
-**The benefit.** Accurate effort and cost data for billing, budgeting, and retrospectives — with rate privacy respected.
-
-#### 4.17 Budgets *(planned)*
-
-**What it is for.** Plan spend and compare it to reality.
-
-**What you can do:** set project budgets made of labor and material items, and track them against actual time and cost.
-
-**The benefit.** Early warning when a project is heading over budget.
-
-#### 4.18 Wiki *(fast-follow)*
-
-**What it is for.** Your project's living knowledge base.
-
-**What you can do:** write pages in a rich editor, organize them in a tree, link between them, keep a version history, and export to PDF. See which pages link to the one you are reading.
-
-**The benefit.** Documentation that lives next to the work it describes, not in a separate silo.
-
-#### 4.19 Meetings *(fast-follow)*
-
-**What it is for.** Meetings that produce outcomes, not just calendar invites.
-
-**What you can do:** build a structured agenda with timed items, link agenda items to the work they concern, invite participants, capture outcomes and minutes, and send calendar invites. Set up recurring meetings with a plain-language schedule ("every two weeks on Tuesday"). Closing a meeting locks the minutes and can email a summary.
-
-**The benefit.** Every meeting has a clear agenda and a durable record, with action items that become real work.
+### 5.4 Scorecard *(fast-follow within v1)*
+When a cycle closes, archive it: per owner, the result and how many goals/KRs landed in each health bucket, with trends across cycles and exports. An optional points layer exists for organizations that want it — **off by default**.
 
 ---
 
-### Part C — AI & agents (built in from day one)
+## 6. Execution: deliver the work
 
-OpenOKR is **AI-native**: AI shows up as helpful actions throughout the product, never as a separate gimmick. Every AI feature is an accelerator over something you can already do by hand, so nothing breaks if you turn AI off, and everything an agent does happens **inside your own permissions**.
+### 6.1 Projects
+A project has a champion, a reviewer, contributors with stated responsibilities, and the same check-in rhythm as goals — status, narrative, milestone snapshot, acknowledgement, staleness. Pause a project and the rhythm pauses with it; resume and it reschedules. **Closing requires a retrospective** and an achieved/missed outcome. A project can link to the goal it serves.
 
-#### 4.20 AI assists in every module
+### 6.2 Milestones
+Real objects, not date pins: a timeframe (as fuzzy as "Q3" or as precise as a date), a description, a comment thread — and completing one can be done straight from a comment. The earliest open milestone is always the project's visible **next step**.
 
-**What you can do:**
+### 6.3 Work items
+The unit of work: title, rich description, **multiple assignees**, a simple honest status (*todo / in progress / done / canceled*), a due date, a checklist, and reminders that understand "3 days before due" or "when overdue". Link a work item to a key result and your delivery feeds the goal's score. An item can block another — and can't be completed while its blockers are open.
 
-- **OKRs:** draft an objective and its key results from a plain goal, rate how clear an objective is, improve an objective or key result, suggest the next key result, suggest a metric and target, suggest which parent to align under, and coach you on whether an OKR is any good.
-- **KPIs:** suggest KPIs for an objective, suggest targets and thresholds, describe a formula in words and get the calculated KPI built for you, and narrate what a trend is telling you.
-- **Work & projects:** summarize a long comment thread, break an objective or epic into work packages, draft a work package from a sentence, suggest an assignee or estimate, and write a project status paragraph or release notes.
-- **Meetings & wiki:** draft an agenda from linked work, turn meeting notes into outcomes and action items (created as real work packages), and draft, expand, or summarize a wiki page.
-- **Anywhere:** ask a question across your OKRs, projects, and wiki and get a grounded answer; or ask in plain language ("show at-risk objectives in Marketing this quarter") and get the filtered view.
+### 6.4 Boards
+Kanban per project or per milestone: drag cards between statuses, live for everyone, safe under simultaneous edits. Add items inline. Works with touch.
 
-**How it stays safe.** AI **proposes**, you **confirm**. Every AI suggestion appears as a preview or a "before → after" change that you approve before anything is saved, with a normal undo afterward. AI-generated values are labeled so you always know their origin.
-
-**The benefit.** The busywork of goal-setting, breaking down work, summarizing, and reporting largely disappears, while you stay in control of every change.
-
-#### 4.21 The copilot
-
-**What it is for.** A single assistant that can both answer and act.
-
-**What you can do:** open a copilot panel from anywhere, ask about your workspace, and have it take actions for you — create an objective, check in on a key result, draft a set of tasks — each proposed for your approval. It only ever sees and cites what **you** are allowed to see.
-
-**The benefit.** A knowledgeable helper that understands your actual data and can do the clicking, without ever exceeding your access.
-
-#### 4.22 Use your own AI agent (MCP)
-
-**What it is for.** Manage OpenOKR from the AI tools you already use.
-
-**What you can do:** connect your preferred AI agent — Claude, Cursor, a custom agent — to OpenOKR through a built-in **agent connection (MCP)**. Your agent can then read and manage your OKRs, KPIs, and projects **as you**, limited to your permissions, with every action logged. You control the access with scoped tokens you can rotate or revoke.
-
-**The benefit.** OpenOKR becomes a tool your own AI can operate, so you can run your goals and work from wherever you already think and type.
-
-#### 4.23 Bring your own AI, or run it locally
-
-**What it is for.** Control cost, privacy, and where your data goes.
-
-**What you can do:** an admin connects OpenOKR to the AI provider of your choice — Anthropic, OpenAI, Google, or OpenRouter — or a **local model** via Ollama or any compatible endpoint, for fully offline use. Keys can be set for the whole deployment, per workspace, or by an individual user who wants their own usage billed to them. Admins control which features are on, what data may leave the instance, and hard spending caps.
-
-**The benefit.** No forced dependency on one vendor, no surprise bills, and a genuine offline option for organizations that cannot send data outside their walls.
+### 6.5 Resource Hub
+Every space, project and goal gets a browsable library: **documents** (a rich editor with drafts, publishing, and version history with visual diffs), **folders**, **files** (previews, thumbnails), and **links** (a Google Doc, Figma or Notion page shown with its real title and icon). Comment on, react to, and subscribe to any of it. This replaces the usual wiki-plus-attachments sprawl with one tree.
 
 ---
 
-### Part D — Platform: the capabilities everything shares
+## 7. Collaboration & platform
 
-#### 4.24 Notifications & Inbox
-
-Stay informed without drowning. An in-app **Inbox** groups notifications by project and work item with reason chips (mentioned, assigned, watching, date alert); the bell badge updates live. Email and digest options are per-user and per-project, so you decide what reaches you and how.
-**Benefit:** the right nudges, on your terms.
-
-#### 4.25 Search & command palette
-
-Press one shortcut (⌘K) to jump to any work item, project, or page, run any action, or search across everything — results respect your permissions. A dedicated search covers work packages, projects, and wikis.
-**Benefit:** the whole product is a keystroke away; nothing is buried in menus.
-
-#### 4.26 Dashboards & My Work *(fast-follow for project dashboards)*
-
-A personal **Home** with your favorites, recent items, and "resume where you left off"; a **My Work** view of what is assigned to, created by, or watched by you; and configurable **dashboards** with widgets (assigned work, status charts, upcoming milestones, KPI tiles) for individuals and projects.
-**Benefit:** every person and project gets a tailored cockpit.
-
-#### 4.27 Favorites & quick navigation
-
-Star the projects and views you use most; they sit in your sidebar and on Home, in the order you choose.
-**Benefit:** your daily tools are always one click away.
-
-#### 4.28 Roles & permissions
-
-Access is role-based and configurable — roles carry permissions, and you assign roles per workspace and per project. Defaults (Owner, Project admin, Member, Reader) get you started; you can tune them precisely, including who manages goals, records KPIs, sees rates, or administers AI.
-**Benefit:** people see and do exactly what they should, no more and no less.
-
-#### 4.29 Audit log
-
-Every sensitive action — sign-ins, permission changes, deletions, exports, imports, settings changes, and every AI action — is written to an append-only audit log.
-**Benefit:** full accountability, and the evidence a security or compliance review will ask for.
-
-#### 4.30 Reporting & exports
-
-Export any work list to CSV, Excel, or PDF; export scorecards; and reach your data programmatically through a clean REST API with scoped access tokens. Large exports run in the background.
-**Benefit:** your data is never trapped — take it into any report or system you need.
-
-#### 4.31 Integrations *(fast-follow / planned)*
-
-Link GitHub and GitLab pull requests, merge requests, issues, and pipelines to work packages; link files from Nextcloud or OneDrive/SharePoint; subscribe to calendar feeds; and create or update work by email.
-**Benefit:** OpenOKR sits naturally in your existing toolchain.
-
-#### 4.32 Data importers (migrate without losing data)
-
-A guided, one-time importer moves your existing data in — from a legacy project tool and from FlowyTeam — covering projects, work, custom fields, comments, OKRs, KPIs, and more. It runs read-only against your old system, produces a full report of exactly what moved, is safe to re-run, and keeps a rollback path.
-**Benefit:** you can switch to OpenOKR in a single maintenance window, with confidence and a safety net, instead of re-keying years of data.
-
-#### 4.33 Language & accessibility
-
-The interface is available in English and Bahasa Melayu at launch (with Indonesian as a bonus), and is built to add more. Dates, numbers, and times follow each user's locale and the workspace timezone. The product targets **WCAG 2.1 AA** accessibility: full keyboard operation, screen-reader labels, and sufficient contrast throughout.
-**Benefit:** a tool your whole organization can use, in their language, however they work.
+- **Spaces** — each team's home: its goals, projects, documents, discussions and members, with its own access scope.
+- **Discussions** — titled threads per space (announcements) or attached to a goal/project; drafts are silent until published.
+- **Comments, mentions, reactions** — everywhere; @mentions notify immediately (your choice), and every comment is deep-linkable.
+- **The feed** — a human-readable, live activity stream per company/space/goal/project ("Aisha checked in on Q3 Revenue — caution", "Milestone 'Beta' completed") — filtered to what you may see, always.
+- **Notifications & digests** — an inbox with reason chips, mute and snooze; email that respects you: instant for direct mentions, otherwise batched into one digest on your schedule, plus an optional daily "your work today" summary in **your** timezone.
+- **People & org** — profiles, titles, a manager chain and org chart, a people directory; suspend/restore, guests with limited access, invitation links with domain rules.
+- **Search & command palette** — ⌘K to jump to anything or do anything; full-text (and later semantic) search across everything you can see.
+- **Exports & portability** — any list to CSV/XLSX; the whole workspace to an encrypted, checksummed archive you can import into any other OpenOKR instance (self-host → cloud or back) after a dry-run preview.
+- **Admin** — members and access (four simple levels; public/workspace/space/invite-only visibility), the rhythm's defaults and thresholds, branding, backups, a read-only freeze switch for maintenance, and a tamper-evident audit log with one-click verification.
 
 ---
 
-## 5. How strategy and execution connect
+## 8. AI & agents (built in, governed, optional)
 
-This is the single idea that sets OpenOKR apart, so it is worth stating plainly:
+Everything here is an accelerator over something you can do by hand. Turn AI off and the product is fully functional.
+
+### 8.1 Assists, everywhere
+Draft a goal and its key results from a sentence; get coached on whether it's a *good* OKR; **draft this week's check-in from what actually happened** (work closed, KR movement, comments) and just edit it; draft the retrospective from the check-in history; get KPI suggestions, thresholds, and formulas from plain language ("gross margin = revenue minus COGS, monthly"); summarize a long thread; decompose a goal into work items; draft or summarize documents; ask questions across everything you may see, with citations. Every AI write is a **preview you apply or dismiss** — never auto-committed, always labeled, always undoable.
+
+### 8.2 The copilot
+One assistant (⌘J) that answers from your workspace's actual data and can act — create the goal, post the check-in, file the work items — each action shown for your approval first. Long jobs run in the background and stream back.
+
+### 8.3 AI teammates
+Hire an agent: give it a name, a persona, instructions, a model, a schedule, and a **scope** (these spaces, those goals — nothing more). It plans its work, executes step by step, and posts updates into the same feeds and Review inbox as everyone else. Safety is layered: run it in **sandbox** (a full dry-run you can read), or the default **batch-approval** mode (it works overnight; you approve its proposed writes over coffee), or grant a narrow trusted agent direct writes. Every step is logged and metered, and a **hard cost cap halts it mid-run** — an agent can never run up an unbounded bill. Air-gapped? Teammates run on your local model.
+
+### 8.4 Bring your own AI
+Anthropic, OpenAI, OpenRouter — or **Ollama and any OpenAI-compatible local endpoint** for zero-egress installs. Keys at the deployment, workspace, or personal level (your personal agent traffic can bill to your own key), encrypted at rest. A model catalog routes cheap tasks to cheap models and hard ones to strong ones. Admins get per-feature switches, budgets, quotas, prompt versioning, and privacy controls that say exactly what may leave the building — with "nothing" a fully supported answer.
+
+### 8.5 Use your own agent (MCP)
+OpenOKR is an MCP server with a real sign-in: connect Claude, ChatGPT, Cursor or a custom agent through a proper consent screen (pick the workspace, see the scopes, revoke anytime), and it works as *you*, within *your* permissions, fully audited. Local desktop agents can connect with zero network exposure. Research connectors can search and cite your workspace.
+
+---
+
+## 9. How strategy and execution connect
 
 ```
-Company objective
-   └── Team objective (aligned under it)
-         └── Key result: "cut onboarding time to 3 days"
-               └── Work package: "rebuild the signup flow"
-                     └── linked, so closing the work moves the key result,
-                         which moves the objective, which moves the company goal
+Company goal
+   └── Space goal (aligned under it)
+         └── Key result: "cut onboarding time to 3 days"   ←— measured by a live KPI, if you like
+               └── Project: "rebuild the signup flow"
+                     └── Work item: "ship the new email verifier"
+                           └── linked to the key result — closing it moves the KR,
+                               the goal, and the company cascade, live, on the Work Map
 ```
 
-Because a **work package can link to a key result** (or a KPI), the work your team does every day feeds the score of the goal it serves. Check in on a key result, or simply complete the linked work, and progress cascades all the way up the alignment tree in real time. You never again have to manually answer "are we actually moving the needle?" — the tool shows you.
+Post a check-in (or just close the linked work) and progress flows all the way up. The Work Map shows the whole chain with health at every node — and a stale or off-track node glows through no matter how green its parent looks.
 
 ---
 
-## 6. Own it: deployment, privacy, and openness
-
-OpenOKR is one product that runs three ways, all the same release with the same behavior:
+## 10. Own it: deployment, privacy, and openness
 
 | How you run it | Who it suits | What it takes |
 |---|---|---|
-| **Cloud** | A solo founder or small team | A deploy button and a few settings, up in minutes. |
-| **Single server** | A small company, budget- or privacy-minded | One Docker Compose file on a cheap server or an office machine, in about half an hour. |
-| **Enterprise** | A university or large organization | A Helm chart on your own Kubernetes, your own database, single sign-on, backups, and audit controls. |
+| **Single server** | A small company, budget- or privacy-minded | One Docker Compose file + a first-run **web setup wizard** (it generates every secret and tests your connections). ~30 minutes on a $10 VPS. |
+| **Enterprise** | A university or large organisation | A Helm chart on your Kubernetes, your Postgres, SSO, backups, audit controls. |
+| **Zero-ops cloud** *(planned, post-v1)* | A solo founder or tiny team | A deploy-button path once the serverless profile ships. |
 
 **Your data, your rules.**
 
-- **Open source (AGPL).** The code is free and auditable. You are never locked in.
-- **Self-hostable.** Keep all your data in your own country and your own infrastructure — enough for most data-residency requirements.
-- **Air-gap capable.** OpenOKR can run fully offline. Point AI at a local model or switch it off; nothing critical depends on an outside service.
-- **Secure by construction.** Each tenant's data is isolated at the database level, sign-in supports passkeys and multi-factor and (in the enterprise tier) single sign-on, access tokens are scoped, and everything sensitive is audited.
-- **Private AI.** Admins decide whether AI is on, which provider it uses, what data may leave the instance, and how much it may spend.
-
-**Benefit:** you get a modern goals-and-work platform without renting it, without shipping your strategy to someone else's cloud, and without betting your institution on a vendor.
+- **Open source (AGPL).** Free, auditable, community-owned direction. Never locked in.
+- **Self-hosted = data residency.** Your country, your servers, your rules.
+- **Air-gap capable.** Fully offline: local AI or no AI, self-hosted assets, no telemetry unless you opt in.
+- **Secure by construction.** Tenant isolation enforced *inside the database*, passkeys and TOTP from day one, an append-only audit log with cryptographic tamper-evidence, scoped expiring API tokens, session management, strict browser protections.
+- **Provably portable.** Encrypted workspace export/import, backups whose restores are tested automatically, and (for hosted setups) support access that is time-boxed and **visible to you** — you can see who from the operator was in your workspace, when, and what they did.
 
 ---
 
-## 7. Works the way you work: methodologies
+## 11. Getting started
 
-OpenOKR does not force a single method. It ships ready-made **template projects and short guides** for the ways teams actually run:
-
-- **OKR** — a starter cycle with sample objectives and key results wired to the native strategy module.
-- **Scrum** and **SAFe** — team and program projects with boards and shared sprints.
-- **PM², PMflex, and PRINCE2** — governance templates with phases, gates, and standard artifacts.
-
-Pick a template when you create a project and you start with the right structure, terminology, and guidance already in place.
-**Benefit:** best-practice scaffolding on day one, with the freedom to adapt or ignore it.
+1. **Deploy** — `docker compose up`, open the wizard, done.
+2. **Set up** — name the workspace, pick a brand color and your check-in day, invite teammates (or share an invite link) — or click **"Explore with demo data"** to poke around a realistic company first.
+3. **Bring your data** — run the FlowyTeam importer or upload CSVs, preview the dry run, then import for real.
+4. **Set your goals** — create a cycle and your first goals with champions and reviewers (or let AI draft them from a sentence).
+5. **Plan the work** and link it to key results — progress starts flowing up the Work Map from day one.
+6. **Friday comes** — everyone's Review inbox fills, check-ins get posted and acknowledged, and the company knows where it stands. That's the product.
 
 ---
 
-## 8. Getting started
-
-1. **Deploy** using whichever path fits (cloud, single server, or enterprise).
-2. **Set up your workspace** in a short guided flow: name it and pick a brand color, invite teammates, and create your first project from the template gallery — or click "explore with demo data" to look around first.
-3. **Bring your data** if you are coming from another tool: run the importer in preview mode to see exactly what will move, then run it for real.
-4. **Set your goals** — create a cycle and your first objectives and key results (or have AI draft them from a sentence).
-5. **Plan the work** and link it to your key results, so progress starts flowing upward from day one.
-
-A short product tour points out the essentials (the sidebar, the command palette, creating work, the Inbox) the first time you sign in.
-
----
-
-## 9. At a glance
+## 12. At a glance
 
 | Area | What you get |
 |---|---|
-| **Strategy** | OKRs with alignment and automatic scoring, KPIs with calculated metrics, check-ins, scorecards |
-| **Execution** | Work packages, projects, boards, Gantt, scheduling, backlogs, calendar, time & cost, wiki, meetings |
-| **The link** | Work items connect to key results and KPIs; progress cascades up automatically |
-| **AI** | Assists in every module, a copilot that acts for you, and your own agent via MCP — with your key or a local model |
-| **Experience** | Inline editing, command palette, dark mode, keyboard control, live updates, mobile-ready |
-| **Platform** | Notifications, search, dashboards, roles, audit, exports, integrations, importers, multi-language |
-| **Ownership** | Open source, self-hostable, air-gap capable, database-level isolation, deploy three ways |
-| **Methods** | Templates and guides for OKR, Scrum, SAFe, PM², PMflex, PRINCE2 |
+| **The rhythm** | Scheduled check-ins, champion + reviewer accountability, the Review inbox, visible staleness |
+| **Strategy** | Weighted, direction-aware OKRs with value history + trend forecasts, alignment cascade, cycles, a full KPI module with calculated formulas, scorecards |
+| **Execution** | Projects with health check-ins + retrospectives, rich milestones, multi-assignee work items, kanban boards, the Resource Hub |
+| **The link** | Work items ↔ key results ↔ KPIs; progress cascades live up the Work Map |
+| **AI** | Assists everywhere, a copilot, AI teammates (sandboxed, batch-approved, cost-capped), MCP for your own agent, your key or a local model |
+| **Platform** | Spaces, discussions, typed live feed, smart notifications + digests, people & org chart, ⌘K search, exports, workspace portability |
+| **Ownership** | Open source, self-hosted in ~30 min, air-gap capable, database-level isolation, tamper-evident audit |
+| **Later (the power floor)** | Custom fields, custom workflows, saved views, Gantt/scheduling, time tracking, backlogs, meetings — added after launch, never required |
 
 ---
 
-*Working name: the product is referred to here as **OpenOKR**. For the technical design and the build plan behind everything above, see [REQUIREMENTS.md](REQUIREMENTS.md), [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md), and [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) in this folder.*
+*Working name: the product is referred to here as **OpenOKR**. For the technical design and the build plan behind everything above, see [REQUIREMENTS.md](REQUIREMENTS.md), [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) and [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) in this folder. For why the plan looks this way, see [OPERATELY-COMPARISON.md](OPERATELY-COMPARISON.md).*

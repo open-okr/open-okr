@@ -1,406 +1,234 @@
 # AI-NATIVE-PLAN.md
 
-The plan for OpenOKR's **AI layer**. It specifies how AI is built into the product from day one, across every module, as an accelerator that never becomes a dependency: how the provider abstraction works (bring-your-own key, OpenRouter, or a local model like Ollama), how the admin manages it, how OpenOKR ships an **MCP server** so any AI agent can drive OKRs and projects on the user's behalf, and how an in-app copilot takes actions safely inside the user's own permissions.
+The plan for OpenOKR's **AI layer**: AI built into every module from day one, an in-app copilot, **AI teammates** (autonomous agent members that plan and execute on the operating cadence), and an **MCP server with a full OAuth 2.1 authorization server** so any external agent drives OpenOKR safely. Multi-provider with bring-your-own-key and local models, per-token cost metering with hard caps, and a governance surface Operately does not have.
 
-Authority: peer of TECHNICAL-PLAN.md for the AI domain; both defer to PLAN.md and REQUIREMENTS.md (full order in CLAUDE.md). The §12 task list is execution authority for **Phase 5**, under IMPLEMENTATION-PLAN.md's Definition of Ready and task-loop rules.
+Authority: peer of TECHNICAL-PLAN.md for the AI domain; both defer to PLAN.md and REQUIREMENTS.md. §12 is the execution authority for Phase 5.
 
-Why this document exists: the rest of the plan set treats AI as one optional adapter port (`chat/embed/extract`, off by default, "summaries and drafting"). The product goal is the opposite. AI is a first-class surface of OpenOKR, present in project creation, OKR authoring, KPI analysis, check-ins, meetings, search, and administration, and reachable by external agents over MCP. This document raises AI from a stub to a domain, without breaking the air-gap and "no LLM on a required path" guarantees that make OpenOKR safe for on-prem institutions.
-
-Provenance note: OpenOKR's OKR authoring assists are informed by a working implementation in the FlowyTeam/OKRI Learn product (Laravel, OpenRouter-backed). §11 records what that design got right, what it got wrong, and how OpenOKR improves on each point. We reuse the ideas and the data (behavior), never the code (CLAUDE.md clean-room rule).
+Honesty note (from the competitive review, OPERATELY-COMPARISON.md §3.6): on the inbound MCP server and autonomous agents, **Operately is ahead of the original draft of this plan** — it ships a ~100-tool MCP server behind a spec-complete OAuth 2.1 flow, and cron-scheduled autonomous agents modeled as real members. This revision therefore treats Operately's shipped design as the **reference spec to match** on those two surfaces (clean-room: behavior, not code — TECHNICAL-PLAN §11), and concentrates OpenOKR's original effort where it genuinely leads: **provider freedom, governance (keys, metering, caps, prompts, egress), local/air-gapped AI, RAG, and safety controls for autonomy** (least privilege, sandbox, batch approval) that Operately lacks.
 
 ---
 
 ## 1. The AI-native stance (principles, ranked)
 
-These sit above the feature list. When a design choice is unclear, the higher principle wins.
+1. **Native, not dependent.** Every AI feature is an accelerator over a complete manual path. Remove AI and the product works end to end. CI enforces it (§10).
+2. **Every AI action runs under a concrete principal — never ambient authority.** Interactive assists and MCP calls act as the human user, through the same `can()` + RLS as a click. **AI teammates act as their own agent member** (`workspace_members.kind = 'ai'`) with **least-privilege bindings** scoped to named spaces/goals — never a workspace-wide grant (Operately's agents get company-wide edit access; we fix that). Either way, authorization is the backstop that makes prompt injection non-catastrophic.
+3. **Bring your own brain.** Deployment, workspace admin, or individual user chooses the provider and supplies the key: Anthropic, OpenAI, OpenRouter, or a **local model** (Ollama, vLLM, LM Studio, any OpenAI-compatible endpoint). Google fast-follow. No provider hardcoded. Air-gapped installs point at a local model or turn AI off — including autonomous teammates.
+4. **Write policy is per mode, not absolute.** *Interactive* AI (assists, copilot, MCP as a user) proposes; the human confirms, with preview/diff and undo. *Autonomous* AI teammates execute unattended **within policy**: default is **batch-approval** (the run produces proposed writes into a review queue), with an admin-selectable scoped direct-write mode for trusted agents — always sandboxable, always cost-capped, always audited. This resolves the old plan's contradiction that forbade the autonomy Operately ships.
+5. **Nothing leaves the instance silently.** Admin controls what context may go to a non-local provider, PII redaction, an egress allow-list, no-train headers. Local provider ⇒ zero egress, and the UI says so.
+6. **Cost is visible and capped.** Every call records tokens and cost. Quotas (tokens / cost / calls) per user, per agent, per workspace; **hard caps auto-disable** — an unattended teammate can never run an unbounded bill (Operately's agents have zero metering).
+7. **Structured output is validated, never trusted.** Model JSON passes Zod with one repair retry, then a clean failure. The model is an untrusted source; so is everything it retrieved.
+8. **One contract, every consumer.** The copilot, the AI teammates' executor, the MCP server, REST, and the CLI all invoke the same action registry in `packages/core` (TECHNICAL-PLAN §14). Define `create_goal` once; it is permission-checked identically everywhere.
 
-1. **Native, not dependent.** Every AI feature is an accelerator layered over a complete manual path. Remove AI and the product still works end to end. This is what lets OpenOKR be AI-native *and* air-gap-safe at the same time.
-2. **The agent is the user, never a superuser.** Every AI action, in-app or over MCP, runs through the same `can(user, permission, context)` check and the same Row Level Security as a human click. An agent can do exactly what the acting user can do, and nothing more. Authorization is the backstop that makes prompt injection non-catastrophic.
-3. **Bring your own brain.** The deployment, the workspace admin, or the individual user chooses the provider and supplies the key: a hosted model (Anthropic, OpenAI, Google, OpenRouter) or a local one (Ollama, vLLM, LM Studio, any OpenAI-compatible endpoint). No provider is hardcoded. Air-gapped installs point at a local model or turn AI off.
-4. **Writes are proposed, then confirmed.** AI drafts; the human commits. In-app, a write shows as a preview or diff with an approve action and an undo toast. Over MCP, writes require a read-write token scope, and the human still owns the token.
-5. **Nothing leaves the instance silently.** The admin controls exactly what context may be sent to a non-local provider, PII is redacted from prompts, egress is allow-listed, and every AI call is metered and auditable. A local provider means zero egress.
-6. **Cost is visible and capped.** Every call records tokens and cost. Quotas and hard caps protect budgets, especially a user's own BYO-key budget. No feature can run the bill up invisibly.
-7. **Structured output is validated, never trusted.** Model JSON passes through Zod at the boundary like any other external input, with a retry on failure. The model is an untrusted source.
-8. **One tool registry, three consumers.** The in-app copilot, the MCP server, and the documented REST surface all call the *same* permission-checked tools in `packages/core`. We define an action once and expose it three ways.
+## 2. The capability catalog
 
-### 1.1 Resolving the tension with the existing hard rules
+Each capability is an accelerator over an existing manual action, uses a §3 port capability, is independently toggleable (§4), and follows the §1.4 write policy.
 
-PLAN.md and CLAUDE.md carry three guarantees that AI-native must not break. It does not, and here is exactly how:
+### 2.1 Strategy (Phase 5 assists over the Phase 3 core)
 
-| Existing guarantee | How AI-native keeps it |
-|---|---|
-| "No LLM call may sit on a required path." | Preserved verbatim as principle 1. A CI test (§10) boots the app with `AI_PROVIDER=off` and asserts every P0 flow still passes. AI features hide or disable; underlying actions stay manual. |
-| "Air-gapped installs can point the AIProvider at a local model or disable it." | Strengthened. Ollama and any OpenAI-compatible base URL are first-class providers (§3.2), embeddings run locally (§9), and the MCP server itself makes no outbound AI calls. Being AI-native does not mean being cloud-dependent. |
-| "Postgres is the only required service." | Kept. Semantic search uses the **pgvector** extension of Postgres, not a separate vector service. Where pgvector is unavailable, retrieval degrades to Postgres full-text search (§9). No new service is required. |
+| Capability | Kind | Degrades to |
+|---|---|---|
+| Draft a goal + KRs from a plain-language ambition (rate/improve/coach variants) | write | blank create form |
+| Suggest metrics, targets, units; suggest the alignment parent (semantic, via embeddings) | write | manual pickers |
+| **Draft the overdue check-in from real activity** (linked work-item movement, KR value history, comments since last check-in) | write | blank check-in |
+| Summarize blockers/risks across a team's check-ins; narrate a cycle | read | read the list |
+| Draft the close retrospective from check-in history | write | blank retro |
+| Suggest KPIs + thresholds; build a calculated-KPI formula from a sentence; narrate a KPI trend / flag anomalies | write/read | manual builder / read the chart |
+| Duplicate/conflicting-goal detection across the org (embeddings) | read | none |
 
-The one principle that changes: AI shifts from **off by default** to **on by default wherever a provider is configured**, per feature, admin-controllable. A deployment with no key configured behaves exactly like today's plan (AI off, everything manual). This is the whole difference between "bolted on" and "built in".
+### 2.2 Execution (over the Phase 4 core)
 
----
+| Capability | Kind | Degrades to |
+|---|---|---|
+| Draft a work item from a sentence; decompose a goal into work items | write | blank form |
+| Summarize a thread; draft a project status narrative; flag reported-health vs data divergence ("on_track but 3 milestones slipped") | read | read it yourself |
+| Draft/expand/summarize a document; summarize an uploaded file | write/read | the editor |
+| Grounded Q&A across goals/projects/docs (permission-filtered citations) | read | full-text search |
+| Natural-language filter ("at-risk goals in Marketing this quarter") → validated list query | read | manual filters |
 
-## 2. What "AI-native everywhere" means: the capability catalog
+### 2.3 The three agent surfaces
 
-AI shows up in every module as named, scoped capabilities. Each is an accelerator over an existing manual action (principle 1), uses one of the port capabilities from §3.1, and is independently toggleable by the admin (§4). "Write" capabilities always propose-then-confirm (principle 4).
-
-### 2.1 Strategy (OKR / KPI / check-ins) — built in Phase 4
-
-| Capability | Kind | Port cap | Degrades to |
-|---|---|---|---|
-| Draft an objective + key results from a goal / role / industry | write | tools/extract | the blank create form |
-| Rate objective clarity (score + feedback) | read | extract | no score shown |
-| Improve an objective or a key result (rewrite + reason) | write | extract | manual edit |
-| Suggest the next key result (complementary, non-duplicate) | write | extract | manual add |
-| Suggest a metric type, unit, and target for a key result | write | extract | manual entry |
-| Suggest the cycle / period for a goal | write | extract | manual pick |
-| Suggest an alignment parent (which objective/KR this rolls up to) | write | tools | manual picker |
-| Draft this period's check-in from recent activity and KR movement | write | tools | blank check-in |
-| Summarize check-in blockers and risks across a team | read | chat | read the list |
-| Coach: "is this a good OKR?" against the methodology | read | chat | the guide docs |
-| Suggest KPIs for an objective; suggest target and RAG thresholds | write | extract | manual KPI create |
-| Draft a calculated-KPI formula from a plain-language description | write | extract | the formula builder |
-| Narrate a KPI trend or flag an anomaly in its history | read | chat | read the chart |
-
-### 2.2 Work management (projects, work packages, meetings, wiki) — built in Phase 3
-
-| Capability | Kind | Port cap | Degrades to |
-|---|---|---|---|
-| Summarize a work-package comment thread on demand | read | chat | read the thread (this is the one capability the base plan already names) |
-| Draft a work package from one sentence | write | extract | blank WP form |
-| Decompose an objective or an epic into work packages | write | tools | manual breakdown |
-| Suggest assignee, estimate, or acceptance criteria | write | extract | manual entry |
-| Detect likely duplicate work packages | read | embed | manual search |
-| Summarize a project's status into a report paragraph | read | chat | the overview widgets |
-| Draft release notes from the work closed in a version | write | chat | manual notes |
-| Draft a meeting agenda from linked work packages and OKRs | write | tools | blank agenda |
-| Summarize meeting notes into outcomes + action items (create WPs) | write | tools | manual minutes |
-| Draft, expand, or summarize a wiki page | write | chat | the editor |
-| Ask a question across the wiki / a project (grounded answer) | read | embed+chat | full-text search |
-
-### 2.3 Cross-cutting
-
-| Capability | Kind | Port cap | Notes |
-|---|---|---|---|
-| **Workspace copilot** (chat that answers and *acts*) | read+write | tools | §6; grounded via §9; every action permission-checked |
-| **Natural-language to query DSL** ("at-risk objectives in Marketing this quarter") | read | extract | emits a validated §4.5 query, never raw SQL |
-| Global semantic search across OKRs, work packages, wiki | read | embed | §9; permission-filtered; hybrid with FTS |
-| Portfolio / alignment-gap narrative for a PMO | read | chat | grounded, read-only |
-| Importer: suggest a mapping for an unmappable legacy filter, formula, or custom field | write | extract | human approves; strictly off the import required path |
-
-### 2.4 The MCP surface (external agents) — §5
-
-Everything in §2.1–§2.3 that is an *action* (create/update/check-in/record/link/comment/query) is also exposed as an MCP tool, so a user's chosen agent (Claude Desktop, Claude Code, Cursor, a custom agent) can do the same work from outside OpenOKR, as that user, within that user's permissions.
-
----
+1. **Copilot (interactive).** §6.1 — answers grounded in workspace data, proposes actions for confirmation.
+2. **AI teammates (autonomous).** §6.3 — agent members with personas that run scheduled plan/execute loops on the cadence.
+3. **External agents over MCP.** §5 — the user's own agent (Claude, ChatGPT, Cursor, custom) acting as that user.
 
 ## 3. AI architecture
 
-### 3.1 The AIProvider port (elevated)
+### 3.1 The AIProvider port
 
-The base plan's port has three methods. The AI-native port keeps the shape (one interface in `packages/adapters`, vendor SDKs live only there) and widens the surface:
+One interface in `packages/adapters`; vendor SDKs live only there (the Vercel AI SDK + the MCP TypeScript SDK are the approved internals).
 
 | Method | Purpose |
 |---|---|
-| `chat(messages, opts)` | completion; `opts`: `model`/`tier`, `temperature`, `maxTokens`, `stop`, `responseFormat` |
-| `stream(messages, opts)` | token streaming (Server-Sent Events) for the copilot and long drafts |
-| `chatWithTools(messages, tools, opts)` | native tool/function calling; drives the agent loop in §6 |
-| `embed(texts, opts)` | vectors for retrieval (§9) |
-| `extract(schema, input, opts)` | structured output; the driver requests JSON mode where the model supports it, and the result is Zod-validated by the caller (§10) |
-| `rerank(query, docs)` *(optional)* | retrieval reranking; falls back to vector score if the provider lacks it |
-| `capabilities(model)` | introspection: `{ tools, vision, jsonMode, contextWindow, embeddingDims, streaming }` so features can adapt or degrade |
+| `chat` / `stream` | completion / token streaming |
+| `chatWithTools` | native tool calling; drives the copilot and teammate loops |
+| `embed` | vectors for §9 |
+| `extract` | structured output (JSON mode where supported), Zod-validated by the caller |
+| `capabilities(model)` | `{tools, vision, jsonMode, contextWindow, embeddingDims, streaming}` so features adapt or degrade |
 
-Key architectural difference from the other ports: the other adapters are selected by the `RUNTIME` env var at boot. **The AI driver is selected by stored configuration, per request, resolved from the workspace and user (§3.3)**, layered over whichever runtime is active. A request-scoped factory reads the effective config, decrypts the key server-side, and returns a driver instance. Feature code calls `ai.chat(...)`; it never knows which provider answered.
+Selected by **stored config per request** (user key → workspace → deployment → off), not the `RUNTIME` var.
 
-### 3.2 Provider drivers (all inside `packages/adapters`)
+### 3.2 Provider drivers
 
-| Provider | Models | Tools | Embeddings | Notes |
-|---|---|---|---|---|
-| `anthropic` | Claude family | yes | via a companion embed model | prompt caching; `anthropic-beta` no-train posture |
-| `openai` | GPT family | yes | yes | JSON mode; org/project ids |
-| `google` | Gemini family | yes | yes | |
-| `openrouter` | many, one key | model-dependent | some | meta-provider; the FlowyTeam product uses this. Attribution headers (`HTTP-Referer`, `X-Title`) |
-| `ollama` | local (Llama, Qwen, etc.) | model-dependent | yes (`nomic-embed-text`) | **base URL** setting (default `http://localhost:11434`); the air-gap default |
-| `openai-compatible` | any | model-dependent | model-dependent | generic base-URL + key driver: vLLM, LM Studio, LiteLLM, Groq, Together, self-hosted gateways |
-| `off` | none | no | no | no-op driver; every capability reports unavailable and features degrade |
+| Provider | Notes |
+|---|---|
+| `anthropic` | Claude family; prompt caching; no-train posture |
+| `openai` | GPT family; JSON mode |
+| `openrouter` | many models, one key; attribution headers |
+| `ollama` | local; base-URL setting; **the air-gap default**; `nomic-embed-text` for embeddings |
+| `openai-compatible` | generic base-URL + key: vLLM, LM Studio, LiteLLM, Groq, Together |
+| `google` | fast-follow (§13 A3) |
+| `off` | no-op; every capability reports unavailable; features degrade |
 
-Adding a driver is adding one file that satisfies the port interface plus a row in the model catalog (§3.4). No feature code changes.
+### 3.3 Bring-your-own-key precedence
 
-### 3.3 Bring-your-own-key and the config precedence
+Deployment env (`AI_PROVIDER`, `AI_API_KEY`, `AI_BASE_URL`) → workspace config (admin UI) → per-user key (if the workspace allows; bills the user, used especially for their MCP/agent traffic). Resolution per call: user → workspace → deployment → off. Keys are envelope-encrypted (per-secret data keys wrapped by a master **key ring**; rotation re-wraps data keys only, zero-downtime — TECHNICAL-PLAN §8.2), never sent to the client, never logged; a masked hint + a live "Test connection".
 
-Three layers, highest wins. Any layer may be absent.
+### 3.4 Model catalog and tier routing
 
-| Layer | Set by | Stored in | Use |
-|---|---|---|---|
-| **Deployment default** | env vars (`AI_PROVIDER`, `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`) | env, Zod-validated at boot | zero-config: a self-hoster sets one key and every workspace can use AI |
-| **Workspace** | workspace admin, in the UI (§4) | `ai_providers` + `ai_credentials` (encrypted) | the normal case: one org, one billing key, admin-controlled features |
-| **User (BYO)** | the individual, if the workspace allows it | `ai_credentials` scoped to the user | the user's own key bills to them; used especially for their MCP/agent traffic so heavy personal use does not spend the org key |
+Features request a **tier**, never a model: `fast` (cleanups, classification) / `balanced` (most assists, summaries) / `deep` (OKR critique, decomposition, teammate reasoning) / `embed`. `ai_models` is a global catalog (context window, capabilities, cost in/out, tier tags; seeded + refreshable from live model lists); `ai_model_policies` maps `(workspace, tier) → (provider, model, sampling, json_mode)`. Free-text model ids are allowed but validated against the live list when reachable; a context-window guard blocks oversize requests. Air-gapped installs map every tier to a local model.
 
-Resolution per call: **user key (if present and feature-allowed) → workspace config → deployment default → `off`**. The resolver returns the provider, base URL, model policy (§3.4), and the decrypted key. If it resolves to `off`, the feature degrades.
+## 4. Admin surface (screen S-24)
 
-**Key storage.** Keys are encrypted at rest with envelope encryption (a data key per secret, wrapped by a master key from env or an external KMS where configured), never returned to the client, never logged, and decrypted only server-side at call time. Each stored key keeps a display hint (`sk-...abcd`) and a status. A "Test connection" action does a cheap live call and reports reachability without exposing the key. (This improves on the FlowyTeam product's single `Crypt::encryptString` global key: see §11.)
+Permission `manage_ai`. Cards: **Provider & connection** (incl. allow-user-keys); **Models & routing** (tier map, sampling); **Features** (a switch per §2 capability, default-on where a provider is configured); **Budgets & limits** (token/cost/call quotas per user / per agent / per workspace; a hard cost cap that auto-disables; throttle window); **Prompts** (versioned system prompt per feature, restore-to-default, eval-gated changes); **Privacy & governance** (context egress level, PII redaction, no-train assertion, egress allow-list, per-workspace opt-out; greyed with a "zero egress" note on local providers); **Agents** (create/edit AI teammates: persona, planning + execution instructions, provider/tier, schedule, access scope, sandbox toggle, autonomy policy, run history); **MCP & connections** (enable server, connected clients/grants with last-used + audit links, revoke); **Usage & logs** (token/cost dashboards by user/feature/agent/model, request log with truncated payloads, flag-misuse, latest eval results).
 
-### 3.4 Model catalog and routing
+## 5. The MCP server (external agents drive OpenOKR)
 
-Features do not name a model. They request a **capability tier**, and a workspace policy maps the tier to a concrete model. This lets the admin run cheap models for cheap tasks and strong models for reasoning, and lets air-gapped installs map every tier to a local model.
-
-| Tier | Typical use | Example (hosted) | Example (local) |
-|---|---|---|---|
-| `fast` | title cleanup, classification, short rewrites | a small/cheap chat model | a 3–8B local model |
-| `balanced` | most authoring assists, summaries | a mid chat model | an 8–14B local model |
-| `deep` | OKR critique, decomposition, agent reasoning | a frontier chat model | the largest local model available |
-| `embed` | retrieval vectors | a hosted embedding model | `nomic-embed-text` on Ollama |
-
-- `ai_models` is a **catalog**: `provider`, `model_id`, `display_name`, `context_window`, `capabilities`, `cost_in`/`cost_out` per million tokens, tier tags, `active`. Seeded, and refreshable from the provider's live model list where one exists (OpenRouter, OpenAI, Ollama `/api/tags`).
-- `ai_model_policies` maps `(workspace, tier) → (provider, model_id, temperature, max_tokens, json_mode)`.
-- For OpenRouter and OpenAI-compatible providers the admin may still type any model id (parity with the FlowyTeam product's free-text field), but the id is **validated against the live model list when reachable** and a context-window guard prevents oversize requests. This fixes the FlowyTeam product's unvalidated free-text model box (§11).
-
----
-
-## 4. Admin management surface (S-24)
-
-A dedicated **Admin → AI** area, permission-gated by `manage_ai` (added to the RBAC catalogue, TECHNICAL-PLAN §4.1 / P2-T01). It follows the S-13 two-level settings pattern and is workspace-scoped. Cards:
-
-1. **Provider & connection.** Provider dropdown (`anthropic`/`openai`/`google`/`openrouter`/`ollama`/`openai-compatible`/`off`), base URL (shown for local/compatible), API key (encrypted, masked, **Test connection**), org/project id where relevant, and whether users may bring their own key.
-2. **Models & routing.** The tier → model map (§3.4), validated against the live model list where reachable; per-tier temperature, top-p, max tokens, and JSON-mode; the context-window guard.
-3. **Features.** A switch per capability from §2 (generator, coach, WP summary, meeting summary, copilot, NL-query, and so on), each independently on/off, defaulting on when a provider is configured. This generalizes the FlowyTeam product's two kill switches into per-feature control.
-4. **Budgets & limits.** Quotas by **tokens, cost, or calls** (admin picks), per user / per workspace / per period; a hard **cost cap** that auto-disables AI when exceeded; a short-window throttle interval. Fixes the FlowyTeam product's call-count-only quota and its never-populated cost field (§11).
-5. **Prompts.** The system prompt per feature, **versioned and editable**, with a shipped default and a one-click restore-to-default; documented template variables; edits are workspace-scoped and take effect on save. A/B or staged prompt changes are gated by the eval harness (§10).
-6. **Privacy & governance.** What context may be sent to a non-local provider (off / titles-only / full), PII redaction toggle, the no-train provider header assertion, the egress domain allow-list, and a per-workspace AI opt-out. Local provider ⇒ these are moot (zero egress) and the UI says so.
-7. **MCP & agents.** Enable the MCP server, mint / rotate / revoke scoped agent tokens with per-token scope and rate limit, and see connected agents with last-used and audit links (§5).
-8. **Usage & logs.** Token and cost dashboards (by user, feature, model, period), a request log with truncated payloads and a "flag misuse" toggle, and the latest eval results.
-
-### 4.1 What this improves over the source product (summary; detail in §11)
-
-Provider abstraction and local models (was OpenRouter-only), BYO user keys (was one global key), validated model catalog with tiers (was one unvalidated free-text model), real per-token cost metering and caps (cost was a stubbed column), per-feature toggles (was two switches), versioned prompts, privacy/egress controls, and the whole MCP + copilot surface (did not exist).
-
----
-
-## 5. The MCP server (OpenOKR as an agent-drivable tool)
-
-OpenOKR ships a **Model Context Protocol server** so any MCP-capable AI agent can read and manage a user's OKRs, KPIs, and projects from outside the app. This is requirement-level: "each user/admin can manage their project/OKR via MCP with their preferred AI agent."
+Reference spec: Operately's shipped server (behavior, not code). Where the original draft under-specified this, the corrected requirements below are mandatory — a PAT-paste-only MCP cannot onboard hosted connectors at all.
 
 ### 5.1 Shape
 
 | Aspect | Decision |
 |---|---|
-| Role | OpenOKR is the **server**; the user's agent (Claude Desktop, Claude Code, Cursor, a custom client) is the **client** |
-| Transports | **stdio** (local, for desktop agents) and **Streamable HTTP** (remote, for hosted agents); both over the same tool registry |
-| Auth | scoped **Personal Access Tokens** from TECHNICAL-PLAN §8.2 (`api_tokens`, extended with an `mcp` capability and `read`/`write`/`admin` scopes); OAuth 2.1 authorization-code flow where the client supports it |
-| Identity | the token resolves to **one user in one workspace**; the server sets the `app.workspace_id` GUC and runs every call as that user |
-| Enforcement | every tool call passes `can(user, permission, ctx)` + RLS (principle 2); write tools require a `write` scope, admin tools require `admin` scope *and* the underlying permission |
-| Rate + audit | per-token rate limit via the Cache port; every tool call writes an `audit_events` row and an `ai_tool_calls` row |
-| Egress | the OpenOKR MCP server makes **no outbound AI calls** of its own; the model lives in the user's agent. Air-gap-safe by construction |
+| Role | OpenOKR is the server; the user's agent is the client |
+| Transports | **Streamable HTTP** (hosted connectors) and **stdio** (local/air-gapped desktop agents — a capability Operately lacks) |
+| Auth (primary) | **OAuth 2.1 authorization-code + PKCE (S256)** — required for the HTTP transport. Scoped PATs remain as the stdio/scripts fallback only |
+| Identity | one grant = one user + one workspace, chosen at a **consent + workspace-picker** screen (tool schemas never take a workspace id) |
+| Enforcement | every tool call resolves the acting member, sets the RLS GUC, and runs the action registry's `can()`; write tools need `write` scope; admin tools need `admin` scope **and** the underlying permission; live membership + suspension revalidated per request; membership loss revokes the grant |
+| Rate + audit | per-token rate limits (Cache port) + cost caps (§4); every call writes `ai_tool_calls` + an audit event |
+| Egress | the MCP server makes no outbound AI calls of its own — air-gap safe by construction |
 
-### 5.2 What the server exposes
+### 5.2 The OAuth 2.1 authorization server (mandatory sub-spec)
 
-- **Tools** — the action registry from §6.2, e.g. `create_objective`, `update_key_result`, `check_in`, `record_kpi`, `create_work_package`, `link_work_to_okr`, `add_comment`, `run_query`, `search`. Names and field lists follow the canonical shapes documented for the source product (`reference/flowyteam-okr-kpi-tasks-model.md` §8) so existing agent integrations map cleanly.
-- **Resources** — read-only handles an agent can fetch: an objective, a project, a saved query's result set, a cycle's scorecard. Backed by the same permission-scoped reads as the UI.
-- **Prompts** — MCP prompt templates the agent can offer the user: "Run my weekly check-in", "Draft next quarter's OKRs for team X", "Summarize project status".
+- Endpoints: `/oauth/authorize` (login → workspace picker → consent), `/oauth/token` (code + refresh grants), `/oauth/register` (RFC 7591 dynamic client registration).
+- Discovery: RFC 9728 protected-resource metadata, RFC 8414 authorization-server metadata, OpenID-configuration (ChatGPT), each with `/mcp`-suffixed variants and CORS preflight; 401s carry a `WWW-Authenticate` challenge pointing at the resource metadata.
+- Clients: static allowlist + **CIMD** (client-id metadata documents) + DCR — CIMD/DCR fetches go through the SSRF-safe fetcher (port-443 only, literal **and** DNS-resolved address checks, no redirects, size/time caps); RFC 8252 native-app redirect rules (custom schemes allowed to `/oauth/callback` only; `javascript:`/`data:`/`file:` denied); HTTPS-only redirects in production; public clients only (`token_endpoint_auth_method=none`).
+- Tokens: authorization codes single-use (consumed in a transaction); access tokens ~15 min; refresh tokens ~30 days with **rotation on every use and reuse-detection that revokes the entire grant lineage**; RFC 8707 resource/audience binding validated at issue and on every request (an `/api/v1` token is not an MCP token); **all secrets stored as SHA-256 hashes with type prefixes**.
+- Sessions: `mcp-session-id` bound to the grant (cross-grant/closed → unknown), protocol-version negotiation and header discipline (Accept both `application/json` + `text/event-stream` else 406; content-type else 415; GET → 405; DELETE closes), Origin/DNS-rebinding validation (strict same-origin on localhost binds), sanitized errors (JSON-RPC errors at HTTP 200 for domain failures; real HTTP codes for transport violations).
 
-### 5.3 Relationship to P4-T19
+### 5.3 What the server exposes
 
-The existing task P4-T19 ("OKR/KPI/Tasks REST + MCP-compatible API") defines the REST resources and the *field shapes*. Phase 5's P5-T09 builds the **actual MCP server** (transports, auth, tool/resource/prompt registration, per-user enforcement) on top of those shapes and the §6 tool registry. P4-T19 stays as written; P5-T09 depends on it.
+- **Tools** — the action registry's projections across *both* pillars (goals, KRs, check-ins + acknowledge, KPIs + records, projects, milestones, work items, documents, comments, search), each carrying `readOnlyHint`/`destructiveHint`, a safety classification, scopes, schemas and examples; lifecycle + destructive actions included (close/reopen/pause/archive/delete) and pinned by a catalog-invariant test. Plus connector-grade **`search`** (global, permission-filtered) and **`fetch`** (canonical OpenOKR URL → structured content + citation markdown; same-origin + path-allowlist validated) so ChatGPT/Claude research connectors work.
+- **Resources** — read-only handles (a goal, a project, a cycle scorecard, a work map slice) — a primitive Operately does not expose.
+- **Prompts** — server-side templates ("Run my weekly check-in", "Draft next quarter's OKRs for team X", "Summarize this week") — also beyond Operately.
 
-### 5.4 Outbound MCP (optional, later)
+## 6. The agentic layer
 
-The reverse direction (OpenOKR's own copilot calling *external* MCP tools, e.g. a GitHub or Slack MCP server) is a natural extension of the §6 tool loop: external MCP tools register into the same registry behind an admin allow-list. Designed for, not built in v1. Listed in §13.
+### 6.1 The copilot (interactive)
 
----
+A side panel (⌘J / "Ask AI", screen S-25): grounded answers via §9 (citations only to what the user may see), actions through the registry with preview → apply → undo, streaming with Stop. Turns that trigger long tool sequences execute as background jobs (outbox → JobQueue) and stream back over Realtime, so they survive reloads and are watchable. Degrades cleanly when AI is off.
 
-## 6. The agentic layer (in-app copilot + the shared tool registry)
+### 6.2 The action registry (shared)
 
-### 6.1 The copilot
+TECHNICAL-PLAN §14. For AI consumers the registry adds: per-tool safety class, write-confirmation gating for interactive mode, proposed-change envelopes for batch approval, `ai_tool_calls` audit, and Zod input/output validation. Tools add no new write paths — every handler is a core service through the Operation pipeline.
 
-A workspace **copilot** panel (a SidePanel, S-25) that answers questions and takes actions. It:
+### 6.3 AI teammates (autonomous agents — the headline)
 
-- grounds answers in the workspace's own data via retrieval (§9), permission-filtered so it can only cite what the user may see;
-- takes actions through the tool registry (§6.2), each one permission-checked;
-- **proposes writes as a preview or diff** and waits for the user to approve (principle 4), then applies through the normal mutation layer so optimistic UI, undo, and audit all work;
-- streams its response and can be stopped mid-generation;
-- degrades cleanly: with AI `off`, the panel shows "AI is disabled for this workspace" and every action it would offer is still reachable by hand.
+Reference behavior: Operately's agents (Person-typed members, plan/execute phases, daily cron, sandbox), upgraded with the governance Operately lacks.
 
-### 6.2 The tool registry (one definition, three consumers)
+- **Identity.** An `agents` row owns a `workspace_members` record with `kind='ai'`: the agent has a name, avatar, profile, and appears in feeds, mentions, assignments and audit like anyone. It can be a goal's champion or a project contributor.
+- **Definition.** Persona (`definition`), **staged instructions** (`planning_instructions`, `execution_instructions`) — versioned like prompts, unlike Operately's plain columns — provider/tier choice, schedule (`daily_run` on working days, or cron), autonomy policy, sandbox flag, access scope.
+- **Least privilege.** The agent's member group gets explicit bindings on named spaces/goals/projects only — default read-only with per-resource write grants. Never a workspace-wide grant.
+- **Runs.** `agent_runs` is a durable state machine (`planning → running → completed/failed/cancelled`) with a `tasks jsonb` list: the planning phase decomposes work via an `add_task` tool; the execution phase pops one task per job, runs a bounded tool loop, appends a **human-readable log** (verbose toggle), and self-reschedules via the JobQueue until done. Resumable across restarts; every tool call carries the `run_id`.
+- **Write policy per §1.4.** `sandbox` — write tools return simulated results, nothing commits (full dry-run). `batch_approval` (default) — writes become proposed-change envelopes queued to a review inbox section; a human applies/dismisses in bulk next morning. `scoped_direct` — writes commit immediately within the agent's bindings (for trusted, narrow agents), still fully audited.
+- **Cost.** Every step meters into `ai_usage_events` under the agent; per-agent and workspace caps **halt a run mid-flight** with a clear log line.
+- **Conversation.** An agent is also conversable (mention it on a goal/project); turns process async and broadcast, anchored to the entity.
 
-A single registry in `packages/core`. Each tool is:
+## 7. Schema (AI domain; DATABASE.md domains M/N)
 
-```ts
-// One tool = one permission-checked action. The registry is the single
-// source of truth for the copilot (§6.1), the MCP server (§5), and REST docs.
-type AiTool = {
-  name: string;                 // e.g. "create_objective"
-  description: string;          // shown to the model
-  inputSchema: ZodType;         // validated before the handler runs
-  permission: Permission;       // checked via can(user, permission, ctx)
-  readOnly: boolean;            // read tools skip the write-confirmation gate
-  handler: (input, ctx) => Promise<Result>; // calls a core service, never raw SQL
-};
-```
+OpenOKR conventions apply (workspace_id + RLS in the same migration; no legacy provenance). `ai_credentials` and all token hashes are never selected to the client.
 
-Rules that make it safe:
-
-- The handler calls an existing `packages/core` service. Tools add no new write paths and inherit every validation and audit the service already has.
-- `can(user, permission, ctx)` runs before the handler, every time, for the copilot and MCP alike. Deny by default. RLS is the database backstop.
-- Non-`readOnly` tools invoked by the copilot return a **proposed change** the UI renders for approval; over MCP they require a `write` token scope.
-- Inputs are Zod-validated (a tool schema is external input). Tool outputs are truncated and recorded in `ai_tool_calls` for audit.
-
-This is the mechanism behind principle 8: define `create_objective` once, and it is available to the human via the UI, to the copilot via the loop, and to the user's external agent via MCP, with identical authorization.
-
----
-
-## 7. Schema (AI domain "S")
-
-New tables, OpenOKR conventions: `id uuid pk`, `workspace_id uuid` (except the global catalog), `created_at`, `updated_at`, an RLS policy in the same migration, text enums with check constraints. These are **new, no legacy source** (they do not come from either importer). Added to DATABASE.md as domain S.
-
-| Table | Key columns | Notes |
-|---|---|---|
-| `ai_providers` | `provider`, `base_url?`, `org_id?`, `enabled`, `is_default`, `allow_user_keys bool` | workspace AI connection config |
-| `ai_credentials` | `owner_type` (`workspace`/`user`), `owner_id`, `provider`, `key_ciphertext`, `key_hint`, `status` | envelope-encrypted keys; RLS so a user sees only their own; **never** selected to the client |
-| `ai_models` | `provider`, `model_id`, `display_name`, `context_window`, `capabilities jsonb`, `cost_in numeric`, `cost_out numeric`, `tiers text[]`, `active` | **global** catalog (no `workspace_id`); seeded + refreshable |
-| `ai_model_policies` | `tier` (`fast`/`balanced`/`deep`/`embed`), `provider`, `model_id`, `temperature`, `max_tokens`, `json_mode bool` | per-workspace tier → model routing |
-| `ai_feature_settings` | `feature_key`, `enabled bool`, `prompt_id?`, `quota jsonb` | per-feature on/off + limits (§4 card 3/4) |
-| `ai_prompts` | `feature_key`, `version int`, `system_prompt text`, `variables jsonb`, `is_default bool` | versioned prompts; workspace override rows over a default row |
-| `ai_threads` | `user_id`, `subject_type?`, `subject_id?`, `title` | copilot conversations, optionally anchored to an entity |
-| `ai_messages` | `thread_id`, `role` (`system`/`user`/`assistant`/`tool`), `content` (rich), `model`, `tokens_in`, `tokens_out`, `cost_usd` | conversation turns |
-| `ai_tool_calls` | `message_id`, `tool_name`, `input jsonb`, `output_excerpt`, `status`, `permission_checked bool`, `duration_ms` | audit of every agent action (copilot + MCP) |
-| `ai_usage_events` | `user_id`, `feature_key`, `source` (`copilot`/`mcp`/`assist`/`rest`), `provider`, `model`, `tokens_in`, `tokens_out`, `cost_usd`, `latency_ms`, `status`, `flagged bool` | the metering spine; drives quotas, caps, dashboards |
-| `embeddings` | `subject_type`, `subject_id`, `chunk_index`, `content`, `embedding vector(N)`, `model`, `content_hash` | pgvector; GIN/HNSW index; rebuilt by a job on write (§9) |
-
-Scoped tokens for MCP reuse the §8.2 `api_tokens` table (with an `mcp` capability + `read`/`write`/`admin` scopes), not a parallel table. An optional `agent_sessions` (`token_id`, `transport`, `connected_at`, `last_activity`, `client_info jsonb`) is observability only.
-
----
+| Table | Key columns |
+|---|---|
+| `ai_providers` | provider, base_url?, enabled, allow_user_keys |
+| `ai_credentials` | owner (workspace/user), provider, key_ciphertext (envelope), key_hint, status |
+| `ai_models` *(global)* | provider, model_id, context_window, capabilities, cost_in/out, tiers, active |
+| `ai_model_policies` | tier → provider+model+sampling+json_mode |
+| `ai_feature_settings` | feature_key, enabled, quota jsonb |
+| `ai_prompts` | feature_key or agent_id+phase, version, system_prompt, is_default |
+| `ai_threads` / `ai_messages` | copilot + agent conversations (anchored via subject), roles, tokens, cost |
+| `ai_tool_calls` | message_id?/run_id?, tool, input, output_excerpt, status, permission_checked, duration |
+| `ai_usage_events` | member/agent, feature, source (copilot/mcp/assist/teammate/rest), provider, model, tokens, cost, latency, status, flagged |
+| `embeddings` | subject, chunk, content, vector(N) (pgvector, HNSW), model, content_hash |
+| `agents` | member_id, definition, planning_instructions, execution_instructions, provider/tier, schedule, autonomy (`sandbox`/`batch_approval`/`scoped_direct`), enabled |
+| `agent_runs` | agent_id, status, tasks jsonb, logs text (append-only), started/finished, error, cost_usd |
+| `proposed_changes` | run_id, action, payload (the registry envelope), status (`pending`/`applied`/`dismissed`), decided_by/at |
+| MCP OAuth | `oauth_clients` (registered + CIMD cache), `oauth_grants` (user+workspace+client, revoked_at), `oauth_codes` (hash, PKCE challenge, resource, consumed_at), `oauth_access_tokens` / `oauth_refresh_tokens` (hashes, resource, expiry, rotation lineage: used_at/replaced_by), `mcp_sessions` (grant_id, protocol_version, closed_at; last-seen throttled) |
 
 ## 8. Security and safety
 
-AI adds surface area. These controls map to §8.2 of TECHNICAL-PLAN and to specific Phase 5 tasks.
-
-| Control | Detail | Task |
-|---|---|---|
-| **Tool authorization = user permissions** | every copilot/MCP tool call runs `can()` + RLS as the acting user; deny by default; writes need `write` scope, admin tools need `admin` scope | P5-T06, P5-T09 |
-| **Prompt-injection containment** | retrieved and third-party content is untrusted; the permission layer (principle 2) is the backstop so injected instructions cannot exceed the user's rights; RAG chunks are treated as data, not instructions; writes are confirmed | P5-T06, P5-T07 |
-| **BYO-key isolation** | user keys are invisible to admins and other users; workspace keys are never sent to the client; decrypt server-side only; keys never logged | P5-T02 |
-| **Data governance / egress** | admin controls what context leaves the instance; PII/secret redaction from prompts; egress domain allow-list; no-train provider headers; per-workspace and per-user opt-out; local provider ⇒ zero egress | P5-T02, P5-T10 |
-| **SSRF on custom base URLs** | `ollama`/`openai-compatible` base URLs are validated; private-range targets are allowed **only** when the admin explicitly set a local provider (the air-gap case), never inferred from user input | P5-T02, P5-T10 |
-| **Cost and abuse limits** | per-token/cost/call quotas, hard caps that disable AI, per-user and per-token rate limits, anomaly flags on `ai_usage_events` | P5-T04 |
-| **Audit** | every agent write, every MCP tool call, and every AI settings change emits an `audit_events` row (append-only, §8.2) | P5-T06, P5-T09 |
-| **MCP token hygiene** | scoped, named, expiring, rotatable, revocable tokens; last-used tracking; OAuth 2.1 where supported | P5-T09 |
-| **No LLM on a required path** | preserved and CI-enforced (§10); AI off ⇒ manual paths intact | P5-T10 |
-| **Structured-output validation** | model JSON validated with Zod at the boundary, retried on failure, never `eval`'d | P5-T05 |
-
----
+| Control | Detail |
+|---|---|
+| Principal-bound authority | every AI call runs as a concrete member (human or agent) through the registry's `can()` + RLS; deny by default; no service-account superuser exists |
+| Prompt injection | retrieved/RAG/tool-returned content is data, never instructions; the principal's bindings bound the blast radius; autonomous writes go through sandbox/batch-approval policy; destructive tools require elevated scope + confirmation even for `scoped_direct` agents |
+| Key handling | envelope encryption + key ring + cheap rotation; user keys invisible to admins; decrypt server-side only; never logged |
+| Egress | context-level controls, PII redaction, allow-list, no-train headers; local provider ⇒ zero egress; base-URL and CIMD fetches SSRF-hardened (literal + resolved addresses) |
+| Cost/abuse | per-user/per-agent/per-workspace quotas; hard caps auto-disable and halt runs; per-token rate limits; anomaly flags |
+| OAuth hygiene | §5.2 in full — hashes at rest, rotation + reuse-detection lineage revocation, audience binding, consent, revoke-on-membership-loss, Origin validation |
+| Token administration | token/OAuth-authed callers cannot mint, rotate, escalate or revoke tokens (403); session-auth only |
+| Audit | every agent write, MCP call, settings change and cap event → `ai_tool_calls` + append-only `audit_events` |
+| No LLM on a required path | preserved and CI-enforced (§10) |
 
 ## 9. Retrieval and embeddings (RAG)
 
-Grounding for the copilot, semantic search, duplicate detection, and grounded wiki/project Q&A.
+pgvector (`embeddings`, HNSW) — no new service; an outbox-driven worker chunks and embeds goals, check-ins, work items, documents, discussion posts and comments on write (content-hash keyed). Retrieval is **always access-filtered** through the same layer as reads; hybrid rank with FTS. Local embedding (Ollama `nomic-embed-text`) keeps RAG air-gap safe. Chunks are passed as cited, untrusted data. Where pgvector is unavailable, semantic features degrade to FTS and everything still works.
 
-- **Store:** the `embeddings` table using **pgvector** (a Postgres extension, so "Postgres is the only required service" holds). Index with HNSW for approximate nearest-neighbor at scale.
-- **Indexing:** a JobQueue worker chunks and embeds work packages, objectives, key results, KPIs, wiki pages, and comments on write, keyed by `content_hash` so unchanged content is not re-embedded. Embeddings run through the `embed` tier, which can be a **local** model (Ollama `nomic-embed-text`), keeping RAG air-gap-safe.
-- **Retrieval:** always **permission-filtered** — the retriever joins to the same access checks as the UI, so the copilot can only surface and cite what the user may read (principle 2). Hybrid ranking combines vector similarity with Postgres full-text search (the Search port).
-- **Grounding:** retrieved chunks are passed as *data* with citations; the model is instructed they are untrusted context, not commands (§8 prompt injection).
-- **Degradation:** where pgvector is not installed or embeddings are disabled, semantic features fall back to full-text search and the copilot answers without private grounding. The product still works.
+## 10. Evaluation, quality, degradation
 
----
+- **Eval harness:** golden fixtures per capability against a deterministic mock provider (schema validity, tool selection, latency, no-PII-in-prompt asserts); optional live smoke on a cheap model, never blocking CI.
+- **Degradation leg:** CI boots `AI_PROVIDER=off` and asserts every P0 flow passes and every ✨/copilot/agent affordance is hidden or disabled.
+- **Live-transport e2e (new, mandatory):** drive the real OAuth/PKCE + Streamable HTTP MCP stack and the REST token surface end to end; assert an under-privileged tool call is denied by `can()`/RLS and no cross-tenant data appears in any result. The "every tool call is permission-checked" claim is machine-verified, not asserted.
+- **Prompt gating:** a prompt version that regresses the eval set fails the check.
+- **Teammate safety tests:** sandbox produces zero committed writes; batch-approval commits nothing until applied; a cost cap halts a mid-run agent; an injection fixture in retrieved content cannot exceed the agent's bindings.
 
-## 10. Evaluation, quality, and graceful degradation
+## 11. What we learned from the source products
 
-AI features get the same test discipline as the scoring and scheduling engines.
+**From FlowyTeam/OKRI (kept/fixed as before):** encrypted stored key, admin-editable prompts, per-call logging, monthly quotas kept; OpenRouter-hardcoding, single global key, unvalidated model text, regex-scraped JSON, stub cost column, two kill switches, unversioned prompts all fixed by §3–§4.
 
-- **Eval harness.** Golden fixtures per capability: input → expected shape/behavior. Assertions cover JSON-schema validity for every `extract` feature, correct tool selection for agent flows, latency budget, and a no-PII-leak check on prompts. Runs in CI against a **deterministic mock provider**; an optional live smoke against a cheap model runs on demand, never blocking CI.
-- **Structured output.** `extract` results are Zod-validated; invalid output triggers one repair retry, then a clean feature-level failure (no partial writes). This replaces regex-scraping model text (§11).
-- **Degradation tests.** A CI leg boots with `AI_PROVIDER=off` and asserts every P0 flow passes and every AI affordance is hidden or disabled. This is the machine-checkable form of principle 1 and the "no LLM on a required path" hard rule.
-- **Prompt-change gating.** A prompt edit that regresses the eval set fails the check; production prompts move forward only on green.
+**From Operately (the new reference):** *adopt* — agents as real members; plan/execute phased runs with readable logs; sandbox mode; scheduled daily runs; the full OAuth 2.1 flow (PKCE, rotation + lineage revocation, resource indicators, CIMD, consent/workspace picker, discovery incl. ChatGPT variants); search+fetch connector tools; per-tool safety classification; tools delegating to the same permission-checked API as the UI. *Fix* — company-wide agent edit grants (→ least-privilege bindings); zero cost metering on agents (→ §1.6); cloud-only providers (→ local models); no batch-approval middle ground (→ §6.3); scopes enforced only in app code (→ RLS backstop); unversioned agent instructions (→ versioned); no MCP Resources/Prompts primitives, no stdio (→ §5.3).
 
----
+## 12. Phase 5 tasks
 
-## 11. What we learned from the source product (FlowyTeam / OKRI Learn)
-
-The OKR authoring assists are informed by a shipped OpenRouter-backed implementation. Recording it keeps OpenOKR honest about what to keep and what to fix. Behavior and data only; no code is carried over (clean-room rule).
-
-**Kept (it got these right):** an encrypted stored key; admin-editable system prompts with strong defaults; per-call usage logging with a flag-misuse control; monthly quotas; a clear free-vs-paid capability split; an event emitted per call for analytics.
-
-**Fixed (its gaps, and the OpenOKR answer):**
-
-| Gap in the source | OpenOKR |
-|---|---|
-| OpenRouter hardcoded; no local model | provider abstraction incl. Ollama / OpenAI-compatible (§3.2) |
-| One global platform key only | deployment + workspace + **per-user BYO** keys with precedence (§3.3) |
-| Model is unvalidated free text | validated catalog + tier routing; free text still allowed but checked (§3.4) |
-| No temperature / JSON mode; JSON recovered by regex | per-tier sampling + JSON mode; Zod-validated structured output with retry (§3.1, §10) |
-| `cost_usd` column never populated | real per-token cost from the catalog on every event; caps and dashboards (§4, §7) |
-| Quotas count calls, not tokens | quotas by tokens / cost / calls, admin's choice (§4) |
-| Two kill switches for all assists | per-feature toggles (§4) |
-| Prompts editable but unversioned | versioned prompts with restore-to-default and eval gating (§4, §10) |
-| No agent / MCP surface | first-class MCP server + in-app copilot (§5, §6) |
-| Doc/UI drift and a dead duplicate settings screen | one settings surface (S-24); the schema is the contract |
-
----
-
-## 12. Phase 5 tasks (the AI layer)
-
-Task format identical to IMPLEMENTATION-PLAN.md; each inherits the Definition of Done in CLAUDE.md. Estimates S/M/L per IMPLEMENTATION-PLAN. Rows mirror into STATUS.md and the IMPLEMENTATION-PLAN appendix (Phase 5).
-
-**Placement.** Phase 5 opens after **Phase 4** — it needs auth, RBAC, audit, settings, jobs, the app shell, and the OKR and work-management cores its assists build on. Two foundations reach earlier: the AIProvider **port interface** and the `off` driver are delivered in **P1-T04** (so AI is architecturally present in the walking skeleton), and `manage_ai` joins the permission catalogue in **P2-T01**. The per-module *assist* tasks (P5-T11, P5-T12) close the phase because they depend on both the AI foundation and their module cores: P5-T11 on Phase 4's OKR core, P5-T12 on Phase 3's work-package/meeting/wiki cores.
+Format and DoD as IMPLEMENTATION-PLAN.md; estimates S/M/L. Rows mirror into STATUS.md. Foundations reaching earlier: the AIProvider port interface + `off` driver ship in P1-T04; `manage_ai` joins the permission catalogue in P2-T01; the action registry itself exists from P1-T07 (tRPC projection) — Phase 5 adds the public projections.
 
 | Task | Title | Depends on | Goal (one line) |
 |---|---|---|---|
-| P5-T00 | AI design gate [DESIGN GATE] | Phase 4 | design docs 14–16 (ai-architecture, mcp-server, ai-safety); human approves "Design approved for Phase 5" |
-| P5-T01 | AIProvider port full surface + drivers | P1-T04 | chat/stream/tools/embed/extract/capabilities; anthropic/openai/google/openrouter/ollama/openai-compatible/off; contract tests on both runtimes |
-| P5-T02 | AI config + BYO-key + encryption | P5-T01, P2-T07 | `ai_providers`/`ai_credentials`, envelope encryption, precedence resolver, test-connection, Provider card (S-24) |
-| P5-T03 | Model catalog + routing | P5-T02 | `ai_models` catalog (seed+refresh+validate), `ai_model_policies` tiers, sampling/JSON-mode config |
-| P5-T04 | Usage + cost metering + quotas + caps | P5-T02, P1-T04 | `ai_usage_events`, cost from catalog, token/cost/call quotas, hard caps auto-disable, usage dashboard + logs |
-| P5-T05 | Structured output + prompt registry | P5-T03 | `extract` with Zod validation + retry; `ai_prompts` versioned + editor; per-feature settings/toggles |
-| P5-T06 | Tool registry + agent authz + confirmation | P5-T05, P2-T02 | core tool registry (Zod + per-tool permission), tool-use loop, write preview/confirm, `ai_tool_calls` audit, deny-by-default + RLS backstop |
-| P5-T07 | Embeddings + RAG | P5-T01, P3-T26 | pgvector `embeddings`, indexing job, permission-filtered hybrid retrieval, FTS degradation |
-| P5-T08 | In-app copilot | P5-T06, P5-T07, P2-T11 | `ai_threads`/`ai_messages`, copilot SidePanel (S-25), streaming, grounded answers + confirmed actions, degradation |
-| P5-T09 | MCP server (inbound) | P5-T06, P4-T19, P2-T12 | stdio + Streamable HTTP, scoped-token auth (extends §8.2), per-user identity + RLS + `can()`, tool/resource/prompt catalog, rate limit, audit, token admin (S-24), connect docs |
-| P5-T10 | AI eval + safety harness + CI | P5-T05, P5-T06 | golden fixtures, mock provider, schema/tool/latency/no-leak asserts, `AI_PROVIDER=off` degradation leg, egress allow-list + redaction + base-URL SSRF checks |
-| P5-T11 | OKR AI authoring + coaching | P5-T06, P4-T04, P4-T05 | the §2.1 assists (generate/rate/improve/suggest/align/check-in draft/coach) on the AI foundation; upgrades the source product's feature |
-| P5-T12 | Work / project AI assists + NL-query | P5-T06, P5-T07, P3-T08, P3-T16, P3-T23 | the §2.2/§2.3 assists (WP summary, decomposition, draft WP, meeting summary→action items, wiki draft/Q&A, NL→query DSL, status narrative) |
+| P5-T00 | AI design gate [DESIGN GATE] [L] | Phase 4 | design docs (ai-architecture, mcp-oauth, teammates-safety); §13 decisions confirmed; human approves |
+| P5-T01 | AIProvider port full surface + drivers [L] | P1-T04 | chat/stream/tools/embed/extract/capabilities; anthropic/openai/openrouter/ollama/openai-compatible/off; contract tests |
+| P5-T02 | AI config + BYO keys + encryption + rotation [M] | P5-T01 | providers/credentials, envelope + key ring, precedence resolver, test-connection, rotation command |
+| P5-T03 | Model catalog + tier routing [M] | P5-T02 | seeded/refreshable catalog, tier policies, context-window guard |
+| P5-T04 | Usage metering + quotas + hard caps [M] | P5-T02 | ai_usage_events, cost from catalog, per-user/agent/workspace quotas, auto-disable + run-halt, dashboards |
+| P5-T05 | Structured output + prompt registry [M] | P5-T03 | extract with Zod+retry; versioned prompts + editor + eval gating; per-feature toggles |
+| P5-T06 | Public contract projections: REST + OpenAPI + CLI + MCP tool defs [L] | P1-T07, P4 core | generate /api/v1 + OpenAPI 3.1 + the CLI + the MCP tool catalog from the action registry; scoped hashed tokens; drift CI |
+| P5-T07 | Embeddings + RAG [L] | P5-T01, P4-T08 | pgvector + indexing worker + access-filtered hybrid retrieval + FTS degradation |
+| P5-T08 | In-app copilot [L] | P5-T06, P5-T07 | threads/messages, side panel, streaming, grounded citations, preview→apply, background tool runs |
+| P5-T09 | MCP OAuth 2.1 authorization server [L] | P5-T06, P2-T09 | §5.2 in full: endpoints, PKCE, discovery, DCR/CIMD + SSRF-safe fetch, rotation + reuse detection, resource binding, consent + workspace picker, revoke-on-membership-loss |
+| P5-T10 | MCP server: transport, sessions, catalog [L] | P5-T09 | Streamable HTTP + stdio, session lifecycle + header discipline, tool catalog with safety classes + invariant test, search+fetch, Resources + Prompts, rate limits |
+| P5-T11 | AI teammates: agents + runs + approvals [L] | P5-T04, P5-T06 | agent members, least-privilege bindings, plan/execute runs on JobQueue, readable logs, sandbox, batch-approval inbox, scheduler, cost-halt |
+| P5-T12 | AI eval + safety harness + live e2e [L] | P5-T05, P5-T10, P5-T11 | mock-provider evals, AI-off leg, MCP/REST live-transport authz e2e, teammate safety tests, egress/redaction/SSRF checks |
+| P5-T13 | Strategy AI assists [M] | P5-T06, P3 core | §2.1: draft/improve/coach goals, check-in + retro drafts, KPI suggestions + formula-from-text, trend narration; provenance |
+| P5-T14 | Execution AI assists + NL query [M] | P5-T06, P5-T07, P4 core | §2.2: work-item drafts, decomposition, status narrative + divergence flag, doc drafting/Q&A, NL→filters |
 
-**Phase 5 exit checklist:** the AIProvider port works on both runtimes with at least one hosted and the local (Ollama) driver; a workspace admin can configure a provider, bring a key, route tiers, toggle features, set budgets, and see usage/cost; a user can bring their own key where allowed; the tool registry enforces `can()` + RLS for every action; the in-app copilot answers grounded and applies confirmed writes; the **MCP server** lets an external agent create/update/check-in as the authenticated user within scope and is fully audited; embeddings/RAG run (locally where required) and degrade to FTS; the eval harness is green and the `AI_PROVIDER=off` leg proves every P0 flow still works; OKR authoring assists (P5-T11) and work/meeting/wiki assists (P5-T12) are live; every AI table ships `workspace_id` + RLS; no secret is logged.
+**Phase 5 exit checklist:** a hosted **and** the local (Ollama) driver work; admin can configure providers, route tiers, toggle features, set budgets, watch usage; a user can bring a personal key where allowed; the copilot answers grounded and applies confirmed writes; an external MCP client onboards **via OAuth end to end** (consent → tools; read scope denied writes; rotation + reuse detection proven) and stdio works air-gapped; an AI teammate runs a scheduled sandbox run, then a batch-approval run whose proposals a human applies; a cost cap halts a run; the AI-off leg is green; every AI table ships RLS; no secret in any log.
 
----
+## 13. AI open decisions (confirm at P5-T00)
 
-## 13. AI open decisions (ask the human, do not guess)
-
-Handled the way PLAN.md §12 handles open decisions: a lean is recorded, the human confirms before the dependent design gate (P5-T00).
-
-| # | Decision | Options | Lean |
-|---|---|---|---|
-| A1 | Default posture | off by default / **on where a provider is configured**, per feature | on-where-configured (this is what "AI-native" means; no key ⇒ behaves like today) |
-| A2 | AI in open core vs a paid tier | fully open / gate advanced AI (copilot, MCP) behind the enterprise pack | fully open; revisit with the §12 business-model decision |
-| A3 | Which drivers ship in v1 | subset / all seven | anthropic + openai + openrouter + **ollama** + openai-compatible + off in v1; google fast-follow |
-| A4 | Per-user BYO keys | allow / workspace-key only | allow, admin-toggleable per workspace (§3.3) |
-| A5 | Eval bar to ship a capability | define pass thresholds per feature | set at P5-T00 with the design docs |
-| A6 | Outbound MCP (OpenOKR calls external MCP tools) | v1 / later | later (§5.4); design the registry so it is a bolt-on |
-| A7 | Embedding dimension + index | fix `N` and HNSW params | decide at P5-T07 against the chosen `embed` model; keep the column swappable |
-
----
-
-## 14. Where the rest of the plan set covers this domain
-
-One map so nothing is duplicated and nothing is missed. Keep these in sync when this file changes (the same-PR rule in CLAUDE.md). This is the update contract that makes AI genuinely woven in rather than a side document.
-
-| Document | What it holds for this domain | Change to make |
+| # | Decision | Lean |
 |---|---|---|
-| REQUIREMENTS.md §3, §4 | AI as a native capability across modules; MCP as an integration surface; the copilot | elevate the AI cross-cutting need and per-module AI notes from "optional summary" to §2's catalog; add MCP-server row |
-| PLAN.md §2, §4, §8, §10, §12 | the AI-native principle; the AIProvider port row; Data-and-AI; the delivery phase; the decision register | add principle; expand §8; note the port is config-selected; add Phase 5; add A1–A7 |
-| TECHNICAL-PLAN.md §5, §8.2, §15, §4 | the elevated port; the AI security controls; the scorecard row; the schema pointer | widen the §5 port row; add §8.2 AI controls; rewrite the §15 AI row; point §4 to this doc's domain S |
-| TECHNICAL-PLAN.md §4.12 + IMPLEMENTATION-PLAN.md Phase 4 | AI hooks on OKR tables; P5-T11; P4-T19's relationship to the MCP server | note AI-generated provenance columns; P5-T11 indexed in Phase 5 |
-| UIUX-PLAN.md §4, §6, §9 | AI interaction patterns; screens S-24 (admin AI), S-25 (copilot); inline assist affordances; the quality gates AI UI runs | add the AI patterns and the S-24/S-25 specs |
-| IMPLEMENTATION-PLAN.md Phase 5 | the task index and the appendix entries | the Phase 5 section indexes §12 |
-| DATABASE.md domain S | the AI tables (§7) | add domain S to the map and relationship view |
-| STATUS.md | the live Phase 5 task rows | the P5-T00…P5-T12 rows |
-| CLAUDE.md | authority order (this file), the AI hard rules, the locked stack (AI SDK + MCP) | insert into the authority list; rewrite the AI rule to the native-not-dependent form; add the stack entries |
-| `reference/flowyteam-okr-kpi-tasks-model.md` §8 | the canonical REST/MCP field shapes the server mirrors | read-only reference; no change |
-
----
-
-## 15. Phase 5 exit contract (mirror of §12 checklist, for the phase gate)
-
-Before Phase 5 is marked complete, the human verifies, live:
-
-- [ ] Configure `anthropic` (or `openai`/`openrouter`), run an OKR draft, see a validated result and a cost recorded.
-- [ ] Switch the same workspace to `ollama` with a local model, disconnect the network, and repeat: the draft still works (air-gap proof).
-- [ ] Set `AI_PROVIDER=off`: every AI affordance disappears and creating an objective, a KPI, and a work package by hand all still work.
-- [ ] As a non-admin user, bring a personal key (where the admin allowed it) and confirm usage bills to that key.
-- [ ] Connect an external MCP client with a `read` token: it can list objectives but a create attempt is refused; rotate to a `write` token and the create succeeds, as that user, within that user's permissions, and both attempts appear in the audit log.
-- [ ] Exceed a cost cap and confirm AI auto-disables with a clear message while manual paths continue.
-- [ ] Every new AI table has an RLS policy; no key or full prompt with PII appears in any log.
+| A1 | Default posture | on where a provider is configured, per feature |
+| A2 | AI in open core vs paid | fully open; revisit with the business-model decision |
+| A3 | Drivers in v1 | anthropic + openai + openrouter + ollama + openai-compatible + off; google fast-follow |
+| A4 | Per-user BYO keys | allow, admin-toggleable |
+| A5 | Eval pass bar per capability | set with the design docs |
+| A6 | Teammate default autonomy | `batch_approval`; `scoped_direct` requires admin opt-in per agent |
+| A7 | Embedding model + dimension | decide at P5-T07; keep the column swappable |
+| A8 | Outbound MCP (copilot calling external MCP tools) | later; registry designed so it bolts on |

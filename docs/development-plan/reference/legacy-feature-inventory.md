@@ -1,5 +1,7 @@
 # The legacy system feature inventory
 
+> **ARCHIVED (2026-07-08).** The OpenProject-parity scope and its importer were cut from the plan (REQUIREMENTS.md §6 — the "power floor"; PLAN.md §14 decided log). Nothing in the current plan depends on this file. Retained as background only; do not cite it as a spec source for any task. The competitive benchmark is now Operately (OPERATELY-COMPARISON.md).
+
 What the legacy system actually does, module by module, with the exact permission symbols and enterprise gates. Companion to `legacy-data-model.md`. Use this to scope the rebuild (what is P0 vs droppable) and to build the permission mapping.
 
 Source: `config/initializers/permissions.rb`, every `modules/*/lib/**/engine.rb`, `app/models/enterprise_token.rb`, `config/constants/settings/definition.rb`, `dev` branch, July 2026.

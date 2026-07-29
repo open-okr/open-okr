@@ -2,123 +2,106 @@
 
 Single source of truth for execution progress of IMPLEMENTATION-PLAN.md. The agent updates rows; a human is the only one who sets `done`. Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped` (skipped requires a note and human sign-off). Rules in EXECUTION-GUIDE.md §5.
 
-Last updated: 2026-07-07 (plan consolidated into eight sequential phases; OKR/KPI/Tasks folded in as Phase 4; 109 tasks `todo`)
+Last updated: 2026-07-08 (plan rewritten after the Operately gap analysis: strategy-first sequencing, single runtime v1, OpenProject importer cut, power floor deferred; **93 tasks `todo`**)
 
-## Phase 1 — Prove the pipeline
+## Phase 1 — Walking skeleton (container-only)
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
 | P1-T01 | Monorepo scaffold | todo |  |  |  |
-| P1-T02 | CI matrix + env schema | todo |  |  |  |
-| P1-T03 | Database package + first migration + RLS harness | todo |  |  |  |
-| P1-T04 | Adapter ports + both driver sets (stubs) | todo |  |  |  |
-| P1-T05 | Better Auth integration | todo |  |  |  |
-| P1-T06 | Workspaces + membership bootstrap | todo |  |  |  |
-| P1-T07 | Hello dashboard (server-rendered) | todo |  |  |  |
-| P1-T08 | Docker Compose target | todo |  |  |  |
-| P1-T09 | Vercel + Supabase target | todo |  |  |  |
+| P1-T02 | CI pipeline + env schema | todo |  |  |  |
+| P1-T03 | Database package + RLS floor + test isolation [SPIKE] | todo |  |  | R1 go/no-go recorded in docs/design/spike-rls-pooling.md |
+| P1-T04 | Adapter ports + container drivers + transactional outbox | todo |  |  |  |
+| P1-T05 | Better Auth: email+password, passkeys, TOTP | todo |  |  |  |
+| P1-T06 | Workspaces + members bootstrap | todo |  |  |  |
+| P1-T07 | Operation pipeline + action registry + audit spine | todo |  |  |  |
+| P1-T08 | Hello dashboard | todo |  |  |  |
+| P1-T09 | Docker Compose target + first-run web setup wizard | todo |  |  |  |
 | P1-T10 | Helm chart target + Phase 1 exit | todo |  |  |  |
 
 ## Phase 2 — Core platform
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P2-T01 | RBAC schema + permission catalogue | todo |  |  |  |
-| P2-T02 | Authorization layer in core | todo |  |  |  |
-| P2-T03 | Audit log | todo |  |  |  |
-| P2-T04 | Invitations + membership management | todo |  |  |  |
-| P2-T05 | File uploads via FileStorage adapter | todo |  |  |  |
-| P2-T06 | Notifications spine | todo |  |  |  |
-| P2-T07 | Workspace & project settings shell | todo |  |  |  |
-| P2-T08 | Navigation & module registration framework | todo |  |  |  |
-| P2-T09 | Importer skeleton + read-only source connection | todo |  |  |  |
-| P2-T10 | Seed + demo workspace | todo |  |  |  |
+| P2-T01 | Access model: contexts, bindings, groups | todo |  |  |  |
+| P2-T02 | can() + access-aware reads | todo |  |  |  |
+| P2-T03 | People: profiles, manager chain, lifecycle | todo |  |  |  |
+| P2-T04 | Invitations: email, reusable links, trusted domains | todo |  |  |  |
+| P2-T05 | Files: blobs, quotas, previews | todo |  |  |  |
+| P2-T06 | Subscriptions + notification spine + email batching | todo |  |  |  |
+| P2-T07 | Typed activity feed engine | todo |  |  |  |
+| P2-T08 | Workspace settings + navigation registry | todo |  |  |  |
+| P2-T09 | Security baseline (rate limits, lockout, CSP, sessions UI, freeze) | todo |  |  |  |
+| P2-T10 | Demo workspace builder + seed | todo |  |  |  |
 | P2-T11 | App shell + design system foundation | todo |  |  |  |
-| P2-T12 | Security baseline: rate limiting, headers, sessions UI | todo |  |  |  |
+| P2-T12 | Rich text editor | todo |  |  |  |
+| P2-T13 | Data-change runner | todo |  |  |  |
 
-## Phase 3 — Work management
-
-| Task | Title | Status | Branch / PR | Updated | Notes |
-|---|---|---|---|---|---|
-| P3-T00 | Domain design docs [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 3" |
-| P3-T01 | Projects schema + tree + CRUD | todo |  |  |  |
-| P3-T02 | Versions + categories | todo |  |  |  |
-| P3-T03 | Import projects/versions/categories | todo |  |  |  |
-| P3-T04 | Types, statuses, workflow, priorities | todo |  |  |  |
-| P3-T05 | Work package CRUD + hierarchy + relations | todo |  |  |  |
-| P3-T06 | Custom fields engine | todo |  |  |  |
-| P3-T07 | Import work packages + custom values | todo |  |  |  |
-| P3-T08 | Query DSL + saved queries + table view | todo |  |  |  |
-| P3-T09 | Import queries/views (DSL translation) | todo |  |  |  |
-| P3-T10 | Scheduling engine (pure) | todo |  |  | highest-risk task; human reviews golden masters |
-| P3-T11 | Reschedule job + working-days admin | todo |  |  |  |
-| P3-T12 | Gantt view | todo |  |  |  |
-| P3-T13 | Boards (kanban) | todo |  |  |  |
-| P3-T14 | Calendar + team planner | todo |  |  |  |
-| P3-T15 | Import boards/queries-backed views + manual order | todo |  |  |  |
-| P3-T16 | Comments + activity feed + reactions | todo |  |  |  |
-| P3-T17 | Wire notifications to work packages | todo |  |  |  |
-| P3-T18 | Import comments + activity | todo |  |  |  |
-| P3-T19 | Time tracking + timer | todo |  |  |  |
-| P3-T20 | Costs + rates | todo |  |  |  |
-| P3-T21 | Import time/cost/rates | todo |  |  |  |
-| P3-T22 | Wiki | todo |  |  |  |
-| P3-T23 | Meetings (structured + recurring) | todo |  |  |  |
-| P3-T24 | Import wiki + meetings | todo |  |  |  |
-| P3-T25 | Dashboards (my page + project overview) | todo |  |  |  |
-| P3-T26 | Global search | todo |  |  |  |
-| P3-T27 | Exports (CSV/XLSX/PDF) | todo |  |  |  |
-| P3-T28 | Backlogs / Scrum + sprint import | todo |  |  |  |
-| P3-T29 | GitHub/GitLab integration | todo |  |  |  |
-| P3-T30 | Full import dry-run + reconciliation + report polish | todo |  |  |  |
-| P3-T31 | Favorites + quick navigation | todo |  |  |  |
-| P3-T32 | Command palette + keyboard shortcuts + quick create | todo |  |  |  |
-| P3-T33 | Project lifecycle phases & gates | todo |  |  | optional — human decides build vs skip |
-
-## Phase 4 — Strategy: OKR, KPI, Check-ins & Tasks
+## Phase 3 — Strategy core
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P4-T00 | OKR/KPI/Tasks design gate [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 4" |
-| P4-T01 | Org units + membership + designations | todo |  |  |  |
-| P4-T02 | OKR cycles + settings | todo |  |  |  |
-| P4-T03 | Objectives + key results schema + CRUD | todo |  |  |  |
-| P4-T04 | Scoring & alignment engine (pure) | todo |  |  | highest-risk Phase 4 task; human reviews golden masters |
-| P4-T05 | OKR check-ins | todo |  |  |  |
-| P4-T06 | OKR views UI (explorer, detail, alignment) | todo |  |  |  |
-| P4-T07 | KPIs + categories + records | todo |  |  |  |
-| P4-T08 | KPI formula engine (calculated KPIs) | todo |  |  |  |
-| P4-T09 | KPI ↔ key result linkage | todo |  |  |  |
-| P4-T10 | KPI views UI (grid, detail, tree, dashboards) | todo |  |  |  |
-| P4-T11 | Performance snapshot + scorecard | todo |  |  | points sub-feature off by default; human-gated |
-| P4-T12 | Tasks unification into work packages | todo |  |  | depends on P3-T05 (work packages) |
-| P4-T13 | FlowyTeam importer — MySQL source + company selection | todo |  |  | MySQL client is the pre-approved importer dependency |
-| P4-T14 | FlowyTeam importer — org, cycles, objectives, KRs, check-ins | todo |  |  |  |
-| P4-T15 | FlowyTeam importer — KPIs, records, formulas | todo |  |  |  |
-| P4-T16 | FlowyTeam importer — tasks into work packages | todo |  |  | depends on P3-T07 |
-| P4-T17 | FlowyTeam full import dry-run + reconciliation + report | todo |  |  |  |
-| P4-T18 | OKR/KPI reminders + notifications | todo |  |  |  |
-| P4-T19 | OKR/KPI/Tasks REST + MCP-compatible API | todo |  |  |  |
+| P3-T00 | Strategy design gate [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 3"; golden-master matrices reviewed |
+| P3-T01 | Spaces | todo |  |  |  |
+| P3-T02 | Cycles + strategy settings | todo |  |  |  |
+| P3-T03 | Goals + key results CRUD | todo |  |  |  |
+| P3-T04 | Scoring & health engine (pure) | todo |  |  | highest-risk Phase 3 task (PLAN §13 R2) |
+| P3-T05 | Cadence engine + staleness | todo |  |  |  |
+| P3-T06 | Check-ins: snapshots, draft/publish, acknowledgement | todo |  |  |  |
+| P3-T07 | Review inbox | todo |  |  |  |
+| P3-T08 | Discussions + reactions wiring | todo |  |  |  |
+| P3-T09 | Goal surfaces: explorer, page, alignment | todo |  |  |  |
+| P3-T10 | Work Map v1 | todo |  |  |  |
+| P3-T11 | KPIs: categories, records, grid | todo |  |  |  |
+| P3-T12 | KPI formula engine | todo |  |  | PLAN §13 R3 fallback: sum/avg rollups only |
+| P3-T13 | KPI detail + KR↔KPI links | todo |  |  |  |
+| P3-T14 | Scorecard + cycle archive | todo |  |  | points sub-feature off by default; human-gated |
+| P3-T15 | Strategy notifications + reminders | todo |  |  |  |
+| P3-T16 | CSV/XLSX importer | todo |  |  |  |
+| P3-T17 | FlowyTeam connector | todo |  |  | MySQL client is the pre-approved importer dependency |
+| P3-T18 | FlowyTeam strategy mappers + reconciliation | todo |  |  |  |
 
-## Phase 5 — The AI layer (AI-native)
-
-Detail in AI-NATIVE-PLAN.md §12.
+## Phase 4 — Execution core
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P5-T00 | AI design gate [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 5" |
+| P4-T00 | Execution design gate [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 4" |
+| P4-T01 | Projects: lifecycle, contributors, health | todo |  |  |  |
+| P4-T02 | Project check-ins + acknowledgement | todo |  |  |  |
+| P4-T03 | Retrospectives + close flows | todo |  |  |  |
+| P4-T04 | Milestones + project next step | todo |  |  |  |
+| P4-T05 | Work items | todo |  |  |  |
+| P4-T06 | Boards | todo |  |  |  |
+| P4-T07 | Resource Hub | todo |  |  |  |
+| P4-T08 | Global search | todo |  |  |  |
+| P4-T09 | Work Map v2 — the full tree | todo |  |  |  |
+| P4-T10 | Command palette + quick create | todo |  |  |  |
+| P4-T11 | Exports | todo |  |  |  |
+| P4-T12 | Execution notifications wiring | todo |  |  |  |
+| P4-T13 | FlowyTeam task import | todo |  |  |  |
+| P4-T14 | FlowyTeam full import: dry-run, reconciliation, report | todo |  |  |  |
+
+## Phase 5 — The AI layer
+
+Task bodies in AI-NATIVE-PLAN.md §12.
+
+| Task | Title | Status | Branch / PR | Updated | Notes |
+|---|---|---|---|---|---|
+| P5-T00 | AI design gate [DESIGN GATE] | todo |  |  | needs human "Design approved for Phase 5"; AI-NATIVE §13 decisions confirmed |
 | P5-T01 | AIProvider port full surface + drivers | todo |  |  |  |
-| P5-T02 | AI config + BYO-key + encryption | todo |  |  |  |
-| P5-T03 | Model catalog + routing | todo |  |  |  |
-| P5-T04 | Usage + cost metering + quotas + caps | todo |  |  |  |
+| P5-T02 | AI config + BYO keys + encryption + rotation | todo |  |  |  |
+| P5-T03 | Model catalog + tier routing | todo |  |  |  |
+| P5-T04 | Usage metering + quotas + hard caps | todo |  |  |  |
 | P5-T05 | Structured output + prompt registry | todo |  |  |  |
-| P5-T06 | Tool registry + agent authz + confirmation | todo |  |  |  |
+| P5-T06 | Public contract projections: REST + OpenAPI + CLI + MCP tool defs | todo |  |  |  |
 | P5-T07 | Embeddings + RAG | todo |  |  |  |
 | P5-T08 | In-app copilot | todo |  |  |  |
-| P5-T09 | MCP server (inbound) | todo |  |  |  |
-| P5-T10 | AI eval + safety harness + CI | todo |  |  |  |
-| P5-T11 | OKR AI authoring + coaching | todo |  |  | detail in AI-NATIVE-PLAN.md §12; depends on P5-T06 + P4 OKR core |
-| P5-T12 | Work / project AI assists + NL-query | todo |  |  | detail in AI-NATIVE-PLAN.md §12; depends on P5-T06/T07 + P3 cores |
+| P5-T09 | MCP OAuth 2.1 authorization server | todo |  |  | PLAN §13 R4: never ship PAT-only MCP |
+| P5-T10 | MCP server: transport, sessions, catalog | todo |  |  |  |
+| P5-T11 | AI teammates: agents + runs + approvals | todo |  |  | PLAN §13 R5: sandbox/batch-approval if safety review fails |
+| P5-T12 | AI eval + safety harness + live e2e | todo |  |  |  |
+| P5-T13 | Strategy AI assists | todo |  |  |  |
+| P5-T14 | Execution AI assists + NL query | todo |  |  |  |
 
 ## Phase 6 — Hardening
 
@@ -126,31 +109,32 @@ Detail in AI-NATIVE-PLAN.md §12.
 |---|---|---|---|---|---|
 | P6-T01 | Performance budgets + indexing at scale | todo |  |  |  |
 | P6-T02 | Load & soak testing | todo |  |  |  |
-| P6-T03 | Backup & restore | todo |  |  |  |
-| P6-T04 | Observability | todo |  |  |  |
-| P6-T05 | Security review + supply chain | todo |  |  |  |
-| P6-T06 | Accessibility audit + Web Vitals budgets in CI | todo |  |  |  |
-| P6-T07 | Cutover rehearsal + rollback drill | todo |  |  |  |
+| P6-T03 | Backups + restore drills | todo |  |  |  |
+| P6-T04 | Workspace export/import (portability) | todo |  |  |  |
+| P6-T05 | Observability | todo |  |  |  |
+| P6-T06 | Security review + supply chain + RLS fuzz | todo |  |  |  |
+| P6-T07 | Accessibility audit + Web Vitals CI | todo |  |  |  |
+| P6-T08 | Migration cutover rehearsal | todo |  |  |  |
 
-## Phase 7 — Enterprise pack
+## Phase 7 — Enterprise & operator pack
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
 | P7-T01 | SSO (OIDC + SAML) | todo |  |  |  |
-| P7-T02 | LDAP sync + groups | todo |  |  |  |
+| P7-T02 | LDAP sync | todo |  |  |  |
 | P7-T03 | SCIM provisioning | todo |  |  |  |
-| P7-T04 | 2FA (TOTP + WebAuthn) | todo |  |  |  |
-| P7-T05 | Audit export + advanced Helm + air-gap guide | todo |  |  |  |
-| P7-T06 | Enterprise feature gating | todo |  |  | needs human open-core decision first |
-| P7-T07 | Project initiation request wizard | todo |  |  | pricing placement is a human decision |
+| P7-T04 | MFA policy enforcement | todo |  |  |  |
+| P7-T05 | Audit export + chain verification + air-gap guide | todo |  |  |  |
+| P7-T06 | Operator console + transparent support impersonation | todo |  |  | billing stays behind BILLING_ENABLED, unbuilt |
+| P7-T07 | Enterprise feature gating | todo |  |  | needs human open-core decision first |
 
 ## Phase 8 — Community launch
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
 | P8-T01 | Docs site | todo |  |  |  |
-| P8-T02 | One-click deploy buttons | todo |  |  |  |
+| P8-T02 | Deploy quickstarts | todo |  |  |  |
 | P8-T03 | Hosted demo instance | todo |  |  |  |
 | P8-T04 | Contributor onboarding | todo |  |  |  |
 | P8-T05 | Launch | todo |  |  |  |
-| P8-T06 | Methodology template gallery + guides | todo |  |  |  |
+| P8-T06 | Template gallery + operating-rhythm guides | todo |  |  |  |

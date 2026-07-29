@@ -1,200 +1,192 @@
 # UIUX-PLAN.md
 
-Design authority for `OpenOKR`'s user interface. Every UI task in IMPLEMENTATION-PLAN.md must cite the relevant section here; if a screen or pattern is not specified here, the agent asks a human instead of inventing. When implementation deviates, update this doc in the same PR.
+Design authority for `OpenOKR`'s user interface. Every UI task in IMPLEMENTATION-PLAN.md cites a screen spec (S-xx) and the §4 interaction patterns here; if a screen or pattern is not specified, the agent asks rather than inventing. When implementation deviates, update this doc in the same PR.
 
-Why this doc exists: The legacy system's UI is its weakest point (heavy Angular pages, modal-heavy editing, reload-based updates, weak mobile). OpenOKR must feel like a modern tool (Linear/Notion/Height class) while keeping that depth.
+Why this doc exists, and its stance: the product's edge over the benchmark (Operately) is **installed opinion, not configurability** (OPERATELY-COMPARISON.md Part 2). So the UI **leads with the opinionated path** — the Work Map, the review inbox, the check-in ritual, champion/reviewer — working with zero configuration. Power-user configuration (custom fields, configurable workflows, a query/view builder, Gantt) is a deferred "power floor" (REQUIREMENTS §6) and is explicitly *not* in the v1 screen set below. It must feel like a modern tool (Linear/Height/Notion class) while carrying real accountability.
 
 ---
 
 ## 1. Design principles (ranked)
 
-1. **Fast is the feature.** Every interaction obeys the budgets in TECHNICAL-PLAN.md §13. Optimistic UI by default; the network is invisible.
-2. **Inline over modal.** Edit in place wherever the value lives. Modals only for create-with-context, destructive confirmation, and pickers that need real estate.
-3. **Keyboard-first, mouse-friendly.** Everything reachable via ⌘K and shortcuts; nothing only reachable via keyboard.
-4. **Progressive depth.** Simple by default, powerful on demand: a new team sees a clean task list; a PMO can open the same list and add grouping, sums, baselines.
-5. **Never lose work.** Drafts persist (comment boxes, descriptions survive navigation/refresh); destructive actions get undo toasts, not confirm dialogs, wherever reversible.
-6. **States are designed, not defaulted.** Every view ships loading (skeleton), empty (guidance + primary action), error (retry + support info), and permission-denied states.
-7. **One design system.** Only `packages/ui` components; no one-off styles. Density, radius, spacing come from tokens.
+1. **Opinion first.** The default screens impose the operating rhythm; there is no "configure your process" step before a user can work. Simplicity by default; depth on demand.
+2. **Fast is the feature.** Every interaction obeys the budgets in TECHNICAL-PLAN §13. Optimistic UI by default; the network is invisible.
+3. **Inline over modal.** Edit in place. Modals only for create-with-context, destructive confirmation, and pickers needing room.
+4. **Keyboard-first, mouse-friendly.** Everything reachable via ⌘K and shortcuts; nothing *only* reachable by keyboard.
+5. **Accountability is visible.** Staleness (`outdated`), who owns it (champion), who must review it (reviewer), and what you owe (the review inbox) are surfaced everywhere, not buried.
+6. **Never lose work.** Drafts persist (fingerprinted against base content + TTL, so a stale draft never resurrects wrong); destructive actions get undo toasts, not confirm dialogs, wherever reversible.
+7. **States are designed, not defaulted.** Every view ships loading (skeleton), empty (guidance + primary action), error (retry), and permission-denied states.
+8. **One design system.** Only `packages/ui`; no one-off styles. Density, radius, spacing from tokens.
 
 ## 2. Foundations
 
-- **Component base:** shadcn/ui on Tailwind, extended in `packages/ui`. **Base UI** primitives for a11y behavior — shadcn/ui is configured against its **Base UI** registry, not Radix. All accessible behavior (focus management, dismissal, ARIA wiring, keyboard) comes from Base UI components; do not add Radix or another primitive library alongside it. Any component that needs a primitive not yet in Base UI is raised to the human, not swapped to Radix.
-- **Animated components:** **SmoothUI** (smoothui.dev) is the animation component layer, added through the shadcn registry and **vendored** (source copied) into `packages/ui` — never loaded from an external host at runtime, so the air-gap rule (REQUIREMENTS §5) holds. SmoothUI is built on **Motion** (the `motion` package, ex-Framer Motion), which is the one approved animation runtime; no other animation library. The layers compose: **Base UI** provides behavior + a11y, **SmoothUI/Motion** provides motion, tokens provide the look. When a SmoothUI component ships its own interactive behavior, wrap or back it with the matching Base UI primitive so a11y is never lost to animation. Animations must run under the **nonce-based strict CSP** (TECHNICAL-PLAN §8.2) without `unsafe-inline` — Motion animates via the CSSOM/`element.style`, which is compatible; verify no component injects an inline `<style>` that would need `unsafe-inline`.
-- **Adding components (dev tooling):** use the **shadcn MCP** to pull components from the shadcn (Base UI) and SmoothUI registries into `packages/ui`, then adapt to tokens. Initialize once per the repo README: `npx shadcn@latest mcp init --client claude`, with the shadcn/Base-UI and `https://smoothui.dev` registries configured. The MCP is a build-time convenience only; it adds no runtime dependency and no runtime network call.
-- **Typography:** Inter (self-hosted, air-gap safe). Scale: 12/13/14 (base)/16/18/24/30. Tabular numerals for tables.
-- **Spacing:** 4 px grid. Density mode: `comfortable` (default) and `compact` (tables −4 px vertical padding); user preference, stored per user.
-- **Color:** neutral gray ramp + one brand hue (workspace-themable: a single brand color + auto-derived shades stored in workspace settings; replaces the legacy system's custom_styles). Semantic tokens: `success`, `warning`, `danger`, `info`. Status/type/priority colors imported from the legacy system `colors` stay user-editable.
-- **Dark mode:** first-class from day one (`class` strategy, token pairs). Every component ships both. User preference: light / dark / system.
-- **Icons:** Lucide. Entity iconography fixed early: project, work package (per type: task/milestone/phase/bug/feature/epic), board, sprint, wiki, meeting.
-- **Motion:** delivered with **SmoothUI on Motion** (`motion/react`). 120–200 ms ease-out for micro-transitions; none on data-heavy re-renders (no entrance animations on virtualized rows/cards); respects `prefers-reduced-motion` (reduced motion disables non-essential transitions, keeping only opacity/instant state). Motion must never gate content on an animation finishing, and never block a performance budget in §13.1.
-- **Elevation:** flat surfaces + 1 px borders; shadows only for overlays.
+- **Component base:** shadcn/ui on Tailwind, extended in `packages/ui`, configured against the **Base UI** registry (not Radix). All accessibility behavior (focus, dismissal, ARIA, keyboard) comes from Base UI. A primitive missing from Base UI is raised to the human, never swapped for Radix.
+- **Animation:** **SmoothUI** (smoothui.dev), vendored into `packages/ui`, built on **Motion** (`motion/react`) — the one approved animation runtime. Runs under the nonce-based strict CSP (no injected inline `<style>`; Motion animates via CSSOM). When a SmoothUI component ships behavior, back it with the matching Base UI primitive so a11y is never lost.
+- **Adding components:** the shadcn MCP pulls from the shadcn/Base-UI and SmoothUI registries into `packages/ui`, then adapt to tokens. Build-time only; no runtime dependency or network call (air-gap safe).
+- **Typography:** Inter (self-hosted). Scale 12/13/14(base)/16/18/24/30. Tabular numerals in tables/grids.
+- **Spacing:** 4 px grid. Density: `comfortable` (default) / `compact`; per-user.
+- **Color:** neutral gray ramp + one workspace-themable brand hue (single color + auto-derived shades in workspace settings). Semantic tokens `success`/`warning`/`danger`/`info`. Status/health colors are token-driven and never the sole signal (icon + label always accompany).
+- **Dark mode:** first-class (`class` strategy, token pairs). Every component ships both. Preference light/dark/system.
+- **Icons:** Lucide. Entity iconography fixed early: goal, key result, KPI, project, milestone, work item, space, document, folder, file, link, agent.
+- **Motion:** 120–200 ms ease-out micro-transitions; none on data-heavy re-renders (no entrance animation on virtualized rows/cards); respects `prefers-reduced-motion`; never gates content on an animation.
+- **Rich text editor:** a TipTap-based editor (ProseMirror JSON storage — TECHNICAL-PLAN §1) is its own subsystem with a dedicated design doc (see S-26): slash commands, @mentions (contextually enabled only where a workspace/entity context exists), `##id` entity autolink, inline attachments (optimistic placeholder → progress → uploaded; submit blocked while uploading; delete-on-failure; image preview modal), code blocks, tables. Draft autosave keyed per entity+user, fingerprinted + TTL'd.
 
-## 3. App shell and navigation IA
+## 3. App shell and navigation
 
 ```
 ┌────────────┬──────────────────────────────────────────────┐
 │  Sidebar   │  Topbar: breadcrumb · search(⌘K) · + New ·   │
-│            │          notifications · avatar               │
+│            │          Ask AI(⌘J) · notifications · avatar │
 │  Home      ├──────────────────────────────────────────────┤
-│  Inbox     │                                              │
-│  My work   │                Content area                  │
-│  ────────  │      (list / detail / split / canvas)        │
-│  Favorites │                                              │
+│  Review ●  │                                              │
+│  Inbox     │                Content area                  │
+│  ────────  │      (Work Map / list / detail / split)      │
+│  Goals     │                                              │
 │  Projects  │                                              │
-│   ▸ Proj A │                                              │
-│     Work   │                                              │
-│     Board  │                                              │
-│     Gantt  │                                              │
-│     ...    │                                              │
+│  KPIs      │                                              │
+│  ────────  │                                              │
+│  Spaces    │                                              │
+│   ▸ Space  │                                              │
 │  ────────  │                                              │
 │  Admin     │                                              │
 └────────────┴──────────────────────────────────────────────┘
 ```
 
-- **Sidebar (global):** Home (dashboard), Inbox (notification center with unread badge), My work (assigned/created/watched tabs), **Strategy** (OKRs, KPIs, Check-ins, Alignment, Scorecard — permission-gated, S-16/S-19/S-21/S-18/S-22), Favorites (starred projects/views, drag-reorderable), Projects (tree, expandable; per-project sub-nav shows only enabled modules), Admin (permission-gated). The **Strategy** section carries a cycle switcher shared across its screens.
-- **Project sub-nav order:** Overview, Work packages, Board, Gantt, Backlog (if enabled), Calendar, Team planner, Wiki, Meetings, Time & costs, Settings. Saved views pin beneath the module they belong to (replaces the legacy system query menu items).
-- **Topbar:** breadcrumb `Workspace / Project / View`; global search field (focuses with `/`, full palette with ⌘K); `+ New` quick-create (work package from anywhere, project, meeting); an **Ask AI** entry point (⌘J) opening the copilot (S-25) when a provider is configured; notification bell (live badge via Realtime); avatar menu (profile, preferences, theme, language, sessions, sign out).
-- **Command palette (⌘K):** actions ("Create work package", "Go to project…", "Toggle theme"), entity jump (fuzzy search WPs by #id/subject, projects, wiki pages), recent items. Powered by the Search port + client-side recents. This is a P0-class differentiator (P3-T32).
-- **Responsive:** ≥1280 full; 768–1279 collapsible sidebar (icons); <768 bottom tab bar (Home, My work, Inbox, Search) + drawer; tables become card lists via the same query definition; boards get horizontal snap-scroll columns with touch drag.
-- **URLs are share-stable:** every view state that matters (query id or inline DSL, selected WP, board, zoom) lives in the URL. Deep links always restore the exact view.
+- **Sidebar:** **Home** (the Work Map), **Review** (the "what I owe" inbox, with a live overdue badge — the highest-placed nav item after Home), **Inbox** (notifications), then **Goals**, **Projects**, **KPIs**, then **Spaces** (each a team home with its own goals/projects/docs), then **Admin** (permission-gated). A **workspace switcher** sits at the top for members of more than one workspace.
+- **Topbar:** breadcrumb; global search (`/` focuses, ⌘K full palette); `+ New` (goal, project, work item, document, discussion from anywhere); **Ask AI** (⌘J → copilot S-25) when a provider is configured; the live notification bell; avatar menu (profile, preferences, theme, language, sessions, sign out).
+- **Command palette (⌘K):** actions, entity jump (fuzzy by short-id/title across goals/projects/work items/docs/discussions), recent items — permission-filtered.
+- **Responsive:** ≥1280 full; 768–1279 collapsible icon sidebar; <768 bottom tab bar (Home, Review, Inbox, Search) + drawer; the Work Map and lists become card lists; boards get horizontal snap-scroll with touch drag.
+- **Share-stable URLs:** every view state that matters (filters, selected entity, board, map scope) lives in the URL and restores exactly. A stale-deploy version mismatch triggers a one-time "app updated — reload" toast (TECHNICAL-PLAN §13.2).
 
 ## 4. Interaction patterns (the contract for every feature task)
 
 | Pattern | Rule |
 |---|---|
-| Optimistic updates | Mutate UI immediately; rollback + toast on server reject; `CONFLICT` (stale lockVersion) → auto-refetch, reapply if clean, else inline conflict banner with "their change / your change" |
-| Inline edit | Click-to-edit on: subject, status (dropdown), assignee (picker), dates (range picker), priority, version, custom fields — in tables, detail view, and board cards. Esc cancels, Enter/blur commits |
-| Undo | Deletes, bulk edits, drag moves show a 6 s undo toast instead of confirm dialogs. Hard-confirm only for irreversible destruction (project delete types the identifier) |
-| Drafts | Comment/description editors autosave drafts locally (per entity, per user); restored on return; cleared on submit |
-| Empty states | Icon + one sentence + primary action + docs link. First-run empties may embed a 3-step mini-checklist |
-| Loading | Skeletons matching final layout (no spinners on full surfaces); stale-while-revalidate keeps old data visible with a subtle refresh indicator |
-| Errors | Inline field errors from Zod; surface-level error card with retry; never a blank screen; error boundary per route segment |
-| Keyboard | Global: ⌘K palette, `/` search, `c` new WP (in project), `g` then `b/g/w` go to board/gantt/work. List: `j/k` move, `x` select, `e` edit, `⌘⏎` save. Detail: `[`/`]` prev/next. Shortcuts help: `?` overlay |
-| Presence | Realtime: avatar stack on WP detail/board ("who's here"), typing indicator on comments. Foundation for future co-edit (PLAN.md §7) |
-| Notifications | In-app first: bell badge updates live; Inbox groups by project/WP with reason chips (mentioned/assigned/watched/date alert); mark-read on view; email respects per-user settings + digest |
-| Bulk actions | List multi-select → floating action bar (edit fields, move, delete, export selection) with per-item permission awareness |
-| Rich text | One editor everywhere (TipTap-class, Markdown storage): slash commands (/heading, /table, /wp to link a work package), @mentions, ##1234 WP autolink, paste-to-upload attachments, code blocks. Macros from the legacy system render read-only with a "legacy macro" chip (importer note, data-model §9) |
-| Date handling | All dates workspace-timezone aware; pickers highlight non-working days (from P3-T11 calendar) and warn when a pick violates scheduling constraints |
-| Confirmation of scheduling effects | When an edit reschedules other WPs (follows-chain), show a preview popover: "This moves 3 work packages" with expand list, before commit (fixes the legacy system's silent cascades) |
-| AI assist affordance | A ✨ action sits beside the value it helps with (objective, KR, KPI, WP subject, comment box, query). Click runs the assist, streams, and returns a **proposal** the user applies or dismisses. Shown only where a provider is configured and the feature is on (AI-NATIVE-PLAN.md §2/§4) |
-| AI preview before apply | Every AI *write* renders as a preview or diff ("current → suggested") with Apply/Dismiss; applying goes through the normal mutation layer so optimistic UI, undo, and audit all work. AI output is never auto-committed |
-| AI provenance + undo | AI-generated or AI-edited values carry an "AI" chip and a normal undo toast; the source and model are recorded (AI-NATIVE-PLAN.md §7) |
-| Copilot (agentic) | ⌘K and the topbar expose "Ask AI"; the copilot answers in a SidePanel (S-25), streams with a Stop control, cites only what the user may see, and proposes any action for confirmation |
-| Cost/limit transparency | When a quota or cost cap is near or hit, the affordance shows the remaining budget and, on hit, disables with a clear message while manual paths continue |
-| AI degradation | With AI `off` or the provider unreachable, every ✨/copilot affordance is hidden or disabled and the manual path is unchanged — no dead buttons, no errors |
+| Optimistic updates | Mutate UI immediately; rollback + toast on reject; `CONFLICT` (stale version) → auto-refetch, reapply if clean else an inline "their change / your change" banner |
+| Inline edit | Click-to-edit on title, status, assignee, dates, champion/reviewer, confidence, KR values — in lists, detail, and cards. Esc cancels, Enter/blur commits |
+| Undo | Deletes, bulk edits, drag moves show a 6 s undo toast, not a confirm dialog. Hard-confirm only for irreversible destruction (delete a project types its name) |
+| Drafts | Comment/description/check-in editors autosave locally per entity+user, fingerprinted against base content with a TTL; restored on return; cleared on submit |
+| Empty states | Icon + one sentence + primary action + docs link; first-run empties may embed a 3-step mini-checklist |
+| Loading | Skeletons matching the final layout; stale-while-revalidate keeps old data visible with a subtle refresh indicator (persisted cache, TECHNICAL-PLAN §13.2) |
+| Errors | Inline Zod field errors; surface-level error card with retry; never a blank screen; error boundary per route segment |
+| Keyboard | Global: ⌘K palette, `/` search, ⌘J Ask AI, `c` new (contextual). List: `j/k` move, `x` select, `e` edit, `⌘⏎` save. Detail: `[`/`]` prev/next. `?` shortcut overlay |
+| Presence | Realtime avatar stack on detail/board/map ("who's here"); typing indicator on comments; foundation for future co-edit |
+| **Staleness** | An `outdated` badge (amber, icon + label) renders on any goal/project past its check-in due date, overriding the last reported health color, in every list, the Work Map, and dashboards |
+| **Accountability chips** | Champion and reviewer avatars render on goal/project rows and headers; a "needs your review" chip appears on a published check-in awaiting the viewer's acknowledgement |
+| Notifications | Bell badge live; Inbox groups by entity with reason chips (mentioned/assigned/watching/review/due); mark-read on view; a compose-time "will notify X and N others" preview; email respects per-user settings + digest window |
+| Rich text | One editor everywhere (S-26); slash commands, @mentions, `##id` autolink, paste-to-upload, code/tables; imported legacy content rendered read-only-safe |
+| Dates | Workspace-timezone aware; contextual granularity (a goal can say "Q3 2026"); pickers show relative labels |
+| AI assist affordance | A ✨ action beside the value it helps (goal, KR, KPI, check-in narrative, work-item title, comment). Runs the assist, streams, returns a **proposal** the user applies or dismisses. Shown only where a provider is configured and the feature is on |
+| AI preview before apply | Every AI *write* renders as a preview/diff (current → suggested) with Apply/Dismiss; applying goes through the normal mutation layer so optimistic UI, undo and audit all work. Never auto-committed |
+| AI provenance | AI-generated/edited values carry an "AI" chip + a normal undo toast; source/model recorded |
+| Copilot | ⌘J / "Ask AI" opens the copilot side panel (S-25); streams with Stop; cites only what the user may see; proposes any action for confirmation |
+| AI teammate presence | An agent member appears with an "AI" avatar badge in feeds, mentions, assignments and as a possible champion/contributor; its check-in and comment proposals surface in the review inbox (batch-approval) |
+| Cost/limit transparency | When a quota/cap is near or hit, the affordance shows remaining budget and, on hit, disables with a clear message while manual paths continue |
+| AI degradation | With AI `off` or the provider unreachable, every ✨/copilot/agent affordance is hidden or disabled and the manual path is unchanged — no dead buttons, no errors |
 
 ## 5. Component inventory (`packages/ui`)
 
-Beyond stock shadcn: `DataTable` (virtualized, TanStack Table: column resize/reorder/pin, group headers with sums, inline-edit cells, row selection, keyboard nav), `EntityPicker` (user/group, WP, project, version — async, recent-first, avatars), `FilterBar` (chip-based filter builder bound to the query DSL; add/edit/remove filter chips, operator dropdowns per field type), `ViewSwitcher` (table/board/gantt/calendar tabs on a query), `StatusBadge`/`TypeIcon`/`PriorityFlag` (color-token driven), `AvatarStack` (+N overflow, presence ring), `RichTextEditor` + `CommentComposer`, `DateRangeField` (working-day aware), `GanttCanvas` (virtualized rows, dependency arrows, drag handles), `BoardColumn` (virtualized cards, drop zones, WIP count), `ProgressRing/Bar` (done_ratio, budgets), `EmptyState`, `SkeletonTable/Card`, `KbdHint`, `Toast+Undo`, `SidePanel` (split-view container with resize), `CommandPalette`, `NotificationItem`, `AuditLogRow`, `Timeline` (activity feed), `MetricTile` (dashboards).
+Beyond stock shadcn: `WorkMapTree` (virtualized hierarchy with per-node status/health/next-step/champion/progress), `ReviewInboxList` (grouped, overdue-first, one-click actions), `CheckInComposer` (status picker + confidence slider + required narrative + auto-snapshot of KR values with previous-value diff), `CheckInCard` (published check-in with acknowledge action + reactions + comments), `HealthBadge`/`StalenessBadge`/`RagBar`, `KeyResultRow` (inline value edit, direction hint, sparkline + trend forecast, KPI-backed badge), `KpiGrid` (periods × KPIs, keyboard entry, calculated-cell formula chip), `FormulaBuilder` (drag KPI refs + operators, per-source aggregation, live preview), `AlignmentTree`, `DataTable` (virtualized, inline-edit cells, group headers, keyboard nav), `BoardColumn` (virtualized cards, drop zones, WIP count), `EntityPicker`, `AvatarStack` (+N, presence ring), `RichTextEditor` + `CommentComposer`, `ResourceNodeTree` (folders/docs/files/links with breadcrumbs, drag upload), `FilePreview` (image/video/pdf), `ProgressRing/Bar`, `EmptyState`, `SkeletonTable/Card`, `KbdHint`, `Toast+Undo`, `SidePanel`, `CommandPalette`, `NotificationItem`, `ActivityTimeline`, `MetricTile`, `AiProposalCard`, `ConsentScreen`.
 
-Each component gets a Storybook-style preview page (Ladle or Storybook — human picks, PLAN dependency rule) with light/dark and states; components are tested for keyboard + screen-reader behavior at build time.
+Each gets a Storybook/Ladle preview (human picks) with light/dark and all states; components are tested for keyboard + screen-reader behavior at build time.
 
-## 6. Screen specifications (S-01…S-25)
+## 6. Screen specifications (S-01 … S-26)
 
-Format: purpose · layout · primary actions · states · notes. IDs referenced by tasks. S-01…S-15 are the work-management and platform screens; S-16…S-23 are the Strategy screens (OKR / KPI / check-ins, built in Phase 4 — schema in TECHNICAL-PLAN.md §4.12); S-24…S-25 are the AI screens (admin AI console + copilot, built in Phase 5 — scope in AI-NATIVE-PLAN.md §4/§6). Inline AI assists live inside existing screens (S-16/S-17 for OKR, S-02 for work packages, S-10 wiki, S-11 meetings). All obey the §4 patterns and §9 gates equally.
+Format: purpose · layout · primary actions · states. `[power-floor]` marks screens deferred to post-v1 (REQUIREMENTS §6), specified only as design-for stubs so v1 does not block them.
 
-### S-01 Work package list (table)
-The core screen. Layout: FilterBar + ViewSwitcher header; virtualized DataTable; right SidePanel opens on row click (split view) without losing scroll; URL carries query + selected WP. Actions: inline edit cells, multi-select bulk bar, column config drawer, group-by with collapsible groups + sums, save view (private/public), export menu, ⌘K quick-jump. States: skeleton table; empty "No work packages match — clear filters / create one"; error retry. Notes: hierarchy mode indents parents with expand carets; drag-to-reparent within hierarchy mode; baseline chip when comparing (P2 feature slot).
+### Home & rhythm
 
-### S-02 Work package detail (split + full)
-Split panel (default) and full page (`⌘⇧F` expands). Header: type icon + editable subject + status pill + ⋯ menu (watch, share, copy link, move, delete-with-undo). Two-column body: left = description (rich editor), activity feed (comments interleaved with changes, filterable: all/comments/changes), comment composer with internal-comment toggle (permission-gated); right = attribute rail (status, assignee, dates via range picker, priority, version, story points, custom fields by section, watchers avatar stack, attachments dropzone, linked GitHub/GitLab items, relations list with add-relation picker showing blocks/follows badges). Presence avatars top-right. `[`/`]` navigate list order. States: not-found (deleted → offer restore if within undo), no-permission (minimal card).
+**S-01 Work Map (Home).** The front door. One virtualized tree: goals → sub-goals → projects → work items, each row = title, champion avatar, health/staleness badge, progress bar, next step, timeframe. Scope tabs (Company / My spaces / a space) + a cycle switcher + filters (status, champion, space). Group/collapse; deep-link every node; open any node in a right SidePanel without losing scroll. States: skeleton tree; empty ("No goals yet — create your first" + template gallery link); error retry. This — not a saved-query builder — is the canonical company view.
 
-### S-03 Board
-Column header: name + count + WIP indicator + column menu. Virtualized cards: type icon, #id, subject, avatar, due chip (red when overdue), priority flag, story points. Drag: card between columns (optimistic, mutates keyed attribute), card within column (manual order), column reorder. Board switcher dropdown + "New board" wizard (pick type: free/status/assignee/version/subproject/parent). Live updates via Realtime: cards move for everyone; presence stack in toolbar. Empty column: ghost "Drop here or + Add".
+**S-02 Review (My Assignments).** The accountability surface. Server-computed, overdue-first list of what the viewer owes: check-ins due (as champion), acknowledgements owed (as reviewer), work items/milestones due. Grouped `Overdue / Due today / This week / Upcoming`; each row = action label ("Submit weekly check-in", "Review goal progress"), due-status ("Overdue by 3 days"), one-click action (opens the composer inline). Drives the sidebar badge. Empty: "You're all caught up."
 
-### S-04 Gantt
-Left: mini WP table (subject, dates, assignee — resizable). Right: GanttCanvas timeline with zoom (day/week/month/quarter, ⌘scroll), today line, non-working-day shading, milestone diamonds, dependency arrows (click arrow to select/delete relation), drag bar = move dates, drag edge = resize duration, drag between bars = create follows relation (with preview popover per §4 scheduling confirmation). Baseline overlay slot (P2). Auto vs manual scheduled bars visually distinct (solid vs outlined).
+**S-03 Inbox (notifications).** Two-pane: left grouped by entity with reason chips + unread dots; right preview renders the target. Mark read/unread, mark all, filter by reason/entity, mute an entity, snooze. Live insert on new notification. Settings link → S-24 notification prefs (per-reason routing, mention immediacy, digest window, daily-summary time).
 
-### S-05 Project overview
-Widget grid (drag/resize, edit mode toggle): description, status card (traffic light + explanation), members, recent activity, WP status donut, milestones/versions upcoming, time logged this week, custom project attributes by section (inline-editable with permission). "Customize" enters edit mode; widget catalog drawer.
+### Strategy
 
-### S-06 My work + Home
-Home: greeting, favorites row, recent items, workspace activity highlights, "resume where you left off". My work: tabs Assigned / Created / Watched / Recently viewed, each a saved query using S-01 table in compact density.
+**S-04 Goals explorer.** Scope tabs + cycle switcher + filters; virtualized list/tree of goals: title, champion + reviewer chips, weight, progress + RAG, health/staleness badge, KR count. Inline weight/confidence edit; quick check-in; `+ New goal` (champion, reviewer, owner, cycle/timeframe); open detail in SidePanel. Tree mode shows alignment indent.
 
-### S-07 Inbox (notifications)
-Two-pane: left list grouped by WP/project with reason chips + unread dots, right preview renders the target (WP split view embedded). Actions: mark read/unread, mark all, filter by reason/project, mute WP. Live insert on new notification; date-alert items show due badge. Settings link → per-project matrix editor (S-13).
+**S-05 Goal detail (split + full).** Header: title (inline) + champion + reviewer + cycle/timeframe + progress ring + health/staleness pill + ⋯ (watch, align, close-with-retrospective, reopen, delete-with-undo). Body left: description (rich), key results (each: inline value/confidence check-in, unit, direction hint, weight, progress bar, sparkline + forecast, KPI-backed badge), the check-in history (each `CheckInCard` with its value diff + acknowledge state + reactions/comments), a titled discussion + composer. Right rail: champion/reviewer (with reassignment), cycle/timeframe, weight, alignment parent (picker), rolled-up child goals, linked projects/work items, watchers, resource hub link. Presence avatars. Close flow requires an outcome + a retrospective (S-08 style). States: not-found (restore if within undo), permission-denied card.
 
-### S-08 Global search + palette
-⌘K overlay: input, scoped tabs (All / Work packages / Projects / Wiki / People), results grouped with highlights, footer key hints. `/` focuses inline topbar search with same backend. Full results page for "see all" with filters. Recent + frequently visited boost ranking (client-side recents + server score).
+**S-06 Check-in composer & session.** For a due goal/project: status (on_track/caution/off_track), optional confidence (0–10 slider with health preview), a required narrative (rich), and an auto-populated snapshot of every KR/target value (editable, showing previous → new). Draft/publish; publishing advances the cadence, notifies subscribers and puts an acknowledgement obligation in the reviewer's Review inbox. A weekly "check-in session" walks the user through all their due goals/projects in sequence. Autosaves drafts. Empty: "Nothing to check in this period."
 
-### S-09 Sprint backlog (P1, backlogs)
-Two stacked virtualized lists: Sprint (with capacity header: story points sum vs velocity hint, dates, sprint goal editable) and Product backlog; drag between them; rank = manual order; burndown sparkline in sprint header expanding to chart; "Start/Complete sprint" actions with confirm summarizing scope.
+**S-07 Alignment diagram.** The cascade tree (company → space → individual) from alignment pointers. Pan/zoom canvas; node = goal card (title, champion, progress ring, health); edges = alignment; collapse/expand; click → S-05 in SidePanel. Cycle switcher, scope filter. Keyboard traverse. Virtualize off-screen nodes.
 
-### S-10 Wiki (P1)
-Left page tree (drag to reorganize, permission-aware), breadcrumb, page body (rich editor with /toc), page actions (history diff viewer, watch, move, export PDF), backlinks panel ("linked from"). Slug conflicts resolved with redirect creation (parity with wiki_redirects).
+**S-08 Retrospective.** Shown at goal/project close and thereafter: outcome (achieved/missed) + a structured rich-text retrospective (AI-draftable from check-in history via a ✨ proposal). Editable; reopening the goal/project keeps it. Reactions/comments.
 
-### S-11 Meetings (P1)
-List (upcoming/past, recurring series grouped) → meeting page: header (time, location/URL, participants with invite status, ICS buttons), agenda sections + items (drag order, duration chips with over-time warning, per-item notes, link WP), outcomes per item, "Close meeting" locks minutes + emails summary. Recurring editor: RRULE builder with plain-language preview ("Every 2 weeks on Tuesday").
+**S-09 KPI grid.** KPIs as rows, periods as columns (frequency-driven, scrollable). Each cell = actual/target with RAG background; keyboard entry (Enter commits, arrows move). Row header = title, category, owner, unit, direction, trend sparkline. Group by category with subtotals; filters (frequency, owner, category, RAG). Calculated-KPI cells are read-only with a formula chip; editing a source cell updates dependents live.
 
-### S-12 Time & costs (P1)
-My timesheet week grid (rows = WPs, cells = hours, keyboard-entry optimized) + running timer widget in topbar (start from any WP ⋯ menu; one active timer; stop → prefilled log form). Project cost view: table by user/activity/type with permission-scoped rate columns; export.
+**S-10 KPI detail + formula builder.** Header: title, category, owner, current RAG. Body: period chart (actual vs target, RAG bands), parent/child KPI tree, records table (editable), and for calculated KPIs the `FormulaBuilder` (drag KPI refs + operators, per-source aggregation, live preview, inline validation). KPI↔KR link control.
 
-### S-13 Settings & admin screens
-Consistent two-level pattern: left section nav, right content cards with save-per-card. Workspace admin: General, Members & roles (matrix editor: roles × permissions grid with search + diff-on-save summary), Types (list → form-config editor: drag attributes into groups, per-type), Statuses, Workflows (matrix: from-status × to-status per type+role with copy-from), Custom fields (list + builder with live preview, per-format options), Working days & holidays (calendar editor with reschedule-warning), Authentication (providers, MFA policy, session/rate settings), Notifications defaults, Audit log (filterable table + export), Backups, Branding (logo, brand color with live preview, dark-mode check). Project settings: Info & attributes, Modules, Members, Versions, Categories, Backlog settings, Storages. Every destructive admin action audit-logged with actor.
+**S-11 Scorecard.** Per owner (person/space) per cycle: result ring, RAG bucket tiles (goals + KRs by completed/on-track/at-risk/outdated), a trend across cycles, and — only when points are enabled — a points breakdown. Filter by owner/cycle; export. Empty when a cycle isn't archived.
 
-### S-14 Auth screens
-Sign in (email+password, passkey button, SSO buttons when configured, MFA step, lockout messaging with retry-after), registration (if enabled) with email verify, invite-accept (name+password/passkey set), forgot/reset. Clean single-card layout, workspace branding, language switcher visible pre-auth.
+### Execution
 
-### S-15 Onboarding (first-run)
-After first login as Owner: 3-step guided setup (name workspace + brand color → invite teammates (skippable) → create first project from template gallery or import banner "Coming from the legacy system? Run the importer" linking docs). Sample project offer ("Explore with demo data") using the seed. Per-user first-visit: 4-stop product tour (sidebar, ⌘K, create WP, inbox), dismissible, never auto-repeats.
+**S-12 Project detail.** Header: name (inline) + state (active/paused/closed) + health/staleness + champion/reviewer + ⋯ (pause/resume, close-with-retrospective, watch). Body: description (rich), milestones (each with timeframe, status, next-step indicator), the project check-in history (`CheckInCard`s with acknowledgement), discussion. Right rail: contributors (champion/reviewer/contributor with reassignment), linked goal, resource hub, dates, watchers. Pausing suspends the cadence; resuming reschedules and records it.
 
-### S-16 OKR explorer
-The Strategy home. Layout: scope tabs (Company / Team / Personal) + cycle switcher + FilterBar (owner, status, confidence); virtualized list/tree of objectives, each row = title, owner avatar/chip, weight, progress bar with RAG color, confidence chip, status pill (completed/on track/at risk/not tracked), KR count. Group-by owner with collapsible groups. Actions: inline weight/confidence edit, quick check-in, `+ New objective` (owner + cycle context), open detail in SidePanel (split view), move-OKR menu, export. States: skeleton; empty "No objectives in this cycle — create one / switch cycle"; error retry. Notes: alignment indent when tree mode on; drag-to-realign within tree.
+**S-13 Milestone + board.** Milestone header (title, timeframe, status, complete/reopen) + a per-milestone kanban of its work items keyed on status; drag optimistically, live presence, concurrency-safe order. A comment can carry a complete/reopen action.
 
-### S-17 Objective detail (split + full)
-Header: title (inline edit) + owner + cycle + score ring (result %) + status pill + ⋯ menu (watch, move, copy, delete-with-undo). Body: left = description (rich), key results list (each with inline value/confidence check-in, unit, weight, progress bar, direction hint, KPI-backed badge when linked), check-in history, threaded discussion + composer; right = attribute rail (owner, lead, cycle, weight, confidence, parent alignment (objective/KR) with picker, child objectives rolled up, linked work packages, watchers). Presence avatars. States: not-found (restore if within undo), no-permission card.
+**S-14 Work item detail (split + full).** Header: title (inline) + status + ⋯ (watch, link to KR/goal/KPI, delete-with-undo). Body: description (rich), checklist, activity+comments. Right rail: assignees (multi), due (contextual), reminders (due-relative), milestone/project, linked key result/goal/KPI (progress-flow indicator), blocked-by relations (with the cannot-complete-while-blocked guard), watchers. `[`/`]` navigate list order.
 
-### S-18 Alignment diagram
-The cascade tree company → team → individual, laid out from `parent_objective_id`/`parent_key_result_id`. Pan/zoom canvas, node = objective card (title, owner, progress ring, RAG), edges show alignment; collapse/expand branches; click a node → S-17 in SidePanel. Toolbar: cycle switcher, scope filter, layout (vertical/horizontal), display lock. Keyboard: arrow to traverse, Enter to open. Empty: "No aligned objectives yet". Performance: virtualize off-screen nodes.
+**S-15 Board (project).** Work items grouped by status across a project (or a milestone); the S-13 board generalized. Card = title, assignee avatars, due chip (red overdue), linked-KR badge. New-item inline per column.
 
-### S-19 KPI board (grid)
-KPIs as rows, periods as columns (frequency-driven, scrollable window). Each cell = actual/target with RAG background; inline entry (keyboard-optimized, Enter commits, arrows move); row header = KPI title, category chip, owner, unit, direction icon, trend sparkline. Group-by category with subtotals. FilterBar (frequency, owner, category, RAG). Actions: `+ New KPI`, record entry, open detail. States: skeleton grid; empty; error. Notes: calculated KPI cells are read-only with a formula chip; editing a source cell updates dependents live.
+### Collaboration & platform
 
-### S-20 KPI detail + tree + formula editor
-Header: title + category + owner + current RAG. Body: period chart (actual vs target over time, RAG bands), parent/child KPI tree, records table (editable). For calculated KPIs: a visual formula builder — drag KPI references and operators into an expression, pick the aggregation function per source, live preview of the resolved value; validation errors inline. States + no-permission as standard.
+**S-16 Resource Hub.** Left: node tree (folders/documents/files/links, drag to reorganize, drag-drop upload, permission-aware). Center: breadcrumb + the node — a rich document (draft/publish, version history with visual diff, backlinks), a file (preview/thumbnail, download), or a typed link (provider icon, enriched preview). Per-node comments/reactions/subscriptions. Available on a space, project, or goal.
 
-### S-21 Check-in flow
-A guided session for the current period: optional mood, then a stepper over the user's objectives and key results — each step shows current value/progress and asks for new value (KR), confidence (0–10 slider with RAG preview), a remark (rich), and a category (challenge/blocker/risk/suggestion/solution/resource-request). Progress indicator, save-draft, submit. Manager view: list of submitted check-ins with a review composer and "reviewed" toggle. Empty: "Nothing to check in this period". Notes: autosaves drafts (§4 Drafts); confidence changes preview the resulting status.
+**S-17 Discussions / space board.** A space's titled discussion threads (announcements) + threads anchored to a goal/project. Draft → publish (drafts silent). Thread = title, rich body, reactions, threaded comments, subscriber list with a "who will be notified" preview.
 
-### S-22 Scorecard
-Per owner (person/team) per cycle: header (owner, cycle, result value ring), RAG bucket tiles (objectives + key results counts by completed/on-track/at-risk/not-tracked), a trend across cycles, and — only when points are enabled — a points breakdown (OKR/KPI/tasks/attendance contributions). Filter by owner/cycle; export CSV/PDF. Empty when a cycle is not yet archived: "This cycle has not been archived".
+**S-18 Activity feed.** The typed, human-readable feed at company/space/goal/project/profile scope: each event rendered by its kind (checked in, closed, aligned, milestone completed, member joined, document published…), reactable/commentable, consecutive same-actor edits aggregated, permission-filtered, live-updating. Distinct from the audit log.
 
-### S-23 OKR/KPI settings & cycles (admin)
-Two-level settings pattern (as S-13): cadence + quotas (max objectives/KRs), RAG thresholds (fail/pass with live preview), term labels (okr/objective/keyresult/kpi/task/vision), level enablement (company/team/personal), cycle management (list + create/archive/generate-next with an archive-warning), scorecard/points toggle (**off by default**), and the OKR/KPI permission matrix editor. Every change audit-logged.
+**S-19 Global search + palette.** ⌘K overlay: scoped tabs (All / Goals / Projects / Work items / Docs / People), grouped highlighted results, footer key hints; `/` focuses inline search. Recents boost ranking. Semantic search (from the AI layer) blends in when available.
 
-### S-24 AI settings & agents (admin)
-The AI console (AI-NATIVE-PLAN.md §4), two-level settings pattern (as S-13), permission `manage_ai`. Cards: **Provider & connection** (provider dropdown incl. Ollama / OpenAI-compatible, base URL, masked key with **Test connection**, allow-user-keys toggle); **Models & routing** (tier→model map validated against the live model list, per-tier temperature / max-tokens / JSON-mode); **Features** (a switch per capability from §2, default-on where a provider is set); **Budgets & limits** (token / cost / call quotas, hard cost cap, throttle); **Prompts** (versioned system prompt per feature, restore-to-default, live variable list); **Privacy & governance** (context-egress level, PII redaction, no-train header, egress allow-list, per-workspace opt-out — greyed with a "zero egress" note for local providers); **MCP & agents** (enable server, mint / rotate / revoke scoped tokens with per-token scope + rate limit, connected-agents list with last-used + audit link); **Usage & logs** (token / cost dashboards by user / feature / model / period, request log with truncated payloads + flag-misuse, latest eval results). States: skeleton; provider-not-configured empty ("Add a provider to enable AI, or leave it off"); connection-error card. Every change audit-logged.
+**S-20 People directory & profile.** Directory (search, filter by space/manager) + a member profile (name, title, timezone, rich bio, manager/reports, the goals/projects they champion). Self-vs-others edit rules. Org-chart view from the manager chain.
 
-### S-25 AI copilot
-A SidePanel (⌘J, or "Ask AI" in the topbar/palette) available across the app, scoped to the current workspace and, when opened from an entity, that entity. Body: a thread of turns (user / assistant / tool), streaming assistant output with a **Stop** control, and inline **action proposals** — each a preview/diff card with Apply/Dismiss that commits through the normal mutation layer (§4 AI preview). Grounded answers cite source entities the user may see (links open S-02 / S-17 / etc.); citations never expose records the user cannot access. Composer: prompt box with entity mentions (`##id`, `@user`, objective/KR), suggested prompts, and a model/tier hint. States: empty ("Ask about your OKRs, projects, or a work package"); AI-off ("AI is disabled for this workspace", with a link to S-24 for admins); rate-limited / cost-capped notice. Obeys §9 gates (keyboard, reduced motion, dark mode) and never gates content on an animation.
+**S-21 Onboarding (first-run).** After first login as Owner: a 3-step guided setup (name workspace + brand color → invite teammates (email or reusable link) → create the first goal from a template, or "Explore with demo data" using the in-product demo builder). Per-user first-visit: a 4-stop tour (Work Map, Review inbox, check-in, ⌘K). Dismissible, never auto-repeats.
+
+**S-22 Auth.** Sign in (email+password, passkey button, TOTP step, SSO buttons when configured, lockout messaging with retry-after), registration (if enabled) with email verify, invite-accept (name + password/passkey), forgot/reset. Clean single-card, workspace branding, pre-auth language switcher.
+
+**S-23 Admin & settings.** Two-level pattern (left section nav, right cards with save-per-card). Workspace: General, Members & access (people, the access editor — public/workspace/space/invite-only levers, roles as binding sugar), Spaces, Strategy (cadence + anchor day, staleness grace, RAG thresholds, cycles create/archive, term labels, scorecard points toggle **off by default**), Notifications defaults, Authentication (providers, MFA policy, sessions, rate limits), Branding, Audit log (filterable + export + a "verify chain" action), Freeze/read-only switch, Backups, Import (CSV + FlowyTeam wizards with dry-run preview), Export (workspace archive). Every destructive admin action is audit-logged with the actor.
+
+### AI
+
+**S-24 AI settings & agents (admin).** The AI console (AI-NATIVE-PLAN §4), permission `manage_ai`: Provider & connection (incl. Ollama/OpenAI-compatible, allow-user-keys); Models & routing; Features (per-capability switches); Budgets & limits (token/cost/call quotas per user/agent/workspace, hard cap, throttle); Prompts (versioned, restore-to-default); Privacy & governance (egress level, PII redaction, allow-list — greyed with a "zero egress" note on local providers); **Agents** (create/edit AI teammates: persona, planning + execution instructions, provider/tier, schedule, access scope, sandbox toggle, autonomy policy, run history + logs); MCP & connections (enable server, connected grants with last-used + audit + revoke); Usage & logs (dashboards by user/feature/agent/model, flag-misuse, latest evals).
+
+**S-25 Copilot.** A SidePanel (⌘J / "Ask AI"), workspace-scoped and entity-scoped when opened from one. Thread of turns (user/assistant/tool), streaming with Stop, inline **action proposals** (preview/diff with Apply/Dismiss committing through the normal mutation layer). Grounded citations only to what the viewer may see. Composer with entity mentions and suggested prompts. States: empty, AI-off (link to S-24 for admins), rate-limited/capped.
+
+**S-26 Rich text editor (design doc + component).** Its own spec: the ProseMirror schema (node/mark allowlist), draft persistence + recovery, contextual mention/attachment enablement, `##id`/link resolution shared with the importer's reference-rewrite pass, paste-to-upload via the FileStorage adapter, sanitizing render, and the excerpt/summary utility used by email/inbox/feed.
+
+### Power-floor stubs (design-for, not built in v1)
+
+`[power-floor]` **S-P1 Query/View builder** (saved filters → table/board/calendar); **S-P2 Custom fields admin**; **S-P3 Types/statuses/workflow admin**; **S-P4 Gantt** (dependency timeline + the scheduling engine); **S-P5 Backlog/Sprint board**; **S-P6 Time & cost logging** (v1 shows imported time read-only); **S-P7 Operator console** (Phase 7 — workspace inspect/suspend, site messages, transparent support impersonation); **S-P8 Billing** (behind `BILLING_ENABLED`). Each is specified only enough that v1 data models do not block it.
 
 ## 7. Accessibility standard (WCAG 2.1 AA)
 
-- Semantic landmarks; one `h1` per page; focus outlines always visible; focus trapped in overlays and returned on close.
-- All interactive elements keyboard operable incl. drag alternatives (move-via-menu on cards/gantt bars: "Move to column…", "Set dates…").
-- Contrast ≥ 4.5:1 text, ≥ 3:1 UI; status/type colors never the sole signal (icons/labels accompany).
-- Live regions for toasts, realtime list changes, notification badge.
-- Virtualized lists expose `aria-rowcount`/`aria-rowindex`; tables have proper header associations.
-- Forms: label + description + error wired via `aria-describedby`; Zod errors announced.
-- Automated axe checks in Playwright on every screen spec above (P6-T06 formal audit).
+- Semantic landmarks; one `h1` per page; visible focus; focus trapped in overlays and returned on close.
+- All interactive elements keyboard-operable including drag alternatives (move-via-menu on cards/map nodes: "Move to…", "Set dates…").
+- Contrast ≥ 4.5:1 text, ≥ 3:1 UI; status/health colors never the sole signal (icon + label accompany).
+- Live regions for toasts, realtime list/feed changes, the notification and review badges.
+- Virtualized lists expose `aria-rowcount`/`aria-rowindex`; tables have header associations.
+- Forms: label + description + error via `aria-describedby`; Zod errors announced.
+- Automated axe checks in Playwright on every screen spec (P6 formal audit).
 
 ## 8. i18n & localization
 
-- ICU MessageFormat catalogs (`en` source, `ms` at launch; `id` seeded from the legacy system's crowdin base as a bonus, per feature inventory §7); no concatenated strings; all dates/numbers via `Intl` with workspace timezone + user locale.
+- ICU MessageFormat catalogs (`en` source, `ms` at launch); no concatenated strings; all dates/numbers/times via `Intl` with the workspace timezone + the user's locale (never hard-coded `en-US`).
 - Language: per-user setting + pre-auth switcher; instance default in workspace settings.
 - Pseudo-locale build check catches hardcoded strings in CI; keys namespaced per module.
-- RTL not required for v1; avoid direction-dependent CSS anyway (logical properties).
+- RTL not required for v1; use logical CSS properties anyway.
 
 ## 9. UX quality gates (added to every UI task's QA)
 
-- [ ] Matches the screen spec section cited by the task (or spec updated in same PR).
-- [ ] Loading, empty, error, no-permission states implemented and visually checked.
+- [ ] Matches the cited screen spec (or the spec is updated in the same PR).
+- [ ] Loading, empty, error and permission-denied states implemented and visually checked.
 - [ ] Dark mode + compact density verified.
-- [ ] `prefers-reduced-motion` honored: SmoothUI/Motion animations reduce to opacity/instant; no content is gated on an animation finishing; no entrance animation on virtualized rows/cards.
-- [ ] Keyboard path for every action; shortcuts registered in the `?` overlay.
+- [ ] `prefers-reduced-motion` honored; no content gated on an animation; no entrance animation on virtualized rows.
+- [ ] Keyboard path for every action; shortcuts in the `?` overlay.
 - [ ] Optimistic update + conflict path exercised (where mutating).
+- [ ] Staleness/accountability chips render correctly where the entity has a cadence/champion/reviewer.
 - [ ] Mobile breakpoint behaves per §3.
 - [ ] axe scan clean on the changed screens.
 - [ ] Strings in catalogs, none hardcoded; `ms` keys stubbed.
-- [ ] Meets the §13 performance budget relevant to the surface (spot-check with seeded data).
-- [ ] Any AI affordance on the screen is hidden/disabled when the provider is `off`; no AI value commits without the preview→apply step; AI-generated values carry provenance (AI-NATIVE-PLAN.md §2/§4).
+- [ ] Meets the §13 performance budget relevant to the surface (spot-check on seeded data).
+- [ ] Any AI affordance is hidden/disabled when the provider is `off`; no AI value commits without preview→apply; AI values carry provenance.
