@@ -1,210 +1,248 @@
-# OpenOKR — Product Overview
+# OpenOKR: product overview
 
-*An open source operating system for running a company on goals: OKRs, KPIs and check-ins joined to the work that delivers them, driven by a built-in weekly rhythm, real accountability, and AI teammates. Self-host it. Own it.*
+*Your OKR coach, built in. Open source, AI-native, self-hosted or in our cloud.*
 
-This document is for the people who will use OpenOKR: team members, champions and reviewers, PMO and operations managers, and the admins who run it. It explains what OpenOKR is, who it is for, every module and its benefit. For the engineering plan behind it, see the other documents in this folder.
+This document is for the people who will use OpenOKR: team members, champions and reviewers, coordinators and facilitators, executives, and the admins who run it. It explains what OpenOKR is, who it is for, and what every part of it does. For the engineering plan behind it, see the other documents in this folder.
 
 ---
 
 ## 1. What OpenOKR is
 
-Most organizations have two problems at once. Their **strategy** lives in one tool and their **work** in another, so nobody can answer "is the work we are doing actually moving the goals we set?" And their work tools give them **infinite flexibility with zero guidance** — endless custom fields, statuses and views, but no opinion about how to actually run a company.
+Most organisations do not fail at OKRs because their tool was bad. They fail because the practice never happened. Somebody wrote objectives in a spreadsheet in January, nobody checked in by March, and the quarterly review was a meeting where everyone agreed things had gone reasonably well.
 
-OpenOKR fixes both, on purpose:
+The practice that makes OKRs work is well understood. Run a proper planning cycle. Refuse to draft without evidence. Check every objective and key result against a quality bar before you commit a quarter to it. Align by contribution, not by copying. Hold a fifteen-minute weekly check-in that produces decisions, not status. Give every blocker an owner and twenty-four hours. Close the quarter with evidence and learn from it.
 
-- It is **one place for strategy and execution.** Objectives and key results (OKRs), the KPIs that measure them, and the projects and work items that deliver them all live together. Link a work item to a key result and progress flows upward automatically.
-- It is **opinionated.** OpenOKR ships with an operating rhythm built in: every goal and project gets a check-in cadence, a named accountable owner and a named reviewer, and a personal "what do I owe this week" inbox. A goal you stop updating goes visibly **stale** — it cannot quietly stay green. You can tune the rhythm; you cannot turn accountability off.
-- It is **AI-native, on your terms.** AI drafts your overdue check-in from what actually happened, decomposes goals into work, summarizes threads, and answers questions about your own data. You can hire **AI teammates** — agent members with a persona and a schedule that plan and do work on the same rhythm as people, safely (they propose, you approve in batch — or you scope them tightly and let them act). And you choose the brain: your own API key, or a fully local model so nothing ever leaves your servers.
-- It is **yours.** Open source, self-hosted in half an hour on a cheap server (or on your own Kubernetes), with your whole workspace exportable to an encrypted archive you can import anywhere. No lock-in, no per-seat rent, air-gap friendly.
+None of that lives in most software. It lives in a consultant's slide deck, and it stops when the consultant leaves.
+
+**OpenOKR puts the practice in the product, and makes the product active.**
+
+- **The method is built in.** A guided eight-phase cycle. Twenty quality rules that check every draft as you type. An alignment score that names its gaps. KPI health corridors that trigger recovery objectives. Two timed session formats. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
+- **The coach is active.** Two AI teammates work the practice alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI drops out of its corridor.
+- **They reach you where you work.** In the browser, in Slack, Microsoft Teams, WhatsApp or Telegram, by email, and through your own AI agent.
+- **You own it.** Open source. Self-host it on your servers in about half an hour, or run it in our cloud. Same release, same behaviour. Export your whole workspace whenever you want.
 
 ### In one paragraph
 
-OpenOKR connects goals to the work that delivers them, imposes a light weekly rhythm that keeps both honest, uses AI to remove the busywork of goal-setting and reporting — including AI teammates that work the rhythm themselves — and lets you own the entire thing.
+OpenOKR runs the entire OKR practice, from the annual frame to the quarterly close, with an AI coach that checks your quality as you write and an AI champion that keeps your rhythm honest. Both work in the browser and in your chat app. Both cite the rule behind every message, so you can argue with them. Turn the AI off and the practice still runs, because the rules are real code, not a prompt.
 
 ---
 
 ## 2. Who it is for
 
-| You are… | OpenOKR gives you… |
+| You are | OpenOKR gives you |
 |---|---|
-| **A team member** | One place to see what you owe this week (check-ins, tasks, reviews), update it fast, and see how your work connects to the company's goals. |
-| **A champion (goal or project owner)** | A clear cadence: a check-in composer that pre-fills what changed, milestones that keep the plan honest, and a Work Map view of everything you own. |
-| **A reviewer / manager** | Every check-in from your people lands in your Review inbox for a one-click acknowledgement — with stale or at-risk work impossible to miss. |
-| **A PMO / operations manager** | OKR cycles, a real KPI module with calculated metrics, the company-wide Work Map, scorecards and exports. |
-| **An org / IT admin** | Member and access management, SSO, passkeys, backups with tested restores, a tamper-evident audit log, AI governance with hard cost caps, and a system built to pass a security review. |
-| **A team migrating** | A FlowyTeam importer (everything: OKRs, KPIs, check-ins, tasks) and CSV/XLSX importers with a dry-run preview, so you switch without losing data. |
-| **An AI teammate** | Yes, really: a seat at the table. An agent member with a name, instructions, scoped permissions and a schedule — accountable like everyone else. |
+| **A team member** | One place, or one chat message, that says what you owe this week and lets you do it in under a minute |
+| **A champion** | A composer that tells you why your key result is weak while you write it, a check-in the coach has already drafted from what actually happened, and a clear view of what is blocking you |
+| **A reviewer** | Every check-in from your people in one queue for a one-click acknowledgement, with stale and at-risk work impossible to miss |
+| **A coordinator** | A weekly session the product runs for you: confidence, blockers with owners and clocks, commitments, a digest, and a streak that makes the habit visible |
+| **A facilitator** | A guided cycle that knows which phase it is in and what is blocking it, and a sixty-minute quarterly review with a timer, a scoring reveal and exportable minutes |
+| **An executive or sponsor** | The whole company on one map, escalations that reach you before things are unrecoverable, and a diagnostic at the close that tells you what to actually fix |
+| **An OKR lead or PMO** | Cycles across the organisation, KPI driver trees with recovery objectives, alignment health with named gaps, and everything exportable |
+| **An admin** | Members, access, single sign-on, backups with tested restores, a tamper-evident audit log, AI governance with hard cost caps, and a system built to pass a security review |
+| **An AI teammate** | A seat at the table: a name, a scope, a schedule and accountability like everyone else |
+| **Your own AI agent** | A proper sign-in, so Claude, ChatGPT, Cursor or your custom agent works as you, within your permissions, fully audited |
 
-**Organizations it fits:** startups and scale-ups that want strategy and execution in one place; universities and institutions that must self-host and prove compliance; consultancies running many workstreams; and any privacy- or budget-minded team that would rather own its tools than rent them.
-
----
-
-## 3. Why OpenOKR — the benefits at a glance
-
-1. **Goals and work in one place.** A work item links to a key result; closing it moves the goal. No more reconciling a strategy spreadsheet against a project tool.
-2. **A rhythm with teeth.** Weekly check-ins are scheduled for you, reviewed by a named person, and a missed check-in makes the goal visibly *stale*. Accountability is a product feature, not a meeting.
-3. **Honest progress.** Key results are real numbers (from → to, up or down), scored automatically, with the full value history — and a trend forecast that flags "this will miss" before anyone admits it.
-4. **A real KPI module.** Track the recurring metrics that matter on a period grid, build calculated KPIs from formulas over other KPIs, and measure a key result directly by a live metric.
-5. **AI that works your way.** Assists everywhere (draft, improve, summarize, answer), a copilot that acts with your approval, AI teammates that run on the cadence — powered by your own key or a local model, metered, and hard-capped so there are no surprise bills.
-6. **Connect your own agent.** A built-in agent connection (MCP) with a proper sign-in flow lets Claude, ChatGPT, Cursor or your custom agent manage your goals and projects as you, within your permissions.
-7. **Own your data — provably.** Self-host anywhere, export your whole workspace to an encrypted archive, restore it anywhere, verify the audit log hasn't been touched. Air-gap capable end to end.
-8. **Fast and modern.** Inline editing, a command palette (⌘K), dark mode, full keyboard control, live updates, a responsive shell. The network is invisible.
-9. **Simple by default, powerful later.** You start working in minutes with zero configuration. Advanced machinery (custom fields, custom workflows, Gantt, time tracking) arrives as an optional power layer after launch — it will never be a prerequisite.
+**Organisations it fits:** companies of any size that want the OKR practice and not just an OKR database; universities and institutions that must self-host and prove compliance; consultancies running the method for clients; and any team that would rather own its tools than rent them.
 
 ---
 
-## 4. The operating rhythm (the heart of the product)
+## 3. The practice, built in
 
-Everything else hangs off five ideas:
+### 3.1 The guided cycle
 
-### 4.1 Cadence
-Every goal and every project has a check-in frequency — **weekly by default**, anchored to a day your company picks (say, Friday). OpenOKR schedules the next check-in for you, reminds the right person, and rolls the schedule forward each time you post. Change the frequency per goal; there is no "never" setting.
+Eight phases, from the annual frame to the close. The product knows which one you are in, what is missing, and how many weeks remain before your publication deadline.
 
-### 4.2 Champion & reviewer
-Every goal and project names exactly one **champion** (the accountable owner) and one **reviewer**. The champion posts the check-in; the reviewer **acknowledges** it (with a comment if they like). Until they do, it sits in their Review inbox. Two people are always on the hook — that is the whole trick.
+| Phase | What happens |
+|---|---|
+| 0. Annual strategy | Set the frame once a year: mission, vision, mid-term strategy, two to five annual strategies, up to five annual objectives, and the year's not-doing list |
+| 1. Prepare | Name a sponsor and a facilitator, book every session, and gather the seven-item input pack. Drafting is blocked until it is complete, because a planning session without inputs produces objectives written from opinion |
+| 2. Diagnose | Score the previous cycle, read the KPI baselines, and rank five to ten strategic issues by impact |
+| 3. Set direction | Three to five priorities, each with a statement of what will be measurably different in twelve months. Then write the not-doing list. The product will not let you skip it |
+| 4. Draft OKRs | Write the objectives and key results, with the quality rules checking every line as you type |
+| 5. Align and commit | Map contribution, register dependencies, check capacity, and clear six publish gates |
+| 6. Run the cadence | Weekly check-ins, monthly reviews, a decision log, and one optional mid-cycle calibration |
+| 7. Review and learn | Score, retro, diagnose, and feed everything into the next cycle automatically |
 
-### 4.3 The Review inbox
-One page answers "what do I owe right now": check-ins due (you're the champion), acknowledgements owed (you're the reviewer), work items and milestones due — ranked overdue-first, with one-click actions. Notifications tell you what happened; Review tells you what's yours to do.
+### 3.2 Quality while you write
 
-### 4.4 Check-ins that mean something
-A check-in is not a status dropdown. It is a short ritual: pick a status (*on track / caution / off track*), optionally a 0–10 confidence, write a few honest sentences, and OpenOKR snapshots every key result value at that moment — so every check-in shows exactly what moved since the last one. Drafts are private; publishing notifies subscribers and starts the review clock. A goal's health is always *derived from its latest check-in* — nobody can hand-paint it green.
+Twenty rules check every objective and key result, live. Each returns a verdict, a coaching prompt, the reason it matters, and a weak-versus-strong example. Your set carries a strength score.
 
-### 4.5 Staleness ("outdated")
-Miss your check-in past a small grace window and the goal or project flips to **outdated** — everywhere: lists, the Work Map, dashboards. It overrides whatever the last check-in said. Neglect is visible by design, which is why it stays rare.
+Some of what it catches:
 
-### And one map of everything: the Work Map
-The home screen is a single company-wide tree — goals → sub-goals → projects → work items — with health, progress, champion and next step rolled up at every level. It is the answer to "what is the whole company working on, and is it healthy?", one click deep, live.
+- An objective that starts with "launch". If we launch it and nothing changes, did we succeed?
+- Numbers in the objective. Metrics belong in the key results.
+- A key result with a target but no baseline. Without the "from", you cannot prove movement.
+- "Hold twelve customer interviews". That is activity. What are the interviews for? Measure that.
+- Every key result lagging. You will only find out at the end. Add a leading indicator.
+- Average confidence above ninety percent at drafting. That is sandbagging, not a stretch.
+- An objective aligned to nothing. Name the priority it moves forward, or rethink it.
 
----
+Six gates are hard. A set that fails one cannot be published: every objective owned and reviewed, every key result passing, alignment stated, dependencies confirmed or risk-owned, capacity checked with nothing over, and a publication date before day one.
 
-## 5. Strategy: set and measure your goals
+### 3.3 Alignment that means something
 
-### 5.1 Goals & key results (OKRs)
-Create goals owned by the **company**, a **space** (team), or a **person**, inside a cycle — or with their own timeframe ("Q3 2026", "July", a custom range). Add **key results** as numeric ranges with a unit and direction (grow signups ↑, cut response time ↓ — both score correctly), weight the important ones, and **align** goals under a parent goal or key result to build the company cascade. Discuss in titled threads; watch, react, comment. Close a goal explicitly as **achieved or missed** — with a short retrospective — and reopen it if the world changes. Every key result keeps its full value history, drawn as a sparkline with a **trend forecast** that flags drift early.
+Vertical alignment is contribution, not copying. Horizontal alignment is the dependency between two teams that both know about it.
 
-### 5.2 Cycles
-Quarters, halves, months or years — generated forward automatically, switched from one control, archived when done. Rename the terminology to your house language ("objective", "rock", "bet" — your call).
+The product scores your alignment and names every gap: no company objective anchoring the tree, an orphan goal, an objective with no key results, a skipped level, or a department with no cross-team dependency anywhere in its branch. The coach adds the findings structure cannot see: two goals that double-count the same metric, a goal that would sit better under a different parent, a hidden dependency between two teams who have not spoken.
 
-### 5.3 KPIs
-The recurring numbers you watch every period — revenue, uptime, NPS — on a grid of KPIs × periods with targets, actuals and health colors. Build **calculated KPIs** from formulas over other KPIs (daily numbers roll into monthly ones automatically; change a source and everything downstream recomputes). Link a KPI to a key result so the KR is measured by the live metric. Organize KPIs in a tree by category.
+### 3.4 KPIs and recovery objectives
 
-### 5.4 Scorecard *(fast-follow within v1)*
-When a cycle closes, archive it: per owner, the result and how many goals/KRs landed in each health bucket, with trends across cycles and exports. An optional points layer exists for organizations that want it — **off by default**.
+KPIs describe the health of your business. OKRs describe what you are changing about it.
 
----
+Build KPI driver trees: revenue is driven by new customers and order value, which are driven by conversion and basket size, and so on down to the leading indicators a team can move this week. Every KPI has a health corridor. Above ninety percent of target is healthy. Seventy to ninety is watch. Below seventy is unhealthy.
 
-## 6. Execution: deliver the work
+When a KPI turns unhealthy, OpenOKR drafts a **recovery objective** from its leading drivers. Objective: bring this metric back to target. Key results: move each driver from where it is to where it needs to be. The KPI then reads "recovering", and its health rises as the recovery progresses, so you can see the fix working before the lagging number catches up. A recovery board shows every unhealthy KPI across the company in one list.
 
-### 6.1 Projects
-A project has a champion, a reviewer, contributors with stated responsibilities, and the same check-in rhythm as goals — status, narrative, milestone snapshot, acknowledgement, staleness. Pause a project and the rhythm pauses with it; resume and it reschedules. **Closing requires a retrospective** and an achieved/missed outcome. A project can link to the goal it serves.
+### 3.5 The weekly rhythm
 
-### 6.2 Milestones
-Real objects, not date pins: a timeframe (as fuzzy as "Q3" or as precise as a date), a description, a comment thread — and completing one can be done straight from a comment. The earliest open milestone is always the project's visible **next step**.
+Fifteen to thirty minutes, four steps, run by the product.
 
-### 6.3 Work items
-The unit of work: title, rich description, **multiple assignees**, a simple honest status (*todo / in progress / done / canceled*), a due date, a checklist, and reminders that understand "3 days before due" or "when overdue". Link a work item to a key result and your delivery feeds the goal's score. An item can block another — and can't be completed while its blockers are open.
+1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
+2. **Diagnose what is low.** High and medium confidence moves on with no discussion. Every low score gets a blocker type, a named owner and one concrete action within twenty-four hours. Anything at or below 0.3 escalates to management the same day.
+3. **Commitments.** Close last week's out loud, delivered or not, no negotiation. Set this week's: two or three moves that will actually shift a key result.
+4. **Digest.** Generated for you, edited by the coordinator, posted to your channel.
 
-### 6.4 Boards
-Kanban per project or per milestone: drag cards between statuses, live for everyone, safe under simultaneous edits. Add items inline. Works with touch.
+It ends with a streak: the number of consecutive weeks your team held the session. A skipped week breaks it. It is a light touch that reliably keeps the heartbeat.
 
-### 6.5 Resource Hub
-Every space, project and goal gets a browsable library: **documents** (a rich editor with drafts, publishing, and version history with visual diffs), **folders**, **files** (previews, thumbnails), and **links** (a Google Doc, Figma or Notion page shown with its real title and icon). Comment on, react to, and subscribe to any of it. This replaces the usual wiki-plus-attachments sprawl with one tree.
+### 3.6 The quarterly review
 
----
+Sixty minutes, three acts, eleven timed stages, ending in exported minutes.
 
-## 7. Collaboration & platform
+**Review** asks whether you achieved the results. A room pulse first, because steady rooms round their numbers up. Then score every key result against evidence, with the objective score hidden until the team reveals it together. Then the story behind each number, owner by owner. Then recognition.
 
-- **Spaces** — each team's home: its goals, projects, documents, discussions and members, with its own access scope.
-- **Discussions** — titled threads per space (announcements) or attached to a goal/project; drafts are silent until published.
-- **Comments, mentions, reactions** — everywhere; @mentions notify immediately (your choice), and every comment is deep-linkable.
-- **The feed** — a human-readable, live activity stream per company/space/goal/project ("Aisha checked in on Q3 Revenue — caution", "Milestone 'Beta' completed") — filtered to what you may see, always.
-- **Notifications & digests** — an inbox with reason chips, mute and snooze; email that respects you: instant for direct mentions, otherwise batched into one digest on your schedule, plus an optional daily "your work today" summary in **your** timezone.
-- **People & org** — profiles, titles, a manager chain and org chart, a people directory; suspend/restore, guests with limited access, invitation links with domain rules.
-- **Search & command palette** — ⌘K to jump to anything or do anything; full-text (and later semantic) search across everything you can see.
-- **Exports & portability** — any list to CSV/XLSX; the whole workspace to an encrypted, checksummed archive you can import into any other OpenOKR instance (self-host → cloud or back) after a dry-run preview.
-- **Admin** — members and access (four simple levels; public/workspace/space/invite-only visibility), the rhythm's defaults and thresholds, branding, backups, a read-only freeze switch for maintenance, and a tamper-evident audit log with one-click verification.
+**Retro** asks how you worked. What worked and what did not, written silently then dot-voted. The four questions leadership owes the team. One honest cause for every key result under 0.7. And an anonymous five-statement survey of the practice itself, where the lowest statement becomes next quarter's process objective.
 
----
+Then the **diagnostic**, which is the most valuable output of the whole session:
 
-## 8. AI & agents (built in, governed, optional)
+| Your situation | What it means |
+|---|---|
+| You hit the results | The question is not effort. It is whether the ambition was set high enough to be worth the quarter |
+| You missed, but the rhythm was strong | A strategy or quality problem. The team ran the rhythm and still missed. Fix the key results, not the people |
+| You missed, and the rhythm was weak | A cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective |
 
-Everything here is an accelerator over something you can do by hand. Turn AI off and the product is fully functional.
+**Reset** decides the next cycle. Every objective is closed deliberately as keep, modify or abandon, with a reason. Nothing carries over by default. Learnings are captured, next-quarter drafts sketched while the evidence is warm, and every action gets a name and a date.
 
-### 8.1 Assists, everywhere
-Draft a goal and its key results from a sentence; get coached on whether it's a *good* OKR; **draft this week's check-in from what actually happened** (work closed, KR movement, comments) and just edit it; draft the retrospective from the check-in history; get KPI suggestions, thresholds, and formulas from plain language ("gross margin = revenue minus COGS, monthly"); summarize a long thread; decompose a goal into work items; draft or summarize documents; ask questions across everything you may see, with citations. Every AI write is a **preview you apply or dismiss** — never auto-committed, always labeled, always undoable.
-
-### 8.2 The copilot
-One assistant (⌘J) that answers from your workspace's actual data and can act — create the goal, post the check-in, file the work items — each action shown for your approval first. Long jobs run in the background and stream back.
-
-### 8.3 AI teammates
-Hire an agent: give it a name, a persona, instructions, a model, a schedule, and a **scope** (these spaces, those goals — nothing more). It plans its work, executes step by step, and posts updates into the same feeds and Review inbox as everyone else. Safety is layered: run it in **sandbox** (a full dry-run you can read), or the default **batch-approval** mode (it works overnight; you approve its proposed writes over coffee), or grant a narrow trusted agent direct writes. Every step is logged and metered, and a **hard cost cap halts it mid-run** — an agent can never run up an unbounded bill. Air-gapped? Teammates run on your local model.
-
-### 8.4 Bring your own AI
-Anthropic, OpenAI, OpenRouter — or **Ollama and any OpenAI-compatible local endpoint** for zero-egress installs. Keys at the deployment, workspace, or personal level (your personal agent traffic can bill to your own key), encrypted at rest. A model catalog routes cheap tasks to cheap models and hard ones to strong ones. Admins get per-feature switches, budgets, quotas, prompt versioning, and privacy controls that say exactly what may leave the building — with "nothing" a fully supported answer.
-
-### 8.5 Use your own agent (MCP)
-OpenOKR is an MCP server with a real sign-in: connect Claude, ChatGPT, Cursor or a custom agent through a proper consent screen (pick the workspace, see the scopes, revoke anytime), and it works as *you*, within *your* permissions, fully audited. Local desktop agents can connect with zero network exposure. Research connectors can search and cite your workspace.
+Then the product feeds it all forward: your scores become the next cycle's Phase 2 scoring list, your carry-forward items become ranked issues that must survive prioritisation on their merits, your learnings join the input pack, and the lowest process-health statement becomes a priority.
 
 ---
 
-## 9. How strategy and execution connect
+## 4. The coach
 
-```
-Company goal
-   └── Space goal (aligned under it)
-         └── Key result: "cut onboarding time to 3 days"   ←— measured by a live KPI, if you like
-               └── Project: "rebuild the signup flow"
-                     └── Work item: "ship the new email verifier"
-                           └── linked to the key result — closing it moves the KR,
-                               the goal, and the company cascade, live, on the Work Map
-```
+Two AI teammates ship with every workspace. They are members: they have names, they appear in feeds, and they are accountable.
 
-Post a check-in (or just close the linked work) and progress flows all the way up. The Work Map shows the whole chain with health at every node — and a stale or off-track node glows through no matter how green its parent looks.
+### The OKR Coach guards quality
+
+It reviews every draft against the rules, runs a nightly semantic sweep for duplicates, conflicts and drift, and speaks at the moments that matter: when the not-doing list is empty at the end of direction-setting, when nothing was cut at the capacity check, when a goal is reported on track but its key results have not moved in a month, when the forecast says a key result will miss before anyone admits it, and when the scores cluster near perfect at the close.
+
+Every message cites the rule behind it. You can open the rule and disagree with it.
+
+### The OKR Champion guards the rhythm
+
+It reminds the champion before the check-in is due, on the day, and daily after. It escalates: to the reviewer at the grace boundary, to the coordinator at a week, to the sponsor at a fortnight, always visibly to the person being escalated past. It runs the blocker clock: a warning at twenty hours, an escalation at twenty-four. It opens and closes the weekly session, assembles the digest, keeps the streak, watches the KPI corridors, and prepares the pack before your quarterly review so the session starts warm.
+
+### They are safe, cheap and honest
+
+- **Scoped.** Each agent has explicit access to named spaces and goals only. Never a blanket grant.
+- **They propose, you approve.** By default every write becomes a proposal in your review queue that you apply or dismiss. You can run one in full dry-run mode, or grant a narrow trusted agent direct writes.
+- **Capped.** Every step is metered, and a hard cost cap halts a run mid-flight. An agent can never run up an unbounded bill.
+- **Quiet by design.** One nudge per subject per day unless it escalates. Quiet hours in your own timezone. A snooze on any message. Snoozing never hides what you actually owe.
+- **Not required.** Turn AI off entirely and the coach still nudges, escalates, scores, checks quality and computes the diagnostic. All of that is real code, not a model. You lose only the drafting and the language.
 
 ---
 
-## 10. Own it: deployment, privacy, and openness
+## 5. Where it reaches you
 
-| How you run it | Who it suits | What it takes |
+| Surface | What you can do |
+|---|---|
+| **Browser** | Everything |
+| **Email** | Nudges, digests, your daily summary, one-click check-in links |
+| **Slack** | Get nudged, check in from a dialog, log a blocker, acknowledge, read a goal, ask the coach |
+| **Microsoft Teams** | The same, in cards |
+| **WhatsApp** | Get nudged, then check in conversationally by replying |
+| **Telegram** | The same, with inline buttons |
+| **Your own AI agent** | Connect Claude, ChatGPT, Cursor or a custom agent through a proper consent screen. It works as you, within your permissions, fully audited. Local desktop agents connect with zero network exposure |
+
+A workspace with no chat provider connected still works completely. Email and the browser cover everything.
+
+---
+
+## 6. The work
+
+Deliberately OKR-shaped. Enough to answer "what is actually moving this key result", not a project-management suite.
+
+- **Initiatives.** The work that moves a key result: an owner, dates, a status, a confidence and a capacity verdict. The capacity check at commit time reads from these, which is why "nothing was cut" is a gate failure.
+- **Tasks and the board.** A kanban with four columns where every card can link to a key result. The sidebar shows your objectives and key results with progress derived from linked completed tasks, shown beside the measured number rather than instead of it. When all the linked work is done but the number has not moved, that is exactly the divergence the coach reports.
+- **Documents.** Rich documents attached to a goal, a key result, an initiative, a cycle or a session. Drafts, publishing, version history with a visual difference, comments and reactions.
+
+---
+
+## 7. Platform
+
+- **Spaces** are team homes with their own goals, sessions, documents and members.
+- **The Work Map** is the home screen: one company-wide tree with health, progress, confidence, champion and next step at every level, live.
+- **The Review inbox** answers "what do I owe right now": check-ins due, acknowledgements owed, blockers you own, commitments due, sessions to run, agent proposals awaiting you. Overdue first.
+- **Comments, mentions and reactions** everywhere, with a preview of who will be notified before you post.
+- **A live activity feed** at workspace, space and goal level, filtered to what you may see.
+- **Notifications** that respect you: instant for direct mentions, otherwise batched on your schedule, plus a daily summary in your timezone.
+- **People and org**: profiles, a manager chain and org chart, a directory, guests, invitation links with domain rules.
+- **Search and ⌘K** across everything you can see.
+- **Admin**: members and access, the rhythm's defaults and thresholds, coaching strictness, branding, backups, a read-only freeze switch for maintenance, and a tamper-evident audit log with one-click verification.
+- **Portability**: export your whole workspace to an encrypted, checksummed archive and import it into any other OpenOKR instance after a dry-run preview.
+
+---
+
+## 8. Bringing your data
+
+- **Spreadsheets.** Upload a CSV or XLSX of goals, key results, KPIs, KPI records, initiatives or tasks. AI proposes the column mapping, you confirm it, you see a dry run, then you import.
+- **FlowyTeam.** A dedicated read-only importer for one company at a time, covering teams, cycles, objectives, key results, check-ins, KPIs with their formulas, and tasks. Re-running it changes nothing. Every derived value is recomputed rather than trusted, and anything that cannot map cleanly appears in the report rather than being quietly dropped.
+
+---
+
+## 9. Running it
+
+| How | Who it suits | What it takes |
 |---|---|---|
-| **Single server** | A small company, budget- or privacy-minded | One Docker Compose file + a first-run **web setup wizard** (it generates every secret and tests your connections). ~30 minutes on a $10 VPS. |
-| **Enterprise** | A university or large organisation | A Helm chart on your Kubernetes, your Postgres, SSO, backups, audit controls. |
-| **Zero-ops cloud** *(planned, post-v1)* | A solo founder or tiny team | A deploy-button path once the serverless profile ships. |
+| **Self-hosted, one server** | Any organisation that wants its data on its own machines | One Docker Compose file and a first-run web wizard that generates every secret and tests your connections. About 30 minutes |
+| **Self-hosted, Kubernetes** | Universities and large organisations | A Helm chart, your Postgres, your single sign-on, your backups |
+| **Our cloud** | Teams that want no operations | Sign up and start |
+
+Both are the same release. Self-host is never seat-limited and never feature-gated. The cloud sells operation, not features.
 
 **Your data, your rules.**
 
-- **Open source (AGPL).** Free, auditable, community-owned direction. Never locked in.
-- **Self-hosted = data residency.** Your country, your servers, your rules.
-- **Air-gap capable.** Fully offline: local AI or no AI, self-hosted assets, no telemetry unless you opt in.
-- **Secure by construction.** Tenant isolation enforced *inside the database*, passkeys and TOTP from day one, an append-only audit log with cryptographic tamper-evidence, scoped expiring API tokens, session management, strict browser protections.
-- **Provably portable.** Encrypted workspace export/import, backups whose restores are tested automatically, and (for hosted setups) support access that is time-boxed and **visible to you** — you can see who from the operator was in your workspace, when, and what they did.
+- **Open source** under AGPL. Free, auditable, never locked in.
+- **Self-hosted means data residency.** Your country, your servers.
+- **Air-gap capable.** Fully offline: a local AI model or none, self-hosted assets, no telemetry unless you opt in.
+- **Secure by construction.** Tenant isolation enforced inside the database, passkeys and second factors from day one, an append-only audit log with cryptographic tamper evidence, scoped expiring tokens.
+- **Provably portable.** Encrypted export and import, backups whose restores are tested automatically, and, in the cloud, support access that is time-boxed and visible to you.
 
 ---
 
-## 11. Getting started
+## 10. Getting started
 
-1. **Deploy** — `docker compose up`, open the wizard, done.
-2. **Set up** — name the workspace, pick a brand color and your check-in day, invite teammates (or share an invite link) — or click **"Explore with demo data"** to poke around a realistic company first.
-3. **Bring your data** — run the FlowyTeam importer or upload CSVs, preview the dry run, then import for real.
-4. **Set your goals** — create a cycle and your first goals with champions and reviewers (or let AI draft them from a sentence).
-5. **Plan the work** and link it to key results — progress starts flowing up the Work Map from day one.
-6. **Friday comes** — everyone's Review inbox fills, check-ins get posted and acknowledged, and the company knows where it stands. That's the product.
+1. **Deploy or sign up.** Run the compose file and open the wizard, or create a cloud workspace.
+2. **Set up.** Name the workspace, pick your check-in day, connect a chat provider or skip it. Or click "explore with demo data" to poke around a realistic company first.
+3. **Bring your data,** or start clean.
+4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing and refuse to let you draft on a thin input pack.
+5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate.
+6. **Friday comes.** Everyone's review inbox fills. The Champion nudges the people who forgot. The session runs in twenty minutes. The digest goes out. The streak ticks up.
+7. **The quarter ends.** Sixty minutes, three acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
+
+That is the product.
 
 ---
 
-## 12. At a glance
+## 11. At a glance
 
 | Area | What you get |
 |---|---|
-| **The rhythm** | Scheduled check-ins, champion + reviewer accountability, the Review inbox, visible staleness |
-| **Strategy** | Weighted, direction-aware OKRs with value history + trend forecasts, alignment cascade, cycles, a full KPI module with calculated formulas, scorecards |
-| **Execution** | Projects with health check-ins + retrospectives, rich milestones, multi-assignee work items, kanban boards, the Resource Hub |
-| **The link** | Work items ↔ key results ↔ KPIs; progress cascades live up the Work Map |
-| **AI** | Assists everywhere, a copilot, AI teammates (sandboxed, batch-approved, cost-capped), MCP for your own agent, your key or a local model |
-| **Platform** | Spaces, discussions, typed live feed, smart notifications + digests, people & org chart, ⌘K search, exports, workspace portability |
-| **Ownership** | Open source, self-hosted in ~30 min, air-gap capable, database-level isolation, tamper-evident audit |
-| **Later (the power floor)** | Custom fields, custom workflows, saved views, Gantt/scheduling, time tracking, backlogs, meetings — added after launch, never required |
-
----
-
-*Working name: the product is referred to here as **OpenOKR**. For the technical design and the build plan behind everything above, see [REQUIREMENTS.md](REQUIREMENTS.md), [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) and [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) in this folder. For why the plan looks this way, see [OPERATELY-COMPARISON.md](OPERATELY-COMPARISON.md).*
+| **The method** | A guided eight-phase cycle, twenty live quality rules, six hard publish gates, an alignment score, KPI health corridors, two timed session formats, and a closing diagnostic |
+| **The coach** | Two AI teammates that guard quality and rhythm, initiate, escalate, cite their rules, and are scoped, capped and auditable |
+| **Reach** | Browser, email, Slack, Teams, WhatsApp, Telegram, and your own AI agent |
+| **OKRs** | Weighted, direction-aware key results with value history, confidence, trend forecasting, KPI-backed measurement, and full alignment with dependencies |
+| **KPIs** | Driver trees, health corridors, calculated formulas, recovery objectives and a recovery board |
+| **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers on a 24-hour clock, commitments, streaks and digests |
+| **The work** | Initiatives, a key-result-linked board, and documents |
+| **Platform** | Spaces, the Work Map, the review inbox, a live feed, notifications that respect you, search, admin and a tamper-evident audit log |
+| **Ownership** | Open source, self-hosted in 30 minutes or in our cloud, air-gap capable, database-level isolation, full export |
+| **Later** | Custom fields, custom workflows, saved views, Gantt, time tracking and sprints. Added after launch, never required |

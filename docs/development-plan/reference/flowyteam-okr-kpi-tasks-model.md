@@ -1,6 +1,6 @@
 # FlowyTeam data model reference (OKR, KPI, Tasks)
 
-Ground truth for the **second** importer source and the design authority for OpenOKR's native strategy modules. This describes the FlowyTeam source schema (Laravel 10, PHP 8, **MySQL**) that `packages/importer` reads for the OKR, KPI, and Tasks domains. It is the companion of `legacy-data-model.md` (which covers the first source, the Rails project tool). Where the two sources disagree on a concept, OpenOKR's target schema in `../TECHNICAL-PLAN.md` §4.12 is the reconciliation.
+Ground truth for the FlowyTeam importer. This describes the source schema (Laravel 10, PHP 8, **MySQL**) that `packages/importer` reads for the OKR, KPI and Tasks domains. The target schema and the field-by-field mapping live in `../TECHNICAL-PLAN.md` §4 and §7.2, which are the authority whenever the two disagree.
 
 Extracted from an analysis of the FlowyTeam codebase (models in `app/Models`, migrations in `database/migrations`, controllers, services, observers, and the v2/MCP API), July 2026. Column lists are the load-bearing columns, not every column. Before writing importer code, cross-check against a real `mysqldump --no-data` of the target instance; FlowyTeam instances differ by version.
 
@@ -415,7 +415,7 @@ One daily digest drives all OKR/KPI/check-in/task nudges: `flowy:sendemailremind
 7. `performance_records`, `reward_settings`, `scores` (optional points layer).
 8. Two-phase reference rewrite of rich-text bodies.
 
-**Idempotency:** keep `legacy_id` + `legacy_type = 'flowyteam'` on every imported row; upsert on `(workspace_id, legacy_type, legacy_id)`. This coexists with the first source's rows (`legacy_type = 'openproject'`) in the same target tables.
+**Idempotency:** keep `legacy_id` + `legacy_type = 'flowyteam'` on every imported row; upsert on `(workspace_id, legacy_type, legacy_id)`. This coexists with rows from the spreadsheet importer (`legacy_type = 'csv'`) in the same target tables.
 
 **Known lossy / hard spots** (log each, raise to human):
 

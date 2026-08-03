@@ -1,438 +1,492 @@
 # TECHNICAL-PLAN.md
 
-Target technical design for `OpenOKR`. This turns REQUIREMENTS.md (what) and PLAN.md (principles) into concrete schema, module, engine, importer and security decisions. IMPLEMENTATION-PLAN.md turns this into ordered tasks.
+Target technical design for OpenOKR. This turns REQUIREMENTS.md (what), PLAN.md (principles) and METHOD.md (the practice) into concrete schema, engine, channel, importer and security decisions. IMPLEMENTATION-PLAN.md turns it into ordered tasks.
 
-Authority: below PLAN.md, above IMPLEMENTATION-PLAN.md. When this doc and PLAN.md disagree, PLAN.md wins. When code and this doc diverge during a task, update this doc in the same PR.
-
-Cross-references: the FlowyTeam source facts live in `reference/flowyteam-okr-kpi-tasks-model.md`. The Operately behavioral benchmark is OPERATELY-COMPARISON.md / OPERATELY-GAP-REGISTER.md; where this doc says "reference behavior: Operately", the engine or flow reproduces Operately's *observable* semantics (clean-room, §11). The archived OpenProject references (`reference/legacy-*.md`) are background only — nothing in this plan depends on them.
+Authority: below PLAN.md and METHOD.md, above IMPLEMENTATION-PLAN.md. Where this document and PLAN.md disagree, PLAN.md wins. Where a rule, band or threshold is concerned, METHOD.md wins. When code and this document diverge during a task, update this document in the same change.
 
 ---
 
-## 1. Stack and layout (from PLAN.md, restated as the contract)
+## 1. Stack and layout
 
-- **Runtime:** Next.js App Router (React, TypeScript strict). Server Components for first-paint shells and read-mostly pages; client-owned data (TanStack Query hydrated from route loaders) for every interactive list/board/map surface. The exact boundary per surface is §13.3.
-- **API:** one **action/contract registry** in `packages/core` (§14). tRPC exposes it to the app UI; a versioned REST surface (`/api/v1`) + OpenAPI 3.1, the MCP tool catalog, and the generated CLI are projections of the same registry. CI diffs the generated artifacts (§10).
-- **Data:** PostgreSQL via Drizzle only. `DATABASE_URL` is the sole connection. RLS on every business table (§8.1). Forward-only migrations + a separate data-change runner (§8.2).
-- **Auth:** Better Auth (email+password, passkeys, TOTP from Phase 1; OIDC/SAML in Phase 7). No hand-rolled sessions. Session tokens hashed at rest.
-- **UI:** Tailwind + shadcn/ui on **Base UI** primitives (not Radix), **SmoothUI** on **Motion**, TanStack Query/Table/Virtual. Design system in `packages/ui`.
-- **Rich text:** ProseMirror/TipTap **JSON is canonical** (jsonb + `version int`). One shared core module (`packages/core/rich-text`) owns parse, structural validation (node/mark allowlist via Zod), sanitizing render-to-HTML, excerpting, and mention/attachment ID extraction — used identically by app, email, exports, search indexing and the importer's reference-rewrite pass. Markdown is a derived, lossy bridge (import/export/AI authoring) with round-trip golden tests.
-- **Validation:** Zod at every boundary.
-- **Adapters:** `packages/adapters` for jobs, realtime, storage, mailer, cache, search, ai. v1 ships container drivers; serverless drivers are designed-for stubs (PLAN.md §5).
-- **Monorepo:** Turborepo + pnpm. Packages: `core`, `db`, `adapters`, `importer`, `ui`, `config`, `test-support`; app in `apps/web`.
+- **Runtime.** Next.js App Router, React, TypeScript in strict mode. Server components for first paint and read-mostly pages. Client-owned data for every interactive list, board, map and session surface. The boundary per surface is §13.3.
+- **API.** One action contract registry in `packages/core` (§14). The internal typed client, the versioned REST surface with OpenAPI, the MCP tool catalogue, the generated command line and the channel command router are all projections of it. CI compares the generated artifacts against the committed ones.
+- **Data.** PostgreSQL through Drizzle only, with the `pgvector` extension for embeddings. `DATABASE_URL` is the sole connection. Row-level security on every business table. Forward-only migrations plus a separate data-change runner.
+- **Auth.** Better Auth. Email and password, passkeys and one-time passwords from Phase 1. Single sign-on in Phase 8. Session tokens hashed at rest.
+- **UI.** Tailwind with shadcn/ui on Base UI primitives, SmoothUI on Motion for animation, TanStack Query, Table and Virtual. The design system lives in `packages/ui`.
+- **Rich text.** Editor JSON is canonical, stored as `jsonb` with a `version` integer. One shared core module owns parsing, structural validation against an allowed node and mark list, sanitised rendering, excerpting and mention extraction. Markdown is a derived, lossy bridge used for import, export and AI authoring, with round-trip golden tests.
+- **Validation.** Zod at every boundary.
+- **Monorepo.** Turborepo with pnpm.
 
 ### Package responsibilities
 
 | Package | Owns | May depend on |
 |---|---|---|
-| `packages/db` | Drizzle schema, migrations, RLS policies, seed, data-change runner, soft-delete scope | nothing app-specific |
-| `packages/core` | Domain services, the Operation pipeline, the action/contract registry, `can()` + access-aware getter, pure engines (scoring, cadence, KPI formulas), rich-text core, typed activity/event registry | `db` |
-| `packages/adapters` | Ports + drivers (only place vendor SDKs live), the outbox relay | `config` |
-| `packages/importer` | FlowyTeam (read-only MySQL) + CSV/XLSX readers, mappers, CLI | `db` (write), read-only source clients |
-| `packages/ui` | Shared shadcn components | — |
-| `packages/test-support` | The factory (builds through core services), test DB harness | `core`, `db` |
-| `apps/web` | Next.js routes, tRPC/REST/MCP endpoints, React UI | `core`, `adapters`, `ui`, `db` (types) |
+| `packages/method` | The METHOD.md canon as data and pure functions: the quality rule catalogue, score and confidence bands, KPI corridors, blocker and root-cause taxonomies, publish gates, session definitions, phase completion rules, diagnostics | nothing |
+| `packages/db` | Schema, migrations, row-level security policies, seed, data-change runner, soft-delete scope | nothing app-specific |
+| `packages/core` | Domain services, the Operation pipeline, the action contract registry, `can()` and the access-aware getter, the stateful engines (scoring, cadence, KPI formulas, alignment, streaks), rich text, the typed event registry | `db`, `method` |
+| `packages/adapters` | Ports and drivers, the only place vendor SDKs live, plus the outbox relay | `config` |
+| `packages/agents` | The Coach and Champion runtimes, the trigger catalogue and scheduler, run state machines, proposal envelopes, prompt assembly | `core`, `method`, `adapters` |
+| `packages/importer` | CSV/XLSX readers, the FlowyTeam MySQL reader, mappers, the command line | `db`, `core` |
+| `packages/ui` | Shared components | `method` (for labels and bands only) |
+| `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
+| `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method` |
 
-## 2. Multi-tenancy and identity model
+## 2. Multi-tenancy and identity
 
-- Top-level tenant is a **workspace**. Every business row carries `workspace_id` and an RLS policy keyed on the `app.workspace_id` GUC, set with `SET LOCAL` per transaction by the request-scoped Drizzle wrapper (never session-level, never from client input). §8.1 has the full discipline.
-- **Identity is two-level.** `users` is global to a deployment (email + credentials; Better Auth owns them). `workspace_members` is the per-workspace person: display name, title, avatar, timezone, `manager_id` (self-reference, cycle-safe), `kind` (`human` / `guest` / `ai` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at`. The same login is a different member per workspace; the app shell has a workspace switcher. All authorship, mentions, assignments and audit reference the *member*, so leaving or being suspended never breaks history.
-- Within a workspace: **spaces** are the team homes; **access** is relationship-based (§4.1); **RLS** is the tenant floor. Never rely on the UI to hide anything.
+- The tenant is a **workspace**. Every business row carries `workspace_id` and a row-level security policy keyed on a transaction-local setting, applied with `SET LOCAL` by the request-scoped database wrapper. Never at session level, never from client input.
+- **Identity is two-level.** `users` is global to a deployment and owned by Better Auth. `workspace_members` is the per-workspace person: display name, title, avatar, timezone, manager, kind (`human`, `guest`, `agent`, `placeholder`), status (`active`, `invited`, `suspended`), and channel preferences. All authorship, mentions, assignments and audit reference the member, so leaving or being suspended never breaks history.
+- Within a workspace, **spaces** are the team homes, **access** is relationship-based (§4.1), and row-level security is the floor beneath all of it.
 
-## 3. Naming and ID strategy
+## 3. Naming and identifiers
 
-- Primary keys are `uuid` v7 (time-ordered, app-generated) — good for index locality and deterministic importer ID assignment.
-- **Public identifiers are separate.** Externally addressable aggregates (goals, projects, work items, documents, discussions, KPIs) carry a `short_id` — a random base58 string, unique per workspace — used in URLs, the REST API, MCP tools and the CLI. Internal v7 PKs (which embed a timestamp) are never exposed. A malformed or unknown public id returns **404**, never 400, so the id format is not an oracle.
-- Importable tables carry `legacy_id bigint?` + `legacy_type text?` (`flowyteam` / `csv`), unique `(workspace_id, legacy_type, legacy_id)` for idempotent upserts.
-- Enumerated values are TypeScript string unions persisted as `text` with a CHECK constraint.
-- Soft delete: `deleted_at timestamptz?` where deletion must be reversible; the repo-wide default scope injects `deleted_at IS NULL` (explicit `withDeleted()` opt-in; CI lint).
+- Primary keys are time-ordered UUIDs, generated by the application. Good index locality and deterministic assignment during import.
+- **Public identifiers are separate.** Externally addressable aggregates (goals, key results, KPIs, initiatives, tasks, documents, sessions, cycles) carry a `short_id`: a random base58 string, unique per workspace, used in URLs, the REST API, MCP tools, the command line and chat commands. Internal keys are never exposed. An unknown or malformed public identifier returns not-found, never a validation error, so the format is not an oracle.
+- Importable tables carry `legacy_id` and `legacy_type` (`flowyteam` or `csv`), unique on `(workspace_id, legacy_type, legacy_id)`, so re-running an import is idempotent.
+- Enumerated values are TypeScript string unions persisted as text with a check constraint.
+- Soft delete uses `deleted_at`. The repository-wide default scope adds `deleted_at IS NULL`, with an explicit opt-in to include deleted rows.
 
-## 4. Target domain model (new schema, by module)
+## 4. Domain model
 
-Tables listed with the columns that matter. All get `id uuid pk`, `workspace_id`, `created_at`, `updated_at`, an RLS policy in the same migration, and (where noted importable) `legacy_id`/`legacy_type` — plus `short_id` on the externally addressable aggregates above. "Rich" columns are ProseMirror JSON + `version int`. The consolidated view of everything below is DATABASE.md (derived; this section is the authority).
+All tables get an identifier, `workspace_id`, `created_at`, `updated_at` and a row-level security policy in the same migration. Externally addressable aggregates also get `short_id`. Importable tables also get `legacy_id` and `legacy_type`. Rich columns are editor JSON plus a version. DATABASE.md is the consolidated view; this section is the authority.
 
-### 4.1 Identity & access (the relationship model)
-
-Reference behavior: Operately's access engine (contexts / bindings / groups), which this reproduces with cleaner naming and a single enforcement point.
+### 4.1 Identity and access (domain A)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `workspaces` | `name`, `slug`, `state` (`active`/`read_only`/`frozen`), `settings jsonb` (brand, trusted_email_domains, cadence defaults) | tenant root |
-| `users` | `email` (unique), auth linkage | global; Better Auth owns credentials, sessions (hashed), passkeys, TOTP |
-| `workspace_members` | `user_id?`, `name`, `title?`, `avatar_blob_id?`, `timezone?`, `manager_id?` (→ members), `kind` (`human`/`guest`/`ai`/`placeholder`), `status`, `suspended_at?`, `bio` (rich) | the per-workspace person; `user_id` null for placeholders/agents pre-claim |
-| `access_contexts` | `resource_type`, `resource_id` | one per protected aggregate (space, goal, project, resource hub, discussion) |
-| `access_groups` | `kind` (`member`/`workspace_standard`/`space_standard`/`anonymous`), `member_id?`, `space_id?` | principals: one per member, one standard per workspace, one per space, one anonymous |
-| `access_group_memberships` | `group_id`, `member_id` | who is in a group (standard groups maintained by membership ops) |
-| `access_bindings` | `group_id`, `context_id`, `level` (`view`=10 / `comment`=40 / `edit`=70 / `full`=100), `tag?` (`champion`/`reviewer`) | the grant. Effective access = max over reachable bindings |
-| `invite_links` | `token_hash`, `mode` (`workspace`/`personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?` | reusable + single-use invites |
-| `audit_events` | `actor_member_id?`, `action`, `target_type`, `target_id`, `payload jsonb` (typed per action), `at`, `prev_hash`, `row_hash` | append-only (no UPDATE/DELETE grants), written in-transaction, per-workspace hash chain |
-| `outbox` | `topic`, `payload jsonb`, `idempotency_key`, `created_at`, `delivered_at?`, `attempts` | the transactional side-effect queue (§5) |
-| `system_settings` | singleton: email config (encrypted secrets), instance flags | AES-GCM envelope; admin-editable; env is bootstrap/override |
+| `workspaces` | `name`, `slug`, `state` (`active` / `read_only` / `frozen`), `settings jsonb` | Tenant root. Settings hold branding, trusted email domains and rhythm defaults |
+| `users` | `email` unique, auth linkage | Global. Better Auth owns credentials, sessions, passkeys and one-time passwords |
+| `workspace_members` | `user_id?`, `name`, `title?`, `avatar_blob_id?`, `timezone?`, `manager_id?`, `kind`, `status`, `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?` | The per-workspace person. `user_id` is null for placeholders and agents before claim |
+| `access_contexts` | `resource_type`, `resource_id` | One per protected aggregate: space, goal, cycle, KPI tree, initiative, session, document |
+| `access_groups` | `kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?` | The principals |
+| `access_group_memberships` | `group_id`, `member_id` | Who is in a group |
+| `access_bindings` | `group_id`, `context_id`, `level` (view 10 / comment 40 / edit 70 / full 100), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`) | The grant. Effective access is the maximum over every reachable binding |
+| `invite_links` | `token_hash`, `mode` (`workspace` / `personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?` | Reusable and single-use invitations |
+| `audit_events` | `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id`, `payload jsonb`, `at`, `prev_hash`, `row_hash` | Append-only. No update or delete grants. Written in-transaction, hash-chained per workspace |
+| `outbox` | `topic`, `payload jsonb`, `idempotency_key`, `created_at`, `delivered_at?`, `attempts` | The transactional side-effect queue |
+| `system_settings` | Singleton: mail configuration with encrypted secrets, instance flags | Envelope-encrypted, admin-editable, environment as bootstrap |
 
 Rules that make this real:
 
-- **Derived privacy.** A resource's privacy label (`public` / `workspace` / `space` / `invite-only`) is computed from which group tiers hold a binding on its context — never a stored boolean. The access editor exposes three levers (public / everyone in the workspace / members only).
-- **One read chokepoint.** Every read of an access-controlled aggregate goes through the core getter, which joins member → groups → bindings → context, takes `max(level)`, excludes `suspended_at IS NOT NULL`, and returns **not-found on forbidden**. List queries use the matching composable filter. A CI lint fails raw selects on protected tables outside the helper.
-- **Sub-resources inherit.** Comments, check-ins, reactions, files, activities resolve authorization through a single `(subject_type, subject_id) → owning context` resolver with an exhaustive, fail-closed subject enumeration. New subject types cannot silently ship unsecured.
-- **Champion/reviewer are tagged bindings**, so reassignment finds and rebinds exactly the right grants atomically inside the Operation.
-- **Freeze overlay.** When `workspaces.state != active`, the permission layer collapses everything to view-only except an admin recovery whitelist.
+- **Derived privacy.** A resource's privacy label (public, workspace, space, invite-only) is computed from which group tiers hold a binding on its context. Never a stored boolean.
+- **One read chokepoint.** Every read of an access-controlled aggregate goes through the core getter, which joins member to groups to bindings to context, takes the maximum level, excludes suspended members, and returns not-found on forbidden. A lint fails raw selects on protected tables outside the helper.
+- **Sub-resources inherit.** Comments, check-ins, reactions, files, votes and activities resolve authorisation through one subject-to-context resolver with an exhaustive, fail-closed list. A new subject type cannot ship unsecured.
+- **Role tags are bindings.** Champion, reviewer, sponsor, facilitator and coordinator are tagged bindings, so reassignment finds and rebinds exactly the right grants inside one transaction.
+- **Freeze overlay.** When the workspace state is not active, the permission layer collapses everything to view-only except an admin recovery list.
 
-### 4.2 Spaces
-
-| Table | Key columns | Notes |
-|---|---|---|
-| `spaces` | `name`, `mission?`, `settings jsonb` | team homes; each owns an access context + a space-standard group |
-| `space_members` | `space_id`, `member_id`, `role` (`member`/`manager`) | manager implies the space `full` binding |
-
-Maps FlowyTeam `teams` (tree flattened; sub-teams become sibling spaces with a naming convention — recorded in the import report).
-
-### 4.3 Strategy: cycles, goals, key results, check-ins
-
-#### Cycles & settings
+### 4.2 Spaces (domain B)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `okr_cycles` | `name`, `cadence` (`annual`/`semiannual`/`quarterly`/`monthly`), `starts_on`, `ends_on`, `status` (`upcoming`/`active`/`closed`), `previous_cycle_id?` | generated forward from the cadence; archive job on close |
-| `strategy_settings` | one row per workspace: `default_check_in_frequency` (`weekly`/`biweekly`/`monthly`), `check_in_anchor_day` (default Friday), `staleness_grace_days` (default 3), `rag_fail_pct` (50), `rag_pass_pct` (75), `max_goals_per_owner?`, `labels jsonb` | the rhythm + thresholds + house terminology |
+| `spaces` | `name`, `mission?`, `settings jsonb` | Team homes. Each owns an access context and a space-standard group |
+| `space_members` | `space_id`, `member_id`, `role` (`member` / `manager` / `coordinator`) | Manager implies a full binding. Coordinator runs the weekly session |
 
-#### Goals & key results
+### 4.3 Cycles and the planning workflow (domain C)
 
-| Table | Key columns | Notes |
-|---|---|---|
-| `goals` | `title`, `description` (rich), `cycle_id?`, `timeframe jsonb?` (contextual: `{start, end, granularity: day\|month\|quarter\|year, label}` — defaults to cycle bounds), `owner` (`workspace`/`space`/`member` + `space_id?`/`member_id?`), `champion_id` (→ members, required), `reviewer_id` (→ members, required), `parent_goal_id?`, `parent_key_result_id?` (alignment: at most one set; cycles prevented), `weight numeric` (1–100), `check_in_frequency`, `next_check_in_at timestamptz` (never null while open), `last_check_in_id?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved`/`missed`), `progress_pct numeric` (derived), `health` (derived; see §6.1), `position` | importable (flowyteam objectives). AI provenance: `ai_generated bool`, `ai_source_id?` |
-| `key_results` | `goal_id`, `title`, `unit`, `direction` (`increase`/`decrease`), `initial_value numeric`, `target_value numeric`, `current_value numeric`, `progress_pct` (derived, capped 0–100), `weight numeric`, `kpi_id?` (KPI-backed KR reads the KPI's latest achievement), `position` | importable |
-| `key_result_values` | `key_result_id`, `value numeric`, `at`, `author_member_id`, `check_in_id?` | full value history; drives sparklines + trend forecasting |
-| `check_ins` | `goal_id`, `author_member_id`, `state` (`draft`/`published`), `published_at?`, `status` (`on_track`/`caution`/`off_track`), `confidence smallint?` (0–10), `narrative` (rich, required to publish), `snapshot jsonb` (immutable: every KR `{id, value, previous_value, progress_pct}` + checklist state at publish), `acknowledged_by_id?`, `acknowledged_at?` | drafts emit no activity/notification and do not advance the cadence; publish stamps the snapshot, advances `next_check_in_at`, sets `last_check_in_id`; edits allowed within a window (latest check-in, ≤3 days) and re-snapshot; delete rolls the goal pointers back |
-| `goal_retrospectives` | `goal_id`, `body` (rich), `author_member_id` | created at close; editable; reopening keeps it |
-
-Alignment integrity: a goal sets exactly one of `parent_goal_id` / `parent_key_result_id` (or neither). Discussions on goals use the §4.7 `discussions` object; watchers use §4.7 subscriptions.
-
-#### Review inbox (assignments)
-
-No table — a computed query in core: for member M, union of (goals/projects where M is champion and `next_check_in_at` ≤ horizon or overdue), (published check-ins awaiting M's acknowledgement as reviewer, respecting reviewer-change history via the binding tag's `granted_at`), (work items assigned to M due/overdue), (milestones M champions due). Ranked overdue → due-today → due-soon; served by one endpoint; badge count cached and invalidated by the relevant Operations.
-
-### 4.4 KPIs & scorecard
+This is the METHOD.md §2 model made concrete.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `kpi_categories` | `name` | maps FlowyTeam `indicator_types` |
-| `kpis` | `category_id`, `title`, `description` (rich), `owner` (as goals), `frequency` (`daily`/`weekly`/`monthly`/`quarterly`/`yearly`), `unit`, `direction` (`higher_better`/`lower_better`), `target_default numeric?`, `aggregate` (`sum`/`avg`/`max`/`min`/`count`), `is_calculated bool`, `formula jsonb?` (typed expression tree, no eval), `rag_fail_pct`, `rag_pass_pct`, `parent_kpi_id?`, `starts_on?`, `ends_on?` | importable (`indicators`) |
-| `kpi_records` | `kpi_id`, `period_start date` (normalized bucket), `target_value?`, `actual_value?`, `remark?`, `author_member_id` | unique `(workspace_id, kpi_id, period_start)` |
-| `kpi_dependencies` | `kpi_id`, `depends_on_kpi_id` | formula edges; drives cascade recompute (cycle-checked) |
-| `key_result_kpis` | (folded into `key_results.kpi_id` — one KPI measures one KR; the many-to-many variant is a §12 open item) | |
-| `kpi_shares` | `kpi_id`, `member_id`, `access` (`read`/`update`) | maps `indicator_accesses`; broader scoping via normal bindings |
-| `performance_snapshots` | `owner…`, `cycle_id`, `result_value`, per-bucket goal/KR counts | recomputed by the archive job; never trusted from import |
-| `scorecard_settings` / `score_entries` | as before; **points off by default**, human-gated | importable if funded |
+| `annual_frames` | `year_label`, `horizon_label`, `mission` (rich), `vision` (rich), `strategy` (rich), `agreed bool`, `open_issues` (rich), `not_doing` (rich) | One current frame per workspace, with history |
+| `annual_strategies` | `frame_id`, `text`, `note?`, `position` | The 2 to 5 strategic thrusts for the year |
+| `cycles` | `name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase` (0 to 7), `frame_id?`, `previous_cycle_id?`, `sponsor_id?`, `facilitator_id?`, `session_dates jsonb`, `publication_deadline date?`, `published_at?`, `levels jsonb` (which levels set OKRs), `contributing_units text?`, `first_cycle bool`, `settings jsonb` | The cycle is the workflow container, not just a date range |
+| `cycle_pack_items` | `cycle_id`, `item_key` (1 to 7), `gathered bool`, `note?` | The input pack. `distributed_at` lives on the cycle |
+| `cycle_prior_scores` | `cycle_id`, `source_key_result_id?`, `text`, `score numeric?` | Phase 2 scoring of the previous cycle. Auto-populated at the previous cycle's close |
+| `cycle_baseline_health` | `cycle_id`, `stable` (rich), `declining` (rich), `business_as_usual` (rich) | Phase 2 KPI reading |
+| `cycle_issues` | `cycle_id`, `text`, `impact smallint` (1 to 5), `source` (`manual` / `carry_forward` / `process_health` / `coach`), `promoted_to_priority_id?` | The ranked strategic issue list |
+| `cycle_priorities` | `cycle_id`, `text`, `success_statement`, `position`, `promoted_to_goal_id?` | Phase 3 priorities with their 12-month success |
+| `cycle_revalidations` | `cycle_id`, `holds bool`, `changed bool`, `change_note?`, `focus_note?` | Quarterly Phase 3 |
+| `cycle_focus_key_results` | `cycle_id`, `annual_key_result_id` | Which annual key results this quarter must move |
+| `cycle_gate_state` | `cycle_id`, `gate_key` (1 to 6), `passed bool`, `evaluated_at`, `detail jsonb` | The publish gates, recomputed on every relevant write |
+| `cycle_capacity_notes` | `cycle_id`, `cuts` (rich) | What was cut. Required to pass gate 5 |
+| `cycle_calibrations` | `cycle_id`, `used bool`, `reason`, `at`, `author_member_id` | Mid-cycle calibration, at most one per cycle |
+| `rhythm_settings` | One row per workspace: `default_check_in_frequency`, `check_in_anchor_day`, `staleness_grace_days`, `blocker_clock_hours` (24), `escalation_ladder jsonb`, `kpi_healthy_pct` (90), `kpi_watch_pct` (70), `rag_fail_pct` (50), `rag_pass_pct` (75), `coach_strictness` (`advisory` / `warn` / `strict`), `max_company_objectives` (5), `max_objectives_per_unit` (3), `labels jsonb` | Every METHOD.md threshold that a workspace may tune, in one place |
 
-### 4.5 Execution: projects, milestones, work items, boards
+Phase completion (METHOD.md §2.3) and the publish gates are computed by `packages/method` from these rows. They are never stored as user-set booleans.
 
-Reference behavior: Operately's project lifecycle, check-in and milestone semantics.
-
-| Table | Key columns | Notes |
-|---|---|---|
-| `projects` | `space_id`, `name`, `description` (rich), `goal_id?` (the goal this project serves), `state` (`active`/`paused`/`closed`), `paused_at?`, `closed_at?`, `success_status?` (`achieved`/`missed`), `check_in_frequency`, `next_check_in_at`, `last_check_in_id?`, `health` (derived), `next_step` (derived: earliest-due open milestone; tie-break by position) | importable (flowyteam projects, csv) |
-| `project_contributors` | `project_id`, `member_id`, `role` (`champion`/`reviewer`/`contributor`), `responsibility?` | champion/reviewer unique per project; kept in lockstep with tagged bindings; person-swap downgrades the outgoing holder to contributor |
-| `project_check_ins` | same shape as `check_ins` minus KR snapshot: `state`, `status` (`on_track`/`caution`/`off_track`), `narrative` (rich), `snapshot jsonb` (milestone states at publish), `acknowledged_by_id?/_at?` | pausing a project suspends the cadence; resuming reschedules it |
-| `project_retrospectives` | `project_id`, `body` (rich), `author_member_id` | required at close |
-| `milestones` | `project_id`, `title`, `description?` (rich), `timeframe jsonb` (contextual), `status` (`open`/`done`), `completed_at?`, `position`, `ordering_state jsonb` (kanban column order, normalized against deleted/closed items, row-locked on write) | comments may carry a `complete`/`reopen` action |
-| `work_items` | `project_id`, `milestone_id?`, `title`, `description` (rich), `status` (`todo`/`in_progress`/`done`/`canceled`), `due jsonb?` (contextual), `key_result_id?`, `goal_id?`, `kpi_id?`, `position` | importable (flowyteam tasks). The strategy join: closing linked work moves the KR/goal |
-| `work_item_assignees` | `work_item_id`, `member_id` | **multi-assignee**; assignment grants edit access via the member's group |
-| `checklist_items` | `work_item_id`, `title`, `assignee_id?`, `done`, `position` | maps `sub_tasks`; no rollup |
-| `work_item_relations` | `from_id`, `to_id`, `kind` (`blocks`) | minimal v1; cannot-complete-while-blocked guard |
-| `reminders` | `work_item_id`, `member_id`, `kind` (`on_date`/`before_due`/`on_due`/`overdue`), `offset_days?`, `remind_at?` | relative kinds require a due date; auto-stripped if due removed |
-| `time_entries` | `work_item_id?`, `project_id`, `member_id`, `hours`, `spent_on`, `comment?` | **import-preservation only in v1** (read-only display); tracking UI is post-v1 |
-
-Boards are views over `work_items` grouped by status per milestone/project — no separate board tables in v1; `ordering_state` on the milestone (and a project-level equivalent in `projects.settings`) holds manual order.
-
-### 4.6 Resource Hub
+### 4.4 Goals, key results and check-ins (domain D)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `resource_hubs` | `owner_type` (`space`/`project`/`goal`), `owner_id`, `name` | each owner gets a default hub; hub inherits the owner's access context |
-| `resource_nodes` | `hub_id`, `parent_id?` (folder tree), `type` (`document`/`folder`/`file`/`link`), `name`, `position` | breadcrumbs via recursive CTE; deep copy/move are transactional |
-| `documents` | `node_id`, `body` (rich), `state` (`draft`/`published`), `published_at?`, `author_member_id` | drafts author-private (enforced in the getter's SQL, excluded from counts); publish emits the activity; version history + visual diff via the rich-text `version` + activities |
-| `files` | `node_id`, `blob_id`, `preview_blob_id?`, `width?`, `height?` | previews generated by a job |
-| `links` | `node_id`, `url`, `provider` (`google_doc`/`google_sheet`/`google_slides`/`figma`/`notion`/`airtable`/`dropbox`/`other`), `description?` (rich), `preview jsonb?` | metadata enrichment via an SSRF-safe fetcher (egress allow-list, resolved-address checks, no redirects, size/time caps) |
+| `goals` | `title`, `description` (rich), `cycle_id?`, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`) with `space_id?` and `member_id?`, `champion_id`, `reviewer_id`, `parent_goal_id?`, `parent_key_result_id?`, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?`, `contribution_statement?`, `closed_at?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `position` | Importable. `quality_score` and `quality_flags` are the last Draft Coach evaluation, recomputed on write |
+| `key_results` | `goal_id`, `title`, `unit`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `baseline_value numeric`, `target_value numeric`, `current_value numeric`, `due_on date?`, `owner_id?`, `weight numeric`, `kpi_id?`, `progress_pct`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `carry_forward bool`, `quality_flags jsonb`, `position` | Importable. `forecast` holds the projected end value and the trending flag |
+| `key_result_values` | `key_result_id`, `value numeric`, `at`, `author_member_id`, `check_in_id?`, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`) | Full history. Drives sparklines and the trend forecast |
+| `check_ins` | `subject_type` (`goal`), `subject_id`, `author_member_id`, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich, required to publish), `snapshot jsonb`, `session_id?`, `acknowledged_by_id?`, `acknowledged_at?`, `ai_drafted bool` | Drafts emit nothing and do not advance the cadence. Publishing stamps the snapshot, advances the next due date and creates the reviewer obligation |
+| `check_in_votes` | `check_in_id?`, `key_result_id`, `session_id?`, `member_id`, `confidence numeric`, `revealed_at?` | Private team confidence votes, revealed together |
+| `goal_retrospectives` | `goal_id`, `body` (rich), `author_member_id`, `ai_drafted bool` | Created at close, editable, kept on reopen |
 
-### 4.7 Collaboration: discussions, comments, reactions, subscriptions
+Alignment integrity: a goal sets at most one of `parent_goal_id` or `parent_key_result_id`. Cycles are rejected.
 
-One subscription model beneath everything (reference behavior: Operately's subscription lists, with its three overlapping thread shapes unified into one).
+The snapshot is immutable and holds, for every key result at publish time: identifier, value, previous value, progress percentage, confidence and previous confidence.
 
-| Table | Key columns | Notes |
-|---|---|---|
-| `discussions` | `space_id?` or (`subject_type`,`subject_id`) anchor, `title`, `body` (rich), `author_member_id`, `state` (`draft`/`published`), `published_at?` | space-scoped = message board / announcements; anchored = goal/project discussions. Drafts silent |
-| `comments` | `subject_type`, `subject_id` (work_item / milestone / check_in / project_check_in / discussion / document / file / link / goal / retrospective), `author_member_id`, `body` (rich), `edited_at?`, `action?` (`complete_milestone`/`reopen_milestone`) | deep-linkable (`#comment-<short_id>`); edit history via activities |
-| `reactions` | `subject_type`, `subject_id`, `member_id`, `emoji` | on all major subjects, not just comments |
-| `subscription_lists` | `subject_type`, `subject_id`, `send_to_everyone bool` | one per notifiable artifact |
-| `subscriptions` | `list_id`, `member_id`, `reason` (`invited`/`joined`/`mentioned`), `canceled bool` | unique (list, member); authors auto-`joined`; mentions auto-`mentioned`; edits re-diff mentions and cancel only stale `mentioned` rows; suspended/placeholder/`ai` members excluded at the join |
-
-Mention extraction is decode-safe (malformed content yields `[]`, never an error) and shared with the importer's reference-rewrite pass.
-
-### 4.8 Feed, notifications, audit
-
-Two systems, deliberately separate: the **typed social activity feed** and the **append-only audit log** (§4.1).
+### 4.5 Alignment and dependencies (domain E)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `activities` | `kind` (typed catalog: `goal.created`, `goal.checked_in`, `goal.closed`, `check_in.acknowledged`, `project.paused`, `milestone.completed`, `member.joined`, `document.published`, …), `payload jsonb` (Zod-validated per kind, snapshots human labels at write), `actor_member_id`, `subject_type`, `subject_id`, `space_id?`, `context_id` (access scope — set by an exhaustive resolver that fails closed), `at` | written in the mutating transaction; feeds (company/space/goal/project/profile) filter by the requester's access to `context_id`, hide soft-deleted subjects, keyset-paginate, and aggregate consecutive same-actor/same-day edits; live via Realtime |
-| `notifications` | `recipient_member_id`, `activity_id`, `reason`, `read_at?`, `should_send_email bool`, `email_batch_id?`, `email_sent_at?` | recipients resolved from subscriptions + assignment/mention/review reasons, **access-checked at send time**, author excluded |
-| `notification_email_batches` | `member_id`, `status` (`scheduled`/`sending`/`sent`/`failed`/`skipped`), `window_minutes`, `send_at`, `sent_at?`, `error?` | per-user coalescing; find-or-create under a row lock (no duplicate batches under bursts); idempotent worker |
-| `notification_settings` | `member_id`, per-reason channel routing, `mention_immediate bool`, `email_window_minutes`, `send_daily_summary bool`, `daily_summary_time` | daily summary scheduled in the member's own timezone (validated against `pg_timezone_names`, UTC fallback, DST-correct) |
+| `goal_dependencies` | `from_goal_id`, `to_goal_id`, `note?`, `created_by_id` | Horizontal links between goals in different teams. Two-way by meaning, stored once |
+| `key_result_dependencies` | `key_result_id`, `provider_space_id?`, `provider_text?`, `confirmed bool`, `confirmed_by_id?`, `confirmed_at?`, `risk_owner_id?` | The dependency register. Unconfirmed and unowned blocks publish gate 4 |
+| `alignment_findings` | `scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id`, `target_goal_id?`, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?` | Structural findings come from the deterministic engine, semantic ones from the Coach agent. Both land here so the UI is one list |
+| `alignment_scores` | `scope`, `scope_id?`, `cycle_id`, `score smallint`, `breakdown jsonb`, `computed_at` | The METHOD.md §5.2 score, recomputed on structural change |
 
-Email rendering: a per-reason registry rendering HTML + plain text + a one-line digest variant, with a dev-only preview page enumerating every reason × (single/digest) × (html/text). A daily "your work today" assignments email (due/overdue/needs-review; suppressed when empty; reminders-only on non-working days).
-
-### 4.9 Attachments & blobs
+### 4.6 KPIs, trees and recovery (domain F)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `blobs` | `filename`, `content_type`, `filesize`, `digest`, `storage_key`, `author_member_id`, `status` (`ok`/`scanning`/`quarantined`), `width?`, `height?` | bytes behind the FileStorage adapter; prepare → upload → claim on save; orphan cleanup job; inline editor blobs use optimistic placeholders with progress, submit-gating and delete-on-failure |
-| storage accounting | per-workspace running byte total in `workspaces.settings` + a quota and a once-at-90% warning | enforced on upload-finish |
+| `kpi_categories` | `name` | |
+| `kpi_trees` | `name`, `description?`, `root_kpi_id?` | A named driver tree. A workspace may have several |
+| `kpis` | `tree_id?`, `category_id?`, `parent_kpi_id?`, `title`, `description` (rich), `owner_kind` with `space_id?` / `member_id?`, `frequency` (`daily` / `weekly` / `monthly` / `quarterly` / `yearly`), `unit`, `direction` (`higher_better` / `lower_better`), `indicator_type` (`leading` / `lagging`), `tier` (`input` / `output` / `outcome` / `impact`), `target_default numeric?`, `aggregate` (`sum` / `avg` / `max` / `min` / `count`), `is_calculated bool`, `formula jsonb?`, `healthy_pct`, `watch_pct`, `state` (`healthy` / `watch` / `unhealthy` / `recovering` / `no_data`), `achievement_pct numeric?`, `effective_pct numeric?`, `recovery_goal_id?`, `recovery_started_pct numeric?`, `starts_on?`, `ends_on?`, `position` | Importable. The tree is the parent pointer. State and achievement are derived |
+| `kpi_records` | `kpi_id`, `period_start date`, `target_value?`, `actual_value?`, `remark?`, `author_member_id` | Unique on `(workspace_id, kpi_id, period_start)`. Periods are normalised per frequency |
+| `kpi_dependencies` | `kpi_id`, `depends_on_kpi_id` | Formula edges. Drives cascade recomputation, cycle-checked |
+| `kpi_shares` | `kpi_id`, `member_id`, `access` (`read` / `update`) | Narrow sharing. Broad scoping uses normal bindings |
+| `performance_snapshots` | `owner_kind` with identifiers, `cycle_id`, `result_value`, bucket counts, `verdict` | Written by the archive job. Never trusted from an import |
+| `scorecard_settings` / `score_entries` | Points configuration and entries | Off by default. No rows exist unless enabled |
 
-### 4.10 Importer & portability
+The recovery rule (METHOD.md §6.5) is implemented as an Operation: it creates the recovery goal, links it back through `recovery_goal_id`, stores `recovery_started_pct`, and flips the KPI state to `recovering`. Effective health while recovering is `max(achievement, start + progress × (healthy − start))`.
+
+### 4.7 The rhythm (domain G)
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `import_runs` | `source` (`flowyteam`/`csv`), `mode` (`dry_run`/`real`), `status`, `report jsonb`, `started_at`, `finished_at?` | every run persisted, including failures |
-| `export_runs` / `workspace_imports` | archive manifest, checksum, status, progress | the §7.3 portability engine |
+| `sessions` | `kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?`, `cycle_id?`, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id`, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` | One row per held ritual. Stage state is live over the realtime channel so everyone sees the same screen |
+| `session_participants` | `session_id`, `member_id`, `attended bool`, `pulse smallint?`, `word?` | Attendance plus the quarterly room pulse |
+| `blockers` | `key_result_id?`, `goal_id?`, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id`, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?`, `session_id?`, `source` (`session` / `manual` / `channel` / `agent`) | `due_at` is `opened_at` plus the workspace blocker clock, 24 hours by default |
+| `commitments` | `session_id?`, `space_id`, `week_start date`, `text`, `owner_id`, `key_result_id?`, `delivered bool?`, `closed_at?` | Set in one week, closed in the next |
+| `decisions` | `cycle_id?`, `key_result_id?`, `goal_id?`, `at date`, `text`, `author_member_id`, `session_id?` | The decision log. Every decision names what it affects |
+| `digests` | `scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `generated_at`, `published_at?`, `channels text[]` | Generated, editable, then published to channels |
+| `streaks` | `space_id`, `current_weeks`, `longest_weeks`, `last_session_week`, `history jsonb` | The rhythm streak. A skipped week breaks it |
+| `objective_trends` | `goal_id`, `month`, `trend` (`improving` / `flat` / `declining`), `author_member_id` | Recorded at the monthly review |
 
-### 4.11 AI + MCP domain
+### 4.8 The quarterly review (domain H)
 
-Specified at this document's level of detail in **AI-NATIVE-PLAN.md §7** (DATABASE.md domain M/N): providers, encrypted credentials, model catalog + tier policies, feature settings, versioned prompts, copilot threads/messages, tool-call + usage/cost events, embeddings (pgvector), **agents + agent_runs**, and the **MCP OAuth tables** (clients, grants, codes, access/refresh tokens with lineage, sessions). All follow §3 conventions; none carries legacy provenance. `ai_credentials` and all token hashes are never selected to the client.
+All keyed on a `session` of kind `quarterly`.
 
-## 5. Adapter ports (concrete interfaces)
+| Table | Key columns | Notes |
+|---|---|---|
+| `review_scores` | `session_id`, `key_result_id`, `score numeric`, `comment?`, `scored_by_id` | Stage 2. Written back to `key_results.score` on close |
+| `review_narratives` | `session_id`, `goal_id`, `body` (rich), `author_member_id` | Stage 3 |
+| `kudos` | `session_id?`, `from_member_id`, `to_member_id`, `text` | Stage 4 |
+| `retro_notes` | `session_id`, `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` | Stage 5. Authorship optional so writing can be anonymous |
+| `retro_votes` | `note_id`, `member_id` | One vote per member per note |
+| `management_answers` | `session_id`, `question_key` (1 to 4), `body` | Stage 6 |
+| `root_causes` | `session_id`, `key_result_id`, `cause_key` (1 to 8), `detail?` | Stage 7. One primary cause per missed key result |
+| `process_health_responses` | `session_id`, `statement_key` (1 to 5), `score smallint`, `respondent_hash` | Stage 8. Anonymous: the hash prevents double voting without identifying |
+| `review_decisions` | `session_id`, `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why` | Stage 9. Written back to the goal on close |
+| `learnings` | `session_id?`, `cycle_id`, `text`, `carry_forward bool`, `source` (`manual` / `retro_theme` / `coach`) | Stage 10 |
+| `next_cycle_drafts` | `session_id`, `title`, `why`, `promoted_to_goal_id?` | Stage 10 |
+| `review_actions` | `session_id`, `what`, `owner_id?`, `due_on?`, `done bool` | Stage 11 |
+| `review_diagnostics` | `session_id`, `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`delivered` / `strategy_or_quality` / `rhythm`), `narrative` | The METHOD.md §8.6 output, computed not typed |
 
-| Port | Methods (sketch) | v1 driver | Post-v1 (designed) |
-|---|---|---|---|
-| JobQueue | `enqueue(name, payload, opts)` **via outbox only**, `schedule(cron)` | pg-boss | Inngest |
-| Realtime | `publish(channel, event)` (typed registry; compact id+version payloads; 8 KB guard), `subscribe(channel)` | WS + LISTEN/NOTIFY | Supabase Realtime |
-| FileStorage | `put`, `get`, `signedUrl`, `delete` | local/MinIO | S3/R2 |
-| Mailer | `send(message)` | SMTP (DB-stored encrypted settings) | Resend |
-| Cache | `get`, `set`, `incr`, `rateLimit` | in-proc + Postgres | Upstash |
-| Search | `index`, `query` | Postgres FTS | Postgres FTS |
-| AIProvider | `chat`, `stream`, `chatWithTools`, `embed`, `extract`, `capabilities` | per AI-NATIVE-PLAN §3 | same |
+### 4.9 The work (domain I)
 
-**The outbox contract (load-bearing):** the only legal enqueue inside a write is `outbox.insert(topic, payload, idempotencyKey)` in the caller's transaction. The relay (a pg-boss worker in v1) drains committed rows to the real driver at-least-once; consumers are idempotent. Direct driver calls on a write path fail CI. This is what keeps write + audit + notify atomic on every current and future driver.
+| Table | Key columns | Notes |
+|---|---|---|
+| `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity` (`fits` / `tight` / `exceeds`), `progress_pct` | Importable. The work that moves a key result |
+| `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many |
+| `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable |
+| `task_assignees` | `task_id`, `member_id` | Multiple assignees. Assignment grants edit access through the member's group |
+| `checklist_items` | `task_id`, `title`, `done`, `position` | |
+| `documents` | `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` | Drafts are author-private, enforced in the query |
+| `attachments` | `subject_type`, `subject_id`, `blob_id`, `position` | Files on any subject |
+| `blobs` | `filename`, `content_type`, `filesize`, `digest`, `storage_key`, `author_member_id`, `status` (`ok` / `scanning` / `quarantined`), `width?`, `height?` | Bytes behind the storage port. Prepare, upload, claim. Orphan cleanup job |
 
-## 6. The pure engines (highest-risk cores)
+Boards are views over `tasks` grouped by status for a space, an initiative or a key result. No separate board tables. Manual order lives in `ordering_state`, normalised against deleted and completed items and written under a row lock.
 
-Pure, DB-free function sets in `packages/core`, golden-master tested. Derived columns are recomputed by jobs on write (via the outbox), never per-row at render.
+Key result progress from linked work: the ratio of completed to total linked tasks is shown as a separate signal beside the measured progress. It never silently replaces the measured value. A key result whose linked work is complete but whose number has not moved is exactly the divergence the coach reports.
 
-### 6.1 The goal health & scoring engine
+### 4.10 Collaboration (domain J)
 
-Reference behavior: Operately's status cascade + FlowyTeam's weighted scoring. Golden-master matrix written and human-approved at P3-T00.
+| Table | Key columns | Notes |
+|---|---|---|
+| `comments` | `subject_type`, `subject_id`, `author_member_id`, `body` (rich), `edited_at?` | Deep-linkable. Edit history through activities |
+| `reactions` | `subject_type`, `subject_id`, `member_id`, `emoji` | On every major subject, not only comments |
+| `subscription_lists` | `subject_type`, `subject_id`, `send_to_everyone bool` | One per notifiable artifact |
+| `subscriptions` | `list_id`, `member_id`, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool` | Authors auto-join. Mentions auto-subscribe and are re-diffed on edit. Suspended, placeholder and agent members are excluded |
 
-1. **KR progress** — direction-aware linear interpolation, clamped 0–100. `increase`: `(current−initial)/(target−initial)`; `decrease`: `(initial−current)/(initial−target)`; equal endpoints → 0. KPI-backed KRs read the KPI's latest achievement.
-2. **Goal progress** — weighted average of its KRs' clamped progress, including aligned child goals' contribution (weight-normalized; cascade walks upward KR → goal → parent KR → parent goal with cycle detection).
-3. **Health (the precedence cascade — never a bare formula):**
-   `success_status (achieved/missed, goal closed)` → **`outdated`** (`now > next_check_in_at + staleness_grace`) → `latest published check-in status (on_track/caution/off_track)` → `pending` (no check-in yet).
-4. **RAG color** — from workspace thresholds over progress (`rag_pass_pct`/`rag_fail_pct`) — a *progress* signal, displayed alongside (never instead of) health.
-5. **Trend forecast (differentiator)** — from `key_result_values` history, project end-of-cycle attainment per KR (linear fit over the recent window) and flag `trending_off_track` before the human status turns.
+Mention extraction is decode-safe: malformed content yields an empty list, never an error.
 
-`recomputeGoal(graph, change)` is the single entry point; the invalidation job fans out from the outbox.
+### 4.11 Feed, notifications and channels (domain K)
 
-### 6.2 The cadence engine
+| Table | Key columns | Notes |
+|---|---|---|
+| `activities` | `kind` (typed catalogue), `payload jsonb` validated per kind, `actor_member_id`, `actor_kind`, `subject_type`, `subject_id`, `space_id?`, `context_id`, `at` | Written in the mutating transaction. Feeds filter by the reader's access to the context, hide soft-deleted subjects, paginate by key and aggregate consecutive same-actor edits |
+| `notifications` | `recipient_member_id`, `activity_id?`, `nudge_id?`, `reason`, `read_at?`, `channel`, `sent_at?` | Recipients resolved from subscriptions and role obligations, access-checked at send time, author excluded |
+| `notification_settings` | `member_id`, per-reason channel routing, `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb` | The daily summary is scheduled in the member's own timezone |
+| `notification_batches` | `member_id`, `channel`, `status`, `window_minutes`, `send_at`, `sent_at?`, `error?` | Per-member coalescing. Found or created under a row lock so bursts cannot duplicate |
+| `channel_connections` | `provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `credentials_ciphertext`, `config jsonb`, `installed_by_id`, `last_verified_at` | One per provider per workspace. Credentials envelope-encrypted |
+| `channel_identities` | `member_id`, `provider`, `external_id`, `external_handle?`, `verified_at?` | Links a member to their identity in a chat provider. Required before any inbound command is honoured |
+| `channel_messages` | `provider`, `direction` (`out` / `in`), `member_id?`, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status`, `error?`, `at` | The delivery and receipt log. Inbound rows are the audit trail for chat-driven writes |
+| `nudges` | `kind`, `subject_type`, `subject_id`, `recipient_member_id`, `agent_id?`, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?` | Every proactive message the product sends. One row per nudge, so noise is measurable and suppressible |
 
-Pure date math (workspace timezone aware): given a frequency, anchor day and the just-published check-in time, compute the next due date (weekly → next anchor day; biweekly/monthly analogous), with a ±1-day on-time tolerance so an early/late-by-a-day check-in does not double-advance. `outdated` evaluation, reminder scheduling and the review inbox all read `next_check_in_at`. Pausing a project suspends it; resuming recomputes it. Golden masters cover anchor-day edges, month ends, timezone/DST.
+### 4.12 AI, agents and MCP (domain L)
 
-### 6.3 The KPI formula engine
+Specified at this level of detail in AI-NATIVE-PLAN.md §7: providers, encrypted credentials, the model catalogue and tier policies, feature settings, versioned prompts, copilot threads and messages, tool calls, usage and cost events, embeddings, agents and agent runs, proposed changes, and the MCP authorisation tables.
 
-A typed expression tree (Zod-validated; operators, parentheses, `kpi(id)` references), a safe evaluator (no `eval`), cross-frequency aggregation (finer-period sources roll up via the source KPI's `aggregate` function), divide-by-zero handling, dependency-graph cascade with cycle detection. Recompute jobs flow through the outbox. Golden masters from documented FlowyTeam formula cases; the importer's formula translator (§7.2) targets this tree.
+### 4.13 Import, export and tenancy (domain M)
 
-### 6.4 Scheduling engine — deferred (design-for note)
+| Table | Key columns | Notes |
+|---|---|---|
+| `import_runs` | `source` (`csv` / `flowyteam`), `mode` (`dry_run` / `real`), `status`, `report jsonb`, `started_at`, `finished_at?` | Every run persisted, including failures |
+| `export_runs` / `workspace_imports` | Archive manifest, checksum, status, progress | The §7.3 portability engine |
+| `tenants` | `workspace_id`, `plan_key?`, `seats?`, `state`, `trial_ends_at?`, `region` | Cloud only. Absent on self-hosted instances |
+| `operator_sessions` | `operator_user_id`, `workspace_id`, `reason`, `granted_at`, `expires_at`, `ended_at?` | Time-boxed support access, visible to the workspace owner |
 
-The automatic dependency-scheduling engine (working-day calendars, lag propagation, parent date rollups) is **post-v1**, spike-gated (PLAN.md §13 R-note). v1 uses contextual dates + the derived `next_step` — the model Operately validates in production. Nothing in v1 blocks the engine later: dates are typed values, relations exist (`blocks`), and derived columns are already job-recomputed.
+## 5. Adapter ports
 
-## 7. Importer architecture (`packages/importer`)
+| Port | Methods | Driver |
+|---|---|---|
+| JobQueue | `enqueue` through the outbox only, `schedule` | pg-boss |
+| Realtime | `publish(channel, event)`, `subscribe(channel)` | WebSocket plus listen and notify |
+| FileStorage | `put`, `get`, `signedUrl`, `delete` | Local disk or S3-compatible |
+| Mailer | `send(message)` | SMTP with encrypted stored settings |
+| Cache | `get`, `set`, `incr`, `rateLimit` | In-process plus Postgres |
+| Search | `index`, `query` | Postgres full-text plus pgvector |
+| AIProvider | `chat`, `stream`, `chatWithTools`, `embed`, `extract`, `capabilities` | Per AI-NATIVE-PLAN.md §3 |
+| Channel | `send(member, message)`, `sendToChannel(target, message)`, `verifyInbound(request)`, `parseInbound(payload)`, `capabilities()` | Slack, Teams, WhatsApp, Telegram, email, none |
 
-Two sources, one target, one pipeline. The OpenProject importer was **cut** (decision 2026-07-08); its reference docs are archived.
+**The outbox contract.** The only legal enqueue inside a write is inserting an outbox row in the caller's transaction. The relay drains committed rows to the driver at least once, and consumers are idempotent. A direct driver call on a write path fails CI. This keeps the write, the audit entry and the outbound message atomic on every driver.
+
+**Channel capabilities.** Providers differ. `capabilities()` reports what each supports (rich cards, buttons, threads, free-form inbound, template-only outbound) and the message builder degrades to plain text with a link when a capability is missing. WhatsApp outbound outside a live conversation window is template-only, and the builder knows it.
+
+## 6. The engines
+
+Pure function sets, golden-master tested. `packages/method` holds the ones that are pure practice. `packages/core` holds the ones that need a graph or a clock.
+
+### 6.1 The quality engine (`packages/method`)
+
+The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, its key results, its alignment and its cycle context. Output: one result per check with a status, a coaching prompt, a reason, an example pair, and a rule key. Plus the strength score and the six publish gates.
+
+- No database access, no network, no AI. It runs identically in the browser as the user types, on the server before a write, inside the Coach agent, and in the importer.
+- Word lists, thresholds and messages are data, versioned with the package, overridable per workspace only where METHOD.md marks a threshold as tunable.
+- Strictness (advisory, warn, strict) is a parameter, not a fork.
+- The golden-master suite carries a corpus of real objectives and key results with their expected verdicts. CI fails on any drift.
+
+### 6.2 The scoring and health engine (`packages/core`)
+
+1. **Key result progress.** Direction-aware, clamped 0 to 100, per METHOD.md §3.1. A KPI-backed key result reads the KPI's latest achievement.
+2. **Goal progress.** Weighted average of its key results, including the weighted contribution of aligned child goals. The cascade walks upward through key result, goal, parent key result, parent goal, with cycle detection.
+3. **Health.** The precedence cascade in METHOD.md §3.5: closed outcome, then outdated, then the latest published check-in status, then pending. Never a bare formula.
+4. **RAG colour.** From the workspace pass and fail thresholds over progress. A progress signal shown beside health, never instead of it.
+5. **Trend forecast.** A linear fit over the recent value window projects the end-of-cycle value. If it misses, the key result is flagged as trending off track.
+6. **Portfolio verdict.** METHOD.md §3.4 over any scored set.
+
+`recomputeGoal(graph, change)` is the single entry point. Invalidation fans out from the outbox.
+
+### 6.3 The cadence engine (`packages/core`)
+
+Pure date arithmetic, timezone aware. Given a frequency, an anchor day and the publication time, compute the next due date. A tolerance of one day means an early or late check-in does not double-advance. The staleness sweep, reminder scheduling and the review inbox all read the next due date. Golden masters cover anchor-day edges, month ends, timezone changes and daylight saving.
+
+### 6.4 The KPI engine (`packages/core` plus `packages/method`)
+
+- **Period normalisation** per frequency, so a value always lands in exactly one bucket.
+- **Achievement** direction-aware, and **state** from the METHOD.md §6.4 corridors.
+- **Effective health while recovering**, per METHOD.md §6.5.
+- **The formula evaluator**: a typed expression tree validated with Zod, with operators, parentheses and KPI references. No dynamic evaluation. Cross-frequency aggregation uses the source KPI's aggregate function. Divide-by-zero is handled explicitly. The dependency graph cascades with cycle detection.
+- **The recovery drafter**: given an unhealthy KPI, produce the recovery goal and up to four key results from its leading children.
+
+### 6.5 The alignment engine (`packages/core`)
+
+Walks the goal graph and produces the METHOD.md §5.2 score plus one finding per penalty, each linked to the goal that caused it. Deterministic and available with AI off. The Coach agent adds semantic findings into the same table.
+
+### 6.6 The rhythm engine (`packages/core`)
+
+- Session scheduling from the workspace rhythm settings.
+- Streak computation: a space's consecutive weeks with a held session, broken by a skip.
+- Blocker clocks: due time, aging, and the escalation ladder from rhythm settings.
+- Digest assembly: the METHOD.md §7.2 step four structure, computed from the session.
+- The review diagnostic: METHOD.md §8.6, from the cycle score and the process-health responses.
+
+### 6.7 The nudge engine (`packages/agents`)
+
+Given the workspace clock, produce the set of nudges due now: which rule fired, for which subject, to which member, on which channel, at which escalation step. Deduplicated so one subject produces at most one nudge per member per day unless it escalates. Suppressed by quiet hours, by member preference, and by a workspace-wide quiet mode. Every decision is recorded, including suppression and its reason, so noise is measurable.
+
+## 7. Importers
+
+Two sources, one target, one pipeline.
 
 ```
-# Generic CSV/XLSX (P0)
-pnpm import:csv --entity goals|key-results|kpis|kpi-records|projects|work-items \
-  --file <path> --workspace <slug> [--dry-run]
+pnpm import:csv --entity goals|key-results|kpis|kpi-records|initiatives|tasks \
+  --file <path> --workspace <slug> [--map <mapping.json>] [--dry-run]
 
-# FlowyTeam (MySQL, per-company)
 pnpm import:flowyteam --source <MYSQL_URL> --company <id> --workspace <slug> \
   [--dry-run] [--only objectives,indicators,tasks]
 ```
 
-### 7.1 Pipeline (both sources)
+### 7.1 Pipeline
 
-1. **Connect read-only** (FlowyTeam: read-only MySQL session; never write/lock/migrate a source). Introspect; assert required tables; guess the source version.
-2. **Extract → map → load** per domain in FK order (`reference/flowyteam-okr-kpi-tasks-model.md` §11), through the normal Operation pipeline with notification dispatch suppressed (a bulk-import flag the notify spine honors).
-3. **Deterministic IDs:** upsert on `(workspace_id, legacy_type, legacy_id)`; re-runs are idempotent.
-4. **Two-phase rich text:** load bodies (HTML → ProseMirror JSON through the sanitizing parser — imported content is untrusted), then a reference-rewrite pass remaps mentions/attachment refs using the shared extraction API.
-5. **Report + reconcile:** `import-report.json` — counts per table, skips with reasons, lossy items — plus a per-domain source-vs-target count reconciliation. `--dry-run` produces both without writing. Every run persists an `import_runs` row.
+1. **Connect read-only.** The FlowyTeam reader opens a read-only MySQL session and never writes, locks or migrates the source. Introspect, assert the required tables, and infer the version.
+2. **Map.** For CSV, a header-to-field mapping, either supplied or proposed by the AI mapper and confirmed by a human in the wizard. For FlowyTeam, the §7.2 table.
+3. **Extract, transform, load** per domain in dependency order, through the normal Operation pipeline with notification dispatch suppressed by a bulk flag.
+4. **Deterministic identifiers.** Upsert on `(workspace_id, legacy_type, legacy_id)`. Re-runs are idempotent.
+5. **Two-phase rich text.** Load bodies through the sanitising parser, because imported content is untrusted, then run a reference-rewrite pass that remaps mentions and attachments.
+6. **Recompute, never trust.** Progress, health, next check-in, achievement, alignment score and streaks are all recomputed by the engines after load.
+7. **Report and reconcile.** Counts per table, skips with reasons, lossy items, and a source-versus-target reconciliation per domain. A dry run produces the same report without writing. Every run persists a row.
 
-### 7.2 FlowyTeam mapping table (the contract; keep current in every schema PR)
+### 7.2 FlowyTeam mapping
 
-| Target | FlowyTeam source | Notes / lossy |
+Keep current in every schema change.
+
+| Target | Source | Notes |
 |---|---|---|
-| `spaces` / `space_members` | `teams` / `other_departments` (+`leader_id`) | tree flattened to siblings (report notes depth); leader → space manager |
-| `workspace_members` | employees/users of the company | placeholder members for unclaimed emails |
-| `okr_cycles` / `strategy_settings` | `performance_cycles` / `performance_settings` | thresholds direct; edit-matrix → bindings, not booleans |
-| `goals` | `objectives` | owner from `model_type`; two-pass alignment; champion=owner, reviewer=manager/lead fallback (report flags unmapped); health/progress recomputed |
-| `key_results` | `key_results` | numeric restore; `direction` inferred; `task_id` → `work_items` link (phase-4 pass) |
-| `key_result_values` | `key_result_records` + check-in snapshots | recompute % |
-| `check_ins` | `checkins` + `objective_checkins`/`key_result_checkins` | one narrative check-in per objective per period; KR values land in the snapshot + value history; reviews → acknowledgements where reviewer known |
-| `kpi_categories` / `kpis` / `kpi_records` | `indicator_types` / `indicators` / `indicator_records` | `occurance`→frequency; period-key normalized; unique per period |
-| `kpi_dependencies` + `kpis.formula` | `indicator_calculates` + `calculated_value` token strings | token → expression tree; unparseable dropped + logged |
-| `kpi_shares` | `indicator_accesses` | view-scope → bindings/shares |
-| `projects` | FlowyTeam projects | state mapped; champion from owner |
-| `work_items` (+assignees, checklist, relations, watchers) | `tasks` (+`sub_tasks`, `dependent_task_id`, `tasks_accesses`) | status from board-column slug (`completed` → done); `key_results_id` → KR link; recurrence flags recorded in report (recurrence engine post-v1) |
-| `comments` / `blobs` | `task_comments` / `task_files` (+KR files) | HTML→JSON; external file URLs → `links` |
-| `time_entries` | `project_time_logs` | **preserved losslessly, read-only in v1** |
-| `performance_snapshots` / points | `performance_records` / `reward_settings`+`scores` | recomputed / imported only if points funded (off by default) |
-| **not imported** | resthooks, universal-search cache, notification rows, attendance/HR modules | see reference §11 |
+| `spaces`, `space_members` | Teams and departments with their leader | The tree is flattened to siblings and the depth is recorded in the report. The leader becomes a space manager |
+| `workspace_members` | Employees and users of the company | Placeholder members for unclaimed email addresses |
+| `cycles`, `rhythm_settings` | Performance cycles and settings | Thresholds map directly. Access matrices become bindings, not booleans |
+| `goals` | Objectives | Owner from the model type. Two passes for alignment. Champion from the owner, reviewer from the manager or lead with a report flag when unmapped. Level inferred from the owner. Health and progress recomputed |
+| `key_results` | Key results | Numeric values restored, direction inferred, indicator type defaulted to lagging and flagged for review |
+| `key_result_values` | Key result records and check-in snapshots | Percentages recomputed |
+| `check_ins` | Check-ins with their objective and key-result rows | One narrative check-in per objective per period. Key result values land in the snapshot and the history. Reviews become acknowledgements where a reviewer is known |
+| `kpi_categories`, `kpis`, `kpi_records` | Indicator types, indicators, indicator records | Occurrence maps to frequency. Period keys normalised. Unique per period. Tier and indicator type default and are flagged for review |
+| `kpi_dependencies` and `kpis.formula` | Indicator calculations and their token strings | Tokens translated into the expression tree. Unparseable formulas are dropped and logged |
+| `kpi_shares` | Indicator accesses | View scope becomes bindings or shares |
+| `initiatives` | Projects | Status mapped, owner becomes the initiative owner |
+| `tasks`, `task_assignees`, `checklist_items` | Tasks, sub-tasks and task accesses | Status from the board column slug. Key result links preserved. Dependencies recorded in the report |
+| `comments`, `blobs`, `attachments` | Task comments and files | HTML converted to editor JSON. External file URLs become links in the body |
+| `learnings`, `decisions` | Where the source holds them | Otherwise created empty |
+| Not imported | Webhooks, search caches, notification rows, attendance and human-resources modules | Recorded in the report |
 
-### 7.3 Workspace portability (export/import between OpenOKR instances)
+Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.
 
-A first-class feature, not an ops script: any workspace admin exports a **versioned, checksummed, AES-GCM-encrypted archive** (all workspace rows in FK order + blobs + a manifest; secrets, sessions, tokens, audit chain excluded by a policy registry) and imports it into any OpenOKR instance with a **dry-run diff first** (what will be created/merged), deterministic PK remap, member de-dup by email, and blob re-upload. Powers self-host ↔ cloud moves, clones, and per-workspace restore. Built in Phase 6 (P6-T04); simpler here than in Operately because every table already carries `workspace_id` + provenance columns.
+### 7.3 Workspace portability
 
-## 8. Security design (must beat Operately, not just match it)
+A first-class feature, not an operations script. Any workspace admin exports a versioned, checksummed, encrypted archive: every workspace row in dependency order, plus blobs and a manifest, with secrets, sessions, tokens, channel credentials and the audit chain excluded by a policy list. Import into any OpenOKR instance runs a dry-run difference first (what will be created and what will merge), then a deterministic key remap, member de-duplication by email address and blob re-upload. This powers self-host to cloud moves in both directions, workspace clones and per-workspace restore.
 
-### 8.1 Layered enforcement (each layer has a distinct job)
+## 8. Security design
 
-| Layer | Mechanism | What it guarantees | Fails how |
+### 8.1 Layered enforcement
+
+| Layer | Mechanism | Guarantees | Fails how |
 |---|---|---|---|
-| 1. Tenant floor | RLS `USING (workspace_id = current_setting('app.workspace_id')::uuid)` on every business table; GUC via `SET LOCAL` per transaction; app role has no `BYPASSRLS` and doesn't own tables | a forgotten filter can never cross workspaces | zero rows, not leaks |
-| 2. Object access | the §4.1 relationship model through one `can(member, level, resource)` + the mandatory access-aware getter/filters; not-found on forbidden; suspended excluded; freeze overlay | per-object view/comment/edit/full, sharing, privacy tiers | denied by default at one chokepoint |
-| 3. Write integrity | the **Operation pipeline**: authorize (against freshly loaded, access-scoped rows) → one transaction: mutate + bindings + activity + audit + outbox → commit | no partial writes; audit cannot drift from state; side effects never fire for rolled-back writes | transaction aborts atomically |
-| 4. UI | hides what layer 2 denies | cosmetics only | never load-bearing |
+| 1. Tenant floor | Row-level security on every business table, keyed on a transaction-local setting. The application role cannot bypass it and does not own the tables | A forgotten filter can never cross workspaces | Zero rows, not a leak |
+| 2. Object access | The §4.1 relationship model through one `can()` plus the mandatory access-aware getter. Not-found on forbidden. Suspended excluded. Freeze overlay | Per-object access, sharing and privacy tiers | Denied by default at one point |
+| 3. Write integrity | The Operation pipeline: authorise against freshly loaded, access-scoped rows, then one transaction covering the change, bindings, activity, audit and outbox | No partial writes. Audit cannot drift from state. Side effects never fire for rolled-back writes | The transaction aborts atomically |
+| 4. Surface | The browser, chat, MCP and the command line all call the same registry actions | One permission decision everywhere | An unregistered write path fails the lint |
+| 5. UI | Hides what layer 2 denies | Cosmetic only | Never load-bearing |
 
-RLS operational discipline (the classic footguns, closed): `SET LOCAL` only (survives no pool reuse); a CI test that an unset-GUC connection reads zero rows from every business table; the Phase 1 spike proves behavior under transaction-pooling; a migration linter fails any `CREATE TABLE` without an RLS policy in the same file.
+Operational discipline for the tenant floor: transaction-local settings only, a test proving an unset connection reads zero rows from every business table, a Phase 1 spike proving behaviour under transaction pooling, and a migration linter that fails any business table created without a policy in the same file.
 
-### 8.2 Control checklist (each maps to a task)
+### 8.2 Control checklist
 
-| Control | Detail | Task |
-|---|---|---|
-| Session security | Better Auth; httpOnly+SameSite; **session tokens hashed at rest**; session list + revoke UI | P1-T05, P2-T09 |
-| MFA | passkeys + TOTP + backup codes **from Phase 1**; org-mandated MFA policy in P7 | P1-T05, P7-T04 |
-| Brute force / rate limits | lockout with backoff + audit; per-IP/per-user limits on auth, API, exports | P2-T09 |
-| Headers | nonce-based strict CSP (no `unsafe-inline`), HSTS, frame/referrer policies | P2-T09 |
-| Input | Zod everywhere; rich-text structural validation + sanitizing allowlist renderer (no raw HTML) at every surface incl. email; upload type/size allowlist; images re-encoded | P2-T05, P2-T11, all |
-| Authorization | §8.1 layers 1–2; CI lint on raw reads; multi-path grant composition = max, deduped; suspended excluded; sub-resource context resolver fail-closed | P2-T01/T02 |
-| Audit | append-only `audit_events` (no UPDATE/DELETE grants) written in-transaction; per-workspace hash chain + verification tool; ACL-scoped audit reads | P1-T07, P7-T05 |
-| Workspace freeze | `state` overlay with admin recovery whitelist | P2-T09 |
-| Secrets | env + encrypted DB settings; envelope encryption with a key ring; one-command master-key rotation (re-wraps data keys only); startup refuses placeholder secrets in prod | P1-T09, P5-T02 |
-| SSRF | outbound fetches (link enrichment, AI base URLs, OAuth client metadata) validate literal host **and** DNS-resolved addresses; block private/link-local/metadata ranges; no redirects; size/time caps | P4-T07, P5-T02/T09 |
-| API tokens | scoped (read/write/admin), expiring, hashed at rest, last-used; token/OAuth-authed callers are **403-forbidden from token administration**; every token/MCP request revalidates live membership + suspension | P5-T06/T09 |
-| MCP OAuth | full OAuth 2.1 authorization server: PKCE-S256, discovery (RFC 9728/8414/OIDC + /mcp variants), DCR (RFC 7591) + CIMD with SSRF-safe fetch, RFC 8707 resource/audience binding validated on issue and every use, 15-min access + 30-day rotating refresh with reuse-detection lineage revocation, single-use codes, consent + workspace picker, grant revoked on membership loss, Origin/DNS-rebinding validation, session-to-grant binding | P5-T09 |
-| AI/agents | acting-principal only (no ambient authority); shared-registry authz + validation; read/write/destructive classes; sandbox + batch approval + hard cost caps for teammates; RAG content untrusted | AI-NATIVE-PLAN §8 |
-| Privacy | PDPA/GDPR export + erasure-as-anonymization; last-owner/last-site-admin invariants; PII minimization | P2-T03, P6-T06 |
-| Supply chain | Dependabot, CodeQL, pinned lockfile, cosign-signed images, SBOM, license gate, DCO | P1-T02, P6-T06 |
-| Support access | (Phase 7) time-boxed, encrypted, **tenant-visible** operator impersonation, every action audited | P7-T06 |
-
-### 8.3 Explicit improvements over Operately (the security scorecard rows)
-
-- RLS tenant floor (Operately: app-code scoping only — one missed filter leaks).
-- Passkeys/TOTP at launch; session tokens hashed (Operately stores session tokens raw).
-- Append-only, hash-chained, typed audit distinct from the feed (Operately's audit *is* its mutable activities table).
-- Transactional outbox portable to any driver (Operately's atomicity depends on Oban sharing its repo).
-- Three-tier token scopes + expiry + no-token-mints-token (Operately: two-tier, no expiry model).
-- Tenant-visible support impersonation (Operately's is invisible to the customer).
-- Uniform Zod boundary validation incl. full JSON-schema on MCP tools (Operately's MCP validator covers a subset).
+| Control | Detail |
+|---|---|
+| Sessions | Better Auth, http-only cookies with same-site restrictions, tokens hashed at rest, a session list with revoke |
+| Multi-factor | Passkeys, one-time passwords and backup codes from Phase 1. Organisation-mandated policy in Phase 8 |
+| Brute force | Lockout with backoff and an audit entry. Per-address and per-user limits on authentication, the API, channels and exports |
+| Headers | Strict content security policy with per-response nonces, transport security, frame and referrer policies |
+| Input | Zod everywhere. Rich text structurally validated and rendered through a sanitising allow-list at every surface including email. Upload type and size allow-list, images re-encoded |
+| Authorisation | Layers 1 and 2, a lint on raw reads, maximum-wins composition across overlapping grants, suspended members excluded, a fail-closed sub-resource resolver |
+| Audit | Append-only with no update or delete grants, written in-transaction, hash-chained per workspace, with a verification tool and access-scoped reads |
+| Freeze | Workspace state overlay with an admin recovery list |
+| Secrets | Environment plus encrypted database settings, envelope encryption with a key ring, one-command rotation that re-wraps data keys only, startup refusal of placeholder secrets in production |
+| Outbound requests | Every outbound fetch (link enrichment, AI base URLs, channel endpoints, client metadata) validates the literal host and the resolved address, blocks private and metadata ranges, follows no redirects, and caps size and time |
+| API tokens | Scoped, expiring, hashed at rest, last-used recorded. A token-authenticated caller cannot administer tokens. Every request revalidates live membership and suspension |
+| Channel inbound | Provider signature verification, replay protection, sender-to-member resolution, rate limits, and the same `can()` as a click. Unknown senders get silence |
+| Agents | Least-privilege principal, no ambient authority, read, write and destructive classes, sandbox and proposal modes, hard cost caps, retrieved content untrusted |
+| Privacy | Export and erasure as anonymisation preserving authorship, last-owner invariants, minimal personal data in logs |
+| Supply chain | Dependency and code scanning, pinned lockfile, signed images, a bill of materials, a licence gate, commit sign-off |
+| Operator access | Cloud only. Time-boxed, reason-recorded, visible to the workspace owner, every action audited |
 
 ## 9. Search
 
-Postgres FTS via the Search port: a `search_documents` table (entity type/id, tsvector, GIN) refreshed by outbox-driven jobs; queries filtered through the access layer. Semantic/hybrid search arrives with the AI layer (pgvector, AI-NATIVE-PLAN §9) and degrades back to FTS. Identical on every deploy target; air-gap safe.
+Postgres full-text search through the Search port: a search document table with a generated vector and a suitable index, refreshed by outbox-driven jobs, with every query filtered through the access layer. Semantic search adds pgvector embeddings and hybrid ranking, and degrades back to full text when embeddings are unavailable. Identical on every deployment target and safe for an air-gapped install.
 
-## 10. Testing strategy
+## 10. Testing
 
-- **10.1 Isolation.** Unit/integration: per-worker database from a migrated **template DB** (fast reset); the workspace GUC set per test by the harness. E2E: Playwright runs against a real server on a per-worker database with truncate-between-tests — transaction-rollback isolation cannot cross Playwright's connection, so we do not pretend it can. Built in Phase 1.
-- **10.2 Factory.** `packages/test-support` builds every entity **through core Operations** (never raw inserts), so setup itself exercises RLS, bindings and `can()`. Multi-persona helpers (champion/reviewer/member/guest/suspended/agent).
-- **10.3 Conventions.** Interactive elements carry stable `data-testid`; Playwright uses `getByRole`/`getByTestId`; a failure helper dumps the DOM's available test-ids.
-- **10.4 Flaky policy.** Playwright retries + trace-on-retry; Vitest retry; merged report surfaces passed-on-retry as a tracked metric; auto-quarantine + ticket after N flakes in a window.
-- **10.5 Engines.** Golden-master suites for scoring/health cascade (§6.1), cadence (§6.2), KPI formulas (§6.3) — matrices human-reviewed at design gates.
-- **10.6 Security.** RLS property/fuzz suite (random cross-tenant reads across every table must return zero rows; removing any policy must fail the suite); an unset-GUC zero-row test; suspended-member access-loss tests; a mutation-without-audit-row impossibility test.
-- **10.7 Out-of-process e2e.** MCP: drive the real OAuth/PKCE + Streamable HTTP transport end to end; assert an under-privileged tool call is denied and no cross-tenant data appears in results. REST: token-scoped equivalents. CLI: run the generated binary against a live server.
-- **10.8 Contract drift.** Regenerate OpenAPI, the MCP catalog and the CLI from the action registry in CI; diff against committed artifacts; fail on drift.
-- **10.9 Importer.** Unit per mapper; integration against a seeded FlowyTeam MySQL in CI (multi-company, `--company` exercised); idempotency (run twice, no diffs); CSV golden files.
+- **Isolation.** Unit and integration tests use a per-worker database cloned from a migrated template, with the workspace setting applied per test. End-to-end tests run against a real server on a per-worker database with truncation between tests.
+- **Factory.** `packages/test-support` builds every entity through core Operations, never raw inserts, so setup itself exercises the security layers. Multi-persona helpers cover champion, reviewer, sponsor, facilitator, coordinator, member, guest, suspended and agent.
+- **Method conformance.** `packages/method` carries a golden-master suite for every rule, band, corridor, gate, taxonomy and diagnostic in METHOD.md, plus a corpus of real OKRs with expected verdicts. CI fails on drift between the document and the implementation.
+- **Engines.** Golden-master suites for scoring and health, cadence, KPI formulas and alignment. The matrices are reviewed by a human at the design gates.
+- **Security.** A property and fuzz suite that fires random cross-tenant reads at every table and requires zero rows, plus a check that removing any policy fails the suite. An unset-connection zero-row test. Suspended-member access-loss tests. A test proving a mutation without its audit row is impossible.
+- **Agents.** Sandbox runs commit nothing. Proposal runs commit nothing until applied. A cost cap halts a run mid-flight. An injected instruction inside retrieved content cannot exceed the agent's bindings. Nudge deduplication and quiet hours are asserted.
+- **Channels.** Each driver has contract tests against a recorded fixture set. Inbound signature verification rejects a tampered payload. An unlinked sender receives nothing. A chat-initiated write appears in the audit log with the channel recorded.
+- **Out-of-process.** MCP is driven end to end over the real authorisation and transport stack, asserting that an under-privileged call is denied and no cross-tenant data appears. REST and the command line get token-scoped equivalents.
+- **Contract drift.** OpenAPI, the MCP catalogue and the command line are regenerated in CI and compared against the committed artifacts.
+- **AI off.** A full CI leg with the provider disabled, asserting every P0 flow passes and every AI affordance is hidden or disabled.
+- **Importer.** Unit tests per mapper, integration against a seeded FlowyTeam database covering multiple companies, an idempotency run, and CSV golden files.
 
-## 11. Licensing and clean-room
+## 11. Licensing and clean room
 
-OpenOKR's own code is licensed per PLAN.md §4 (AGPL-3.0 + CLA, pending sign-off). Two clean-room stances:
+OpenOKR's own code is licensed per PLAN.md §4. FlowyTeam is proprietary. We read its database, meaning data and not code, through the reference knowledge base, and reproduce observable behaviour described in our own words. No source code is copied.
 
-- **FlowyTeam** (proprietary): we read its *database* (data, not code) via the reference docs and reproduce observable behavior described in our own words. No source code is ever copied.
-- **Operately** (Apache-2.0): legally copyable with attribution, but the §2 PLAN decision is original code — so the same rule applies by policy: we study observable behavior, UI semantics and public docs as the reference spec; we do not copy source. If any Operately code were ever ported, Apache-2.0 attribution obligations apply — treat that as a decision for the human, not a default.
+The OKR practice encoded in METHOD.md is method, not expression: rules, thresholds, taxonomies and agendas written here in our own words. No third party's copy, branding, typefaces, logos or course material is reproduced anywhere in the product.
 
-## 12. Open technical decisions (ask the human)
+## 12. Open technical decisions
 
-**Decided (2026-07-08):** greenfield vs fork (PLAN §2); v1 scope trim + power floor (REQUIREMENTS §6); single runtime v1 (PLAN §3); importers = CSV + FlowyTeam full strategy+tasks, OpenProject cut (§7); rich text = ProseMirror JSON canonical (§1); relationship access model + RLS floor (§4.1/§8.1); transactional outbox (§5); hosted SaaS designed-for (REQUIREMENTS §5).
-
-| # | Decision | Lean |
+| # | Decision | Position |
 |---|---|---|
-| T1 | KR↔KPI: single `kpi_id` on the KR vs many-to-many | single link for v1; revisit with real demand |
-| T2 | Trend-forecast model (linear fit window, thresholds) | decide at P3-T00 with the golden masters |
-| T3 | Space tree vs flat spaces | flat + naming in v1 (imports flatten); tree post-v1 if demanded |
-| T4 | Public read (anonymous) surfaces in v1 | design the anonymous group now; ship no public pages until a use case lands |
-| T5 | FlowyTeam points/rewards history import | only if the points layer is funded (off by default) |
-| T6 | Better Auth bcrypt import feasibility for FlowyTeam passwords | verify; fallback = invite-reset flow |
-| T7 | Embedding model + dimension | decide at P5-T07 (AI-NATIVE §13 A7) |
+| T1 | Key result to KPI: a single link or many to many | A single link for v1. Revisit on real demand |
+| T2 | Trend forecast model: fit window and thresholds | Decide at the Phase 3 design gate with the golden masters |
+| T3 | Space tree or flat spaces | Flat with a naming convention in v1. Imports flatten and record depth |
+| T4 | Anonymous public read surfaces | Design the anonymous group now, ship no public pages until a use case lands |
+| T5 | Embedding model and dimension | Decide at the retrieval task. Keep the column swappable |
+| T6 | Password import feasibility from FlowyTeam | Verify. The fallback is an invite-and-reset flow |
+| T7 | Whether team confidence voting is on by default | Off by default per space, on by opt-in. Revisit after the first pilots |
 
-## 13. Performance engineering (budgets are requirements, not hopes)
+## 13. Performance
 
-### 13.1 Budgets (measured on the P6-T01 large dataset: 100k work items + 10k goals in one workspace)
+### 13.1 Budgets
+
+Measured on the large seeded dataset: 100,000 goals and key results plus 1,000,000 tasks in one workspace.
 
 | Surface | Budget |
 |---|---|
-| Work Map first paint (100 nodes visible) | < 1.0 s server render, < 2.0 s interactive |
-| Work Map / list scroll | 60 fps virtualized; no cliff to 10k loaded rows |
-| Goal/project page open from a list | < 300 ms perceived (optimistic + hydrated cache) |
-| Board render (6 columns × 50 cards) | < 1.5 s |
-| Review inbox | < 500 ms p95 server |
-| Global search suggestions | < 300 ms p95 |
-| Save actions (check-in publish, field edit) | optimistic instant; server ack < 500 ms p95 |
-| Core Web Vitals (app shell) | LCP < 2.5 s, INP < 200 ms, CLS < 0.1 on mid-range hardware |
+| Work Map first paint, 100 nodes visible | Under 1.0 s server render, under 2.0 s interactive |
+| Work Map and list scroll | 60 frames per second virtualised, no cliff at 10,000 loaded rows |
+| Goal page opened from a list | Under 300 ms perceived |
+| Board render, 4 columns by 50 cards | Under 1.5 s |
+| Review inbox | Under 500 ms at the 95th percentile on the server |
+| Draft Coach evaluation on typing | Under 16 ms on the client, so it never blocks a keystroke |
+| Alignment score recomputation, 10,000 goals | Under 2 s in a job |
+| KPI grid, 200 KPIs by 24 periods | Under 1.5 s |
+| Session stage transition, 20 participants | Under 200 ms to every connected client |
+| Global search suggestions | Under 300 ms at the 95th percentile |
+| Save actions | Optimistic and instant, server acknowledgement under 500 ms at the 95th percentile |
+| Channel nudge delivery | Under 60 s from trigger to delivery at the 95th percentile |
+| Core web vitals | Largest contentful paint under 2.5 s, interaction to next paint under 200 ms, layout shift under 0.1 |
 
-### 13.2 Techniques (mandatory patterns)
+### 13.2 Techniques
 
-- Server Components + streaming for first paint; hydration only where interactive.
-- **Keyset pagination everywhere** (no OFFSET beyond ~page 10).
-- Virtualized trees/tables/boards (TanStack Virtual).
-- **N+1 budget in CI:** list endpoints load relations set-based; a dev-mode query counter fails tests over budget (>15 queries on a list view).
-- **Indexes ship with the feature**; composite `(workspace_id, space_id, common-filter)` where lists filter on it.
-- Derived values (progress, health, next_step, counts) recomputed by outbox-driven jobs into columns — never per-row at render.
-- **Response shapes:** every resource declares a `summary` (list) and `full` (detail) Zod shape; list endpoints return only `summary`.
-- Client: TanStack Query with a **persisted cache keyed by buildId** (instant back/forward; corruption-tolerant; quota-aware) — a maintained-library equivalent of Operately's hand-rolled PageCache.
-- **Stale-deploy handshake:** an `x-app-version` header; a shared interceptor detects mismatch on not-found/gone and triggers a one-time debounced reload with an "app updated" toast; persisted caches bust on buildId.
-- Realtime instead of polling; compact events + refetch through the access-checked read path.
+- Server components with streaming for first paint. Hydration only where interactive.
+- Keyset pagination everywhere.
+- Virtualised trees, tables and boards.
+- A query-count budget enforced in CI on list endpoints, with a development-mode counter failing tests over budget.
+- Indexes ship with the feature, including composite indexes matching the common list filters.
+- Derived values recomputed by outbox-driven jobs into columns, never per row at render.
+- Every resource declares a summary shape for lists and a full shape for detail. List endpoints return only the summary.
+- A client cache persisted and keyed by build identifier, so back and forward are instant and a new deployment invalidates it.
+- A stale-deployment handshake: a version header, a shared interceptor, and one debounced reload with a clear message.
+- Realtime instead of polling, publishing compact events and refetching through the access-checked read path.
 
 ### 13.3 Data-loading boundary
 
-RSC-streamed: the shell, auth/onboarding, settings, read-mostly detail first paint. Client-owned (loader-prefetched, TanStack-hydrated): Work Map, review inbox, explorers, boards, KPI grid, feeds, notification inbox — everywhere inline edit, virtualization, realtime and URL-stable view state live. Share-stable URL state parses client-side.
+Server-streamed: the shell, authentication and onboarding, settings, and the first paint of read-mostly detail pages. Client-owned: the Work Map, the review inbox, explorers, boards, the KPI grid, live sessions, feeds and the notification inbox, that is everywhere inline editing, virtualisation, realtime and shareable view state live. Shareable state is parsed on the client.
 
-## 14. API conventions (one contract, five projections)
+## 14. API conventions
 
-- **The action/contract registry** (`packages/core`): every read and write is defined once — name, Zod input/output (`summary`/`full` shapes), required access level, `readOnly`/`write`/`destructive` class, handler calling a core service through the Operation pipeline. tRPC procedures, REST routes, MCP tools, OpenAPI 3.1 and the CLI are generated projections. One permission decision, everywhere; CI drift checks (§10.8).
-- **REST `/api/v1`:** JSON, cursor pagination (`?cursor=&limit=`), `filters` grammar matching the list contracts, OpenAPI from Zod, scoped bearer tokens (hashed), audience-separated from MCP tokens (RFC 8707). Errors: typed enum (`FORBIDDEN` collapsed to `NOT_FOUND` for invisible resources, `CONFLICT` for stale versions, `VALIDATION`).
-- **Optimistic concurrency:** updates carry `version`; mismatch → 409 → client refetch/reapply or conflict banner.
-- **Form-validation endpoints:** `POST /…/validate` returns field errors + computed defaults without committing (powers rich client forms and the CSV importer preview).
-- **CLI:** generated from the registry/OpenAPI — every resource becomes a command with typed flags, `--field-file` inputs, multi-profile config (0600), and a browser device-login flow that mints a scoped token. Ships in Phase 5 with the registry.
-- **Webhooks (outbound, P1 within Phase 5/6):** signed (HMAC per-hook secret), SSRF-checked, delivering the same `summary` resource shapes, with delivery logs.
-- **Deprecation:** `/api/v1` is stable; breaking changes require `/api/v2` side-by-side.
+- **The action contract registry** in `packages/core` defines every read and write once: a name, Zod input and output shapes, the required access level, a safety class of read, write or destructive, and a handler that calls a core service through the Operation pipeline. The internal typed client, REST, OpenAPI, the MCP catalogue, the command line and the chat command router are generated projections. One permission decision, everywhere.
+- **REST.** A versioned JSON surface with cursor pagination, a filter grammar matching the list contracts, OpenAPI generated from the schemas, and scoped bearer tokens hashed at rest, with audiences separated from MCP tokens. Errors are a typed enumeration, where forbidden collapses to not-found for invisible resources.
+- **Optimistic concurrency.** Updates carry a version. A mismatch returns a conflict and the client refetches or shows an inline comparison.
+- **Validation endpoints.** A validate call per resource returns field errors and computed defaults without committing. This powers rich client forms, the importer preview and the Draft Coach's server-side evaluation.
+- **Command line.** Generated from the registry, with typed flags, file inputs, multiple profiles and a browser device-login that mints a scoped token.
+- **Chat commands.** Generated from the same registry: a small surface of read and write actions exposed as slash commands and natural-language intents, each mapped to one registry action and checked identically.
+- **Webhooks.** Outbound, signed per hook, validated against the outbound-request rules, delivering the same summary shapes, with delivery logs.
+- **Deprecation.** The versioned surface is stable. Breaking changes require a new version side by side.
 
-## 15. Where OpenOKR must beat Operately (the scorecard)
+## 15. What must be true at v1
 
-The reason to exist, re-benchmarked against the real competitor (decision 2026-07-08; the old OpenProject scorecard is retired). Each row is verified at a phase exit; "same as Operately" is the parity bar unless marked *(parity)*.
+Each row is verified at a phase exit.
 
-| Dimension | Operately today | OpenOKR target | Where |
-|---|---|---|---|
-| Operating rhythm | weekly cadence, outdated staleness, ack loop — shipped | *(parity is mandatory)* + configurable grace/cadence per goal, AI-drafted overdue check-ins, reviewer SLA + escalation | P3 |
-| OKR depth | goals + targets; no weights, no KPI system, no forecasting | weighted direction-aware KRs, value history + trend forecast, full KPI module with calculated formulas, KPI-backed KRs | P3 |
-| Work Map | shipped, goals+projects+tasks | *(parity)* + KPI tiles, staleness surfaced, 100k-item virtualization, RLS-filtered | P4 |
-| Check-ins | narrative + snapshot + ack | *(parity)* + diff timeline UI, draft AI assist, acknowledgement SLA | P3/P5 |
-| Execution core | projects, milestones, tasks, boards, docs | *(parity)* + multi-assignee, due-relative reminders, blocked-guard, KR-linked progress flow | P4 |
-| Resource hub | shipped (space/project/goal) | *(parity)* + doc version diff, link auto-enrichment, quotas, semantic search over content | P4/P5 |
-| Tenant isolation | app-code scoping | **Postgres RLS floor + relationship layer**; fuzz-tested | P1/P2 |
-| Authorization | bindings engine (app-level) | *(parity on expressiveness)* + one registry-enforced `can()` across UI/REST/MCP/CLI, CI-linted chokepoint | P2 |
-| Audit | mutable activities table doubles as audit | separate append-only, hash-chained, typed, ACL-scoped audit + verification tool | P1/P7 |
-| Write integrity | Ecto.Multi + Oban-in-repo | *(parity)* via Operation pipeline + **portable transactional outbox** | P1 |
-| MCP server | 102 tools, full OAuth 2.1, ChatGPT connectors | *(parity is mandatory — port the flow)* + Resources & Prompts primitives, stdio for air-gap, per-token rate limits + cost caps, admin scope tier | P5 |
-| AI providers & governance | 2 cloud providers, env keys, no metering | BYO-key 3-level, local models/air-gap, tier routing, per-token metering + hard caps, versioned prompts, egress controls | P5 |
-| AI teammates | autonomous agents, company-wide edit grant, no cost control | *(parity on autonomy)* + least-privilege principal, sandbox, batch-approval, cost-capped, local-model capable | P5 |
-| Portability | owner-gated company transfer | self-serve encrypted workspace export/import with dry-run diff; CI-verified restore | P6 |
-| API surface | typed RPC + private catalog CLI | public OpenAPI 3.1 + generated SDK-able surface + generated CLI + drift CI | P5 |
-| Setup | shell installer | first-run web wizard, secrets auto-generated, <30 min | P1 |
-| First load | client-rendered SPA | RSC streaming, LCP < 2.5 s cold | P2/P6 |
-| Accessibility & i18n | partial | WCAG 2.1 AA CI-gated; en+ms ICU catalogs | P6 |
-| Parity risks (must not regress) | polished feeds, notifications, editor, demo builder | typed feed engine, buffered digests, editor design doc, demo builder — all specified, not improvised | P2 |
+| Dimension | Target |
+|---|---|
+| The method is in the product | Every rule, band, corridor, gate, taxonomy and diagnostic in METHOD.md is implemented in `packages/method` and covered by a golden master |
+| Quality at the point of writing | Live checks under 16 ms, publish gates enforced server-side, coaching prompts cite their rule |
+| Active coaching | Every trigger in AI-NATIVE-PLAN.md §6 fires, escalates and is recorded. Nudge volume is measurable and suppressible |
+| Multi-surface | The same action is reachable from the browser, email, four chat providers, MCP, REST and the command line, and passes the same permission check every time |
+| Rhythm | Cadence, staleness, blockers with a 24-hour clock, commitments, streaks, digests, and both sessions running end to end |
+| OKR depth | Weighted, direction-aware key results with value history, confidence, forecasting, KPI-backed measurement and full alignment |
+| KPI depth | Driver trees, health corridors, calculated formulas, recovery OKRs and the recovery board |
+| Tenant isolation | Row-level security floor plus the relationship layer, fuzz-tested |
+| Audit | Append-only, hash-chained, typed, access-scoped, with a verification tool |
+| Write integrity | The Operation pipeline plus the transactional outbox |
+| AI governance | Bring your own key at three levels, local models, tier routing, per-token metering, hard caps, versioned prompts, egress controls |
+| Agent safety | Least-privilege principal, sandbox, proposal-plus-approval, cost caps, machine-verified authorisation |
+| Portability | Self-serve encrypted export and import with a dry-run difference, verified in CI |
+| Deployment | Self-host in under 30 minutes and a managed cloud on the same release |
+| Accessibility and languages | WCAG 2.1 AA gated in CI, English and Bahasa Melayu catalogues |

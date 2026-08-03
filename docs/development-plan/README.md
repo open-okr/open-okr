@@ -1,81 +1,85 @@
-# OpenOKR — development plan
+# OpenOKR: development plan
 
-This folder holds a complete, self-contained plan to build `OpenOKR`, an open source **operating system for running a company on goals**, on a modern TypeScript stack. It joins native strategy (OKRs, KPIs, check-ins) to an Operately-class execution core (projects, milestones, work items, boards, a Resource Hub) through a built-in **operating rhythm**: a check-in cadence with enforced staleness, a champion/reviewer accountability contract, a personal review inbox, and one company-wide Work Map. It is **AI-native**: assists in every module, an in-app copilot, autonomous **AI teammates**, and an MCP server (with a full OAuth 2.1 authorization server) so any external agent can drive it safely. It is executed by Claude Code under human supervision, one task at a time.
+This folder holds a complete, self-contained plan to build **OpenOKR**, an open source, AI-agentic-native OKR platform that coaches an organisation through the whole OKR practice instead of merely storing its goals.
 
-## The benchmark: Operately (and why we build, not fork)
+The product's difference is two things at once. **The method is in the product**: a guided eight-phase planning cycle, twenty quality rules that check every draft as it is typed, an alignment health score, KPI health corridors with recovery objectives, two timed session formats, and a diagnostic at the close. And **the product is active**: two AI teammates, an OKR Coach that guards quality and an OKR Champion that guards the rhythm, initiate, escalate and propose, in the browser, in Slack, Teams, WhatsApp and Telegram, by email, and through any AI agent the user already runs.
 
-OpenOKR's competitor and quality bar is **[Operately](https://operately.com)** — a shipped, mature, Apache-2.0 "company operating system". This plan was **rewritten after a full source-level comparison against Operately** (see the two analysis docs below). The product owner chose to build ground-up rather than fork; the recorded reasons (stack ownership, license/IP independence, architectural freedom) are in [PLAN.md §2](PLAN.md). We study Operately's *observable behavior* as a reference spec where it is already validated (the goal status cascade, the check-in lifecycle, the MCP OAuth flow); we never copy its code.
+It runs two ways from day one: self-hosted on your own servers, or in our managed cloud, from the same release.
 
-Read these two first — they explain *why* the plan looks the way it does:
-
-| File | What it is |
-|---|---|
-| [OPERATELY-COMPARISON.md](OPERATELY-COMPARISON.md) | The synthesis: where OpenOKR must beat Operately, the strategic reckoning, the product-philosophy gap, security/robustness, and the prioritized roadmap |
-| [OPERATELY-GAP-REGISTER.md](OPERATELY-GAP-REGISTER.md) | The exhaustive backing: all 142 itemized gaps + superiority ideas + the exact plan-doc edits |
-
-## Data importers
-
-OpenOKR is a new product, not a fork of anything. One legacy tool gets a one-way importer; everything else comes via a generic file importer.
-
-| Source | What it contributes | Stack | Reference |
-|---|---|---|---|
-| FlowyTeam | Strategy + tasks: OKRs, KPIs (+ formulas), check-ins, and tasks → work items (with comments, files, time logs) | Laravel 10 / PHP 8, MySQL | [reference/flowyteam-okr-kpi-tasks-model.md](reference/flowyteam-okr-kpi-tasks-model.md) |
-| Generic CSV / XLSX | Goals, key results, KPIs + records, projects, work items | — | template downloads + dry-run preview |
-
-*(An OpenProject importer was in an earlier draft and was cut on 2026-07-08. The `reference/legacy-*.md` OpenProject files remain only as archived background.)*
+The plan is executed by Claude Code under human supervision, one task at a time.
 
 ## The documents
 
-Read in this order the first time:
+Read in this order the first time.
 
 | # | File | What it is | Authority over |
 |---|---|---|---|
-| 1 | [REQUIREMENTS.md](REQUIREMENTS.md) | Product definition: personas, the operating model (§3), modules, priorities, the v1 vs "power floor" split (§6) | What the product does |
-| 2 | [PLAN.md](PLAN.md) | Architecture principles, the greenfield decision (§2), deployment, delivery phases, the risk register (§13), open decisions (§14) | How it is architected |
-| 3 | [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) | Target design: identity + relationship access model (§4.1), full schema (§4), adapter ports + transactional outbox (§5), the pure engines (§6), the importer (§7), security (§8), testing (§10), the one-contract API (§14), the Operately scorecard (§15) | Technical design |
-| 4 | [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) | The AI layer: providers/BYO-key/local models, governance, the MCP OAuth 2.1 server, the copilot, AI teammates, AI schema/security, Phase 5 tasks | The AI domain (peer of TECHNICAL-PLAN.md there) |
-| 5 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, screen specs, accessibility and UX quality gates | The user interface |
-| 6 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases and tasks with IDs, each with test plan / development / QA, plus Definition of Ready | What gets built, in what order |
-| 7 | [EXECUTION-GUIDE.md](EXECUTION-GUIDE.md) | The operating protocol between the human engineer and Claude Code | Process |
-| 8 | [CLAUDE.md](CLAUDE.md) | Working rules for the Claude Code agent | Agent behavior |
-| 9 | [reference/](reference/) | The FlowyTeam source knowledge base (data model, features, scoring, permissions). Ground truth for the importer | Facts about the source |
+| 1 | [REQUIREMENTS.md](REQUIREMENTS.md) | Product definition: personas, the operating model, modules, priorities, deployment, and what is deferred | What the product does |
+| 2 | [PLAN.md](PLAN.md) | Architecture principles, packages, adapters, licence, deployment tiers, delivery phases, the risk register, open decisions | How it is architected |
+| 3 | [METHOD.md](METHOD.md) | The OKR practice canon: the cycle model, scoring and confidence bands, the twenty quality rules with their word lists and coaching prompts, publish gates, alignment scoring, KPI corridors and recovery, the blocker and root-cause taxonomies, session agendas, and the closing diagnostic | What good OKR practice is |
+| 4 | [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) | Target design: the identity and access model, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance budgets and the one-contract API | Technical design |
+| 5 | [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) | The AI and agent layer: providers and bring-your-own-key, governance, chat channels, the Coach and the Champion with the full trigger and escalation catalogue, the copilot, retrieval, and the external agent surface | The AI domain |
+| 6 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, forty screen specifications, accessibility and quality gates | The user interface |
+| 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 104 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
+| 8 | [EXECUTION-GUIDE.md](EXECUTION-GUIDE.md) | The protocol between the human engineer and the agent | Process |
+| 9 | [reference/](reference/) | Source-system knowledge bases, the ground truth for the importers | Facts about the sources |
+
+The agent's own working rules live in [CLAUDE.md](../../CLAUDE.md) at the repository root, where they are loaded automatically.
 
 Also here:
 
-- [OVERVIEW.md](OVERVIEW.md) — the **end-user product overview** (what OpenOKR is, who it is for, every module and its benefit). For users and admins; not part of the build-authority chain.
-- [DATABASE.md](DATABASE.md) — the full consolidated schema (every table, key columns, foreign keys, relationship diagram). A derived view; the authority is TECHNICAL-PLAN.md §4.
-- [PROMPT.md](PROMPT.md) — copy-paste prompts for running development with Claude Code.
-- [STATUS.md](STATUS.md) — task tracking. The agent updates rows; only a human sets `done`.
+- [OVERVIEW.md](OVERVIEW.md): the end-user product overview: what OpenOKR is, who it is for, and what every part of it does. Written for users and admins, not builders.
+- [DATABASE.md](DATABASE.md): the consolidated schema: every table, key columns and relationships. A derived view; the authority is TECHNICAL-PLAN.md §4.
+- [PROMPT.md](PROMPT.md): copy-and-paste prompts for running development.
+- [STATUS.md](STATUS.md): task tracking. The agent updates rows; only a human sets `done`.
 
-`docs/design/*` exists only after execution starts: detailed designs written by the agent at each phase's design gate.
+`docs/design/` exists only once execution starts: detailed designs written by the agent at each phase's design gate.
 
 ## How the pieces fit
 
 ```
-OPERATELY-COMPARISON.md    why the plan is shaped this way (benchmark = Operately)
+REQUIREMENTS.md      what to build: the operating model, the modules, what is deferred
+METHOD.md            what good OKR practice is: every rule, band, corridor and ritual
       |
-REQUIREMENTS.md            what to build (the operating model §3; v1 vs power floor §6)
+PLAN.md              principles, packages, deployment, phases, risks
+TECHNICAL-PLAN.md    schema, access model, outbox, engines, importers, security, budgets
+AI-NATIVE-PLAN.md    providers, governance, channels, the Coach and the Champion, MCP
+UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40)
       |
-PLAN.md                    principles, greenfield decision, phases, risk register
-TECHNICAL-PLAN.md          schema, access model, outbox, engines, importer, security, scorecard
-AI-NATIVE-PLAN.md          the AI domain (providers/BYO-key, copilot, AI teammates, MCP OAuth)
-UIUX-PLAN.md               how it looks and behaves (screen specs)
+IMPLEMENTATION-PLAN.md   104 ordered tasks in eight phases: P1-* to P8-*
       |
-IMPLEMENTATION-PLAN.md     ordered tasks in eight phases (strategy-first): P1-* … P8-*
+EXECUTION-GUIDE.md   human picks a task, agent builds, human reviews, merge
       |
-EXECUTION-GUIDE.md         human picks a task -> agent builds -> human reviews -> merge
-      |
-STATUS.md                  live record of where execution stands
+STATUS.md            live record of where execution stands
 ```
 
-The delivery order is deliberately **strategy-first**: the OKR + operating-rhythm core (the differentiator) ships before the execution pillar, so the core value proposition exists and is validated early (PLAN.md §11).
+Two documents deserve special attention.
+
+**METHOD.md** is unusual for an engineering plan, and it is the point of the product. It is compiled into `packages/method`, a pure library with no database or network access, and a conformance suite fails the build when the document and the code disagree. Every coaching message the product sends cites a rule key that resolves back to it.
+
+**The phase order is deliberate.** The AI and agent foundation lands in Phase 2, with the platform, so the coaching layer can ship in Phase 4 alongside the OKR core rather than years later. An OKR tool where the coach arrives last is just another tracker.
+
+## Data importers
+
+| Source | What it contributes | Reference |
+|---|---|---|
+| Spreadsheets (CSV, XLSX) | Goals, key results, KPIs and records, initiatives, tasks. AI proposes the column mapping, a human confirms it, a dry run precedes every import | Templates in the product |
+| FlowyTeam | One company at a time: teams, cycles, objectives, key results, check-ins, KPIs with formulas, and tasks | [reference/flowyteam-okr-kpi-tasks-model.md](reference/flowyteam-okr-kpi-tasks-model.md) |
+
+The other files in `reference/` are background knowledge about systems in this space. They inform nothing in the design and constrain nothing in the schema.
 
 ## Quick start
 
-1. Run the bootstrap prompt in EXECUTION-GUIDE.md §2 (first-run sanity check).
+1. Run the bootstrap prompt in [PROMPT.md](PROMPT.md) §1.
 2. Read the agent's reply and fix any contradiction it surfaces.
 3. Start with task `P1-T01`.
 
-## Provenance
+## Provenance and licensing
 
-The `reference/` FlowyTeam knowledge base was extracted from an analysis of that codebase so the importer can be built without access to it. FlowyTeam is proprietary; OpenOKR reads its database (data, not code) and reproduces observable behavior described in our own words (TECHNICAL-PLAN.md §11). The same clean-room stance applies to Operately (Apache-2.0), which is a behavioral benchmark, never a code source. OpenOKR's own code is AGPL-3.0 + CLA (pending sign-off, PLAN.md §4).
+OpenOKR is a new product. It is not a fork of anything.
+
+The `reference/` knowledge base was extracted ahead of time so the importers can be built without access to the source systems. FlowyTeam is proprietary. OpenOKR reads its database, meaning data and not code, and reproduces observable behaviour described in our own words.
+
+The OKR practice in METHOD.md is method, not expression: rules, thresholds, taxonomies and agendas, written here in our own words. No third party's copy, branding, typefaces, logos or course material appears anywhere in the product.
+
+OpenOKR's own code is AGPL-3.0 with a contributor licence agreement. See [PLAN.md](PLAN.md) §4.

@@ -1,65 +1,61 @@
-# OpenOKR — development plan
+# OpenOKR
 
-This repository holds a complete, self-contained plan (in [`docs/development-plan/`](docs/development-plan/)) to build `OpenOKR`, an open source **OKR and work management platform**, on a modern TypeScript stack. It combines native strategy modules (OKR, KPI, check-ins) with full work management (work packages, boards, gantt, wiki, meetings), ships importers that migrate data from two legacy tools, and is **AI-native throughout**: every module has AI assists, an in-app copilot acts inside the user's own permissions, and an MCP server lets any AI agent drive OKRs and projects. It is executed by Claude Code under human supervision, one task at a time.
+**Your OKR coach, built in. Open source, AI-native, self-hosted or in the cloud.**
 
-Two source systems inform the plan, and each gets a one-way data importer:
+Most organisations do not fail at OKRs because their tool was bad. They fail because the practice never happened. Objectives get written in January, nobody checks in by March, and the quarterly review is a meeting where everyone agrees things went reasonably well.
 
-| Source | What it contributes | Stack | Reference |
-|---|---|---|---|
-| 1. A legacy project tool | Work management: work packages, workflows, queries, boards, gantt, wiki, meetings, time/cost | Ruby on Rails ~8.0, PostgreSQL | `docs/development-plan/reference/legacy-data-model.md`, `legacy-feature-inventory.md` |
-| 2. FlowyTeam | Strategy: OKR, KPI, check-ins, and lightweight tasks (unified into work packages) | Laravel 10 / PHP 8, MySQL | `docs/development-plan/reference/flowyteam-okr-kpi-tasks-model.md` |
+OpenOKR fixes that in two ways at once.
 
-OpenOKR is a new product, not a fork of either.
+**The method is in the product.** A guided eight-phase planning cycle that knows what is missing. Twenty quality rules that check every objective and key result as you type, each with a coaching prompt, the reason it matters and a weak-versus-strong example. Six publish gates that a weak OKR set cannot pass. An alignment score that names its own gaps. KPI health corridors that draft a recovery objective when a metric drops out of range. A four-step weekly session and a timed sixty-minute quarterly review that ends in a real diagnosis.
 
-## The documents
+**The product is active.** Two AI teammates work the practice alongside you. The **OKR Coach** guards quality: it flags the task-shaped key result, the empty not-doing list, the sandbagged confidence, the goal reported on track whose numbers have not moved. The **OKR Champion** guards the rhythm: it nudges the champion whose check-in is due, escalates the blocker that aged past its twenty-four hour clock, chases acknowledgements, runs the weekly session, and prepares the quarterly review pack. They reach you in the browser, in Slack, Microsoft Teams, WhatsApp or Telegram, by email, and through your own AI agent.
 
-Read in this order the first time:
+Every message cites the rule behind it, so you can argue with it. Turn the AI off entirely and the coach still nudges, escalates, scores and diagnoses, because those rules are real code, not a prompt.
 
-| # | File | What it is | Authority over |
-|---|---|---|---|
-| 1 | [REQUIREMENTS.md](docs/development-plan/REQUIREMENTS.md) | Product definition: personas, modules, priorities, non-functional needs | What the product does |
-| 2 | [PLAN.md](docs/development-plan/PLAN.md) | Architecture principles, license, deployment tiers, delivery philosophy | How it is architected |
-| 3 | [TECHNICAL-PLAN.md](docs/development-plan/TECHNICAL-PLAN.md) | Target design: domain model and full schema (incl. §4.12 strategy: OKR/KPI/tasks, and §6.2 the scoring engine), source-system mapping for both importers (§7.4/§7.6), security controls, performance budgets | Technical design decisions |
-| 4 | [AI-NATIVE-PLAN.md](docs/development-plan/AI-NATIVE-PLAN.md) | The AI layer: the AI-native stance, capability catalog, provider / bring-your-own-key architecture, admin surface, the MCP server, the agentic copilot + tool registry, AI schema/security, Phase 5 tasks | The AI domain (peer of TECHNICAL-PLAN.md there) |
-| 5 | [UIUX-PLAN.md](docs/development-plan/UIUX-PLAN.md) | Design system, navigation, interaction patterns, screen specs (S-01…S-25), accessibility and UX quality gates | The user interface |
-| 6 | [IMPLEMENTATION-PLAN.md](docs/development-plan/IMPLEMENTATION-PLAN.md) | The work: eight sequential phases (1–8) and 109 tasks with IDs, each with test plan, development and QA blocks, plus Definition of Ready | What gets built, in what order |
-| 7 | [EXECUTION-GUIDE.md](docs/development-plan/EXECUTION-GUIDE.md) | The operating protocol between the human engineer and Claude Code | Process |
-| 8 | [CLAUDE.md](CLAUDE.md) | Working rules for the Claude Code agent (auto-loaded from the repo root) | Agent behavior |
-| 9 | [reference/](docs/development-plan/reference/) | The source-system knowledge base: data models and feature inventories for both legacy tools, extracted and verified against their codebases | Facts about the source systems |
+---
 
-Also here:
+## Where things are
 
-- [OVERVIEW.md](docs/development-plan/OVERVIEW.md): the **end-user product overview** — what OpenOKR is, who it is for, every module and its benefit, and how to get started. Written for users and admins, not builders; not part of the build authority chain.
-- [DATABASE.md](docs/development-plan/DATABASE.md): the full consolidated database structure — every table, key columns, foreign keys, enums, and a relationship diagram. A derived reference view; the authoritative schema lives in TECHNICAL-PLAN.md §4 (incl. §4.12 strategy).
-- [PROMPT.md](docs/development-plan/PROMPT.md): copy-paste prompts for running development with Claude Code (start a task, resume, rework, approve a design gate), and how Claude finds the plan.
-- [STATUS.md](docs/development-plan/STATUS.md): task tracking, pre-filled with all 109 tasks as `todo`. The agent updates rows; only a human sets `done` (rules in EXECUTION-GUIDE.md §5).
+This repository currently holds the complete plan. Implementation starts at task `P1-T01`.
 
-One artifact set exists only after execution starts: `docs/design/*` — detailed designs written by the agent at each phase's design gate.
+| Where | What |
+|---|---|
+| [docs/development-plan/](docs/development-plan/) | The full plan set. Start with its [README](docs/development-plan/README.md) |
+| [docs/development-plan/OVERVIEW.md](docs/development-plan/OVERVIEW.md) | The product overview, written for users rather than builders. Read this first if you want to know what OpenOKR does |
+| [docs/development-plan/METHOD.md](docs/development-plan/METHOD.md) | The OKR practice canon: every rule, band, corridor, taxonomy and ritual the product encodes |
+| [docs/development-plan/STATUS.md](docs/development-plan/STATUS.md) | Live execution status across 104 tasks |
+| [CLAUDE.md](CLAUDE.md) | Working rules for the Claude Code agent that builds it |
 
-## How the pieces fit
+## The shape of it
 
-```
-REQUIREMENTS.md            what to build
-      |
-TECHNICAL-PLAN.md          how to build it (schema incl. §4.12 strategy + both source mappings)
-AI-NATIVE-PLAN.md          the AI domain (providers/BYO-key, copilot, MCP server)
-UIUX-PLAN.md               how it looks and behaves (screen specs S-xx)
-      |
-IMPLEMENTATION-PLAN.md     ordered tasks in eight sequential phases: P1-* … P8-*
-      |
-EXECUTION-GUIDE.md         human picks a task -> agent builds -> human reviews -> merge
-      |
-STATUS.md                  live record of where execution stands
-```
+| Area | What it does |
+|---|---|
+| **The cycle** | Eight guided phases from the annual frame to the close, with computed completion, an input pack that gates drafting, ranked strategic issues, priorities with 12-month success statements, a mandatory not-doing list, and automatic feed-forward into the next cycle |
+| **OKRs** | Weighted, direction-aware key results with baseline, target, owner, indicator type, full value history, confidence and a trend forecast that flags a miss before anyone admits it |
+| **Alignment** | Vertical contribution across company, department, team and individual, horizontal dependencies between teams, a health score that names its gaps, and a dependency register with confirmations and risk owners |
+| **KPIs** | Driver trees, health corridors, calculated formulas over other KPIs, KPI-backed key results, recovery objectives drafted from an unhealthy metric's leading drivers, and a recovery board |
+| **The rhythm** | A weekly session with private confidence voting, a five-type blocker taxonomy on a 24-hour clock, commitments, digests and a streak. A monthly review with a decision log. A quarterly review in three acts and eleven timed stages |
+| **The coach** | Two scoped, metered, cost-capped agent members that initiate, escalate and propose. They propose by default and you approve |
+| **Reach** | Browser, email, Slack, Microsoft Teams, WhatsApp, Telegram, and an agent surface so Claude, ChatGPT, Cursor or a custom agent works as you, within your permissions |
+| **The work** | Initiatives that move a key result, a key-result-linked kanban board, and documents. Deliberately OKR-shaped, not a project-management suite |
+| **Platform** | Spaces, the Work Map, the review inbox, a live activity feed, notifications that respect your timezone and quiet hours, search, people and org chart, admin, and a tamper-evident audit log |
 
-The `reference/` folder exists because this repository does not contain either source system's code. Everything the agent needs to know about them (table layouts, business rules, scoring formulas, permission names) was extracted into those files ahead of time. They are the ground truth for the data importers.
+## Running it
 
-## Quick start
+| How | Who it suits | What it takes |
+|---|---|---|
+| Self-hosted, one server | Any organisation that wants its data on its own machines | One Docker Compose file and a first-run web wizard. About 30 minutes |
+| Self-hosted, Kubernetes | Universities and large organisations | A Helm chart, your Postgres, your single sign-on, your backups |
+| Managed cloud | Teams that want no operations | Sign up and start |
 
-1. Run the bootstrap prompt in EXECUTION-GUIDE.md section 2 (first-run sanity check).
-2. Read the agent's reply and fix any contradiction it surfaces.
-3. Start with task `P1-T01`.
+Both are the same tagged release. Self-host is never seat-limited and never feature-gated. The cloud sells operation, not features.
 
-## Provenance
+Postgres is the only required service. Air-gapped installations are fully supported: a local AI model or none at all, self-hosted assets, no telemetry unless you opt in.
 
-The `reference/` knowledge base was extracted from analyses of the two source codebases (July 2026) so the importers can be built without access to either. The legacy project tool is GPL-licensed; see TECHNICAL-PLAN.md §11 for the clean-room stance that keeps OpenOKR's own code unencumbered. The same stance applies to FlowyTeam: OpenOKR reads its database (data, not code) and reproduces observable behavior described in our own words.
+## Stack
+
+Next.js with React and TypeScript in strict mode, PostgreSQL through Drizzle with row-level security as the tenant floor, Better Auth, Tailwind with shadcn/ui on Base UI, Turborepo and pnpm, Vitest and Playwright. One action contract registry generates the internal API, the public REST surface, OpenAPI, the command line, the agent tool catalogue and the chat commands, so every surface passes the same permission check.
+
+## Licence
+
+AGPL-3.0 with a contributor licence agreement. See [PLAN.md](docs/development-plan/PLAN.md) §4.

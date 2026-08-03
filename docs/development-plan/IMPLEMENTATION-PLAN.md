@@ -1,551 +1,772 @@
 # IMPLEMENTATION-PLAN.md
 
-The work, as ordered tasks. Each task has an ID, dependencies, a test plan, a development block, and a QA checklist. Claude Code executes one task at a time under the protocol in EXECUTION-GUIDE.md. A human reviews and merges every task.
+The work, as ordered tasks. Each task has an identifier, dependencies, deliverables, a test plan and acceptance criteria. Claude Code executes one task at a time under the protocol in EXECUTION-GUIDE.md. A human reviews and merges every task.
 
-Authority: this is the execution authority. It implements TECHNICAL-PLAN.md (and AI-NATIVE-PLAN.md for Phase 5). If a task conflicts with a design doc, the design doc wins and the task must be corrected first.
-
-The plan runs in **eight sequential phases**, deliberately **strategy-first**: the OKR + operating-rhythm core (the differentiator, Phase 3) ships before the execution pillar (Phase 4). Each phase gates on the one before it; phases with a `[DESIGN GATE]` task also need explicit human approval of that gate's docs.
+Authority: this is the execution authority. It implements TECHNICAL-PLAN.md, AI-NATIVE-PLAN.md, UIUX-PLAN.md and METHOD.md. If a task conflicts with one of those, the design document wins and the task is corrected first.
 
 | Phase | Theme | Tasks |
 |---|---|---|
-| 1 | Walking skeleton (container-only) | P1-T01…P1-T10 |
-| 2 | Core platform | P2-T01…P2-T13 |
-| 3 | Strategy core — goals, rhythm, KPIs | P3-T00…P3-T18 |
-| 4 | Execution core — projects, work, docs | P4-T00…P4-T14 |
-| 5 | The AI layer | P5-T00…P5-T14 (bodies in AI-NATIVE-PLAN.md §12) |
-| 6 | Hardening | P6-T01…P6-T08 |
-| 7 | Enterprise & operator pack | P7-T01…P7-T07 |
-| 8 | Community launch | P8-T01…P8-T06 |
+| 1 | Foundation | P1-T01 to P1-T10 |
+| 2 | Platform and agent spine | P2-T01 to P2-T17 |
+| 3 | The OKR core | P3-T00 to P3-T17 |
+| 4 | The coaching layer | P4-T00 to P4-T15 |
+| 5 | Reach: channels, agents, work | P5-T00 to P5-T13 |
+| 6 | Data: import, export, portability | P6-T01 to P6-T07 |
+| 7 | Hardening | P7-T01 to P7-T08 |
+| 8 | Cloud, enterprise and launch | P8-T01 to P8-T14 |
 
-**93 tasks.** Sizing: S (≤0.5 day), M (~1 day), L (~2–3 days) — guidance, not promises. With the PLAN.md §12 throughput assumption (one human reviewer, 3–5 merged tasks/week, L counts double), Phases 1–6 are a realistic **6–9 months**. If actuals diverge >±50% over a month, re-baseline (PLAN.md §13 R6) — do not silently slip.
-
-**What was cut from the previous revision** (decision 2026-07-08, OPERATELY-COMPARISON.md): the OpenProject importer and all its mappers; the automatic scheduling engine and Gantt; custom fields; configurable types/statuses/workflows; the query DSL + saved views; backlogs; time/cost UI; meetings; wiki (folded into the Resource Hub); the dual container/serverless CI matrix. All live in the **post-v1 backlog** (appendix B) with design-for notes.
+**104 tasks.** Sizing: S is half a day or less, M is about a day, L is two to three days. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
 
 ## How to read a task
 
 ```
 ### <ID>: <title> [size]
-Depends on: <IDs or "-">
+Depends on: <IDs or a dash>
 Goal: one sentence.
-Deliverables: what exists when done.
-Test plan: the tests to write first (red before green).
-Development: the implementation steps.
-QA: the checklist to pass before opening the PR.
-Acceptance: Given/When/Then that a human verifies.
+Deliverables: what exists when it is done.
+Test plan: the tests to write first, red before green.
+Acceptance: Given / When / Then that a human verifies.
 ```
 
-Every task inherits the **Definition of Done** in CLAUDE.md (Operation pipeline for writes, access getter for reads, RLS + migration together, Zod at boundaries, audit events, factory-based tests, loading/empty/error/denied states, STATUS.md updated). Tasks below only call out extras.
+Every task inherits the **Definition of Done** in CLAUDE.md: writes through the Operation pipeline, reads through the access getter, a migration with its row-level security policy in the same change, validation at the boundary, audit events on sensitive actions, tests built through the factory, loading, empty, error and permission-denied states, and the status row updated. Tasks below only call out extras.
 
-**Definition of Ready** — before code, all must hold:
+**Definition of Ready.** Before code, all of these must hold:
 
-1. Dependencies are `done` in STATUS.md.
-2. Spec sources exist: UI tasks cite a UIUX-PLAN screen (S-xx) + the §4 patterns; schema tasks cite TECHNICAL-PLAN §4 and keep the FlowyTeam mapping (§7.2) current (or mark "new, no legacy source"); importer tasks cite `reference/flowyteam-okr-kpi-tasks-model.md`.
-3. Acceptance criteria are unambiguous; if not, ask before coding.
-4. No open PLAN §14 / AI-NATIVE §13 decision blocks the task.
+1. Every dependency is done.
+2. Specification sources exist: UI tasks cite a screen (S-xx) and the UIUX-PLAN.md §4 patterns; schema tasks cite TECHNICAL-PLAN.md §4 and keep the §7.2 mapping current; rule, band, corridor and ritual tasks cite METHOD.md by section.
+3. Acceptance criteria are unambiguous. If not, ask before coding.
+4. No open decision in PLAN.md §13 or AI-NATIVE-PLAN.md §12 blocks the task.
 
-UI tasks additionally run the UX quality gates (UIUX-PLAN §9). List-rendering tasks meet the TECHNICAL-PLAN §13.1 budgets. Tasks marked **[SPIKE]** end in a written go/no-go against their PLAN §13 risk-register row.
+UI tasks additionally run the UIUX-PLAN.md §9 quality gates. List-rendering tasks meet the TECHNICAL-PLAN.md §13.1 budgets. Tasks marked **[SPIKE]** end in a written go or no-go against their risk-register row.
 
 ---
 
-# Phase 1 — Walking skeleton (container-only)
+# Phase 1: Foundation
 
-Goal: auth + one workspace + the write/read spine (Operation pipeline, outbox, RLS, access-ready) + a dashboard, deployed to Compose and Helm, CI green. No product features. Exit only when both targets serve the skeleton and the R1 spike has a go.
+Goal: authentication, one workspace, the write and read spine, deployed to Compose and Helm, with continuous integration green. No product features. Exit only when both targets serve the skeleton and the tenant-isolation spike has a decision.
 
 ### P1-T01: Monorepo scaffold [M]
 Depends on: -
-Goal: Turborepo + pnpm workspace with the package skeleton from TECHNICAL-PLAN §1.
-Deliverables: `apps/web`, `packages/{core,db,adapters,importer,ui,config,test-support}`, root `package.json`, `turbo.json`, strict `tsconfig` base, Biome config, `.gitignore`, `LICENSE` (AGPL-3.0 placeholder), `CONTRIBUTING.md`, `GOVERNANCE.md` stubs.
-Test plan: a trivial Vitest test per package importing its entrypoint; `pnpm typecheck` and `pnpm lint` clean.
-Development: init workspace; wire Turbo pipelines (`dev`,`build`,`test`,`typecheck`,`lint`); strict TS; empty barrels.
-QA: `pnpm install && pnpm typecheck && pnpm lint && pnpm test` pass from a clean checkout.
-Acceptance: *Given* a clean checkout, *when* the four commands run, *then* all succeed with the package graph resolved.
+Goal: a Turborepo and pnpm workspace with the package skeleton from TECHNICAL-PLAN.md §1.
+Deliverables: `apps/web` and `packages/{method,core,db,adapters,agents,importer,ui,config,test-support}`, root package manifest, pipeline configuration, a strict TypeScript base, lint configuration, `LICENSE`, `CONTRIBUTING.md` and `GOVERNANCE.md`.
+Test plan: a trivial test per package importing its entry point. Type checking and linting clean.
+Acceptance: Given a clean checkout, when install, type check, lint and test run, then all succeed with the package graph resolved.
 
-### P1-T02: CI pipeline + env schema [M]
+### P1-T02: CI pipeline + environment schema [M]
 Depends on: P1-T01
-Goal: CI that stays fast and honest at scale, plus a Zod env schema.
-Deliverables: GitHub Actions using Turbo **affected-graph** (`--filter=[origin/main]`) + remote cache; Vitest/Playwright **sharding** scaffolds; `concurrency: cancel-in-progress`; a **flaky-test policy** (retry + trace-on-retry, merged report surfacing passed-on-retry, quarantine annotation); **knip** dead-code gate; **license-compatibility** gate; **DCO/CLA** check; Dependabot + CodeQL; `packages/config` env schema validated at boot (fails fast naming the bad variable).
-Test plan: env schema rejects a missing `DATABASE_URL`, accepts a valid env; a deliberately flaky sample test shows up in the flakiness report, not as silent green.
-QA: push a branch: only affected tasks run; a re-push cancels the superseded run.
-Acceptance: *Given* an invalid env, *when* the app boots, *then* it exits with a clear Zod error; *and given* a doc-only change, *then* CI skips unaffected packages.
+Goal: continuous integration that stays fast and honest at scale, plus a validated environment schema.
+Deliverables: workflows using the affected graph with a remote cache; test sharding scaffolds; cancel-in-progress; a flaky-test policy with retry, trace on retry, a merged report surfacing passed-on-retry, and automatic quarantine; a dead-code gate; a dependency licence gate; a commit sign-off check; dependency and code scanning; an environment schema in `packages/config` validated at boot that fails fast naming the bad variable.
+Test plan: the schema rejects a missing database URL and accepts a valid environment. A deliberately flaky sample test appears in the flakiness report rather than passing silently.
+Acceptance: Given an invalid environment, when the application boots, then it exits with a clear error naming the variable; and given a documentation-only change, then unaffected packages are skipped.
 
-### P1-T03: Database package + RLS floor + test isolation [SPIKE] [L]
+### P1-T03: Database package + tenant floor + test isolation [SPIKE] [L]
 Depends on: P1-T01
-Goal: Drizzle + Postgres with the RLS tenant floor proven safe under pooling, and the test-DB harness every later task uses.
-Deliverables: `packages/db` with migration tooling (forward-only); the request-scoped wrapper that opens a transaction and issues `SET LOCAL app.workspace_id` (never session-level); an app role with no `BYPASSRLS` that doesn't own tables; the migration linter (any `CREATE TABLE` on a business table without an RLS policy in the same file fails); the **repo-wide soft-delete scope** helper (`deleted_at IS NULL` default, `withDeleted()` opt-in, CI lint); test harness: **template-database** creation + per-worker clone for unit/integration, truncate-between-tests reset for e2e, per-test GUC setting. **R1 spike:** run the isolation suite through a transaction-pooling proxy (pgbouncer-style) and document the result.
-Test plan: two workspaces, rows in each: workspace A cannot see B even via raw Drizzle; a connection with **no GUC set reads zero rows**; the pooling spike suite passes (or the fallback in PLAN §13 R1 is invoked and recorded); soft-delete scope hides deleted rows and `withDeleted()` reveals them.
-QA: migrations apply from empty; linter catches a policy-less table; harness resets are < 1 s per test file.
-Acceptance: *Given* the spike suite under pooling, *when* it runs, *then* isolation holds and the go/no-go is recorded in `docs/design/spike-rls-pooling.md`.
+Goal: Drizzle and Postgres with the tenant floor proven safe under pooling, and the test harness every later task uses.
+Deliverables: `packages/db` with forward-only migration tooling; the request-scoped wrapper that opens a transaction and applies the workspace setting with `SET LOCAL`, never at session level; an application role that cannot bypass row-level security and does not own the tables; a migration linter failing any business table created without a policy in the same file; the repository-wide soft-delete scope with an explicit opt-in and a lint; the test harness with a migrated template database cloned per worker for unit and integration tests, truncation between tests for end to end, and the workspace setting applied per test. The spike runs the isolation suite through a transaction-pooling proxy and records the result.
+Test plan: two workspaces with rows in each, where workspace A cannot see B even through raw queries; a connection with no workspace setting reads zero rows; the pooling suite passes or the PLAN.md §12 R1 fallback is invoked and recorded; the soft-delete scope hides deleted rows and the opt-in reveals them.
+Acceptance: Given the spike suite under pooling, when it runs, then isolation holds and the decision is recorded in a design document.
 
-### P1-T04: Adapter ports + container drivers + the transactional outbox [L]
+### P1-T04: Adapter ports + drivers + the transactional outbox [L]
 Depends on: P1-T03
-Goal: the seven ports with working container drivers, and the outbox as the only enqueue path.
-Deliverables: `packages/adapters` interfaces for JobQueue, Realtime, FileStorage, Mailer, Cache, Search, AIProvider; container drivers (pg-boss; WS + LISTEN/NOTIFY with compact typed events + 8 KB guard + self-echo suppression; local disk; SMTP-to-console; in-proc+PG cache; PG FTS; AI `off`); serverless driver **stubs** (interfaces only, not CI-gated — post-v1); the `outbox` table + `outbox.insert(topic,payload,idempotencyKey)` + the relay worker (drains committed rows at-least-once); a CI grep failing any direct driver call on a write path and any vendor SDK import outside the package.
-Test plan: port contract tests on the container drivers; outbox: a rolled-back transaction delivers nothing, a committed one delivers exactly-once-per-idempotency-key across relay retries; NOTIFY payload over 8 KB raises.
-QA: no vendor SDK outside `packages/adapters` (grep in CI).
-Acceptance: *Given* a write that inserts an outbox row and then rolls back, *when* the relay runs, *then* nothing is delivered; committed, it is delivered once.
+Goal: the eight ports with working drivers, and the outbox as the only enqueue path.
+Deliverables: interfaces for jobs, realtime, storage, mail, cache, search, AI and channels; drivers for pg-boss, a WebSocket server with listen and notify carrying compact typed events with an 8 KB guard and self-echo suppression, local disk storage, SMTP to console, in-process and Postgres cache, Postgres full-text search, AI off, and channel none; the outbox table with an insert helper and a relay worker draining committed rows at least once; a CI check failing any direct driver call on a write path and any vendor SDK import outside the adapters package.
+Test plan: contract tests per driver; a rolled-back transaction delivers nothing while a committed one delivers exactly once per idempotency key across relay retries; a notify payload over the guard raises.
+Acceptance: Given a write that inserts an outbox row and then rolls back, when the relay runs, then nothing is delivered; committed, it is delivered once.
 
-### P1-T05: Better Auth: email+password, passkeys, TOTP [M]
+### P1-T05: Authentication: password, passkeys, one-time codes [M]
 Depends on: P1-T03
-Goal: real authentication with modern factors from day one (TECHNICAL-PLAN §8.2; UIUX S-22).
-Deliverables: Better Auth mounted with the Drizzle adapter; sign-up/sign-in/sign-out; passkey enrollment + login; TOTP enrollment + challenge + backup codes; session middleware exposing the current user; **session tokens hashed at rest**; protected routes 401 without a session.
-Test plan: register/login/bad-password/logout; passkey + TOTP happy paths; a raw DB read of the sessions table yields only hashes.
-QA: passwords/tokens never logged.
-Acceptance: *Given* a user with TOTP enrolled, *when* they sign in, *then* they are challenged and a hashed session is established.
+Goal: real authentication with modern factors from day one (TECHNICAL-PLAN.md §8.2, screen S-35).
+Deliverables: Better Auth mounted with the database adapter; sign up, sign in, sign out; passkey enrolment and login; one-time password enrolment, challenge and backup codes; session middleware exposing the current user; session tokens hashed at rest; protected routes refusing unauthenticated requests.
+Test plan: register, log in, bad password, log out; passkey and one-time password happy paths; a raw read of the session table yields only hashes.
+Acceptance: Given a user with a second factor enrolled, when they sign in, then they are challenged and a hashed session is established.
 
 ### P1-T06: Workspaces + members bootstrap [M]
 Depends on: P1-T05
-Goal: the two-level identity: global user, per-workspace member.
-Deliverables: `workspaces`, `workspace_members` (name, kind, status per TECHNICAL-PLAN §4.1), a bootstrap flow (first registration provisions a workspace with the user as its first member + owner-level access placeholder until P2-T01), the workspace switcher stub, `SET LOCAL` wiring from the member's active workspace.
-Test plan: fresh DB → register → workspace + member exist; RLS scoping verified across two workspaces; the same user joins a second workspace as a distinct member.
-QA: DoD; audit event on workspace create (via P1-T07 once it lands — sequence-safe stub until then).
-Acceptance: *Given* a first-run instance, *when* the first user registers, *then* a workspace exists with them as an active member and the GUC scopes every query to it.
+Goal: the two-level identity: a global user and a per-workspace member.
+Deliverables: the workspace and member tables per TECHNICAL-PLAN.md §4.1; a bootstrap flow where the first registration provisions a workspace with the user as its first member; the workspace switcher; the workspace setting wired from the member's active workspace.
+Test plan: a fresh database, register, then a workspace and member exist; isolation verified across two workspaces; the same user joins a second workspace as a distinct member.
+Acceptance: Given a first-run instance, when the first user registers, then a workspace exists with them as an active member and every query is scoped to it.
 
 ### P1-T07: Operation pipeline + action registry + audit spine [L]
 Depends on: P1-T04, P1-T06
-Goal: the write path and the single contract everything projects from (TECHNICAL-PLAN §8.1 layer 3, §14).
-Deliverables: the `Operation` abstraction in `packages/core` (authorize against freshly loaded rows → one transaction: mutate + bindings + activity stub + **audit row** + outbox → typed result); `audit_events` append-only (no UPDATE/DELETE grants) with the per-workspace hash chain (`prev_hash`/`row_hash`); the **action/contract registry** (name, Zod in/out, required access level, read/write/destructive class, handler) with its tRPC projection wired into `apps/web`; a CI lint that mutating tRPC procedures resolve to a registry action (no ad-hoc writes).
-Test plan: a sample operation: rolled-back mutation leaves **no** audit row and no outbox row; committed leaves exactly one of each; the hash chain verifies; UPDATE on `audit_events` is denied at the DB; a mutating procedure outside the registry fails the lint.
-QA: DoD.
-Acceptance: *Given* any committed mutation, *when* the audit chain is verified, *then* it is intact, and a mutation without its audit row is impossible by construction.
+Goal: the write path and the single contract everything projects from (TECHNICAL-PLAN.md §8.1 layer 3, §14).
+Deliverables: the Operation abstraction in `packages/core` (authorise against freshly loaded rows, then one transaction covering the change, bindings, an activity stub, an audit row and the outbox); the append-only audit table with no update or delete grants and a per-workspace hash chain; the action contract registry with a name, input and output schemas, the required access level and a safety class, plus its internal typed projection wired into the application; a lint requiring every mutating procedure to resolve to a registry action.
+Test plan: a sample operation where a rolled-back mutation leaves no audit and no outbox row while a committed one leaves exactly one of each; the hash chain verifies; an update on the audit table is denied by the database; a mutating procedure outside the registry fails the lint.
+Acceptance: Given any committed mutation, when the audit chain is verified, then it is intact, and a mutation without its audit row is impossible by construction.
 
-### P1-T08: Hello dashboard [S]
+### P1-T08: Proving dashboard [S]
 Depends on: P1-T07
-Goal: an authenticated page proving the whole stack.
-Deliverables: `/` shows workspace + member via a registry query through the getter; loading/empty/error states; one Playwright e2e (register → dashboard) on the P1-T03 harness.
-Acceptance: *Given* a signed-in member, *when* they open `/`, *then* they see their workspace and name, rendered via RSC with client hydration per TECHNICAL-PLAN §13.3.
+Goal: an authenticated page proving the whole stack end to end.
+Deliverables: a home route showing the workspace and member through a registry query and the access getter, with loading, empty and error states, plus one end-to-end test from registration to dashboard on the P1-T03 harness.
+Acceptance: Given a signed-in member, when they open the home route, then they see their workspace and name, server-rendered with client hydration per TECHNICAL-PLAN.md §13.3.
 
-### P1-T09: Docker Compose target + first-run web setup wizard [L]
+### P1-T09: Docker Compose target + first-run setup wizard [L]
 Depends on: P1-T08
-Goal: `docker compose up` to a working instance in under 30 minutes, no shell editing.
-Deliverables: `deploy/docker/` (multi-stage Dockerfile, compose with app + Postgres + Caddy auto-TLS + optional MinIO, volumes, health checks, migrations-on-boot with DB-readiness polling); the **first-run web setup wizard**: detects an unconfigured instance, generates and persists all secrets (refusing placeholder secrets in prod thereafter), tests DB/SMTP connections live, creates the admin + workspace, offers the demo seed; the `openokr` lifecycle helper (`upgrade` = pull + migrate + restart, `status`, `logs`, `rotate-keys`) with a documented rollback; `.env.example` for the override path.
-Test plan: CI job builds the image, boots compose, drives the wizard headlessly, asserts login works; upgrade helper re-runs migrations idempotently.
-Acceptance: *Given* a clean VPS, *when* `docker compose up` + the wizard run, *then* a secured instance with an admin exists inside the 30-minute budget.
+Goal: a working instance in under 30 minutes with no file editing.
+Deliverables: `deploy/docker` with a multi-stage image, a compose file covering the application, Postgres, a reverse proxy with automatic certificates and optional object storage, volumes, health checks and migrations on boot with readiness polling; the first-run web wizard that detects an unconfigured instance, generates and stores every secret, refuses placeholder secrets thereafter, tests the database, mail, channel and AI connections live, creates the admin and workspace, and offers demo data; a lifecycle helper for upgrade, status, logs and key rotation with a documented rollback; an example environment file for the override path.
+Test plan: a CI job builds the image, boots compose, drives the wizard headlessly and asserts sign-in works; the upgrade helper re-runs migrations idempotently.
+Acceptance: Given a clean server, when compose and the wizard run, then a secured instance with an admin exists inside the 30-minute budget.
 
-### P1-T10: Helm chart target + Phase 1 exit [L]
+### P1-T10: Helm chart + Phase 1 exit [L]
 Depends on: P1-T09
 Goal: the same skeleton on Kubernetes.
-Deliverables: `deploy/helm/` (deployment, service, ingress, secrets, migration hook, external-Postgres values); cosign-signed image published to GHCR on tag; the Phase 1 exit checklist run.
-Test plan: `helm template` lints; a kind-cluster CI job installs and passes readiness + register.
-Acceptance: *Given* a kind cluster + Postgres, *when* the chart installs, *then* the skeleton serves and a user can register.
+Deliverables: `deploy/helm` with deployment, service, ingress, secrets, a migration hook and external-database values; a signed image published on tag; the Phase 1 exit checklist run and recorded.
+Test plan: the chart lints and templates; a cluster job installs it and passes readiness and registration.
+Acceptance: Given a cluster and a database, when the chart installs, then the skeleton serves and a user can register.
 
-**Phase 1 exit checklist:** skeleton on Compose + Helm; CI green with the §P1-T02 machinery; RLS proven incl. the pooling spike go; outbox semantics proven; Operation pipeline + hash-chained audit live; action registry driving tRPC; passkeys/TOTP work; wizard provisions an instance in budget; no vendor SDK outside adapters.
+**Phase 1 exit:** the skeleton runs on Compose and Helm; CI is green with the P1-T02 machinery; tenant isolation is proven including the pooling decision; outbox semantics are proven; the Operation pipeline and hash-chained audit are live; the action registry drives the internal API; passkeys and one-time passwords work; the wizard provisions an instance inside budget; no vendor SDK sits outside the adapters package.
 
 ---
 
-# Phase 2 — Core platform
+# Phase 2: Platform and agent spine
 
-Goal: the shared machinery every module needs — the relationship access model, people, invitations, files, subscriptions + notifications, the typed feed, settings, security baseline, the demo builder, the app shell + editor, the data-change runner. Still no product modules.
+Goal: the shared machinery every module needs, including the AI and agent foundation, so the coach can ship with the OKR core rather than after it. Still no product modules.
 
 ### P2-T01: Access model: contexts, bindings, groups [L]
 Depends on: P1-T07
-Goal: the relationship authorization model (TECHNICAL-PLAN §4.1).
-Deliverables: `access_contexts`, `access_groups` (member / workspace_standard / space_standard / anonymous), `access_group_memberships`, `access_bindings` (levels 10/40/70/100, tags champion/reviewer); creation wiring so every protected aggregate is born with its context + default bindings inside its Operation; derived privacy computation (public/workspace/space/invite-only) from binding tiers; the permission catalogue constants (incl. `manage_ai` for Phase 5).
-Test plan: creating a sample aggregate produces context + bindings atomically; privacy label derives correctly for each lever combination; deleting a binding downgrades access immediately.
-Acceptance: *Given* an aggregate created with "workspace can view, space can edit", *when* privacy is computed, *then* it reads `workspace` and a non-space member gets view only.
+Goal: the relationship authorisation model (TECHNICAL-PLAN.md §4.1).
+Deliverables: access contexts, groups (member, workspace standard, space standard, anonymous), group memberships and bindings with graded levels and role tags for champion, reviewer, sponsor, facilitator and coordinator; wiring so every protected aggregate is born with its context and default bindings inside its Operation; derived privacy computed from binding tiers; the permission catalogue constants including `manage_ai` and `manage_coaching`.
+Test plan: creating a sample aggregate produces the context and bindings atomically; the privacy label derives correctly for each combination; deleting a binding downgrades access immediately.
+Acceptance: Given an aggregate created with "the workspace can view, the space can edit", when privacy is computed, then it reads workspace and a non-space member gets view only.
 
 ### P2-T02: can() + access-aware reads [L]
 Depends on: P2-T01
 Goal: one enforcement point for every surface.
-Deliverables: `can(member, level, resource)` in core; the **access-aware getter** (join member → groups → bindings → context; `max(level)`; `suspended_at IS NULL`; **not-found on forbidden**) + composable list filters; the sub-resource `(subject_type, subject_id) → context` resolver with an exhaustive, fail-closed enumeration; the CI lint failing raw selects on protected tables outside the helper; effective-access composition rules (union, max-wins, deduped) documented + tested.
-Test plan: a permission matrix across member/guest/suspended/anonymous × view/comment/edit/full × multiple overlapping grants (direct + space + workspace) asserting max-wins; a suspended member loses all reads/writes everywhere; forbidden reads return not-found (no existence oracle); an unknown subject type in the resolver throws.
-Acceptance: *Given* a member holding view via the workspace group and full via a champion binding, *when* access is computed, *then* it is full; *and given* their suspension, *then* every read returns not-found.
+Deliverables: `can(member, level, resource)` in core; the access-aware getter joining member to groups to bindings to context, taking the maximum level, excluding suspended members and returning not-found on forbidden, plus composable list filters; the subject-to-context resolver with an exhaustive, fail-closed list; a lint failing raw selects on protected tables outside the helper; documented and tested composition rules.
+Test plan: a permission matrix across member, guest, suspended, agent and anonymous against every level with overlapping grants, asserting maximum wins; a suspended member loses every read and write; forbidden reads return not-found so there is no existence oracle; an unknown subject type raises.
+Acceptance: Given a member holding view through the workspace group and full through a champion binding, when access is computed, then it is full; and given their suspension, then every read returns not-found.
 
 ### P2-T03: People: profiles, manager chain, lifecycle [L]
 Depends on: P2-T02
-Goal: members as real people with an org structure and a safe lifecycle (UIUX S-20).
-Deliverables: member profiles (title, timezone, avatar, rich bio; self-vs-others editable field sets); `manager_id` with a cycle-safe possible-managers query (recursive CTE excluding the member's own report subtree); the people directory + org-chart view; **suspend/restore** (suspension excluded from every authz join by P2-T02; restore reinstates); guest kind + **convert-to-guest** that strips prior bindings and rebuilds minimal access; **erasure as anonymization** (placeholder identity, authorship FKs intact, audit event, machine-readable export) with last-owner / last-site-admin invariants.
-Test plan: manager cycle attempt rejected; suspend → all access gone, restore → back; convert-to-guest leaves no stale binding (regression test); erasure keeps comments readable with an anonymized author; removing the last owner is refused.
-Acceptance: *Given* a suspended member, *when* they hit any endpoint or their agent token is used, *then* access is denied; *and given* erasure, *then* their content survives anonymized and an export is produced.
+Goal: members as real people with an org structure and a safe lifecycle (screen S-33).
+Deliverables: profiles with title, timezone, avatar and bio with self-versus-others editable field sets; a cycle-safe manager chain with a possible-managers query; the directory and org chart; suspend and restore; the guest kind with a convert action that strips prior bindings; erasure as anonymisation with a placeholder identity, authorship intact, an audit event and a machine-readable export, plus last-owner invariants.
+Test plan: a manager cycle is rejected; suspend removes all access and restore returns it; converting to guest leaves no stale binding; erasure keeps comments readable with an anonymised author; removing the last owner is refused.
+Acceptance: Given a suspended member, when any request arrives under their identity, then access is denied; and given erasure, then their content survives anonymised and an export is produced.
 
-### P2-T04: Invitations: email, reusable links, trusted domains [M]
+### P2-T04: Invitations [M]
 Depends on: P2-T03
 Goal: every joining path through one provisioning funnel.
-Deliverables: invite-by-email (token via Mailer through the outbox); **reusable workspace invite links** (hashed token, use count, max uses, expiry, revoke/reset, allowed email domains); single-use personal links (24 h, revoke-on-use); workspace `trusted_email_domains` auto-join; all paths land in one member-provisioning operation (consistent defaults + audit).
-Test plan: invite→accept→member; a link past `max_uses`/expiry/revocation refuses; a domain-restricted link rejects other domains; trusted-domain self-serve join works; permission tests (only members with manage-level access invite).
-Acceptance: *Given* a reusable link limited to `@acme.com`, *when* `bob@other.com` tries, *then* joining is refused and audited.
+Deliverables: invitation by email through the mailer and the outbox; reusable workspace links with a hashed token, use count, maximum uses, expiry, revoke and allowed domains; single-use personal links; trusted-domain automatic joining; all paths landing in one member-provisioning operation with consistent defaults and audit.
+Test plan: invite, accept, member exists; a link past its limit, expiry or revocation refuses; a domain-restricted link rejects other domains; trusted-domain joining works; only members with sufficient access may invite.
+Acceptance: Given a reusable link limited to one domain, when someone outside it tries, then joining is refused and audited.
 
-### P2-T05: Files: blobs, quotas, previews [M]
+### P2-T05: Files and blobs [M]
 Depends on: P1-T04, P2-T02
-Goal: upload/download that later modules (editor, Resource Hub) build on.
-Deliverables: `blobs` + prepare→upload→claim flow with signed URLs; type/size validation (Zod allowlist; images re-encoded); per-workspace storage byte accounting + quota + once-at-90% warning (via the notification spine when it lands — outbox topic now); a preview/thumbnail worker (image resize, pdf first page, video poster); the ClamAV scan hook driving `ok/scanning/quarantined` (adapter-optional, documented); orphan-cleanup job.
-Test plan: upload→claim→download on the disk driver; oversized/blocked types rejected; quota crossing fires exactly one warning; orphans reaped.
-Acceptance: *Given* an upload finishing over the 90% threshold, *when* accounting runs, *then* one warning event is emitted and the file still saves (hard stop only at 100%).
+Goal: upload and download that later modules build on.
+Deliverables: the blob table with a prepare, upload and claim flow using signed URLs; type and size validation with images re-encoded; per-workspace byte accounting with a quota and a single warning at ninety percent; a preview and thumbnail worker; an optional scan hook driving the status; an orphan cleanup job.
+Test plan: upload, claim and download on the disk driver; oversized and blocked types are rejected; crossing the quota fires exactly one warning; orphans are reaped.
+Acceptance: Given an upload finishing above the warning threshold, when accounting runs, then one warning is emitted and the file still saves, with a hard stop only at the quota.
 
-### P2-T06: Subscriptions + notification spine + email batching [L]
+### P2-T06: Subscriptions + notification spine [L]
 Depends on: P2-T02, P1-T04
-Goal: the delivery machinery every module wires into (TECHNICAL-PLAN §4.8; UIUX S-03).
-Deliverables: `subscription_lists` + `subscriptions` (reasons invited/joined/mentioned; author auto-joined; mention auto-subscribe with edit-time re-diff; suspended/placeholder/`ai` excluded); `notifications` with **access-gating at send time** (recipient must still pass `can(view)` on the subject); routing per member settings: immediate email for direct mentions (opt-in), otherwise a **buffered batch** (`notification_email_batches`, find-or-create under a row lock, idempotent send worker, single-email vs digest rendering); the per-user-local-time **daily summary** cron (SQL against `pg_timezone_names`, UTC fallback); per-reason HTML+text templates + a one-line digest variant + the dev **email preview page**; a bulk-import/seed suppression flag; the in-app Inbox (S-03) with live badge, mute, snooze.
-Test plan: mention → immediate email when opted; three rapid events → one batch (no duplicates under concurrency — race test); a recipient who lost access after enqueue receives nothing; un-mentioning on edit stops their notification but keeps watchers; DST-boundary daily summary fires at the member's local time; suppression flag silences a bulk insert.
-Acceptance: *Given* a member with a 10-minute window, *when* four notifications arrive in it, *then* they get one digest email listing four items, each deep-linked.
+Goal: the delivery machinery every module wires into (TECHNICAL-PLAN.md §4.11, screen S-03).
+Deliverables: subscription lists and subscriptions with reasons, authors auto-joined, mentions auto-subscribed and re-diffed on edit, and suspended, placeholder and agent members excluded; notifications with access gating at send time; per-member settings for per-reason routing, batching window, daily summary time and quiet hours in their own timezone; batches found or created under a row lock with an idempotent send worker; per-reason mail templates in HTML and plain text with a digest variant and a development preview page; a bulk-suppression flag; the in-app inbox with a live badge, mute and snooze.
+Test plan: a mention delivers immediately when opted; three rapid events produce one batch with no duplicates under concurrency; a recipient who lost access after enqueue receives nothing; un-mentioning on edit stops their notification but keeps watchers; the daily summary fires at the member's local time across a daylight-saving boundary; the suppression flag silences a bulk insert.
+Acceptance: Given a member with a ten-minute window, when four notifications arrive inside it, then they receive one digest listing four items, each deep-linked.
 
 ### P2-T07: Typed activity feed engine [L]
 Depends on: P2-T06
-Goal: the human-readable event log (TECHNICAL-PLAN §4.8; UIUX S-18) — distinct from audit.
-Deliverables: the typed event catalog (Zod discriminated union; payload snapshots human labels); `activities` with `context_id` access scope set by the fail-closed resolver; feed queries for company/space/goal/project/profile scopes (access-filtered, soft-delete-hiding, keyset-paginated); consecutive same-actor/same-day edit aggregation (never collapsing narrative events); per-kind React renderers (registry pattern — adding an event kind is one module); live inserts via Realtime; notification fan-out driven off activities.
-Test plan: an event kind outside the catalog is unpersistable; a private-space activity never appears in a non-member's company feed (the leak test); aggregation collapses five field edits into one row but never a check-in; feeds paginate stably under concurrent inserts.
-Acceptance: *Given* a member without access to space X, *when* they read the company feed, *then* no X activity appears, while an X member sees typed, readable entries.
+Goal: the human-readable event log (screen S-31), distinct from audit.
+Deliverables: the typed event catalogue as a discriminated union with payloads that snapshot human labels; the activity table with an access-scope context set by the fail-closed resolver; feed queries at workspace, space, goal and profile scope, access-filtered, hiding soft-deleted subjects and paginated by key; aggregation of consecutive same-actor edits that never collapses narrative events; per-kind renderers behind a registry; live inserts; notification fan-out driven from activities.
+Test plan: an event kind outside the catalogue cannot be persisted; a private-space activity never appears in a non-member's workspace feed; aggregation collapses five field edits into one row but never a check-in; feeds paginate stably under concurrent inserts.
+Acceptance: Given a member without access to a space, when they read the workspace feed, then no activity from it appears, while a member of that space sees typed, readable entries.
 
-### P2-T08: Workspace settings + navigation registry [M]
+### P2-T08: Workspace settings + module registry [M]
 Depends on: P2-T02
-Goal: the settings shell and module registration (UIUX S-23 skeleton).
-Deliverables: settings service (Zod-validated jsonb, env overrides win); the admin two-level shell; a typed module registry (`registerModule({nav, permissions, settings})`) driving the sidebar/admin menus by access.
-Acceptance: *Given* a module registering a nav item requiring an access level, *when* a member lacks it, *then* the item is hidden and the route is denied.
+Goal: the settings shell and module registration (screen S-36 skeleton).
+Deliverables: a settings service with validated storage where environment overrides win; the two-level admin shell; a typed module registry driving the sidebar and admin menus by access.
+Acceptance: Given a module registering a navigation item that requires an access level, when a member lacks it, then the item is hidden and the route is denied.
 
 ### P2-T09: Security baseline [M]
 Depends on: P1-T05, P2-T02
-Goal: the platform-layer controls from TECHNICAL-PLAN §8.2.
-Deliverables: rate limiting via the Cache port (per-IP + per-member on auth/API/exports, 429 + headers); account lockout with backoff + audit; nonce-based strict CSP + HSTS + frame/referrer headers; secure cookie audit; the sessions UI (list devices, revoke one/all); the **workspace freeze overlay** (`state` active/read_only/frozen collapsing writes with an admin recovery whitelist); startup placeholder-secret refusal verified in prod mode.
-Test plan: N failed logins → lockout + audit + retry-after; revoked session's next request is 401; a frozen workspace rejects every write except the whitelist; CSP nonce varies per response.
-Acceptance: *Given* a workspace set read_only, *when* any member saves anything, *then* it is refused with a clear banner while admins can still manage members/billing-class settings.
+Goal: the platform controls from TECHNICAL-PLAN.md §8.2.
+Deliverables: rate limiting through the cache port per address and per member on authentication, the API, channels and exports; account lockout with backoff and audit; a strict content security policy with per-response nonces plus transport, frame and referrer headers; a secure cookie audit; the sessions interface listing devices with revoke; the workspace freeze overlay with an admin recovery list; verified refusal of placeholder secrets in production.
+Test plan: repeated failed sign-ins trigger lockout with audit and a retry hint; a revoked session's next request is rejected; a frozen workspace refuses every write except the recovery list; the policy nonce varies per response.
+Acceptance: Given a workspace set to read-only, when any member saves anything, then it is refused with a clear message while admins can still manage members and settings.
 
-### P2-T10: Demo workspace builder + seed [M]
-Depends on: P2-T07
-Goal: the demo as a product feature (UIUX S-21).
-Deliverables: `pnpm db:seed` for dev; an in-product, env-gated (`DEMO_BUILDER_ALLOWED`) "Explore with demo data" action building a realistic org — spaces, members, goals with check-in history (some deliberately `outdated`), KPIs with records, projects with milestones/work items, documents, discussions — in one transaction with notification dispatch suppressed; idempotent.
-Acceptance: *Given* a fresh workspace, *when* the demo builds, *then* the Work Map, review inbox and feeds are populated and believable, and nobody got an email.
-
-### P2-T11: App shell + design system foundation [L]
+### P2-T10: App shell + design system [L]
 Depends on: P1-T08, P2-T08
-Goal: the global UI everything plugs into (UIUX §2–§3, §5).
-Deliverables: shadcn/ui on the **Base UI** registry + SmoothUI/Motion vendored into `packages/ui` (build-time only); design tokens (type scale, spacing, semantic colors, density modes); dark mode (light/dark/system, persisted); the shell (sidebar Home/Review/Inbox/Goals/Projects/KPIs/Spaces/Admin, topbar with breadcrumb + search + `+ New` + bell + avatar + workspace switcher); responsive behavior (collapse, mobile tab bar); core components with preview pages (`DataTable` virtualized base, `EntityPicker`, `EmptyState`, skeletons, `Toast+Undo`, `SidePanel`, `KbdHint`, `AvatarStack`, `HealthBadge`/`StalenessBadge`); the keyboard registry + `?` overlay; the i18n pipeline (ICU `en` + `ms` stub, pseudo-locale CI check); the persisted TanStack Query cache keyed by buildId + the **stale-deploy reload toast**.
-Test plan: keyboard/focus component tests; theme + density persistence e2e; mobile viewport smoke; pseudo-locale build catches a hardcoded string; a simulated version-mismatch response triggers exactly one reload.
-QA: DoD + UIUX §9 gates; axe clean on the shell.
-Acceptance: *Given* a deploy bumping the app version, *when* a stale tab makes its next request, *then* it shows "app updated" and reloads once, with caches invalidated.
+Goal: the global interface everything plugs into (UIUX-PLAN.md §2, §3, §5).
+Deliverables: components on the Base UI registry with the animation library vendored into `packages/ui`; design tokens for type scale, spacing, semantic colours and density; dark mode with light, dark and system; the shell with the sidebar, topbar, cycle strip placeholder and workspace switcher; responsive behaviour including the mobile tab bar; core components with preview pages; the keyboard registry and shortcut overlay; the message-catalogue pipeline with a pseudo-locale check; the persisted client cache keyed by build identifier with the stale-deployment reload.
+Test plan: keyboard and focus component tests; theme and density persistence end to end; a mobile viewport smoke test; the pseudo-locale build catches a hardcoded string; a simulated version mismatch triggers exactly one reload.
+Acceptance: Given a deployment bumping the application version, when a stale tab makes its next request, then it shows an update message and reloads once, with caches invalidated.
 
-### P2-T12: Rich text editor [L]
-Depends on: P2-T11, P2-T05
-Goal: the one editor everywhere, done once, properly (UIUX S-26; TECHNICAL-PLAN §1 rich-text contract).
-Deliverables: `docs/design/rich-text-editor.md`; the TipTap editor over the canonical ProseMirror schema (node/mark allowlist enforced by the shared core validator); slash commands, @mentions (contextually enabled), `##short-id` autolink, tables, code blocks; inline attachments (optimistic placeholder → progress → uploaded; submit-gated while uploading; delete-on-failure; image preview modal); local draft autosave (per entity+member, base-content fingerprint + TTL, cleared on submit); the sanitizing HTML renderer + the excerpt utility (server + client from one core module); mention/attachment extraction API (decode-safe: malformed → `[]`).
-Test plan: schema round-trip goldens (JSON → HTML → excerpt); a malicious pasted payload renders inert; a draft against changed base content does not resurrect; mention extraction on legacy/malformed JSON returns `[]`.
-Acceptance: *Given* a comment with an in-flight upload, *when* the user hits submit, *then* submission waits for (or fails with) the upload, never dropping the attachment silently.
+### P2-T11: Rich text editor [L]
+Depends on: P2-T10, P2-T05
+Goal: the one editor everywhere, done once (screen S-30).
+Deliverables: a design document; the editor over the canonical schema with the node and mark allow-list enforced by the shared validator; slash commands, mentions, entity autolink by short identifier, tables and code blocks; inline attachments with optimistic placeholders, progress, submit gating while uploading and deletion on failure; local draft autosave per entity and member, fingerprinted against base content with an expiry; the sanitising renderer and the excerpt utility shared by server and client; the decode-safe mention and attachment extraction interface.
+Test plan: schema round-trip golden tests; a malicious pasted payload renders inert; a draft against changed base content does not resurrect; extraction on malformed content returns an empty list.
+Acceptance: Given a comment with an upload in flight, when the user submits, then submission waits for the upload or fails loudly, never dropping the attachment silently.
 
-### P2-T13: Data-change runner [M]
+### P2-T12: Data-change runner [S]
 Depends on: P1-T03
-Goal: production data backfills decoupled from DDL.
-Deliverables: `pnpm db:change` — versioned, idempotent, batched, resumable change scripts that freeze their own column expectations (no imports of live schema), with a completion ledger; conventions doc; one sample change with tests.
-Acceptance: *Given* a change script run twice across a deploy boundary, *when* it re-runs, *then* it no-ops cleanly and the ledger shows one completion.
+Goal: production backfills decoupled from schema changes.
+Deliverables: a versioned, idempotent, batched, resumable change runner whose scripts freeze their own column expectations, with a completion ledger, a conventions document and one sample change with tests.
+Acceptance: Given a change script run twice across a deployment boundary, when it re-runs, then it does nothing and the ledger shows one completion.
 
-**Phase 2 exit checklist:** relationship access enforced through one `can()`/getter with the CI lint; people lifecycle safe (suspend/guest/erasure invariants); invitations + links + trusted domains; files with quotas/previews; subscriptions + access-gated notifications + buffered/daily email with preview page; the typed feed live and leak-tested; settings + registry; security baseline (rate limits, lockout, CSP, sessions UI, freeze); demo builder; shell + tokens + editor + i18n + stale-deploy handshake; data-change runner.
+### P2-T13: AIProvider port + drivers [L]
+Depends on: P1-T04
+Goal: the provider abstraction and its drivers (AI-NATIVE-PLAN.md §3.1, §3.2).
+Deliverables: the full port surface for chat, streaming, tool calling, embedding, structured extraction and capability reporting; drivers for Anthropic, OpenAI, OpenRouter, Ollama, any OpenAI-compatible endpoint and off; contract tests per driver against recorded fixtures; a deterministic mock driver for the test suite.
+Test plan: every driver satisfies the contract; the off driver reports every capability unavailable without raising; a model without tool support degrades rather than failing.
+Acceptance: Given the provider set to off, when any capability is requested, then it reports unavailable and the caller's manual path is unaffected.
+
+### P2-T14: AI configuration, keys, encryption and rotation [M]
+Depends on: P2-T13
+Goal: bring your own key at three levels, safely (AI-NATIVE-PLAN.md §3.3).
+Deliverables: the provider and credential tables; envelope encryption with per-secret data keys wrapped by a master key ring; the precedence resolver of user, then workspace, then deployment, then off; a masked hint and a live connection test; a one-command rotation that re-wraps data keys only.
+Test plan: a stored key never appears in any response or log; rotation leaves every credential usable with no downtime; a user key overrides the workspace key for that user's calls only.
+Acceptance: Given a workspace key and a personal key, when the member runs an assist, then their own key is used, and an admin cannot read it.
+
+### P2-T15: Model catalogue, tier routing, structured output and prompts [M]
+Depends on: P2-T14
+Goal: features request a tier, never a model (AI-NATIVE-PLAN.md §3.4).
+Deliverables: the seeded and refreshable model catalogue; per-workspace tier policies with sampling; the context-window guard; structured extraction with schema validation and one repair attempt then a clean failure; the versioned prompt registry with a default, an editor and restore.
+Test plan: an oversized request is blocked before the call; malformed model output repairs once then fails cleanly; a prompt version change is recorded and reversible.
+Acceptance: Given an air-gapped workspace mapping every tier to a local model, when any AI feature runs, then no external request is made.
+
+### P2-T16: Usage metering, quotas and hard caps [M]
+Depends on: P2-T14
+Goal: cost visible and bounded (AI-NATIVE-PLAN.md §1.7, screen S-37).
+Deliverables: usage events per call with tokens, cost from the catalogue, latency, source and status; quotas per user, per agent and per workspace; a hard cap that disables features and halts running agents; the AI console (screen S-37) assembling the provider, models, features, coaching, budgets, prompts, privacy and usage cards from P2-T13 to P2-T16; anomaly flagging.
+Test plan: a call records tokens and cost accurately against the catalogue; crossing a quota disables the feature with a clear message; crossing a hard cap halts a running agent mid-flight with a log line.
+Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then it halts with an explanatory log entry and every manual path still works.
+
+### P2-T17: Agent runtime: agents, runs, sandbox, proposals [L]
+Depends on: P2-T16, P1-T07
+Goal: the runtime the Coach and the Champion will use (AI-NATIVE-PLAN.md §6.5).
+Deliverables: the agent table owning a member with the agent kind; least-privilege binding wiring scoped to named resources; the run state machine with a task list, a bounded tool loop, an append-only readable log, self-rescheduling through the job queue and resumption across restarts; the three write policies of sandbox, propose and scoped direct; the proposal envelope table and the bulk apply and dismiss action; the run history interface (screen S-38).
+Test plan: a sandbox run commits nothing; a proposal run commits nothing until applied and applying goes through the normal Operation pipeline with audit; a run resumes after a restart; a run cannot touch a resource outside its bindings.
+Acceptance: Given an agent scoped to one space in proposal mode, when it runs against a goal in another space, then the tool call is denied by the permission layer and the denial is logged.
+
+**Phase 2 exit:** relationship access enforced through one entry point with its lint; the people lifecycle safe; invitations and links; files with quotas and previews; subscriptions and access-gated notifications with batching and the daily summary; the typed feed live and leak-tested; settings and the module registry; the security baseline; the shell, tokens, editor and languages; the data-change runner; the provider port with every driver; keys encrypted with rotation; tier routing, structured output and versioned prompts; metering with quotas and hard caps; the agent runtime with sandbox and proposals.
 
 ---
 
-# Phase 3 — Strategy core
+# Phase 3: The OKR core
 
-The namesake: goals with real accountability, the rhythm engines, check-ins, the review inbox, KPIs with formulas, the Work Map, and the importers. Starts with a design gate.
+The namesake. Starts with a design gate.
 
-### P3-T00: Strategy design gate [DESIGN GATE] [L]
+### P3-T00: OKR core design gate [DESIGN GATE] [L]
 Depends on: Phase 2 complete
-Goal: the strategy design docs, with the risk-register de-risking artifacts (PLAN §13 R2/R3).
-Deliverables: `docs/design/` — `strategy-domain.md` (goals/KRs/cycles/check-ins schema + lifecycles as Given/When/Then), `scoring-engine.md` (**the golden-master matrix**: weighted rollups, decrease-direction KRs, KPI-backed KRs, aligned cascades with cycles, the health precedence cascade incl. `outdated` overrides, equal-endpoint edge cases, the trend-forecast model per TECHNICAL-PLAN §12 T2), `cadence-engine.md` (anchor-day math, tolerance, timezone/DST cases), `kpi-formula-engine.md` (grammar, aggregation, cascade, failure modes), `flowyteam-import.md` (mapping walkthrough against §7.2).
-Acceptance: **human approves** with "Design approved for Phase 3" before any Phase 3 implementation task starts; the golden-master matrices are explicitly reviewed.
+Goal: the design documents and the correctness artifacts for the highest-risk engines.
+Deliverables: design documents covering the OKR domain (cycles, the guided workflow, goals, key results, check-ins, lifecycles as Given / When / Then); the scoring engine with its full golden-master matrix (weighted rollups, reduce-direction key results, KPI-backed key results, aligned cascades with cycles, the health precedence cascade including staleness override, equal-endpoint cases and the trend-forecast model); the cadence engine (anchor-day arithmetic, tolerance, timezone and daylight-saving cases); the KPI engine (corridors, period normalisation, formula grammar, aggregation, cascade, recovery drafting); and the alignment engine (penalty arithmetic and finding generation).
+Acceptance: the human approves with an explicit statement before any Phase 3 implementation task starts, and the golden-master matrices receive a line-by-line review.
 
 ### P3-T01: Spaces [M]
 Depends on: P3-T00
-Goal: team homes (TECHNICAL-PLAN §4.2).
-Deliverables: `spaces` + `space_members` (member/manager); space creation Operation wiring context + standard group + manager bindings; the space home shell (goals/projects/docs/discussions tabs fill in as modules land); join/leave; audit.
-Acceptance: *Given* a space manager, *when* they add a member, *then* that member gains space-standard access to the space's aggregates immediately.
+Goal: team homes (TECHNICAL-PLAN.md §4.2).
+Deliverables: spaces and space members with member, manager and coordinator roles; a creation Operation wiring the context, the standard group and manager bindings; the space home shell; join and leave; audit.
+Acceptance: Given a space manager, when they add a member, then that member gains space-standard access to the space's aggregates immediately.
 
-### P3-T02: Cycles + strategy settings [M]
+### P3-T02: Annual frame, cycles and rhythm settings [L]
 Depends on: P3-T01
-Goal: time-boxing and the workspace rhythm defaults (UIUX S-23 strategy section).
-Deliverables: `okr_cycles` (auto-generation forward from cadence, timezone-honoring, archive step) + `strategy_settings` (frequency default, anchor day, staleness grace, RAG thresholds, quotas, labels); admin UI; audit on create/archive.
-Test plan: cycle generation across quarter/half/year boundaries and timezones; label overrides render in the UI catalogs.
-Acceptance: *Given* quarterly cadence on 2026-08-01, *then* the active cycle is "Q3 2026" with correct bounds, auto-created if absent.
+Goal: the time boxes and every tunable threshold (TECHNICAL-PLAN.md §4.3, METHOD.md §2.1).
+Deliverables: the annual frame with mission, vision, mid-term strategy, horizon, agreement state and the not-doing list, plus annual strategies; cycles with mode, cadence, dates, status, phase, sponsor, facilitator, session dates, publication deadline, levels and contributing units, generated forward from the cadence and honouring the workspace timezone; rhythm settings with every METHOD.md threshold a workspace may tune, plus terminology labels; the admin surface; audit on create and archive.
+Test plan: cycle generation across quarter, half and year boundaries and across timezones; label overrides render throughout the interface; a threshold change takes effect without a restart.
+Acceptance: Given quarterly cadence on a date inside Q3, then the active cycle is Q3 with correct bounds, created automatically if absent.
 
-### P3-T03: Goals + key results CRUD [L]
+### P3-T03: The guided cycle workflow [L]
 Depends on: P3-T02
-Goal: the core objects with accountability and an explicit lifecycle (TECHNICAL-PLAN §4.3; UIUX S-04/S-05 create/edit slices).
-Deliverables: `goals` (champion + reviewer required, owner scope, cycle + optional contextual timeframe, weight, alignment pointers with cycle prevention, close lifecycle: close-with-outcome creates a `goal_retrospectives` row (S-08), reopen restores) + `key_results` (direction-aware ranges, units, weights, KPI-link slot) + `key_result_values` history; create/edit UI with inline patterns; champion/reviewer reassignment rebinding tagged bindings atomically; move-between-cycles.
-Test plan: alignment single-parent invariant + cycle rejection; close requires an outcome and creates the retro; reopen clears outcome but keeps the retro; reassigning reviewer rebinds and reassigns pending acknowledgements (with the P3-T06 hook noted); weight clamping.
-Acceptance: *Given* goal-edit access in an active cycle, *when* a goal with champion, reviewer and two weighted KRs is created, *then* it persists at 0% `pending`, and closing it as `achieved` requires and produces a retrospective.
+Goal: the eight phases as a computed workflow, not a checklist (METHOD.md §2, screens S-04 to S-12).
+Deliverables: the input pack with per-item state and distribution tracking; prior-cycle scoring rows; baseline health; ranked strategic issues with impact and source; priorities with success statements and promotion into objectives; the quarterly revalidation record with focus key results; capacity notes; the gate state table recomputed on every relevant write; phase completion computed from METHOD.md §2.3; the mid-cycle calibration record; the cycle workspace interface with the phase rail, facilitator guidance and the deadline countdown; the cycle strip in the shell.
+Test plan: each phase's completion conditions flip exactly on their inputs; promoting a priority creates an objective linked back to it; the countdown honours the workspace timezone; a calibration beyond the first is refused.
+Acceptance: Given a quarterly cycle whose input pack has two items missing, when the facilitator opens Phase 4, then drafting is blocked with the two missing items named and a link to gather them.
 
-### P3-T04: Scoring & health engine (pure) [L]
+### P3-T04: Goals + key results [L]
 Depends on: P3-T03
-Goal: TECHNICAL-PLAN §6.1 as pure functions against the approved golden masters.
-Deliverables: KR progress (direction-aware, clamped), weighted goal progress incl. aligned children, upward cascade with cycle detection, RAG from thresholds, the **health precedence cascade** (`success_status → outdated → latest check-in status → pending`), the trend forecast (`trending_off_track`); `recomputeGoal(graph, change)`; the outbox-driven invalidation job writing derived columns.
-Test plan: the P3-T00 golden-master suite passes verbatim; a cascade over a 1k-goal chain terminates within budget; forecast flags a decaying KR before its status changes.
-QA: parity notes recorded in `docs/design/scoring-engine.md`.
-Acceptance: *Given* KRs weighted 2 and 1 at 100% and 40%, *then* the goal scores 80%; *and given* a stale goal whose last check-in said on_track, *then* health reads `outdated`.
+Goal: the core objects with accountability and an explicit lifecycle (TECHNICAL-PLAN.md §4.4, screens S-13, S-14, S-17).
+Deliverables: goals with a required champion and reviewer, owner scope, level, cycle or contextual timeframe, weight, contribution statement, alignment pointers with cycle prevention, and a close lifecycle where closing requires an outcome and creates a retrospective and reopening restores; key results with direction, indicator type, unit, baseline, target, current, owner, due date and weight, plus the KPI link slot; the value history table; create and edit interfaces with inline patterns; champion and reviewer reassignment rebinding tagged bindings atomically; moving between cycles.
+Test plan: the single-parent invariant and cycle rejection; closing requires an outcome and creates the retrospective; reopening clears the outcome but keeps the retrospective; reassigning a reviewer rebinds and reassigns pending obligations; weight clamping.
+Acceptance: Given goal-edit access in an active cycle, when a goal with a champion, a reviewer and two weighted key results is created, then it persists at zero percent and pending, and closing it requires and produces a retrospective.
 
-### P3-T05: Cadence engine + staleness [M]
+### P3-T05: Scoring and health engine [L]
 Depends on: P3-T04
-Goal: TECHNICAL-PLAN §6.2 — the rhythm that makes health honest.
-Deliverables: pure next-due math (frequency, anchor day, tolerance, workspace timezone); `next_check_in_at` maintained on publish/create/frequency-change; the staleness sweep job flipping health to `outdated` past grace; reminder scheduling hooks (consumed by P3-T15).
-Test plan: golden masters incl. DST and month-end; publishing early/late within tolerance advances exactly one period; a paused entity (Phase 4 projects) is exempt — interface noted.
-Acceptance: *Given* a weekly Friday-anchored goal checked in on Thursday, *when* the cadence advances, *then* the next due is the following Friday, and 3+grace days after a miss the goal renders `outdated` everywhere.
+Goal: TECHNICAL-PLAN.md §6.2 as pure functions against the approved golden masters.
+Deliverables: direction-aware clamped key result progress including the maintain and move directions; weighted goal progress including aligned children; the upward cascade with cycle detection; RAG from thresholds; the health precedence cascade; the trend forecast with its trending flag; the portfolio verdict; a single recompute entry point; the outbox-driven invalidation job writing derived columns.
+Test plan: the P3-T00 golden-master suite passes verbatim; a cascade over a thousand-goal chain finishes within budget; the forecast flags a decaying key result before its status changes; a reduce-direction key result scores correctly at both ends.
+Acceptance: Given key results weighted two and one at one hundred percent and forty percent, then the goal scores eighty percent; and given a stale goal whose last check-in said on track, then its health reads outdated.
 
-### P3-T06: Check-ins: snapshots, draft/publish, acknowledgement [L]
-Depends on: P3-T05, P2-T06
-Goal: the narrative ritual (TECHNICAL-PLAN §4.3; UIUX S-06).
-Deliverables: `check_ins` (status vocabulary, confidence, required narrative, the **immutable snapshot** of all KR values with previous values, draft/publish with full side-effect suppression on draft, the edit window with re-snapshot, delete-with-pointer-rollback); the acknowledgement action (reviewer-only, stamps + notifies + clears the obligation); the composer + check-in session walker (S-06) and the `CheckInCard` with value-diff rendering; reactions/comments/subscriptions wired.
-Test plan: a draft produces zero activity/notification/cadence movement; publish snapshots values, advances cadence, notifies subscribers, creates the reviewer obligation; editing after the window is refused; deleting the latest check-in restores prior goal pointers; acknowledge by a non-reviewer is denied.
-Acceptance: *Given* a published check-in setting a KR from 40→55 with status caution, *then* the goal's health reads caution, the snapshot shows 40→55, and the reviewer sees "Review goal progress" in their Review inbox until they acknowledge.
+### P3-T06: Cadence engine + staleness [M]
+Depends on: P3-T05
+Goal: TECHNICAL-PLAN.md §6.3, the rhythm that makes health honest.
+Deliverables: pure next-due arithmetic from frequency, anchor day, tolerance and the workspace timezone; the next due date maintained on publication, creation and frequency change; the staleness sweep job flipping health past the grace window; scheduling hooks the nudge engine will consume.
+Test plan: golden masters including daylight saving and month ends; publishing early or late inside the tolerance advances exactly one period.
+Acceptance: Given a weekly goal anchored to a chosen day and checked in the day before, when the cadence advances, then the next due date is the following anchor day, and three days plus the grace after a miss the goal renders outdated everywhere.
 
-### P3-T07: Review inbox [M]
-Depends on: P3-T06
-Goal: "what do I owe right now" (UIUX S-02).
-Deliverables: the computed assignments query (check-ins due as champion; acknowledgements owed as reviewer, respecting reviewer-change history; work-item/milestone hooks land in Phase 4); overdue-first grouping with action + due labels; the S-02 page with one-click inline actions; the live sidebar badge (count cached, invalidated by the relevant Operations).
-Test plan: obligation appears/disappears exactly on publish/acknowledge; a reviewer appointed today is not asked to acknowledge last month's check-ins; badge updates live.
-Acceptance: *Given* a champion with one overdue check-in and a reviewer role on another goal's fresh check-in, *when* they open Review, *then* they see exactly two obligations, overdue first, each actionable inline.
-
-### P3-T08: Discussions + reactions wiring [M]
-Depends on: P3-T01, P2-T07
-Goal: titled threads + broad reactions (TECHNICAL-PLAN §4.7; UIUX S-17).
-Deliverables: `discussions` (space boards + goal/project-anchored; draft/publish, drafts silent); comments wired onto goals/check-ins/discussions with deep links + unread highlight; reactions across the §4.7 subject list; the "will notify X and N others" composer preview.
-Acceptance: *Given* a draft announcement, *when* it is published, *then* subscribers are notified once with the correct preview, and a reaction on a check-in appears live.
-
-### P3-T09: Goal surfaces: explorer, page, alignment [L]
-Depends on: P3-T06
-Goal: the primary strategy UI (S-04, S-05, S-07).
-Deliverables: the explorer (scope tabs, cycle switcher, filters, virtualized tree with health/staleness chips, inline edits, quick check-in); the goal page (split + full: score ring, KR rows with sparkline+forecast, check-in history with diffs, discussion, right rail with champion/reviewer + alignment picker + linked work placeholder); the alignment diagram (pan/zoom, virtualized).
-QA: §13.1 budgets spot-checked on seeded data.
-Acceptance: *Given* the explorer, *when* a KR is checked in from the side panel, *then* the row's progress, RAG and health update live in both views.
-
-### P3-T10: Work Map v1 [M]
-Depends on: P3-T09
-Goal: the home screen, goals-only for now (S-01).
-Deliverables: the WorkMapTree over goals → sub-goals (alignment), with the uniform node contract (health incl. `outdated`, progress, champion, timeframe, next step = next check-in due); scope tabs + filters; SidePanel open; deep links; Home routing.
-Acceptance: *Given* Home, *when* it renders, *then* the company's goal tree shows rolled-up health with stale goals visibly `outdated`, inside the §13.1 budget.
-
-### P3-T11: KPIs: categories, records, grid [L]
-Depends on: P3-T02
-Goal: the metrics module Operately doesn't have (TECHNICAL-PLAN §4.4; UIUX S-09).
-Deliverables: `kpi_categories`, `kpis` (frequency/unit/direction/thresholds/tree), `kpi_records` (unique per normalized period); period-bucket normalization per frequency; achievement % + RAG (direction-aware); the keyboard-first grid with grouping + sparklines; sharing (`kpi_shares`).
-Test plan: period normalization across all five frequencies; direction-aware achievement both ways; uniqueness under concurrent record writes.
-Acceptance: *Given* a monthly KPI (fail 50/pass 75, target 100), *when* 80 is recorded for July, *then* the cell shows 80% amber and re-recording updates, never duplicates.
-
-### P3-T12: KPI formula engine [L]
-Depends on: P3-T11
-Goal: calculated KPIs (TECHNICAL-PLAN §6.3; PLAN §13 R3).
-Deliverables: the typed expression tree + Zod schema; the safe evaluator (`kpi(id)` refs, operators, parentheses, divide-by-zero handling); cross-frequency aggregation via source `aggregate`; `kpi_dependencies` + cascade recompute with cycle detection (outbox-driven); golden masters from the P3-T00 doc.
-Acceptance: *Given* monthly C = A + B, *when* A's July actual changes, *then* C's July record recomputes and any KPI depending on C follows, and a self-referencing formula is rejected.
-
-### P3-T13: KPI detail + KR↔KPI links [M]
-Depends on: P3-T12, P3-T04
-Goal: S-10 + the KPI-backed key result.
-Deliverables: the KPI detail (period chart with RAG bands, tree, records table) + the FormulaBuilder; `key_results.kpi_id` attach/detach UI; the scoring-engine branch reading a KPI-backed KR's progress from the KPI's latest achievement.
-Acceptance: *Given* a KR linked to a KPI at 80% achievement, *when* the goal recomputes, *then* that KR contributes 80% and shows the KPI-backed badge.
-
-### P3-T14: Scorecard + cycle archive [M]
-Depends on: P3-T04, P3-T11
-Goal: the per-owner rollup (S-11); points stay off.
-Deliverables: `performance_snapshots` + the archive job on cycle close (per owner: result value + health-bucket counts incl. outdated); the scorecard UI + trend + export; `scorecard_settings`/`score_entries` gated **off by default** (no rows unless enabled — human-gated).
-Acceptance: *Given* a closed cycle, *when* archived, *then* each owner's snapshot is correct and no score_entries exist with points disabled.
-
-### P3-T15: Strategy notifications + reminders [M]
+### P3-T07: Check-ins: snapshots, publication, acknowledgement, voting [L]
 Depends on: P3-T06, P2-T06
-Goal: the rhythm's nudges on the spine.
-Deliverables: reasons + triggers: check-in due / overdue (from cadence), check-in published (subscribers), acknowledgement requested / received, goal became `outdated`, goal closed/reopened, KR trending off-track (forecast), KPI period due, cycle opening/closing; the daily assignments email hook (due/overdue/needs-review; suppressed when empty; reminders-only on non-working days); settings coverage.
-Acceptance: *Given* a goal crossing its grace window overnight, *when* the sweep runs, *then* the champion gets "check-in overdue", the goal renders `outdated`, and nobody suspended/AI receives anything.
+Goal: the narrative ritual (TECHNICAL-PLAN.md §4.4, screen S-15).
+Deliverables: check-ins with the status vocabulary, confidence, a required narrative, the immutable snapshot of every key result value with its previous value and confidence, draft and publish with full side-effect suppression on draft, an edit window with re-snapshot, and deletion that rolls goal pointers back; the acknowledgement action restricted to the reviewer; private team confidence votes with a synchronised reveal and a team average; the composer and the sequence walker; the check-in card with value differences; reactions, comments and subscriptions wired.
+Test plan: a draft produces no activity, notification or cadence movement; publication snapshots values, advances the cadence, notifies subscribers and creates the reviewer obligation; editing after the window is refused; deleting the latest check-in restores prior pointers; acknowledgement by a non-reviewer is denied; votes stay hidden until the reveal and the reveal is atomic for every connected client.
+Acceptance: Given a published check-in moving a key result from forty to fifty-five with a caution status, then the goal's health reads caution, the snapshot shows the movement, and the reviewer sees the obligation until they acknowledge.
 
-### P3-T16: CSV/XLSX importer [M]
-Depends on: P3-T03, P3-T11
-Goal: the generic migration path (TECHNICAL-PLAN §7).
-Deliverables: `pnpm import:csv` + an admin wizard (S-23 Import): entity templates (goals, key results, KPIs, kpi-records; projects/work-items activate in Phase 4), dry-run preview using the registry's validate endpoints, per-row error report, idempotent upsert on `(workspace, csv, row-key)`, `import_runs` persisted.
-Acceptance: *Given* a goals CSV with one bad row, *when* dry-run runs, *then* the preview shows N-1 creatable + 1 explained error, and the real run imports exactly N-1 idempotently.
+### P3-T08: Review inbox [M]
+Depends on: P3-T07
+Goal: what I owe right now (screen S-02).
+Deliverables: the computed obligations query covering check-ins due as champion, acknowledgements owed as reviewer respecting reviewer-change history, and placeholders for the blocker, commitment, session and proposal sources that later phases fill; overdue-first grouping with action and due labels; the page with inline one-click actions; the live sidebar badge with cache invalidation from the relevant Operations.
+Test plan: an obligation appears and disappears exactly on publication and acknowledgement; a reviewer appointed today is not asked to acknowledge last month; the badge updates live.
+Acceptance: Given a champion with one overdue check-in and a reviewer role on another goal's fresh check-in, when they open Review, then they see exactly two obligations, overdue first, each actionable inline.
 
-### P3-T17: FlowyTeam connector [M]
-Depends on: P3-T16
-Goal: the read-only MySQL source (TECHNICAL-PLAN §7.1).
-Deliverables: `pnpm import:flowyteam --source <MYSQL_URL> --company <id> [--dry-run]`; read-only session enforcement (an attempted write must fail); introspection + required-table assertions + version guess; multi-company guardrail (refuses without `--company`); empty report writer; the `(legacy_type, legacy_id) → uuid` map.
-Acceptance: *Given* a FlowyTeam DB, *when* the dry run executes for company 7, *then* it prints that company's schema summary, writes an empty report, and provably cannot write to the source.
+### P3-T09: Alignment: parents, dependencies, the alignment engine [L]
+Depends on: P3-T04
+Goal: the cascade and the cross-team links with a computed health score (METHOD.md §5).
+Deliverables: horizontal goal dependencies; the key result dependency register with confirmation and a named risk owner; the alignment engine producing the score and one structural finding per penalty, each linked to the goal that caused it; the finding table shared with the Coach's later semantic findings; recomputation driven from the outbox on structural change.
+Test plan: each penalty fires exactly on its condition and the arithmetic matches METHOD.md §5.2; a department whose subtree gains one dependency clears the silo finding; a dependency that is confirmed clears its finding, and one with a risk owner but no confirmation clears the gate but keeps the finding.
+Acceptance: Given a tree with one orphan goal and one siloed department, when the score is computed, then it reads eighty and lists exactly two findings, each opening the goal responsible.
 
-### P3-T18: FlowyTeam strategy mappers + reconciliation [L]
-Depends on: P3-T17, P3-T14
-Goal: the strategy import (mapping table §7.2; reference §11 FK order).
-Deliverables: mappers — teams→spaces (+members/managers), cycles+settings, objectives→goals (owner/champion/reviewer resolution with report flags, two-pass alignment), key_results (+values), check-ins (narrative rows + snapshots + reviews→acknowledgements), KPI categories/KPIs/records, formula-token→expression-tree translation (unparseable dropped + logged), kpi_shares; derived values recomputed via the engines; per-domain reconciliation counts; dispatch suppressed; idempotency proven.
-Test plan: seeded FlowyTeam MySQL in CI (multi-company): counts match, alignment correct, a documented calculated KPI recomputes to source value, re-run changes nothing; a second company imports alongside without collisions.
-Acceptance: *Given* company N, *when* the full strategy import runs twice, *then* the report + reconciliation are clean and the second run is a no-op.
+### P3-T10: Goal surfaces: explorer, detail, alignment studio [L]
+Depends on: P3-T07, P3-T09
+Goal: the primary interface (screens S-13, S-14, S-16).
+Deliverables: the explorer with scope tabs, cycle switcher, filters and a virtualised tree with health, staleness and confidence chips, inline editing and a quick check-in; the goal page with the score ring, key result rows with sparkline and forecast, check-in history with differences, discussion and the right rail; the alignment studio canvas with vertical connectors, dashed dependency connectors, pan, zoom, keyboard traverse, virtualisation, the link mode and the three-tab panel of details, health and review.
+Test plan: budgets spot-checked on seeded data; the canvas stays interactive at a thousand nodes; keyboard traverse reaches every node.
+Acceptance: Given the explorer, when a key result is checked in from the side panel, then progress, RAG and health update live in both the list and the canvas.
 
-**Phase 3 exit checklist:** goals with champion/reviewer + close/reopen usable end to end; scoring + cadence + staleness live and golden-master-green; check-ins with snapshots, drafts, acknowledgements; the Review inbox driving the rhythm; discussions + reactions; explorer/goal page/alignment within budget; the Work Map is Home; KPIs + calculated formulas + KR links; scorecard archives (points off); rhythm notifications + the daily assignments email; CSV + FlowyTeam strategy imports green, idempotent, reconciled. **This is the first demoable, opinion-complete product.**
+### P3-T11: Work Map [M]
+Depends on: P3-T10
+Goal: the home screen (screen S-01).
+Deliverables: the virtualised tree over goals, sub-goals and key results with the uniform node contract of health including staleness, progress, confidence, champion, timeframe and next step; scope tabs and filters; side-panel opening; deep links; home routing. Initiative and task rows are added in Phase 5.
+Acceptance: Given the home screen, when it renders, then the company's goal tree shows rolled-up health with stale goals visibly outdated, inside the budget.
+
+### P3-T12: KPIs: categories, records, grid [L]
+Depends on: P3-T02
+Goal: the metrics module (TECHNICAL-PLAN.md §4.6, screen S-20).
+Deliverables: categories and KPIs with frequency, unit, direction, indicator type, tier, thresholds and the parent pointer; records unique per normalised period; period normalisation for every frequency; direction-aware achievement and the corridor state; the keyboard-first grid with grouping and sparklines; sharing.
+Test plan: period normalisation across all five frequencies; direction-aware achievement in both directions; uniqueness under concurrent writes.
+Acceptance: Given a monthly KPI with a target and default corridors, when a value at eighty percent of target is recorded, then the cell shows the watch state and re-recording updates rather than duplicating.
+
+### P3-T13: KPI formula engine [L]
+Depends on: P3-T12
+Goal: calculated KPIs (TECHNICAL-PLAN.md §6.4).
+Deliverables: the typed expression tree with its schema; the safe evaluator with references, operators, parentheses and explicit divide-by-zero handling; cross-frequency aggregation using each source's aggregate function; the dependency table with cascade recomputation and cycle detection driven from the outbox; golden masters from the design gate.
+Acceptance: Given a monthly KPI defined as the sum of two others, when one source's value changes, then the dependent recomputes for that period, anything depending on it follows, and a self-referencing formula is rejected.
+
+### P3-T14: KPI trees, corridors, recovery OKRs [L]
+Depends on: P3-T13, P3-T05
+Goal: the driver tree and the recovery loop (METHOD.md §6, screens S-18, S-19, S-21).
+Deliverables: named KPI trees with the canvas, corridor gauges and per-node metadata; the recovery drafter creating the recovery goal from the KPI's leading children with the objective and up to four key results, storing the starting achievement and flipping the state to recovering; effective health while recovering; the proposal to close when achievement re-enters the corridor; the recovery board across every tree; the KPI detail with the period chart, corridor bands, records table and formula builder; the key result to KPI link with the scoring branch reading the KPI's achievement.
+Test plan: launching a recovery OKR on an unhealthy KPI with three leading children produces three key results with correct baselines and targets; effective health rises with recovery progress while real achievement lags; a KPI with no leading children gets the placeholder key result; re-entering the corridor proposes closure exactly once.
+Acceptance: Given an unhealthy KPI, when the owner launches recovery, then a goal exists whose key results are its leading drivers, the KPI reads recovering, and the recovery board shows it with its progress.
+
+### P3-T15: Scorecard, cycle archive and feed-forward [M]
+Depends on: P3-T05, P3-T12
+Goal: closing a cycle and opening the next one (METHOD.md §8.9).
+Deliverables: performance snapshots written by the archive job with the result, bucket counts and the portfolio verdict; the scorecard interface with the band table, trends across cycles and export; the feed-forward operation that opens the next cycle carrying prior scores into its scoring list, carry-forward key results into its issue list at impact four, learnings into its input pack and the annual frame forward with focus flags cleared; points configuration present but off with no rows unless enabled.
+Test plan: archiving a closed cycle produces correct snapshots and verdicts; feed-forward populates the next cycle exactly per the mapping and is idempotent; nothing exists in the points tables while disabled.
+Acceptance: Given a closed cycle with two carry-forward key results, when the next cycle opens, then its issue list contains those two at impact four and its scoring list contains every prior key result with its score.
+
+### P3-T16: Comments, reactions and discussion wiring [M]
+Depends on: P3-T01, P2-T07
+Goal: conversation across the OKR objects (TECHNICAL-PLAN.md §4.10).
+Deliverables: comments on goals, key results, check-ins, cycles and documents with deep links and unread highlighting; reactions across every major subject; the compose-time preview of who will be notified.
+Acceptance: Given a comment mentioning two members, when it is posted, then both are subscribed and notified once, and the preview shown before posting matched the outcome.
+
+### P3-T17: Demo workspace builder + seed [M]
+Depends on: P3-T15
+Goal: the demo as a product feature (screen S-34).
+Deliverables: a development seed command; an in-product, flag-gated action building a believable organisation in one transaction with notifications suppressed: spaces, members, an annual frame, a completed prior cycle with scores, an active cycle in Phase 6, goals with check-in history where some are deliberately outdated, KPI trees with one unhealthy KPI and an active recovery OKR, blockers at different ages, commitments, a streak, and documents; idempotent.
+Acceptance: Given a fresh workspace, when the demo builds, then the Work Map, review inbox, recovery board and feeds are populated and believable, and nobody received a message.
+
+**Phase 3 exit:** the guided cycle runs from Phase 0 to Phase 7 with computed completion; goals with champion and reviewer, close and reopen; scoring, cadence and staleness live and golden-master green; check-ins with snapshots, voting and acknowledgement; the review inbox; alignment with dependencies and a computed health score; KPI trees with formulas, corridors and working recovery OKRs; the scorecard, archive and feed-forward; the Work Map as home; the demo builder. **This is the first demonstrable, opinion-complete product.**
 
 ---
 
-# Phase 4 — Execution core
+# Phase 4: The coaching layer
 
-Operately-class execution joined to the strategy pillar. No configuration engines (REQUIREMENTS §6). Starts with a design gate.
+The active product. Starts with a design gate.
 
-### P4-T00: Execution design gate [DESIGN GATE] [M]
+### P4-T00: Coaching design gate [DESIGN GATE] [M]
 Depends on: Phase 3 complete
-Goal: `docs/design/execution-domain.md` — projects/milestones/work-items lifecycles, board ordering + concurrency, Resource Hub node semantics, the Work Map v2 merge, acceptance criteria as Given/When/Then.
-Acceptance: **human approves** with "Design approved for Phase 4".
+Goal: the design documents for the canon package, the agents and the sessions.
+Deliverables: design documents covering the method package (every rule with its exact condition, status, prompt, reason and example, plus the corpus of real objectives and key results with expected verdicts); the agents (trigger catalogue, escalation ladders, deduplication, quiet hours, the deterministic behaviour with AI off, and the prompt design per phase); and the sessions (both rituals stage by stage with their state machines, live synchronisation and completion conditions).
+Acceptance: the human approves with an explicit statement, and the rule corpus and the trigger catalogue receive a line-by-line review.
 
-### P4-T01: Projects: lifecycle, contributors, health [L]
+### P4-T01: The method package [L]
 Depends on: P4-T00
-Goal: projects as accountable containers (TECHNICAL-PLAN §4.5; UIUX S-12).
-Deliverables: `projects` (state active/paused/closed with side effects: pause suspends cadence + records a comment-worthy activity, resume reschedules; close requires outcome + retrospective via P4-T03) + `project_contributors` (champion/reviewer/contributor with responsibility, unique champion/reviewer, tagged-binding lockstep, swap-downgrades-outgoing); goal link; the project page shell; audit.
-Acceptance: *Given* an active project, *when* paused and later resumed, *then* no check-in became due while paused and the next due date is recomputed from resume.
+Goal: METHOD.md as executable data and pure functions (TECHNICAL-PLAN.md §6.1).
+Deliverables: `packages/method` with no database or network access, holding the twenty-rule catalogue with word lists, conditions, statuses, prompts, reasons and example pairs; the score, confidence and portfolio bands; the KPI corridors; the blocker and root-cause taxonomies; the publish gates; phase completion conditions; session stage definitions with durations; the process-health statements and management-retro questions; the rhythm diagnostic; and the facilitator guidance. Plus the pure evaluators over each, and the strength-score calculation with strictness as a parameter.
+Test plan: a golden-master suite over every rule, band, corridor, gate and diagnostic; the corpus from the design gate produces its expected verdicts exactly; a conformance test comparing the package's rule keys and thresholds against METHOD.md fails on drift.
+Acceptance: Given the corpus of real OKR drafts, when the package evaluates them, then every verdict matches the reviewed expectation, and changing a threshold in the document without changing the package fails the build.
 
-### P4-T02: Project check-ins + acknowledgement [L]
-Depends on: P4-T01
-Goal: the same ritual for projects (S-12 check-in slice; reuses P3-T06 machinery).
-Deliverables: `project_check_ins` (status/narrative/milestone-snapshot/draft/publish/acknowledge) on the shared composer + card components; cadence + staleness + Review-inbox integration; health derived by the same cascade.
-Acceptance: *Given* a project check-in published as caution, *then* the project's health is caution until staleness or the next check-in, and the reviewer owes an acknowledgement.
+### P4-T02: The quality engine and Draft Coach surfaces [L]
+Depends on: P4-T01, P3-T04
+Goal: quality at the point of writing (REQUIREMENTS.md §3.2, screen S-09).
+Deliverables: server-side evaluation on every goal and key result write, storing the strength score and flags; client-side evaluation as the user types, from the same package; the rule verdict component showing a status dot, a short label and on demand the coaching prompt, the reason and the example pair; the strength meter in the composer header; the quality panel listing every open issue across a set grouped by objective; a link from every verdict to the rule itself; per-workspace strictness.
+Test plan: evaluation completes inside the sixteen-millisecond budget on the client for a five-key-result objective; server and client verdicts are identical for the same input; strict mode promotes every warning to a failure; the flags stored on the goal match the last evaluation.
+Acceptance: Given an objective beginning with an output verb, when the champion types it, then the rule fails inline with its coaching prompt and example within one keystroke's latency, and the strength score drops immediately.
 
-### P4-T03: Retrospectives + close flows [M]
-Depends on: P4-T01
-Goal: closing as a ritual (S-08 shared with goals).
-Deliverables: `project_retrospectives` (required at close; outcome achieved/missed; editable; reopen keeps it); the shared retrospective component + close dialog polish for goals and projects; feed + notification events.
-Acceptance: *Given* a project close attempt without a retrospective, *then* it is refused; with one, the project reads `closed · achieved` and the retro is linked from the page and the feed.
+### P4-T03: Publish gates [M]
+Depends on: P4-T02, P3-T03
+Goal: the six gates as hard server-side enforcement (METHOD.md §4.5, screen S-10).
+Deliverables: gate evaluation from the method package over the cycle's whole set, recomputed on every relevant write; the gate checklist interface where each unmet gate links to what would fix it; the publish action refusing with the specific gate and reason; an override path that requires elevated access, a written reason and an audit event.
+Test plan: each gate flips exactly on its condition; publishing with any gate red is refused server-side even when the interface is bypassed; an override records its reason and actor.
+Acceptance: Given a set with one unconfirmed and unowned dependency, when the facilitator publishes, then it is refused naming gate four and linking to the dependency register.
 
-### P4-T04: Milestones + project next step [M]
-Depends on: P4-T01
-Goal: rich milestones (S-13 header; TECHNICAL-PLAN §4.5).
-Deliverables: `milestones` (contextual timeframe, description, status, complete/reopen incl. **comment-with-action**, position); the derived project `next_step` (earliest-due open milestone, documented tie-break) recomputed via outbox; milestone header UI.
-Acceptance: *Given* a comment posted with "complete milestone", *then* the milestone closes, the project's next step advances, and both render in the feed as one event.
+### P4-T04: The nudge engine, triggers and escalation [L]
+Depends on: P4-T01, P3-T08
+Goal: the machinery that makes the product active (AI-NATIVE-PLAN.md §6.3, §6.4).
+Deliverables: the nudge table and rule registry; the engine computing what is due now per member with deduplication of one per subject per member per day unless escalating; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; escalation ladders for check-ins, acknowledgements and blockers; the suppression record with a reason; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules. Delivery goes to the in-app inbox and email in this task; chat channels arrive in Phase 5.
+Test plan: a burst of triggers on one subject produces one nudge; an escalation advances exactly one step and is delivered even inside quiet hours when marked urgent; a snooze silences the nudge but never the review-inbox obligation; a simulated month against the demo workspace stays under the volume ceiling per member.
+Acceptance: Given a champion who misses their check-in, when the engine runs over the following fortnight, then they are nudged on the due day and once daily after, the reviewer is brought in at the grace boundary, the coordinator at seven days and the sponsor at fourteen, each step recorded and visible to the champion.
 
-### P4-T05: Work items [L]
-Depends on: P4-T04
-Goal: the unit of work, joined to strategy (S-14).
-Deliverables: `work_items` (fixed status vocabulary, contextual due, rich description) + `work_item_assignees` (**multi-assignee**, assignment grants edit + notifies) + `checklist_items` + `work_item_relations` (`blocks`, cannot-complete-while-blocked) + due-relative `reminders` (validated against due; auto-stripped on due removal) + the KR/goal/KPI links (closing a linked item nudges the KR's linked-work rollup + feeds the forecast); the detail page; Review-inbox due integration.
-Test plan: blocked completion refused with the blocker named; relative reminder without a due date rejected; multi-assignee notifications exclude the actor; the KR link renders on both ends.
-Acceptance: *Given* a work item blocking another, *when* the blocker closes, *then* the blocked item becomes completable and its assignees are notified once.
+### P4-T05: The OKR Champion agent [L]
+Depends on: P4-T04, P2-T17
+Goal: the rhythm agent (AI-NATIVE-PLAN.md §6.2).
+Deliverables: the seeded Champion agent member with its persona, staged instructions, schedule and least-privilege scope; the hourly nudge run, the daily sweep covering staleness, blocker aging, KPI corridors and the morning summary, the weekly session lifecycle, and the per-cycle countdown and review preparation; proposal generation for drafted check-ins and recovery OKRs; the readable run log; deterministic behaviour with AI off where it still nudges, escalates and computes but drafts nothing.
+Test plan: with AI off every trigger still fires and no drafting occurs; with a provider on, an overdue check-in produces a drafted narrative as a proposal that a human applies; a KPI unhealthy for two periods produces a recovery proposal; the run halts on the cost cap.
+Acceptance: Given a workspace with the agent enabled and AI configured, when a check-in is three days overdue, then the champion receives a nudge containing a drafted check-in they can review and publish in one action, and the draft is marked as AI-generated.
 
-### P4-T06: Boards [L]
+### P4-T06: The OKR Coach agent [L]
 Depends on: P4-T05
-Goal: kanban that survives concurrency (S-13, S-15).
-Deliverables: per-milestone and per-project boards keyed on status; drag with optimistic updates + live presence; `ordering_state` (normalized against deleted/closed items, row-locked writes); inline new-item per column; mobile snap-scroll.
-Test plan: two simulated users reordering concurrently converge without lost cards (race test); a deleted item vanishes from ordering on next write.
-Acceptance: *Given* two members dragging simultaneously, *when* both commit, *then* the final order is consistent for everyone and no card duplicates or disappears.
+Goal: the quality agent (AI-NATIVE-PLAN.md §6.1).
+Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the nightly semantic sweep producing relink, dependency, conflict and gap findings into the shared finding table with severity, reason and a one-click apply where mechanical; divergence detection between reported health and the data; the quality triggers from AI-NATIVE-PLAN.md §6.4; the rewrite assist per failing rule; the coach strip on the goal page and the review tab in the alignment studio; every message citing its rule key.
+Test plan: a message citing a rule key the method package does not define fails the build; a dismissed finding stays dismissed; applying a relink finding re-parents the goal through the normal Operation with audit; with AI off the structural findings and the quality triggers still fire while the semantic ones do not.
+Acceptance: Given two goals in different spaces that double-count the same metric, when the nightly sweep runs, then a conflict finding appears for both champions with a specific reason, and dismissing it on one side dismisses it everywhere.
 
-### P4-T07: Resource Hub [L]
-Depends on: P4-T05, P2-T12, P2-T05
-Goal: docs, folders, files, links on spaces/projects/goals (S-16; TECHNICAL-PLAN §4.6).
-Deliverables: `resource_hubs` + `resource_nodes` tree + `documents` (draft→publish, author-private drafts enforced in SQL, version history + visual diff), `files` (previews), `links` (typed provider + SSRF-safe enrichment worker); move/copy (transactional deep copy); per-node comments/reactions/subscriptions; breadcrumbs + drag upload.
-Test plan: another member cannot read my draft even via a direct URL/id probe (not-found); deep folder copy is atomic; enrichment refuses a private-range URL.
-Acceptance: *Given* a goal's hub, *when* a document is drafted then published, *then* only publish emits the activity/notification and the doc's history shows a readable diff.
+### P4-T07: Weekly session: confidence round, voting, blockers [L]
+Depends on: P4-T04, P3-T07
+Goal: steps one and two of the ritual (METHOD.md §7.2, screen S-22).
+Deliverables: the session record with kind, schedule, facilitator, stage state and elapsed time, synchronised live so every participant sees the same screen; the confidence round with the key result list, the focus panel, the draggable dial with band shortcuts, the synchronised vote reveal with a team average, the what-changed note and the confirm that advances; the blocker step with the five-type picker showing each type's definition, the owner, the next action, the twenty-four hour clock and the escalation notice at the critical threshold; the blocker table, board and aging.
+Test plan: a step cannot be completed while any key result is unscored or any low score lacks a type, an owner and an action; the vote reveal is atomic across clients; a blocker's due time is its opening plus the workspace clock; a confidence at or below the critical threshold escalates immediately.
+Acceptance: Given a session where one key result scores below the threshold, when the coordinator tries to continue, then it is refused until that key result has a blocker type, a named owner and a next action, and the blocker's clock starts on save.
 
-### P4-T08: Global search [M]
-Depends on: P4-T05, P4-T07
-Goal: FTS across everything (S-19 backend).
-Deliverables: `search_documents` + GIN, outbox-driven (re)indexing for goals/projects/work items/docs/discussions/comments, access-filtered queries, the search page + palette source.
-Acceptance: *Given* a term in a private space's doc, *when* a non-member searches it, *then* no result appears; a member finds it highlighted.
+### P4-T08: Weekly session: commitments, digest, streaks [M]
+Depends on: P4-T07
+Goal: steps three and four (METHOD.md §7.2).
+Deliverables: the commitment table with the previous week closed as delivered or not and the new week set with owner and linked key result; the digest engine assembling the headline with its change on last week, on track, at risk, blockers and commitments; the coordinator note; publishing to the in-app feed and email now and to chat in Phase 5; the streak engine with break-on-skip and the streak ribbon; the twelve-week confidence trend; the space home before the session.
+Test plan: closing a session rolls this week's commitments into next week's list to close; a skipped week breaks the streak and a held one extends it; the digest content matches the session record exactly.
+Acceptance: Given a completed session, when it closes, then the digest is generated with correct figures, the streak advances, last week's commitments are closed and this week's are open.
 
-### P4-T09: Work Map v2 — the full tree [L]
-Depends on: P4-T05, P3-T10
-Goal: the complete home: goals → projects → work items (S-01 final).
-Deliverables: the merged hierarchy query (alignment + goal-links + milestones/work items) with the uniform node contract at every level; rollups (a project's health, its next step, its open-work count under its goal); filters incl. champion/space/status; virtualization to the 100k budget.
-Acceptance: *Given* Home, *when* a linked work item closes, *then* its KR, goal progress and the map row update live, and an `outdated` project is visibly stale under its healthy-looking goal.
+### P4-T09: Monthly review and decision log [M]
+Depends on: P4-T08
+Goal: the monthly ritual (METHOD.md §7.5, screen S-23).
+Deliverables: the objective trend record; the dependency and risk log view; the decision table where every decision names the key result or goal it affects, with the log surfaced on the goal page and in the cycle workspace.
+Acceptance: Given a monthly review recording a decision against a key result, when the goal page is opened, then the decision appears in its history with its date and author.
 
-### P4-T10: Command palette + quick create + favorites-lite [M]
-Depends on: P4-T08, P2-T11
-Goal: the ⌘K layer (S-19).
-Deliverables: palette (actions, entity jump by short-id/title, recents) permission-filtered; `+ New` quick-create (goal/project/work item/document/discussion from anywhere); the shortcut set registered in `?`.
-Acceptance: *Given* any screen, *when* ⌘K + a work-item short-id is typed, *then* the item opens within budget.
-
-### P4-T11: Exports [S]
+### P4-T10: Quarterly review: session shell, scoring, narratives [L]
 Depends on: P4-T09
-Goal: CSV/XLSX of any list (goals, KPIs+records, projects, work items), async via outbox for large sets, audited.
-Acceptance: *Given* a filtered goal list, *when* exported, *then* the file matches the visible rows/columns and the export is audit-logged.
+Goal: the first act (METHOD.md §8, screen S-24).
+Deliverables: the session shell with the eleven-stage rail grouped by act, the lap bar segmented by duration, the stage timer with pacing cues and an add-a-minute control, private facilitator notes per stage, and live stage synchronisation; the open and check-in stage with the pulse picker and the room-pulse read; the scoring stage with evidence, sliders, reasons, the hidden objective score with an animated reveal that respects reduced motion, and the running cycle score; the narratives stage with the pass-the-mic control; the recognition stage.
+Test plan: stage changes reach every connected client inside the budget; the reveal is deterministic and instant under reduced motion; scores written here land on the key results when the session closes.
+Acceptance: Given a running review at the scoring stage, when the facilitator reveals an objective's score, then every participant sees the same number at the same time, and the cycle score updates.
 
-### P4-T12: Execution notifications wiring [M]
-Depends on: P4-T05, P2-T06
-Goal: the remaining reasons: assignment, mention-in-work, milestone due/completed, project paused/resumed/closed, blocked/unblocked; Review-inbox coverage for work due; settings + digest coverage.
-Acceptance: *Given* a member assigned to a work item due tomorrow, *then* it appears in their Review inbox and (per settings) tomorrow's daily assignments email.
+### P4-T11: Quarterly review: retro, diagnostic, reset [L]
+Depends on: P4-T10
+Goal: the second and third acts (METHOD.md §8).
+Deliverables: the team retro with prompt chips, two columns, sticky notes and dot voting; the management retro with its four questions; the root-cause stage listing every key result below the threshold with the eight-cause picker and a detail field; the anonymous process-health survey with live averages and response counts; the rhythm diagnostic computed from the cycle score and the rhythm score with its verdict and narrative; keep, modify and abandon per objective with the meaning of the chosen decision and a required why; learnings with promotion from top-voted themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
+Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; process-health responses cannot be attributed to a member but cannot be submitted twice; a keep, modify or abandon decision writes back to the goal on close; the lowest process-health statement becomes an issue in the next cycle.
+Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic renders, then it reads as a strategy or quality problem with the specific figures, and the prescription tells the facilitator to fix the key results before pushing the team.
 
-### P4-T13: FlowyTeam task import [L]
-Depends on: P3-T18, P4-T05
-Goal: tasks → work items with everything attached (mapping §7.2).
-Deliverables: mappers — task boards/columns→status mapping (completed-slug → done), tasks→work items (+KR links deriving goal links), sub_tasks→checklist, dependencies→`blocks`, accesses→subscriptions, comments (HTML→JSON sanitized, two-phase reference rewrite), files→blobs/links, **time logs→`time_entries` (read-only display on the item)**; recurrence flags recorded in the report (engine post-v1).
-Acceptance: *Given* FlowyTeam tasks linked to KRs, *when* imported, *then* they appear as work items in the right status with KR links, checklists, comments and preserved time logs, idempotently.
+### P4-T12: Minutes, exports and review feed-forward [M]
+Depends on: P4-T11, P3-T15
+Goal: the artifact and the handover (METHOD.md §8.10, screen S-25).
+Deliverables: the minutes document with the executive summary and every stage's record; document and PDF export; the close action writing scores, decisions and learnings back to their objects and running the feed-forward into the next cycle; a link from the closed cycle to its minutes.
+Acceptance: Given a completed review, when the facilitator closes it, then the minutes are generated and exportable, every score and decision is written back, and the next cycle's Phase 2 already holds the scores and carry-forward issues.
 
-### P4-T14: FlowyTeam full import: dry-run, reconciliation, report [M]
-Depends on: P4-T13
-Goal: one end-to-end company import that is trustworthy.
-Deliverables: orchestrated full pipeline in FK order; consolidated `import-report.json` + human-readable summary; per-domain reconciliation; `--only`/`--dry-run` verified; a mixed test (CSV rows + a FlowyTeam company in one workspace, no collisions).
-Acceptance: *Given* a seeded company, *when* `import:flowyteam` runs end to end, *then* counts reconcile, every skip is explained, derived values are engine-computed, and a re-run is a no-op.
+### P4-T13: Embeddings and retrieval [L]
+Depends on: P2-T15
+Goal: grounded answers over workspace data (AI-NATIVE-PLAN.md §9).
+Deliverables: the pgvector extension and embedding table with an appropriate index; the outbox-driven worker chunking and embedding goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts, keyed by content hash; access-filtered hybrid retrieval combining vectors and full text; degradation to full text where vectors are unavailable; local embedding support.
+Test plan: retrieval never returns a chunk the requester cannot read; re-embedding is skipped when content is unchanged; with the extension absent the product still answers using full text.
+Acceptance: Given a private space's check-in, when a non-member asks a question that would match it, then no chunk from it is retrieved or cited.
 
-**Phase 4 exit checklist:** projects with lifecycle + contributors + acknowledged health check-ins + required retrospectives; rich milestones driving next-step; multi-assignee work items with checklists, blocks guard, relative reminders and live KR links; concurrency-safe boards; the Resource Hub with draft-safe docs and typed links; access-filtered search; **Work Map v2 as Home**; palette + quick create; exports; the FlowyTeam import complete and reconciled. Strategy + execution are now one product.
+### P4-T14: Copilot [L]
+Depends on: P4-T13, P1-T07
+Goal: the interactive assistant (screen S-39).
+Deliverables: threads and messages anchored to the workspace or an entity; the side panel with streaming and a stop control; grounded answers with citations only to what the viewer may see; action proposals rendered as a preview or difference with apply and dismiss, committing through the normal mutation layer; long tool runs executing as background jobs and streaming back over realtime; the states for empty, AI off and capped.
+Test plan: a proposal that the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a background run survives a page reload; with AI off the panel explains and links admins to the console.
+Acceptance: Given a member asking the copilot to create a goal, when they approve the proposal, then the goal is created through the normal Operation with audit, an AI provenance chip and a working undo.
+
+### P4-T15: Coaching and rhythm assists [M]
+Depends on: P4-T14, P4-T06
+Goal: the per-module assists (AI-NATIVE-PLAN.md §2).
+Deliverables: draft a goal and key results from an ambition; rewrite a failing objective or key result to satisfy its rule; suggest metrics, units, baselines, targets and alignment parents; draft the overdue check-in from real activity; draft the weekly digest, the retrospective, the review minutes and the diagnostic narrative; suggest KPIs, thresholds and formulas from plain language; narrate a KPI trend; cluster retro notes into themes; propose next-cycle objectives from carried learnings; natural language to a validated list filter. Every one behind a feature switch, with provenance recorded and a preview before applying.
+Test plan: every assist degrades to its manual path with AI off; every write assist renders a preview and commits nothing until applied; provenance is recorded on the resulting value.
+Acceptance: Given a key result failing the measurability rule, when the champion uses the rewrite assist, then a corrected version is proposed with the rule it now satisfies, and applying it clears the verdict.
+
+**Phase 4 exit:** the method package is the single source of every rule with a passing conformance suite; the Draft Coach evaluates live inside budget and the publish gates are enforced server-side; the nudge engine fires, deduplicates, escalates and stays under its volume ceiling; both agents run on schedule and are fully functional in their deterministic form with AI off; both sessions run end to end with live synchronisation; the diagnostic, the minutes and the feed-forward work; the copilot and the assists are live behind switches with previews and provenance.
 
 ---
 
-# Phase 5 — The AI layer
+# Phase 5: Reach: channels, agents, work
 
-Task bodies live in **AI-NATIVE-PLAN.md §12** (P5-T00…P5-T14): the provider port + drivers, BYO keys + encryption + rotation, the model catalog + tiers, metering/quotas/hard caps, structured output + versioned prompts, the public contract projections (REST + OpenAPI + **CLI** + MCP tool defs with drift CI), embeddings/RAG, the copilot, the **MCP OAuth 2.1 authorization server**, the MCP transport/sessions/catalog (+ `search`/`fetch`, Resources, Prompts, stdio), **AI teammates** (agents + runs + sandbox + batch approval + cost-halt), the eval + safety harness with the AI-off leg and **live-transport authz e2e**, and the strategy + execution assists. This section is the index; the same Definition of Ready/Done applies. It opens with the P5-T00 design gate confirming AI-NATIVE §13 decisions.
+Getting the coach to where people are, opening the product to external agents, and adding the work layer. Starts with a design gate.
 
-**Phase 5 exit checklist:** AI-NATIVE-PLAN.md §12 (end of section).
+### P5-T00: Reach design gate [DESIGN GATE] [M]
+Depends on: Phase 4 complete
+Goal: the design documents for channels, the external agent surface and the work layer.
+Deliverables: design documents covering the channel port and per-provider capability matrix, the conversational check-in and blocker flows per provider, identity linking and inbound security; the authorisation server and tool catalogue; and the work layer (initiatives, tasks, board ordering and the key result linkage semantics).
+Acceptance: the human approves with an explicit statement.
+
+### P5-T01: Channel port, email driver and routing [L]
+Depends on: P5-T00, P4-T04
+Goal: the delivery layer (AI-NATIVE-PLAN.md §5).
+Deliverables: the channel port with send, verify, parse and capability reporting; the email driver as the always-available baseline with one-click action links; the connection and identity tables with envelope-encrypted credentials; per-member primary channel and quiet hours; the message log with idempotency; routing so every nudge, digest and escalation reaches the member's chosen channel; the message builder degrading to plain text with a link where a capability is missing.
+Test plan: a nudge routes to the member's primary channel and falls back to email when it fails; an unlinked member falls back to email and in-app; the log records every send with its outcome; idempotency prevents a duplicate send on relay retry.
+Acceptance: Given a member whose primary channel is unreachable, when a nudge is delivered, then it arrives by email, the failure is logged, and the member is told once that their channel needs reconnecting.
+
+### P5-T02: Slack driver [L]
+Depends on: P5-T01
+Goal: the first chat provider.
+Deliverables: self-serve installation and workspace connection; identity linking; outbound rich messages with buttons for direct messages and space channels; inbound signature verification with replay protection; slash command and button action handling; a modal-based check-in.
+Test plan: a tampered inbound payload is rejected; an unlinked sender receives nothing at all; a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry.
+Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
+
+### P5-T03: Microsoft Teams driver [L]
+Depends on: P5-T01
+Goal: the enterprise chat provider.
+Deliverables: the application manifest and tenant consent flow; connection and identity linking; adaptive card outbound for direct messages and channels; inbound verification; command and card action handling.
+Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
+
+### P5-T04: WhatsApp driver [L]
+Depends on: P5-T01
+Goal: the reach provider.
+Deliverables: Business API connection; template registration per nudge kind with the template-versus-free-form window handled by the message builder; identity linking with verification; conversational inbound handling for check-in and blocker capture; a documented setup runbook.
+Test plan: an outbound message outside the conversation window uses an approved template; inside it, free form is used; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
+Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
+
+### P5-T05: Telegram driver [M]
+Depends on: P5-T01
+Goal: the lightweight provider.
+Deliverables: bot connection, identity linking with a verification code, outbound messages with inline keyboards, and inbound command and callback handling.
+Acceptance: Given a Telegram-linked member, when they send the status command with a goal identifier, then they receive that goal's health, progress, confidence and next check-in date, subject to their permissions.
+
+### P5-T06: The chat command surface [L]
+Depends on: P5-T02, P5-T03, P5-T04, P5-T05
+Goal: one command surface generated from the action registry (AI-NATIVE-PLAN.md §5.3).
+Deliverables: the command router mapping each command to exactly one registry action; the commands for check in, blocker, status, acknowledge, commit, ask and snooze; per-provider rendering from one definition; rate limiting per member and per provider; audit entries naming the channel.
+Test plan: every command resolves to a registry action and is refused when the member lacks the access level; the same command produces identical results across all four providers; rate limiting returns a clear message rather than silence for a linked member.
+Acceptance: Given a member without edit access on a goal, when they attempt a check-in from chat, then it is refused with the same message the browser would show, and the attempt is audited.
+
+### P5-T07: Public contract projections: REST, OpenAPI and the command line [L]
+Depends on: P1-T07, Phase 4 complete
+Goal: the public surfaces generated from one registry (TECHNICAL-PLAN.md §14).
+Deliverables: the versioned REST surface with cursor pagination, the filter grammar, typed errors and scoped hashed bearer tokens with separated audiences; the OpenAPI document generated from the schemas; the generated command line with typed flags, file inputs, profiles and a browser device login; the drift check comparing regenerated artifacts against the committed ones.
+Test plan: a token without write scope is refused on every write; a forbidden resource returns not-found; the drift check fails when a registry action changes without regeneration.
+Acceptance: Given a change to a registry action's schema, when continuous integration runs without regenerating, then the drift check fails naming the action.
+
+### P5-T08: MCP authorisation server [L]
+Depends on: P5-T07, P2-T09
+Goal: the authorisation half of the external agent surface (AI-NATIVE-PLAN.md §8.2).
+Deliverables: the authorise, token and registration endpoints; the consent screen with a workspace picker (screen S-40); discovery documents with their transport variants and preflight; client allow-listing, metadata documents and dynamic registration, all fetched through the outbound-request rules; native redirect rules; single-use codes consumed in a transaction; short-lived access tokens; refresh rotation with reuse detection that revokes the whole lineage; resource binding validated at issue and on every use; every secret stored hashed; revocation on membership loss.
+Test plan: a replayed authorisation code is refused; a reused refresh token revokes the lineage; an API token is rejected at the agent endpoint and the reverse; losing membership invalidates the grant on the next call.
+Acceptance: Given an external client completing the flow, when it later presents a rotated-away refresh token, then the entire grant is revoked and the user is told in their connections list.
+
+### P5-T09: MCP transport, sessions and tool catalogue [L]
+Depends on: P5-T08
+Goal: the tool half (AI-NATIVE-PLAN.md §8.3).
+Deliverables: the streaming HTTP transport and the local standard-input transport; session lifecycle bound to the grant with version negotiation, header discipline and origin validation; the tool catalogue generated from the registry with safety hints, scopes, schemas and examples, pinned by an invariant test; the permission-filtered global search tool and the fetch tool turning a canonical URL into cited content; read-only resources; prompt templates.
+Test plan: a live end-to-end run over the real transport asserting that an under-privileged call is denied by the permission layer and no cross-tenant data appears in any result; the catalogue invariant test fails when a tool loses its safety classification.
+Acceptance: Given an external agent holding read scope, when it calls a write tool, then the call is denied by the permission layer, the denial is audited, and the agent receives a clear error rather than a partial result.
+
+### P5-T10: Initiatives [M]
+Depends on: P5-T00, P3-T04
+Goal: the work that moves a key result (screen S-26).
+Deliverables: initiatives with owner, dates, status, confidence and capacity verdict; the many-to-many link to key results; the list and detail surfaces; the capacity view feeding the Phase 5 capacity check and its publish gate.
+Acceptance: Given an initiative linked to two key results and marked as exceeding capacity, when the cycle's gates are evaluated, then gate five is red and links to that initiative.
+
+### P5-T11: Tasks and the OKR board [L]
+Depends on: P5-T10
+Goal: the board keyed to key results (screens S-27, S-28).
+Deliverables: tasks with status, due date, description and checklist; multiple assignees where assignment grants edit access and notifies; the key result and initiative links; the board across a space, an initiative or a key result with drag, optimistic updates, live presence and concurrency-safe ordering normalised against deleted and completed items; the objective and key result rail with progress derived from linked completed tasks shown as a separate signal beside measured progress; the task detail page; review-inbox coverage for tasks due.
+Test plan: two simultaneous reorders converge with no lost or duplicated cards; the derived linked-work signal never overwrites the measured key result value; assignment notifies everyone except the actor.
+Acceptance: Given a key result whose linked tasks are all complete but whose measured value has not moved, when the Coach's divergence check runs, then it reports exactly that, naming both figures.
+
+### P5-T12: Documents and attachments [M]
+Depends on: P5-T11, P2-T11
+Goal: rich documents attached where they belong (screen S-29).
+Deliverables: documents on a space, goal, key result, initiative, cycle or session with draft and publish where drafts are author-private and enforced in the query, version history with a visual difference, comments, reactions and subscriptions; attachments on any subject.
+Test plan: another member cannot read a draft even through a direct identifier probe, receiving not-found; publishing emits the activity and the notification while drafting does not.
+Acceptance: Given a document drafted on a goal and then published, when a space member opens the goal, then they see it with a readable history of changes, and before publication they saw nothing.
+
+### P5-T13: Search, palette and exports [M]
+Depends on: P5-T12, P4-T13
+Goal: finding and extracting (screens S-32, S-01).
+Deliverables: the search document table with full-text indexing driven from the outbox across goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions, with semantic results blended when available; access-filtered queries; the search page and the command palette with entity jump, actions and recents; Work Map rows for initiatives and tasks; CSV and XLSX export of any list, run asynchronously for large sets and audited.
+Test plan: a term inside a private space's document returns nothing for a non-member and a highlighted result for a member; an export matches the visible rows and columns exactly.
+Acceptance: Given any screen, when the palette is opened and a short identifier typed, then the entity opens inside the budget.
+
+**Phase 5 exit:** all four chat providers deliver and accept commands with one generated command surface; the coach reaches members where they are and respects quiet hours; the public REST surface, OpenAPI and the command line are generated with drift checked; the external agent surface works end to end over the real transport with authorisation proven by machine; initiatives, tasks and the board are joined to key results; documents, search, the palette and exports are live.
 
 ---
 
-# Phase 6 — Hardening
+# Phase 6: Data: import, export, portability
 
-### P6-T01: Performance budgets + indexing at scale [L]
-Depends on: Phase 4
-Deliverables: the large seeded dataset (100k work items + 10k goals in one workspace); every §13.1 budget measured in CI (Work Map, explorer, boards, KPI grid, Review inbox, search); the N+1 query-count budget enforced on list endpoints; index/plan review with fixes.
-Acceptance: every §13.1 row is green on the large dataset in CI.
+### P6-T01: CSV and XLSX importer with the AI mapper [L]
+Depends on: Phase 5 complete
+Goal: the generic migration path (TECHNICAL-PLAN.md §7).
+Deliverables: the import command and the admin wizard; entity templates for goals, key results, KPIs, KPI records, initiatives and tasks; column mapping either supplied or proposed by the AI mapper and confirmed by a human; a dry-run preview through the registry's validation endpoints; a per-row error report; idempotent upsert; persisted run records.
+Test plan: a file with one bad row previews as creatable minus one with the error explained and imports exactly that on the real run; re-running changes nothing; with AI off the manual mapping path is complete.
+Acceptance: Given a goals spreadsheet with unfamiliar headers, when the wizard runs, then a mapping is proposed, the human confirms or corrects it, the dry run reports accurately and the real run matches it.
 
-### P6-T02: Load & soak testing [M]
+### P6-T02: FlowyTeam connector [M]
 Depends on: P6-T01
-Deliverables: load scripts (hundreds of concurrent members, one workspace: check-in bursts, feed reads, board drags, MCP traffic); soak run; fixes.
-Acceptance: no errors and within budget under target concurrency; realtime fan-out stays bounded.
+Goal: the read-only source (TECHNICAL-PLAN.md §7.1).
+Deliverables: the import command with a required company selector; a read-only session where an attempted write must fail; introspection, required-table assertions and version inference; the multi-company guard; the report writer; the legacy identifier map.
+Acceptance: Given a source database, when the dry run executes for one company, then it prints that company's schema summary, writes an empty report, and provably cannot write to the source.
 
-### P6-T03: Backups + restore drills [M]
-Depends on: Phase 4
-Deliverables: scheduled encrypted backups (DB + blobs) with checksums; a **CI restore drill** (restore into an ephemeral DB, assert row counts + a smoke login); the restore runbook.
-Acceptance: the scheduled CI drill proves a restore reproduces a workspace, continuously.
+### P6-T03: FlowyTeam strategy mappers [L]
+Depends on: P6-T02, P3-T15
+Goal: the OKR and KPI import (TECHNICAL-PLAN.md §7.2).
+Deliverables: mappers for teams to spaces with members and managers, cycles and settings, objectives to goals with owner, champion and reviewer resolution and two-pass alignment, key results with values, check-ins into narrative rows with snapshots and acknowledgements, KPI categories, KPIs and records, formula token translation into the expression tree with unparseable formulas dropped and logged, and KPI sharing; derived values recomputed through the engines; per-domain reconciliation; dispatch suppressed; proven idempotency.
+Test plan: against a seeded multi-company source, counts match, alignment is correct, a documented calculated KPI recomputes to the source value, a re-run changes nothing, and a second company imports alongside without collision.
+Acceptance: Given one company, when the full strategy import runs twice, then the report and reconciliation are clean and the second run is a no-op.
 
-### P6-T04: Workspace export/import (portability) [L]
-Depends on: P6-T03
-Deliverables: the TECHNICAL-PLAN §7.3 engine: admin-triggered export to a versioned, checksummed, AES-GCM archive (policy registry excludes secrets/sessions/tokens/audit chain); import with a **dry-run diff**, deterministic remap, member de-dup by email, blob re-upload; `export_runs`/`workspace_imports` UI (S-23).
-Acceptance: *Given* an exported workspace, *when* imported into a fresh instance, *then* the dry-run diff is accurate, the import reconciles, and goals/check-ins/docs render identically (spot check).
+### P6-T04: FlowyTeam work and collaboration mappers [L]
+Depends on: P6-T03, P5-T11
+Goal: the remaining domains.
+Deliverables: mappers for projects to initiatives, tasks to tasks with status from the board column, key result links, sub-tasks to checklists, accesses to subscriptions, comments with HTML converted and a two-phase reference rewrite, and files to blobs and attachments; every unmapped construct recorded in the report rather than dropped; the consolidated report and human-readable summary; the full orchestrated pipeline in dependency order with the selective and dry-run flags verified; a mixed test importing a spreadsheet and a company into one workspace.
+Acceptance: Given a seeded company, when the full import runs end to end, then counts reconcile, every skip is explained, derived values are engine-computed and a re-run is a no-op.
 
-### P6-T05: Observability [M]
-Depends on: Phase 4
-Deliverables: OpenTelemetry traces/metrics (request, Operation, outbox lag, job, MCP/OAuth outcomes, AI usage), self-hostable dashboards (Grafana), opt-in + documented; no telemetry leaves by default.
-Acceptance: an on-prem install sees its own dashboards with zero external calls.
+### P6-T05: Workspace export and import [L]
+Depends on: P6-T04
+Goal: portability (TECHNICAL-PLAN.md §7.3).
+Deliverables: admin-triggered export to a versioned, checksummed, encrypted archive with a policy list excluding secrets, sessions, tokens, channel credentials and the audit chain; import with a dry-run difference, deterministic key remapping, member de-duplication by email and blob re-upload; the run interfaces.
+Acceptance: Given an exported workspace, when it is imported into a fresh instance, then the dry-run difference is accurate, the import reconciles, and goals, check-ins, sessions and documents render identically.
 
-### P6-T06: Security review + supply chain + RLS fuzz [L]
-Depends on: Phase 5
-Deliverables: every TECHNICAL-PLAN §8.2 control verified or ticketed; the **RLS property/fuzz suite** (random cross-tenant probes across every table → zero rows; policy-removal mutation check); headers/CSP audit; dependency audit + SBOM + signed-image verification; SSRF checks exercised; PDPA/GDPR export + erasure flows tested end to end.
-Acceptance: no high findings open; the §8.2 table has ✅ or an accepted-risk note per row, signed off by the human.
+### P6-T06: Backups and restore drills [M]
+Depends on: P6-T05
+Goal: recoverability that is proven, not assumed.
+Deliverables: scheduled encrypted backups of the database and blobs with checksums; a restore drill in continuous integration restoring into an ephemeral database and asserting row counts and a smoke sign-in; the restore runbook.
+Acceptance: the scheduled drill proves a restore reproduces a workspace, continuously.
 
-### P6-T07: Accessibility audit + Web Vitals CI [M]
-Depends on: Phase 4
-Deliverables: axe-driven Playwright across every S-xx screen wired into CI (fails on serious/critical); keyboard-only walkthrough scripts for the P0 flows; Lighthouse budgets (LCP/INP/CLS per §13.1) on the seeded dataset; fixes; the screen-reader smoke procedure.
-Acceptance: CI blocks a PR introducing a serious axe violation or busting a Web Vitals budget.
-
-### P6-T08: Migration cutover rehearsal [M]
-Depends on: P4-T14, P6-T03
-Deliverables: the documented cutover runbook (freeze source → backup → dry-run → import → reconcile → go-live → rollback window) rehearsed against a production-shaped FlowyTeam copy + CSV set, using the workspace freeze overlay; a tested rollback.
-Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, and rollback restores the prior state within the window.
-
----
-
-# Phase 7 — Enterprise & operator pack
-
-### P7-T01: SSO (OIDC + SAML) [L] — via Better Auth; JIT provisioning lands in the one member funnel (P2-T04). *Acceptance:* a user logs in via a configured IdP and is provisioned with default access.
-### P7-T02: LDAP sync [L] — users/groups sync mapped to members/space membership; deprovision → suspend. *Acceptance:* an LDAP-removed user is suspended within one sync.
-### P7-T03: SCIM provisioning [M] — create/deactivate mapped to the member lifecycle (deactivate = suspend, never delete). *Acceptance:* a SCIM deactivate suspends the member and their tokens/grants stop working.
-### P7-T04: MFA policy enforcement [S] — org-mandated MFA (members without a factor are forced to enroll at next login). *Acceptance:* enabling the policy locks unenrolled members into the enrollment flow.
-### P7-T05: Audit export + chain verification + air-gap guide [M] — filtered audit export; the hash-chain verification tool + an S-23 "verify" action; the documented fully-offline install (AI local/off, no external calls) validated. *Acceptance:* a tampered audit row is detected by verification; the air-gap checklist passes on an offline VM.
-### P7-T06: Operator console + transparent support impersonation [L] — instance-operator role; list/inspect/suspend workspaces; instance feature flags; site messages (dismissible, targeted, expiring); **time-boxed, consent-gated impersonation that is visible to the workspace owner** (inbox notice + audit) — the designed-for SaaS surface (billing stays behind `BILLING_ENABLED`, unbuilt). *Acceptance:* an impersonation session expires on time and the owner can see who was in their workspace, when, and what they did.
-### P7-T07: Enterprise feature gating [M] — the licensing check scaffold, **only if** the human chooses open-core (PLAN §14 #6); gated features degrade gracefully. *Acceptance:* per the human decision; default is nothing gated.
+### P6-T07: Migration cutover rehearsal [M]
+Depends on: P6-T06
+Goal: a trustworthy switch-over.
+Deliverables: the documented runbook of freeze the source, back up, dry run, import, reconcile, go live and keep a rollback window, rehearsed against a production-shaped copy using the workspace freeze overlay, with a tested rollback.
+Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, and the rollback restores the prior state inside the window.
 
 ---
 
-# Phase 8 — Community launch
+# Phase 7: Hardening
 
-### P8-T01: Docs site [M] — user + admin + API (generated OpenAPI reference) + importer runbook + the operating-rhythm handbook.
-### P8-T02: Deploy quickstarts [S] — Compose + Helm guides polished; the wizard walkthrough; (serverless arrives post-v1).
-### P8-T03: Hosted demo instance [M] — the demo builder on a public instance, reset on schedule.
-### P8-T04: Contributor onboarding [S] — CONTRIBUTING, good-first-issues, the CLA bot live.
-### P8-T05: Launch [S] — release, changelog, posts.
-### P8-T06: Template gallery + operating-rhythm guides [M] — seeded templates: the OKR starter (a cycle with sample goals/KRs/KPIs wired to the strategy module), a company-onboarding template, a product-team space template; short guides mapping Scrum/PM²-style working (docs only, no per-methodology code) onto spaces/projects/milestones; selectable from onboarding (S-21). *Acceptance:* a fresh workspace creating from the OKR starter gets working goals with cadence and a populated Work Map.
+### P7-T01: Performance budgets and indexing at scale [L]
+Depends on: Phase 6 complete
+Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace; every TECHNICAL-PLAN.md §13.1 budget measured in continuous integration; the query-count budget enforced on list endpoints; an index and plan review with fixes.
+Acceptance: every budget row is green on the large dataset in continuous integration.
 
-**Phase 8 exit:** anyone deploys in under 30 minutes via a documented path; a FlowyTeam admin can follow the importer runbook end to end; the gallery + rhythm guides ship in onboarding.
+### P7-T02: Load and soak testing [M]
+Depends on: P7-T01
+Deliverables: load scripts covering hundreds of concurrent members in one workspace with check-in bursts, a live session with twenty participants, feed reads, board drags, chat inbound and external agent traffic; a soak run; fixes.
+Acceptance: no errors and within budget at the target concurrency, with realtime fan-out bounded and nudge delivery inside its budget.
+
+### P7-T03: Security review, supply chain and tenant fuzzing [L]
+Depends on: Phase 6 complete
+Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; the tenant property and fuzz suite firing random cross-tenant probes at every table and requiring zero rows, plus a policy-removal mutation check; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
+Acceptance: no high findings remain open, and every control row carries either a verified mark or an accepted-risk note signed off by the human.
+
+### P7-T04: Agent, nudge and channel safety hardening [M]
+Depends on: P7-T03
+Deliverables: the agent safety suite (sandbox commits nothing, proposals commit nothing until applied, a cost cap halts a run mid-flight, an injected instruction in retrieved content cannot exceed the agent's bindings); the nudge suite (deduplication under bursts, quiet hours deferral, one escalation step at a time, snooze never hiding an obligation, a simulated month under the volume ceiling); the channel suite (signature verification rejects tampering, an unlinked sender receives nothing, a chat write appears in audit with its channel, rate limits behave).
+Acceptance: every suite passes, and a deliberately injected instruction inside a retrieved document fails to make the Coach exceed its scope.
+
+### P7-T05: Accessibility audit and web vitals [M]
+Depends on: P7-T01
+Deliverables: automated accessibility checks across every screen wired into continuous integration and failing on serious findings; keyboard-only walkthrough scripts for the primary flows including both sessions; performance budgets on the seeded dataset; fixes; the screen-reader smoke procedure.
+Acceptance: continuous integration blocks a change that introduces a serious accessibility finding or breaks a web vitals budget.
+
+### P7-T06: Observability [M]
+Depends on: Phase 6 complete
+Deliverables: traces and metrics for requests, Operations, outbox lag, jobs, nudge delivery, channel delivery, session synchronisation, agent runs, authorisation outcomes and AI usage; self-hostable dashboards; opt-in and documented, with no telemetry leaving by default.
+Acceptance: a self-hosted installation sees its own dashboards with zero external calls.
+
+### P7-T07: Method conformance audit [M]
+Depends on: P4-T01
+Deliverables: a full pass comparing every rule, threshold, band, corridor, taxonomy, gate, agenda and diagnostic in METHOD.md against `packages/method` and against the behaviour observed in the running product; the coaching-prompt corpus reviewed for tone and accuracy against the tuned false-positive rate; any drift corrected in the document or the code, whichever is wrong.
+Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
+
+### P7-T08: Privacy: export, erasure and retention [M]
+Depends on: P7-T03
+Deliverables: personal data export and erasure as anonymisation tested end to end; retention settings for message logs, nudge records and agent run logs; a review that no personal data reaches logs, prompts or telemetry.
+Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export is produced, and no personal data of theirs remains in message logs, prompts or telemetry.
 
 ---
 
-## Appendix A: task ID index
+# Phase 8: Cloud, enterprise and launch
 
-Phase 1: P1-T01…T10 · Phase 2: P2-T01…T13 · Phase 3: P3-T00…T18 · Phase 4: P4-T00…T14 · Phase 5: P5-T00…T14 (bodies in AI-NATIVE-PLAN §12) · Phase 6: P6-T01…T08 · Phase 7: P7-T01…T07 · Phase 8: P8-T01…T06. **93 tasks.**
+### P8-T01: Cloud design gate [DESIGN GATE] [M]
+Depends on: Phase 7 complete
+Goal: the design documents for vendor operation.
+Deliverables: design documents covering tenant provisioning and lifecycle, per-tenant limits and noisy-neighbour protection, the operator console's surface and its boundaries, the support-access contract, and the plan and seat model behind its flag.
+Acceptance: the human approves with an explicit statement.
 
-Design gates (human approval): P3-T00, P4-T00, P5-T00. Spikes with go/no-go: P1-T03 (RLS/pooling, PLAN §13 R1); the P3-T00 golden-master matrices (R2/R3). Human-gated options: P3-T14 points layer (off by default), P7-T07 gating.
+### P8-T02: Tenant provisioning, signup and onboarding [L]
+Depends on: P8-T01
+Deliverables: the tenant table and provisioning Operation; cloud signup with email verification and workspace creation; the onboarding flow (screen S-34) shared with self-host; the workspace lifecycle of active, suspended and closed with data retention on closure; region recorded per tenant.
+Acceptance: Given a new cloud signup, when it completes, then a workspace exists with the user as owner, the onboarding runs, and the tenant record carries its plan and region.
 
-Importer tasks (keep TECHNICAL-PLAN §7.2 current): P3-T16, P3-T17, P3-T18, P4-T13, P4-T14, P6-T08.
+### P8-T03: Operator console [L]
+Depends on: P8-T02
+Deliverables: the instance-operator role separate from every workspace role; list, inspect and suspend workspaces; instance feature flags; site messages that are dismissible, targeted and expiring; per-tenant health and usage. Every action audited. Absent entirely on self-hosted instances.
+Acceptance: Given an operator suspending a workspace, when a member of it signs in, then they see a clear message, the workspace is read-only, and the suspension is recorded with its actor and reason.
 
-Spec authorities per task type: UI → UIUX-PLAN (S-xx + §4 + §9) · schema → TECHNICAL-PLAN §4 (+ §7.2 mapping) · engines → TECHNICAL-PLAN §6 · security → TECHNICAL-PLAN §8.2 · AI → AI-NATIVE-PLAN · performance → TECHNICAL-PLAN §13.
+### P8-T04: Transparent support access [M]
+Depends on: P8-T03
+Deliverables: time-boxed, reason-recorded operator access to a workspace, requiring an explicit grant, visible to the workspace owner in their inbox and in the audit log, with every action attributed to the operator and an automatic expiry.
+Acceptance: Given a support session, when it expires, then access ends automatically and the owner can see who was in their workspace, when, and what they did.
 
-## Appendix B: post-v1 backlog (designed-for, not funded — REQUIREMENTS §6)
+### P8-T05: Plans, seats and limits [M]
+Depends on: P8-T04
+Deliverables: plan definitions, seat counting and workspace limits behind a flag that is off for self-host; enforcement at the member-provisioning funnel; upgrade and downgrade paths; no feature gating anywhere.
+Acceptance: Given the flag off, when any limit is evaluated, then it is unlimited and no billing surface appears; and given it on, then seat limits apply at invitation while every feature stays available.
 
-Serverless/zero-ops profile (drivers + dual-profile CI) · custom fields · configurable types/statuses/workflows · saved-query DSL + view builder · Gantt + the automatic scheduling engine (spike-gated) · backlogs/Scrum · time & cost UI (v1 preserves imported logs read-only) · meetings · budgets · phases/gates · GitHub/GitLab integration · Slack/Teams notification channels · incoming email · calendar feeds · billing/entitlements + hosted cloud · an OpenProject importer (demand-driven) · CRDT co-editing · native mobile. Each keeps its design-for note in TECHNICAL-PLAN; pulling any into v1 requires the human (CLAUDE.md "ask" list).
+### P8-T06: Cloud operations [M]
+Depends on: P8-T05
+Deliverables: per-tenant rate and resource limits; a public status surface; per-tenant backup verification; the incident runbook; capacity dashboards.
+Acceptance: Given one tenant generating heavy load, when limits engage, then other tenants stay inside their performance budgets.
+
+### P8-T07: Single sign-on [L]
+Depends on: Phase 7 complete
+Deliverables: OIDC and SAML through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
+Acceptance: Given a configured identity provider, when a user signs in through it, then they are provisioned with default access and their session behaves identically to a password session.
+
+### P8-T08: Directory sync and provisioning [L]
+Depends on: P8-T07
+Deliverables: directory synchronisation of users and groups mapped to members and space membership, plus the provisioning protocol where deactivation maps to suspension and never to deletion.
+Acceptance: Given a user removed from the directory, when the next synchronisation runs, then the member is suspended and every token and grant of theirs stops working.
+
+### P8-T09: Multi-factor policy [S]
+Depends on: P8-T07
+Deliverables: an organisation-mandated second factor where members without one are held in the enrolment flow at their next sign-in.
+Acceptance: Given the policy enabled, when an unenrolled member signs in, then they are locked into enrolment before reaching any other screen.
+
+### P8-T10: Audit export, chain verification and the air-gap guide [M]
+Depends on: Phase 7 complete
+Deliverables: filtered audit export; the hash-chain verification tool with an admin action; the documented fully offline installation validated on an isolated machine with AI local or off and no external calls.
+Acceptance: Given a tampered audit row, when verification runs, then it is detected and located; and the air-gap checklist passes on an offline machine.
+
+### P8-T11: Documentation site [M]
+Depends on: Phase 7 complete
+Deliverables: user, administrator and API documentation with the generated reference; the importer runbook; the deployment quickstarts for Compose, Helm and cloud; and the OKR handbook derived from METHOD.md, written for practitioners rather than builders.
+Acceptance: a new administrator follows the quickstart to a working instance without reading the repository.
+
+### P8-T12: Template gallery and rhythm guides [M]
+Depends on: P8-T11
+Deliverables: seeded templates: an OKR starter cycle with sample goals, key results and a KPI tree wired to the module; a company onboarding template; a product team space template; each selectable from onboarding. Plus short guides mapping common ways of working onto spaces, cycles and initiatives, as documentation only.
+Acceptance: Given a fresh workspace created from the starter template, when it opens, then goals with a cadence exist, the Work Map is populated, and the first weekly session is scheduled.
+
+### P8-T13: Hosted demo instance [M]
+Depends on: P8-T12
+Deliverables: the demo builder on a public instance, reset on a schedule, with sign-in as a sample persona and the agents running visibly in sandbox mode.
+Acceptance: a visitor can explore a realistic workspace, see a coach nudge and a diagnostic, and the instance resets cleanly.
+
+### P8-T14: Launch [S]
+Depends on: P8-T13
+Deliverables: the release, changelog, announcement, contributor onboarding with good first issues and the agreement bot live.
+Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud.
+
+---
+
+## Appendix A: index
+
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T08 (8). Phase 8: P8-T01 to T14 (14). **104 tasks.**
+
+Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
+
+Specification authority per task type: user interface to UIUX-PLAN.md, schema to TECHNICAL-PLAN.md §4 with the §7.2 mapping, engines to TECHNICAL-PLAN.md §6, rules and rituals to METHOD.md, AI and agents to AI-NATIVE-PLAN.md, security to TECHNICAL-PLAN.md §8.2, performance to TECHNICAL-PLAN.md §13.
+
+Importer tasks that must keep the §7.2 mapping current: P6-T01 through P6-T04, and P6-T07.
+
+## Appendix B: designed for, not built
+
+Serverless runtime profile, custom fields, configurable statuses and workflows, a saved-query language and view builder, Gantt with dependency scheduling, sprints and backlogs, time and cost tracking, meetings beyond the OKR sessions, calendar two-way sync, additional chat providers, incoming email, source-control work links, collaborative document editing, native mobile applications, and importers beyond FlowyTeam and spreadsheets. Each keeps a design-for note in TECHNICAL-PLAN.md. Pulling any of them into v1 requires the human.

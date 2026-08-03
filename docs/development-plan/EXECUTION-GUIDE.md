@@ -1,8 +1,8 @@
 # EXECUTION-GUIDE.md
 
-How a human engineer and Claude Code execute IMPLEMENTATION-PLAN.md together, one task at a time, in this repository.
+How a human engineer and Claude Code execute IMPLEMENTATION-PLAN.md together, one task at a time.
 
-Read this once before starting. After that, you only need section 3 (the task loop) day to day.
+Read this once before starting. After that, section 3 is the only part you need day to day.
 
 ---
 
@@ -10,131 +10,124 @@ Read this once before starting. After that, you only need section 3 (the task lo
 
 | Who | Responsible for |
 |---|---|
-| Human engineer | Picks the next task, reviews and merges every PR, approves design gates and spike go/no-gos, answers the agent's questions, owns all credentials and deployments, re-baselines the plan when throughput drifts |
-| Claude Code agent | Executes one task at a time: test plan first, then code, then QA. Updates STATUS.md. Opens one PR per task. Stops and asks when blocked |
+| Human engineer | Picks the next task, reviews and merges every change, approves design gates and spike decisions, answers the agent's questions, owns all credentials and deployments, re-baselines the plan when throughput drifts |
+| Claude Code agent | Executes one task at a time: tests first, then code, then quality checks. Updates STATUS.md. Opens one change per task. Stops and asks when blocked |
 
-Two rules that keep this safe:
+Two rules keep this safe:
 
-1. The agent never merges its own PRs. A human merges.
+1. The agent never merges its own work. A human merges.
 2. The agent never starts a task the human did not name. No self-directed scope.
 
-## 2. First-run sanity check
+## 2. First run
 
-The plan lives in `docs/development-plan/`; `CLAUDE.md` (copied to the repo root of the build repo) is auto-loaded. Before the first task:
+The plan lives in `docs/development-plan/`. `CLAUDE.md` at the repository root is loaded automatically. Before the first task:
 
-1. Verify `STATUS.md` is present with all **93 tasks** set to `todo`.
-2. Open Claude Code at the repo root and paste:
-
-> **Bootstrap prompt**
-> Read CLAUDE.md, then docs/development-plan/REQUIREMENTS.md, PLAN.md, TECHNICAL-PLAN.md, AI-NATIVE-PLAN.md, UIUX-PLAN.md, IMPLEMENTATION-PLAN.md and EXECUTION-GUIDE.md. Skim OPERATELY-COMPARISON.md so you know why the plan is shaped this way. Do not write any code. Reply with: (1) a one-paragraph summary of what we are building, (2) the first task ID you would execute and why, (3) any contradiction or ambiguity you found across the documents. Then stop.
-
-3. Fix any real contradiction it finds (edit the docs, commit). When the reply is clean, start `P1-T01`.
+1. Check that STATUS.md is present with all 104 tasks set to `todo`.
+2. Open Claude Code at the repository root and paste the bootstrap prompt from PROMPT.md §1.
+3. Fix any real contradiction it finds by editing the documents and committing. When the reply is clean, start `P1-T01`.
 
 ## 3. The task loop
 
-One task, one branch, one PR.
+One task, one branch, one change request.
 
 ```
-human picks task -> agent restates plan -> human confirms -> agent: tests -> code -> QA
-      -> agent opens PR + updates STATUS.md -> human reviews -> merge (or rework) -> next task
+human picks a task -> agent restates the plan -> human confirms
+   -> agent: tests -> code -> quality checks
+   -> agent opens the change and updates STATUS.md
+   -> human reviews -> merge or rework -> next task
 ```
 
-### Step 1. Human starts a task
+### Step 1. The human starts a task
 
-Pick the next task whose `Depends on` entries are all `done` in STATUS.md. Paste:
+Pick the next task whose dependencies are all `done` in STATUS.md, then paste the start-task prompt from PROMPT.md §2 with that task identifier.
 
-> **Start-task prompt**
-> Execute task `<TASK-ID>` from docs/development-plan/IMPLEMENTATION-PLAN.md. First restate the task in your own words: goal, deliverables, test plan, and anything unclear, and confirm the Definition of Ready holds. Do not write code yet. Wait for my confirmation.
+### Step 2. The agent restates, the human confirms
 
-Note: every task's full body lives in IMPLEMENTATION-PLAN.md, except Phase 5 (`P5-*`), whose bodies are in AI-NATIVE-PLAN.md §12. The loop is identical.
+The agent replies with its understanding and any questions. If the restatement is wrong, correct it now. It is the cheapest moment to fix a misunderstanding. Then reply "confirmed, proceed".
 
-### Step 2. Agent restates, human confirms
+### Step 3. The agent executes
 
-The agent replies with its understanding and any questions. If the restatement is wrong, correct it now — it is the cheapest moment to fix a misunderstanding. Then reply `Confirmed, proceed`.
+1. **Tests.** Write the task's tests first. New tests must fail before the implementation exists, except for pure scaffolding. Setup goes through the test-support factory, calling core services rather than inserting rows directly.
+2. **Development.** Implement until green, following every hard rule in CLAUDE.md.
+3. **Quality checks.** Run type checking, linting and the affected suites, and exercise the feature in the running application where the task calls for it.
 
-### Step 3. Agent executes
-
-1. **Test plan.** Write the task's tests first; new tests must fail before the implementation exists (red), except pure scaffolding. Test setup goes through the `test-support` factory (core services, never raw inserts).
-2. **Development.** Implement until green. Follow every hard rule in CLAUDE.md (Operation pipeline, access getter, RLS-with-migration, outbox-only enqueue, Zod, strict TS).
-3. **QA.** Run the task's QA checklist, `pnpm typecheck`, `pnpm lint`, the full affected suite, and exercise the feature in the running app when the checklist says so.
-
-### Step 4. Agent reports
+### Step 4. The agent reports
 
 1. Set the STATUS.md row to `in_review` with the branch name and date.
-2. Commit on `task/<task-id-lowercase>-<short-slug>` (e.g. `task/p3-t06-check-ins`).
-3. Open a PR titled `<TASK-ID>: <task title>` containing: the task ID, what was done, the CLAUDE.md Definition of Done checklist with each box ticked or explained, test evidence, and any deviations from the task text.
+2. Commit on a branch named `task/<task-id-lowercase>-<short-slug>`.
+3. Open a change request titled `<TASK-ID>: <task title>` containing the task identifier, what was done, the Definition of Done checklist with every box ticked or explained, test evidence, and any deviation from the task text.
 4. Stop. Do not start another task.
 
-If CI or tests fail beyond the task's scope, set the task to `blocked`, describe the blocker, and stop.
+If tests or continuous integration fail beyond the task's scope, set the task to `blocked`, describe the blocker, and stop.
 
-### Step 5. Human reviews
+### Step 5. The human reviews
 
-Use the checklist in section 7. Outcomes: **approve and merge** (set the row `done`), or **request changes**:
-
-> **Rework prompt**
-> Rework task `<TASK-ID>`. Address these review comments: `<comments>`. Do not change anything outside the scope of these comments. Update the PR when done and stop.
+Use the checklist in §7. The outcome is either approve and merge, setting the row to `done`, or request changes with the rework prompt from PROMPT.md §5.
 
 ### Step 6. Next task
 
-Return to step 1. One task at a time per working copy; for parallelism see §6.
+Return to step 1. One task at a time per working copy. For parallel work see §6.
 
-## 4. Phase gates, design gates, and spikes
+## 4. Phases, design gates and spikes
 
-- The eight phases run **strictly in sequence** (Phase 2 on Phase 1, and so on). Within a phase, per-task `Depends on` rules the order.
-- Before a phase's first task: the human checks the previous phase is `done`, and the agent runs that phase's exit checklist and reports results.
-- **Design gates** (`P3-T00`, `P4-T00`, `P5-T00`) produce `docs/design/*` docs and require the explicit reply `Design approved for Phase <n>` before that phase's implementation tasks start. The P3-T00 golden-master matrices get a line-by-line human review — they are the correctness contract for the engines.
-- **Spikes** (`P1-T03`, and any task marked `[SPIKE]`) end in a written go/no-go against their PLAN.md §13 risk-register row. A "no-go" invokes that row's documented fallback — it is not a failure, it is the plan working.
+- The eight phases run strictly in sequence. Within a phase, each task's dependencies rule the order.
+- Before a phase's first task, the human checks the previous phase is complete, and the agent runs that phase's exit checklist and reports the result.
+- **Design gates** are P3-T00, P4-T00, P5-T00 and P8-T01. Each produces design documents and requires the explicit reply "design approved for phase N" before any implementation task in that phase starts. Two artifacts get a line-by-line human review because they are correctness contracts: the golden-master matrices at P3-T00, and the rule corpus and trigger catalogue at P4-T00.
+- **Spikes** end in a written decision against their risk-register row in PLAN.md §12. A negative result invokes that row's documented fallback. That is the plan working, not a failure.
 
 ## 5. STATUS.md rules
 
-- One row per task, statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped` (skipped requires a note and human sign-off).
-- Append-only in spirit: never delete rows, never rewrite history in Notes.
-- Every status change is one commit (may ride the task branch). If STATUS.md and reality disagree, reality wins; fix it in the same PR.
+- One row per task. Statuses are `todo`, `in_progress`, `in_review`, `blocked`, `done` and `skipped`. Skipping requires a note and human sign-off.
+- Never delete a row and never rewrite history in the notes column.
+- Every status change is one commit, which may ride the task branch. If STATUS.md and reality disagree, reality wins, and the file is corrected in the same change.
 
-## 6. Throughput, parallelism, and re-baselining
+## 6. Throughput and parallel work
 
-- **Planning assumption (PLAN.md §12):** one human reviewer + the agent sustain **3–5 merged tasks per week** (L tasks count double). Phases 1–6 ≈ 6–9 months. Review time is the rate limiter — budget 10–30 minutes per task.
-- **Parallel tracks are allowed** for tasks with no dependency edge and no shared files, using separate git worktrees/sessions (e.g. P2-T05 files alongside P2-T04 invitations). Never run two tasks in one working copy. Merge order follows the dependency graph.
-- **Re-baseline, don't slip:** if actual throughput diverges from the assumption by more than ±50% over a month, stop and re-baseline — cut Phase 4 scope before Phase 3 scope (PLAN.md §13 R6), or split tasks. A silent slip is the only unacceptable outcome.
+- **The planning assumption:** one human reviewer plus the agent sustain three to five merged tasks per week, where large tasks count double. Phases 1 to 7 take roughly seven to ten months. Review time is the limiting factor, so budget ten to thirty minutes per task.
+- **Parallel tracks are allowed** for tasks with no dependency edge and no shared files, using separate worktrees and sessions. Never run two tasks in one working copy. Merge order follows the dependency graph.
+- **Re-baseline rather than slip.** If actual throughput diverges from the assumption by more than half over a month, stop and re-baseline. Cut Phase 5 scope before Phase 4 scope. A silent slip is the only unacceptable outcome.
 
-## 7. Human review checklist per PR
+## 7. Review checklist
 
-- [ ] Acceptance criteria met — walk each Given/When/Then yourself or via the e2e output.
-- [ ] CI green (affected-graph run; flakiness report shows no new quarantine candidates).
-- [ ] Definition of Done checklist in the PR description is complete and honest.
-- [ ] New tables ship `workspace_id` + an RLS policy in the same migration; protected aggregates get an access context + bindings in their creation Operation.
-- [ ] Writes go through the Operation pipeline (audit + outbox in-transaction); reads through the access getter. Spot-check the diff for ad-hoc queries or direct driver calls.
-- [ ] No vendor SDK import outside `packages/adapters`.
-- [ ] External inputs Zod-validated; rich text through the shared core module.
-- [ ] If the schema changed: the FlowyTeam mapping (TECHNICAL-PLAN.md §7.2) updated in the same PR (or "new, no legacy source" noted); DATABASE.md updated.
-- [ ] If the action registry changed: contract projections regenerated, drift check green.
-- [ ] STATUS.md row updated. No secrets, no unjustified `any`, no unapproved dependency.
+- [ ] Acceptance criteria met. Walk each Given / When / Then yourself or through the test output.
+- [ ] Continuous integration is green, and the flakiness report shows no new quarantine candidates.
+- [ ] The Definition of Done checklist in the change description is complete and honest.
+- [ ] New tables carry the tenant key and a row-level security policy in the same migration. Protected aggregates get an access context and bindings inside their creation Operation.
+- [ ] Writes go through the Operation pipeline with audit and outbox in the same transaction. Reads go through the access getter. Spot-check the change for ad-hoc queries or direct driver calls.
+- [ ] No vendor SDK imported outside the adapters package.
+- [ ] External inputs validated at the boundary. Rich text goes through the shared module.
+- [ ] Any rule, threshold, band, corridor or taxonomy touched matches METHOD.md, and the conformance suite passes.
+- [ ] If the schema changed: the importer mapping in TECHNICAL-PLAN.md §7.2 is updated in the same change, or the table is marked as having no legacy source. DATABASE.md is updated.
+- [ ] If the action registry changed: the generated projections are regenerated and the drift check is green.
+- [ ] If a proactive message was added: it has a rule key, a nudge record, deduplication, an escalation position and a snooze path.
+- [ ] STATUS.md row updated. No secrets, no unjustified loose types, no unapproved dependency.
 
 ## 8. When the agent must stop and ask
 
 - Acceptance criteria are ambiguous or contradict another document.
-- A task needs a new runtime dependency, or a power-floor item (REQUIREMENTS §6) seems needed in v1.
-- Anything in the CLAUDE.md "Ask the human" list.
-- A spike is trending no-go.
-- Two consecutive rework rounds have failed. Do not grind; escalate with a written summary of what was tried.
+- A task needs a new runtime dependency, or a deferred item from REQUIREMENTS.md §9 seems necessary in v1.
+- Anything on the "ask the human" list in CLAUDE.md.
+- A rule, threshold or coaching message would need to change in METHOD.md.
+- A spike is trending toward a negative result.
+- Two consecutive rework rounds have failed. Do not grind. Escalate with a written summary of what was tried.
 
-## 9. Failure and rework handling
+## 9. Failure and rework
 
-- A task that keeps failing is a signal the task is cut wrong. The human may split it (`<TASK-ID>a`, `<TASK-ID>b` added to IMPLEMENTATION-PLAN.md with a note) rather than letting one PR balloon.
-- Reverts are normal: revert PR first, then fix forward. Keep main releasable at all times.
-- Never rewrite a shipped migration. Forward-only, always; data reshaping goes through the data-change runner (P2-T13).
+- A task that keeps failing is a signal that the task is cut wrong. The human may split it, adding the split to IMPLEMENTATION-PLAN.md with a note, rather than letting one change balloon.
+- Reverts are normal. Revert first, then fix forward. Keep the main branch releasable at all times.
+- Never rewrite a shipped migration. Forward-only, always. Data reshaping goes through the data-change runner.
 
-## 10. Session hygiene for the agent
+## 10. Session hygiene
 
 - One task per session where practical. Long sessions drift.
-- Start every session by reading: CLAUDE.md (automatic), STATUS.md, and the current task's text. Small tasks need nothing else.
-- If a session ends mid-task, leave STATUS.md at `in_progress` with a Notes entry saying exactly where it stopped.
+- Start every session by reading CLAUDE.md (automatic), STATUS.md and the current task's text. Small tasks need nothing else.
+- If a session ends mid-task, leave STATUS.md at `in_progress` with a note saying exactly where it stopped.
 
 ## 11. Worked example
 
-1. Human: STATUS.md shows `P3-T05 done`. Next eligible is `P3-T06`. Paste the start-task prompt.
-2. Agent: restates — "Goal: check-ins as immutable snapshot bundles with draft/publish and reviewer acknowledgement… Tests: draft emits no side effects; publish snapshots + advances cadence + creates the reviewer obligation; delete rolls pointers back. Question: does the edit window apply to drafts?" Human: "Drafts are freely editable; the window applies after publish. Confirmed, proceed."
-3. Agent: writes failing tests, implements, runs QA, updates STATUS.md to `in_review`, opens `P3-T06: Check-ins: snapshots, draft/publish, acknowledgement`, stops.
-4. Human: reviews with §7, merges, sets `done`. Repeat with `P3-T07`.
+1. The human sees `P3-T06` is done. The next eligible task is `P3-T07`. They paste the start-task prompt.
+2. The agent restates: "Goal: check-ins as immutable snapshot bundles with draft and publish, reviewer acknowledgement and private team voting. Tests: a draft emits no side effects, publishing snapshots values and advances the cadence and creates the reviewer obligation, deletion rolls pointers back, votes stay hidden until the reveal. Question: does the edit window apply to drafts?" The human answers: "Drafts are freely editable. The window applies after publishing. Confirmed, proceed."
+3. The agent writes failing tests, implements, runs the quality checks, sets STATUS.md to `in_review`, opens the change and stops.
+4. The human reviews with §7, merges, and sets the row to `done`. Then starts `P3-T08`.
 
-Total human time per small task is typically 10–20 minutes of review. That is the monitoring cost this process is designed around — and the §6 throughput math is built on it.
+Total human time per small task is typically ten to twenty minutes of review. That is the cost this process is designed around, and the §6 throughput assumption is built on it.
