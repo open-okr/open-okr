@@ -443,10 +443,10 @@ picture_slide('05-alignment-studio', 'Alignment is contribution, not copying',
               'the Coach adds what structure alone cannot see.', 'S-16')
 
 picture_slide('06-kpi-recovery', 'When a KPI leaves its corridor, the product drafts the fix',
-              'Net revenue retention sits at seventy-one percent of target, below the ninety percent '
-              'floor. The recovery objective was drafted from its own leading drivers and is half '
-              'complete, so effective health reads seventy-nine: the fix is visible before the '
-              'lagging number catches up.', 'S-18 / S-19')
+              'Expansion revenue sits at forty-three percent of target. It was forty percent when the '
+              'recovery launched and the recovery is forty-nine percent complete, so effective health '
+              'reads sixty-five: the fix shows before the lagging number catches up. One key result '
+              'per leading child driver.', 'S-18 / S-19')
 
 picture_slide('07-weekly-session', 'Fifteen minutes, four steps, run by the product',
               'Team votes reveal together so nobody anchors on the champion. Every low score becomes '

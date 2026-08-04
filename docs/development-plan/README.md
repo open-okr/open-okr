@@ -32,6 +32,7 @@ Also here:
 - [DATABASE.md](DATABASE.md): the consolidated schema: every table, key columns and relationships. A derived view; the authority is TECHNICAL-PLAN.md §4.
 - [PROMPT.md](PROMPT.md): copy-and-paste prompts for running development.
 - [STATUS.md](STATUS.md): task tracking. The agent updates rows; only a human sets `done`.
+- [Reference mockups](../stakeholder/mockups/README.md): eleven screens from UIUX-PLAN.md §6 drawn as HTML and rendered to PNG. Look at the mockup before starting a UI task. Reference, not authority: UIUX-PLAN.md §10 has the rule.
 
 `docs/design/` exists only once execution starts: detailed designs written by the agent at each phase's design gate.
 
@@ -45,6 +46,7 @@ PLAN.md              principles, packages, deployment, phases, risks
 TECHNICAL-PLAN.md    schema, access model, outbox, engines, importers, security, budgets
 AI-NATIVE-PLAN.md    providers, governance, channels, the Coach and the Champion, MCP
 UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40)
+      |              ...eleven of which are drawn in ../stakeholder/mockups/
       |
 IMPLEMENTATION-PLAN.md   104 ordered tasks in eight phases: P1-* to P8-*
       |

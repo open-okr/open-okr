@@ -29,7 +29,7 @@ All in `docs/development-plan/` unless noted:
 
 If two documents disagree, the one higher in this list wins, with one exception: never resolve a REQUIREMENTS versus PLAN conflict yourself. Stop and ask.
 
-**Supporting documents** (context, not authority): `STATUS.md` (the live task tracker, read it every session, you update rows and only a human sets `done`), `DATABASE.md` (the derived consolidated schema, authority is TECHNICAL-PLAN §4, update it in the same change), `OVERVIEW.md` (the end-user product overview), `PROMPT.md` (the human's prompts), `README.md` (the index).
+**Supporting documents** (context, not authority): `STATUS.md` (the live task tracker, read it every session, you update rows and only a human sets `done`), `DATABASE.md` (the derived consolidated schema, authority is TECHNICAL-PLAN §4, update it in the same change), `OVERVIEW.md` (the end-user product overview), `PROMPT.md` (the human's prompts), `README.md` (the index), `docs/stakeholder/mockups/` (eleven screens from UIUX-PLAN §6 drawn as HTML and rendered to PNG).
 
 ## How you work: the task loop
 
@@ -49,6 +49,8 @@ Phases have design gates at P3-T00, P4-T00, P5-T00 and P8-T01. Do not begin a ph
 ## Design docs
 
 Detailed designs live in `docs/design/`, written by you at each design gate. Keep them scannable: tables and examples over prose. Write acceptance criteria as testable Given / When / Then. When implementation deviates from a design document, update the document in the same change.
+
+**Reference mockups.** Eleven screens are drawn in `docs/stakeholder/mockups/` and indexed in UIUX-PLAN.md §10. Look at the mockup before you start a UI task that cites one: it shows the density, the chips, the states and the composition the specification describes in words. They are reference, not authority. When a mockup and a specification disagree, the specification wins and the mockup gets fixed. Never cite a mockup as the reason for a behaviour.
 
 ## Hard rules, never break these
 
@@ -125,6 +127,7 @@ deploy/helm         Helm chart
 deploy/cloud        Vendor-operated overlay: provisioning, operator console
 docs/development-plan  This plan set, STATUS.md, the reference knowledge base
 docs/design         Design documents, written per phase
+docs/stakeholder    Stakeholder pack, and the reference mockups the UI tasks cite
 ```
 
 ## Commands
@@ -152,6 +155,7 @@ Keep this list current once scaffolded.
 - Sensitive actions emit append-only audit events with the acting principal and, where relevant, the channel.
 - Loading, empty, error and permission-denied states implemented, not just the happy path.
 - Interface tasks pass the UIUX-PLAN.md §9 quality gates.
+- Any reference mockup showing a rule, band, corridor, penalty, taxonomy or trigger key you changed is updated in the same change, or recorded as a follow-up. The conformance suite cannot see those files.
 - Contract projections regenerated and the drift check green if the registry changed.
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The design document is updated if implementation deviated. The `STATUS.md` row is updated.

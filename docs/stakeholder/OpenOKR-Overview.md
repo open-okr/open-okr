@@ -179,9 +179,9 @@ Vertical alignment is contribution, not copying. Horizontal alignment is a depen
 
 KPIs describe the health of the business. OKRs describe what is being changed about it. The product holds both, and connects them.
 
-Every KPI sits in a health corridor: at or above ninety percent of target is healthy, seventy to eighty-nine is watch, below seventy is unhealthy. When a KPI turns unhealthy, OpenOKR drafts a **recovery objective** from its own leading drivers. The KPI then reads "recovering", and its effective health rises with the recovery's progress, so the fix is visible before the lagging number catches up.
+Every KPI sits in a health corridor: at or above ninety percent of target is healthy, seventy to eighty-nine is watch, below seventy is unhealthy. When a KPI turns unhealthy, OpenOKR drafts a **recovery objective**, one key result per leading child driver. The KPI then reads "recovering", and its effective health rises with the recovery's progress, so the fix is visible before the lagging number catches up.
 
-![A KPI driver tree with a live recovery objective. Net revenue retention is at seventy-one percent of target, below the corridor floor, but the recovery is half complete so effective health reads seventy-nine. The recovery board lists every unhealthy KPI across every tree with a one-click launch.](mockups/png/06-kpi-recovery.png){width=6.5in}
+![A KPI driver tree with a live recovery objective. Expansion revenue sits at forty-three percent of target. It was forty percent when the recovery launched and the recovery is forty-nine percent complete, so effective health reads sixty-five: the fix shows before the lagging number catches up. Each key result comes from one leading child driver. The recovery board lists every unhealthy KPI across every tree with a one-click launch.](mockups/png/06-kpi-recovery.png){width=6.5in}
 
 ## 4.7 The weekly rhythm
 

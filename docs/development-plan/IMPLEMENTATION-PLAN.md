@@ -269,6 +269,7 @@ Acceptance: Given quarterly cadence on a date inside Q3, then the active cycle i
 ### P3-T03: The guided cycle workflow [L]
 Depends on: P3-T02
 Goal: the eight phases as a computed workflow, not a checklist (METHOD.md §2, screens S-04 to S-12).
+Reference mockup: [02-cycle-workspace](../stakeholder/mockups/png/02-cycle-workspace.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the input pack with per-item state and distribution tracking; prior-cycle scoring rows; baseline health; ranked strategic issues with impact and source; priorities with success statements and promotion into objectives; the quarterly revalidation record with focus key results; capacity notes; the gate state table recomputed on every relevant write; phase completion computed from METHOD.md §2.3; the mid-cycle calibration record; the cycle workspace interface with the phase rail, facilitator guidance and the deadline countdown; the cycle strip in the shell.
 Test plan: each phase's completion conditions flip exactly on their inputs; promoting a priority creates an objective linked back to it; the countdown honours the workspace timezone; a calibration beyond the first is refused.
 Acceptance: Given a quarterly cycle whose input pack has two items missing, when the facilitator opens Phase 4, then drafting is blocked with the two missing items named and a link to gather them.
@@ -304,6 +305,7 @@ Acceptance: Given a published check-in moving a key result from forty to fifty-f
 ### P3-T08: Review inbox [M]
 Depends on: P3-T07
 Goal: what I owe right now (screen S-02).
+Reference mockup: [10-review-inbox](../stakeholder/mockups/png/10-review-inbox.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the computed obligations query covering check-ins due as champion, acknowledgements owed as reviewer respecting reviewer-change history, and placeholders for the blocker, commitment, session and proposal sources that later phases fill; overdue-first grouping with action and due labels; the page with inline one-click actions; the live sidebar badge with cache invalidation from the relevant Operations.
 Test plan: an obligation appears and disappears exactly on publication and acknowledgement; a reviewer appointed today is not asked to acknowledge last month; the badge updates live.
 Acceptance: Given a champion with one overdue check-in and a reviewer role on another goal's fresh check-in, when they open Review, then they see exactly two obligations, overdue first, each actionable inline.
@@ -311,6 +313,7 @@ Acceptance: Given a champion with one overdue check-in and a reviewer role on an
 ### P3-T09: Alignment: parents, dependencies, the alignment engine [L]
 Depends on: P3-T04
 Goal: the cascade and the cross-team links with a computed health score (METHOD.md §5).
+Reference mockup: [05-alignment-studio](../stakeholder/mockups/png/05-alignment-studio.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: horizontal goal dependencies; the key result dependency register with confirmation and a named risk owner; the alignment engine producing the score and one structural finding per penalty, each linked to the goal that caused it; the finding table shared with the Coach's later semantic findings; recomputation driven from the outbox on structural change.
 Test plan: each penalty fires exactly on its condition and the arithmetic matches METHOD.md §5.2; a department whose subtree gains one dependency clears the silo finding; a dependency that is confirmed clears its finding, and one with a risk owner but no confirmation clears the gate but keeps the finding.
 Acceptance: Given a tree with one orphan goal and one siloed department, when the score is computed, then it reads eighty and lists exactly two findings, each opening the goal responsible.
@@ -318,6 +321,7 @@ Acceptance: Given a tree with one orphan goal and one siloed department, when th
 ### P3-T10: Goal surfaces: explorer, detail, alignment studio [L]
 Depends on: P3-T07, P3-T09
 Goal: the primary interface (screens S-13, S-14, S-16).
+Reference mockup: [05-alignment-studio](../stakeholder/mockups/png/05-alignment-studio.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the explorer with scope tabs, cycle switcher, filters and a virtualised tree with health, staleness and confidence chips, inline editing and a quick check-in; the goal page with the score ring, key result rows with sparkline and forecast, check-in history with differences, discussion and the right rail; the alignment studio canvas with vertical connectors, dashed dependency connectors, pan, zoom, keyboard traverse, virtualisation, the link mode and the three-tab panel of details, health and review.
 Test plan: budgets spot-checked on seeded data; the canvas stays interactive at a thousand nodes; keyboard traverse reaches every node.
 Acceptance: Given the explorer, when a key result is checked in from the side panel, then progress, RAG and health update live in both the list and the canvas.
@@ -325,6 +329,7 @@ Acceptance: Given the explorer, when a key result is checked in from the side pa
 ### P3-T11: Work Map [M]
 Depends on: P3-T10
 Goal: the home screen (screen S-01).
+Reference mockup: [01-work-map](../stakeholder/mockups/png/01-work-map.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the virtualised tree over goals, sub-goals and key results with the uniform node contract of health including staleness, progress, confidence, champion, timeframe and next step; scope tabs and filters; side-panel opening; deep links; home routing. Initiative and task rows are added in Phase 5.
 Acceptance: Given the home screen, when it renders, then the company's goal tree shows rolled-up health with stale goals visibly outdated, inside the budget.
 
@@ -344,6 +349,8 @@ Acceptance: Given a monthly KPI defined as the sum of two others, when one sourc
 ### P3-T14: KPI trees, corridors, recovery OKRs [L]
 Depends on: P3-T13, P3-T05
 Goal: the driver tree and the recovery loop (METHOD.md §6, screens S-18, S-19, S-21).
+Reference mockup: [06-kpi-recovery](../stakeholder/mockups/png/06-kpi-recovery.png). Reference, not authority: UIUX-PLAN.md §10.
+Open question, resolve before starting: METHOD.md §6.5 and §6.3 disagree on which drivers become the recovery objective's key results when the unhealthy KPI's own children are all lagging. See REQUIREMENTS.md §10. The mockup deliberately shows a KPI where both readings agree.
 Deliverables: named KPI trees with the canvas, corridor gauges and per-node metadata; the recovery drafter creating the recovery goal from the KPI's leading children with the objective and up to four key results, storing the starting achievement and flipping the state to recovering; effective health while recovering; the proposal to close when achievement re-enters the corridor; the recovery board across every tree; the KPI detail with the period chart, corridor bands, records table and formula builder; the key result to KPI link with the scoring branch reading the KPI's achievement.
 Test plan: launching a recovery OKR on an unhealthy KPI with three leading children produces three key results with correct baselines and targets; effective health rises with recovery progress while real achievement lags; a KPI with no leading children gets the placeholder key result; re-entering the corridor proposes closure exactly once.
 Acceptance: Given an unhealthy KPI, when the owner launches recovery, then a goal exists whose key results are its leading drivers, the KPI reads recovering, and the recovery board shows it with its progress.
@@ -391,6 +398,7 @@ Acceptance: Given the corpus of real OKR drafts, when the package evaluates them
 ### P4-T02: The quality engine and Draft Coach surfaces [L]
 Depends on: P4-T01, P3-T04
 Goal: quality at the point of writing (REQUIREMENTS.md §3.2, screen S-09).
+Reference mockup: [03-draft-coach](../stakeholder/mockups/png/03-draft-coach.png), [03b-rule-card](../stakeholder/mockups/png/03b-rule-card.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: server-side evaluation on every goal and key result write, storing the strength score and flags; client-side evaluation as the user types, from the same package; the rule verdict component showing a status dot, a short label and on demand the coaching prompt, the reason and the example pair; the strength meter in the composer header; the quality panel listing every open issue across a set grouped by objective; a link from every verdict to the rule itself; per-workspace strictness.
 Test plan: evaluation completes inside the sixteen-millisecond budget on the client for a five-key-result objective; server and client verdicts are identical for the same input; strict mode promotes every warning to a failure; the flags stored on the goal match the last evaluation.
 Acceptance: Given an objective beginning with an output verb, when the champion types it, then the rule fails inline with its coaching prompt and example within one keystroke's latency, and the strength score drops immediately.
@@ -398,6 +406,7 @@ Acceptance: Given an objective beginning with an output verb, when the champion 
 ### P4-T03: Publish gates [M]
 Depends on: P4-T02, P3-T03
 Goal: the six gates as hard server-side enforcement (METHOD.md §4.5, screen S-10).
+Reference mockup: [04-gates-capacity](../stakeholder/mockups/png/04-gates-capacity.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: gate evaluation from the method package over the cycle's whole set, recomputed on every relevant write; the gate checklist interface where each unmet gate links to what would fix it; the publish action refusing with the specific gate and reason; an override path that requires elevated access, a written reason and an audit event.
 Test plan: each gate flips exactly on its condition; publishing with any gate red is refused server-side even when the interface is bypassed; an override records its reason and actor.
 Acceptance: Given a set with one unconfirmed and unowned dependency, when the facilitator publishes, then it is refused naming gate four and linking to the dependency register.
@@ -405,6 +414,7 @@ Acceptance: Given a set with one unconfirmed and unowned dependency, when the fa
 ### P4-T04: The nudge engine, triggers and escalation [L]
 Depends on: P4-T01, P3-T08
 Goal: the machinery that makes the product active (AI-NATIVE-PLAN.md §6.3, §6.4).
+Reference mockup: [10-review-inbox](../stakeholder/mockups/png/10-review-inbox.png), [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the nudge table and rule registry; the engine computing what is due now per member with deduplication of one per subject per member per day unless escalating; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; escalation ladders for check-ins, acknowledgements and blockers; the suppression record with a reason; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules. Delivery goes to the in-app inbox and email in this task; chat channels arrive in Phase 5.
 Test plan: a burst of triggers on one subject produces one nudge; an escalation advances exactly one step and is delivered even inside quiet hours when marked urgent; a snooze silences the nudge but never the review-inbox obligation; a simulated month against the demo workspace stays under the volume ceiling per member.
 Acceptance: Given a champion who misses their check-in, when the engine runs over the following fortnight, then they are nudged on the due day and once daily after, the reviewer is brought in at the grace boundary, the coordinator at seven days and the sponsor at fourteen, each step recorded and visible to the champion.
@@ -419,6 +429,7 @@ Acceptance: Given a workspace with the agent enabled and AI configured, when a c
 ### P4-T06: The OKR Coach agent [L]
 Depends on: P4-T05
 Goal: the quality agent (AI-NATIVE-PLAN.md §6.1).
+Reference mockup: [05-alignment-studio](../stakeholder/mockups/png/05-alignment-studio.png), [03-draft-coach](../stakeholder/mockups/png/03-draft-coach.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the nightly semantic sweep producing relink, dependency, conflict and gap findings into the shared finding table with severity, reason and a one-click apply where mechanical; divergence detection between reported health and the data; the quality triggers from AI-NATIVE-PLAN.md §6.4; the rewrite assist per failing rule; the coach strip on the goal page and the review tab in the alignment studio; every message citing its rule key.
 Test plan: a message citing a rule key the method package does not define fails the build; a dismissed finding stays dismissed; applying a relink finding re-parents the goal through the normal Operation with audit; with AI off the structural findings and the quality triggers still fire while the semantic ones do not.
 Acceptance: Given two goals in different spaces that double-count the same metric, when the nightly sweep runs, then a conflict finding appears for both champions with a specific reason, and dismissing it on one side dismisses it everywhere.
@@ -426,6 +437,7 @@ Acceptance: Given two goals in different spaces that double-count the same metri
 ### P4-T07: Weekly session: confidence round, voting, blockers [L]
 Depends on: P4-T04, P3-T07
 Goal: steps one and two of the ritual (METHOD.md §7.2, screen S-22).
+Reference mockup: [07-weekly-session](../stakeholder/mockups/png/07-weekly-session.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the session record with kind, schedule, facilitator, stage state and elapsed time, synchronised live so every participant sees the same screen; the confidence round with the key result list, the focus panel, the draggable dial with band shortcuts, the synchronised vote reveal with a team average, the what-changed note and the confirm that advances; the blocker step with the five-type picker showing each type's definition, the owner, the next action, the twenty-four hour clock and the escalation notice at the critical threshold; the blocker table, board and aging.
 Test plan: a step cannot be completed while any key result is unscored or any low score lacks a type, an owner and an action; the vote reveal is atomic across clients; a blocker's due time is its opening plus the workspace clock; a confidence at or below the critical threshold escalates immediately.
 Acceptance: Given a session where one key result scores below the threshold, when the coordinator tries to continue, then it is refused until that key result has a blocker type, a named owner and a next action, and the blocker's clock starts on save.
@@ -446,6 +458,7 @@ Acceptance: Given a monthly review recording a decision against a key result, wh
 ### P4-T10: Quarterly review: session shell, scoring, narratives [L]
 Depends on: P4-T09
 Goal: the first act (METHOD.md §8, screen S-24).
+Reference mockup: [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the session shell with the eleven-stage rail grouped by act, the lap bar segmented by duration, the stage timer with pacing cues and an add-a-minute control, private facilitator notes per stage, and live stage synchronisation; the open and check-in stage with the pulse picker and the room-pulse read; the scoring stage with evidence, sliders, reasons, the hidden objective score with an animated reveal that respects reduced motion, and the running cycle score; the narratives stage with the pass-the-mic control; the recognition stage.
 Test plan: stage changes reach every connected client inside the budget; the reveal is deterministic and instant under reduced motion; scores written here land on the key results when the session closes.
 Acceptance: Given a running review at the scoring stage, when the facilitator reveals an objective's score, then every participant sees the same number at the same time, and the cycle score updates.
@@ -453,6 +466,7 @@ Acceptance: Given a running review at the scoring stage, when the facilitator re
 ### P4-T11: Quarterly review: retro, diagnostic, reset [L]
 Depends on: P4-T10
 Goal: the second and third acts (METHOD.md §8).
+Reference mockup: [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the team retro with prompt chips, two columns, sticky notes and dot voting; the management retro with its four questions; the root-cause stage listing every key result below the threshold with the eight-cause picker and a detail field; the anonymous process-health survey with live averages and response counts; the rhythm diagnostic computed from the cycle score and the rhythm score with its verdict and narrative; keep, modify and abandon per objective with the meaning of the chosen decision and a required why; learnings with promotion from top-voted themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
 Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; process-health responses cannot be attributed to a member but cannot be submitted twice; a keep, modify or abandon decision writes back to the goal on close; the lowest process-health statement becomes an issue in the next cycle.
 Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic renders, then it reads as a strategy or quality problem with the specific figures, and the prescription tells the facilitator to fix the key results before pushing the team.
@@ -508,6 +522,7 @@ Acceptance: Given a member whose primary channel is unreachable, when a nudge is
 ### P5-T02: Slack driver [L]
 Depends on: P5-T01
 Goal: the first chat provider.
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: self-serve installation and workspace connection; identity linking; outbound rich messages with buttons for direct messages and space channels; inbound signature verification with replay protection; slash command and button action handling; a modal-based check-in.
 Test plan: a tampered inbound payload is rejected; an unlinked sender receives nothing at all; a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry.
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
@@ -515,12 +530,14 @@ Acceptance: Given a champion with a due check-in, when they receive the nudge in
 ### P5-T03: Microsoft Teams driver [L]
 Depends on: P5-T01
 Goal: the enterprise chat provider.
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the application manifest and tenant consent flow; connection and identity linking; adaptive card outbound for direct messages and channels; inbound verification; command and card action handling.
 Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
 
 ### P5-T04: WhatsApp driver [L]
 Depends on: P5-T01
 Goal: the reach provider.
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: Business API connection; template registration per nudge kind with the template-versus-free-form window handled by the message builder; identity linking with verification; conversational inbound handling for check-in and blocker capture; a documented setup runbook.
 Test plan: an outbound message outside the conversation window uses an approved template; inside it, free form is used; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
 Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
@@ -528,6 +545,7 @@ Acceptance: Given a member whose primary channel is WhatsApp, when their check-i
 ### P5-T05: Telegram driver [M]
 Depends on: P5-T01
 Goal: the lightweight provider.
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: bot connection, identity linking with a verification code, outbound messages with inline keyboards, and inbound command and callback handling.
 Acceptance: Given a Telegram-linked member, when they send the status command with a goal identifier, then they receive that goal's health, progress, confidence and next check-in date, subject to their permissions.
 

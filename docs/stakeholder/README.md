@@ -2,6 +2,8 @@
 
 The shareable overview of OpenOKR, for a methodology partner, an investor or an early customer. It is a summary of the plan set in `docs/development-plan/`, not an authority over it. When a fact here disagrees with a planning document, the planning document wins and this one gets corrected.
 
+The `mockups/` folder does double duty. It supplies the screenshots for both artifacts here, and it is the **reference guide the UI implementation tasks cite**, indexed in [UIUX-PLAN.md §10](../development-plan/UIUX-PLAN.md). See [mockups/README.md](mockups/README.md) before changing any of them.
+
 | File | What it is |
 |---|---|
 | `OpenOKR-Overview.docx` | **The document.** A4, ~20 pages, eleven screen mockups. Generated, so never edit it directly |

@@ -132,6 +132,8 @@ Permission `manage_ai`. One admin console:
 
 ## 5. Channels
 
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png), showing the same nudge in all four channels with its trigger key and escalation position. Reference, not authority: UIUX-PLAN.md §10.
+
 The coach is only active if it reaches people. Channels are the delivery layer for everything in §6 and a light command surface for the actions people take most.
 
 ### 5.1 The port

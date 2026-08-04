@@ -217,3 +217,4 @@ Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md.
 - Whether a formal external accessibility audit is required before launch.
 - Sector-specific compliance beyond PDPA and GDPR.
 - Whether the scorecard points layer is built at all. It ships off by default either way.
+- **Recovery OKR drafting when the unhealthy KPI has no leading children.** METHOD.md §6.5 says one key result per *leading child driver*, which yields the placeholder key result. METHOD.md §6.3 says to take the leading drivers at the *edge of the unhealthy branch*, which reaches further down and yields real key results. The two give different answers for a root KPI whose own children are all lagging, which is the common shape. Blocks P3-T14 and the `packages/method` conformance suite.
