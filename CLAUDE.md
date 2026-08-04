@@ -6,7 +6,7 @@
 
 Two things make it different, and every design decision serves one of them.
 
-**The method is in the product.** `docs/development-plan/METHOD.md` holds the OKR practice canon: the eight-phase cycle, scoring and confidence bands, twenty quality rules with their word lists and coaching prompts, six publish gates, the alignment health score, KPI health corridors and recovery objectives, the blocker and root-cause taxonomies, both session agendas, and the closing diagnostic. It is compiled into `packages/method`, a pure library with no database or network access. A conformance suite fails the build when the document and the code disagree.
+**The method is in the product.** `docs/development-plan/METHOD.md` holds the OKR practice canon: the eight-phase cycle, scoring and confidence bands, twenty-six quality checks with their word lists and coaching prompts, six publish gates, the alignment health score, KPI health corridors and recovery objectives, the blocker and root-cause taxonomies, both session agendas, and the closing diagnostic. It is compiled into `packages/method`, a pure library with no database or network access. A conformance suite fails the build when the document and the code disagree.
 
 **The product is active.** Two agent members ship with every workspace. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate, escalate and propose, in the browser, in Slack, Microsoft Teams, WhatsApp and Telegram, by email, and through any external AI agent the user runs. Every message cites a rule key that resolves back to METHOD.md.
 

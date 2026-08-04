@@ -2,7 +2,7 @@
 
 This folder holds a complete, self-contained plan to build **OpenOKR**, an open source, AI-agentic-native OKR platform that coaches an organisation through the whole OKR practice instead of merely storing its goals.
 
-The product's difference is two things at once. **The method is in the product**: a guided eight-phase planning cycle, twenty quality rules that check every draft as it is typed, an alignment health score, KPI health corridors with recovery objectives, two timed session formats, and a diagnostic at the close. And **the product is active**: two AI teammates, an OKR Coach that guards quality and an OKR Champion that guards the rhythm, initiate, escalate and propose, in the browser, in Slack, Teams, WhatsApp and Telegram, by email, and through any AI agent the user already runs.
+The product's difference is two things at once. **The method is in the product**: a guided eight-phase planning cycle, twenty-six quality checks that judge every draft as it is typed, an alignment health score, KPI health corridors with recovery objectives, two timed session formats, and a diagnostic at the close. And **the product is active**: two AI teammates, an OKR Coach that guards quality and an OKR Champion that guards the rhythm, initiate, escalate and propose, in the browser, in Slack, Teams, WhatsApp and Telegram, by email, and through any AI agent the user already runs.
 
 It runs two ways from day one: self-hosted on your own servers, or in our managed cloud, from the same release.
 
@@ -16,7 +16,7 @@ Read in this order the first time.
 |---|---|---|---|
 | 1 | [REQUIREMENTS.md](REQUIREMENTS.md) | Product definition: personas, the operating model, modules, priorities, deployment, and what is deferred | What the product does |
 | 2 | [PLAN.md](PLAN.md) | Architecture principles, packages, adapters, licence, deployment tiers, delivery phases, the risk register, open decisions | How it is architected |
-| 3 | [METHOD.md](METHOD.md) | The OKR practice canon: the cycle model, scoring and confidence bands, the twenty quality rules with their word lists and coaching prompts, publish gates, alignment scoring, KPI corridors and recovery, the blocker and root-cause taxonomies, session agendas, and the closing diagnostic | What good OKR practice is |
+| 3 | [METHOD.md](METHOD.md) | The OKR practice canon: the cycle model, scoring and confidence bands, the twenty-six quality checks with their word lists and coaching prompts, publish gates, alignment scoring, KPI corridors and recovery, the blocker and root-cause taxonomies, session agendas, and the closing diagnostic | What good OKR practice is |
 | 4 | [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) | Target design: the identity and access model, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance budgets and the one-contract API | Technical design |
 | 5 | [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) | The AI and agent layer: providers and bring-your-own-key, governance, chat channels, the Coach and the Champion with the full trigger and escalation catalogue, the copilot, retrieval, and the external agent surface | The AI domain |
 | 6 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, forty screen specifications, accessibility and quality gates | The user interface |

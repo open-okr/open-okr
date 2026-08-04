@@ -201,7 +201,7 @@ Format: purpose, layout, primary actions, states.
 
 **S-35 Auth.** Sign in with email and password, passkeys, one-time passwords, single sign-on buttons where configured, and clear lockout messaging. Registration where enabled, invitation acceptance, forgot and reset. A single clean card with workspace branding and a pre-authentication language switcher.
 
-**S-36 Admin and settings.** A left section navigation with cards on the right and a save per card. Workspace: general, members and access, spaces, rhythm (check-in day, frequency, grace, blocker clock, escalation ladder), thresholds (KPI corridors, RAG bands, objective caps), coaching (strictness, which gates are hard), terminology labels, notifications and channels, authentication and sessions, branding, the audit log with filtering, export and chain verification, the freeze switch, backups, import wizards and workspace export. Every destructive admin action is audit-logged with its actor.
+**S-36 Admin and settings.** A left section navigation with cards on the right and a save per card. Workspace: general, members and access, spaces, rhythm (check-in day, frequency, grace, blocker clock, escalation ladder), thresholds (KPI corridors, RAG bands, objective caps), coaching (strictness with per-space overrides), terminology labels, notifications and channels, authentication and sessions, branding, the audit log with filtering, export and chain verification, the freeze switch, backups, import wizards and workspace export. Every destructive admin action is audit-logged with its actor.
 
 ### AI
 

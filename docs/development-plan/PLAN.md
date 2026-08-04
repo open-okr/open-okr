@@ -61,6 +61,7 @@ deploy/
 docs/
   development-plan/    This plan set
   design/              Written by the agent at each design gate
+  stakeholder/         Stakeholder pack and the reference mockups
 ```
 
 `packages/method` is deliberately separate from `packages/core`. It has no database access and no framework. It is a pure library of the OKR canon, which means every rule is unit-testable in isolation, the agents and the browser share one implementation, and a change to practice is a change to one package.
@@ -175,17 +176,17 @@ Eight phases, each gating on the one before it. The order is deliberate: the age
 
 **Phase 1: Foundation.** Monorepo, CI, database package with the tenant floor and the pooling spike, adapter ports with drivers and the transactional outbox, authentication with passkeys and one-time passwords, workspaces and members, the Operation pipeline with the action contract registry and the audit spine, a proving dashboard, the Compose target with the setup wizard, the Helm target.
 
-**Phase 2: Platform and agent spine.** The relationship access model and `can()`, people and the org chart, invitations, files, subscriptions and the notification spine, the typed activity feed, settings and the module registry, the security baseline, the demo builder, the app shell, design system and rich text editor, the data-change runner, and the AI and agent foundation: the provider port with drivers, bring-your-own-key with encryption and rotation, the model catalogue and tier routing, metering with quotas and hard caps, structured output with versioned prompts, and the agent runtime with runs, sandbox and proposal envelopes.
+**Phase 2: Platform and agent spine.** The relationship access model and `can()`, people and the org chart, invitations, files, subscriptions and the notification spine, the typed activity feed, settings and the module registry, the security baseline, the app shell, design system and rich text editor, the data-change runner, and the AI and agent foundation: the provider port with drivers, bring-your-own-key with encryption and rotation, the model catalogue and tier routing, metering with quotas and hard caps, structured output with versioned prompts, and the agent runtime with runs, sandbox and proposal envelopes.
 
-**Phase 3: The OKR core.** Spaces, cycles and the guided planning workflow, goals and key results with champion and reviewer, the scoring and health engines, the cadence engine and staleness, check-ins with snapshots and acknowledgement, the review inbox, alignment with dependencies and the health score, KPIs with driver trees, formulas, health corridors and recovery OKRs, the scorecard, the goal surfaces and the Work Map.
+**Phase 3: The OKR core.** Spaces, cycles and the guided planning workflow, goals and key results with champion and reviewer, the scoring and health engines, the cadence engine and staleness, check-ins with snapshots and acknowledgement, the review inbox, alignment with dependencies and the health score, KPIs with driver trees, formulas, health corridors and recovery OKRs, the scorecard, the goal surfaces and the Work Map, and the demo workspace builder.
 
 **Phase 4: The coaching layer.** `packages/method` with the full rule catalogue, the Draft Coach engine and its surfaces, the OKR Coach agent, the OKR Champion agent, the trigger and escalation catalogue, the weekly check-in session, the monthly review and decision log, the quarterly review session with the diagnostic and minutes, the copilot, and the per-module assists.
 
 **Phase 5: Reach.** The channel port with Slack, Microsoft Teams, WhatsApp and Telegram drivers, two-way conversational check-in and blocker capture, the MCP server with its OAuth 2.1 authorisation server and the full tool catalogue, initiatives, tasks and the OKR board, documents, search and the command palette, and exports.
 
-**Phase 6: Data.** The CSV and XLSX importer with the AI-assisted mapper, the FlowyTeam importer with reconciliation, workspace export and import, and backups with restore drills.
+**Phase 6: Data.** The CSV and XLSX importer with the AI-assisted mapper, the FlowyTeam importer with reconciliation, workspace export and import, backups with restore drills, and the migration cutover rehearsal.
 
-**Phase 7: Hardening.** Performance budgets at scale, load and soak testing, the security review and the row-level-security fuzz suite, accessibility audit and web vitals budgets, observability, and the migration cutover rehearsal.
+**Phase 7: Hardening.** Performance budgets at scale, load and soak testing, the security review and the row-level-security fuzz suite, accessibility audit and web vitals budgets, observability, and the method conformance audit.
 
 **Phase 8: Cloud, enterprise and launch.** Tenant provisioning and the operator console, plans and seats behind a flag, transparent support access, single sign-on, directory sync and provisioning, multi-factor policy, audit export and chain verification, the air-gap guide, the documentation site, the template gallery, the hosted demo and the launch.
 

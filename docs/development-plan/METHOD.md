@@ -169,19 +169,20 @@ Equal baseline and target scores 0. A goal's progress is the weighted average of
 
 | Confidence | Band | What happens |
 |---|---|---|
-| 0.7 to 1.0 | High | Move to the next key result |
-| 0.4 to 0.69 | Medium | Name what changes this week |
-| 0.0 to 0.39 | Low | Capture a blocker, name an owner and a next action within 24 hours |
-| 0.0 to 0.3 | Low, escalating | The coordinator raises it with management the same day |
+| 0.7 and above | High | Move to the next key result |
+| 0.4 to below 0.7 | Medium | Name what changes this week |
+| Below 0.4 | Low | Capture a blocker, name an owner and a next action within 24 hours |
+
+One further rule inside the low band: at 0.3 and below, the coordinator raises it with management the same day.
 
 At drafting time, judge the *set*, not each key result:
 
 | Average confidence at draft | Verdict |
 |---|---|
 | Above 0.90 | Sandbagging. If you are near certain, this is business as usual, not an OKR. Raise the targets |
-| 0.76 to 0.90 | Comfortable. Stretch until it feels like a 6 or 7 out of 10 |
+| Above 0.75, up to 0.90 | Comfortable. Stretch until it feels like a 6 or 7 out of 10 |
 | 0.40 to 0.75 | The sweet spot. A real stretch you still believe in |
-| 0.25 to 0.39 | Ambitious. Check that the team genuinely believes it is possible |
+| 0.25 to below 0.40 | Ambitious. Check that the team genuinely believes it is possible |
 | Below 0.25 | A moonshot bordering on fantasy. Make sure there is a credible path |
 
 ### 3.3 Score bands
@@ -190,17 +191,17 @@ Scored at the close, against the key result as written. No partial credit for ef
 
 | Score | Meaning |
 |---|---|
-| 0.9 to 1.0 | Fully achieved. Check whether the target was ambitious enough |
-| 0.7 to 0.8 | Strong result. This is the intended level for a stretch target |
-| 0.4 to 0.6 | Partial progress. Examine what limited it |
-| 0.0 to 0.3 | Little progress. Examine the target, the capacity, or the tracking |
+| 0.9 and above | Fully achieved. Check whether the target was ambitious enough |
+| 0.7 to below 0.9 | Strong result. This is the intended level for a stretch target |
+| 0.4 to below 0.7 | Partial progress. Examine what limited it |
+| Below 0.4 | Little progress. Examine the target, the capacity, or the tracking |
 
-Per key result, the coach annotates:
+Per key result, the coach annotates. First match wins; a score from 0.3 to below 0.6 gets no note:
 
 | Score | Note |
 |---|---|
-| 1.0 or above | The target was too safe |
-| 0.6 and above | On the intended level |
+| 1.0 | The target was too safe |
+| 0.6 to below 1.0 | On the intended level |
 | Below 0.3 | Disconnected from capacity |
 
 ### 3.4 Portfolio verdict
@@ -211,7 +212,7 @@ The average across a scored set.
 |---|---|
 | Above 0.85 | Targets were too safe |
 | 0.60 to 0.85 | Healthy portfolio |
-| 0.40 to 0.59 | Partial. Examine what limited it |
+| 0.40 to below 0.60 | Partial. Examine what limited it |
 | Below 0.40 | Targets outran capacity |
 
 ### 3.5 Health
@@ -229,15 +230,19 @@ A goal that has never been checked in is `pending`, not `on track`. Silence is n
 
 From the key result's value history, project the end-of-cycle value with a linear fit over the recent window. If the projection misses the target, flag `trending off track` before the human status changes. This is the coach's earliest honest signal.
 
+### 3.7 The progress signal
+
+Beside health, every goal and key result carries a red, amber or green signal computed from progress alone: green at or above the pass threshold, red below the fail threshold, amber between. The defaults are 75% and 50%, both workspace settings (§11). The signal is shown beside health, never instead of it. A green progress bar on an outdated goal still reads outdated.
+
 ---
 
 ## 4. The quality canon
 
-Twenty checks across four groups. This is the Draft Coach engine's specification. Each check has a status, a coaching prompt, and a reason.
+Twenty-six checks across four groups: five objective checks, seven key result checks, six alignment checks and eight cycle checks. This is the Draft Coach engine's specification. Each check has a status, a coaching prompt, and a reason. In every condition table in this section, rows are evaluated top to bottom and the first matching row wins.
 
 Statuses: **pass**, **warn** (worth another look), **fail** (fix before publishing), **todo** (waiting on input). In strict mode every warn becomes a fail.
 
-**Strength score** = (passes + 0.5 × warns) / total checks, as a percentage. Below 45% is red, 45 to 74% is amber, 75% and above is green.
+**Strength score** = (passes + 0.5 × warns) / evaluated checks, as a percentage, computed over the objective, key result and alignment checks of the set being drafted. A todo check counts in the denominator and adds nothing. The cycle checks feed phase completion and the publish gates, not the strength score. Below 45% is red, 45% to below 75% is amber, 75% and above is green.
 
 ### 4.1 Objective checks
 
@@ -432,21 +437,23 @@ Achievement is the direction-aware ratio of current to target.
 | Achievement | State | Meaning |
 |---|---|---|
 | 90% and above | Healthy | At or above the healthy corridor |
-| 70% to 89% | Watch | Watch the leading drivers |
+| 70% to below 90% | Watch | Watch the leading drivers |
 | Below 70% | Unhealthy | Launch a recovery OKR to focus the team |
 | Any, with an active recovery OKR | Recovering | Health improves as the recovery key results progress |
 | No data | No data | Enter a current value and a target |
 
-Both thresholds are workspace settings. The defaults are 90 and 70.
+State precedence, first match wins: no data, then recovering (an active recovery OKR), then the corridor band. Both thresholds are workspace settings (§11). The defaults are 90 and 70.
 
 ### 6.5 Recovery OKRs
 
 When a KPI turns unhealthy, the product drafts a recovery OKR:
 
 - **Objective**: "Bring *KPI name* back to *target*".
-- **Key results**: up to four, one per *leading* child driver, each written "improve *driver* from *current* to *target*", inheriting the driver's owner.
-- If there are no leading children, one placeholder key result: "define the first leading driver to move".
+- **Key results**: up to four, one per leading driver at the edge of the unhealthy branch, each written "improve *driver* from *current* to *target*", inheriting the driver's owner. The drivers are found by walking the unhealthy KPI's subtree breadth-first: a leading child becomes a key result directly; a lagging child is descended through until its nearest leading descendants are found. The walk stops at four key results.
+- If the subtree contains no leading KPI at all, one placeholder key result: "define the first leading driver to move".
 - The KPI's achievement at launch is stored as the recovery starting point.
+
+The draft is available for one-click launch the moment the KPI turns unhealthy. The proactive proposal from the coach fires only after two consecutive unhealthy periods, so a single bad period never triggers a drafted OKR.
 
 While a recovery OKR is active the KPI reads **recovering**, and its displayed health is the higher of its real achievement and a projection: `start + progress × (healthy threshold − start)`. That makes the recovery visible before the lagging number catches up. When real achievement re-enters the healthy corridor, the coach proposes closing the recovery OKR.
 
@@ -596,7 +603,7 @@ The lowest-scoring statement becomes next cycle's process OKR.
 
 ### 8.6 The rhythm diagnostic
 
-This is the most valuable output of the review. Combine the cycle score with the rhythm score (the average of process-health statements 2 and 5).
+This is the most valuable output of the review. Combine the cycle score (the §3.4 portfolio average over every scored key result in the cycle) with the rhythm score (the average of process-health statements 2 and 5).
 
 | Condition | Diagnosis | Prescription |
 |---|---|---|
@@ -655,7 +662,7 @@ What a good coach says at each phase. The product surfaces these as notes to the
 
 | Phase | Guidance |
 |---|---|
-| 0 Annual strategy | Run this once a year with the most senior group in the room, before any quarterly cycle starts. Keep it to three to five annual objectives. If the annual set already contains everything, no quarter can choose |
+| 0 Annual strategy | Run this once a year with the most senior group in the room, before any quarterly cycle starts. Keep it to five annual objectives at most. If the annual set already contains everything, no quarter can choose |
 | 1 Prepare | Refuse to run Phase 4 without a complete input pack. This is the most common failure point. Timebox the gathering. An incomplete pack on time beats a complete pack late |
 | 2 Diagnose | Keep scoring factual. Scores are planning data, not appraisal. The moment they feel like appraisal, candour dies. If prior OKRs were never tracked, record that as a process issue to fix in Phase 6 |
 | 3 Set direction | Force trade-offs. A priority list that accommodates everything is a to-do list, not a strategy. Push until the not-doing list is written down. Quarterly revalidation takes 30 to 60 minutes, not a full strategy debate |
@@ -687,10 +694,35 @@ The full trigger catalogue is in AI-NATIVE-PLAN.md §6. This is the practice beh
 | Dependency unconfirmed and unowned | Unconfirmed is a risk. Name a risk owner or get the confirmation |
 | Capacity check with nothing cut | If the answer is nothing, capacity was not checked |
 | Check-in overdue past grace | This goal is stale. It cannot quietly stay green |
-| Blocker past its 24-hour clock | This blocker is aging. Escalating to the sponsor |
+| Blocker past its 24-hour clock | This blocker is aging. Escalating to the coordinator |
 | Reported health disagrees with the data | Reported on track, but this key result has not moved in four weeks |
 | Trend forecast misses the target | On current trajectory this misses. Better to say it now than at the close |
 | KPI drops out of its corridor | This KPI is unhealthy. Here is a recovery OKR drafted from its leading drivers |
 | Scores near 1.0 across a closed cycle | Targets were too safe. Address stretch explicitly when drafting the next cycle |
 
 The coach never guesses at the situation. Every one of the twenty maps to a rule in this document, and every message cites the rule so the recipient can argue with it.
+
+---
+
+## 11. Tunable thresholds
+
+Everything in this document is canon. Only the thresholds below may be tuned per workspace. They live in the workspace rhythm settings with the defaults stated here. Everything else is fixed and is not a setting.
+
+| Threshold | Default |
+|---|---|
+| Check-in frequency | Weekly |
+| Check-in anchor day | Chosen at workspace setup |
+| Staleness grace | 3 days past the due date, after which the goal reads outdated |
+| Blocker clock | 24 hours |
+| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded, coordinator at 7 days, sponsor at 14 days |
+| Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days |
+| Blocker ladder | Owner warned at 20 hours, coordinator at 24 hours, sponsor at 48 hours |
+| KPI healthy threshold | 90% of target |
+| KPI watch threshold | 70% of target |
+| Progress signal pass | 75% |
+| Progress signal fail | 50% |
+| Company objective cap | 5 |
+| Objectives per unit cap | 3 |
+| Coach strictness | Warn, with the six publish gates hard |
+
+The confidence bands, score bands, portfolio verdicts, alignment penalties, blocker and root-cause taxonomies, session agendas, publish gates and the diagnostic are canon and cannot be tuned.

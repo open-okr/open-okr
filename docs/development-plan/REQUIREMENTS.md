@@ -42,7 +42,7 @@ Every OKR cycle runs the eight phases in METHOD.md §2 with computed completion,
 
 ### 3.2 Quality at the point of writing
 
-Every objective and key result is checked live against the twenty rules in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. The six publish gates in METHOD.md §4.5 are hard: an OKR set that fails one cannot be published.
+Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. The six publish gates in METHOD.md §4.5 are hard: an OKR set that fails one cannot be published.
 
 *Acceptance:* Given an objective beginning "Launch the new mobile app", when the champion types it, then the outcome-not-output check fails inline with the coaching prompt, the strength score drops, and publishing the set is blocked until it passes or the workspace overrides with a recorded reason.
 
@@ -50,7 +50,7 @@ Every objective and key result is checked live against the twenty rules in METHO
 
 Every goal has a check-in frequency (weekly by default, anchored to a company-chosen day), exactly one champion and exactly one reviewer. The system computes the next due date, honours the workspace timezone and a small tolerance, and drives every reminder from it. A missed check-in past the grace window makes the goal **outdated**, which overrides the last reported health everywhere it appears. A published check-in enters `awaiting acknowledgement` until the reviewer closes the loop.
 
-*Acceptance:* Given a weekly goal last checked in ten days ago, when any list, map or dashboard renders it, then it shows `outdated` regardless of the last check-in, its champion has been nudged three times on their chosen channel, and the sponsor has been told.
+*Acceptance:* Given a weekly goal last checked in ten days ago, when any list, map or dashboard renders it, then it shows `outdated` regardless of the last check-in, its champion has been nudged on their chosen channel on the due day and daily after, and the reviewer has been brought in at the grace boundary.
 
 ### 3.4 Check-ins as narrative snapshots
 
@@ -79,7 +79,7 @@ Two agent members ship with every workspace, on by default where an AI provider 
 
 They act under their own least-privilege principal, are metered and hard-capped, and are audited. Their default write policy is to propose; a human approves. Full design in AI-NATIVE-PLAN.md §6.
 
-*Acceptance:* Given a champion who has not checked in by the anchor day, when the Champion agent runs, then it messages them on their chosen channel with a one-tap check-in, and on the third consecutive miss it escalates to the reviewer and then the sponsor, every step recorded and visible to the champion.
+*Acceptance:* Given a champion who has not checked in by the anchor day, when the Champion agent runs, then it messages them on their chosen channel with a one-tap check-in, and as the miss ages it escalates up the ladder: the reviewer at the grace boundary, the coordinator at seven days, the sponsor at fourteen, every step recorded and visible to the champion.
 
 ### 3.9 The Work Map
 
@@ -106,7 +106,7 @@ One company-wide tree: goals, sub-goals, key results, initiatives and the KPIs t
 - **Mid-cycle calibration (P0).** Once per cycle, only for a verifiable external change, with a written reason.
 - **Review inbox and digests (P0).** §3.5, plus daily and weekly digests in the member's own timezone and channel.
 
-### Pillar C: The work (P0/P1, Phase 5)
+### Pillar C: The work (P0, Phase 5)
 
 Deliberately OKR-shaped. Enough to answer "what is actually moving this key result", not a project management suite.
 
@@ -198,7 +198,7 @@ Self-host is never seat-limited and never feature-gated.
 
 ## 9. Out of v1, designed for
 
-Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md.
+Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md §16.
 
 1. Serverless runtime profile (the cloud runs the container profile in v1).
 2. Custom fields, configurable statuses and workflows, a saved-query language and view builder.
@@ -217,4 +217,3 @@ Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md.
 - Whether a formal external accessibility audit is required before launch.
 - Sector-specific compliance beyond PDPA and GDPR.
 - Whether the scorecard points layer is built at all. It ships off by default either way.
-- **Recovery OKR drafting when the unhealthy KPI has no leading children.** METHOD.md §6.5 says one key result per *leading child driver*, which yields the placeholder key result. METHOD.md §6.3 says to take the leading drivers at the *edge of the unhealthy branch*, which reaches further down and yields real key results. The two give different answers for a root KPI whose own children are all lagging, which is the common shape. Blocks P3-T14 and the `packages/method` conformance suite.

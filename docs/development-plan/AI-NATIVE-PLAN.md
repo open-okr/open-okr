@@ -120,7 +120,7 @@ Permission `manage_ai`. One admin console:
 | Provider and connection | Provider, base URL, key, connection test, allow per-user keys |
 | Models and routing | The tier map, sampling, context guard |
 | Features | A switch per §2 capability, on by default where a provider is configured |
-| Coaching | Draft Coach strictness (advisory, warn, strict), which publish gates are hard, per-space overrides |
+| Coaching | Draft Coach strictness (advisory, warn, strict) with per-space overrides. The six publish gates stay hard; a failed publish can be overridden only per attempt, with elevated access and a recorded reason |
 | Agents | Create and edit agents: persona, instructions per phase, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, run history and logs |
 | Nudges | Per-rule enable and channel, escalation ladders, workspace quiet mode, per-member quiet hours defaults, a live volume chart with the top noisy rules |
 | Budgets and limits | Token, cost and call quotas per user, per agent and per workspace. A hard cap that halts runs. A throttle window |
@@ -217,19 +217,19 @@ What it does:
 2. **Chases acknowledgements.** A published check-in with no acknowledgement after a day is a reviewer nudge, and after three days an escalation.
 3. **Runs the blocker clock.** At twenty hours it warns the owner. At twenty-four it escalates to the coordinator, then to the sponsor. It never re-opens a discussion, it moves the clock.
 4. **Opens and closes the weekly session.** Posts the agenda, collects confidence from members who cannot attend, marks the session held or skipped, updates the streak, publishes the digest.
-5. **Watches the KPI corridors.** When a KPI drops below the watch threshold it tells the owner. When it drops below the unhealthy threshold for two periods it drafts the recovery OKR and proposes it.
+5. **Watches the KPI corridors.** When a KPI drops out of the healthy corridor it tells the owner. When it stays unhealthy for two consecutive periods it drafts the recovery OKR and proposes it.
 6. **Prepares the sessions.** Before a quarterly review it assembles the pack: scores ready to confirm, missed key results awaiting a cause, retro prompts, the process-health survey, and the draft minutes skeleton.
 7. **Runs the planning countdown.** As the publication deadline approaches it tells the sponsor and the facilitator what is missing, phase by phase, week by week.
 
 ### 6.3 The escalation ladder
 
-Configurable per workspace. The default:
+Configurable per workspace. The defaults are canon in METHOD.md §11:
 
 | Step | After | Goes to |
 |---|---|---|
 | 1 | Due date reached | The champion or the owner |
 | 2 | 1 day overdue | The champion again, on their primary channel |
-| 3 | 3 days overdue, or grace exceeded | The reviewer, and the goal renders outdated |
+| 3 | Grace exceeded (3 days by default) | The reviewer, and the goal renders outdated |
 | 4 | 7 days overdue | The space coordinator |
 | 5 | 14 days overdue | The cycle sponsor |
 
@@ -239,7 +239,7 @@ Escalation is always visible to the person being escalated past. Nobody is repor
 
 ### 6.4 The full trigger catalogue
 
-Every proactive message the product sends. Each row is a rule key, and each writes a nudge record.
+Every proactive message the product sends. Each row is a rule key, and each writes a nudge record. The catalogue's keys, default recipients and default timings ship as data in `packages/method`; a message citing a key the package does not define fails the build.
 
 **Rhythm triggers, owned by the Champion**
 
@@ -263,7 +263,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `digest.weekly` | After the session closes | Space and leadership |
 | `digest.daily` | The member's local morning | Everyone opted in |
 | `kpi.watch` | A KPI enters the watch corridor | KPI owner |
-| `kpi.unhealthy` | A KPI leaves the healthy corridor | KPI owner and sponsor |
+| `kpi.unhealthy` | A KPI enters the unhealthy corridor | KPI owner, and the active cycle's sponsor where one exists |
 | `kpi.recovery_proposed` | Unhealthy for two periods | KPI owner, with a drafted recovery OKR |
 | `kpi.recovered` | Achievement re-enters the healthy corridor | KPI owner, proposing to close the recovery OKR |
 | `cycle.planning_opens` | Six weeks (annual) or three weeks (quarterly) before the start | Sponsor and facilitator |
@@ -324,10 +324,9 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `agents` | member reference, definition, planning instructions, execution instructions, provider and tier, schedule, autonomy (`sandbox` / `propose` / `scoped_direct`), scope, enabled, built-in kind (`coach` / `champion` / `custom`) |
 | `agent_runs` | agent, trigger, status, tasks, append-only log, started and finished, error, cost |
 | `proposed_changes` | run, action, payload envelope, subject, status (`pending` / `applied` / `dismissed`), decided by and when |
-| `nudge_rules` | rule key, enabled, channel override, escalation ladder override, quiet-mode exempt |
 | MCP authorisation | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_access_tokens`, `oauth_refresh_tokens` with rotation lineage, `mcp_sessions` |
 
-The `nudges` and `channel_*` tables live in TECHNICAL-PLAN.md §4.11, because they serve notifications as well as agents.
+The `nudges`, `nudge_rules` and `channel_*` tables live in TECHNICAL-PLAN.md §4.11, because they serve notifications as well as agents.
 
 ## 8. The MCP server
 

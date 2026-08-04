@@ -27,7 +27,7 @@ Never cite a mockup as the reason for a behaviour. Cite the specification.
 | [03b-rule-card](png/03b-rule-card.png) | S-09 detail | P4-T02 | One verdict opened: prompt, reason, weak-versus-strong pair, rewrite and dismiss |
 | [04-gates-capacity](png/04-gates-capacity.png) | S-10 | P4-T03, P3-T09 | The six gates as a checklist with two unmet, the disabled publish control stating its reason, the capacity table and the mandatory cut, the dependency register |
 | [05-alignment-studio](png/05-alignment-studio.png) | S-16 | P3-T10, P3-T09, P4-T06 | Contribution as solid connectors and dependencies as dashed, an unaligned goal, the health score with each gap and its penalty, the Coach's typed findings |
-| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | P3-T14 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading child driver, effective health, the cross-tree recovery board |
+| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | P3-T14 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading driver at the edge of the unhealthy branch, effective health, the cross-tree recovery board |
 | [07-weekly-session](png/07-weekly-session.png) | S-22 | P4-T07 | The four-step rail, the confidence dial with its bands, private votes revealed together, a low score becoming a typed blocker on a clock, the streak |
 | [08-quarterly-review](png/08-quarterly-review.png) | S-24 | P4-T10, P4-T11 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the eight root causes, the five process-health statements |
 | [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | P5-T02 to P5-T05 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
@@ -40,7 +40,7 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 | Shown in the mockups | Source |
 |---|---|
 | `OBJ-1`, `KR-2`, `AL-1`, `CY-6` and the other quality rules | METHOD.md §4 |
-| Confidence bands: high 0.7 and above, medium 0.4 to 0.69, low below 0.4, escalating at 0.3 | METHOD.md §3.2 |
+| Confidence bands: high 0.7 and above, medium 0.4 to below 0.7, low below 0.4, escalating at 0.3 | METHOD.md §3.2 |
 | Alignment penalties: 12 orphan, 8 silo, 4 no key results, 3 level skip, healthy at 75 | METHOD.md §5.2 |
 | Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
 | KPI corridors, tiers and the effective-health projection | METHOD.md §6.2, §6.4, §6.5 |
@@ -64,11 +64,6 @@ Needs a Chromium headless shell. It looks in the Playwright browser cache, falls
 
 The rendered PNGs are also used by [OpenOKR-Overview.docx](../OpenOKR-Overview.docx) and [OpenOKR-Deck.pptx](../OpenOKR-Deck.pptx), so re-run those builds after re-rendering. See [../README.md](../README.md).
 
-## Known open question
+## A note on 06-kpi-recovery
 
-`06-kpi-recovery` shows the recovery objective on **expansion revenue**, not on the root KPI, because METHOD.md is ambiguous about a case the root would hit:
-
-- §6.5 says the recovery drafts one key result **per leading child driver**.
-- §6.3 says to find the unhealthy branch and take **the leading drivers at its edge**, and that those become the key results.
-
-Those give different answers when an unhealthy KPI's own children are all lagging and the leading drivers sit further down. The mockup deliberately shows a KPI whose immediate children are leading, so both readings agree. **This needs a human decision before P3-T14 is built.**
+`06-kpi-recovery` shows the recovery objective on **expansion revenue**, a KPI whose immediate children are leading. Per METHOD.md §6.5 the drafter walks the unhealthy KPI's subtree breadth-first for the leading drivers at the edge of the unhealthy branch, so for this KPI the key results are exactly its leading children, which is what the mockup draws.

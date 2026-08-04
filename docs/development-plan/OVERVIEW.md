@@ -16,7 +16,7 @@ None of that lives in most software. It lives in a consultant's slide deck, and 
 
 **OpenOKR puts the practice in the product, and makes the product active.**
 
-- **The method is built in.** A guided eight-phase cycle. Twenty quality rules that check every draft as you type. An alignment score that names its gaps. KPI health corridors that trigger recovery objectives. Two timed session formats. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
+- **The method is built in.** A guided eight-phase cycle. Twenty-six quality checks that judge every draft as you type. An alignment score that names its gaps. KPI health corridors that trigger recovery objectives. Two timed session formats. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
 - **The coach is active.** Two AI teammates work the practice alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI drops out of its corridor.
 - **They reach you where you work.** In the browser, in Slack, Microsoft Teams, WhatsApp or Telegram, by email, and through your own AI agent.
 - **You own it.** Open source. Self-host it on your servers in about half an hour, or run it in our cloud. Same release, same behaviour. Export your whole workspace whenever you want.
@@ -65,7 +65,7 @@ Eight phases, from the annual frame to the close. The product knows which one yo
 
 ### 3.2 Quality while you write
 
-Twenty rules check every objective and key result, live. Each returns a verdict, a coaching prompt, the reason it matters, and a weak-versus-strong example. Your set carries a strength score.
+Twenty-six quality checks run against your set, live. Each returns a verdict, a coaching prompt, the reason it matters, and a weak-versus-strong example. Your set carries a strength score.
 
 Some of what it catches:
 
@@ -236,7 +236,7 @@ That is the product.
 
 | Area | What you get |
 |---|---|
-| **The method** | A guided eight-phase cycle, twenty live quality rules, six hard publish gates, an alignment score, KPI health corridors, two timed session formats, and a closing diagnostic |
+| **The method** | A guided eight-phase cycle, twenty-six live quality checks, six hard publish gates, an alignment score, KPI health corridors, two timed session formats, and a closing diagnostic |
 | **The coach** | Two AI teammates that guard quality and rhythm, initiate, escalate, cite their rules, and are scoped, capped and auditable |
 | **Reach** | Browser, email, Slack, Teams, WhatsApp, Telegram, and your own AI agent |
 | **OKRs** | Weighted, direction-aware key results with value history, confidence, trend forecasting, KPI-backed measurement, and full alignment with dependencies |

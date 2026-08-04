@@ -88,8 +88,8 @@ This is the METHOD.md §2 model made concrete.
 |---|---|---|
 | `annual_frames` | `year_label`, `horizon_label`, `mission` (rich), `vision` (rich), `strategy` (rich), `agreed bool`, `open_issues` (rich), `not_doing` (rich) | One current frame per workspace, with history |
 | `annual_strategies` | `frame_id`, `text`, `note?`, `position` | The 2 to 5 strategic thrusts for the year |
-| `cycles` | `name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase` (0 to 7), `frame_id?`, `previous_cycle_id?`, `sponsor_id?`, `facilitator_id?`, `session_dates jsonb`, `publication_deadline date?`, `published_at?`, `levels jsonb` (which levels set OKRs), `contributing_units text?`, `first_cycle bool`, `settings jsonb` | The cycle is the workflow container, not just a date range |
-| `cycle_pack_items` | `cycle_id`, `item_key` (1 to 7), `gathered bool`, `note?` | The input pack. `distributed_at` lives on the cycle |
+| `cycles` | `name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase` (0 to 7), `frame_id?`, `previous_cycle_id?`, `sponsor_id?`, `facilitator_id?`, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb` (which levels set OKRs), `contributing_units text?`, `first_cycle bool`, `settings jsonb` | The cycle is the workflow container, not just a date range |
+| `cycle_pack_items` | `cycle_id`, `item_key` (1 to 7), `gathered bool`, `note?` | The input pack. `pack_distributed_at` lives on the cycle |
 | `cycle_prior_scores` | `cycle_id`, `source_key_result_id?`, `text`, `score numeric?` | Phase 2 scoring of the previous cycle. Auto-populated at the previous cycle's close |
 | `cycle_baseline_health` | `cycle_id`, `stable` (rich), `declining` (rich), `business_as_usual` (rich) | Phase 2 KPI reading |
 | `cycle_issues` | `cycle_id`, `text`, `impact smallint` (1 to 5), `source` (`manual` / `carry_forward` / `process_health` / `coach`), `promoted_to_priority_id?` | The ranked strategic issue list |
@@ -99,7 +99,7 @@ This is the METHOD.md §2 model made concrete.
 | `cycle_gate_state` | `cycle_id`, `gate_key` (1 to 6), `passed bool`, `evaluated_at`, `detail jsonb` | The publish gates, recomputed on every relevant write |
 | `cycle_capacity_notes` | `cycle_id`, `cuts` (rich) | What was cut. Required to pass gate 5 |
 | `cycle_calibrations` | `cycle_id`, `used bool`, `reason`, `at`, `author_member_id` | Mid-cycle calibration, at most one per cycle |
-| `rhythm_settings` | One row per workspace: `default_check_in_frequency`, `check_in_anchor_day`, `staleness_grace_days`, `blocker_clock_hours` (24), `escalation_ladder jsonb`, `kpi_healthy_pct` (90), `kpi_watch_pct` (70), `rag_fail_pct` (50), `rag_pass_pct` (75), `coach_strictness` (`advisory` / `warn` / `strict`), `max_company_objectives` (5), `max_objectives_per_unit` (3), `labels jsonb` | Every METHOD.md threshold that a workspace may tune, in one place |
+| `rhythm_settings` | One row per workspace: `default_check_in_frequency`, `check_in_anchor_day`, `staleness_grace_days` (3), `blocker_clock_hours` (24), `escalation_ladder jsonb`, `kpi_healthy_pct` (90), `kpi_watch_pct` (70), `rag_fail_pct` (50), `rag_pass_pct` (75), `coach_strictness` (`advisory` / `warn` / `strict`), `max_company_objectives` (5), `max_objectives_per_unit` (3), `labels jsonb` | The METHOD.md §11 tunable thresholds, in one place. Nothing else is a setting |
 
 Phase completion (METHOD.md §2.3) and the publish gates are computed by `packages/method` from these rows. They are never stored as user-set booleans.
 
@@ -107,8 +107,8 @@ Phase completion (METHOD.md §2.3) and the publish gates are computed by `packag
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `goals` | `title`, `description` (rich), `cycle_id?`, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`) with `space_id?` and `member_id?`, `champion_id`, `reviewer_id`, `parent_goal_id?`, `parent_key_result_id?`, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?`, `contribution_statement?`, `closed_at?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `position` | Importable. `quality_score` and `quality_flags` are the last Draft Coach evaluation, recomputed on write |
-| `key_results` | `goal_id`, `title`, `unit`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `baseline_value numeric`, `target_value numeric`, `current_value numeric`, `due_on date?`, `owner_id?`, `weight numeric`, `kpi_id?`, `progress_pct`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `carry_forward bool`, `quality_flags jsonb`, `position` | Importable. `forecast` holds the projected end value and the trending flag |
+| `goals` | `title`, `description` (rich), `cycle_id?`, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`) with `space_id?` and `member_id?`, `champion_id`, `reviewer_id`, `parent_goal_id?`, `parent_key_result_id?`, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?`, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool`, `position` | Importable. `quality_score` and `quality_flags` are the last Draft Coach evaluation, recomputed on write |
+| `key_results` | `goal_id`, `title`, `unit`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `baseline_value numeric`, `target_value numeric`, `current_value numeric`, `due_on date?`, `owner_id?`, `weight numeric`, `kpi_id?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `carry_forward bool`, `quality_flags jsonb`, `position` | Importable. `forecast` holds the projected end value and the trending flag. `capacity` is the METHOD.md §5.5 align-and-commit verdict; publish gate 5 reads it, and linked initiatives enrich it once the work module is live |
 | `key_result_values` | `key_result_id`, `value numeric`, `at`, `author_member_id`, `check_in_id?`, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`) | Full history. Drives sparklines and the trend forecast |
 | `check_ins` | `subject_type` (`goal`), `subject_id`, `author_member_id`, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich, required to publish), `snapshot jsonb`, `session_id?`, `acknowledged_by_id?`, `acknowledged_at?`, `ai_drafted bool` | Drafts emit nothing and do not advance the cadence. Publishing stamps the snapshot, advances the next due date and creates the reviewer obligation |
 | `check_in_votes` | `check_in_id?`, `key_result_id`, `session_id?`, `member_id`, `confidence numeric`, `revealed_at?` | Private team confidence votes, revealed together |
@@ -215,6 +215,7 @@ Mention extraction is decode-safe: malformed content yields an empty list, never
 | `channel_identities` | `member_id`, `provider`, `external_id`, `external_handle?`, `verified_at?` | Links a member to their identity in a chat provider. Required before any inbound command is honoured |
 | `channel_messages` | `provider`, `direction` (`out` / `in`), `member_id?`, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status`, `error?`, `at` | The delivery and receipt log. Inbound rows are the audit trail for chat-driven writes |
 | `nudges` | `kind`, `subject_type`, `subject_id`, `recipient_member_id`, `agent_id?`, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?` | Every proactive message the product sends. One row per nudge, so noise is measurable and suppressible |
+| `nudge_rules` | `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool` | Per-rule workspace configuration over the AI-NATIVE-PLAN.md §6.4 catalogue |
 
 ### 4.12 AI, agents and MCP (domain L)
 
@@ -255,7 +256,7 @@ Pure function sets, golden-master tested. `packages/method` holds the ones that 
 The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, its key results, its alignment and its cycle context. Output: one result per check with a status, a coaching prompt, a reason, an example pair, and a rule key. Plus the strength score and the six publish gates.
 
 - No database access, no network, no AI. It runs identically in the browser as the user types, on the server before a write, inside the Coach agent, and in the importer.
-- Word lists, thresholds and messages are data, versioned with the package, overridable per workspace only where METHOD.md marks a threshold as tunable.
+- Word lists, thresholds and messages are data, versioned with the package, overridable per workspace only for the thresholds METHOD.md §11 marks as tunable.
 - Strictness (advisory, warn, strict) is a parameter, not a fork.
 - The golden-master suite carries a corpus of real objectives and key results with their expected verdicts. CI fails on any drift.
 
@@ -264,7 +265,7 @@ The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, 
 1. **Key result progress.** Direction-aware, clamped 0 to 100, per METHOD.md §3.1. A KPI-backed key result reads the KPI's latest achievement.
 2. **Goal progress.** Weighted average of its key results, including the weighted contribution of aligned child goals. The cascade walks upward through key result, goal, parent key result, parent goal, with cycle detection.
 3. **Health.** The precedence cascade in METHOD.md §3.5: closed outcome, then outdated, then the latest published check-in status, then pending. Never a bare formula.
-4. **RAG colour.** From the workspace pass and fail thresholds over progress. A progress signal shown beside health, never instead of it.
+4. **RAG colour.** The METHOD.md §3.7 progress signal, from the workspace pass and fail thresholds over progress. Shown beside health, never instead of it.
 5. **Trend forecast.** A linear fit over the recent value window projects the end-of-cycle value. If it misses, the key result is flagged as trending off track.
 6. **Portfolio verdict.** METHOD.md §3.4 over any scored set.
 
@@ -280,7 +281,7 @@ Pure date arithmetic, timezone aware. Given a frequency, an anchor day and the p
 - **Achievement** direction-aware, and **state** from the METHOD.md §6.4 corridors.
 - **Effective health while recovering**, per METHOD.md §6.5.
 - **The formula evaluator**: a typed expression tree validated with Zod, with operators, parentheses and KPI references. No dynamic evaluation. Cross-frequency aggregation uses the source KPI's aggregate function. Divide-by-zero is handled explicitly. The dependency graph cascades with cycle detection.
-- **The recovery drafter**: given an unhealthy KPI, produce the recovery goal and up to four key results from its leading children.
+- **The recovery drafter**: given an unhealthy KPI, produce the recovery goal and up to four key results from the leading drivers at the edge of its unhealthy branch, per METHOD.md §6.5.
 
 ### 6.5 The alignment engine (`packages/core`)
 
@@ -490,3 +491,20 @@ Each row is verified at a phase exit.
 | Portability | Self-serve encrypted export and import with a dry-run difference, verified in CI |
 | Deployment | Self-host in under 30 minutes and a managed cloud on the same release |
 | Accessibility and languages | WCAG 2.1 AA gated in CI, English and Bahasa Melayu catalogues |
+
+## 16. Designed for, not built
+
+The design-for notes for every REQUIREMENTS.md §9 deferred item: what in the v1 design keeps each one an addition rather than a rewrite. Pulling any of them into v1 requires the human.
+
+| Deferred item | What v1 already provides |
+|---|---|
+| Serverless runtime profile | Every runtime-sensitive capability sits behind an adapter port with an environment-driven driver loader. Feature code never checks the runtime; only the loader does. A serverless profile is a new set of drivers |
+| Custom fields, statuses, workflows, saved queries and views | Enumerated values are text with check constraints, not native enums, so vocabularies can extend. Entities carry `settings jsonb`. Views live in shareable URL state. The action registry gives a saved-query surface one place to plug in. The power-floor stubs in UIUX-PLAN.md §6 reserve the screens |
+| Gantt and dependency scheduling | Initiatives and tasks already carry start and end dates, owners and key result links. Scheduling is a new view plus a solver, not a schema change |
+| Time and cost tracking | Tasks and initiatives are the anchor entities a log row would reference. The FlowyTeam importer already records source time logs as unmapped, so a later backfill has its raw material |
+| Sprints, backlogs and story points | Boards are views over `tasks` with no board tables, so a sprint is a new grouping dimension, not a migration of board state |
+| Meetings beyond the OKR sessions, calendar sync | `sessions` is keyed by `kind` and generalises. Session dates are data, so a calendar bridge reads and writes through the normal contract |
+| Additional channels, incoming email, source-control links | One Channel port, one driver per provider. A new channel is a new driver behind the same interface, capability-reported and degraded by the message builder |
+| Real-time co-editing | Content is editor JSON with a version column, all writes run through the Operation pipeline, conflicts are surfaced rather than silently merged, and presence exists. A sync server becomes an alternative write path into the same layer |
+| Native mobile applications | The one-contract API (REST with OpenAPI, generated from the action registry) is the mobile backend, permission-checked identically to the browser |
+| Importers beyond FlowyTeam and CSV | The importer pipeline (read-only extract, map, load through Operations, recompute, reconcile) is source-agnostic; a new source is a new reader and mapping table with the same `legacy_id` idempotency |
