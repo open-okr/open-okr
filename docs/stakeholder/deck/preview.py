@@ -142,9 +142,14 @@ def render(slide, number):
 
 
 def write(deck):
+    """Write the whole deck as one scrollable page, plus one page per slide."""
     os.makedirs(OUT, exist_ok=True)
     pages = [render(slide, number) for number, slide in enumerate(deck, 1)]
     path = os.path.join(OUT, 'slides.html')
     with open(path, 'w') as handle:
         handle.write(HEAD + ''.join(pages))
+    single = HEAD.replace('margin: 0 0 14px;', 'margin: 0;')
+    for number, page in enumerate(pages, 1):
+        with open(os.path.join(OUT, 'slide-%02d.html' % number), 'w') as handle:
+            handle.write(single + page)
     return path
