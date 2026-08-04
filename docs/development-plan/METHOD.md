@@ -144,7 +144,7 @@ Every objective carries 2 to 5 key results. A unit may contribute to another uni
 
 ## 3. Scoring, confidence and health
 
-Three different numbers. They are never mixed.
+Three different numbers. They are never mixed. Every numeric boundary in this section is a parameter in the §11 registry; the values shown are the canon defaults.
 
 | Number | Range | Direction | Answers |
 |---|---|---|---|
@@ -704,25 +704,86 @@ The coach never guesses at the situation. Every one of the twenty maps to a rule
 
 ---
 
-## 11. Tunable thresholds
+## 11. The threshold registry
 
-Everything in this document is canon. Only the thresholds below may be tuned per workspace. They live in the workspace rhythm settings with the defaults stated here. Everything else is fixed and is not a setting.
+The structure of the practice is canon and cannot be changed: which checks exist and how they judge, the six publish gates and their conditions, the blocker and root-cause taxonomies, the session agendas and their stage order, the process-health statements, the management-retro questions, the health precedence, the diagnostic verdicts and the feed-forward mapping. A workspace that needs a different structure is practising a different method, not configuring this one.
 
-| Threshold | Default |
+Every numeric value in the practice is a parameter in this registry. Each ships as data in `packages/method` with the canon default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
+
+**Cadence and escalation**
+
+| Parameter | Canon default |
 |---|---|
 | Check-in frequency | Weekly |
 | Check-in anchor day | Chosen at workspace setup |
+| Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
-| Blocker clock | 24 hours |
 | Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded, coordinator at 7 days, sponsor at 14 days |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days |
+| Blocker clock | 24 hours to the next action |
 | Blocker ladder | Owner warned at 20 hours, coordinator at 24 hours, sponsor at 48 hours |
-| KPI healthy threshold | 90% of target |
-| KPI watch threshold | 70% of target |
+| Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
+| Nudge volume ceiling | 10 per member per week |
+
+**Confidence and scoring**
+
+| Parameter | Canon default |
+|---|---|
+| Confidence high boundary | 0.7 |
+| Confidence low boundary | 0.4 |
+| Critical confidence | 0.3 and below escalates the same day |
+| Draft sandbagging threshold | Average above 0.90 |
+| Draft comfortable boundary | 0.75 |
+| Draft ambitious boundary | 0.25 |
+| Score band boundaries | 0.9, 0.7, 0.4 |
+| Score annotation boundaries | 1.0 too safe, 0.6 and above intended, below 0.3 disconnected |
+| Portfolio verdict boundaries | 0.85, 0.60, 0.40 |
+| Close sandbagging threshold | Scores clustering above 0.85 |
+| Root-cause threshold | Scores below 0.7 require a cause |
 | Progress signal pass | 75% |
 | Progress signal fail | 50% |
+
+**Quality and planning**
+
+| Parameter | Canon default |
+|---|---|
+| Coach strictness | Warn. The six publish gates are always hard |
+| Strength score boundaries | Red below 45%, green at 75% and above |
+| Key results per objective | 2 to 5 |
+| Objective length bounds | 4 to 18 words |
 | Company objective cap | 5 |
 | Objectives per unit cap | 3 |
-| Coach strictness | Warn, with the six publish gates hard |
+| Strategic issue bounds | 5 to 10, ranked |
+| Priority bounds | 3 to 5, each with a 12-month success statement |
+| Input pack lead time | 3 working days before session one |
+| Quality word lists | The §4 lists. A workspace may add terms; the canon terms remain |
 
-The confidence bands, score bands, portfolio verdicts, alignment penalties, blocker and root-cause taxonomies, session agendas, publish gates and the diagnostic are canon and cannot be tuned.
+**Alignment**
+
+| Parameter | Canon default |
+|---|---|
+| Alignment healthy threshold | 75 |
+| Alignment penalties | 10 no anchor, 12 per orphan, 4 per objective without key results, 3 per level skip, 8 per silo, floor 5 |
+
+**KPIs and recovery**
+
+| Parameter | Canon default |
+|---|---|
+| KPI healthy threshold | 90% of target |
+| KPI watch threshold | 70% of target |
+| Recovery key result cap | 4 |
+| Recovery proposal delay | 2 consecutive unhealthy periods |
+
+**Sessions**
+
+| Parameter | Canon default |
+|---|---|
+| Weekly session length | 15 to 30 minutes |
+| Monthly review length | 30 to 60 minutes |
+| Quarterly review length | 60 minutes |
+| Quarterly stage minutes | The §8.1 durations |
+| Room pulse read boundaries | 4.0 and 3.0 |
+| Diagnostic cycle-score threshold | 0.7 |
+| Diagnostic rhythm-score threshold | 3.5 |
+
+The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the canon default. The conformance suite compares the defaults against this document.

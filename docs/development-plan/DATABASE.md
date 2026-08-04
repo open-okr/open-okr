@@ -163,7 +163,7 @@ Mail configuration with encrypted secrets, instance flags.
 `cycle_id` to cycles, `used bool`, `reason`, `at`, `author_member_id` to workspace_members.
 
 ### rhythm_settings *(one row per workspace)*
-`default_check_in_frequency`, `check_in_anchor_day`, `staleness_grace_days`, `blocker_clock_hours`, `escalation_ladder jsonb`, `kpi_healthy_pct`, `kpi_watch_pct`, `rag_fail_pct`, `rag_pass_pct`, `coach_strictness` (`advisory` / `warn` / `strict`), `max_company_objectives`, `max_objectives_per_unit`, `labels jsonb`. Defaults per METHOD.md §11.
+`default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb`. `overrides` holds sparse deviations from the METHOD.md §11 registry, validated against the method package's schema; an unset key reads the canon default.
 
 ## 7. Goals, key results and check-ins (domain D)
 

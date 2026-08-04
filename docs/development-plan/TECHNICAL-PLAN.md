@@ -53,7 +53,7 @@ All tables get an identifier, `workspace_id`, `created_at`, `updated_at` and a r
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `workspaces` | `name`, `slug`, `state` (`active` / `read_only` / `frozen`), `settings jsonb` | Tenant root. Settings hold branding, trusted email domains and rhythm defaults |
+| `workspaces` | `name`, `slug`, `state` (`active` / `read_only` / `frozen`), `settings jsonb` | Tenant root. Settings hold branding, the workspace timezone and trusted email domains. Every rhythm threshold lives in `rhythm_settings` (§4.3), nowhere else |
 | `users` | `email` unique, auth linkage | Global. Better Auth owns credentials, sessions, passkeys and one-time passwords |
 | `workspace_members` | `user_id?`, `name`, `title?`, `avatar_blob_id?`, `timezone?`, `manager_id?`, `kind`, `status`, `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?` | The per-workspace person. `user_id` is null for placeholders and agents before claim |
 | `access_contexts` | `resource_type`, `resource_id` | One per protected aggregate: space, goal, cycle, KPI tree, initiative, session, document |
@@ -99,7 +99,7 @@ This is the METHOD.md §2 model made concrete.
 | `cycle_gate_state` | `cycle_id`, `gate_key` (1 to 6), `passed bool`, `evaluated_at`, `detail jsonb` | The publish gates, recomputed on every relevant write |
 | `cycle_capacity_notes` | `cycle_id`, `cuts` (rich) | What was cut. Required to pass gate 5 |
 | `cycle_calibrations` | `cycle_id`, `used bool`, `reason`, `at`, `author_member_id` | Mid-cycle calibration, at most one per cycle |
-| `rhythm_settings` | One row per workspace: `default_check_in_frequency`, `check_in_anchor_day`, `staleness_grace_days` (3), `blocker_clock_hours` (24), `escalation_ladder jsonb`, `kpi_healthy_pct` (90), `kpi_watch_pct` (70), `rag_fail_pct` (50), `rag_pass_pct` (75), `coach_strictness` (`advisory` / `warn` / `strict`), `max_company_objectives` (5), `max_objectives_per_unit` (3), `labels jsonb` | The METHOD.md §11 tunable thresholds, in one place. Nothing else is a setting |
+| `rhythm_settings` | One row per workspace: `default_check_in_frequency`, `check_in_anchor_day`, `coach_strictness` (`advisory` / `warn` / `strict`), `overrides jsonb`, `labels jsonb` | The METHOD.md §11 registry. `overrides` holds sparse deviations from the canon defaults, validated against the method package's registry schema; an unset key reads the default. No threshold lives anywhere else |
 
 Phase completion (METHOD.md §2.3) and the publish gates are computed by `packages/method` from these rows. They are never stored as user-set booleans.
 
@@ -230,6 +230,21 @@ Specified at this level of detail in AI-NATIVE-PLAN.md §7: providers, encrypted
 | `tenants` | `workspace_id`, `plan_key?`, `seats?`, `state`, `trial_ends_at?`, `region` | Cloud only. Absent on self-hosted instances |
 | `operator_sessions` | `operator_user_id`, `workspace_id`, `reason`, `granted_at`, `expires_at`, `ended_at?` | Time-boxed support access, visible to the workspace owner |
 
+### 4.14 The settings map
+
+Every setting in the product, by scope. The settings service implements this map, and a setting that is not in it does not exist. Each scope has one storage home, one admin surface and one governing permission, so no setting has two owners.
+
+| Scope | Lives in | Managed from | Permission | Contents |
+|---|---|---|---|---|
+| Instance | `system_settings`, environment as bootstrap | The first-run wizard, then instance administration | Instance admin | Mail configuration, instance flags, default language, registration policy, the deployment-level AI key, telemetry opt-in |
+| Workspace general | `workspaces.settings` | Screen S-36 | Workspace admin | Name, slug, branding, workspace timezone, trusted email domains, default language |
+| Rhythm and thresholds | `rhythm_settings` | Screen S-36, rhythm and thresholds cards | `manage_coaching` | The METHOD.md §11 registry: frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings, plus terminology labels |
+| Coaching and nudges | `rhythm_settings`, `nudge_rules` | Screen S-36, coaching and nudges cards | `manage_coaching` | Strictness with per-space overrides; per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode. Deterministic, fully available with AI off |
+| Channels | `channel_connections`, `channel_identities` | Screen S-36, notifications and channels card | Workspace admin | Provider connection, verification, identity mapping, test send. Deterministic, fully available with AI off |
+| AI | `ai_providers`, `ai_credentials`, `ai_model_policies`, `ai_feature_settings`, `ai_prompts`, `agents`, quotas | Screen S-37 | `manage_ai` | Provider and keys, tier routing, feature switches, agent definitions, budgets and caps, prompts, privacy and egress, MCP connections and grants |
+| Space | `spaces.settings` | Space settings | Space manager | Team voting opt-in, strictness override, space defaults |
+| Member | `notification_settings`, the member profile, `ai_credentials` with a user owner | Personal settings | The member | Primary channel, quiet hours, per-reason routing, batch window, daily summary time, language, theme, density, personal AI key |
+
 ## 5. Adapter ports
 
 | Port | Methods | Driver |
@@ -256,7 +271,7 @@ Pure function sets, golden-master tested. `packages/method` holds the ones that 
 The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, its key results, its alignment and its cycle context. Output: one result per check with a status, a coaching prompt, a reason, an example pair, and a rule key. Plus the strength score and the six publish gates.
 
 - No database access, no network, no AI. It runs identically in the browser as the user types, on the server before a write, inside the Coach agent, and in the importer.
-- Word lists, thresholds and messages are data, versioned with the package, overridable per workspace only for the thresholds METHOD.md §11 marks as tunable.
+- Word lists, thresholds and messages are data, versioned with the package. Every numeric threshold follows the METHOD.md §11 registry with per-workspace overrides, word lists accept per-workspace additions, and the messages and check logic are fixed.
 - Strictness (advisory, warn, strict) is a parameter, not a fork.
 - The golden-master suite carries a corpus of real objectives and key results with their expected verdicts. CI fails on any drift.
 
@@ -273,7 +288,7 @@ The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, 
 
 ### 6.3 The cadence engine (`packages/core`)
 
-Pure date arithmetic, timezone aware. Given a frequency, an anchor day and the publication time, compute the next due date. A tolerance of one day means an early or late check-in does not double-advance. The staleness sweep, reminder scheduling and the review inbox all read the next due date. Golden masters cover anchor-day edges, month ends, timezone changes and daylight saving.
+Pure date arithmetic, timezone aware. Given a frequency, an anchor day and the publication time, compute the next due date. A tolerance (one day by default, per METHOD.md §11) means an early or late check-in does not double-advance. The staleness sweep, reminder scheduling and the review inbox all read the next due date. Golden masters cover anchor-day edges, month ends, timezone changes and daylight saving.
 
 ### 6.4 The KPI engine (`packages/core` plus `packages/method`)
 

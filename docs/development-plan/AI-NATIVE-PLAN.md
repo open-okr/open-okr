@@ -120,15 +120,14 @@ Permission `manage_ai`. One admin console:
 | Provider and connection | Provider, base URL, key, connection test, allow per-user keys |
 | Models and routing | The tier map, sampling, context guard |
 | Features | A switch per §2 capability, on by default where a provider is configured |
-| Coaching | Draft Coach strictness (advisory, warn, strict) with per-space overrides. The six publish gates stay hard; a failed publish can be overridden only per attempt, with elevated access and a recorded reason |
 | Agents | Create and edit agents: persona, instructions per phase, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, run history and logs |
-| Nudges | Per-rule enable and channel, escalation ladders, workspace quiet mode, per-member quiet hours defaults, a live volume chart with the top noisy rules |
 | Budgets and limits | Token, cost and call quotas per user, per agent and per workspace. A hard cap that halts runs. A throttle window |
 | Prompts | Versioned system prompt per feature and per agent phase, restore to default, gated by the evaluation set |
 | Privacy and governance | Context egress level, personal-data redaction, no-training assertion, egress allow-list. Greyed out with a zero-egress note on a local provider |
-| Channels | Connect Slack, Teams, WhatsApp and Telegram, verify, map identities, test send |
 | Connections | MCP clients and grants with last-used and audit links, revoke |
 | Usage and logs | Token and cost dashboards by user, feature, agent and model. A request log with truncated payloads. Flagged calls. Latest evaluation results |
+
+This console holds only what depends on a provider, plus the external-agent connections. The coaching, nudge and channel surfaces are deterministic and live in workspace admin (UIUX-PLAN.md screen S-36) behind `manage_coaching` and workspace administration, per the TECHNICAL-PLAN.md §4.14 settings map, so they remain fully available with AI off. The six publish gates stay hard everywhere; a failed publish can be overridden only per attempt, with elevated access and a recorded reason.
 
 ## 5. Channels
 
@@ -386,5 +385,5 @@ Task bodies for the AI and agent work live in IMPLEMENTATION-PLAN.md alongside e
 | A4 | Evaluation pass bar per capability | Set with the design documents |
 | A5 | Agent default autonomy | Propose and approve. Scoped direct writes require admin opt-in per agent |
 | A6 | Embedding model and dimension | Decide at the retrieval task. Keep the column swappable |
-| A7 | Nudge volume ceiling per member per week | Start at ten, measure in the pilots, make it a workspace setting |
+| A7 | Nudge volume ceiling per member per week | A workspace setting in the METHOD.md §11 registry, default ten. Measure in the pilots |
 | A8 | Outbound MCP, meaning the copilot calling external tools | Later. The registry is designed so it bolts on |

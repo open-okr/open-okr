@@ -174,7 +174,7 @@ Acceptance: Given a member without access to a space, when they read the workspa
 ### P2-T08: Workspace settings + module registry [M]
 Depends on: P2-T02
 Goal: the settings shell and module registration (screen S-36 skeleton).
-Deliverables: a settings service with validated storage where environment overrides win; the two-level admin shell; a typed module registry driving the sidebar and admin menus by access.
+Deliverables: a settings service implementing the TECHNICAL-PLAN.md §4.14 settings map with validated storage where environment overrides win; the two-level admin shell; a typed module registry driving the sidebar and admin menus by access.
 Acceptance: Given a module registering a navigation item that requires an access level, when a member lacks it, then the item is hidden and the route is denied.
 
 ### P2-T09: Security baseline [M]
@@ -228,7 +228,7 @@ Acceptance: Given an air-gapped workspace mapping every tier to a local model, w
 ### P2-T16: Usage metering, quotas and hard caps [M]
 Depends on: P2-T14
 Goal: cost visible and bounded (AI-NATIVE-PLAN.md §1.7, screen S-37).
-Deliverables: usage events per call with tokens, cost from the catalogue, latency, source and status; quotas per user, per agent and per workspace; a hard cap that disables features and halts running agents; the AI console (screen S-37) assembling the provider, models, features, coaching, budgets, prompts, privacy and usage cards from P2-T13 to P2-T16; anomaly flagging.
+Deliverables: usage events per call with tokens, cost from the catalogue, latency, source and status; quotas per user, per agent and per workspace; a hard cap that disables features and halts running agents; the AI console (screen S-37) assembling the provider, models, features, budgets, prompts, privacy and usage cards from P2-T13 to P2-T16; anomaly flagging.
 Test plan: a call records tokens and cost accurately against the catalogue; crossing a quota disables the feature with a clear message; crossing a hard cap halts a running agent mid-flight with a log line.
 Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then it halts with an explanatory log entry and every manual path still works.
 
@@ -262,7 +262,7 @@ Acceptance: Given a space manager, when they add a member, then that member gain
 ### P3-T02: Annual frame, cycles and rhythm settings [L]
 Depends on: P3-T01
 Goal: the time boxes and every tunable threshold (TECHNICAL-PLAN.md §4.3, METHOD.md §2.1).
-Deliverables: the annual frame with mission, vision, mid-term strategy, horizon, agreement state and the not-doing list, plus annual strategies; cycles with mode, cadence, dates, status, phase, sponsor, facilitator, session dates, publication deadline, levels and contributing units, generated forward from the cadence and honouring the workspace timezone; rhythm settings with every METHOD.md threshold a workspace may tune, plus terminology labels; the admin surface; audit on create and archive.
+Deliverables: the annual frame with mission, vision, mid-term strategy, horizon, agreement state and the not-doing list, plus annual strategies; cycles with mode, cadence, dates, status, phase, sponsor, facilitator, session dates, publication deadline, levels and contributing units, generated forward from the cadence and honouring the workspace timezone; rhythm settings holding the METHOD.md §11 registry overrides plus terminology labels; the admin surface; audit on create and archive.
 Test plan: cycle generation across quarter, half and year boundaries and across timezones; label overrides render throughout the interface; a threshold change takes effect without a restart.
 Acceptance: Given quarterly cadence on a date inside Q3, then the active cycle is Q3 with correct bounds, created automatically if absent.
 
@@ -390,7 +390,7 @@ Acceptance: the human approves with an explicit statement, and the rule corpus a
 ### P4-T01: The method package [L]
 Depends on: P4-T00
 Goal: METHOD.md as executable data and pure functions (TECHNICAL-PLAN.md §6.1).
-Deliverables: `packages/method` with no database or network access, holding the twenty-six-check quality catalogue with word lists, conditions, statuses, prompts, reasons and example pairs; the score, confidence and portfolio bands; the progress signal; the KPI corridors; the blocker and root-cause taxonomies; the publish gates; phase completion conditions; session stage definitions with durations; the process-health statements and management-retro questions; the rhythm diagnostic; the facilitator guidance; the METHOD.md §11 tunable-threshold defaults; and the nudge trigger catalogue from AI-NATIVE-PLAN.md §6.4 as data, so every proactive message's rule key resolves inside the package. Plus the pure evaluators over each, and the strength-score calculation with strictness as a parameter.
+Deliverables: `packages/method` with no database or network access, holding the twenty-six-check quality catalogue with word lists, conditions, statuses, prompts, reasons and example pairs; the score, confidence and portfolio bands; the progress signal; the KPI corridors; the blocker and root-cause taxonomies; the publish gates; phase completion conditions; session stage definitions with durations; the process-health statements and management-retro questions; the rhythm diagnostic; the facilitator guidance; the METHOD.md §11 threshold registry with its keys, types, valid ranges, defaults and override schema; and the nudge trigger catalogue from AI-NATIVE-PLAN.md §6.4 as data, so every proactive message's rule key resolves inside the package. Plus the pure evaluators over each, and the strength-score calculation with strictness as a parameter.
 Test plan: a golden-master suite over every rule, band, corridor, gate and diagnostic; the corpus from the design gate produces its expected verdicts exactly; a conformance test comparing the package's rule keys and thresholds against METHOD.md fails on drift.
 Acceptance: Given the corpus of real OKR drafts, when the package evaluates them, then every verdict matches the reviewed expectation, and changing a threshold in the document without changing the package fails the build.
 
@@ -414,7 +414,7 @@ Acceptance: Given a set with one unconfirmed and unowned dependency, when the fa
 Depends on: P4-T01, P3-T08
 Goal: the machinery that makes the product active (AI-NATIVE-PLAN.md §6.3, §6.4).
 Reference mockup: [10-review-inbox](../stakeholder/mockups/png/10-review-inbox.png), [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the nudge table and rule registry; the engine computing what is due now per member with deduplication of one per subject per member per day unless escalating; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; escalation ladders for check-ins, acknowledgements and blockers; the suppression record with a reason; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules. Delivery goes to the in-app inbox and email in this task; chat channels arrive in Phase 5.
+Deliverables: the nudge table and rule registry; the engine computing what is due now per member with deduplication of one per subject per member per day unless escalating; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; escalation ladders for check-ins, acknowledgements and blockers; the suppression record with a reason; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules, all administered from workspace admin (screen S-36) behind `manage_coaching`. Delivery goes to the in-app inbox and email in this task; chat channels arrive in Phase 5.
 Test plan: a burst of triggers on one subject produces one nudge; an escalation advances exactly one step and is delivered even inside quiet hours when marked urgent; a snooze silences the nudge but never the review-inbox obligation; a simulated month against the demo workspace stays under the volume ceiling per member.
 Acceptance: Given a champion who misses their check-in, when the engine runs over the following fortnight, then they are nudged on the due day and once daily after, the reviewer is brought in at the grace boundary, the coordinator at seven days and the sponsor at fourteen, each step recorded and visible to the champion.
 
