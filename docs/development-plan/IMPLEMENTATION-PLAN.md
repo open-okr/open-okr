@@ -207,7 +207,7 @@ Acceptance: Given a change script run twice across a deployment boundary, when i
 ### P2-T13: AIProvider port + drivers [L]
 Depends on: P1-T04
 Goal: the provider abstraction and its drivers (AI-NATIVE-PLAN.md §3.1, §3.2).
-Deliverables: the full port surface for chat, streaming, tool calling, embedding, structured extraction and capability reporting; drivers for Anthropic, OpenAI, OpenRouter, Ollama, any OpenAI-compatible endpoint and off; contract tests per driver against recorded fixtures; a deterministic mock driver for the test suite.
+Deliverables: the full port surface for chat, streaming, tool calling, embedding, structured extraction and capability reporting; drivers for Anthropic, OpenAI, Google, OpenRouter, Ollama, any OpenAI-compatible endpoint and off; contract tests per driver against recorded fixtures; a deterministic mock driver for the test suite; a documented driver contract so a new vendor is added without touching feature code.
 Test plan: every driver satisfies the contract; the off driver reports every capability unavailable without raising; a model without tool support degrades rather than failing.
 Acceptance: Given the provider set to off, when any capability is requested, then it reports unavailable and the caller's manual path is unaffected.
 
@@ -221,8 +221,8 @@ Acceptance: Given a workspace key and a personal key, when the member runs an as
 ### P2-T15: Model catalogue, tier routing, structured output and prompts [M]
 Depends on: P2-T14
 Goal: features request a tier, never a model (AI-NATIVE-PLAN.md §3.4).
-Deliverables: the seeded and refreshable model catalogue; per-workspace tier policies with sampling; the context-window guard; structured extraction with schema validation and one repair attempt then a clean failure; the versioned prompt registry with a default, an editor and restore.
-Test plan: an oversized request is blocked before the call; malformed model output repairs once then fails cleanly; a prompt version change is recorded and reversible.
+Deliverables: the seeded and refreshable model catalogue with admin add and edit for custom models carrying their own context window and cost figures; per-workspace tier policies with sampling; the optional per-feature tier override; the context-window guard; structured extraction with schema validation and one repair attempt then a clean failure; the versioned prompt registry with a default, an editor and restore.
+Test plan: an oversized request is blocked before the call; malformed model output repairs once then fails cleanly; a prompt version change is recorded and reversible; a custom catalogue entry meters cost from its own figures; a feature with a tier override routes to that tier while every other feature is unaffected.
 Acceptance: Given an air-gapped workspace mapping every tier to a local model, when any AI feature runs, then no external request is made.
 
 ### P2-T16: Usage metering, quotas and hard caps [M]

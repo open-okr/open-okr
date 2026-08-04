@@ -80,7 +80,7 @@ One runtime: the container profile. It runs on a customer's server, on their Kub
 | Mailer | SMTP, with settings stored encrypted in the database and editable by an admin |
 | Cache and rate limit | In-process plus Postgres |
 | Search | Postgres full-text search, with pgvector for semantic search |
-| AIProvider | Anthropic, OpenAI, OpenRouter, Ollama, any OpenAI-compatible endpoint, or off |
+| AIProvider | Anthropic, OpenAI, Google, OpenRouter, Ollama, any OpenAI-compatible endpoint, or off |
 | Channel | Slack, Microsoft Teams, WhatsApp Business, Telegram, email, or none |
 
 Rules that make this real:

@@ -354,9 +354,9 @@ Every table references `session_id` to sessions.
 |---|---|
 | `ai_providers` | `provider`, `base_url?`, `enabled`, `allow_user_keys` |
 | `ai_credentials` | `owner_kind` (`workspace` / `user`), `owner_id`, `provider`, `key_ciphertext`, `key_hint`, `status` |
-| `ai_models` *(global, no workspace_id)* | `provider`, `model_id`, `context_window`, `capabilities jsonb`, `cost_in`, `cost_out`, `tiers text[]`, `active` |
+| `ai_models` *(global, no workspace_id)* | `provider`, `model_id`, `context_window`, `capabilities jsonb`, `cost_in`, `cost_out`, `tiers text[]`, `active`, `custom bool` |
 | `ai_model_policies` | `tier`, `provider`, `model_id`, `sampling jsonb`, `json_mode` |
-| `ai_feature_settings` | `feature_key`, `enabled`, `quota jsonb` |
+| `ai_feature_settings` | `feature_key`, `enabled`, `tier_override?`, `quota jsonb` |
 | `ai_prompts` | `feature_key?`, `agent_id?`, `phase?`, `version`, `system_prompt`, `is_default` |
 | `ai_threads` | `subject_type?`, `subject_id?`, `member_id`, `title?` |
 | `ai_messages` | `thread_id`, `role`, `content`, `tokens`, `cost` |

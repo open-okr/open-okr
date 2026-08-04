@@ -12,7 +12,7 @@ Authority: peer of TECHNICAL-PLAN.md for this domain. Both defer to PLAN.md, REQ
 2. **Native, never dependent.** Every AI feature accelerates a complete manual path. The quality rules, the alignment score, the health corridors, the diagnostics, the nudges and the escalations are all deterministic and run with the provider off. AI adds rewriting, semantic judgement, natural language and drafting. CI proves the product is whole with AI disabled.
 3. **Every AI action runs under a concrete principal.** Assists, the copilot and MCP calls act as the human, through the same `can()` and row-level security as a click. The Coach and the Champion act as their own agent member with least-privilege bindings scoped to named spaces and goals. There is no service account with ambient authority.
 4. **Propose by default.** Interactive AI proposes and the human confirms, with a preview and an undo. Autonomous agents produce proposals into a review queue by default. A workspace may grant a named agent scoped direct writes. Sandbox mode is always available and commits nothing.
-5. **Bring your own brain.** Deployment, workspace admin or individual user chooses the provider and supplies the key. Anthropic, OpenAI, OpenRouter, Ollama or any OpenAI-compatible endpoint. An air-gapped installation points at a local model or turns AI off, including the agents.
+5. **Bring your own brain.** Deployment, workspace admin or individual user chooses the provider and supplies the key. Anthropic, OpenAI, Google, OpenRouter, Ollama or any OpenAI-compatible endpoint. An air-gapped installation points at a local model or turns AI off, including the agents.
 6. **Nothing leaves silently.** An admin controls what context may reach a non-local provider, personal-data redaction, an egress allow-list and no-training headers. A local provider means zero egress, and the interface says so.
 7. **Cost is visible and capped.** Every call records tokens and cost. Quotas per user, per agent and per workspace. A hard cap halts a run mid-flight with a clear log line.
 8. **Structured output is validated, never trusted.** Model output passes Zod with one repair attempt, then fails cleanly. The model is an untrusted source, and so is everything it retrieved.
@@ -89,10 +89,13 @@ Selected per request by stored configuration: user key, then workspace, then dep
 |---|---|
 | `anthropic` | Claude family. Prompt caching. No-training posture |
 | `openai` | GPT family. JSON mode |
-| `openrouter` | Many models behind one key, with attribution headers |
+| `google` | Gemini family. Native tool calling and structured output, long context windows |
+| `openrouter` | Many models behind one key, with attribution headers. The route to any model without its own driver |
 | `ollama` | Local. The air-gap default. Local embeddings |
-| `openai-compatible` | Generic base URL and key for self-hosted inference servers |
+| `openai-compatible` | Generic base URL and key for self-hosted inference servers, gateways and any vendor exposing an OpenAI-shaped endpoint |
 | `off` | No-op. Every capability reports unavailable and features degrade |
+
+Adding a provider is a new driver behind the same port, never a change to feature code. Until one exists, a vendor is reachable through `openrouter` or `openai-compatible`, so no organisation is blocked on a driver landing.
 
 ### 3.3 Bring your own key
 
@@ -109,7 +112,9 @@ Features request a **tier**, never a model.
 | `deep` | OKR critique, semantic alignment review, decomposition, agent reasoning, the diagnostic narrative |
 | `embed` | Retrieval |
 
-A global model catalogue records context window, capabilities, cost in and out, and tier tags. A per-workspace policy maps each tier to a provider and model with sampling settings. Free-text model identifiers are allowed but validated against the live list when reachable. A context-window guard blocks oversized requests. An air-gapped installation maps every tier to a local model.
+The tier is an indirection, not a restriction. A per-workspace policy maps each tier to a provider, a model and its sampling settings, so one change swaps the model for every feature that uses that tier. A feature may additionally be pinned to a different tier, which covers the case where one capability deserves a stronger or cheaper model than its default; the feature still names a tier, so no feature code changes.
+
+The model catalogue records context window, capabilities, cost in and out, and tier tags per model. It ships seeded and is refreshable from the provider, and an admin may add or edit an entry, including a custom or self-hosted model with its own context window and cost figures, so metering stays accurate for models the catalogue has never seen. Free-text model identifiers are allowed and validated against the live list when reachable. A context-window guard blocks oversized requests. An air-gapped installation maps every tier to a local model.
 
 ## 4. Governance surface
 
@@ -118,8 +123,8 @@ Permission `manage_ai`. One admin console:
 | Card | Contents |
 |---|---|
 | Provider and connection | Provider, base URL, key, connection test, allow per-user keys |
-| Models and routing | The tier map, sampling, context guard |
-| Features | A switch per §2 capability, on by default where a provider is configured |
+| Models and routing | The tier map, sampling, context guard, and the model catalogue with add and edit for custom models |
+| Features | A switch per §2 capability, on by default where a provider is configured, each with an optional tier override and quota |
 | Agents | Create and edit agents: persona, instructions per phase, provider and tier, schedule, access scope, autonomy policy, sandbox toggle, run history and logs |
 | Budgets and limits | Token, cost and call quotas per user, per agent and per workspace. A hard cap that halts runs. A throttle window |
 | Prompts | Versioned system prompt per feature and per agent phase, restore to default, gated by the evaluation set |
@@ -314,7 +319,7 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `ai_credentials` | owner (workspace or user), provider, key ciphertext, key hint, status |
 | `ai_models` (global) | provider, model identifier, context window, capabilities, cost in and out, tiers, active |
 | `ai_model_policies` | tier to provider, model, sampling and JSON mode |
-| `ai_feature_settings` | feature key, enabled, quota |
+| `ai_feature_settings` | feature key, enabled, tier override, quota |
 | `ai_prompts` | feature key or agent identifier and phase, version, system prompt, default flag |
 | `ai_threads` / `ai_messages` | Copilot and agent conversations anchored to a subject, roles, tokens, cost |
 | `ai_tool_calls` | message or run reference, tool, input, output excerpt, status, permission checked, duration |
@@ -380,7 +385,7 @@ Task bodies for the AI and agent work live in IMPLEMENTATION-PLAN.md alongside e
 | # | Decision | Position |
 |---|---|---|
 | A1 | Default posture | On per feature where a provider is configured |
-| A2 | Drivers in v1 | Anthropic, OpenAI, OpenRouter, Ollama, OpenAI-compatible and off |
+| A2 | Drivers in v1 | Anthropic, OpenAI, Google, OpenRouter, Ollama, OpenAI-compatible and off. Further vendors are new drivers behind the same port |
 | A3 | Per-user keys | Allowed, admin-toggleable |
 | A4 | Evaluation pass bar per capability | Set with the design documents |
 | A5 | Agent default autonomy | Propose and approve. Scoped direct writes require admin opt-in per agent |
