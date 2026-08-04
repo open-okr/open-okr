@@ -10,7 +10,7 @@ Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skip
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P1-T01 | Monorepo scaffold | todo |  |  |  |
+| P1-T01 | Monorepo scaffold | in_progress | task/p1-t01-monorepo-scaffold | 2026-08-04 | Session started. LICENSE already present at root (AGPL-3.0) |
 | P1-T02 | CI pipeline + environment schema | todo |  |  |  |
 | P1-T03 | Database package + tenant floor + test isolation | todo |  |  | Tenant-isolation spike. Decision recorded in a design document |
 | P1-T04 | Adapter ports + drivers + the transactional outbox | todo |  |  |  |
