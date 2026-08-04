@@ -20,7 +20,8 @@ HEAD = '''<!doctype html><meta charset="utf-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0 }
   body { background: #64748B; font-family: Calibri, Carlito, "Helvetica Neue", Arial, sans-serif }
-  .slide { position: relative; width: 960px; height: 540px; overflow: hidden;
+  /* 1pt = 1.333px, so a 960pt slide is 1280px wide. Screenshot at 1280x720. */
+  .slide { position: relative; width: 960pt; height: 540pt; overflow: hidden;
            background: #fff; margin: 0 0 14px; }
   .n { position: absolute; right: 6px; top: 4px; font: 700 10px monospace;
        color: #CBD5E1; z-index: 99 }
@@ -45,7 +46,7 @@ def spans(text, color, bold, italic, face, spacing, size):
                  % (color, '700' if strong else '400',
                     'italic' if italic else 'normal',
                     'Calibri, Carlito, Arial' if face == 'Calibri'
-                    else '"Calibri Light", Carlito, Arial',
+                    else "'Calibri Light', Carlito, Arial",  # single quotes: this sits in a style="" attribute
                     spacing, size))
         out.append('<span style="%s">%s</span>'
                    % (style, html.escape(chunk).replace('\n', '<br>')))

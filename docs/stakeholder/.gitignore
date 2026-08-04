@@ -1,0 +1,6 @@
+# Build scratch and previews. The committed artifacts are the .docx and .pptx.
+.build/
+deck/.preview/
+__pycache__/
+# Word's lock file, present while OpenOKR-Overview.docx is open
+~$*

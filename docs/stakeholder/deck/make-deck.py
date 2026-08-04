@@ -4,6 +4,7 @@
 Slides are laid out by hand in points on a 960 x 540 canvas, using the same
 design tokens as the interface mockups. Run: python3 make-deck.py
 """
+import math
 import os
 
 import pptx
@@ -57,15 +58,20 @@ def chrome(slide, rule=True):
                [para(str(number), 9, INK4, align='r', bold=True)])
 
 
+# Calibri Light bold at 29pt fits about 58 characters across the content width.
+TITLE_CHARS = 58
+
+
 def heading(slide, title, kicker=None, sub=None):
     y = 44.0
     if kicker:
         slide.text(M, y, CW, 14,
                    [para(kicker.upper(), 9, BRAND_600, bold=True, spacing=1.2)])
         y += 17
-    slide.text(M, y, CW, 40,
+    lines = max(1, math.ceil(len(title) / TITLE_CHARS))
+    slide.text(M, y, CW, 36 * lines,
                [para(title, 29, BRAND_DARK, bold=True, face='Calibri Light')])
-    y += 40
+    y += 36 * lines + 4
     if sub:
         slide.text(M, y, CW - 60, 34, [para(sub, 13.5, INK3, line=124)])
         y += 30
@@ -142,7 +148,7 @@ s.text(M, 468, 600, 18,
 
 # ------------------------------------------------------- 2. opening statement
 
-s = new(WHITE)
+s = new(WHITE, label='The problem')
 s.rect(0, 0, 6, H, fill=BRAND)
 s.text(M + 24, 150, 800, 130,
        [para('Most organisations do not fail at OKRs because their '
@@ -159,21 +165,21 @@ chrome(s)
 # -------------------------------------------------------------- 3. problem
 
 s = new(BG)
-y = heading(s, 'Three ways to run OKRs today, three ways to lose the practice',
+y = heading(s, 'How OKRs are run today, and why the practice still dies',
             'The problem')
 cw = (CW - 40) / 3
-card(s, M, y, cw, 210, 'Spreadsheets',
+card(s, M, y, cw, 168, 'Spreadsheets',
      'No cadence, no accountability, no quality bar. Nobody is ever told '
      'anything. The file is opened twice a quarter.', accent=INK4, tag='What most start with')
-card(s, M + cw + 20, y, cw, 210, 'Conventional OKR trackers',
+card(s, M + cw + 20, y, cw, 168, 'Conventional OKR trackers',
      'A database with a progress bar. They store objectives faithfully and '
      'are entirely passive. They will happily hold a badly written key result '
      'for a whole quarter without comment.', accent=WARN, tag='What most buy')
-card(s, M + 2 * (cw + 20), y, cw, 210, 'Consulting and training',
+card(s, M + 2 * (cw + 20), y, cw, 168, 'Consulting and training',
      'The method is real, but it walks out of the door with the consultant. '
      'There is nothing to enforce it on a wet Tuesday in week six.',
      accent=BAD, tag='What most fall back on')
-s.text(M, y + 232, CW, 26,
+s.text(M, y + 192, CW, 26,
        [para('The practice that makes OKRs work has been well understood for '
              'twenty years. It just does not live in the software.',
              14, INK2, italic=True)])
@@ -413,17 +419,16 @@ for index, (number, text) in enumerate(gates):
     gy = y + index * 40
     s.rect(M, gy, 26, 26, fill=BRAND_WEAK, radius=13)
     s.text(M, gy + 6, 26, 16, [para(number, 12, BRAND_600, bold=True, align='ctr')])
-    s.text(M + 40, gy + 4, 520, 22, [para(text, 13.5, INK2)])
-s.rect(M + 596, y, CW - 596, 246, fill=WARNBG, line='FCD34D', radius=8)
-s.text(M + 620, y + 26, CW - 644, 24,
+    s.text(M + 40, gy + 4, 460, 22, [para(text, 13.5, INK2)])
+s.rect(M + 528, y, 320, 250, fill=WARNBG, line='FCD34D', radius=8)
+s.text(M + 552, y + 24, 272, 24,
        [para('Gate five is the one nobody has had', 13.5, WARN, bold=True)])
-s.text(M + 620, y + 56, CW - 644, 170,
-       [para('Capacity is read from the initiatives actually planned against each key '
-             'result, not self-declared.\n\n'
-             'If one key result exceeds capacity and no cut is recorded, the cycle '
-             'cannot be published.\n\n'
-             '**A plan where nothing was cut is a plan that has not been made.** '
-             'Without the gate, the cut happens in week six instead, without a decision.',
+s.text(M + 552, y + 54, 272, 180,
+       [para('Capacity is read from the initiatives actually planned against each '
+             'key result, not self-declared.\n\n'
+             'If one exceeds and no cut is recorded, the cycle cannot be '
+             'published.\n\n'
+             '**A plan where nothing was cut is a plan that has not been made.**',
              12, WARN, line=130)])
 chrome(s)
 
@@ -607,12 +612,12 @@ pillars = [
 cw = (CW - 2 * 16) / 3
 for index, (letter, title, body) in enumerate(pillars):
     x = M + (index % 3) * (cw + 16)
-    ry = y + (index // 3) * 150
-    s.rect(x, ry, cw, 138, fill=WHITE, line=LINE, radius=8)
+    ry = y + (index // 3) * 164
+    s.rect(x, ry, cw, 152, fill=WHITE, line=LINE, radius=8)
     s.rect(x + 18, ry + 16, 22, 22, fill=BRAND_WEAK, radius=6)
     s.text(x + 18, ry + 21, 22, 14, [para(letter, 10.5, BRAND_600, bold=True, align='ctr')])
     s.text(x + 48, ry + 18, cw - 66, 18, [para(title, 13, INK, bold=True)])
-    s.text(x + 18, ry + 48, cw - 36, 82, [para(body, 10.5, INK3, line=126)])
+    s.text(x + 18, ry + 48, cw - 36, 96, [para(body, 10.5, INK3, line=126)])
 chrome(s)
 
 # ------------------------------------------------------- how it runs
@@ -722,16 +727,16 @@ asks = [('A methodology institute', BRAND,
          'lock-in of any kind because the whole workspace exports at any time.')]
 for index, (title, colour, ask, give) in enumerate(asks):
     x = M + index * (cw + 18)
-    s.rect(x, y, cw, 250, fill=WHITE, line=LINE, radius=8, shadow=True)
+    s.rect(x, y, cw, 268, fill=WHITE, line=LINE, radius=8, shadow=True)
     s.rect(x, y, cw, 3.5, fill=colour)
     s.text(x + 20, y + 22, cw - 40, 22, [para(title, 15, INK, bold=True)])
     s.text(x + 20, y + 56, cw - 40, 14,
            [para('WHAT WE ASK', 8.5, colour, bold=True, spacing=1.1)])
     s.text(x + 20, y + 76, cw - 40, 76, [para(ask, 11.5, INK2, line=128)])
-    s.rect(x + 20, y + 160, cw - 40, 0.75, fill=LINE)
-    s.text(x + 20, y + 174, cw - 40, 14,
+    s.rect(x + 20, y + 166, cw - 40, 0.75, fill=LINE)
+    s.text(x + 20, y + 180, cw - 40, 14,
            [para('WHAT YOU GET', 8.5, INK4, bold=True, spacing=1.1)])
-    s.text(x + 20, y + 194, cw - 40, 76, [para(give, 11.5, INK3, line=128)])
+    s.text(x + 20, y + 200, cw - 40, 80, [para(give, 11.5, INK3, line=128)])
 chrome(s)
 
 # ------------------------------------------------------------------ closing

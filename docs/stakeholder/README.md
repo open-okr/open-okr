@@ -4,21 +4,24 @@ The shareable overview of OpenOKR, for a methodology partner, an investor or an 
 
 | File | What it is |
 |---|---|
-| `OpenOKR-Overview.docx` | **The deliverable.** A4, ~20 pages, eleven screen mockups. Generated, so never edit it directly |
-| `OpenOKR-Overview.md` | The source text. Edit this |
+| `OpenOKR-Overview.docx` | **The document.** A4, ~20 pages, eleven screen mockups. Generated, so never edit it directly |
+| `OpenOKR-Deck.pptx` | **The deck.** 36 slides, 16:9, the same content and all eleven mockups. Also generated |
+| `OpenOKR-Overview.md` | The document source. Edit this |
+| `deck/make-deck.py` | The deck source. Every slide is laid out here |
 | `mockups/src/*.html` | The mockup screens, hand-built against UIUX-PLAN.md §2 and the S-xx screen specifications |
-| `mockups/png/*.png` | Rendered at 1440 wide, 2x, palette-optimised. Reusable in a deck or on a site |
+| `mockups/png/*.png` | Rendered at 1440 wide, 2x, palette-optimised. Reusable on a site or in another deck |
 | `build.sh` | Markdown to Word |
 | `render.sh` | Mockups to PNG |
 
 ## Rebuilding
 
 ```bash
-./mockups/render.sh   # only after editing a mockup
-./build.sh            # writes OpenOKR-Overview.docx
+./mockups/render.sh          # only after editing a mockup
+./build.sh                   # writes OpenOKR-Overview.docx
+python3 deck/make-deck.py    # writes OpenOKR-Deck.pptx
 ```
 
-`render.sh` needs a Chromium headless shell. It looks in the Playwright browser cache and falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. `build.sh` needs pandoc and python3 with Pillow.
+`render.sh` needs a Chromium headless shell. It looks in the Playwright browser cache and falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. `build.sh` needs pandoc and python3 with Pillow. The deck needs neither: `deck/pptx.py` writes the OOXML itself.
 
 ## How the Word file is produced
 
@@ -29,6 +32,31 @@ The shareable overview of OpenOKR, for a methodology partner, an investor or an 
 3. **Fit tables.** `fit-tables.py` replaces pandoc's equal column widths with widths allocated from how much text each column actually carries, damped and clamped so no column collapses or swallows the table.
 
 There is no automatic table of contents. Word's TOC field renders empty in Google Docs, Pages and Preview, so the contents page is written out as an ordinary table instead.
+
+## How the deck is produced
+
+`deck/pptx.py` is a small PowerPoint writer: a .pptx is a zip of XML parts, and it writes them directly. That keeps the deck on the same design tokens as the mockups and avoids a dependency. It handles rounded rectangles, text boxes with mixed weight runs, pictures with a border and shadow, and simple tables, all positioned in points on a 960 x 540 slide.
+
+Every shape is drawn explicitly rather than dropped into a layout placeholder, so slides look exactly as authored and stay fully editable in PowerPoint.
+
+To check a layout before opening PowerPoint:
+
+```bash
+PREVIEW=1 python3 deck/make-deck.py
+open deck/.preview/slides.html
+```
+
+`deck/preview.py` replays the same geometry in CSS at the same point coordinates. Fonts are approximate, so it proves layout and catches text overflow rather than being pixel-accurate. It also writes one page per slide, which is what the build screenshots for review.
+
+## Slide map
+
+| Slides | What they cover |
+|---|---|
+| 1 to 4 | Title, the opening statement, and the problem |
+| 5 to 10 | What OpenOKR is: the two differences, the pure rule library, the two agents, deterministic-first, and who it is for |
+| 11 to 25 | The product, screen by screen. Eleven mockups plus the eight phases, the six gates and the diagnostic |
+| 26 to 29 | Why it wins: five differentiators, what each audience gets, and the target outcomes |
+| 30 to 36 | The business: module inventory, deployment and licence, roadmap, the coaching-quality risk, the three asks, and the close |
 
 ## Screen coverage
 
