@@ -39,7 +39,7 @@ human picks a task -> agent restates the plan -> human confirms
 
 ### Step 1. The human starts a task
 
-Pick the next task whose dependencies are all `done` in STATUS.md, then paste the start-task prompt from PROMPT.md §2 with that task identifier.
+Pick the next task whose dependencies are all `done` in STATUS.md, then paste the session prompt from START-PROMPT.md with that task identifier. Leaving the task line out makes the agent propose the next eligible task for you to confirm.
 
 ### Step 2. The agent restates, the human confirms
 

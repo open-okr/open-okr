@@ -2,6 +2,8 @@
 
 Copy-and-paste prompts for running OpenOKR development with Claude Code. Day to day you only name a task identifier. The agent pulls in everything else itself.
 
+To start a session, use the single prompt in [START-PROMPT.md](START-PROMPT.md). It detects the state you are in and covers prompts 2, 4 and 6 below. The prompts here remain for the other situations.
+
 ---
 
 ## How the agent finds the plan

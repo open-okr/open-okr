@@ -30,7 +30,8 @@ Also here:
 
 - [OVERVIEW.md](OVERVIEW.md): the end-user product overview: what OpenOKR is, who it is for, and what every part of it does. Written for users and admins, not builders.
 - [DATABASE.md](DATABASE.md): the consolidated schema: every table, key columns and relationships. A derived view; the authority is TECHNICAL-PLAN.md §4.
-- [PROMPT.md](PROMPT.md): copy-and-paste prompts for running development.
+- [START-PROMPT.md](START-PROMPT.md): the one prompt that starts every development session.
+- [PROMPT.md](PROMPT.md): copy-and-paste prompts for the other situations: bootstrap, rework, spikes, phase exits, conformance.
 - [STATUS.md](STATUS.md): task tracking. The agent updates rows; only a human sets `done`.
 - [Reference mockups](../stakeholder/mockups/README.md): eleven screens from UIUX-PLAN.md §6 drawn as HTML and rendered to PNG. Look at the mockup before starting a UI task. Reference, not authority: UIUX-PLAN.md §10 has the rule.
 
