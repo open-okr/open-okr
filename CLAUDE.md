@@ -75,6 +75,7 @@ Detailed designs live in `docs/design/`, written by you at each design gate. Kee
 - Never import a vendor SDK (a cloud provider, a queue, a mail service, a chat provider, an LLM client) outside `packages/adapters`.
 - Every runtime-sensitive capability goes through a port in `packages/adapters`: jobs, realtime, storage, mail, cache, search, ai, channels.
 - **Every write is one transaction through the Operation pipeline:** the domain change, access bindings, the activity row, the audit row and the outbox row commit together. Authorise *before* the transaction against freshly loaded, access-scoped rows. Side effects are enqueued **only** by inserting an outbox row in that transaction. A direct driver call on a write path is a build failure.
+- **Every setting has a working default and nothing must be configured before the product works.** New settings are declared in the TECHNICAL-PLAN.md §4.14 map with a default, and thresholds belong to the METHOD.md §11 registry. Never hardcode a value that belongs in either. Never ship a screen that blocks until a setting is chosen.
 - Every business table gets `workspace_id` and a **row-level security policy in the same migration**. The tenant setting is applied with `SET LOCAL` per transaction. Row-level security is the tenant floor; it does not replace object authorisation.
 - **Object authorisation is the relationship model through one `can()`.** Every read of a protected aggregate goes through the single access-aware getter, which returns not-found on forbidden and excludes suspended members. No per-endpoint ad-hoc checks. Never rely on the interface to hide anything.
 - Rich text is editor JSON in `jsonb` with a version column, never Markdown as storage. Parse, validate, render, excerpt and extract through the one shared `packages/core` module. Rendering is a sanitising allow-list at every surface, including email and exports. Imported content is untrusted.
@@ -148,6 +149,7 @@ Keep this list current once scaffolded.
 - The migration and its row-level security policy ship together. Every new business table carries `workspace_id`.
 - Writes go through the Operation pipeline with the change, audit and outbox atomic. Reads go through the access getter.
 - Any rule, threshold, band, corridor or taxonomy touched comes from `packages/method`, and the conformance suite passes.
+- Any setting added is in the TECHNICAL-PLAN.md §4.14 map with a default that a fresh workspace resolves without configuration.
 - Any proactive message added has a rule key, a nudge row, deduplication, an escalation position and a snooze path.
 - Unit tests plus at least one end-to-end happy path for anything user-visible. Setup uses the test-support factory, never raw inserts.
 - The importer mapping is updated if any table changed, or the table is marked as having no legacy source.

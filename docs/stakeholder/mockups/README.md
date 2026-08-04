@@ -49,6 +49,7 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 | `checkin.overdue`, `kpi.recovery_proposed`, `quality.conflict` and the other trigger keys | AI-NATIVE-PLAN.md §6.4 |
 | The escalation ladder steps and the blocker ladder | AI-NATIVE-PLAN.md §6.3 |
 | Colour, spacing, chips, badges and density | UIUX-PLAN.md §2, §4 |
+| The Friday check-in day | A workspace choice this fictional company made. The canon default is Monday (METHOD.md §11) |
 
 **When one of those changes, the mockup that quotes it is stale.** `pnpm method:check` cannot see these files, so treat them the way you would treat documentation: update them in the same change, or note them in the change as needing a follow-up.
 

@@ -221,7 +221,7 @@ Both are the same release. Self-host is never seat-limited and never feature-gat
 ## 10. Getting started
 
 1. **Deploy or sign up.** Run the compose file and open the wizard, or create a cloud workspace.
-2. **Set up.** Name the workspace, pick your check-in day, connect a chat provider or skip it. Or click "explore with demo data" to poke around a realistic company first.
+2. **Set up, or don't.** Every setting starts on a sensible default, so you can skip straight past this. If you like, name the workspace, pick your check-in day, connect a chat provider. Or click "explore with demo data" to poke around a realistic company first.
 3. **Bring your data,** or start clean.
 4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing and refuse to let you draft on a thin input pack.
 5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate.

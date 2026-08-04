@@ -83,9 +83,9 @@ Acceptance: Given a user with a second factor enrolled, when they sign in, then 
 ### P1-T06: Workspaces + members bootstrap [M]
 Depends on: P1-T05
 Goal: the two-level identity: a global user and a per-workspace member.
-Deliverables: the workspace and member tables per TECHNICAL-PLAN.md §4.1; a bootstrap flow where the first registration provisions a workspace with the user as its first member; the workspace switcher; the workspace setting wired from the member's active workspace.
-Test plan: a fresh database, register, then a workspace and member exist; isolation verified across two workspaces; the same user joins a second workspace as a distinct member.
-Acceptance: Given a first-run instance, when the first user registers, then a workspace exists with them as an active member and every query is scoped to it.
+Deliverables: the workspace and member tables per TECHNICAL-PLAN.md §4.1; a bootstrap flow where the first registration provisions a workspace with the user as its first member and applies the TECHNICAL-PLAN.md §4.14 provisioning defaults for the modules present, in the same transaction; the workspace switcher; the workspace setting wired from the member's active workspace.
+Test plan: a fresh database, register, then a workspace and member exist with every existing setting resolved to its default and no null required setting; isolation verified across two workspaces; the same user joins a second workspace as a distinct member.
+Acceptance: Given a first-run instance, when the first user registers, then a workspace exists with them as an active member, every setting resolves to its documented default without anyone choosing one, and every query is scoped to it.
 
 ### P1-T07: Operation pipeline + action registry + audit spine [L]
 Depends on: P1-T04, P1-T06
@@ -174,8 +174,9 @@ Acceptance: Given a member without access to a space, when they read the workspa
 ### P2-T08: Workspace settings + module registry [M]
 Depends on: P2-T02
 Goal: the settings shell and module registration (screen S-36 skeleton).
-Deliverables: a settings service implementing the TECHNICAL-PLAN.md §4.14 settings map with validated storage where environment overrides win; the two-level admin shell; a typed module registry driving the sidebar and admin menus by access.
-Acceptance: Given a module registering a navigation item that requires an access level, when a member lacks it, then the item is hidden and the route is denied.
+Deliverables: a settings service implementing the TECHNICAL-PLAN.md §4.14 settings map with validated storage where environment overrides win, every key carrying a declared default so an unset key always resolves, and a reset-to-default action per setting and per card; the two-level admin shell; a typed module registry driving the sidebar and admin menus by access.
+Test plan: every setting in the map resolves to its documented default on a workspace where nothing has been configured, proven by a test that enumerates the registry rather than a fixed list, so a setting added later without a default fails; resetting a card restores the defaults exactly.
+Acceptance: Given a module registering a navigation item that requires an access level, when a member lacks it, then the item is hidden and the route is denied; and given a freshly provisioned workspace, when every setting is read, then each returns its documented default and none is unset.
 
 ### P2-T09: Security baseline [M]
 Depends on: P1-T05, P2-T02
@@ -221,8 +222,8 @@ Acceptance: Given a workspace key and a personal key, when the member runs an as
 ### P2-T15: Model catalogue, tier routing, structured output and prompts [M]
 Depends on: P2-T14
 Goal: features request a tier, never a model (AI-NATIVE-PLAN.md §3.4).
-Deliverables: the seeded and refreshable model catalogue with admin add and edit for custom models carrying their own context window and cost figures; per-workspace tier policies with sampling; the optional per-feature tier override; the context-window guard; structured extraction with schema validation and one repair attempt then a clean failure; the versioned prompt registry with a default, an editor and restore.
-Test plan: an oversized request is blocked before the call; malformed model output repairs once then fails cleanly; a prompt version change is recorded and reversible; a custom catalogue entry meters cost from its own figures; a feature with a tier override routes to that tier while every other feature is unaffected.
+Deliverables: the seeded and refreshable model catalogue with admin add and edit for custom models carrying their own context window and cost figures; a seeded default tier map per driver so supplying a key is the only step; per-workspace tier policies with sampling; the optional per-feature tier override; the context-window guard; structured extraction with schema validation and one repair attempt then a clean failure; the versioned prompt registry with a default, an editor and restore.
+Test plan: an oversized request is blocked before the call; malformed model output repairs once then fails cleanly; a prompt version change is recorded and reversible; a custom catalogue entry meters cost from its own figures; a feature with a tier override routes to that tier while every other feature is unaffected; a workspace that has supplied only a key resolves every tier through the driver's seeded map.
 Acceptance: Given an air-gapped workspace mapping every tier to a local model, when any AI feature runs, then no external request is made.
 
 ### P2-T16: Usage metering, quotas and hard caps [M]
@@ -256,7 +257,7 @@ Acceptance: the human approves with an explicit statement before any Phase 3 imp
 ### P3-T01: Spaces [M]
 Depends on: P3-T00
 Goal: team homes (TECHNICAL-PLAN.md §4.2).
-Deliverables: spaces and space members with member, manager and coordinator roles; a creation Operation wiring the context, the standard group and manager bindings; the space home shell; join and leave; audit.
+Deliverables: spaces and space members with member, manager and coordinator roles; a creation Operation wiring the context, the standard group and manager bindings; the default space per TECHNICAL-PLAN.md §4.14, provisioned for new workspaces and backfilled for existing ones through the data-change runner; the space home shell; join and leave; audit.
 Acceptance: Given a space manager, when they add a member, then that member gains space-standard access to the space's aggregates immediately.
 
 ### P3-T02: Annual frame, cycles and rhythm settings [L]
@@ -293,7 +294,7 @@ Depends on: P3-T05
 Goal: TECHNICAL-PLAN.md §6.3, the rhythm that makes health honest.
 Deliverables: pure next-due arithmetic from frequency, anchor day, tolerance and the workspace timezone; the next due date maintained on publication, creation and frequency change; the staleness sweep job flipping health past the grace window; scheduling hooks the nudge engine will consume.
 Test plan: golden masters including daylight saving and month ends; publishing early or late inside the tolerance advances exactly one period.
-Acceptance: Given a weekly goal anchored to a chosen day and checked in the day before, when the cadence advances, then the next due date is the following anchor day, and three days plus the grace after a miss the goal renders outdated everywhere.
+Acceptance: Given a weekly goal anchored to a chosen day and checked in the day before, when the cadence advances, then the next due date is the following anchor day, and once a missed check-in ages past the grace window the goal renders outdated everywhere.
 
 ### P3-T07: Check-ins: snapshots, publication, acknowledgement, voting [L]
 Depends on: P3-T06, P2-T06
@@ -709,8 +710,8 @@ Acceptance: the human approves with an explicit statement.
 
 ### P8-T02: Tenant provisioning, signup and onboarding [L]
 Depends on: P8-T01
-Deliverables: the tenant table and provisioning Operation; cloud signup with email verification and workspace creation; the onboarding flow (screen S-34) shared with self-host; the workspace lifecycle of active, suspended and closed with data retention on closure; region recorded per tenant.
-Acceptance: Given a new cloud signup, when it completes, then a workspace exists with the user as owner, the onboarding runs, and the tenant record carries its plan and region.
+Deliverables: the tenant table and provisioning Operation; cloud signup with email verification and workspace creation; the onboarding flow (screen S-34) shared with self-host, every step skippable over the TECHNICAL-PLAN.md §4.14 defaults; the workspace lifecycle of active, suspended and closed with data retention on closure; region recorded per tenant.
+Acceptance: Given a new cloud signup, when the member dismisses onboarding entirely, then they land in a working workspace running the default rhythm with the coach and gates active, and the tenant record carries its plan and region.
 
 ### P8-T03: Operator console [L]
 Depends on: P8-T02

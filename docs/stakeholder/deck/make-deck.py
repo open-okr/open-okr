@@ -276,7 +276,7 @@ y = heading(s, 'Two AI teammates, with names, scopes and accountability',
 cw = (CW - 24) / 2
 for index, (initials, colour, name, owns, does) in enumerate([
         ('C', BRAND, 'OKR Coach', 'Quality and practice',
-         'Reviews every draft against the twenty rules. Runs a nightly semantic '
+         'Reviews every draft against the quality checks. Runs a nightly semantic '
          'sweep for duplicated metrics, better parents and hidden dependencies.\n\n'
          'Speaks up when the not-doing list is empty, when nothing was cut at the '
          'capacity check, when a goal is reported on track but its key results '
@@ -374,14 +374,14 @@ rows = [['Phase', 'What happens', 'The gate'],
         ['1. Prepare', 'Sponsor, facilitator, every session booked, the seven-item input pack', 'Drafting refused until the pack is complete'],
         ['2. Diagnose', 'Score the last cycle, read KPI baselines, rank five to ten issues', 'Prior cycle scored, or a first cycle declared'],
         ['3. Set direction', 'Three to five priorities with twelve-month success statements', 'The not-doing list is written'],
-        ['4. Draft OKRs', 'Write objectives and key results, twenty rules checking live', 'Every key result passes its checks'],
+        ['4. Draft OKRs', 'Write objectives and key results, the quality checks judging live', 'Every key result passes its checks'],
         ['5. Align and commit', 'Map contribution, register dependencies, check capacity', 'All six publish gates green'],
         ['6. Run the cadence', 'Weekly check-ins, monthly reviews, the decision log', 'Sessions booked for the whole cycle'],
         ['7. Review and learn', 'Score, retro, diagnose, feed forward automatically', 'Every objective closed deliberately']]
 s.table(M, y, [140, 400, CW - 540], rows, row_h=34, size=11)
 chrome(s)
 
-picture_slide('03-draft-coach', 'Twenty rules, running on every keystroke',
+picture_slide('03-draft-coach', 'Twenty-six checks, running on every keystroke',
               'The failing objective shows its verdicts inline. One key result measures activity, '
               'another has no baseline, and the whole set has no leading indicator. The strength '
               'meter and quality panel update live. Warnings never block typing.', 'S-09')
@@ -693,7 +693,7 @@ y += 142
 cw = (CW - 20) / 2
 s.text(M, y, cw, 20, [para('What we are doing about it', 14, INK, bold=True)])
 s.text(M, y + 26, cw, 110,
-       [para('The warn-versus-fail line on all twenty rules will be tuned against a corpus of '
+       [para('The warn-versus-fail line on every check will be tuned against a corpus of '
              'real, anonymised OKRs before launch. Assembling that corpus is a named deliverable '
              'of the coaching phase design gate, not an afterthought.', 12.5, INK2, line=130)])
 s.rect(M + cw + 20, y - 12, cw, 140, fill=BRAND_WEAK, line=BRAND_LINE, radius=8)

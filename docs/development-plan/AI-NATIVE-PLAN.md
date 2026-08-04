@@ -114,6 +114,8 @@ Features request a **tier**, never a model.
 
 The tier is an indirection, not a restriction. A per-workspace policy maps each tier to a provider, a model and its sampling settings, so one change swaps the model for every feature that uses that tier. A feature may additionally be pinned to a different tier, which covers the case where one capability deserves a stronger or cheaper model than its default; the feature still names a tier, so no feature code changes.
 
+**Every driver ships a seeded default tier map**, so supplying a key is the only step: the tiers resolve to sensible models for that provider immediately, and remapping is a later refinement rather than a prerequisite. A driver added without a default tier map is incomplete.
+
 The model catalogue records context window, capabilities, cost in and out, and tier tags per model. It ships seeded and is refreshable from the provider, and an admin may add or edit an entry, including a custom or self-hosted model with its own context window and cost figures, so metering stays accurate for models the catalogue has never seen. Free-text model identifiers are allowed and validated against the live list when reachable. A context-window guard blocks oversized requests. An air-gapped installation maps every tier to a local model.
 
 ## 4. Governance surface

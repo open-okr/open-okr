@@ -708,14 +708,14 @@ The coach never guesses at the situation. Every one of the twenty maps to a rule
 
 The structure of the practice is canon and cannot be changed: which checks exist and how they judge, the six publish gates and their conditions, the blocker and root-cause taxonomies, the session agendas and their stage order, the process-health statements, the management-retro questions, the health precedence, the diagnostic verdicts and the feed-forward mapping. A workspace that needs a different structure is practising a different method, not configuring this one.
 
-Every numeric value in the practice is a parameter in this registry. Each ships as data in `packages/method` with the canon default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
+Every numeric value the product enforces, computes with or fires on is a parameter in this registry; the §2.4 planning timelines are guidance for humans, not machine thresholds. Each parameter ships as data in `packages/method` with the canon default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
 
 **Cadence and escalation**
 
 | Parameter | Canon default |
 |---|---|
 | Check-in frequency | Weekly |
-| Check-in anchor day | Chosen at workspace setup |
+| Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
 | Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded, coordinator at 7 days, sponsor at 14 days |
@@ -724,6 +724,10 @@ Every numeric value in the practice is a parameter in this registry. Each ships 
 | Blocker ladder | Owner warned at 20 hours, coordinator at 24 hours, sponsor at 48 hours |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
 | Nudge volume ceiling | 10 per member per week |
+| Due-soon lead | 1 day before the anchor day |
+| Planning-open lead | 6 weeks before an annual cycle starts, 3 weeks before a quarterly |
+| Publication deadline countdown | 14, 7 and 1 days before the deadline |
+| Review preparation lead | 2 weeks before the cycle ends |
 
 **Confidence and scoring**
 
@@ -755,6 +759,8 @@ Every numeric value in the practice is a parameter in this registry. Each ships 
 | Objectives per unit cap | 3 |
 | Strategic issue bounds | 5 to 10, ranked |
 | Priority bounds | 3 to 5, each with a 12-month success statement |
+| Annual strategy bounds | 2 to 5 |
+| Carry-forward issue impact | 4 |
 | Input pack lead time | 3 working days before session one |
 | Quality word lists | The §4 lists. A workspace may add terms; the canon terms remain |
 
@@ -781,9 +787,13 @@ Every numeric value in the practice is a parameter in this registry. Each ships 
 | Weekly session length | 15 to 30 minutes |
 | Monthly review length | 30 to 60 minutes |
 | Quarterly review length | 60 minutes |
+| Annual revalidation length | 30 to 60 minutes |
+| Weekly commitment bounds | 2 to 3 per week |
 | Quarterly stage minutes | The §8.1 durations |
 | Room pulse read boundaries | 4.0 and 3.0 |
 | Diagnostic cycle-score threshold | 0.7 |
 | Diagnostic rhythm-score threshold | 3.5 |
 
 The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the canon default. The conformance suite compares the defaults against this document.
+
+Every parameter has a default, so a workspace practises the full method correctly from the moment it is created. Tuning is an option, never a prerequisite.

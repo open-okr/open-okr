@@ -25,7 +25,7 @@ Same repository, same tagged release, same behaviour. The cloud is a way of oper
 6. **No vendor SDK outside the adapter package.** Jobs, realtime, storage, mail, cache, search, AI and channels all sit behind ports.
 7. **Two layers of security by construction.** Row-level security in Postgres is the tenant floor: a forgotten filter cannot cross workspaces. A relationship-based access model behind a single `can()` is the authorisation model. Neither replaces the other.
 8. **Every write is one transaction.** Domain change, access bindings, activity, audit row and outbox row commit together. Side effects run from the outbox after commit, never as fire-and-forget calls on the write path.
-9. **Opinion first, configuration later.** The rhythm, the roles, the gates and the map work with zero setup. Custom fields, custom workflows and query builders are deferred (REQUIREMENTS.md §9) and are never the lead.
+9. **Opinion first, configuration later.** The rhythm, the roles, the gates and the map work with zero setup. Every setting has a working default, so registering is the whole of setup and configuration is how an organisation adapts the product later, never how it starts. Custom fields, custom workflows and query builders are deferred (REQUIREMENTS.md §9) and are never the lead.
 10. **Design first, then code.** The agent writes design documents, a human approves, then it builds.
 
 ## 3. Architecture in one page

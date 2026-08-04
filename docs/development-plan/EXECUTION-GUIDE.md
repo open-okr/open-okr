@@ -97,6 +97,7 @@ Return to step 1. One task at a time per working copy. For parallel work see §6
 - [ ] No vendor SDK imported outside the adapters package.
 - [ ] External inputs validated at the boundary. Rich text goes through the shared module.
 - [ ] Any rule, threshold, band, corridor or taxonomy touched matches METHOD.md, and the conformance suite passes.
+- [ ] Any new setting is in the TECHNICAL-PLAN.md §4.14 map with a default, and no screen blocks until it is chosen.
 - [ ] If the schema changed: the importer mapping in TECHNICAL-PLAN.md §7.2 is updated in the same change, or the table is marked as having no legacy source. DATABASE.md is updated.
 - [ ] If the action registry changed: the generated projections are regenerated and the drift check is green.
 - [ ] If a proactive message was added: it has a rule key, a nudge record, deduplication, an escalation position and a snooze path.

@@ -5,7 +5,7 @@ subtitle: "Your OKR coach, built in. Open source, AI-native, self-hosted or in o
 
 Most organisations do not fail at OKRs because their software was bad. They fail because the practice never happened. Somebody wrote objectives in a spreadsheet in January, nobody checked in by March, and the quarterly review was a meeting where everyone agreed things had gone reasonably well.
 
-**OpenOKR puts the practice inside the product, and makes the product active.** The full OKR method ships as executable rules: a guided eight-phase cycle, twenty quality checks that run as you type, six hard publish gates, an alignment health score, KPI health corridors with automatic recovery objectives, two timed session formats, and a diagnostic at the close. Two AI teammates work that practice alongside the organisation. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate, escalate and propose, in the browser, in Slack, Microsoft Teams, WhatsApp and Telegram, by email, and through whatever AI agent the user already runs.
+**OpenOKR puts the practice inside the product, and makes the product active.** The full OKR method ships as executable rules: a guided eight-phase cycle, twenty-six quality checks that run as you type, six hard publish gates, an alignment health score, KPI health corridors with automatic recovery objectives, two timed session formats, and a diagnostic at the close. Two AI teammates work that practice alongside the organisation. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate, escalate and propose, in the browser, in Slack, Microsoft Teams, WhatsApp and Telegram, by email, and through whatever AI agent the user already runs.
 
 | | |
 |---|---|
@@ -38,7 +38,7 @@ Most organisations do not fail at OKRs because their software was bad. They fail
 | **10. Open source and licensing** | AGPL-3.0, the contributor agreement, and our position on methodology rights |
 | **11. Status and roadmap** | Eight phases, 104 tasks, and the principal risk we are managing |
 | **12. Working with us** | Three tracks: methodology partner, investor, design partner |
-| **Appendix** | The twenty quality rules in full |
+| **Appendix** | The twenty-six quality checks in full |
 
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
@@ -68,7 +68,7 @@ Two things make it different, and every design decision serves one of them.
 
 ## 2.1 The method is in the product
 
-The OKR practice canon is written down as a single authoritative specification and compiled into a pure software library with no database, no network and no AI dependency. It holds the eight-phase cycle, the scoring and confidence bands, the twenty quality rules with their word lists and coaching prompts, the six publish gates, the alignment scoring arithmetic, the KPI health corridors, the blocker and root-cause taxonomies, both session agendas, and the closing diagnostic.
+The OKR practice canon is written down as a single authoritative specification and compiled into a pure software library with no database, no network and no AI dependency. It holds the eight-phase cycle, the scoring and confidence bands, the twenty-six quality checks with their word lists and coaching prompts, the six publish gates, the alignment scoring arithmetic, the KPI health corridors, the blocker and root-cause taxonomies, both session agendas, and the closing diagnostic.
 
 Because it is a pure library, the same rules run in four places at once: in the browser as a user types, on the server before any write is accepted, inside the AI agents, and in the data importer. A conformance suite fails the build when the specification and the code disagree, so the product cannot drift away from the method.
 
@@ -80,7 +80,7 @@ Two agent members ship with every workspace. They are members, not features: the
 
 | Agent | What it owns | What it actually does |
 |---|---|---|
-| **OKR Coach** | Quality and practice | Reviews every draft against the twenty rules. Runs a nightly semantic sweep for duplicated metrics, better parents and hidden dependencies. Speaks up when the not-doing list is empty at the end of direction setting, when nothing was cut at the capacity check, when a goal is reported on track but its key results have not moved in a month, when the forecast says a key result will miss before anyone admits it, and when the scores cluster suspiciously near perfect at the close |
+| **OKR Coach** | Quality and practice | Reviews every draft against the quality checks. Runs a nightly semantic sweep for duplicated metrics, better parents and hidden dependencies. Speaks up when the not-doing list is empty at the end of direction setting, when nothing was cut at the capacity check, when a goal is reported on track but its key results have not moved in a month, when the forecast says a key result will miss before anyone admits it, and when the scores cluster suspiciously near perfect at the close |
 | **OKR Champion** | Rhythm and momentum | Reminds the champion before a check-in is due, on the day, and daily after. Escalates to the reviewer at the grace boundary, the coordinator at a week and the sponsor at a fortnight, always visibly to the person being escalated past. Runs the blocker clock with a warning at twenty hours and an escalation at twenty-four. Opens and closes the weekly session, assembles the digest, keeps the streak, watches every KPI corridor, and drafts the recovery objective when one drops out of range |
 
 Both are deterministic first. With the AI provider switched off, the product still nudges, escalates, scores, gates, checks quality and computes the diagnostic, because those are real rules in real code rather than prompts. AI adds drafting, rewriting, semantic judgement and natural language. It never makes the decision.
@@ -125,7 +125,7 @@ Every cycle runs eight phases with **computed** completion, not self-reported ti
 | **1. Prepare** | Name a sponsor and a facilitator, book every session, gather the seven-item input pack | Drafting is refused until the pack is complete and distributed |
 | **2. Diagnose** | Score the previous cycle, read the KPI baselines, rank five to ten strategic issues by impact | The prior cycle is scored, or this is declared a first cycle |
 | **3. Set direction** | Three to five priorities, each with a statement of what will be measurably different in twelve months. Then the not-doing list | The not-doing list is written. The product will not skip it |
-| **4. Draft OKRs** | Write the objectives and key results, with twenty rules checking every line live | Every key result passes its checks |
+| **4. Draft OKRs** | Write the objectives and key results, with the quality checks judging every line live | Every key result passes its checks |
 | **5. Align and commit** | Map contribution, register dependencies, check capacity, clear six publish gates | All six gates green, or no publication |
 | **6. Run the cadence** | Weekly check-ins, monthly reviews, a decision log, one optional mid-cycle calibration | Sessions are booked for the whole cycle |
 | **7. Review and learn** | Score, retro, diagnose, and feed everything into the next cycle automatically | Every objective closed deliberately |
@@ -136,7 +136,7 @@ A planning session without inputs produces objectives written from opinion. That
 
 ## 4.3 Quality at the point of writing
 
-Twenty rules check every objective and key result as it is typed. Each returns pass, warn or fail with a specific coaching prompt, the reason it matters, and a weak-versus-strong example. The set carries a live strength score.
+Twenty-six quality checks judge the set as it is typed. Each returns pass, warn or fail with a specific coaching prompt, the reason it matters, and a weak-versus-strong example. The set carries a live strength score.
 
 ![Drafting with the coach running. The failing objective shows its rule verdicts inline. One key result measures activity, another has no baseline, and the set has no leading indicator. The strength meter and the quality panel update on every keystroke. The Coach has also raised a semantic finding as a proposal, not a write.](mockups/png/03-draft-coach.png){width=6.5in}
 
@@ -312,7 +312,7 @@ Deliberately OKR-shaped. Enough to answer "what is actually moving this key resu
 
 | Module | What it does |
 |---|---|
-| **The Draft Coach** | The twenty-rule engine, deterministic and always available with AI off, enriched by AI for rewrite suggestions and semantic judgement when a provider is configured |
+| **The Draft Coach** | The twenty-six-check engine, deterministic and always available with AI off, enriched by AI for rewrite suggestions and semantic judgement when a provider is configured |
 | **The OKR Coach agent** | Quality and practice: draft review, the nightly semantic sweep, reported-health-versus-data divergence, sandbagging at draft and at close, and the rhythm diagnostic |
 | **The OKR Champion agent** | Rhythm and momentum: check-in reminders and the five-step escalation ladder, the blocker clock, acknowledgement chasing, opening and closing the weekly session, digests, the quarterly review pack, KPI corridor watching and recovery OKR proposals |
 | **Agent governance** | Least-privilege bindings on named spaces and goals only, propose-by-default with a review queue, sandbox mode, per-step metering, hard cost caps that halt a run mid-flight, versioned instructions, and a readable run log for every execution |
@@ -414,7 +414,7 @@ The product is fully specified and not yet built. The specification set covers r
 
 The order is deliberate. The AI and agent foundation lands in phase two, with the platform, so the coaching layer can ship in phase four alongside the OKR core. An OKR tool where the coach arrives last is just another tracker.
 
-**Principal risk we are managing.** A coaching engine that produces false positives is worse than no coaching at all, because people learn to dismiss it. The warn-versus-fail line on all twenty rules will be tuned against a corpus of real, anonymised OKRs before launch, and assembling that corpus is a named deliverable of the coaching phase's design gate. This is the single place where a methodology partner would add the most value.
+**Principal risk we are managing.** A coaching engine that produces false positives is worse than no coaching at all, because people learn to dismiss it. The warn-versus-fail line on every check will be tuned against a corpus of real, anonymised OKRs before launch, and assembling that corpus is a named deliverable of the coaching phase's design gate. This is the single place where a methodology partner would add the most value.
 
 # 12. Working with us
 
@@ -432,7 +432,7 @@ Everything in this document is specified in detail in the project's planning set
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 ```
 
-# Appendix: the twenty quality rules
+# Appendix: the twenty-six quality checks
 
 Every rule below runs on every keystroke, returns pass, warn or fail, and carries a coaching prompt, the reason it matters and a weak-versus-strong example. Rules marked as a gate block publication.
 

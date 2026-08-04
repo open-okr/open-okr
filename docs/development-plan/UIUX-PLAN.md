@@ -197,7 +197,7 @@ Format: purpose, layout, primary actions, states.
 
 **S-33 People and profile.** A directory with search and filters, and a member profile with name, title, timezone, bio, manager and reports, the goals they champion, their channel identities and their nudge preferences. An org chart from the manager chain.
 
-**S-34 Onboarding.** After the first sign-in as owner: a four-step guided setup (name the workspace and pick a brand colour, choose the check-in day and rhythm, connect a channel or skip, then create the first cycle from a template or explore with demo data). Per user on first visit: a five-stop tour covering the Work Map, the review inbox, a check-in, the cycle strip and ⌘K.
+**S-34 Onboarding.** After the first sign-in as owner: a four-step guided setup (name the workspace and pick a brand colour, choose the check-in day and rhythm, connect a channel or skip, then create the first cycle from a template or explore with demo data). **Every step is skippable and every field arrives pre-filled with the TECHNICAL-PLAN.md §4.14 default**, so the owner can dismiss the whole flow and land in a working workspace. The flow confirms and refines defaults; it never gathers settings the product needs to function. A dismissed onboarding is resumable from admin, and no screen anywhere blocks on an unanswered setting. Per user on first visit: a five-stop tour covering the Work Map, the review inbox, a check-in, the cycle strip and ⌘K.
 
 **S-35 Auth.** Sign in with email and password, passkeys, one-time passwords, single sign-on buttons where configured, and clear lockout messaging. Registration where enabled, invitation acceptance, forgot and reset. A single clean card with workspace branding and a pre-authentication language switcher.
 

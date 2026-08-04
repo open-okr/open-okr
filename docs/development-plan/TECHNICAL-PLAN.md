@@ -78,7 +78,7 @@ Rules that make this real:
 | Table | Key columns | Notes |
 |---|---|---|
 | `spaces` | `name`, `mission?`, `settings jsonb` | Team homes. Each owns an access context and a space-standard group |
-| `space_members` | `space_id`, `member_id`, `role` (`member` / `manager` / `coordinator`) | Manager implies a full binding. Coordinator runs the weekly session |
+| `space_members` | `space_id`, `member_id`, `role` (`member` / `manager` / `coordinator`) | Manager implies a full binding. Coordinator runs the weekly session. A manager covers the coordinator's duties while no coordinator is named, and any nudge or escalation targeting a coordinator falls back to the manager |
 
 ### 4.3 Cycles and the planning workflow (domain C)
 
@@ -234,9 +234,13 @@ Specified at this level of detail in AI-NATIVE-PLAN.md §7: providers, encrypted
 
 Every setting in the product, by scope. The settings service implements this map, and a setting that is not in it does not exist. Each scope has one storage home, one admin surface and one governing permission, so no setting has two owners.
 
+**Every setting has a working default, and no setting must be answered before the product is usable.** Registering provisions a complete, correct workspace: the member signs in to a working instance practising the full method, and every card in admin is a later refinement. This is a hard rule, tested as such. A setting introduced without a default fails review, and a screen that blocks progress until a setting is chosen is a defect.
+
+The only exceptions are the instance connections that describe the deployment itself: mail, the deployment AI key and channel credentials. Each is optional, offered by the first-run wizard, and degraded cleanly when absent — with no mail, delivery stays in the in-app inbox; with no AI key, AI is off; with no channel, email and the inbox carry everything. None of them blocks registration or use.
+
 | Scope | Lives in | Managed from | Permission | Contents |
 |---|---|---|---|---|
-| Instance | `system_settings`, environment as bootstrap | The first-run wizard, then instance administration | Instance admin | Mail configuration, instance flags, default language, registration policy, the deployment-level AI key, telemetry opt-in |
+| Instance | `system_settings`, environment as bootstrap | The first-run wizard, then instance administration | Instance admin | Mail configuration, instance flags, default language (English), registration policy (open until the first admin exists, then invitation-only), the deployment-level AI key, telemetry opt-in (off) |
 | Workspace general | `workspaces.settings` | Screen S-36 | Workspace admin | Name, slug, branding, workspace timezone, trusted email domains, default language |
 | Rhythm and thresholds | `rhythm_settings` | Screen S-36, rhythm and thresholds cards | `manage_coaching` | The METHOD.md §11 registry: frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings, plus terminology labels |
 | Coaching and nudges | `rhythm_settings`, `nudge_rules` | Screen S-36, coaching and nudges cards | `manage_coaching` | Strictness with per-space overrides; per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode. Deterministic, fully available with AI off |
@@ -244,6 +248,30 @@ Every setting in the product, by scope. The settings service implements this map
 | AI | `ai_providers`, `ai_credentials`, `ai_model_policies`, `ai_feature_settings`, `ai_prompts`, `agents`, quotas | Screen S-37 | `manage_ai` | Provider and keys, tier routing, feature switches, agent definitions, budgets and caps, prompts, privacy and egress, MCP connections and grants |
 | Space | `spaces.settings` | Space settings | Space manager | Team voting opt-in, strictness override, space defaults |
 | Member | `notification_settings`, the member profile, `ai_credentials` with a user owner | Personal settings | The member | Primary channel, quiet hours, per-reason routing, batch window, daily summary time, language, theme, density, personal AI key |
+
+**Defaults applied at provisioning.** The workspace-provisioning and member-provisioning Operations write these without asking. Each module contributes its rows to those Operations as it lands, and the settings-service test enumerates the live registry, so the set grows with the product and a module cannot ship settings it does not default:
+
+| Setting | Default |
+|---|---|
+| Workspace name and slug | From the registering member's details, editable immediately |
+| Workspace timezone | The registering member's browser timezone, falling back to UTC |
+| Branding | The product's own palette, until a brand colour is chosen |
+| Trusted email domains | None. Joining is by invitation |
+| Rhythm and thresholds | The METHOD.md §11 canon defaults, stored as an empty override set |
+| Workspace default language | The instance default language |
+| Terminology labels | The canon terms in the workspace default language |
+| Coach strictness | Warn, with the six gates hard |
+| Nudge rules | Every rule in the AI-NATIVE-PLAN.md §6.4 catalogue enabled, on the member's primary channel, with the canon ladder. Workspace quiet mode off |
+| Channels | None connected. Email and the in-app inbox carry everything |
+| AI | Off unless a deployment key is present. With a key, the provider's seeded tier map applies and every AI-NATIVE-PLAN.md §2 capability is on |
+| Agent autonomy | Propose. Both built-in agents enabled wherever AI is available, and active in their deterministic form when it is not |
+| AI budgets | No workspace cap on self-host; the tenant's plan cap in the cloud |
+| Spaces | One space named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named |
+| Member primary channel | Email, beside the always-on in-app inbox, until a chat identity is linked |
+| Member quiet hours | 19:00 to 08:00 in the member's own timezone |
+| Member notifications | Mentions immediate, everything else batched in a 30-minute window, daily summary on at 08:00 local |
+| Member language, theme, density | The workspace default language, system theme, comfortable density |
+| Member timezone | The browser timezone at first sign-in, falling back to the workspace timezone |
 
 ## 5. Adapter ports
 
@@ -504,6 +532,7 @@ Each row is verified at a phase exit.
 | AI governance | Bring your own key at three levels, local models, tier routing, per-token metering, hard caps, versioned prompts, egress controls |
 | Agent safety | Least-privilege principal, sandbox, proposal-plus-approval, cost caps, machine-verified authorisation |
 | Portability | Self-serve encrypted export and import with a dry-run difference, verified in CI |
+| Zero setup | A freshly registered workspace runs the full method with nothing configured, every setting resolving to its documented default |
 | Deployment | Self-host in under 30 minutes and a managed cloud on the same release |
 | Accessibility and languages | WCAG 2.1 AA gated in CI, English and Bahasa Melayu catalogues |
 
