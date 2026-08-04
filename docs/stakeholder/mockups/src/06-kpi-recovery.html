@@ -9,14 +9,18 @@
       radial-gradient(circle, #DDE3EA 1px, transparent 1px) 0 0/18px 18px, var(--surface);
     border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
   .canvas > svg { position: absolute; inset: 0 }
-  .kn { position: absolute; width: 218px; background: #fff; border: 1px solid var(--line-2); border-radius: 9px;
-    padding: 8px 10px; box-shadow: 0 1px 3px rgba(15,23,42,.09) }
+  .kn { position: absolute; width: 218px; background: #fff; border: 1px solid var(--line-2); border-radius: 10px;
+    padding: 8px 10px; box-shadow: 0 1px 3px rgba(15,23,42,.09);
+    transition: box-shadow .15s var(--ease), transform .15s var(--ease), border-color .15s var(--ease) }
+  .kn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.12); border-color: var(--ink-4) }
   .kn.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(79,70,229,.12), 0 2px 6px rgba(15,23,42,.1) }
   .kn .nm { font-size: 12px; font-weight: 640; line-height: 1.25 }
   .kn .vals { font-size: 11px; color: var(--ink-3); margin: 3px 0 5px; font-variant-numeric: tabular-nums }
   .kn .vals b { color: var(--ink); font-weight: 700 }
-  .corr { height: 7px; border-radius: 20px; background: var(--raised); position: relative; overflow: hidden }
-  .corr > i { position: absolute; inset: 0 auto 0 0; border-radius: 20px }
+  .corr { height: 7px; border-radius: 20px; background: var(--raised); position: relative; overflow: hidden;
+    box-shadow: inset 0 1px 1px rgba(15,23,42,.05) }
+  .corr > i { position: absolute; inset: 0 auto 0 0; border-radius: 20px;
+    animation: grow-bar .55s var(--ease) .18s backwards }
   .corr .m70 { position: absolute; left: 70%; top: -2px; bottom: -2px; width: 1px; background: #fff; opacity: .95 }
   .corr .m90 { position: absolute; left: 90%; top: -2px; bottom: -2px; width: 1px; background: #fff; opacity: .95 }
   .kn .ft { display: flex; align-items: center; gap: 5px; margin-top: 5px }
@@ -69,7 +73,7 @@
 
       <div class="wrap">
         <div class="col" style="gap:14px;min-width:0">
-          <div class="canvas">
+          <div class="canvas stagger">
             <svg viewBox="0 0 790 406" preserveAspectRatio="none" width="100%" height="406">
               <g stroke="#94A3B8" stroke-width="1.4" fill="none">
                 <path d="M230 204 H260 V106 H290 M230 204 H260 V302 H290"/>
@@ -133,7 +137,7 @@
               <div class="h2">Recovery board</div>
               <span class="sub">Every unhealthy or recovering KPI across every tree</span>
             </div>
-            <div class="board">
+            <div class="board stagger">
               <div class="bc">
                 <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Retention tree</div>
                 <div class="h3" style="margin:3px 0 6px">Net revenue retention</div>
@@ -156,7 +160,7 @@
           </div>
         </div>
 
-        <div class="col" style="gap:12px;min-height:0">
+        <div class="col stagger" style="gap:12px;min-height:0">
           <div class="card">
             <div class="card-h"><div class="h3">Expansion revenue</div><span class="chip brand" style="margin-left:auto"><i class="dot"></i>Recovering</span></div>
             <div class="card-b" style="padding:12px 14px">

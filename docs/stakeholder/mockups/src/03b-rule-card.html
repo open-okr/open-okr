@@ -7,7 +7,12 @@
   html, body { width: 860px; height: 430px; background: #EEF1F5; }
   .stage { padding: 22px; height: 100%; }
   .pop { background: #fff; border: 1px solid var(--line); border-radius: 14px;
-    box-shadow: 0 14px 40px rgba(15,23,42,.14), 0 2px 8px rgba(15,23,42,.07); overflow: hidden; }
+    box-shadow: 0 14px 40px rgba(15,23,42,.14), 0 2px 8px rgba(15,23,42,.07); overflow: hidden;
+    transform-origin: 60px top; animation: pop-in .3s var(--ease) .2s backwards; }
+  @keyframes pop-in { from { opacity: 0; transform: scale(.96) translateY(-5px) } }
+  .field { animation: fall .3s var(--ease) backwards; }
+  .caret-bar { animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0 } }
   .pop-h { padding: 13px 17px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; background: #FFFBFB }
   .pop-b { padding: 16px 17px; }
   .vchip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px;
@@ -28,7 +33,7 @@
   <div class="field">
     <span class="vd fail" style="width:9px;height:9px"></span>
     <span class="txt">Launch the new mobile ordering app in 3 markets</span>
-    <span style="display:inline-block;width:1.5px;height:16px;background:var(--brand)"></span>
+    <span class="caret-bar" style="display:inline-block;width:1.5px;height:16px;background:var(--brand)"></span>
     <span class="chip bad" style="margin-left:auto">2 rules firing</span>
   </div>
 

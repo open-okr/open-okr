@@ -10,9 +10,12 @@
   .grp .ct { background: var(--raised); color: var(--ink-3); border-radius: 20px; padding: 0 6px; font-size: 10px }
   .grp.od { color: var(--bad) } .grp.od .ct { background: var(--bad-bg); color: var(--bad) }
   .it { display: flex; align-items: center; gap: 11px; padding: 10px 13px; border: 1px solid var(--line);
-    border-radius: var(--r); background: #fff; margin-bottom: 7px; box-shadow: var(--shadow) }
+    border-radius: var(--r); background: #fff; margin-bottom: 7px; box-shadow: var(--shadow);
+    transition: box-shadow .15s var(--ease), transform .15s var(--ease), border-color .15s var(--ease) }
+  .it:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15,23,42,.09); border-color: var(--line-2) }
   .it.od { border-left: 3px solid var(--bad-dot) }
   .it.ag { border-color: var(--brand-line); background: #FCFCFF }
+  .it.ag:hover { border-color: #A5B4FC }
   .ico { width: 28px; height: 28px; border-radius: 7px; flex: none; display: grid; place-items: center }
   .ico.c { background: var(--info-bg); color: var(--info) }
   .ico.a { background: var(--brand-weak); color: var(--brand-600) }
@@ -67,7 +70,7 @@
       </div>
 
       <div class="wrap">
-        <div class="col" style="min-width:0;overflow:hidden">
+        <div class="col stagger" style="min-width:0;overflow:hidden">
           <div class="grp od">Overdue <span class="ct">3</span></div>
 
           <div class="it od">
@@ -149,7 +152,7 @@
           <div class="tiny mut4" style="padding:4px 2px">2 more this week</div>
         </div>
 
-        <div class="col" style="gap:12px;min-height:0">
+        <div class="col stagger" style="gap:12px;min-height:0">
           <div class="card">
             <div class="card-h"><div class="h3">Why you got nudged</div>
               <span class="chip agent" style="margin-left:auto;height:18px">Provenance</span></div>

@@ -6,10 +6,21 @@
 <style>
   .wrap { display: grid; grid-template-columns: 224px 1fr 330px; gap: 16px; height: calc(100% - 64px); }
   .lap { display: flex; gap: 2px; height: 8px; margin: 10px 0 0 }
-  .lap i { border-radius: 2px; background: var(--line-2) }
+  .lap i { border-radius: 2px; background: var(--line-2); transform-origin: left;
+    animation: grow-x .4s var(--ease) backwards }
   .lap i.done { background: var(--ok-dot) } .lap i.now { background: var(--brand) }
-  .stg { display: flex; gap: 8px; padding: 6px 9px; border-radius: 6px; align-items: center }
-  .stg.on { background: var(--brand-weak) }
+  .lap i:nth-child(2) { animation-delay: .05s } .lap i:nth-child(3) { animation-delay: .10s }
+  .lap i:nth-child(4) { animation-delay: .15s } .lap i:nth-child(5) { animation-delay: .20s }
+  .lap i:nth-child(6) { animation-delay: .25s } .lap i:nth-child(7) { animation-delay: .30s }
+  .lap i:nth-child(n+8) { animation-delay: .35s }
+  @keyframes grow-x { from { transform: scaleX(0) } }
+  .stg { display: flex; gap: 8px; padding: 6px 9px; border-radius: 6px; align-items: center;
+    transition: background .15s var(--ease) }
+  .stg:hover { background: rgba(15,23,42,.035) }
+  .stg.on { background: var(--brand-weak); box-shadow: inset 0 0 0 1px rgba(79,70,229,.12) }
+  .stg.on:hover { background: var(--brand-weak) }
+  /* the score reveal: every objective score appears at once, per UIUX-PLAN §2's deliberate exception */
+  .srow .sv { animation: pop .35s var(--ease) .5s backwards }
   .stg .n { width: 17px; height: 17px; border-radius: 50%; flex: none; display: grid; place-items: center;
     font-size: 9px; font-weight: 700; border: 1.5px solid var(--line-2); background: #fff; color: var(--ink-4) }
   .stg.on .n { background: var(--brand); border-color: var(--brand); color: #fff }
@@ -73,7 +84,7 @@
 
       <div class="wrap">
         <div class="card" style="overflow:hidden;align-self:start">
-          <div class="card-b" style="padding:5px 6px 9px">
+          <div class="card-b stagger" style="padding:5px 6px 9px">
             <div class="act">Open</div>
             <div class="stg done"><div class="n">✓</div><div class="t">Open and check-in</div><div class="m">5</div></div>
             <div class="act">Review</div>
@@ -92,7 +103,7 @@
           </div>
         </div>
 
-        <div class="col" style="gap:13px;min-width:0">
+        <div class="col stagger" style="gap:13px;min-width:0">
           <div class="diag">
             <div class="row" style="gap:9px;margin-bottom:9px">
               <svg style="width:17px;height:17px;color:#92400E" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
@@ -159,7 +170,7 @@
           </div>
         </div>
 
-        <div class="col" style="gap:12px;min-height:0">
+        <div class="col stagger" style="gap:12px;min-height:0">
           <div class="card">
             <div class="card-h"><div class="h3">Scorecard</div><span class="chip warn" style="margin-left:auto"><i class="dot"></i>Cycle 0.58</span></div>
             <div class="card-b" style="padding:6px 14px 12px">

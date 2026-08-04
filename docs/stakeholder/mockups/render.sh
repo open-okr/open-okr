@@ -15,7 +15,10 @@ for f in src/*.html; do
   name=$(basename "$f" .html)
   w=$(grep -o 'window-width:[0-9]*'  "$f" | head -1 | cut -d: -f2 || true); w=${w:-1440}
   h=$(grep -o 'window-height:[0-9]*' "$f" | head -1 | cut -d: -f2 || true); h=${h:-900}
+  # Reduced motion forces every entrance animation to its settled state,
+  # so the screenshot never catches a frame mid-animation.
   "$CHROME" --headless --disable-gpu --hide-scrollbars --no-sandbox \
+    --force-prefers-reduced-motion \
     --force-device-scale-factor=2 --window-size="$w","$h" \
     --screenshot="png/$name.png" "file://$PWD/$f" >/dev/null 2>&1
   echo "rendered $name (${w}x${h} @2x)"

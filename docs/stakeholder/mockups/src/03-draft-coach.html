@@ -10,7 +10,11 @@
   .objhead { padding: 11px 14px; display: flex; gap: 10px; align-items: flex-start; }
   .objtitle { font-size: 15.5px; font-weight: 660; letter-spacing: -.2px; }
   .editing { border-bottom: 2px solid var(--brand); padding-bottom: 1px; }
-  .caret-bar { display: inline-block; width: 1.5px; height: 15px; background: var(--brand); vertical-align: -2px; margin-left: 1px; }
+  .caret-bar { display: inline-block; width: 1.5px; height: 15px; background: var(--brand); vertical-align: -2px; margin-left: 1px;
+    animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0 } }
+  .ring circle:last-child { animation: draw-ring .8s var(--ease) .25s backwards; }
+  @keyframes draw-ring { from { stroke-dasharray: 0 97.4 } }
   .vlist { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .vchip { display: inline-flex; align-items: center; gap: 5px; height: 19px; padding: 0 7px; border-radius: 5px;
     font-size: 10.5px; font-weight: 700; letter-spacing: .2px; }
@@ -84,7 +88,7 @@
     <div class="body" style="position:relative">
       <div class="wrap">
 
-        <div class="col" style="min-width:0;overflow:hidden">
+        <div class="col stagger" style="min-width:0;overflow:hidden">
           <div class="spread" style="margin-bottom:12px">
             <div><div class="h1">Revenue · Q3 objectives</div><div class="sub">Every line is checked as you type. Warnings never block typing.</div></div>
             <div class="row"><div class="btn ai sm"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg>Draft from an ambition</div><div class="btn sm">+ Objective</div></div>
@@ -164,7 +168,7 @@
           </div>
         </div>
 
-        <div class="col" style="gap:14px">
+        <div class="col stagger" style="gap:14px">
           <div class="card">
             <div class="card-b">
               <div class="meter">
@@ -186,7 +190,7 @@
 
           <div class="card grow" style="min-height:0;overflow:hidden">
             <div class="card-h"><div class="h3">Quality panel</div><span class="chip bad" style="margin-left:auto"><i class="dot"></i>3 must fix</span></div>
-            <div class="card-b" style="padding:2px 14px">
+            <div class="card-b stagger" style="padding:2px 14px">
               <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:10px 0 2px">Launch the new mobile ordering app</div>
               <div class="issue"><span class="k f">OBJ-1</span><div><div class="t">Outcome, not output</div><div class="d">Your objective starts with a deliverable, not a destination.</div></div></div>
               <div class="issue"><span class="k f">AL-1</span><div><div class="t">Supports a bigger priority</div><div class="d">No parent and no stated contribution.</div></div></div>
