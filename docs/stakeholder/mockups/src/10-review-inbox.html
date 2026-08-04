@@ -1,0 +1,205 @@
+<!doctype html>
+<!-- window-height:860 -->
+<meta charset="utf-8">
+<title>S-02 Review: what I owe</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 1fr 328px; gap: 16px; height: calc(100% - 56px); }
+  .grp { font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-4);
+    padding: 13px 2px 7px; display: flex; align-items: center; gap: 8px }
+  .grp .ct { background: var(--raised); color: var(--ink-3); border-radius: 20px; padding: 0 6px; font-size: 10px }
+  .grp.od { color: var(--bad) } .grp.od .ct { background: var(--bad-bg); color: var(--bad) }
+  .it { display: flex; align-items: center; gap: 11px; padding: 10px 13px; border: 1px solid var(--line);
+    border-radius: var(--r); background: #fff; margin-bottom: 7px; box-shadow: var(--shadow) }
+  .it.od { border-left: 3px solid var(--bad-dot) }
+  .it.ag { border-color: var(--brand-line); background: #FCFCFF }
+  .ico { width: 28px; height: 28px; border-radius: 7px; flex: none; display: grid; place-items: center }
+  .ico.c { background: var(--info-bg); color: var(--info) }
+  .ico.a { background: var(--brand-weak); color: var(--brand-600) }
+  .ico.b { background: var(--bad-bg); color: var(--bad) }
+  .ico.k { background: var(--warn-bg); color: var(--warn) }
+  .ico.s { background: var(--ok-bg); color: var(--ok) }
+  .it .t { font-size: 12.5px; font-weight: 600; line-height: 1.3 }
+  .it .m { font-size: 11px; color: var(--ink-3); margin-top: 2px }
+  .due { font-size: 11px; font-weight: 700; white-space: nowrap }
+  .due.od { color: var(--bad) } .due.td { color: var(--warn) } .due.up { color: var(--ink-4) }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="logo">O</div><div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navsec">Practice</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div><div class="navsub">Product</div><div class="navsub">Customer Success</div><div class="navsub">People &amp; Ops</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">2 proposals</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">nudged you 2×</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb"><b>Review</b></div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd">⌘K</span></div>
+      <div class="tools"><div class="btn ai sm">Ask AI <span class="kbd">⌘J</span></div><div class="btn sm">+ New</div><div class="av a1 sm">SL</div></div>
+    </div>
+
+    <div class="body">
+      <div class="spread" style="margin-bottom:14px">
+        <div><div class="h1">What you owe</div>
+          <div class="sub">Server-computed, overdue first. Notifications say what happened. This says what you owe.</div></div>
+        <div class="row" style="gap:20px">
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Overdue</div>
+            <div class="h1 num" style="color:var(--bad)">3</div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Today</div>
+            <div class="h1 num" style="color:var(--warn)">2</div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">This week</div>
+            <div class="h1 num">4</div></div>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <div class="col" style="min-width:0;overflow:hidden">
+          <div class="grp od">Overdue <span class="ct">3</span></div>
+
+          <div class="it od">
+            <div class="ico c"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg></div>
+            <div class="grow"><div class="t">Post your check-in on "Make onboarding something customers finish without us"</div>
+              <div class="m">Champion · weekly · Product space · confidence was 0.3 last week</div></div>
+            <span class="due od">Overdue by 4 days</span>
+            <div class="btn p sm">Check in</div>
+          </div>
+
+          <div class="it od">
+            <div class="ico b"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+            <div class="grow"><div class="t">Clear the blocker "Pricing sign-off from Finance"</div>
+              <div class="m">Dependency · Raise win rate vs Meridian · escalated to you as sponsor</div></div>
+            <span class="due od">26h on a 24h clock</span>
+            <div class="btn p sm">Take action</div>
+          </div>
+
+          <div class="it od">
+            <div class="ico k"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+            <div class="grow"><div class="t">Close last week's commitment: "Agree the discount ladder with Finance"</div>
+              <div class="m">Commitment · Revenue space · second week open</div></div>
+            <span class="due od">Overdue by 8 days</span>
+            <div class="btn sm">Delivered / not</div>
+          </div>
+
+          <div class="grp">Due today <span class="ct">2</span></div>
+
+          <div class="it">
+            <div class="ico s"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg></div>
+            <div class="grow"><div class="t">Acknowledge 3 check-ins from your team</div>
+              <div class="m">Reviewer · Jun Tan, Lena Wong, Priya Nair · published yesterday</div></div>
+            <span class="due td">Today</span>
+            <div class="btn p sm">Review all 3</div>
+          </div>
+
+          <div class="it">
+            <div class="ico a"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></div>
+            <div class="grow"><div class="t">Run the weekly session for Revenue</div>
+              <div class="m">Coordinator · 6 key results to score · 3 open blockers · streak 9</div></div>
+            <span class="due td">16:00 today</span>
+            <div class="btn p sm">Start session</div>
+          </div>
+
+          <div class="grp">Agent proposals waiting on you <span class="ct">2</span></div>
+
+          <div class="it ag">
+            <div class="av bot" style="width:28px;height:28px;font-size:11px">C</div>
+            <div class="grow"><div class="t">Coach proposes: split the duplicated partner-ARR metric between two objectives</div>
+              <div class="m">Rule AL-2 · semantic review · would edit 2 key results · nothing changes until you apply</div></div>
+            <div class="row"><div class="btn sm">Dismiss</div><div class="btn p sm">Review</div></div>
+          </div>
+
+          <div class="it ag">
+            <div class="av bot2" style="width:28px;height:28px;font-size:11px">Ch</div>
+            <div class="grow"><div class="t">Champion drafted a recovery objective for "Net revenue retention"</div>
+              <div class="m">Rule KP-4 · KPI dropped below its corridor · 3 key results from its leading drivers</div></div>
+            <div class="row"><div class="btn sm">Dismiss</div><div class="btn p sm">Review</div></div>
+          </div>
+
+          <div class="grp">This week <span class="ct">4</span></div>
+
+          <div class="it">
+            <div class="ico c"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg></div>
+            <div class="grow"><div class="t">Post your check-in on "Become the default supplier for mid-market retail in ASEAN"</div>
+              <div class="m">Champion · weekly · Company · on track, 64%</div></div>
+            <span class="due up">Friday</span>
+            <div class="btn sm">Check in</div>
+          </div>
+
+          <div class="it">
+            <div class="ico s"><svg style="width:15px;height:15px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg></div>
+            <div class="grow"><div class="t">Acknowledge Dinesh Kumar's check-in on onboarding</div>
+              <div class="m">Reviewer · Product space · confidence dropped 0.5 to 0.3</div></div>
+            <span class="due up">Thursday</span>
+            <div class="btn sm">Review</div>
+          </div>
+
+          <div class="tiny mut4" style="padding:4px 2px">2 more this week</div>
+        </div>
+
+        <div class="col" style="gap:12px;min-height:0">
+          <div class="card">
+            <div class="card-h"><div class="h3">Why you got nudged</div>
+              <span class="chip agent" style="margin-left:auto;height:18px">Provenance</span></div>
+            <div class="card-b" style="padding:12px 14px">
+              <div class="row" style="align-items:flex-start;gap:9px">
+                <div class="av bot2 sm">Ch</div>
+                <div class="grow">
+                  <div class="tiny mut" style="line-height:1.55">"Your check-in on <b>Make onboarding…</b> was due Friday. It is the third reminder, so I have let Marc know."</div>
+                  <div class="tiny mut4" style="margin-top:7px">Sent 09:00 on Slack · escalation step 3 of 5</div>
+                </div>
+              </div>
+              <div class="row" style="gap:6px;margin-top:11px;flex-wrap:wrap">
+                <div class="btn sm" style="height:24px">See the rule</div>
+                <div class="btn sm" style="height:24px">Snooze</div>
+                <div class="btn sm" style="height:24px">Change my channel</div>
+              </div>
+              <div class="tiny mut" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+                A snooze quietens the message. It never hides what you owe here.
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><div class="h3">Escalation ladder</div></div>
+            <div class="card-b" style="padding:11px 14px">
+              <div class="row" style="padding:4px 0"><span class="chip ok" style="width:22px;justify-content:center">1</span><span class="tiny grow">Before it is due · the champion</span><span class="tiny mut4">done</span></div>
+              <div class="row" style="padding:4px 0"><span class="chip ok" style="width:22px;justify-content:center">2</span><span class="tiny grow">On the day · the champion</span><span class="tiny mut4">done</span></div>
+              <div class="row" style="padding:4px 0"><span class="chip warn" style="width:22px;justify-content:center">3</span><span class="tiny grow" style="font-weight:650">Grace boundary · the reviewer</span><span class="tiny" style="color:var(--warn);font-weight:650">now</span></div>
+              <div class="row" style="padding:4px 0"><span class="chip" style="width:22px;justify-content:center">4</span><span class="tiny grow mut">One week · the coordinator</span></div>
+              <div class="row" style="padding:4px 0"><span class="chip" style="width:22px;justify-content:center">5</span><span class="tiny grow mut">A fortnight · the sponsor</span></div>
+              <div class="tiny mut" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">
+                Every step is visible to the person being escalated past. Nothing happens behind anyone's back.
+              </div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="h3">Your week</div></div>
+            <div class="card-b" style="padding:12px 14px">
+              <div class="spread" style="padding:5px 0"><span class="tiny mut">Check-ins on time</span><span class="tiny num" style="font-weight:750">7 of 9</span></div>
+              <div class="bar" style="margin-bottom:9px"><i class="warn" style="width:78%"></i></div>
+              <div class="spread" style="padding:5px 0"><span class="tiny mut">Acknowledgements closed</span><span class="tiny num" style="font-weight:750">12 of 12</span></div>
+              <div class="bar" style="margin-bottom:9px"><i class="ok" style="width:100%"></i></div>
+              <div class="spread" style="padding:5px 0"><span class="tiny mut">Median blocker to action</span><span class="tiny num" style="font-weight:750">9h</span></div>
+              <div class="bar"><i class="ok" style="width:62%"></i></div>
+              <div class="tiny mut" style="margin-top:11px">Target is under 24 hours.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

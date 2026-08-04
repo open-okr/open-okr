@@ -1,0 +1,148 @@
+<!doctype html>
+<!-- window-height:820 -->
+<meta charset="utf-8">
+<title>S-10 Align and commit</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 1fr 340px; gap: 16px; height: 100%; }
+  .gate { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: flex-start }
+  .gate:last-child { border-bottom: 0 }
+  .gmark { width: 20px; height: 20px; border-radius: 50%; flex: none; display: grid; place-items: center; margin-top: 1px }
+  .gmark.y { background: var(--ok-bg) } .gmark.n { background: var(--bad-bg) }
+  .gate .t { font-size: 12.5px; font-weight: 600 }
+  .gate .d { font-size: 11px; color: var(--ink-3); margin-top: 2px }
+  .gate .d a { color: var(--brand-600); font-weight: 600; text-decoration: none }
+  tbl { display: block }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-4);
+    text-align: left; padding: 7px 10px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: middle }
+  tr:last-child td { border-bottom: 0 }
+  .cut { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r); padding: 10px 12px; }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="logo">O</div><div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navsec">Practice</div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle<span class="chip brand" style="margin-left:auto;height:17px;font-size:10px">P5</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div><div class="navsub">Product</div><div class="navsub">Customer Success</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">1 finding</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">chasing 2</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Cycle / Q3 FY2026 / <b>Phase 5 · Align and commit</b></div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd">⌘K</span></div>
+      <div class="tools"><div class="btn ai sm">Ask AI <span class="kbd">⌘J</span></div><div class="av a7 sm">MR</div></div>
+    </div>
+    <div class="strip">
+      <span class="phase">Phase 5 · Align and commit</span><span class="sep">|</span>
+      <span class="block">2 of 6 gates unmet</span>
+      <span class="due">Publication deadline in 6 days</span>
+    </div>
+
+    <div class="body">
+      <div class="wrap">
+
+        <div class="col" style="gap:14px;min-width:0">
+          <div class="card">
+            <div class="card-h"><div class="h2">Capacity check</div>
+              <span class="sub" style="margin-left:auto">Read from the initiatives actually planned against each key result</span></div>
+            <table>
+              <tr><th style="width:38%">Key result</th><th>Main initiatives</th><th style="width:96px">Team load</th><th style="width:96px">Verdict</th></tr>
+              <tr><td>Grow ASEAN mid-market ARR to RM 12.0m</td><td class="mut">Partner programme, outbound pod, pricing refresh</td>
+                <td class="num">3 of 4 FTE</td><td><span class="chip ok"><i class="dot"></i>Fits</span></td></tr>
+              <tr><td>Raise win rate against Meridian to 35%</td><td class="mut">Battlecards, competitive pricing sign-off</td>
+                <td class="num">2 of 2 FTE</td><td><span class="chip warn"><i class="dot"></i>Tight</span></td></tr>
+              <tr><td>Cut median time-to-first-value to 7 days</td><td class="mut">Self-serve wizard, template library, in-app guide, migration tooling</td>
+                <td class="num">6 of 4 FTE</td><td><span class="chip bad"><i class="dot"></i>Exceeds</span></td></tr>
+              <tr><td>Increase NPS from 32 to 50</td><td class="mut">Response-time programme</td>
+                <td class="num">1 of 2 FTE</td><td><span class="chip ok"><i class="dot"></i>Fits</span></td></tr>
+            </table>
+            <div class="card-b" style="padding:12px 14px">
+              <div class="cut">
+                <div class="row" style="align-items:flex-start;gap:9px">
+                  <svg class="ic" style="width:15px;height:15px;color:#B45309;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                  <div class="grow">
+                    <div class="h3" style="color:#92400E">What did you cut?</div>
+                    <div class="tiny" style="color:#92400E;margin-top:2px">One key result exceeds capacity and this field is empty. A plan where nothing was cut is a plan that has not been made. Required before gate 5 turns green.</div>
+                    <div style="margin-top:8px;border:1px dashed #FCD34D;border-radius:6px;padding:7px 9px;background:#fff;font-size:11.5px;color:var(--ink-4)">Name the initiative you are dropping, and who was told…</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="h2">Dependency register</div>
+              <span class="chip warn" style="margin-left:auto"><i class="dot"></i>1 unconfirmed</span></div>
+            <table>
+              <tr><th style="width:31%">Key result</th><th style="width:17%">Needs</th><th style="width:16%">From</th><th style="width:15%">State</th><th style="white-space:nowrap">Risk owner</th></tr>
+              <tr><td>Cut time-to-first-value to 7 days</td><td class="mut">Migration API</td><td class="mut">Platform</td>
+                <td><span class="chip ok"><i class="dot"></i>Confirmed</span></td><td class="mut">—</td></tr>
+              <tr><td>Raise win rate to 35%</td><td class="mut">Pricing sign-off</td><td class="mut">Finance</td>
+                <td><span class="chip bad"><i class="dot"></i>Unconfirmed</span></td>
+                <td style="white-space:nowrap"><div class="row"><div class="av a7 sm">MR</div><span class="mut">Marc Reyes</span></div></td></tr>
+              <tr><td>Increase NPS from 32 to 50</td><td class="mut">Support headcount</td><td class="mut">People &amp; Ops</td>
+                <td><span class="chip ok"><i class="dot"></i>Confirmed</span></td><td class="mut">—</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="col" style="gap:14px">
+          <div class="card">
+            <div class="card-h"><div class="h2">Publish gates</div><span class="chip warn" style="margin-left:auto"><i class="dot"></i>4 of 6</span></div>
+            <div class="card-b" style="padding:2px 14px 12px">
+              <div class="gate"><div class="gmark y"><svg style="width:11px;height:11px;color:var(--ok)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div><div class="t">1 · Every objective owned and reviewed</div><div class="d">7 objectives · champion and reviewer set on all</div></div></div>
+              <div class="gate"><div class="gmark y"><svg style="width:11px;height:11px;color:var(--ok)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div><div class="t">2 · Every key result passes its checks</div><div class="d">23 key results · all seven checks green</div></div></div>
+              <div class="gate"><div class="gmark y"><svg style="width:11px;height:11px;color:var(--ok)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div><div class="t">3 · Alignment is mapped</div><div class="d">Every objective states what it contributes to</div></div></div>
+              <div class="gate"><div class="gmark n"><svg style="width:11px;height:11px;color:var(--bad)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
+                <div><div class="t" style="color:var(--bad)">4 · Every dependency confirmed or risk-owned</div><div class="d">Pricing sign-off from Finance is unconfirmed. <a>Open the register</a></div></div></div>
+              <div class="gate"><div class="gmark n"><svg style="width:11px;height:11px;color:var(--bad)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6 6 18"/></svg></div>
+                <div><div class="t" style="color:var(--bad)">5 · Capacity checked, nothing exceeding</div><div class="d">1 key result exceeds and no cut is recorded. <a>Fix the capacity check</a></div></div></div>
+              <div class="gate"><div class="gmark y"><svg style="width:11px;height:11px;color:var(--ok)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div><div class="t">6 · Publication date before day one</div><div class="d">Publishes 29 Sep · cycle starts 1 Oct</div></div></div>
+            </div>
+            <div class="card-b" style="border-top:1px solid var(--line);background:var(--bg);border-radius:0 0 var(--r-lg) var(--r-lg)">
+              <div class="btn dis" style="width:100%;justify-content:center;height:34px">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+                Publish the cycle
+              </div>
+              <div class="tiny mut" style="text-align:center;margin-top:7px">Disabled until gates 4 and 5 are green. The reason is always stated, never silently inert.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-b" style="padding:11px 13px">
+              <div class="row" style="align-items:flex-start;gap:9px">
+                <div class="av bot sm">C</div>
+                <div class="grow">
+                  <div class="row" style="gap:6px"><b style="font-size:12px">OKR Coach</b><span class="chip agent" style="height:16px;font-size:9.5px">Agent</span></div>
+                  <div class="tiny mut" style="margin-top:4px">Nothing has been cut anywhere in this cycle, yet one key result is over capacity. In my experience that means the cut happens in week six instead, without a decision.</div>
+                  <div class="tiny mut4" style="margin-top:6px">Rule CY-6 · capacity-honesty · sent to Marc Reyes on Slack</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

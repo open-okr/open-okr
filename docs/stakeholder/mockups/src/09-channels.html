@@ -1,0 +1,195 @@
+<!doctype html>
+<!-- window-height:830 -->
+<meta charset="utf-8">
+<title>Channels: the coach reaches you where you work</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 830px; background: #EEF1F5; }
+  .stage { padding: 26px 30px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .win { background: #fff; border-radius: 12px; box-shadow: 0 6px 22px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06); overflow: hidden; }
+  .wbar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #fff; font-size: 12px; font-weight: 650 }
+  .wbar .lg { width: 16px; height: 16px }
+  .wbody { padding: 13px; }
+  .msg { display: flex; gap: 9px; }
+  .msg .who { font-size: 12px; font-weight: 700 }
+  .msg .tag { font-size: 8.5px; font-weight: 800; letter-spacing: .4px; background: var(--raised); color: var(--ink-3); padding: 1px 4px; border-radius: 3px }
+  .msg .tm { font-size: 10px; color: var(--ink-4) }
+  .msg .bd { font-size: 12px; line-height: 1.5; color: var(--ink); margin-top: 3px }
+  .msg .bd b { font-weight: 700 }
+  .attach { border-left: 3px solid var(--brand); background: var(--bg); border-radius: 0 6px 6px 0; padding: 8px 10px; margin-top: 8px }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 11px; margin-top: 6px }
+  .facts .k { color: var(--ink-3); font-weight: 600 }
+  .facts .v { font-weight: 650; font-variant-numeric: tabular-nums }
+  .sbtns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap }
+  .sbtn { border: 1px solid var(--line-2); background: #fff; border-radius: 5px; padding: 4px 9px; font-size: 11px; font-weight: 650; color: var(--ink-2) }
+  .sbtn.g { background: #007A5A; border-color: #007A5A; color: #fff }
+  .sbtn.b { background: #4F46E5; border-color: #4F46E5; color: #fff }
+  .prov { font-size: 10px; color: var(--ink-4); margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line) }
+  .bub { max-width: 88%; padding: 8px 10px; border-radius: 12px; font-size: 11.5px; line-height: 1.45; margin-bottom: 8px; position: relative }
+  .bub.in { background: #fff; border: 1px solid #E6EBF0; border-bottom-left-radius: 3px }
+  .bub.out { background: #D9FDD3; margin-left: auto; border-bottom-right-radius: 3px }
+  .bub .tm { font-size: 9px; color: var(--ink-4); text-align: right; margin-top: 3px }
+  .wa { background: #EFE7DE; padding: 12px; }
+  .tg { background: #E8EDF2; padding: 12px; }
+  .bub.tgin { background: #fff; border: 0 }
+  .bub.tgout { background: #E3F1FD; margin-left: auto }
+  .ikb { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px }
+  .ikb span { background: #F1F5F9; border-radius: 6px; padding: 5px; font-size: 10.5px; font-weight: 650; text-align: center; color: #2563EB }
+  .ikb span.full { grid-column: 1/-1 }
+  .card2 { border: 1px solid #E1E4E8; border-radius: 8px; padding: 11px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06) }
+  .lead { font-size: 13px; color: var(--ink-2); line-height: 1.55 }
+</style>
+
+<div class="stage">
+  <div class="spread" style="margin-bottom:6px">
+    <div>
+      <div class="h1" style="font-size:22px">The coach reaches you where you already work</div>
+      <div class="lead" style="max-width:900px;margin-top:4px">Every message names the rule that sent it, offers a snooze and a way to change channel, and is recorded as a nudge with its escalation step. One per subject per person per day, unless it escalates.</div>
+    </div>
+    <div class="row"><span class="chip brand"><i class="dot"></i>Two-way on all four</span><span class="chip"><i class="dot n"></i>Quiet hours honoured</span></div>
+  </div>
+
+  <div class="grid" style="margin-top:18px">
+
+    <div class="win">
+      <div class="wbar" style="background:#3F0E40">
+        <svg class="lg" viewBox="0 0 24 24" fill="#fff"><path d="M5.5 15a2 2 0 1 1-2-2h2zm1 0a2 2 0 0 1 4 0v5a2 2 0 1 1-4 0zM8.5 7a2 2 0 1 1 2-2v2zm0 1a2 2 0 0 1 0 4h-5a2 2 0 1 1 0-4zM17 8.5a2 2 0 1 1 2 2h-2zm-1 0a2 2 0 0 1-4 0v-5a2 2 0 1 1 4 0zM15.5 17a2 2 0 1 1-2 2v-2zm0-1a2 2 0 0 1 0-4h5a2 2 0 1 1 0 4z"/></svg>
+        Slack · #revenue
+      </div>
+      <div class="wbody">
+        <div class="msg">
+          <div class="av bot2" style="width:32px;height:32px;font-size:12px">Ch</div>
+          <div class="grow">
+            <div class="row" style="gap:6px"><span class="who">OKR Champion</span><span class="tag">APP</span><span class="tm">09:00</span></div>
+            <div class="bd">Morning Dinesh. Your check-in on <b>Make onboarding something customers finish without us</b> was due Friday. It is the third reminder, so I have let Marc know.</div>
+            <div class="attach">
+              <div style="font-size:11.5px;font-weight:660">Cut median time-to-first-value from 21 to 7 days</div>
+              <div class="facts">
+                <span class="k">Now</span><span class="v">17 days</span>
+                <span class="k">Last confidence</span><span class="v" style="color:var(--bad)">0.3 low</span>
+                <span class="k">Last check-in</span><span class="v" style="color:#C2410C">11 days ago</span>
+                <span class="k">Escalation</span><span class="v">Step 3 of 5 · sponsor</span>
+              </div>
+            </div>
+            <div class="sbtns">
+              <span class="sbtn g">Check in</span><span class="sbtn">Log a blocker</span><span class="sbtn">Snooze 1 day</span>
+            </div>
+            <div class="prov">Rule RH-3 · check-in overdue · <span style="color:var(--brand-600);font-weight:650">why am I getting this?</span> · change my channel</div>
+          </div>
+        </div>
+
+        <hr class="rule" style="margin:13px 0">
+        <div class="msg">
+          <div class="av bot2" style="width:32px;height:32px;font-size:12px">Ch</div>
+          <div class="grow">
+            <div class="row" style="gap:6px"><span class="who">OKR Champion</span><span class="tag">APP</span><span class="tm">16:45</span></div>
+            <div class="bd"><b>Revenue weekly digest · week 6</b></div>
+            <div class="attach" style="border-left-color:var(--ok-dot)">
+              <div class="facts">
+                <span class="k">On track</span><span class="v">3 of 6 key results</span>
+                <span class="k">At risk</span><span class="v" style="color:var(--bad)">Win rate vs Meridian · 0.4</span>
+                <span class="k">Blockers</span><span class="v">1 open, 26h, escalated</span>
+                <span class="k">Commitments</span><span class="v">2 delivered, 1 not</span>
+                <span class="k">Streak</span><span class="v">9 weeks</span>
+              </div>
+            </div>
+            <div class="sbtns"><span class="sbtn">Open the digest</span><span class="sbtn">Post to #general</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="win">
+      <div class="wbar" style="background:#464EB8">
+        <svg class="lg" viewBox="0 0 24 24" fill="#fff"><path d="M3 6h10v2.4H9.3V18H6.7V8.4H3zM14 7.6h6.6a1 1 0 0 1 1 1V15a3.3 3.3 0 0 1-3.3 3.3h-1a3.3 3.3 0 0 1-3.3-3.3zM17.6 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
+        Microsoft Teams · Revenue
+      </div>
+      <div class="wbody">
+        <div class="msg" style="margin-bottom:11px">
+          <div class="av bot" style="width:32px;height:32px;font-size:12px">C</div>
+          <div class="grow">
+            <div class="row" style="gap:6px"><span class="who">OKR Coach</span><span class="tag">BOT</span><span class="tm">14:20</span></div>
+            <div class="bd">Two objectives in this cycle both move mobile order share. One quarter, two teams, the same number.</div>
+          </div>
+        </div>
+        <div class="card2">
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--bad);text-transform:uppercase">Duplicate metric · AL-2</div>
+          <div style="font-size:12px;font-weight:660;margin:5px 0 7px;line-height:1.35">Revenue and Partnerships both count partner-sourced ARR</div>
+          <div class="facts">
+            <span class="k">Objective A</span><span class="v">Win the accounts…</span>
+            <span class="k">Objective B</span><span class="v">Make partners our…</span>
+            <span class="k">Overlap</span><span class="v">RM 2.1m of target</span>
+            <span class="k">Proposed</span><span class="v">Partnerships owns it</span>
+          </div>
+          <div class="sbtns"><span class="sbtn b">Review the proposal</span><span class="sbtn">Dismiss</span></div>
+        </div>
+        <div class="prov">A proposal, not a write. Nothing changes until a human applies it.</div>
+
+        <hr class="rule" style="margin:13px 0">
+        <div class="msg">
+          <div class="av bot2" style="width:32px;height:32px;font-size:12px">Ch</div>
+          <div class="grow">
+            <div class="row" style="gap:6px"><span class="who">OKR Champion</span><span class="tag">BOT</span><span class="tm">15:30</span></div>
+            <div class="bd">The weekly session starts in 30 minutes. Six key results to score, three blockers open.</div>
+            <div class="sbtns"><span class="sbtn b">Open the session</span><span class="sbtn">I cannot make it</span></div>
+            <div class="prov">Rule RH-7 · session reminder · quiet hours respected in your timezone</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="win">
+      <div class="wbar" style="background:#075E54">
+        <svg class="lg" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-1.7-.1a13 13 0 0 1-5.6-4.9c-.4-.6-1-1.5-1-2.9s.7-2 1-2.3c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.3.3c-.1.2-.3.3-.1.6.2.3.7 1.2 1.5 1.9 1 .9 1.9 1.2 2.2 1.3.2.1.4.1.6-.1l.8-1c.2-.2.3-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.6 0 1z"/></svg>
+        WhatsApp · Business
+      </div>
+      <div class="wa" style="height:calc(100% - 34px)">
+        <div class="bub in">Hi Priya. Weekly check-in for <b>Raise win rate against Meridian</b>. Reply with the current number and your confidence 0 to 1.<div class="tm">09:00</div></div>
+        <div class="bub out">26% and 0.4<div class="tm">09:04 ✓✓</div></div>
+        <div class="bub in">Logged. 0.4 is below the line, so this needs a blocker type. Reply with a number:<br>1 Resource · 2 Dependency<br>3 Clarity · 4 Priority conflict · 5 External<div class="tm">09:04</div></div>
+        <div class="bub out">2<div class="tm">09:05 ✓✓</div></div>
+        <div class="bub in">Dependency noted. Who owns clearing it, and what is the one action in the next 24 hours?<div class="tm">09:05</div></div>
+        <div class="bub out">Marc. Pricing sign-off in Monday's exec slot<div class="tm">09:06 ✓✓</div></div>
+        <div class="bub in">Done. Marc has the blocker with a 24 hour clock, and your check-in is published. <b>Nothing else is due from you today.</b><div class="tm">09:06</div></div>
+      </div>
+    </div>
+
+    <div class="win">
+      <div class="wbar" style="background:#2AABEE">
+        <svg class="lg" viewBox="0 0 24 24" fill="#fff"><path d="M21.9 4.3 18.6 20c-.2 1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13.6l-4.8-1.5c-1-.3-1-1 .2-1.5l18.7-7.2c.9-.3 1.6.2 1.6 1z"/></svg>
+        Telegram · OpenOKR bot
+      </div>
+      <div class="tg" style="height:calc(100% - 34px)">
+        <div class="bub tgin">
+          <b>Blocker escalation</b><br>
+          "Pricing sign-off from Finance" has been open <b>26 hours</b> with no action logged. The clock is 24.
+          <div style="margin-top:6px;font-size:10.5px;color:var(--ink-3)">Key result: Raise win rate vs Meridian · Owner: Marc Reyes · Confidence 0.4</div>
+          <div class="ikb">
+            <span>I have cleared it</span><span>Reassign</span>
+            <span class="full">Escalate to Sofia (sponsor)</span>
+            <span>Snooze 4h</span><span>See the rule</span>
+          </div>
+          <div class="tm">17:00</div>
+        </div>
+        <div class="bub tgout">Escalate to Sofia<div class="tm">17:02</div></div>
+        <div class="bub tgin">Sofia has been told, and Marc can see that I escalated. Escalation step 2 of 5.
+          <div class="tm">17:02</div></div>
+        <div class="bub tgin">
+          <b>Daily summary · Friday</b><br>
+          2 check-ins due · 1 acknowledgement owed · 1 blocker you own · weekly session at 16:00
+          <div class="ikb"><span class="full">Open my review inbox</span></div>
+          <div class="tm">08:00</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:18px">
+    <div class="sub"><b style="color:var(--ink)">Email</b> &nbsp;nudges, digests, the daily summary, one-click check-in links</div>
+    <div class="sub"><b style="color:var(--ink)">Browser</b> &nbsp;everything</div>
+    <div class="sub"><b style="color:var(--ink)">Your own AI agent</b> &nbsp;Claude, ChatGPT, Cursor or a custom agent, acting as you, within your permissions</div>
+    <div class="sub"><b style="color:var(--ink)">No chat provider</b> &nbsp;a workspace with none configured still works completely</div>
+  </div>
+</div>

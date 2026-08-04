@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- window-width:860 window-height:430 -->
+<meta charset="utf-8">
+<title>The coaching card</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { width: 860px; height: 430px; background: #EEF1F5; }
+  .stage { padding: 22px; height: 100%; }
+  .pop { background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 14px 40px rgba(15,23,42,.14), 0 2px 8px rgba(15,23,42,.07); overflow: hidden; }
+  .pop-h { padding: 13px 17px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; background: #FFFBFB }
+  .pop-b { padding: 16px 17px; }
+  .vchip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px;
+    font-size: 11px; font-weight: 800; letter-spacing: .3px; }
+  .vchip.fail { background: var(--bad-bg); color: var(--bad) }
+  .ex { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 13px; }
+  .exbox { border: 1px solid var(--line); border-radius: 9px; padding: 11px; }
+  .exbox .lbl { font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px }
+  .exbox.w { background: #FEF2F2; border-color: #FECACA } .exbox.w .lbl { color: var(--bad) }
+  .exbox.s { background: #F0FDF4; border-color: #BBF7D0 } .exbox.s .lbl { color: var(--ok) }
+  .exbox .txt { font-size: 13px; color: var(--ink); line-height: 1.4; font-weight: 550 }
+  .field { border: 1px solid var(--line-2); border-radius: 9px; padding: 10px 13px; background: #fff;
+    display: flex; align-items: center; gap: 10px; margin-bottom: 13px; box-shadow: var(--shadow); }
+  .field .txt { font-size: 16px; font-weight: 660; letter-spacing: -.2px; border-bottom: 2px solid var(--brand); padding-bottom: 1px }
+</style>
+
+<div class="stage">
+  <div class="field">
+    <span class="vd fail" style="width:9px;height:9px"></span>
+    <span class="txt">Launch the new mobile ordering app in 3 markets</span>
+    <span style="display:inline-block;width:1.5px;height:16px;background:var(--brand)"></span>
+    <span class="chip bad" style="margin-left:auto">2 rules firing</span>
+  </div>
+
+  <div class="pop">
+    <div class="pop-h">
+      <span class="vd fail" style="width:10px;height:10px"></span>
+      <b style="font-size:13.5px">OBJ-1 · Outcome, not output</b>
+      <span class="vchip fail" style="margin-left:auto">FAIL</span>
+    </div>
+    <div class="pop-b">
+      <div style="font-size:13.5px;line-height:1.55;color:var(--ink)">
+        Your objective starts with a deliverable, not a destination. If we do it and nothing changes, did we succeed? Rewrite around the change you want.
+      </div>
+      <div class="sub" style="margin-top:9px;line-height:1.5"><b>Why it matters.</b> An objective you can complete without anything improving is a task list. The launch is a means, not the end.</div>
+      <div class="ex">
+        <div class="exbox w"><div class="lbl">Weak</div><div class="txt">Launch the new mobile app by end of Q3</div></div>
+        <div class="exbox s"><div class="lbl">Strong</div><div class="txt">Make mobile the way our customers prefer to reach us</div></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <div class="btn ai">✨ Rewrite this for me</div>
+        <div class="btn">See the rule in METHOD</div>
+        <div class="btn" style="margin-left:auto">Dismiss</div>
+      </div>
+    </div>
+  </div>
+</div>

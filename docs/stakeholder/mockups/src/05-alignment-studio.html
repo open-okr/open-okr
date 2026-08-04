@@ -1,0 +1,201 @@
+<!doctype html>
+<!-- window-height:1010 -->
+<meta charset="utf-8">
+<title>S-16 Alignment studio</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 1fr 336px; gap: 16px; height: 100%; }
+  .canvas { position: relative; background:
+      radial-gradient(circle, #DDE3EA 1px, transparent 1px) 0 0/18px 18px, var(--surface);
+    border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+  .canvas > svg { position: absolute; inset: 0; }
+  .node { position: absolute; background: #fff; border: 1px solid var(--line-2); border-radius: 9px;
+    box-shadow: 0 1px 3px rgba(15,23,42,.09); padding: 9px 10px; }
+  .node.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(79,70,229,.12), 0 2px 6px rgba(15,23,42,.1); }
+  .node.orphan { border-color: var(--bad-dot); border-style: dashed; background: #FFFCFC }
+  .node .lv { font-size: 9px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-4) }
+  .node.sel .lv { color: var(--brand-600) }
+  .node .ti { font-size: 12px; font-weight: 620; line-height: 1.3; margin: 3px 0 6px; }
+  .node .ft { display: flex; align-items: center; gap: 6px; }
+  .node .mt { font-size: 10.5px; color: var(--ink-3); font-weight: 600 }
+  .lbl { position: absolute; font-size: 10px; font-weight: 700; color: var(--ink-3); background: #fff;
+    border: 1px solid var(--line); border-radius: 20px; padding: 1px 7px; }
+  .ptab { display: flex; gap: 3px; padding: 3px; background: var(--raised); border-radius: 8px; }
+  .ptab div { flex: 1; text-align: center; font-size: 11.5px; font-weight: 640; padding: 4px 0; border-radius: 6px; color: var(--ink-3) }
+  .ptab div.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(15,23,42,.08) }
+  .gap { display: flex; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: flex-start }
+  .gap:last-child { border-bottom: 0 }
+  .gap .pen { font-size: 12px; font-weight: 800; color: var(--bad); flex: none; width: 26px }
+  .gap .t { font-size: 12px; font-weight: 570 }
+  .gap .d { font-size: 11px; color: var(--ink-3); margin-top: 1px }
+  .find { border: 1px solid var(--line); border-radius: var(--r); padding: 10px; margin-bottom: 9px; background: #fff }
+  .find .hd { display: flex; align-items: center; gap: 6px; margin-bottom: 5px }
+  .find .bd { font-size: 11.5px; color: var(--ink-2); line-height: 1.45 }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="logo">O</div><div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navsec">Practice</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle</div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div><div class="navsub">Product</div><div class="navsub">Customer Success</div><div class="navsub">People &amp; Ops</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">3 findings</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">idle</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Goals / <b>Alignment studio</b></div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd">⌘K</span></div>
+      <div class="tools">
+        <div class="btn sm"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6M12 5v14"/></svg>Link mode</div>
+        <div class="btn ai sm">Ask AI <span class="kbd">⌘J</span></div><div class="av a1 sm">SL</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="spread" style="margin-bottom:12px">
+        <div><div class="h1">Alignment studio</div><div class="sub">Vertical is contribution. Horizontal is a dependency both teams know about.</div></div>
+        <div class="row">
+          <div class="chip"><i class="dot n"></i>4 levels</div><div class="chip"><i class="dot n"></i>18 objectives</div>
+          <div class="chip info"><i class="dot"></i>5 dependencies</div><div class="chip warn"><i class="dot"></i>78 / 100</div>
+        </div>
+      </div>
+
+      <div class="wrap" style="height:calc(100% - 52px)">
+        <div class="canvas">
+          <svg viewBox="0 0 814 830" preserveAspectRatio="none" width="100%" height="830">
+            <g stroke="#94A3B8" stroke-width="1.4" fill="none">
+              <path d="M403 106 L403 128 M137 128 L669 128 M137 128 L137 150 M403 128 L403 150 M669 128 L669 150"/>
+              <path d="M137 248 L137 272 M95 272 L261 272 M95 272 L95 296 M261 272 L261 296"/>
+              <path d="M403 248 L403 272 L427 272 L427 296"/>
+              <path d="M669 248 L669 296"/>
+            </g>
+            <g stroke="#7C3AED" stroke-width="1.6" fill="none" stroke-dasharray="5 4">
+              <path d="M95 384 C 95 462, 427 462, 427 384"/>
+              <path d="M261 384 C 261 526, 669 526, 669 384"/>
+            </g>
+            <g fill="#7C3AED">
+              <circle cx="95" cy="384" r="3"/><circle cx="427" cy="384" r="3"/>
+              <circle cx="261" cy="384" r="3"/><circle cx="669" cy="384" r="3"/>
+            </g>
+          </svg>
+
+          <div class="node" style="left:278px;top:16px;width:250px">
+            <div class="lv">Company</div>
+            <div class="ti">Become the default supplier for mid-market retail in ASEAN</div>
+            <div class="ft"><div class="av a1 sm">SL</div><span class="mt">3 KRs</span><span class="mt">·</span><span class="mt">2 deps</span>
+              <span class="chip ok" style="margin-left:auto;height:18px"><i class="dot"></i>On track</span></div>
+          </div>
+
+          <div class="node" style="left:20px;top:150px;width:234px">
+            <div class="lv">Department · Revenue</div>
+            <div class="ti">Win the accounts our competitors think are safe</div>
+            <div class="ft"><div class="av a2 sm">JT</div><span class="mt">3 KRs</span><span class="mt">·</span><span class="mt">1 dep</span>
+              <span class="chip ok" style="margin-left:auto;height:18px"><i class="dot"></i>0.8</span></div>
+          </div>
+
+          <div class="node sel" style="left:286px;top:150px;width:234px">
+            <div class="lv">Department · Product</div>
+            <div class="ti">Make onboarding something customers finish without us</div>
+            <div class="ft"><div class="av a3 sm">DK</div><span class="mt">4 KRs</span><span class="mt">·</span><span class="mt">2 deps</span>
+              <span class="chip out" style="margin-left:auto;height:18px">Outdated</span></div>
+          </div>
+
+          <div class="node" style="left:552px;top:150px;width:234px">
+            <div class="lv">Department · Cust. Success</div>
+            <div class="ti">Turn support from a cost centre into a retention engine</div>
+            <div class="ft"><div class="av a4 sm">FA</div><span class="mt">3 KRs</span><span class="mt">·</span><span class="mt">1 dep</span>
+              <span class="chip bad" style="margin-left:auto;height:18px"><i class="dot"></i>0.3</span></div>
+          </div>
+
+          <div class="node" style="left:20px;top:296px;width:150px">
+            <div class="lv">Team · Enterprise</div>
+            <div class="ti">Beat Meridian where it hurts</div>
+            <div class="ft"><div class="av a5 sm">PN</div><span class="mt">2 KRs</span></div>
+          </div>
+          <div class="node" style="left:186px;top:296px;width:150px">
+            <div class="lv">Team · Partnerships</div>
+            <div class="ti">Make partners our biggest channel</div>
+            <div class="ft"><div class="av a8 sm">LW</div><span class="mt">3 KRs</span></div>
+          </div>
+          <div class="node" style="left:352px;top:296px;width:150px">
+            <div class="lv">Team · Platform</div>
+            <div class="ti">Ship self-serve setup</div>
+            <div class="ft"><div class="av a6 sm">RH</div><span class="mt">3 KRs</span></div>
+          </div>
+          <div class="node" style="left:594px;top:296px;width:150px">
+            <div class="lv">Team · Support</div>
+            <div class="ti">Answer before they ask</div>
+            <div class="ft"><div class="av a4 sm">FA</div><span class="mt">2 KRs</span></div>
+          </div>
+
+          <div class="lbl" style="left:206px;top:444px">depends on · confirmed</div>
+          <div class="lbl" style="left:395px;top:506px;border-color:#FCA5A5;color:var(--bad)">depends on · unconfirmed</div>
+
+          <div class="node orphan" style="left:552px;top:592px;width:234px">
+            <div class="row" style="gap:6px;margin-bottom:2px">
+              <svg style="width:12px;height:12px;color:var(--bad)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+              <div class="lv" style="color:var(--bad)">Team · People &amp; Ops · unaligned</div>
+            </div>
+            <div class="ti">Roll out the new performance framework</div>
+            <div class="ft"><div class="av a7 sm">MR</div><span class="mt">2 KRs</span>
+              <span class="chip bad" style="margin-left:auto;height:18px"><i class="dot"></i>AL-1 fail</span></div>
+          </div>
+        </div>
+
+        <div class="col" style="gap:12px;min-height:0">
+          <div class="ptab"><div>Details</div><div class="on">Health</div><div>Review <span style="color:var(--brand-600)">3</span></div></div>
+
+          <div class="card">
+            <div class="card-b">
+              <div class="spread"><div class="h2">Alignment health</div><span class="h1 num" style="color:var(--warn)">78</span></div>
+              <div class="bar" style="height:8px;margin:8px 0 4px"><i class="warn" style="width:78%"></i></div>
+              <div class="tiny mut">Every gap below links to the goal that caused it.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><div class="h3">Gaps</div><span class="chip bad" style="margin-left:auto"><i class="dot"></i>−22</span></div>
+            <div class="card-b" style="padding:2px 14px 10px">
+              <div class="gap"><span class="pen">−12</span><div><div class="t">An orphan goal</div><div class="d">People &amp; Ops · "Roll out the new performance framework" has no parent and no stated contribution</div></div></div>
+              <div class="gap"><span class="pen">−6</span><div><div class="t">A possible silo</div><div class="d">People &amp; Ops has no horizontal dependency anywhere in its branch</div></div></div>
+              <div class="gap"><span class="pen">−4</span><div><div class="t">A skipped level</div><div class="d">Team · Support aligns straight to a company objective</div></div></div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="av bot sm">C</div><div class="h3">Coach findings</div>
+              <span class="chip agent" style="margin-left:auto;height:18px">Nightly sweep</span></div>
+            <div class="card-b" style="padding:11px 12px">
+              <div class="find">
+                <div class="hd"><span class="chip bad" style="height:17px;font-size:9.5px">Duplicate metric</span><span class="tiny mut4" style="margin-left:auto">AL-2</span></div>
+                <div class="bd">Revenue and Partnerships both count new partner-sourced ARR. One quarter, two teams, the same money. Pick the owner.</div>
+                <div class="row" style="margin-top:8px;gap:6px"><div class="btn sm p" style="height:23px">Apply</div><div class="btn sm" style="height:23px">Dismiss</div></div>
+              </div>
+              <div class="find">
+                <div class="hd"><span class="chip warn" style="height:17px;font-size:9.5px">Better parent</span><span class="tiny mut4" style="margin-left:auto">AL-3</span></div>
+                <div class="bd">"Ship self-serve setup" sits under Product but every key result it moves belongs to the onboarding objective in Customer Success.</div>
+                <div class="row" style="margin-top:8px;gap:6px"><div class="btn sm p" style="height:23px">Apply</div><div class="btn sm" style="height:23px">Dismiss</div></div>
+              </div>
+              <div class="find">
+                <div class="hd"><span class="chip info" style="height:17px;font-size:9.5px">Hidden dependency</span><span class="tiny mut4" style="margin-left:auto">AL-5</span></div>
+                <div class="bd">Support cannot hit two-hour first response without the migration API from Platform, and neither team has logged it.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

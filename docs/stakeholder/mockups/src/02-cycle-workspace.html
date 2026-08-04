@@ -1,0 +1,169 @@
+<!doctype html>
+<!-- window-height:900 -->
+<meta charset="utf-8">
+<title>S-04 / S-06 Cycle workspace</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 264px 1fr 300px; gap: 16px; height: 100%; }
+  .pstep { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r); }
+  .pstep.on { background: var(--brand-weak); }
+  .pstep .mark { width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; border: 1.5px solid var(--line-2); color: var(--ink-4); background: #fff; margin-top: 1px; }
+  .pstep.done .mark { background: var(--ok-dot); border-color: var(--ok-dot); color: #fff; }
+  .pstep.on .mark { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .pstep .nm { font-size: 12.5px; font-weight: 620; }
+  .pstep.on .nm { color: var(--brand-600); }
+  .pstep .out { font-size: 11px; color: var(--ink-4); }
+  .pstep.done .nm { color: var(--ink-2); }
+  .pk { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .pk:last-child { border-bottom: 0 }
+  .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--line-2); flex: none; margin-top: 1px;
+    display: grid; place-items: center; background: #fff; }
+  .box.y { background: var(--ok-dot); border-color: var(--ok-dot); }
+  .box.n { border-color: var(--bad-dot); border-style: dashed; }
+  .pk .t { font-size: 12.5px; font-weight: 570; }
+  .pk .d { font-size: 11.5px; color: var(--ink-3); }
+  .blocked { background: #FFF7ED; border: 1px solid #FED7AA; border-radius: var(--r); padding: 11px 12px; }
+  .tl { display: grid; grid-template-columns: 58px 1fr 74px; gap: 8px; padding: 6px 0; font-size: 12px; border-bottom: 1px solid var(--line) }
+  .tl:last-child { border: 0 }
+  .guide li { font-size: 12px; color: var(--ink-2); margin: 0 0 7px 15px; line-height: 1.5; }
+  .quote { border-left: 2px solid var(--brand-line); padding-left: 10px; font-size: 12px; color: var(--ink-2); font-style: italic; }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="logo">O</div><div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navsec">Practice</div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div><div class="navsub">Product</div><div class="navsub">Customer Success</div><div class="navsub">People &amp; Ops</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">idle</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">chasing 3</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Cycle / <b>Q3 FY2026 planning</b></div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd">⌘K</span></div>
+      <div class="tools">
+        <div class="chip"><i class="dot n"></i>Quarterly mode</div>
+        <div class="btn ai sm">Ask AI <span class="kbd">⌘J</span></div>
+        <div class="av a1 sm">AA</div>
+      </div>
+    </div>
+    <div class="strip">
+      <span class="phase">Phase 1 · Prepare</span><span class="sep">|</span>
+      <span class="block">Drafting is blocked: the input pack is 4 of 7 complete</span>
+      <span class="due">Publication deadline in 19 days</span>
+    </div>
+
+    <div class="body">
+      <div class="wrap">
+
+        <div class="card" style="overflow:hidden">
+          <div class="card-h"><div class="h3">The cycle</div><span class="chip brand" style="margin-left:auto">2 of 8 done</span></div>
+          <div class="card-b" style="padding:8px">
+            <div class="pstep done"><div class="mark">✓</div><div><div class="nm">0 · Annual strategy</div><div class="out">The frame for FY2026</div></div></div>
+            <div class="pstep on"><div class="mark">1</div><div><div class="nm">1 · Prepare</div><div class="out">Roles, dates, input pack</div>
+              <div class="row" style="margin-top:5px"><div class="bar grow" style="height:5px"><i style="width:57%"></i></div><span class="tiny num mut">57%</span></div></div></div>
+            <div class="pstep"><div class="mark">2</div><div><div class="nm">2 · Diagnose</div><div class="out">Scores, baselines, ranked issues</div></div></div>
+            <div class="pstep"><div class="mark">3</div><div><div class="nm">3 · Set direction</div><div class="out">Priorities and the not-doing list</div></div></div>
+            <div class="pstep"><div class="mark">4</div><div><div class="nm">4 · Draft OKRs</div><div class="out">Objectives and key results</div></div></div>
+            <div class="pstep"><div class="mark">5</div><div><div class="nm">5 · Align and commit</div><div class="out">Cascade, capacity, six gates</div></div></div>
+            <div class="pstep"><div class="mark">6</div><div><div class="nm">6 · Run the cadence</div><div class="out">Weekly, monthly, decisions</div></div></div>
+            <div class="pstep"><div class="mark">7</div><div><div class="nm">7 · Review and learn</div><div class="out">Score, retro, feed forward</div></div></div>
+          </div>
+        </div>
+
+        <div class="col" style="gap:14px;min-width:0">
+          <div class="card">
+            <div class="card-h"><div class="h2">Phase 1 · Prepare</div>
+              <span class="sub" style="margin-left:auto">Completion is computed, never self-reported</span></div>
+            <div class="card-b" style="padding:12px 14px">
+              <div class="blocked row" style="align-items:flex-start;gap:9px">
+                <svg class="ic" style="width:16px;height:16px;color:#C2410C;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                <div>
+                  <div class="h3" style="color:#9A3412">Drafting stays locked until the input pack is complete</div>
+                  <div class="tiny" style="color:#9A3412;margin-top:2px">A planning session without inputs produces objectives written from opinion. Missing: customer and market signal, capacity and constraints, the distribution confirmation.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="h3">Input pack</div><span class="chip warn" style="margin-left:auto"><i class="dot"></i>4 of 7</span></div>
+            <div class="card-b" style="padding:4px 14px">
+              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div class="grow"><div class="t">Last cycle's scores and retrospective</div><div class="d">Carried forward automatically from Q2 FY2026</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
+              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div class="grow"><div class="t">The annual strategy and annual OKRs</div><div class="d">FY2026 frame · 3 strategies · 4 annual objectives</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
+              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div class="grow"><div class="t">KPI baselines and current health</div><div class="d">18 KPIs · 2 outside their corridor</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
+              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+                <div class="grow"><div class="t">Financial and operational plan</div><div class="d">Uploaded by Sofia Lim · 2 days ago</div></div><span class="chip ok"><i class="dot"></i>Done</span></div>
+              <div class="pk"><div class="box n"></div>
+                <div class="grow"><div class="t">Customer and market signal</div><div class="d">Assigned to Priya Nair · due in 3 days</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
+              <div class="pk"><div class="box n"></div>
+                <div class="grow"><div class="t">Capacity and known constraints</div><div class="d">Assigned to Marc Reyes · due in 3 days</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
+              <div class="pk"><div class="box n"></div>
+                <div class="grow"><div class="t">Confirmed distribution to every participant</div><div class="d">Send the pack at least 5 working days before the session</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:250px 1fr;gap:14px">
+            <div class="card">
+              <div class="card-h"><div class="h3">Roles</div></div>
+              <div class="card-b" style="padding:10px 14px">
+                <div class="row" style="padding:3px 0"><div class="av a1 sm">SL</div><div class="grow"><div style="font-size:12.5px;font-weight:600">Sofia Lim</div><div class="tiny mut">Sponsor · decides and unblocks</div></div></div>
+                <div class="row" style="padding:3px 0"><div class="av a7 sm">MR</div><div class="grow"><div style="font-size:12.5px;font-weight:600">Marc Reyes</div><div class="tiny mut">Facilitator · guards the method</div></div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><div class="h3">Session timeline</div><span class="chip ok" style="margin-left:auto"><i class="dot"></i>All booked</span></div>
+              <div class="card-b" style="padding:6px 14px">
+                <div class="tl"><span class="mut">Week 1</span><span>Diagnose and set direction</span><span class="num mut">18 Aug</span></div>
+                <div class="tl"><span class="mut">Week 2</span><span>Draft OKRs</span><span class="num mut">25 Aug</span></div>
+                <div class="tl"><span class="mut">Week 3</span><span>Align, capacity, commit</span><span class="num mut">1 Sep</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="overflow:hidden">
+          <div class="card-h"><svg class="ic" style="color:var(--brand)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg><div class="h3">Facilitator guidance</div></div>
+          <div class="card-b">
+            <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">Key output</div>
+            <div class="quote" style="margin-bottom:14px">A named sponsor, a named facilitator, every session in the calendar, and a complete pack in every participant's hands five working days before you start.</div>
+            <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">Watch for</div>
+            <ul class="guide" style="margin-bottom:14px">
+              <li>A sponsor who delegates the decision. If they cannot attend, move the session.</li>
+              <li>"We already know the numbers." Then it costs nothing to write them down.</li>
+              <li>A pack sent the night before. People read it in the room and plan from opinion.</li>
+            </ul>
+            <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">Quarterly mode</div>
+            <div class="sub" style="margin-bottom:14px">The frame already exists. Phase 1 is a 30 minute confirmation, not a workshop. Reuse the annual sponsor unless the quarter changes owner.</div>
+            <hr class="rule" style="margin-bottom:11px">
+            <div class="row" style="align-items:flex-start;gap:8px">
+              <div class="av bot2 sm">Ch</div>
+              <div>
+                <div style="font-size:12px"><b>OKR Champion</b> <span class="chip agent" style="height:16px;font-size:9.5px">Agent</span></div>
+                <div class="tiny mut" style="margin-top:3px">I have asked Priya and Marc for the two missing items on Slack, and booked a reminder for tomorrow 09:00.</div>
+                <div class="tiny mut4" style="margin-top:5px">Rule CY-2 · prepare-before-draft</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

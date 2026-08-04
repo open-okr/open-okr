@@ -1,0 +1,214 @@
+<!doctype html>
+<!-- window-height:900 -->
+<meta charset="utf-8">
+<title>S-22 Weekly check-in session</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { display: grid; grid-template-columns: 196px 1fr 320px; gap: 16px; height: calc(100% - 54px); }
+  .step { display: flex; gap: 9px; padding: 9px 10px; border-radius: var(--r); align-items: flex-start }
+  .step.on { background: var(--brand-weak) }
+  .step .n { width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-size: 10px; font-weight: 700; border: 1.5px solid var(--line-2); background: #fff; color: var(--ink-4) }
+  .step.on .n { background: var(--brand); border-color: var(--brand); color: #fff }
+  .step.done .n { background: var(--ok-dot); border-color: var(--ok-dot); color: #fff }
+  .step .t { font-size: 12.5px; font-weight: 620 }
+  .step.on .t { color: var(--brand-600) }
+  .step .d { font-size: 10.5px; color: var(--ink-4) }
+  .krl { display: flex; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--line); align-items: center }
+  .krl:last-child { border-bottom: 0 }
+  .krl.sel { background: var(--brand-weak) }
+  .krl .t { font-size: 12px; font-weight: 570; line-height: 1.3 }
+  .sc { width: 42px; height: 24px; border-radius: 6px; display: grid; place-items: center;
+    font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; flex: none }
+  .sc.ok { background: var(--ok-bg); color: var(--ok) } .sc.wa { background: var(--warn-bg); color: var(--warn) }
+  .sc.bd { background: var(--bad-bg); color: var(--bad) } .sc.no { background: var(--raised); color: var(--ink-4) }
+  .vote { display: flex; align-items: center; gap: 7px; padding: 5px 0 }
+  .blk { border: 1px solid #FECACA; background: #FFFBFB; border-radius: var(--r); padding: 10px 11px; margin-bottom: 9px }
+  .pick { border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; background: #fff }
+  .pick.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand-600) }
+  .sparkw { display: flex; align-items: flex-end; gap: 3px; height: 34px }
+  .sparkw i { flex: 1; border-radius: 2px 2px 0 0; background: var(--brand-line) }
+  .sparkw i.hi { background: var(--brand) }
+  .cmt { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); align-items: flex-start }
+  .cmt:last-child { border-bottom: 0 }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark"><div class="logo">O</div><div><div class="wsname">Northwind Group</div><div class="wssub">Revenue space</div></div></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">3</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox</div>
+    <div class="navsec">Practice</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub" style="color:var(--brand-600);font-weight:650">Revenue</div><div class="navsub">Product</div><div class="navsub">Customer Success</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Running this session</div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">live</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">Revenue / <b>Weekly check-in</b> · Friday 14 Aug</div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd">⌘K</span></div>
+      <div class="tools">
+        <div class="chip brand"><i class="dot"></i>Session live · 08:41 elapsed</div>
+        <div class="avstack"><div class="av a2 sm">JT</div><div class="av a5 sm">PN</div><div class="av a8 sm">LW</div><div class="av a1 sm">SL</div><div class="av bot2 sm">Ch</div></div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="spread" style="margin-bottom:12px">
+        <div><div class="h1">Weekly check-in</div><div class="sub">Fifteen minutes, four steps. It produces decisions, not status.</div></div>
+        <div class="row">
+          <div class="chip ok"><svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>9 week streak</div>
+          <div class="btn sm">Skip step</div><div class="btn p sm">Continue to blockers</div>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <div class="card" style="overflow:hidden;align-self:start">
+          <div class="card-b" style="padding:8px">
+            <div class="step on"><div class="n">1</div><div><div class="t">Confidence round</div><div class="d">4 of 6 scored</div></div></div>
+            <div class="step"><div class="n">2</div><div><div class="t">Diagnose the lows</div><div class="d">Type, owner, 24h action</div></div></div>
+            <div class="step"><div class="n">3</div><div><div class="t">Commitments</div><div class="d">Close last, set this</div></div></div>
+            <div class="step"><div class="n">4</div><div><div class="t">Digest</div><div class="d">Generated, then posted</div></div></div>
+          </div>
+          <div class="card-b" style="border-top:1px solid var(--line);padding:11px">
+            <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px">12 week confidence</div>
+            <div class="sparkw">
+              <i style="height:52%"></i><i style="height:60%"></i><i style="height:71%"></i><i style="height:66%"></i>
+              <i style="height:78%"></i><i style="height:83%"></i><i style="height:75%"></i><i style="height:62%"></i>
+              <i style="height:55%"></i><i style="height:48%"></i><i style="height:44%"></i><i class="hi" style="height:40%"></i>
+            </div>
+            <div class="tiny mut" style="margin-top:6px">Falling four weeks running.</div>
+          </div>
+        </div>
+
+        <div class="col" style="gap:14px;min-width:0">
+          <div class="card" style="display:grid;grid-template-columns:1fr 292px;overflow:hidden">
+            <div style="border-right:1px solid var(--line);min-width:0">
+              <div class="card-h"><div class="h3">Key results</div><span class="sub" style="margin-left:auto">Score 0.0 to 1.0</span></div>
+              <div class="krl"><span class="sc ok">0.8</span><div class="grow"><div class="t">Grow ASEAN mid-market ARR to RM 12.0m</div></div><div class="av a2 sm">JT</div></div>
+              <div class="krl sel"><span class="sc bd">0.4</span><div class="grow"><div class="t">Raise win rate against Meridian from 22% to 35%</div>
+                <div class="tiny mut" style="margin-top:2px">Voting now · 4 of 4 in</div></div><div class="av a5 sm">PN</div></div>
+              <div class="krl"><span class="sc ok">0.7</span><div class="grow"><div class="t">Increase partner-sourced pipeline to RM 5.0m</div></div><div class="av a8 sm">LW</div></div>
+              <div class="krl"><span class="sc wa">0.5</span><div class="grow"><div class="t">Cut sales cycle from 74 to 45 days</div></div><div class="av a2 sm">JT</div></div>
+              <div class="krl"><span class="sc no">–</span><div class="grow"><div class="t">Raise average deal size from RM 42k to RM 60k</div></div><div class="av a5 sm">PN</div></div>
+              <div class="krl"><span class="sc no">–</span><div class="grow"><div class="t">Lift proposal win rate on renewals to 85%</div></div><div class="av a8 sm">LW</div></div>
+            </div>
+
+            <div style="padding:13px">
+              <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Now scoring</div>
+              <div class="h3" style="margin:3px 0 2px;line-height:1.3">Raise win rate against Meridian from 22% to 35%</div>
+              <div class="tiny mut">Champion Priya Nair · now 26% · leading</div>
+
+              <svg viewBox="0 0 220 118" width="100%" style="margin:6px 0 0">
+                <path d="M32 96 A78 78 0 0 1 64.1 32.9" fill="none" stroke="#EF4444" stroke-width="15" stroke-linecap="round"/>
+                <path d="M64.1 32.9 A78 78 0 0 1 155.9 32.9" fill="none" stroke="#F59E0B" stroke-width="15"/>
+                <path d="M155.9 32.9 A78 78 0 0 1 188 96" fill="none" stroke="#22C55E" stroke-width="15" stroke-linecap="round"/>
+                <line x1="110" y1="96" x2="89.6" y2="33.2" stroke="#0F172A" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="110" cy="96" r="6" fill="#0F172A"/>
+                <text x="110" y="82" text-anchor="middle" font-size="27" font-weight="800" fill="#0F172A" font-family="-apple-system,sans-serif">0.4</text>
+                <text x="30" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">LOW</text>
+                <text x="98" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">MED</text>
+                <text x="168" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">HIGH</text>
+              </svg>
+
+              <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin:4px 0 3px">Team votes, revealed together</div>
+              <div class="vote"><div class="av a5 sm">PN</div><span class="tiny grow">Priya</span><span class="sc bd" style="height:20px;width:34px;font-size:11px">0.3</span></div>
+              <div class="vote"><div class="av a2 sm">JT</div><span class="tiny grow">Jun Tan</span><span class="sc wa" style="height:20px;width:34px;font-size:11px">0.5</span></div>
+              <div class="vote"><div class="av a8 sm">LW</div><span class="tiny grow">Lena Wong</span><span class="sc bd" style="height:20px;width:34px;font-size:11px">0.3</span></div>
+              <div class="vote"><div class="av a1 sm">SL</div><span class="tiny grow">Sofia</span><span class="sc wa" style="height:20px;width:34px;font-size:11px">0.5</span></div>
+              <div class="tiny mut" style="margin-top:5px;padding-top:7px;border-top:1px solid var(--line)">
+                Everyone submitted privately, so nobody anchored on the champion.
+              </div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="h3">Step 2 · Diagnose what is low</div>
+              <span class="sub" style="margin-left:auto">Every score below 0.5 needs a type, an owner and one action within 24 hours</span></div>
+            <div class="card-b" style="padding:12px 14px">
+              <div class="blk">
+                <div class="spread" style="margin-bottom:7px">
+                  <div class="row"><span class="sc bd" style="height:21px;width:36px;font-size:11px">0.4</span>
+                    <span style="font-size:12.5px;font-weight:620">Raise win rate against Meridian</span></div>
+                  <span class="chip bad"><i class="dot"></i>Escalates at 0.3</span>
+                </div>
+                <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                  <span class="tiny mut4" style="font-weight:700">TYPE</span>
+                  <span class="pick">Resource</span><span class="pick on">Dependency</span><span class="pick">Clarity</span>
+                  <span class="pick">Priority conflict</span><span class="pick">External</span>
+                </div>
+                <div class="tiny mut" style="margin-bottom:8px">Dependency: another team owes you something before you can move. Name them and the date.</div>
+                <div class="row" style="gap:8px">
+                  <div class="row" style="gap:6px"><span class="tiny mut4" style="font-weight:700">OWNER</span><div class="av a7 sm">MR</div><span class="tiny">Marc Reyes</span></div>
+                  <div class="grow" style="border:1px solid var(--line-2);border-radius:6px;padding:5px 9px;font-size:11.5px;background:#fff">
+                    Get pricing sign-off from Finance in Monday's exec slot</div>
+                  <span class="chip warn"><svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20h left</span>
+                </div>
+              </div>
+
+              <div class="blk" style="border-color:var(--line);background:var(--bg)">
+                <div class="spread">
+                  <div class="row"><span class="sc wa" style="height:21px;width:36px;font-size:11px">0.5</span>
+                    <span style="font-size:12.5px;font-weight:620">Cut sales cycle from 74 to 45 days</span></div>
+                  <div class="row"><span class="chip"><i class="dot n"></i>Clarity</span><div class="av a2 sm">JT</div><span class="chip ok"><i class="dot"></i>Action set</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col" style="gap:12px;min-height:0">
+          <div class="card">
+            <div class="card-b" style="padding:12px 14px">
+              <div class="spread"><div class="h3">Rhythm streak</div><span class="chip ok"><i class="dot"></i>9 weeks</span></div>
+              <div class="row" style="gap:3px;margin-top:9px">
+                <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
+                <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
+                <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
+                <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
+                <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--brand-line)"></i>
+              </div>
+              <div class="tiny mut" style="margin-top:7px">A skipped week breaks it. Nothing else does.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><div class="h3">Open blockers</div><span class="chip bad" style="margin-left:auto"><i class="dot"></i>1 overdue</span></div>
+            <div class="card-b" style="padding:10px 14px">
+              <div class="cmt"><span class="chip bad" style="flex:none"><i class="dot"></i>26h</span>
+                <div class="grow"><div style="font-size:11.5px;font-weight:600">Pricing sign-off from Finance</div>
+                  <div class="tiny mut">Dependency · Marc Reyes · escalated to sponsor</div></div></div>
+              <div class="cmt"><span class="chip warn" style="flex:none"><i class="dot"></i>20h</span>
+                <div class="grow"><div style="font-size:11.5px;font-weight:600">Migration API scope unclear</div>
+                  <div class="tiny mut">Clarity · Jun Tan</div></div></div>
+              <div class="cmt"><span class="chip" style="flex:none"><i class="dot n"></i>6h</span>
+                <div class="grow"><div style="font-size:11.5px;font-weight:600">Two analysts pulled to the audit</div>
+                  <div class="tiny mut">Resource · Lena Wong</div></div></div>
+            </div>
+          </div>
+
+          <div class="card grow" style="min-height:0">
+            <div class="card-h"><div class="h3">Last week's commitments</div><span class="sub" style="margin-left:auto">No negotiation</span></div>
+            <div class="card-b" style="padding:10px 14px">
+              <div class="cmt"><svg style="width:14px;height:14px;color:var(--ok);flex:none;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg>
+                <div class="grow"><div style="font-size:11.5px">Ship the Meridian battlecard to all AEs</div><div class="tiny mut">Priya Nair · delivered</div></div></div>
+              <div class="cmt"><svg style="width:14px;height:14px;color:var(--ok);flex:none;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg>
+                <div class="grow"><div style="font-size:11.5px">Book the top 20 renewal calls</div><div class="tiny mut">Lena Wong · delivered</div></div></div>
+              <div class="cmt"><svg style="width:14px;height:14px;color:var(--bad);flex:none;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                <div class="grow"><div style="font-size:11.5px">Agree the discount ladder with Finance</div><div class="tiny mut">Jun Tan · not delivered, second week</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

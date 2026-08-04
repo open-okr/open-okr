@@ -1,0 +1,235 @@
+<!doctype html>
+<!-- window-height:768 -->
+<meta charset="utf-8">
+<title>S-01 Work Map</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .tree { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+  .thead { display: grid; grid-template-columns: 1fr 118px 98px 112px 158px 84px; gap: 10px;
+    padding: 8px 14px; background: var(--bg); border-bottom: 1px solid var(--line);
+    font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-4); }
+  .tr { display: grid; grid-template-columns: 1fr 118px 98px 112px 158px 84px; gap: 10px;
+    padding: 8px 14px; border-bottom: 1px solid var(--line); align-items: center; }
+  .tr:last-child { border-bottom: 0 }
+  .tr.alt { background: #FCFDFE }
+  .tname { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .tw { flex: none; }
+  .caret { width: 12px; height: 12px; color: var(--ink-4); flex: none; }
+  .kind { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; color: var(--ink-4);
+    border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; flex: none; background: var(--surface); }
+  .kind.o { color: var(--brand-600); border-color: var(--brand-line); background: var(--brand-weak) }
+  .kind.k { color: #0E7490; border-color: #A5F3FC; background: #ECFEFF }
+  .kind.i { color: #7C3AED; border-color: #DDD6FE; background: #F5F3FF }
+  .kind.p { color: #B45309; border-color: #FDE68A; background: #FFFBEB }
+  .ttl { font-size: 12.5px; font-weight: 560; }
+  .ttl.o { font-weight: 650; font-size: 13px; }
+  .next { font-size: 11.5px; color: var(--ink-3); }
+  .tabs { display: flex; gap: 4px; }
+  .tab { height: 27px; padding: 0 11px; border-radius: 7px; font-size: 12.5px; font-weight: 600;
+    color: var(--ink-3); display: grid; place-items: center; }
+  .tab.on { background: var(--ink); color: #fff; }
+  .stat { display: flex; align-items: baseline; gap: 6px; }
+  .stat b { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brandmark">
+      <div class="logo">O</div>
+      <div><div class="wsname">Northwind Group</div><div class="wssub">FY2026 · Q3</div></div>
+    </div>
+    <div class="navitem on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10h-5l-2 3h-2l-2-3H4z"/></svg>Review<span class="badge">7</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20h4"/></svg>Inbox<span class="badge mute">12</span></div>
+    <div class="navsec">Practice</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>Cycle<span class="chip brand" style="margin-left:auto;height:17px;font-size:10px">P5</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>Goals</div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"/></svg>KPIs<span class="badge">2</span></div>
+    <div class="navitem"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Work</div>
+    <div class="navsec">Spaces</div>
+    <div class="navsub">Revenue</div>
+    <div class="navsub">Product</div>
+    <div class="navsub">Customer Success</div>
+    <div class="navsub">People &amp; Ops</div>
+    <div class="agentcard">
+      <div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 0 5px">Your agents</div>
+      <div class="agentrow"><div class="av bot sm">C</div><div class="nm">OKR Coach</div><div class="st">3 findings</div></div>
+      <div class="agentrow"><div class="av bot2 sm">Ch</div><div class="nm">OKR Champion</div><div class="st">nudged 4</div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb"><b>Work Map</b></div>
+      <div class="searchbox"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search goals, KPIs, people<span class="kbd">⌘K</span></div>
+      <div class="tools">
+        <div class="btn ai sm"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/></svg>Ask AI <span class="kbd">⌘J</span></div>
+        <div class="btn sm">+ New</div>
+        <div class="av a1 sm">AA</div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <span class="phase">Phase 5 · Align and commit</span>
+      <span class="sep">|</span>
+      <span class="block">2 gates unmet: capacity check, dependency confirmation</span>
+      <span class="due">Publication deadline in 6 days</span>
+    </div>
+
+    <div class="body">
+      <div class="spread" style="margin-bottom:13px">
+        <div>
+          <div class="h1">Northwind Group</div>
+          <div class="sub">Company-wide tree · 4 objectives · 14 key results · live</div>
+        </div>
+        <div class="row" style="gap:22px">
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">On track</div><div class="stat"><b style="color:var(--ok)">61%</b><span class="tiny mut">of KRs</span></div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Outdated</div><div class="stat"><b style="color:#C2410C">3</b><span class="tiny mut">goals</span></div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Alignment</div><div class="stat"><b>78</b><span class="tiny mut">/100</span></div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Streak</div><div class="stat"><b>9</b><span class="tiny mut">weeks</span></div></div>
+        </div>
+      </div>
+
+      <div class="spread" style="margin-bottom:11px">
+        <div class="tabs"><div class="tab on">Company</div><div class="tab">My spaces</div><div class="tab">Revenue</div><div class="tab">Product</div></div>
+        <div class="row">
+          <div class="btn sm">Q3 FY2026 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="btn sm"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>Filter</div>
+        </div>
+      </div>
+
+      <div class="tree">
+        <div class="thead"><div>Goal / key result</div><div>Health</div><div>Confidence</div><div>Progress</div><div>Next step</div><div>Champion</div></div>
+
+        <div class="tr">
+          <div class="tname">
+            <svg class="caret" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 8 7-8 7z" transform="rotate(90 12 12)"/></svg>
+            <span class="kind o">OBJ</span><span class="ttl o trunc">Become the default supplier for mid-market retail in ASEAN</span>
+          </div>
+          <div><span class="chip ok"><i class="dot"></i>On track</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
+          <div class="row"><div class="bar grow"><i class="ok" style="width:64%"></i></div><span class="tiny num mut">64%</span></div>
+          <div class="next trunc">Confirm 2 dependencies</div>
+          <div class="row"><div class="av a1 sm">SL</div><div class="av a7 sm">MR</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Grow ASEAN mid-market ARR from RM 8.2m to RM 12.0m</span></div>
+          <div><span class="chip ok"><i class="dot"></i>On track</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
+          <div class="row"><div class="bar grow"><i class="ok" style="width:58%"></i></div><span class="tiny num mut">58%</span></div>
+          <div class="next trunc num">RM 10.4m of RM 12.0m</div>
+          <div class="row"><div class="av a2 sm">JT</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Raise win rate against Meridian from 22% to 35%</span></div>
+          <div><span class="chip warn"><i class="dot"></i>Caution</span></div>
+          <div><span class="chip warn"><i class="dot"></i>Med 0.6</span></div>
+          <div class="row"><div class="bar grow"><i class="warn" style="width:39%"></i></div><span class="tiny num mut">39%</span></div>
+          <div class="next trunc">Blocker: pricing sign-off</div>
+          <div class="row"><div class="av a5 sm">PN</div></div>
+        </div>
+
+        <div class="tr">
+          <div class="tname">
+            <svg class="caret" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 8 7-8 7z" transform="rotate(90 12 12)"/></svg>
+            <span class="kind o">OBJ</span><span class="ttl o trunc">Make onboarding something customers finish without us</span>
+          </div>
+          <div><span class="chip out"><svg class="ic" style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Outdated 11d</span></div>
+          <div><span class="chip"><i class="dot n"></i>Med 0.5</span></div>
+          <div class="row"><div class="bar grow"><i class="warn" style="width:41%"></i></div><span class="tiny num mut">41%</span></div>
+          <div class="next trunc" style="color:var(--bad);font-weight:600">Escalated to sponsor</div>
+          <div class="row"><div class="av a3 sm">DK</div><div class="av a7 sm">MR</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Cut median time-to-first-value from 21 days to 7 days</span></div>
+          <div><span class="chip out"><svg class="ic" style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Outdated</span></div>
+          <div><span class="chip bad"><i class="dot"></i>Low 0.3</span></div>
+          <div class="row"><div class="bar grow"><i class="bad" style="width:29%"></i></div><span class="tiny num mut">29%</span></div>
+          <div class="next trunc num">17 days · target 7</div>
+          <div class="row"><div class="av a3 sm">DK</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:44px"><span class="kind i">INIT</span><span class="ttl trunc">Self-serve setup wizard</span></div>
+          <div><span class="chip"><i class="dot n"></i>Active</span></div>
+          <div><span class="chip warn"><i class="dot"></i>Med 0.5</span></div>
+          <div class="row"><div class="bar grow"><i style="width:70%"></i></div><span class="tiny num mut">7/10</span></div>
+          <div class="next trunc">Capacity: tight</div>
+          <div class="row"><div class="av a6 sm">RH</div></div>
+        </div>
+
+        <div class="tr">
+          <div class="tname">
+            <svg class="caret" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 8 7-8 7z" transform="rotate(90 12 12)"/></svg>
+            <span class="kind o">OBJ</span><span class="ttl o trunc">Turn support from a cost centre into a retention engine</span>
+          </div>
+          <div><span class="chip bad"><i class="dot"></i>Off track</span></div>
+          <div><span class="chip bad"><i class="dot"></i>Low 0.3</span></div>
+          <div class="row"><div class="bar grow"><i class="bad" style="width:22%"></i></div><span class="tiny num mut">22%</span></div>
+          <div class="next trunc" style="color:var(--bad);font-weight:600">Blocker 26h · escalated</div>
+          <div class="row"><div class="av a4 sm">FA</div><div class="av a1 sm">SL</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind p">KPI</span><span class="ttl trunc">Net revenue retention · corridor 90% of target</span></div>
+          <div><span class="chip bad"><i class="dot"></i>Unhealthy 71%</span></div>
+          <div><span class="chip brand"><i class="dot"></i>Recovering</span></div>
+          <div class="row"><div class="bar grow"><i class="bad" style="width:71%"></i></div><span class="tiny num mut">71%</span></div>
+          <div class="next trunc" style="color:var(--brand-600);font-weight:600">Recovery OKR live</div>
+          <div class="row"><div class="av a4 sm">FA</div></div>
+        </div>
+
+        <div class="tr">
+          <div class="tname">
+            <svg class="caret" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 8 7-8 7z" transform="rotate(90 12 12)"/></svg>
+            <span class="kind o">OBJ</span><span class="ttl o trunc">Ship the platform our 2027 roadmap depends on</span>
+          </div>
+          <div><span class="chip ok"><i class="dot"></i>On track</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.9</span></div>
+          <div class="row"><div class="bar grow"><i class="ok" style="width:76%"></i></div><span class="tiny num mut">76%</span></div>
+          <div class="next trunc">Check-in due Friday</div>
+          <div class="row"><div class="av a6 sm">RH</div><div class="av a2 sm">JT</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Move platform p95 latency from 840ms to under 300ms</span></div>
+          <div><span class="chip ok"><i class="dot"></i>On track</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.9</span></div>
+          <div class="row"><div class="bar grow"><i class="ok" style="width:81%"></i></div><span class="tiny num mut">81%</span></div>
+          <div class="next trunc num">395ms · target 300ms</div>
+          <div class="row"><div class="av a6 sm">RH</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Raise deploy frequency from 3 to 20 per week</span></div>
+          <div><span class="chip ok"><i class="dot"></i>On track</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
+          <div class="row"><div class="bar grow"><i class="ok" style="width:70%"></i></div><span class="tiny num mut">70%</span></div>
+          <div class="next trunc num">15 of 20 per week</div>
+          <div class="row"><div class="av a2 sm">JT</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Cut change-failure rate from 18% to under 5%</span></div>
+          <div><span class="chip warn"><i class="dot"></i>Caution</span></div>
+          <div><span class="chip warn"><i class="dot"></i>Med 0.6</span></div>
+          <div class="row"><div class="bar grow"><i class="warn" style="width:52%"></i></div><span class="tiny num mut">52%</span></div>
+          <div class="next trunc num">11% · target 5%</div>
+          <div class="row"><div class="av a8 sm">LW</div></div>
+        </div>
+
+        <div class="tr alt">
+          <div class="tname" style="padding-left:44px"><span class="kind i">INIT</span><span class="ttl trunc">Migrate the ingest pipeline off the legacy queue</span></div>
+          <div><span class="chip"><i class="dot n"></i>Active</span></div>
+          <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
+          <div class="row"><div class="bar grow"><i style="width:85%"></i></div><span class="tiny num mut">17/20</span></div>
+          <div class="next trunc">Capacity: fits</div>
+          <div class="row"><div class="av a8 sm">LW</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
