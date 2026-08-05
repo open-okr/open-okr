@@ -10,8 +10,8 @@ Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skip
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P1-T01 | Monorepo scaffold | in_review | task/p1-t01-monorepo-scaffold, PR #1 | 2026-08-04 | Workspace scaffolded, all checks green. LICENSE was already present (AGPL-3.0). TypeScript pinned to 5.9.x, not 7.x |
-| P1-T02 | CI pipeline + environment schema | todo |  |  |  |
+| P1-T01 | Monorepo scaffold | done | task/p1-t01-monorepo-scaffold, PR #1 | 2026-08-05 | Merged to main 2026-08-05. LICENSE was already present (AGPL-3.0). TypeScript pinned to 5.9.x, not 7.x |
+| P1-T02 | CI pipeline + environment schema | in_progress | task/p1-t02-ci-pipeline-env-schema | 2026-08-05 |  |
 | P1-T03 | Database package + tenant floor + test isolation | todo |  |  | Tenant-isolation spike. Decision recorded in a design document |
 | P1-T04 | Adapter ports + drivers + the transactional outbox | todo |  |  |  |
 | P1-T05 | Authentication: password, passkeys, one-time codes | todo |  |  |  |
