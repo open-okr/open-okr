@@ -1,0 +1,26 @@
+name: Dependency review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Blocks a pull request that introduces a dependency with a known
+      # vulnerability or a licence AGPL-3.0 cannot ship. The licence list here
+      # mirrors scripts/check-licences.ts; change both together.
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: >-
+            0BSD, AGPL-3.0-only, AGPL-3.0-or-later, Apache-2.0, Artistic-2.0,
+            BlueOak-1.0.0, BSD-2-Clause, BSD-3-Clause, CC-BY-4.0, CC0-1.0, ISC,
+            LGPL-3.0-or-later, MIT, MPL-2.0, Python-2.0, Unlicense, WTFPL, Zlib
+          comment-summary-in-pr: on-failure

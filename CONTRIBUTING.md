@@ -24,10 +24,27 @@ pnpm install
 | `pnpm dev` | Run the application locally |
 | `pnpm test` | Run unit and integration tests |
 | `pnpm typecheck` | Strict TypeScript checking across all packages |
-| `pnpm lint` | Biome lint and format check |
+| `pnpm lint` | Biome lint and format check (`pnpm lint:fix` writes the fixes) |
+| `pnpm dead-code` | Fail on unused files, exports and dependencies |
 | `pnpm build` | Production build |
 
-All four checks must pass before a change is reviewed.
+All of these must pass before a change is reviewed. Continuous integration runs
+them again, plus a dependency licence gate, a commit sign-off gate, dependency
+review and code scanning.
+
+## Environment
+
+Copy `.env.example` to `.env`. Only `DATABASE_URL` has to be set; everything else
+has a working default. The application validates its environment at boot and
+exits naming any variable that is wrong.
+
+## Flaky tests
+
+Tests retry twice in CI. A test that only passes on a retry is recorded in the
+flakiness report on the run summary rather than passing silently, and can be
+moved into `test-quarantine.json` with `pnpm flaky quarantine`. A quarantined
+test no longer fails the build, which makes it a debt to pay, not a fix. Fix or
+delete it.
 
 ## Code rules
 

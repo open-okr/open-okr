@@ -1,0 +1,29 @@
+name: Set up the workspace
+description: Node, pnpm, an installed workspace and a warm Turbo cache.
+
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Install Node
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # Turbo's local cache, carried between runs. This is the remote cache for a
+    # project with no vendor account: same effect, no credentials, no new
+    # service. Set TURBO_TOKEN and TURBO_TEAM to switch to a hosted cache.
+    - name: Restore Turbo cache
+      uses: actions/cache@v4
+      with:
+        path: .turbo
+        key: turbo-${{ runner.os }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-

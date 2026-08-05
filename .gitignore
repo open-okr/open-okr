@@ -12,6 +12,9 @@ build/
 coverage/
 *.tsbuildinfo
 
+# Flakiness reports. The quarantine list (test-quarantine.json) is committed.
+.flaky/
+
 # Environment files. Commit only .env.example.
 .env
 .env.*
@@ -21,3 +24,6 @@ coverage/
 .DS_Store
 *.pem
 *.log
+
+# Next.js generates this and its contents differ between dev and build.
+next-env.d.ts

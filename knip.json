@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"]
+    },
+    "apps/web": {
+      "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]
+    },
+    "packages/test-support": {
+      "entry": ["bin/*.ts", "fixtures/**/vitest.config.ts"]
+    }
+  }
+}
