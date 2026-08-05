@@ -69,6 +69,20 @@ describe("parseEnv", () => {
   test("rejects a port that is not a number", () => {
     expect(() => parseEnv({ ...VALID, PORT: "http" })).toThrow(/PORT/);
   });
+
+  test("leaves the admin database URL unset unless provided", () => {
+    expect(parseEnv(VALID).DATABASE_ADMIN_URL).toBeUndefined();
+    expect(
+      parseEnv({ ...VALID, DATABASE_ADMIN_URL: "postgres://owner@db/openokr" })
+        .DATABASE_ADMIN_URL,
+    ).toBe("postgres://owner@db/openokr");
+  });
+
+  test("rejects an admin database URL that is not postgres", () => {
+    expect(() =>
+      parseEnv({ ...VALID, DATABASE_ADMIN_URL: "mysql://nope" }),
+    ).toThrow(/DATABASE_ADMIN_URL/);
+  });
 });
 
 function captureError(run: () => unknown): Error {

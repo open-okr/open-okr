@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./db": "./src/db-harness.ts",
+    "./db-fixtures": "./fixtures/db/schema.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -12,10 +14,13 @@
   },
   "dependencies": {
     "@openokr/core": "workspace:*",
-    "@openokr/db": "workspace:*"
+    "@openokr/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

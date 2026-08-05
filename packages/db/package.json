@@ -8,10 +8,19 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate": "node --experimental-strip-types --no-warnings src/bin/migrate.ts",
+    "lint:migrations": "node --experimental-strip-types --no-warnings src/bin/lint-migrations.ts",
+    "lint:soft-delete": "node --experimental-strip-types --no-warnings src/bin/lint-soft-delete.ts"
+  },
+  "dependencies": {
+    "@openokr/config": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

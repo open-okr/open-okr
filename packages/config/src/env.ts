@@ -41,6 +41,19 @@ const envSchema = z.object({
       ),
   ),
 
+  /** Optional owner-role connection for migrations. When unset, migrations
+   * run over DATABASE_URL, which suits single-role local setups. Production
+   * separates the two so the application role never owns the tables. */
+  DATABASE_ADMIN_URL: optional(
+    z
+      .string()
+      .refine(
+        (value) => /^postgres(ql)?:\/\//.test(value),
+        "must be a postgres:// or postgresql:// connection string",
+      )
+      .optional(),
+  ),
+
   NODE_ENV: optional(
     z.enum(["development", "test", "production"]).default("development"),
   ),

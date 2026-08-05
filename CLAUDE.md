@@ -142,7 +142,9 @@ Keep this list current once scaffolded.
 - `pnpm dead-code`: the dead-code gate
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
+- `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
 - `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:change`: migrations, demo data, the data-change runner
+- `pnpm db:lint`: the migration linter (tenant floor, soft delete) and the soft-delete usage lint
 - `pnpm method:check`: the conformance suite comparing `packages/method` against METHOD.md
 - `pnpm import:csv` and `pnpm import:flowyteam`: the importers, dry-run by default
 - `pnpm gen:contract`: regenerate OpenAPI, the agent tool catalogue, the command line and the chat commands from the action registry

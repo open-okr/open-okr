@@ -5,6 +5,9 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // Command lines run under Node's native type stripping, which requires
+    // explicit .ts specifiers; packages importing them must accept the same.
+    "allowImportingTsExtensions": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
