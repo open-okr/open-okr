@@ -11,7 +11,7 @@ Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skip
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
 | P1-T01 | Monorepo scaffold | done | task/p1-t01-monorepo-scaffold, PR #1 | 2026-08-05 | Merged to main 2026-08-05. LICENSE was already present (AGPL-3.0). TypeScript pinned to 5.9.x, not 7.x |
-| P1-T02 | CI pipeline + environment schema | in_review | task/p1-t02-ci-pipeline-env-schema | 2026-08-05 | Turbo local cache used instead of a vendor remote cache, no credentials needed. apps/web now depends on packages/config: confirm the TECHNICAL-PLAN §1 table allows it |
+| P1-T02 | CI pipeline + environment schema | in_review | task/p1-t02-ci-pipeline-env-schema, PR #2 | 2026-08-05 | CI and CodeQL green. Dependency review needs the repository Dependency graph setting enabled by a human. Turbo local cache used instead of a vendor remote cache, no credentials needed. apps/web now depends on packages/config: confirm the TECHNICAL-PLAN §1 table allows it |
 | P1-T03 | Database package + tenant floor + test isolation | todo |  |  | Tenant-isolation spike. Decision recorded in a design document |
 | P1-T04 | Adapter ports + drivers + the transactional outbox | todo |  |  |  |
 | P1-T05 | Authentication: password, passkeys, one-time codes | todo |  |  |  |
