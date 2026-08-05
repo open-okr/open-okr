@@ -23,4 +23,19 @@ jobs:
             0BSD, AGPL-3.0-only, AGPL-3.0-or-later, Apache-2.0, Artistic-2.0,
             BlueOak-1.0.0, BSD-2-Clause, BSD-3-Clause, CC-BY-4.0, CC0-1.0, ISC,
             LGPL-3.0-or-later, MIT, MPL-2.0, Python-2.0, Unlicense, WTFPL, Zlib
+          # One package, not one licence. MS-PL is not on the list above and
+          # must not be: it cannot ship inside an AGPL-3.0 work.
+          #
+          # GitHub reports rou3 as "MIT AND MS-PL" because it scans the source
+          # repository, which carries an unrelated second licence file. The
+          # published package we actually redistribute is MIT only: package.json
+          # declares "MIT", the single LICENSE file is the 21-line MIT text, and
+          # no file in the tarball mentions MS-PL. Verified on rou3@0.7.12,
+          # 2026-08-06. It reaches us transitively:
+          # rou3 -> better-call -> @better-auth/core -> better-auth.
+          #
+          # Recheck this on a rou3 major bump. If upstream ever ships MS-PL
+          # code in the tarball, drop the exception and stop, do not widen the
+          # licence list.
+          allow-dependencies-licenses: pkg:npm/rou3
           comment-summary-in-pr: on-failure
