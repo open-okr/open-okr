@@ -21,6 +21,15 @@ export {
   ensureRoles,
   type SqlRunner,
 } from "./roles.ts";
+export {
+  accounts,
+  authSchema,
+  passkeys,
+  sessions,
+  twoFactors,
+  users,
+  verifications,
+} from "./schema/auth.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
   activeOnly,

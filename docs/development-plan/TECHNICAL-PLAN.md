@@ -386,6 +386,7 @@ Keep current in every schema change.
 | `learnings`, `decisions` | Where the source holds them | Otherwise created empty |
 | Not imported | Webhooks, search caches, notification rows, attendance and human-resources modules | Recorded in the report |
 | No legacy source | `outbox`, `cache_entries`, `search_documents` | Infrastructure, not user data. The outbox is written by the Operation pipeline as the import runs, the cache is derived, and the search index is rebuilt from the imported rows afterwards |
+| `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.
 

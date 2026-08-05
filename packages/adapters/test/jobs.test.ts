@@ -43,11 +43,6 @@ describe("PgBossJobQueue", () => {
     queue = new PgBossJobQueue({ connectionString });
     await queue.start();
 
-    const handled: unknown[] = [];
-    await queue.work<{ goalId: string }>("recompute.goal", async (payload) => {
-      handled.push(payload);
-    });
-
     const first = await queue.enqueue(
       "recompute.goal",
       { goalId: "g1" },
@@ -55,14 +50,22 @@ describe("PgBossJobQueue", () => {
     );
     expect(first).toMatch(/.+/);
 
-    // The same key while the first is still pending is one job, which is what
-    // makes the relay's at-least-once delivery safe.
+    // The same key while the first is still waiting to run is one job, which
+    // is what makes the relay's at-least-once delivery safe to retry. The
+    // worker is registered only afterwards, so the first job is provably
+    // still pending here rather than by luck of the polling interval; once a
+    // job has run, the same key may legitimately be queued again.
     const duplicate = await queue.enqueue(
       "recompute.goal",
       { goalId: "g1" },
       { idempotencyKey: "recompute.goal:g1" },
     );
     expect(duplicate).toBeNull();
+
+    const handled: unknown[] = [];
+    await queue.work<{ goalId: string }>("recompute.goal", async (payload) => {
+      handled.push(payload);
+    });
 
     await waitFor(() => (handled.length > 0 ? handled : undefined));
     expect(handled[0]).toMatchObject({ goalId: "g1" });

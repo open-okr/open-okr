@@ -15,13 +15,17 @@
     "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
     "@openokr/method": "workspace:*",
+    "@better-auth/passkey": "catalog:",
     "@openokr/ui": "workspace:*",
+    "better-auth": "catalog:",
     "next": "16.3.0",
+    "pg": "catalog:",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "typescript": "catalog:",

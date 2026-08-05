@@ -1,4 +1,12 @@
 {
   "extends": "../config/tsconfig.base.json",
-  "include": ["src", "test"]
+  "compilerOptions": {
+    // Mirrors the vitest.config.ts alias: authentication tests use the shared
+    // harness without a package dependency, which would cycle back through
+    // test-support.
+    "paths": {
+      "@openokr/test-support/db": ["../test-support/src/db-harness.ts"]
+    }
+  },
+  "include": ["src", "test", "../test-support/src"]
 }
