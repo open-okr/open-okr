@@ -12,10 +12,16 @@ export {
   type MigrationLintResult,
 } from "./migration-lint.ts";
 export {
+  enqueueOutbox,
+  type OutboxMessage,
+  type OutboxPayload,
+} from "./outbox.ts";
+export {
   type EnsureRolesOptions,
   ensureRoles,
   type SqlRunner,
 } from "./roles.ts";
+export { outbox } from "./schema/outbox.ts";
 export {
   activeOnly,
   includeDeleted,

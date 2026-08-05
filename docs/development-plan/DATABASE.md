@@ -26,6 +26,14 @@ Additional conventions:
 - **Derived columns** (progress, health, achievement, alignment score, next check-in, streak, quality score) are written by jobs driven from the outbox, never computed at render time.
 - **`_migrations`** is the forward-only migration runner's bookkeeping table (name, checksum, applied time), created by the runner itself rather than by a migration. Infrastructure, not business data: no `workspace_id`, no policy, invisible to the importer.
 
+**Infrastructure tables.** Three tables serve the platform rather than the domain, and each carries an explicit marker in its migration explaining why it steps outside a convention:
+
+| Table | Key columns | Tenancy | Notes |
+|---|---|---|---|
+| `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete |
+| `cache_entries` | `key` primary key, `value jsonb`, `expires_at?` | Not tenant scoped | The Postgres cache driver's storage. Callers namespace keys with the workspace id. Reads filter on expiry, so a missed sweep cannot serve stale data |
+| `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. Queries return identifiers and a rank; the caller reloads each hit through the access getter |
+
 ## 2. Domains
 
 | Domain | Contents |

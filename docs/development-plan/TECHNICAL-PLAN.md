@@ -385,6 +385,7 @@ Keep current in every schema change.
 | `comments`, `blobs`, `attachments` | Task comments and files | HTML converted to editor JSON. External file URLs become links in the body |
 | `learnings`, `decisions` | Where the source holds them | Otherwise created empty |
 | Not imported | Webhooks, search caches, notification rows, attendance and human-resources modules | Recorded in the report |
+| No legacy source | `outbox`, `cache_entries`, `search_documents` | Infrastructure, not user data. The outbox is written by the Operation pipeline as the import runs, the cache is derived, and the search index is rebuilt from the imported rows afterwards |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.
 

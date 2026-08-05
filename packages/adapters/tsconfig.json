@@ -1,4 +1,12 @@
 {
   "extends": "../config/tsconfig.base.json",
-  "include": ["src", "test"]
+  "compilerOptions": {
+    // Mirrors the vitest.config.ts alias: driver contract tests use the
+    // shared harness without a package dependency, which TECHNICAL-PLAN §1
+    // does not allow for adapters.
+    "paths": {
+      "@openokr/test-support/db": ["../test-support/src/db-harness.ts"]
+    }
+  },
+  "include": ["src", "test", "../test-support/src"]
 }
