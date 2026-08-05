@@ -1,0 +1,25 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request per group keeps review cost down. Security updates
+      # still arrive on their own, immediately.
+      dev-tooling:
+        patterns: ["@biomejs/*", "turbo", "vitest", "knip", "typescript", "@types/*"]
+      next:
+        patterns: ["next", "react", "react-dom", "@next/*"]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

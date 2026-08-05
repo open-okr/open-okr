@@ -15,5 +15,8 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
   }
 }

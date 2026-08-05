@@ -1,6 +1,7 @@
 {
   "name": "openokr",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=22"
@@ -9,11 +10,19 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:ci": "vitest run --config vitest.ci.config.ts --retry=2",
     "typecheck": "turbo run typecheck",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "dead-code": "knip",
+    "check:licences": "node --experimental-strip-types --no-warnings scripts/check-licences.ts",
+    "check:signoff": "node --experimental-strip-types --no-warnings scripts/check-signoff.ts",
+    "flaky": "node --experimental-strip-types --no-warnings packages/test-support/bin/flaky.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
-    "turbo": "2.10.8"
+    "knip": "6.31.0",
+    "turbo": "2.10.8",
+    "vitest": "catalog:"
   }
 }

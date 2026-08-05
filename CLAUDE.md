@@ -137,7 +137,11 @@ Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
 - `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end
-- `pnpm typecheck` and `pnpm lint`: strict types, then lint
+- `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
+- `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
+- `pnpm dead-code`: the dead-code gate
+- `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate
+- `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:change`: migrations, demo data, the data-change runner
 - `pnpm method:check`: the conformance suite comparing `packages/method` against METHOD.md
 - `pnpm import:csv` and `pnpm import:flowyteam`: the importers, dry-run by default

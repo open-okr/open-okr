@@ -1,0 +1,183 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push to a branch makes the previous run pointless. Cancel it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Turbo prints which packages it skipped, which is how the "unaffected packages
+  # are skipped" acceptance criterion is checked on a documentation-only change.
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  # Decides what the rest of the run needs to do. A documentation-only change
+  # skips the code jobs entirely.
+  scope:
+    name: Work out what changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect code changes
+        id: filter
+        run: |
+          BASE="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "No usable base commit. Running everything."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          echo "Changed files:"; echo "$CHANGED"
+          if echo "$CHANGED" | grep -qvE '^(docs/|\.github/ISSUE_TEMPLATE/|.*\.md$|LICENSE$)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Documentation-only change. Code jobs will be skipped."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Types, lint and dead code
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+
+      - name: Type check (affected only)
+        run: pnpm turbo run typecheck --affected
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Dead code gate
+        run: pnpm dead-code
+
+  test:
+    name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Sharding scaffold. Raise this as the suite grows; nothing else changes.
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+
+      - name: Run tests
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        # --retry keeps a briefly unreliable test from blocking the queue. The
+        # flakiness reporter records every retry so it cannot pass silently.
+        run: pnpm test:ci --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+      - name: Upload flakiness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-report-${{ matrix.shard }}
+          path: .flaky/report-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  flakiness:
+    name: Flakiness report
+    needs: [scope, test]
+    if: always() && needs.scope.outputs.code == 'true' && needs.test.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+
+      - name: Download shard reports
+        uses: actions/download-artifact@v5
+        with:
+          pattern: flaky-report-*
+          path: .flaky
+          merge-multiple: true
+
+      - name: Merge reports and gate
+        # Writes the merged report to the run summary. Fails only on tests that
+        # failed outright and are not quarantined.
+        run: pnpm flaky merge .flaky/report-*.json
+
+      - name: List quarantine candidates
+        if: always()
+        run: |
+          pnpm flaky quarantine
+          if ! git diff --quiet -- test-quarantine.json; then
+            echo "::warning::New flaky tests detected. Run 'pnpm flaky quarantine' and commit test-quarantine.json, or fix the tests."
+            git --no-pager diff -- test-quarantine.json
+          fi
+
+  build:
+    name: Build
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+
+      - name: Build (affected only)
+        run: pnpm turbo run build --affected
+
+  compliance:
+    name: Licences and sign-off
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+
+      - name: Dependency licence gate
+        run: pnpm check:licences
+
+      - name: Commit sign-off gate
+        # Bots do not sign off; their commits are covered by the maintainer who
+        # merges them.
+        if: github.event_name == 'pull_request' && !endsWith(github.actor, '[bot]')
+        run: pnpm check:signoff origin/${{ github.base_ref }} HEAD
+
+  # One required check to protect the branch with, so the shard count and the
+  # documentation-only skip can change without touching branch protection.
+  ci:
+    name: CI
+    needs: [scope, quality, test, flakiness, build, compliance]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        run: |
+          RESULTS="${{ join(needs.*.result, ' ') }}"
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "A required job did not pass."
+              exit 1
+            fi
+          done
+          echo "All required jobs passed or were skipped."

@@ -1,4 +1,9 @@
 {
   "extends": "../config/tsconfig.base.json",
-  "include": ["src", "test"]
+  "compilerOptions": {
+    // The flaky command line runs under Node's native type stripping, which
+    // requires explicit .ts specifiers.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "test", "bin", "fixtures"]
 }
