@@ -115,7 +115,7 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Download shard reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: flaky-report-*
           path: .flaky
