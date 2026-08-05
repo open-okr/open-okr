@@ -78,6 +78,12 @@ jobs:
       - name: Migration and soft-delete lint
         run: pnpm db:lint
 
+      - name: Architecture boundary gate
+        # Vendor SDKs stay inside packages/adapters, application code
+        # consumes ports, and write paths cause side effects only through
+        # the outbox.
+        run: pnpm check:boundaries
+
   test:
     name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope

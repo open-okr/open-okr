@@ -1,4 +1,76 @@
+/**
+ * `packages/adapters`: the ports every runtime-sensitive capability goes
+ * through, and the drivers behind them. The only place a vendor SDK may be
+ * imported (CLAUDE.md), which is what keeps the rest of the codebase
+ * portable and testable.
+ *
+ * Consume the ports, never a driver class: `pnpm check:boundaries` fails the
+ * build when application code reaches past this boundary.
+ */
 import { PACKAGE_NAME as CONFIG } from "@openokr/config";
 
 export const PACKAGE_NAME = "@openokr/adapters";
 export const DEPENDS_ON = [CONFIG] as const;
+
+export {
+  type AdapterOptions,
+  type Adapters,
+  createAdapters,
+} from "./create-adapters.ts";
+// The socket server is process infrastructure the host application mounts,
+// not a port, so it is exported by name.
+export {
+  RealtimeSocketServer,
+  type RealtimeSocketServerOptions,
+  type SocketPrincipal,
+} from "./drivers/realtime/socket-server.ts";
+export type {
+  AIProvider,
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  ChatRole,
+  EmbedRequest,
+  EmbedResponse,
+  ExtractRequest,
+  ModelCapabilities,
+  TokenUsage,
+  ToolCall,
+  ToolDefinition,
+} from "./ports/ai.ts";
+export { AIUnavailableError } from "./ports/ai.ts";
+export type { Cache, RateLimitResult } from "./ports/cache.ts";
+export type {
+  Channel,
+  ChannelCapabilities,
+  ChannelMessage,
+  ChannelProvider,
+  ChannelRecipient,
+  DeliveryResult,
+  InboundMessage,
+  InboundRequest,
+} from "./ports/channel.ts";
+export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
+export type { Mailer, MailMessage, SentMail } from "./ports/mail.ts";
+export type {
+  Realtime,
+  RealtimeEvent,
+  SubscribeOptions,
+  Subscription,
+} from "./ports/realtime.ts";
+export { EventTooLargeError, MAX_EVENT_BYTES } from "./ports/realtime.ts";
+export type {
+  Search,
+  SearchDocument,
+  SearchHit,
+  SearchQuery,
+} from "./ports/search.ts";
+export type { FileStorage, PutOptions, StoredObject } from "./ports/storage.ts";
+export { ObjectNotFoundError } from "./ports/storage.ts";
+export {
+  type OutboxRecord,
+  OutboxRelay,
+  type OutboxRelayOptions,
+  type RelayClient,
+  type RelayPool,
+} from "./relay.ts";

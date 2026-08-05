@@ -11,10 +11,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openokr/config": "workspace:*"
+    "@openokr/config": "workspace:*",
+    "pg": "catalog:",
+    "pg-boss": "catalog:",
+    "ws": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/ws": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

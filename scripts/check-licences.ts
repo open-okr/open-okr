@@ -11,6 +11,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { isLicenceAllowed } from "../packages/config/src/licence-policy.ts";
 
 const run = promisify(execFile);
 
@@ -56,7 +57,9 @@ const byLicence = JSON.parse(stdout) as PnpmLicensesOutput;
 const violations: string[] = [];
 
 for (const [licence, packages] of Object.entries(byLicence)) {
-  if (ALLOWED.has(licence)) {
+  // Licence fields are SPDX expressions, not always bare identifiers:
+  // "MIT OR CC0-1.0" lets us choose, "MIT AND CC-BY-4.0" binds us to both.
+  if (isLicenceAllowed(licence, ALLOWED)) {
     continue;
   }
 
