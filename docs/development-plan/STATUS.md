@@ -149,3 +149,5 @@ Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skip
 | P8-T12 | Template gallery and rhythm guides | todo |  |  |  |
 | P8-T13 | Hosted demo instance | todo |  |  |  |
 | P8-T14 | Launch | todo |  |  |  |
+
+<!-- CI skip verification, reverted immediately -->
