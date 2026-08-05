@@ -1,36 +1,23 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Build output
+.next/
+dist/
+out/
+build/
 
-# testing
-/coverage
+# Tooling caches
+.turbo/
+coverage/
+*.tsbuildinfo
 
-# next.js
-/.next/
-/out/
+# Environment files. Commit only .env.example.
+.env
+.env.*
+!.env.example
 
-# production
-/build
-
-# misc
+# OS and editor noise
 .DS_Store
 *.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
-.env
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+*.log

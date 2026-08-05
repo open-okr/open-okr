@@ -63,6 +63,8 @@ Needs a Chromium headless shell. It looks in the Playwright browser cache, falls
 
 `src/style.css` carries the shared tokens, and they are deliberately the same values as UIUX-PLAN.md §2 describes: one brand hue, a neutral grey ramp, semantic tokens for success, warning, danger and info, and health or confidence colour never used without a label beside it.
 
+**Motion.** The HTML sources carry the motion language from UIUX-PLAN.md §2 so that opening one in a browser shows it: 120 to 200 millisecond ease-out micro-transitions on hover, an entrance stagger that settles inside half a second, progress bars that grow to their value, and the two deliberate exceptions, the vote reveal in the weekly session and the score reveal in the quarterly review. Everything is disabled under `prefers-reduced-motion`, and `render.sh` passes `--force-prefers-reduced-motion` so every PNG captures the settled state, never a mid-animation frame.
+
 The rendered PNGs are also used by [OpenOKR-Overview.docx](../OpenOKR-Overview.docx) and [OpenOKR-Deck.pptx](../OpenOKR-Deck.pptx), so re-run those builds after re-rendering. See [../README.md](../README.md).
 
 ## A note on 06-kpi-recovery

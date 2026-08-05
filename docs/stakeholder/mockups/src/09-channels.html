@@ -7,7 +7,17 @@
   html, body { height: 830px; background: #EEF1F5; }
   .stage { padding: 26px 30px; }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-  .win { background: #fff; border-radius: 12px; box-shadow: 0 6px 22px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06); overflow: hidden; }
+  .win { background: #fff; border-radius: 14px; box-shadow: 0 6px 22px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06); overflow: hidden;
+    transition: box-shadow .18s var(--ease), transform .18s var(--ease); }
+  .win:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(15,23,42,.14), 0 2px 6px rgba(15,23,42,.07); }
+  /* chat bubbles land in conversation order */
+  .wa .bub, .tg .bub { animation: rise .3s var(--ease) backwards }
+  .wa .bub:nth-child(1), .tg .bub:nth-child(1) { animation-delay: .25s }
+  .wa .bub:nth-child(2), .tg .bub:nth-child(2) { animation-delay: .40s }
+  .wa .bub:nth-child(3), .tg .bub:nth-child(3) { animation-delay: .55s }
+  .wa .bub:nth-child(4), .tg .bub:nth-child(4) { animation-delay: .70s }
+  .wa .bub:nth-child(5), .tg .bub:nth-child(5) { animation-delay: .85s }
+  .wa .bub:nth-child(n+6), .tg .bub:nth-child(n+6) { animation-delay: 1s }
   .wbar { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px; color: #fff; font-size: 12px; font-weight: 650 }
   .wbar .lg { width: 16px; height: 16px }
   .wbody { padding: 13px; }
@@ -50,7 +60,7 @@
     <div class="row"><span class="chip brand"><i class="dot"></i>Two-way on all four</span><span class="chip"><i class="dot n"></i>Quiet hours honoured</span></div>
   </div>
 
-  <div class="grid" style="margin-top:18px">
+  <div class="grid stagger" style="margin-top:18px">
 
     <div class="win">
       <div class="wbar" style="background:#3F0E40">

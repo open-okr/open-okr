@@ -5,8 +5,11 @@
 <link rel="stylesheet" href="style.css">
 <style>
   .wrap { display: grid; grid-template-columns: 264px 1fr 300px; gap: 16px; height: 100%; }
-  .pstep { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r); }
-  .pstep.on { background: var(--brand-weak); }
+  .pstep { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r);
+    transition: background .15s var(--ease); }
+  .pstep:hover { background: rgba(15, 23, 42, .035); }
+  .pstep.on { background: var(--brand-weak); box-shadow: inset 0 0 0 1px rgba(79, 70, 229, .12); }
+  .pstep.on:hover { background: var(--brand-weak); }
   .pstep .mark { width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid; place-items: center;
     font-size: 10px; font-weight: 700; border: 1.5px solid var(--line-2); color: var(--ink-4); background: #fff; margin-top: 1px; }
   .pstep.done .mark { background: var(--ok-dot); border-color: var(--ok-dot); color: #fff; }
@@ -71,7 +74,7 @@
 
         <div class="card" style="overflow:hidden">
           <div class="card-h"><div class="h3">The cycle</div><span class="chip brand" style="margin-left:auto">2 of 8 done</span></div>
-          <div class="card-b" style="padding:8px">
+          <div class="card-b stagger" style="padding:8px">
             <div class="pstep done"><div class="mark">✓</div><div><div class="nm">0 · Annual strategy</div><div class="out">The frame for FY2026</div></div></div>
             <div class="pstep on"><div class="mark">1</div><div><div class="nm">1 · Prepare</div><div class="out">Roles, dates, input pack</div>
               <div class="row" style="margin-top:5px"><div class="bar grow" style="height:5px"><i style="width:57%"></i></div><span class="tiny num mut">57%</span></div></div></div>
@@ -101,7 +104,7 @@
 
           <div class="card grow" style="min-height:0">
             <div class="card-h"><div class="h3">Input pack</div><span class="chip warn" style="margin-left:auto"><i class="dot"></i>4 of 7</span></div>
-            <div class="card-b" style="padding:4px 14px">
+            <div class="card-b stagger" style="padding:4px 14px">
               <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
                 <div class="grow"><div class="t">Last cycle's scores and retrospective</div><div class="d">Carried forward automatically from Q2 FY2026</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
               <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>

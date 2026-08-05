@@ -1,0 +1,29 @@
+{
+  "name": "@openokr/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openokr/adapters": "workspace:*",
+    "@openokr/agents": "workspace:*",
+    "@openokr/core": "workspace:*",
+    "@openokr/method": "workspace:*",
+    "@openokr/ui": "workspace:*",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

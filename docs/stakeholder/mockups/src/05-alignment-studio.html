@@ -9,8 +9,13 @@
       radial-gradient(circle, #DDE3EA 1px, transparent 1px) 0 0/18px 18px, var(--surface);
     border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
   .canvas > svg { position: absolute; inset: 0; }
-  .node { position: absolute; background: #fff; border: 1px solid var(--line-2); border-radius: 9px;
-    box-shadow: 0 1px 3px rgba(15,23,42,.09); padding: 9px 10px; }
+  .node { position: absolute; background: #fff; border: 1px solid var(--line-2); border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(15,23,42,.09); padding: 9px 10px;
+    transition: box-shadow .15s var(--ease), transform .15s var(--ease), border-color .15s var(--ease); }
+  .node:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.12); border-color: var(--ink-4); }
+  /* dependency arcs drift slowly in the direction of the dependency */
+  .dep path { animation: march 26s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -180 } }
   .node.sel { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(79,70,229,.12), 0 2px 6px rgba(15,23,42,.1); }
   .node.orphan { border-color: var(--bad-dot); border-style: dashed; background: #FFFCFC }
   .node .lv { font-size: 9px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-4) }
@@ -81,7 +86,7 @@
               <path d="M403 248 L403 272 L427 272 L427 296"/>
               <path d="M669 248 L669 296"/>
             </g>
-            <g stroke="#7C3AED" stroke-width="1.6" fill="none" stroke-dasharray="5 4">
+            <g class="dep" stroke="#7C3AED" stroke-width="1.6" fill="none" stroke-dasharray="5 4">
               <path d="M95 384 C 95 462, 427 462, 427 384"/>
               <path d="M261 384 C 261 526, 669 526, 669 384"/>
             </g>
@@ -154,7 +159,7 @@
           </div>
         </div>
 
-        <div class="col" style="gap:12px;min-height:0">
+        <div class="col stagger" style="gap:12px;min-height:0">
           <div class="ptab"><div>Details</div><div class="on">Health</div><div>Review <span style="color:var(--brand-600)">3</span></div></div>
 
           <div class="card">

@@ -5,8 +5,11 @@
 <link rel="stylesheet" href="style.css">
 <style>
   .wrap { display: grid; grid-template-columns: 196px 1fr 320px; gap: 16px; height: calc(100% - 54px); }
-  .step { display: flex; gap: 9px; padding: 9px 10px; border-radius: var(--r); align-items: flex-start }
-  .step.on { background: var(--brand-weak) }
+  .step { display: flex; gap: 9px; padding: 9px 10px; border-radius: var(--r); align-items: flex-start;
+    transition: background .15s var(--ease) }
+  .step:hover { background: rgba(15,23,42,.035) }
+  .step.on { background: var(--brand-weak); box-shadow: inset 0 0 0 1px rgba(79,70,229,.12) }
+  .step.on:hover { background: var(--brand-weak) }
   .step .n { width: 19px; height: 19px; border-radius: 50%; flex: none; display: grid; place-items: center;
     font-size: 10px; font-weight: 700; border: 1.5px solid var(--line-2); background: #fff; color: var(--ink-4) }
   .step.on .n { background: var(--brand); border-color: var(--brand); color: #fff }
@@ -14,9 +17,12 @@
   .step .t { font-size: 12.5px; font-weight: 620 }
   .step.on .t { color: var(--brand-600) }
   .step .d { font-size: 10.5px; color: var(--ink-4) }
-  .krl { display: flex; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--line); align-items: center }
+  .krl { display: flex; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--line); align-items: center;
+    transition: background .15s var(--ease) }
   .krl:last-child { border-bottom: 0 }
+  .krl:hover { background: #F4F7FD }
   .krl.sel { background: var(--brand-weak) }
+  .krl.sel:hover { background: var(--brand-weak) }
   .krl .t { font-size: 12px; font-weight: 570; line-height: 1.3 }
   .sc { width: 42px; height: 24px; border-radius: 6px; display: grid; place-items: center;
     font-size: 12px; font-weight: 750; font-variant-numeric: tabular-nums; flex: none }
@@ -27,8 +33,20 @@
   .pick { border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; background: #fff }
   .pick.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand-600) }
   .sparkw { display: flex; align-items: flex-end; gap: 3px; height: 34px }
-  .sparkw i { flex: 1; border-radius: 2px 2px 0 0; background: var(--brand-line) }
+  .sparkw i { flex: 1; border-radius: 2px 2px 0 0; background: var(--brand-line);
+    transform-origin: bottom; animation: grow-up .45s var(--ease) backwards }
   .sparkw i.hi { background: var(--brand) }
+  .sparkw i:nth-child(2) { animation-delay: .03s } .sparkw i:nth-child(3) { animation-delay: .06s }
+  .sparkw i:nth-child(4) { animation-delay: .09s } .sparkw i:nth-child(5) { animation-delay: .12s }
+  .sparkw i:nth-child(6) { animation-delay: .15s } .sparkw i:nth-child(7) { animation-delay: .18s }
+  .sparkw i:nth-child(8) { animation-delay: .21s } .sparkw i:nth-child(9) { animation-delay: .24s }
+  .sparkw i:nth-child(10) { animation-delay: .27s } .sparkw i:nth-child(11) { animation-delay: .30s }
+  .sparkw i:nth-child(12) { animation-delay: .33s }
+  @keyframes grow-up { from { transform: scaleY(0) } }
+  /* the vote reveal: private votes appear together, per UIUX-PLAN §2's deliberate exception */
+  .vote { animation: pop .3s var(--ease) .55s backwards }
+  .needle { transform-origin: 110px 96px; animation: sweep .7s var(--ease) .25s backwards }
+  @keyframes sweep { from { transform: rotate(-54deg) } }
   .cmt { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); align-items: flex-start }
   .cmt:last-child { border-bottom: 0 }
 </style>
@@ -112,7 +130,7 @@
                 <path d="M32 96 A78 78 0 0 1 85.9 21.8" fill="none" stroke="#EF4444" stroke-width="15" stroke-linecap="round"/>
                 <path d="M85.9 21.8 A78 78 0 0 1 155.9 32.9" fill="none" stroke="#F59E0B" stroke-width="15"/>
                 <path d="M155.9 32.9 A78 78 0 0 1 188 96" fill="none" stroke="#22C55E" stroke-width="15" stroke-linecap="round"/>
-                <line x1="110" y1="96" x2="71.2" y2="42.6" stroke="#0F172A" stroke-width="3" stroke-linecap="round"/>
+                <g class="needle"><line x1="110" y1="96" x2="71.2" y2="42.6" stroke="#0F172A" stroke-width="3" stroke-linecap="round"/></g>
                 <circle cx="110" cy="96" r="6" fill="#0F172A"/>
                 <text x="30" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">LOW</text>
                 <text x="104" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">MED</text>
@@ -169,11 +187,11 @@
           </div>
         </div>
 
-        <div class="col" style="gap:12px;min-height:0">
+        <div class="col stagger" style="gap:12px;min-height:0">
           <div class="card">
             <div class="card-b" style="padding:12px 14px">
               <div class="spread"><div class="h3">Rhythm streak</div><span class="chip ok"><i class="dot"></i>9 weeks</span></div>
-              <div class="row" style="gap:3px;margin-top:9px">
+              <div class="row stagger" style="gap:3px;margin-top:9px">
                 <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
                 <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
                 <i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i><i style="flex:1;height:22px;border-radius:3px;background:var(--ok-dot)"></i>
