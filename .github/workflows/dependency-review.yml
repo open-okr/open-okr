@@ -16,7 +16,7 @@ jobs:
       # Blocks a pull request that introduces a dependency with a known
       # vulnerability or a licence AGPL-3.0 cannot ship. The licence list here
       # mirrors scripts/check-licences.ts; change both together.
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
           allow-licenses: >-
