@@ -43,7 +43,12 @@ jobs:
           fi
           CHANGED=$(git diff --name-only "$BASE" HEAD)
           echo "Changed files:"; echo "$CHANGED"
-          if echo "$CHANGED" | grep -qvE '^(docs/|\.github/ISSUE_TEMPLATE/|.*\.md$|LICENSE$)'; then
+          # Anything that is not documentation counts as code. Tested with a
+          # non-empty check rather than `grep -qv`, whose exit code differs
+          # between GNU and BSD grep.
+          CODE=$(echo "$CHANGED" | grep -vE '^(docs/|\.github/ISSUE_TEMPLATE/|.*\.md$|LICENSE$)' || true)
+          if [ -n "$CODE" ]; then
+            echo "Code changed:"; echo "$CODE"
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "Documentation-only change. Code jobs will be skipped."
