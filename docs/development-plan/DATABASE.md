@@ -26,6 +26,17 @@ Additional conventions:
 - **Derived columns** (progress, health, achievement, alignment score, next check-in, streak, quality score) are written by jobs driven from the outbox, never computed at render time.
 - **`_migrations`** is the forward-only migration runner's bookkeeping table (name, checksum, applied time), created by the runner itself rather than by a migration. Infrastructure, not business data: no `workspace_id`, no policy, invisible to the importer.
 
+**Authentication tables.** Better Auth owns six tables, all global to the deployment rather than workspace-scoped (§2), and all hard-delete: a soft-deleted credential is a live credential wearing a deleted label. Their column and identifier conventions are Better Auth's own, because it owns the schema.
+
+| Table | Key columns | Notes |
+|---|---|---|
+| `users` | `email` unique, `name`, `email_verified`, `two_factor_enabled` | The global person. The per-workspace person is `workspace_members`, which references this |
+| `sessions` | `token` unique, `user_id`, `expires_at`, `ip_address`, `user_agent` | `token` holds the SHA-256 of the browser's token, never the token itself. The hashing adapter in `packages/core` hashes on write and hashes the predicate on lookup, so a database copy cannot be replayed as a signed-in browser |
+| `accounts` | `user_id`, `provider_id`, `account_id`, `password?`, tokens | One per credential. `password` is hashed by Better Auth; null for passkey and social accounts. Unique on `(provider_id, account_id)` |
+| `verifications` | `identifier`, `value`, `expires_at` | Email verification and password reset challenges. Consumed rows are removed |
+| `passkeys` | `user_id`, `public_key`, `credential_id` unique, `counter`, `device_type`, `backed_up` | The public half only; the private key never leaves the authenticator |
+| `two_factors` | `user_id`, `secret`, `backup_codes`, `verified`, `failed_verification_count`, `locked_until?` | The TOTP secret and backup codes, both encrypted by Better Auth with the instance secret before they reach the table |
+
 **Infrastructure tables.** Three tables serve the platform rather than the domain, and each carries an explicit marker in its migration explaining why it steps outside a convention:
 
 | Table | Key columns | Tenancy | Notes |

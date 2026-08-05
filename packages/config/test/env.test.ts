@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { EnvironmentError, parseEnv } from "../src/env";
+import {
+  DEVELOPMENT_AUTH_SECRET,
+  EnvironmentError,
+  parseEnv,
+} from "../src/env";
 
 const VALID = {
   DATABASE_URL: "postgres://openokr:secret@localhost:5432/openokr",
@@ -48,7 +52,16 @@ describe("parseEnv", () => {
 
   test("accepts the environments the deployment targets use", () => {
     for (const value of ["development", "test", "production"] as const) {
-      expect(parseEnv({ ...VALID, NODE_ENV: value }).NODE_ENV).toBe(value);
+      // Production additionally requires a real auth secret; the placeholder
+      // refusal has its own test below.
+      const source = {
+        ...VALID,
+        NODE_ENV: value,
+        ...(value === "production"
+          ? { BETTER_AUTH_SECRET: "a-real-secret-value-of-sufficient-length" }
+          : {}),
+      };
+      expect(parseEnv(source).NODE_ENV).toBe(value);
     }
   });
 
@@ -82,6 +95,49 @@ describe("parseEnv", () => {
     expect(() =>
       parseEnv({ ...VALID, DATABASE_ADMIN_URL: "mysql://nope" }),
     ).toThrow(/DATABASE_ADMIN_URL/);
+  });
+
+  test("defaults the auth secret and URL so a fresh checkout boots", () => {
+    const env = parseEnv(VALID);
+    expect(env.BETTER_AUTH_SECRET).toBe(DEVELOPMENT_AUTH_SECRET);
+    expect(env.BETTER_AUTH_URL).toBe("http://localhost:3000");
+  });
+
+  test("refuses to boot production with the placeholder auth secret", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, NODE_ENV: "production" }),
+    );
+    expect(error.message).toMatch(/BETTER_AUTH_SECRET/);
+    expect(error.message).toMatch(/placeholder/i);
+    expect((error as EnvironmentError).variables).toEqual([
+      "BETTER_AUTH_SECRET",
+    ]);
+  });
+
+  test("accepts production with a real auth secret", () => {
+    const env = parseEnv({
+      ...VALID,
+      NODE_ENV: "production",
+      BETTER_AUTH_SECRET: "a-real-secret-value-of-sufficient-length",
+    });
+    expect(env.NODE_ENV).toBe("production");
+  });
+
+  test("allows the placeholder outside production, where it is the point", () => {
+    expect(() => parseEnv({ ...VALID, NODE_ENV: "development" })).not.toThrow();
+    expect(() => parseEnv({ ...VALID, NODE_ENV: "test" })).not.toThrow();
+  });
+
+  test("rejects an auth secret that is too short to be worth having", () => {
+    expect(() => parseEnv({ ...VALID, BETTER_AUTH_SECRET: "short" })).toThrow(
+      /BETTER_AUTH_SECRET/,
+    );
+  });
+
+  test("rejects an auth URL that is not a URL", () => {
+    expect(() => parseEnv({ ...VALID, BETTER_AUTH_URL: "not-a-url" })).toThrow(
+      /BETTER_AUTH_URL/,
+    );
   });
 });
 

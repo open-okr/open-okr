@@ -29,6 +29,18 @@ const optional = <T extends z.ZodTypeAny>(schema: T) =>
     schema,
   );
 
+/**
+ * The development stand-in for `BETTER_AUTH_SECRET`. Deliberately obvious:
+ * it names itself in logs and error messages, and production refuses to boot
+ * with it. Generating a random secret at boot instead would silently log
+ * everyone out on restart and hide the misconfiguration rather than surface
+ * it (TECHNICAL-PLAN §8.2, "startup refusal of placeholder secrets").
+ */
+export const DEVELOPMENT_AUTH_SECRET = "openokr-insecure-development-secret";
+
+/** Secrets that must never reach production, whatever their source. */
+const PLACEHOLDER_SECRETS = new Set([DEVELOPMENT_AUTH_SECRET]);
+
 const envSchema = z.object({
   /** The sole database connection. Postgres only: the schema, row-level security
    * policies and the `pgvector` extension are all Postgres-specific. */
@@ -53,6 +65,17 @@ const envSchema = z.object({
       )
       .optional(),
   ),
+
+  /** Signs session cookies and tokens. Development gets the placeholder below
+   * so a fresh checkout runs; production refuses it (see `assertProduction`),
+   * because a shared known secret is the same as no secret at all. The
+   * first-run wizard generates a real one. */
+  BETTER_AUTH_SECRET: optional(
+    z.string().min(16).default(DEVELOPMENT_AUTH_SECRET),
+  ),
+
+  /** The instance's public origin, used to build callback and passkey origins. */
+  BETTER_AUTH_URL: optional(z.string().url().default("http://localhost:3000")),
 
   NODE_ENV: optional(
     z.enum(["development", "test", "production"]).default("development"),
@@ -80,6 +103,29 @@ export class EnvironmentError extends Error {
 }
 
 /**
+ * Refuses to boot production with a development placeholder in place. This is
+ * the difference between a secret and a well-known string, so it fails loudly
+ * at startup rather than quietly signing sessions anyone can forge.
+ */
+function assertProductionSecrets(env: Env): void {
+  if (env.NODE_ENV !== "production") {
+    return;
+  }
+  if (PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
+    throw new EnvironmentError(
+      ["BETTER_AUTH_SECRET"],
+      [
+        "Invalid environment. 1 variable to fix:",
+        "  BETTER_AUTH_SECRET: is still the development placeholder, which is public knowledge",
+        "",
+        "Generate one with:  openssl rand -base64 32",
+        "",
+      ].join("\n"),
+    );
+  }
+}
+
+/**
  * Validates an environment record. Throws `EnvironmentError` listing every bad
  * variable at once, so a misconfigured deployment is fixed in one pass rather
  * than one boot at a time.
@@ -90,6 +136,7 @@ export function parseEnv(
   const result = envSchema.safeParse(source);
 
   if (result.success) {
+    assertProductionSecrets(result.data);
     return result.data;
   }
 
