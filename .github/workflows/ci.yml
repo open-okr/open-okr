@@ -75,6 +75,9 @@ jobs:
       - name: Dead code gate
         run: pnpm dead-code
 
+      - name: Migration and soft-delete lint
+        run: pnpm db:lint
+
   test:
     name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope
@@ -88,6 +91,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+
+      - name: Start the test database stack
+        # Postgres plus PgBouncer in transaction mode; the P1-T03 isolation
+        # and pooling-spike suites run against it on every shard.
+        run: pnpm db:up
 
       - name: Run tests
         env:

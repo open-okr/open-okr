@@ -1,0 +1,42 @@
+# The test and development database stack. Test-only infrastructure: the
+# product itself needs nothing but Postgres (PLAN.md §5), and the deployment
+# artifacts live in deploy/, not here.
+#
+# Two entry points on purpose:
+#   - Postgres direct on 55432, used by most tests and local development.
+#   - PgBouncer in transaction pooling mode on 56432, used by the P1-T03
+#     tenant-isolation spike to prove SET LOCAL survives pooled connections.
+#
+# Non-default host ports so a locally installed Postgres on 5432 is never
+# touched. Credentials are throwaway test values; never reuse them anywhere.
+#
+# Start with: pnpm db:up   Stop with: pnpm db:down
+name: openokr-test
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    # Test databases are disposable; tmpfs makes cloning and truncation fast.
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "56432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy

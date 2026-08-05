@@ -24,6 +24,7 @@ Additional conventions:
 - **Rich columns** are editor JSON stored as `jsonb` with a `version` integer beside them. Never Markdown as storage.
 - **Enumerated values** are TypeScript string unions stored as text with a check constraint.
 - **Derived columns** (progress, health, achievement, alignment score, next check-in, streak, quality score) are written by jobs driven from the outbox, never computed at render time.
+- **`_migrations`** is the forward-only migration runner's bookkeeping table (name, checksum, applied time), created by the runner itself rather than by a migration. Infrastructure, not business data: no `workspace_id`, no policy, invisible to the importer.
 
 ## 2. Domains
 

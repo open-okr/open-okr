@@ -15,6 +15,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "dead-code": "knip",
+    "db:up": "docker compose -f packages/test-support/docker/compose.yaml up -d --wait",
+    "db:down": "docker compose -f packages/test-support/docker/compose.yaml down",
+    "db:migrate": "pnpm --filter @openokr/db migrate",
+    "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "check:licences": "node --experimental-strip-types --no-warnings scripts/check-licences.ts",
     "check:signoff": "node --experimental-strip-types --no-warnings scripts/check-signoff.ts",
     "flaky": "node --experimental-strip-types --no-warnings packages/test-support/bin/flaky.ts"

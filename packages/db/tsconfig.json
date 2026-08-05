@@ -1,4 +1,20 @@
 {
   "extends": "../config/tsconfig.base.json",
-  "include": ["src", "test"]
+  "compilerOptions": {
+    // Mirrors the vitest.config.ts aliases: db tests use the shared harness
+    // without a package dependency, which would create a db <-> test-support
+    // cycle in the task graph.
+    "paths": {
+      "@openokr/test-support/db-fixtures": [
+        "../test-support/fixtures/db/schema.ts"
+      ],
+      "@openokr/test-support/db": ["../test-support/src/db-harness.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "test",
+    "../test-support/src",
+    "../test-support/fixtures/db"
+  ]
 }
