@@ -7,6 +7,12 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      # Pinned to 5.9.x by the P1-T01 decision. Moving to a new major is a
+      # human task with its own verification, not a bot bump: the 7.0.2 bump
+      # broke typecheck on main.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       # One pull request per group keeps review cost down. Security updates
       # still arrive on their own, immediately.
