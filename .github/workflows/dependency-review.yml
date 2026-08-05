@@ -11,7 +11,7 @@ jobs:
     name: Dependency review
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Blocks a pull request that introduces a dependency with a known
       # vulnerability or a licence AGPL-3.0 cannot ship. The licence list here
