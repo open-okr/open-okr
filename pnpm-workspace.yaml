@@ -3,10 +3,14 @@ packages:
   - packages/*
 
 catalog:
-  typescript: 7.0.2
+  # Pinned to 5.9.x by the P1-T01 decision. The 7.x bump (dependabot PR #5)
+  # broke typecheck repo-wide; adopting 7.x is its own task, not a bot merge.
+  typescript: 5.9.3
   vitest: 4.1.10
   "@types/node": 26.1.2
-  drizzle-orm: ^0.44.2
+  # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
+  # improperly escaped identifiers).
+  drizzle-orm: ^0.45.2
   pg: ^8.16.3
   "@types/pg": ^8.15.4
 
