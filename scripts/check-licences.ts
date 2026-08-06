@@ -10,6 +10,7 @@
  * Reads `pnpm licenses list --json`, so it needs no extra dependency.
  */
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { isLicenceAllowed } from "../packages/config/src/licence-policy.ts";
 
@@ -45,6 +46,93 @@ const ALLOWED = new Set([
 /** Packages cleared by a human despite an unrecognised licence field. Each needs
  * a reason. Keep this list short and audited. */
 const EXCEPTIONS = new Map<string, string>();
+
+/**
+ * Identifiers this gate accepts that GitHub's dependency-review action does
+ * not. `AGPL-3.0` is deprecated in SPDX in favour of the `-only` and
+ * `-or-later` forms, which the action lists instead. Both spellings mean the
+ * same thing, so this is a spelling difference rather than a policy one.
+ */
+const DEPRECATED_ALIASES = new Set(["AGPL-3.0"]);
+
+/**
+ * Fails when the two copies of the allow list disagree.
+ *
+ * The policy lives here and in `.github/workflows/dependency-review.yml`,
+ * because the action cannot read a TypeScript file. Two copies of a security
+ * policy is a policy nobody has: adding a licence to one and not the other
+ * produces a gate that passes locally and fails in CI, or worse, the reverse.
+ * So the disagreement is checked rather than remembered.
+ */
+async function checkWorkflowAgrees(): Promise<string[]> {
+  const path = new URL(
+    "../.github/workflows/dependency-review.yml",
+    import.meta.url,
+  );
+  const yaml = await readFile(path, "utf8");
+
+  // Scanned line by line rather than matched with one expression. The block is
+  // a YAML folded scalar whose end is "the indentation stops", which a regular
+  // expression states badly and a loop states plainly.
+  const lines = yaml.split("\n");
+  const start = lines.findIndex((line) => /^\s*allow-licenses:\s*>-\s*$/.test(line));
+
+  if (start === -1) {
+    return [
+      "Could not read allow-licenses from .github/workflows/dependency-review.yml. " +
+        "If the field moved, update this check: a licence gate that cannot find " +
+        "the other list is not checking anything.",
+    ];
+  }
+
+  const keyIndent = (lines[start] ?? "").search(/\S/);
+  const collected: string[] = [];
+
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const indent = line.search(/\S/);
+    // A blank line, a comment, or anything not indented past the key ends the
+    // scalar.
+    if (indent === -1 || indent <= keyIndent || line.trim().startsWith("#")) {
+      break;
+    }
+    collected.push(line.trim());
+  }
+
+  const workflow = new Set(
+    collected
+      .join(" ")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== ""),
+  );
+
+  if (workflow.size === 0) {
+    return [
+      "Read an empty allow-licenses list from the workflow, which cannot be right.",
+    ];
+  }
+
+  const problems: string[] = [];
+
+  for (const licence of workflow) {
+    if (!ALLOWED.has(licence)) {
+      problems.push(
+        `${licence} is allowed by the workflow but not by this script.`,
+      );
+    }
+  }
+  for (const licence of ALLOWED) {
+    if (!workflow.has(licence) && !DEPRECATED_ALIASES.has(licence)) {
+      problems.push(
+        `${licence} is allowed by this script but not by the workflow. ` +
+          "Add it to allow-licenses in .github/workflows/dependency-review.yml.",
+      );
+    }
+  }
+
+  return problems;
+}
 
 interface PnpmLicensePackage {
   name: string;
@@ -88,6 +176,25 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
+// Checked after the dependencies, so a real licence violation is reported
+// first. This is bookkeeping between two files; that is a distributable-work
+// problem.
+const drift = await checkWorkflowAgrees();
+if (drift.length > 0) {
+  process.stderr.write(
+    [
+      `Licence gate failed. The allow list here and the one in the dependency-review workflow disagree:`,
+      ...drift.map((problem) => `  ${problem}`),
+      "",
+      "Both are enforced, so a licence on one list only produces a gate that",
+      "passes in one place and fails in the other.",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 process.stdout.write(
-  `Licence gate passed. ${Object.keys(byLicence).length} distinct licence(s), all allowed.\n`,
+  `Licence gate passed. ${Object.keys(byLicence).length} distinct licence(s) allowed, ` +
+    `and the dependency-review workflow agrees.\n`,
 );
