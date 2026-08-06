@@ -16,9 +16,15 @@ import { passkey } from "@better-auth/passkey";
 import { authSchema } from "@openokr/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
+import {
+  isRegistrationOpen,
+  REGISTRATION_CLOSED_MESSAGE,
+} from "../workspaces/registration.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 
 export interface AuthOptions {
@@ -143,6 +149,44 @@ export function createAuth(options: AuthOptions) {
           max: SIGN_IN_ATTEMPTS,
         },
         "/forget-password": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+      },
+    },
+
+    databaseHooks: {
+      user: {
+        create: {
+          /**
+           * The registration policy (§4.14): open until somebody has claimed
+           * this instance, invitation-only afterwards. Refusing here rather
+           * than at the route covers every path that creates a user, so a
+           * future social or single-sign-on provider cannot quietly reopen
+           * registration by not knowing about the rule.
+           */
+          before: async () => {
+            if (!(await isRegistrationOpen(options.pool))) {
+              throw new APIError("FORBIDDEN", {
+                message: REGISTRATION_CLOSED_MESSAGE,
+              });
+            }
+          },
+          /**
+           * Provisioning. Better Auth queues after-create hooks and drains
+           * them once its own transaction has committed, so this runs on a
+           * real, committed user and opens a transaction of its own rather
+           * than nesting inside one it does not control.
+           *
+           * A failure here therefore leaves a user with no workspace. That is
+           * why provisioning is idempotent and why the web app repairs the
+           * state on the next request instead of trusting this to be the only
+           * path that ever runs.
+           */
+          after: async (user) => {
+            await provisionWorkspaceForUser(options.pool, {
+              id: user.id,
+              name: user.name,
+            });
+          },
+        },
       },
     },
 

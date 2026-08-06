@@ -28,7 +28,18 @@ const EXCLUDED = new Set([
   "fixtures",
 ]);
 
-const collectFiles = async (dir: string): Promise<string[]> => {
+/**
+ * `packages/db/src` is skipped when scanning for *consumers*: the db package
+ * implements the scope rather than using it, so its own helpers would report
+ * themselves. The schema scan must not skip it, because that is exactly where
+ * the schema lives.
+ */
+const dbSource = join(repoRoot, "packages/db/src");
+
+const collectFiles = async (
+  dir: string,
+  options: { readonly includeDbSource?: boolean } = {},
+): Promise<string[]> => {
   const entries = await readdir(dir, { withFileTypes: true }).catch(
     (error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") {
@@ -44,11 +55,11 @@ const collectFiles = async (dir: string): Promise<string[]> => {
     }
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectFiles(path)));
+      files.push(...(await collectFiles(path, options)));
     } else if (
       entry.name.endsWith(".ts") &&
       !entry.name.endsWith(".test.ts") &&
-      !path.startsWith(join(repoRoot, "packages/db/src"))
+      (options.includeDbSource === true || !path.startsWith(dbSource))
     ) {
       files.push(path);
     }
@@ -56,8 +67,17 @@ const collectFiles = async (dir: string): Promise<string[]> => {
   return files;
 };
 
+const schemaFiles = await collectFiles(schemaDir, { includeDbSource: true });
+if (schemaFiles.length === 0) {
+  // A silent empty registry would make this whole gate a no-op, which is how
+  // it went unnoticed before: nothing was soft-deletable yet, so "0 tables"
+  // looked like the right answer.
+  process.stderr.write(`No schema sources found under ${schemaDir}.\n`);
+  process.exit(1);
+}
+
 const schemaSources = await Promise.all(
-  (await collectFiles(schemaDir)).map((path) => readFile(path, "utf8")),
+  schemaFiles.map((path) => readFile(path, "utf8")),
 );
 const tables = collectSoftDeletableTables(schemaSources);
 

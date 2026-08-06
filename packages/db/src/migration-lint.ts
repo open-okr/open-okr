@@ -12,12 +12,21 @@
  *
  *   -- openokr:not-tenant-scoped: <why this table holds no workspace data>
  *   -- openokr:hard-delete: <why rows are really removed>
+ *   -- openokr:tenant-root: <why this table has no workspace_id of its own>
+ *
+ * The third marker exists for exactly one table. `workspaces` cannot carry a
+ * `workspace_id`, because it is what every other table's `workspace_id` points
+ * at. Calling it infrastructure would excuse it from the policy and soft-delete
+ * checks as well, which is the last thing that should happen to the table the
+ * whole tenant floor rests on. So this marker drops the column requirement and
+ * keeps every other one.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const NOT_TENANT_SCOPED = "openokr:not-tenant-scoped";
 const HARD_DELETE = "openokr:hard-delete";
+const TENANT_ROOT = "openokr:tenant-root";
 
 interface TableStatement {
   readonly name: string;
@@ -108,9 +117,10 @@ export function lintMigrationSql(fileName: string, sql: string): string[] {
     problems.push(...table.problems.map((problem) => `${label}: ${problem}`));
 
     const infrastructure = table.markers.has(NOT_TENANT_SCOPED);
+    const tenantRoot = table.markers.has(TENANT_ROOT);
 
     if (!infrastructure) {
-      if (!/\bworkspace_id\b/i.test(table.body)) {
+      if (!tenantRoot && !/\bworkspace_id\b/i.test(table.body)) {
         problems.push(
           `${label}: business tables carry a workspace_id column. ` +
             `Infrastructure tables need an "-- ${NOT_TENANT_SCOPED}: <reason>" marker.`,
