@@ -12,6 +12,7 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { workspaceOverview } from "./overview.ts";
 import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
 
 /**
@@ -19,6 +20,7 @@ import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
  * and output from the name alone.
  */
 export const ACTION_MAP = {
+  "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
   "workspace.provision": provisionWorkspace,
 } as const;
