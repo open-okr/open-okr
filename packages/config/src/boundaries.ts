@@ -14,6 +14,11 @@
  *     driver directly from a write means the side effect can fire for a
  *     change that rolled back, and the message can go missing for one that
  *     committed. Insert an outbox row instead; the relay delivers it.
+ *  4. **Mutations go through the Operation pipeline.** A domain write outside
+ *     an operation has no audit row, no activity row and no outbox row, which
+ *     is exactly the drift the pipeline exists to make impossible. This is the
+ *     lint TECHNICAL-PLAN §8.1 layer 4 calls for: an unregistered write path
+ *     fails the build.
  */
 
 export interface BoundarySourceFile {
@@ -26,7 +31,11 @@ export interface BoundaryViolation {
   readonly path: string;
   /** 1-based line of the offending code. */
   readonly line: number;
-  readonly rule: "vendor-sdk" | "driver-import" | "write-path-side-effect";
+  readonly rule:
+    | "vendor-sdk"
+    | "driver-import"
+    | "write-path-side-effect"
+    | "mutation-outside-operation";
   readonly message: string;
 }
 
@@ -251,11 +260,106 @@ const checkWritePathSideEffects = (
   return violations;
 };
 
+/**
+ * Where a domain write may legitimately appear.
+ *
+ * `packages/db` implements the primitives every write is built from, and the
+ * pipeline itself writes the activity, audit and outbox rows.
+ */
+const MUTATION_ALLOWED_PREFIXES: readonly string[] = [
+  "packages/db/",
+  "packages/core/src/operations/",
+];
+
+/** Packages whose domain writes must run through the pipeline. */
+const MUTATION_CHECKED_PREFIXES: readonly string[] = [
+  "packages/core/",
+  "packages/agents/",
+  "packages/importer/",
+  "apps/",
+];
+
+/**
+ * Drizzle's mutating builders.
+ *
+ * The hard part is telling a domain write from `seen.delete(key)` on a Set or
+ * `editor.update(state)` on something else entirely. Two shapes are matched,
+ * and both require the single-identifier argument a table always is:
+ *
+ *  1. The builder chain: `.insert(t).values(`, `.update(t).set(`,
+ *     `.delete(t).where(`. Nothing but Drizzle reads like that.
+ *  2. The same call on a receiver that is plainly a database handle, which
+ *     catches an unchained `await tx.delete(table)`.
+ *
+ * A write that matches neither is possible to construct, so this is a strong
+ * net rather than a proof. The pipeline's own return type is the proof: an
+ * operation cannot commit without handing back its audit row.
+ */
+const MUTATION_CHAIN =
+  /\.(insert|update|delete)\s*\(\s*[A-Za-z_$][\w$]*\s*\)\s*\.\s*(?:values|set|where|returning|onConflictDoNothing|onConflictDoUpdate)\s*\(/g;
+
+const MUTATION_ON_DB_HANDLE =
+  /\b(?:tx|trx|db|database|savepoint|executor)\s*\.\s*(insert|update|delete)\s*\(\s*[A-Za-z_$][\w$]*\s*\)/g;
+
+/** Checks the mutation rule for one file. */
+const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
+  if (!MUTATION_CHECKED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+  if (MUTATION_ALLOWED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+  // A file that declares an operation is a handler: its writes are the change
+  // the pipeline commits alongside the audit row. Both spellings count.
+  // `runOperation` runs a spec directly; `defineWriteAction` is the registry
+  // builder that takes a spec and runs it, so a write action cannot be
+  // declared without one.
+  if (/\b(?:runOperation|defineWriteAction)\b/.test(file.text)) {
+    return [];
+  }
+
+  const violations: BoundaryViolation[] = [];
+  const seenLines = new Set<number>();
+  const matches = [
+    ...file.text.matchAll(MUTATION_CHAIN),
+    ...file.text.matchAll(MUTATION_ON_DB_HANDLE),
+  ];
+
+  for (const match of matches) {
+    const method = match[1] as string;
+    const line = lineOf(file.text, match.index);
+    // Both patterns can match the same statement; report it once.
+    if (seenLines.has(line)) {
+      continue;
+    }
+    seenLines.add(line);
+    const previous = (file.text.split("\n")[line - 2] ?? "").trim();
+    const marker = previous.match(/^\/\/\s*openokr:allow-mutation:\s*(.+)$/);
+    if (marker && (marker[1] ?? "").trim().length > 0) {
+      continue;
+    }
+
+    violations.push({
+      path: file.path,
+      line,
+      rule: "mutation-outside-operation",
+      message:
+        `writes with .${method}() outside the Operation pipeline. ` +
+        `A write here commits with no audit row, no activity row and no ` +
+        `outbox row. Run it through runOperation, which writes all four in ` +
+        `one transaction.`,
+    });
+  }
+
+  return violations;
+};
+
 export function checkBoundaries(
   files: readonly BoundarySourceFile[],
 ): BoundaryViolation[] {
   return files.flatMap((file) => [
     ...checkImports(file),
     ...checkWritePathSideEffects(file),
+    ...checkMutations(file),
   ]);
 }

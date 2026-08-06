@@ -1,5 +1,10 @@
 export const PACKAGE_NAME = "@openokr/db";
 
+export {
+  APPEND_ONLY_TABLES,
+  type GrantOptions,
+  grantAppPrivileges,
+} from "./grants.ts";
 export { idTimestamp, newId } from "./id.ts";
 export {
   type MigrationClient,
@@ -22,6 +27,13 @@ export {
   ensureRoles,
   type SqlRunner,
 } from "./roles.ts";
+export {
+  type Activity,
+  type ActorKind,
+  type AuditEvent,
+  activities,
+  auditEvents,
+} from "./schema/audit.ts";
 export {
   accounts,
   authSchema,

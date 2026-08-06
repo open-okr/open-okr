@@ -132,8 +132,16 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 ### invite_links
 `token_hash`, `mode` (`workspace` / `personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?`.
 
-### audit_events *(append-only, no update or delete grants)*
-`actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id`, `payload jsonb`, `at`, `prev_hash`, `row_hash`.
+### audit_events *(append-only, hash-chained per workspace)*
+`seq`, `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id?`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `(workspace_id, seq)`.
+
+`seq` is the position in this workspace's chain, from 1. Ordering by `at` would be ambiguous under concurrency, and a chain needs exactly one order to be verifiable. `action` is the registry action name, so a row resolves back to one contract.
+
+`at` is written by the application rather than defaulted to `now()`, because it is part of the hash and has to be the value the hash was computed over.
+
+Neither foreign key carries an ON DELETE action. A cascade would delete audit rows and a SET NULL would update them, so the append-only trigger would refuse an ordinary member removal.
+
+Append-only is enforced three ways, each covering what the last does not. The application role holds no UPDATE or DELETE grant, applied by `grantAppPrivileges` in `packages/db` rather than by the migration, because the role's name belongs to the deployment. A trigger refuses UPDATE and DELETE from anybody, including the owner and a superuser. And the hash chain makes tampering that defeats both of those *visible*: `pnpm audit:verify` names the sequence number where the chain stops adding up. TRUNCATE is deliberately not blocked, because emptying the table is self-evident and anyone who can truncate can drop the table.
 
 ### outbox
 `topic`, `payload jsonb`, `idempotency_key`, `created_at`, `delivered_at?`, `attempts`.

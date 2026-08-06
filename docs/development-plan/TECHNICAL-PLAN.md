@@ -386,6 +386,7 @@ Keep current in every schema change.
 | `comments`, `blobs`, `attachments` | Task comments and files | HTML converted to editor JSON. External file URLs become links in the body |
 | `learnings`, `decisions` | Where the source holds them | Otherwise created empty |
 | Not imported | Webhooks, search caches, notification rows, attendance and human-resources modules | Recorded in the report |
+| No legacy source | `audit_events`, `activities` | Written by the Operation pipeline as the import runs, so the import's own writes are audited like any other. A source system's history is not replayed into the chain: the chain records what this instance did, and importing somebody else's audit trail would make it describe events that never happened here. Source history that matters is recorded in the import report |
 | No legacy source | `outbox`, `cache_entries`, `search_documents` | Infrastructure, not user data. The outbox is written by the Operation pipeline as the import runs, the cache is derived, and the search index is rebuilt from the imported rows afterwards |
 | `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
 

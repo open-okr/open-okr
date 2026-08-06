@@ -18,6 +18,9 @@ catalog:
   "@types/ws": ^8.18.1
   better-auth: ^1.6.26
   "@better-auth/passkey": ^1.6.26
+  # Already used by the environment schema. Shared here so the action contract
+  # registry validates against the same version the boundary does.
+  zod: 4.4.3
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'

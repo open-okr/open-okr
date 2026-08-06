@@ -21,13 +21,14 @@
 import {
   activeOnly,
   newId,
-  withContext,
+  withUser,
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { runOperation } from "../operations/operation.ts";
 import {
   type ProvisioningContext,
   resolveMemberSettings,
@@ -113,15 +114,54 @@ export async function createWorkspace(
   pool: Pool,
   input: CreateWorkspaceInput,
 ): Promise<ProvisionedWorkspace> {
-  const db = drizzle(pool);
   const workspaceId = newId();
 
-  // The tenant floor applies to the row that creates the tenant. The id is
-  // generated here and applied as the workspace setting before the insert, so
-  // the policy's `with check` passes on a workspace that does not exist yet.
-  // Nothing is exempted and no policy is loosened to make this work.
-  return withContext(db, { workspaceId }, (tx) =>
-    insertWorkspaceAndMember(tx, workspaceId, input),
+  // A bootstrap operation: it creates the workspace it runs in, so there is no
+  // member to authorise against and no workspace to load. Everything else is
+  // the ordinary pipeline, including the audit row, which is why the first
+  // entry in every workspace's chain is its own creation.
+  //
+  // The tenant floor still applies to the row that creates the tenant. The id
+  // is generated here and applied as the workspace setting before the insert,
+  // so the policy's `with check` passes on a workspace that does not exist
+  // yet. Nothing is exempted and no policy is loosened to make this work.
+  return runOperation(
+    { pool },
+    {
+      action: "workspace.provision",
+      workspaceId,
+      actor: { kind: "system" },
+      bootstrap: true,
+      async execute({ tx }) {
+        const provisioned = await insertWorkspaceAndMember(
+          tx,
+          workspaceId,
+          input,
+        );
+        return {
+          result: provisioned,
+          activity: {
+            kind: "workspace.provisioned",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: { name: provisioned.name, slug: provisioned.slug },
+          },
+          audit: {
+            action: "workspace.provision",
+            targetType: "workspace",
+            targetId: workspaceId,
+            // The acting member does not exist yet, so the user this workspace
+            // was created for is recorded here instead.
+            payload: {
+              userId: input.user.id,
+              name: provisioned.name,
+              slug: provisioned.slug,
+              memberId: provisioned.memberId,
+            },
+          },
+        };
+      },
+    },
   );
 }
 
@@ -138,22 +178,44 @@ export async function provisionWorkspaceForUser(
   user: WorkspaceUser,
   context: ProvisioningContext = {},
 ): Promise<ProvisionedWorkspace> {
+  // Creating the workspace is an Operation with its own transaction, so the
+  // "have they got one already" check cannot share that transaction. A
+  // session-level lock on a dedicated connection covers both instead: two
+  // browser tabs finishing sign-up together would otherwise both find no
+  // membership and both create a workspace.
+  const guard = await pool.connect();
+  try {
+    await guard.query("select pg_advisory_lock(hashtext($1))", [
+      `provision:${user.id}`,
+    ]);
+
+    const existing = await findMembership(pool, user.id);
+    if (existing) {
+      return existing;
+    }
+
+    return await createWorkspace(pool, { user, ...context });
+  } finally {
+    // Releasing before the connection returns to the pool matters: a
+    // session-level lock outlives the transaction and would otherwise travel
+    // with the connection to whoever gets it next.
+    await guard
+      .query("select pg_advisory_unlock(hashtext($1))", [
+        `provision:${user.id}`,
+      ])
+      .catch(() => undefined);
+    guard.release();
+  }
+}
+
+/** This person's first live membership, or nothing. */
+async function findMembership(
+  pool: Pool,
+  userId: string,
+): Promise<ProvisionedWorkspace | undefined> {
   const db = drizzle(pool);
-  const workspaceId = newId();
-
-  // Both settings, in one transaction: the user setting to see whether this
-  // person is already a member somewhere, the workspace setting to create the
-  // new one if they are not.
-  return withContext(db, { workspaceId, userId: user.id }, async (tx) => {
-    // Serialises concurrent provisions of the same person. Two browser tabs
-    // finishing sign-up together would otherwise both find no membership and
-    // both create a workspace. The lock is transaction-scoped, so it is
-    // released by the commit or the rollback either way.
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`provision:${user.id}`}))`,
-    );
-
-    const [existing] = await tx
+  const [existing] = await withUser(db, userId, (tx) =>
+    tx
       .select({
         workspaceId: workspaces.id,
         memberId: workspaceMembers.id,
@@ -164,18 +226,13 @@ export async function provisionWorkspaceForUser(
       .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
       .where(
         and(
-          activeOnly(workspaceMembers, eq(workspaceMembers.userId, user.id)),
+          activeOnly(workspaceMembers, eq(workspaceMembers.userId, userId)),
           activeOnly(workspaces),
         ),
       )
-      .limit(1);
-
-    if (existing) {
-      return existing;
-    }
-
-    return insertWorkspaceAndMember(tx, workspaceId, { user, ...context });
-  });
+      .limit(1),
+  );
+  return existing;
 }
 
 type Tx = Parameters<

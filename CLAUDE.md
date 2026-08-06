@@ -141,7 +141,8 @@ Keep this list current once scaffolded.
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate
-- `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox)
+- `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline)
+- `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
 - `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:change`: migrations, demo data, the data-change runner
