@@ -78,6 +78,10 @@ export {
   type SealedSecret,
 } from "./secrets/key-ring.ts";
 export {
+  type ResolvedMailSettings,
+  resolveMailSettings,
+} from "./secrets/mail-settings.ts";
+export {
   DEFAULT_QUIET_HOURS,
   INSTANCE_DEFAULT_LANGUAGE,
   isKnownTimezone,

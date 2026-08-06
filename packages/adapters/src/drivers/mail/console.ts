@@ -5,7 +5,12 @@
  * development and tests work with no mail server, and makes a misconfigured
  * production install obvious rather than silently dropping mail.
  */
-import type { Mailer, MailMessage, SentMail } from "../../ports/mail.ts";
+import type {
+  Mailer,
+  MailMessage,
+  MailVerifyResult,
+  SentMail,
+} from "../../ports/mail.ts";
 
 export interface ConsoleMailerOptions {
   /** Where the rendered message goes. Defaults to standard output. */
@@ -21,6 +26,12 @@ export class ConsoleMailer implements Mailer {
   constructor(options: ConsoleMailerOptions = {}) {
     this.#write =
       options.write ?? ((line) => process.stdout.write(`${line}\n`));
+  }
+
+  async verify(): Promise<MailVerifyResult> {
+    // There is nothing to test: this driver has no server. It is a working
+    // default, not a missing one, so it verifies rather than warns.
+    return { ok: true };
   }
 
   async send(message: MailMessage): Promise<SentMail> {

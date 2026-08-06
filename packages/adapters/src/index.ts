@@ -17,6 +17,7 @@ export {
   type Adapters,
   createAdapters,
 } from "./create-adapters.ts";
+export { createMailer, type MailerConfig } from "./create-mailer.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {
@@ -51,7 +52,12 @@ export type {
   InboundRequest,
 } from "./ports/channel.ts";
 export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
-export type { Mailer, MailMessage, SentMail } from "./ports/mail.ts";
+export type {
+  Mailer,
+  MailMessage,
+  MailVerifyResult,
+  SentMail,
+} from "./ports/mail.ts";
 export type {
   Realtime,
   RealtimeEvent,
