@@ -162,24 +162,52 @@ const statementStart = (text: string, index: number): number => {
 const isPackage = (specifier: string, name: string): boolean =>
   specifier === name || specifier.startsWith(`${name}/`);
 
-/** An `// openokr:allow-vendor-sdk: <reason>` comment on the line above. */
-const hasAllowMarker = (text: string, statementIndex: number): boolean => {
-  const line = lineOf(text, statementIndex);
-  const previous = (text.split("\n")[line - 2] ?? "").trim();
-  const match = previous.match(/^\/\/\s*openokr:allow-vendor-sdk:\s*(.+)$/);
-  return match !== null && (match[1] ?? "").trim().length > 0;
+/**
+ * Is there an `// openokr:<marker>: <reason>` comment above this line?
+ *
+ * The whole contiguous `//` block is searched rather than only the line
+ * directly above, so a reason can be written properly instead of squeezed onto
+ * one line. The migration linter reads its markers the same way. A marker with
+ * no reason after the colon does not count: an escape without a stated reason
+ * is the thing these gates exist to prevent.
+ */
+const hasMarkerAbove = (
+  lines: readonly string[],
+  startLine: number,
+  marker: string,
+): boolean => {
+  const pattern = new RegExp(`^//\\s*openokr:${marker}:\\s*(.+)$`);
+
+  for (let i = startLine - 2; i >= 0; i--) {
+    const text = (lines[i] ?? "").trim();
+    if (text === "") {
+      continue;
+    }
+    if (!text.startsWith("//")) {
+      return false;
+    }
+    const match = text.match(pattern);
+    if (match && (match[1] ?? "").trim().length > 0) {
+      return true;
+    }
+  }
+  return false;
 };
 
 /** Checks the vendor SDK and driver-import rules for one file. */
 const checkImports = (file: BoundarySourceFile): BoundaryViolation[] => {
   const violations: BoundaryViolation[] = [];
   const inAdapters = file.path.startsWith(ADAPTERS_PREFIX);
+  const lines = file.text.split("\n");
 
   for (const { specifier, index: matchIndex } of importSpecifiers(file.text)) {
     const index = statementStart(file.text, matchIndex);
     if (!inAdapters) {
       const vendor = VENDOR_SDKS.find((name) => isPackage(specifier, name));
-      if (vendor && !hasAllowMarker(file.text, index)) {
+      if (
+        vendor &&
+        !hasMarkerAbove(lines, lineOf(file.text, index), "allow-vendor-sdk")
+      ) {
         violations.push({
           path: file.path,
           line: lineOf(file.text, index),
@@ -301,6 +329,48 @@ const MUTATION_CHAIN =
 const MUTATION_ON_DB_HANDLE =
   /\b(?:tx|trx|db|database|savepoint|executor)\s*\.\s*(insert|update|delete)\s*\(\s*[A-Za-z_$][\w$]*\s*\)/g;
 
+/**
+ * The line a statement begins on.
+ *
+ * Walks back to the last statement boundary, so a chain spread over five
+ * lines resolves to the one line a reader would call its start. Both mutation
+ * patterns then agree on where a write is, which is what lets the escape
+ * marker have a single home.
+ */
+const statementStartLine = (text: string, index: number): number => {
+  let cursor = index;
+  while (cursor > 0) {
+    const char = text[cursor - 1];
+    if (char === ";" || char === "{" || char === "}") {
+      break;
+    }
+    cursor--;
+  }
+  // Skip whitespace between the boundary and the statement itself.
+  while (cursor < index && /\s/.test(text[cursor] ?? "")) {
+    cursor++;
+  }
+
+  // A comment block sits between the boundary and the code, so the walk above
+  // lands on the comment rather than the statement. Step forward over it:
+  // otherwise the marker would have to look for itself.
+  const lines = text.split("\n");
+  const matchLine = lineOf(text, index);
+  let line = lineOf(text, cursor);
+  while (line < matchLine) {
+    const current = (lines[line - 1] ?? "").trim();
+    if (
+      current !== "" &&
+      !current.startsWith("//") &&
+      !current.startsWith("*")
+    ) {
+      break;
+    }
+    line++;
+  }
+  return line;
+};
+
 /** Checks the mutation rule for one file. */
 const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   if (!MUTATION_CHECKED_PREFIXES.some((p) => file.path.startsWith(p))) {
@@ -319,7 +389,8 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   }
 
   const violations: BoundaryViolation[] = [];
-  const seenLines = new Set<number>();
+  const lines = file.text.split("\n");
+  const seenStatements = new Set<number>();
   const matches = [
     ...file.text.matchAll(MUTATION_CHAIN),
     ...file.text.matchAll(MUTATION_ON_DB_HANDLE),
@@ -328,14 +399,17 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   for (const match of matches) {
     const method = match[1] as string;
     const line = lineOf(file.text, match.index);
-    // Both patterns can match the same statement; report it once.
-    if (seenLines.has(line)) {
+    // Both patterns match the same statement at different lines: one lands on
+    // `await tx`, the other on the `.insert(...)` that follows it. Resolving
+    // each to the line its statement begins on collapses them to one finding,
+    // and gives the marker a single place to sit.
+    const start = statementStartLine(file.text, match.index);
+    if (seenStatements.has(start)) {
       continue;
     }
-    seenLines.add(line);
-    const previous = (file.text.split("\n")[line - 2] ?? "").trim();
-    const marker = previous.match(/^\/\/\s*openokr:allow-mutation:\s*(.+)$/);
-    if (marker && (marker[1] ?? "").trim().length > 0) {
+    seenStatements.add(start);
+
+    if (hasMarkerAbove(lines, start, "allow-mutation")) {
       continue;
     }
 

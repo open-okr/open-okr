@@ -31,6 +31,10 @@ const ALLOWED = new Set([
   "ISC",
   "LGPL-3.0-or-later",
   "MIT",
+  // MIT No Attribution: MIT without the attribution clause, so it grants
+  // strictly more than MIT, which is already here. Added with nodemailer in
+  // P1-T09, approved 2026-08-06.
+  "MIT-0",
   "MPL-2.0",
   "Python-2.0",
   "Unlicense",

@@ -153,6 +153,75 @@ create policy tenant_isolation on workspaces
     });
   });
 
+  describe("instance scope", () => {
+    // A second table that cannot carry a workspace_id, for the opposite
+    // reason to the tenant root: it sits above every workspace rather than
+    // beneath them. Calling it infrastructure would waive its policy checks,
+    // and this is the table holding the instance's encrypted credentials.
+    const INSTANCE = `
+-- openokr:instance-scope: instance configuration, above every workspace
+-- openokr:hard-delete: removing a row restores the registry default
+create table system_settings (
+  key text primary key,
+  value jsonb not null default 'null'::jsonb
+);
+alter table system_settings enable row level security;
+alter table system_settings force row level security;
+create policy instance_settings_read on system_settings for select using (true);
+`;
+
+    it("accepts an instance table with no workspace_id but a full policy", () => {
+      expect(lintMigrationSql("0007_system_settings.sql", INSTANCE)).toEqual(
+        [],
+      );
+    });
+
+    it("still requires the policy on an instance table", () => {
+      const sql = INSTANCE.replace(/create policy[\s\S]*?;/, "");
+      expect(
+        lintMigrationSql("0007_system_settings.sql", sql).some((p) =>
+          p.includes("policy"),
+        ),
+      ).toBe(true);
+    });
+
+    it("still requires force on an instance table", () => {
+      const sql = INSTANCE.replace(
+        "alter table system_settings force row level security;",
+        "",
+      );
+      expect(
+        lintMigrationSql("0007_system_settings.sql", sql).some((p) =>
+          p.includes("force"),
+        ),
+      ).toBe(true);
+    });
+
+    it("still requires a soft-delete column or a hard-delete reason", () => {
+      const sql = INSTANCE.replace(
+        "-- openokr:hard-delete: removing a row restores the registry default",
+        "",
+      );
+      expect(
+        lintMigrationSql("0007_system_settings.sql", sql).some((p) =>
+          p.includes("deleted_at"),
+        ),
+      ).toBe(true);
+    });
+
+    it("requires a reason on the instance-scope marker too", () => {
+      const sql = INSTANCE.replace(
+        "-- openokr:instance-scope: instance configuration, above every workspace",
+        "-- openokr:instance-scope:",
+      );
+      expect(
+        lintMigrationSql("0007_system_settings.sql", sql).some((p) =>
+          p.includes("reason"),
+        ),
+      ).toBe(true);
+    });
+  });
+
   it("checks every table in a multi-table migration independently", () => {
     const sql = `${GOOD}\ncreate table bare (id uuid primary key);`;
     const problems = lintMigrationSql("0003_both.sql", sql);

@@ -12,6 +12,9 @@ catalogs:
     '@types/node':
       specifier: 26.1.2
       version: 26.1.2
+    '@types/nodemailer':
+      specifier: ^8.0.1
+      version: 8.0.1
     '@types/pg':
       specifier: ^8.15.4
       version: 8.20.3
@@ -24,6 +27,9 @@ catalogs:
     drizzle-orm:
       specifier: ^0.45.2
       version: 0.45.2
+    nodemailer:
+      specifier: ^9.0.4
+      version: 9.0.4
     pg:
       specifier: ^8.16.3
       version: 8.22.0
@@ -138,6 +144,9 @@ importers:
       '@openokr/config':
         specifier: workspace:*
         version: link:../config
+      nodemailer:
+        specifier: 'catalog:'
+        version: 9.0.4
       pg:
         specifier: 'catalog:'
         version: 8.22.0
@@ -151,6 +160,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2
+      '@types/nodemailer':
+        specifier: 'catalog:'
+        version: 8.0.1
       '@types/pg':
         specifier: 'catalog:'
         version: 8.20.3
@@ -1176,6 +1188,9 @@ packages:
   '@types/node@26.1.2':
     resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
 
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
+
   '@types/pg@8.20.3':
     resolution: {integrity: sha512-4Tvg+HO6+oQaAkpT8GTYoSExzpGGZz532GXgbbCElWJQeQdMozBWxEKNBhJJpHFjWXsMxqPbyypvj/89FWNoSQ==}
 
@@ -1587,6 +1602,10 @@ packages:
         optional: true
       sass:
         optional: true
+
+  nodemailer@9.0.4:
+    resolution: {integrity: sha512-LmJNRVRtfSCULxcZpy0Cpg4WWenlUZ9+zbmTO+S7v9wD6XreYLjXRFtDjtV/4F0HT5p1GyZfA0Ux/myxHb18CQ==}
+    engines: {node: '>=6.0.0'}
 
   non-error@0.1.0:
     resolution: {integrity: sha512-TMB1uHiGsHRGv1uYclfhivcnf0/PdFp2pNqRxXjncaAsjYMoisaQJI+SSZCqRq+VliwRTC8tsMQfmrWjDMhkPQ==}
@@ -2549,6 +2568,10 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  '@types/nodemailer@8.0.1':
+    dependencies:
+      '@types/node': 26.1.2
+
   '@types/pg@8.20.3':
     dependencies:
       '@types/node': 26.1.2
@@ -2817,6 +2840,8 @@ snapshots:
       - '@babel/core'
       - '@types/node'
       - babel-plugin-macros
+
+  nodemailer@9.0.4: {}
 
   non-error@0.1.0: {}
 

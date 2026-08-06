@@ -12,12 +12,14 @@
   },
   "dependencies": {
     "@openokr/config": "workspace:*",
+    "nodemailer": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "ws": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/nodemailer": "catalog:",
     "@types/pg": "catalog:",
     "@types/ws": "catalog:",
     "typescript": "catalog:",

@@ -18,6 +18,11 @@ catalog:
   "@types/ws": ^8.18.1
   better-auth: ^1.6.26
   "@better-auth/passkey": ^1.6.26
+  # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
+  # dependencies of its own. Confined to packages/adapters like every vendor
+  # SDK, behind the Mailer port.
+  nodemailer: ^9.0.4
+  "@types/nodemailer": ^8.0.1
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.4.3

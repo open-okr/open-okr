@@ -11,15 +11,36 @@
  * under the tenant floor and would report zero on every unscoped connection,
  * which would leave registration open forever.
  *
- * This is computed rather than stored. When `system_settings` arrives with the
- * first-run wizard (P1-T09), the stored flag becomes the override and this
- * stays the default it falls back to.
+ * P1-T09 added the stored override this file anticipated. `registration.policy`
+ * holds 'auto', 'open' or 'invite_only'. 'auto' is the default and is the
+ * computed answer above; the other two fix the policy whatever the instance
+ * looks like, which is what an operator running a public instance or a closed
+ * one actually wants.
  */
 import type { Pool } from "pg";
+import { readSetting } from "../secrets/instance-settings.ts";
 
-export async function isRegistrationOpen(pool: Pool): Promise<boolean> {
+export type RegistrationPolicy = "auto" | "open" | "invite_only";
+
+/** The computed half: an instance nobody has claimed is open. */
+async function isUnclaimed(pool: Pool): Promise<boolean> {
   const result = await pool.query("select 1 from users limit 1");
   return result.rowCount === 0;
+}
+
+export async function isRegistrationOpen(pool: Pool): Promise<boolean> {
+  const stored = await readSetting(pool, "registration.policy");
+
+  if (stored === "open") {
+    return true;
+  }
+  if (stored === "invite_only") {
+    return false;
+  }
+  // 'auto', an unset value, or anything unrecognised. An unrecognised policy
+  // falls back to the safe computed answer rather than throwing: a typo in a
+  // settings row must not take the sign-in page down.
+  return isUnclaimed(pool);
 }
 
 /**

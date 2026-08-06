@@ -267,6 +267,49 @@ describe("the mutation rule: writes go through the Operation pipeline", () => {
     expect(check("packages/core/src/x.ts", text)).toHaveLength(1);
   });
 
+  test("takes a marker anywhere in the comment block above the write", () => {
+    // A reason worth writing rarely fits on one line, and a marker that
+    // forces it to is a marker people work around rather than explain.
+    const text = [
+      "function save() {",
+      "  // openokr:allow-mutation: instance settings are not workspace data,",
+      "  // so there is no workspace whose audit chain this could join.",
+      "  // The pipeline needs both, and the wizard has neither.",
+      "  await tx.insert(settings).values(row);",
+      "}",
+    ].join("\n");
+    expect(check("packages/core/src/x.ts", text)).toEqual([]);
+  });
+
+  test("reports one write once, however many lines it spans", () => {
+    // Both mutation patterns match this: one on `await tx`, the other on the
+    // `.insert(...)` below it. An operator fixing one finding should not see
+    // the same write reported twice.
+    const text = [
+      "async function save() {",
+      "  await tx",
+      "    .insert(settings)",
+      "    .values(row)",
+      "    .onConflictDoUpdate({ target: settings.key, set: row });",
+      "}",
+    ].join("\n");
+    expect(check("packages/core/src/x.ts", text)).toHaveLength(1);
+  });
+
+  test("escapes a multi-line write with a multi-line reason", () => {
+    const text = [
+      "async function save() {",
+      "  // openokr:allow-mutation: the wizard writes before any workspace",
+      "  // exists, so there is no chain to append to.",
+      "  await tx",
+      "    .insert(settings)",
+      "    .values(row)",
+      "    .onConflictDoUpdate({ target: settings.key, set: row });",
+      "}",
+    ].join("\n");
+    expect(check("packages/core/src/x.ts", text)).toEqual([]);
+  });
+
   test("leaves the adapters package alone, which has no domain writes", () => {
     expect(check("packages/adapters/src/drivers/cache.ts", MUTATION)).toEqual(
       [],
