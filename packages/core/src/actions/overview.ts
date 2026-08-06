@@ -10,9 +10,13 @@
  * **The access seam.** A read of a protected aggregate is supposed to go
  * through the access-aware getter, which returns not-found on forbidden and
  * excludes suspended members (§8.1 layer 2). That getter is P2-T02. Until it
- * exists this resolves the member through the same single function the
- * Operation pipeline uses, so there is exactly one place that answers "who is
- * asking and may they", and one place to change when `can()` lands.
+ * exists this resolves the member with its own query, shaped the same way as
+ * the pipeline's `resolveActor`: filtered on the scoped workspace explicitly,
+ * because row-level security is the tenant floor, not the query's predicate.
+ * The `own_memberships` policy deliberately shows a person every membership
+ * they hold, so a query that leans on the floor alone would answer with
+ * whichever workspace the planner met first. Both call sites fold into
+ * `can()` when it lands.
  */
 import {
   activeOnly,
@@ -89,7 +93,11 @@ export const workspaceOverview = defineReadAction({
           )
           .where(
             and(
-              activeOnly(workspaceMembers, eq(workspaceMembers.userId, userId)),
+              activeOnly(
+                workspaceMembers,
+                eq(workspaceMembers.workspaceId, context.workspaceId),
+                eq(workspaceMembers.userId, userId),
+              ),
               activeOnly(workspaces),
             ),
           )

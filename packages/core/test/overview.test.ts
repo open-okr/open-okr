@@ -3,7 +3,10 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import { callAction, getAction } from "../src/actions/registry.ts";
 import { OperationError } from "../src/operations/operation.ts";
-import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import {
+  createWorkspace,
+  provisionWorkspaceForUser,
+} from "../src/workspaces/provisioning.ts";
 
 /**
  * `workspace.overview`, the registry's first read action (P1-T08).
@@ -90,6 +93,25 @@ describe("what a member sees", () => {
   it("carries the workspace's resolved settings, so the page proves provisioning", async () => {
     const result = await overview();
     expect(result.workspace.timezone).toBeTruthy();
+  });
+
+  it("answers for the scoped workspace, not whichever membership comes first", async () => {
+    // Regression. The `own_memberships` policy shows a person every workspace
+    // they belong to, so a query leaning on row-level security alone returns
+    // an indeterminate row for a person with two memberships. The action must
+    // filter on the scoped workspace itself: the floor is not the predicate.
+    const wb = await workerDb();
+    const second = await createWorkspace(wb.appPool, {
+      user: { id: USER, name: "Ada Lovelace" },
+    });
+
+    const first = await overview();
+    expect(first.workspace.id).toBe(workspaceId);
+
+    workspaceId = second.workspaceId;
+    const other = await overview();
+    expect(other.workspace.id).toBe(second.workspaceId);
+    expect(other.member.id).toBe(second.memberId);
   });
 
   it("matches its declared output schema", async () => {
