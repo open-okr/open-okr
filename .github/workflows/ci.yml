@@ -155,6 +155,32 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  deploy:
+    name: Compose target
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # No pnpm setup: this job builds and runs the shipped image, so anything
+      # it needs from the repository has to be in the image already. Installing
+      # the workspace here would hide a missing COPY in the Dockerfile.
+      - name: Build the image
+        run: docker build -f deploy/docker/Dockerfile -t openokr:ci .
+
+      - name: Boot compose and drive the wizard
+        # Proves the acceptance criterion end to end: a clean server reaches a
+        # secured instance with an admin, inside the budget, and an upgrade
+        # re-runs migrations without damage.
+        run: OPENOKR_IMAGE=openokr:ci sh deploy/docker/smoke-test.sh
+
+      - name: Show the logs on failure
+        if: failure()
+        run: |
+          cd deploy/docker
+          docker compose -p openokr logs --tail=200 || true
+
   flakiness:
     name: Flakiness report
     needs: [scope, test]
@@ -221,7 +247,7 @@ jobs:
   # documentation-only skip can change without touching branch protection.
   ci:
     name: CI
-    needs: [scope, quality, test, e2e, flakiness, build, compliance]
+    needs: [scope, quality, test, e2e, deploy, flakiness, build, compliance]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -26,8 +26,11 @@ const silentServer = async (): Promise<number> => {
     // Deliberately no greeting. This is the hang an operator hits when they
     // point port 587 at something that is not an SMTP server.
   });
-  await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
-  return (server?.address() as { port: number }).port;
+  const listening = server;
+  await new Promise<void>((resolve) =>
+    listening.listen(0, "127.0.0.1", resolve),
+  );
+  return (listening.address() as { port: number }).port;
 };
 
 /** A socket that greets and then accepts anything, enough for a handshake. */
@@ -46,8 +49,11 @@ const politeServer = async (): Promise<number> => {
       }
     });
   });
-  await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
-  return (server?.address() as { port: number }).port;
+  const listening = server;
+  await new Promise<void>((resolve) =>
+    listening.listen(0, "127.0.0.1", resolve),
+  );
+  return (listening.address() as { port: number }).port;
 };
 
 describe("the connection test", () => {

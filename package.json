@@ -19,6 +19,7 @@
     "db:down": "docker compose -f packages/test-support/docker/compose.yaml down",
     "db:migrate": "pnpm --filter @openokr/db migrate",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
+    "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
     "check:boundaries": "node --experimental-strip-types --no-warnings scripts/check-boundaries.ts",
     "check:licences": "node --experimental-strip-types --no-warnings scripts/check-licences.ts",
     "check:signoff": "node --experimental-strip-types --no-warnings scripts/check-signoff.ts",

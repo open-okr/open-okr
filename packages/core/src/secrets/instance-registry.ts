@@ -12,7 +12,7 @@
  * wins, so changing a setting in the product survives the next restart.
  */
 
-export type InstanceSettingKind = "string" | "number" | "boolean";
+type InstanceSettingKind = "string" | "number" | "boolean";
 
 export interface InstanceSettingDefinition {
   readonly key: string;

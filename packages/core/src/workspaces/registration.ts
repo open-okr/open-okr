@@ -20,8 +20,6 @@
 import type { Pool } from "pg";
 import { readSetting } from "../secrets/instance-settings.ts";
 
-export type RegistrationPolicy = "auto" | "open" | "invite_only";
-
 /** The computed half: an instance nobody has claimed is open. */
 async function isUnclaimed(pool: Pool): Promise<boolean> {
   const result = await pool.query("select 1 from users limit 1");
