@@ -370,6 +370,7 @@ Keep current in every schema change.
 
 | Target | Source | Notes |
 |---|---|---|
+| `workspaces` | The company being imported, one per run | Not created by the importer. The run targets a workspace that already exists, because provisioning owns the §4.14 defaults and an import must not invent a second way to make one. The company's name and timezone are offered as edits to the existing workspace, never applied silently |
 | `spaces`, `space_members` | Teams and departments with their leader | The tree is flattened to siblings and the depth is recorded in the report. The leader becomes a space manager |
 | `workspace_members` | Employees and users of the company | Placeholder members for unclaimed email addresses |
 | `cycles`, `rhythm_settings` | Performance cycles and settings | Thresholds map directly. Access matrices become bindings, not booleans |

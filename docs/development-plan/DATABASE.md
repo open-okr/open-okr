@@ -101,13 +101,21 @@ workspaces
 ## 4. Identity and access (domain A)
 
 ### workspaces *(tenant root, no workspace_id)*
-`name`, `slug`, `state` (`active` / `read_only` / `frozen`), `settings jsonb`.
+`name`, `slug` unique across the instance, `state` (`active` / `read_only` / `frozen`), `settings jsonb`.
+
+The one table that cannot carry a `workspace_id`, because it is what every other `workspace_id` points at. Its policy keys on `id` instead, and its migration carries an `openokr:tenant-root` marker: that marker drops the column requirement and keeps every other floor check, so the table the whole tenancy model rests on is not the one table nobody checks.
+
+`slug` is unique across the instance because it addresses the workspace in a URL. Row-level security hides other workspaces from a reader, but the unique index still refuses a duplicate, which is what makes a slug dependable. Provisioning therefore does not look before it writes: it writes, and retries with a suffix if the index refuses.
 
 ### users *(global, no workspace_id)*
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
 ### workspace_members
 `user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`.
+
+Unique on `(workspace_id, user_id)` for live rows, so one person has at most one membership per workspace while a rejoin does not collide with their own soft-deleted row.
+
+**Two transaction-local settings.** Beside the tenant floor's `app.workspace_id`, these two tables carry a second, read-only policy keyed on `app.user_id`: a member may see their own membership rows and the workspaces those rows point at. It exists for one question, which the workspace switcher asks on every page: "which workspaces do I belong to". That question crosses tenants by definition, and the alternative is a privileged query stepping around the floor. Postgres combines permissive policies with OR, so this widens reads without loosening any write: neither policy carries a `with check`.
 
 ### access_contexts
 `resource_type`, `resource_id`. One per protected aggregate.

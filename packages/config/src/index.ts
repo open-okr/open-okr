@@ -6,4 +6,7 @@ export {
   loadEnv,
   parseEnv,
   resetEnvCache,
-} from "./env";
+  // The extension is required. Bundlers resolve it either way, but a plain
+  // `node --experimental-strip-types` entry point does not, and that is how
+  // db:migrate, db:seed and db:change run.
+} from "./env.ts";

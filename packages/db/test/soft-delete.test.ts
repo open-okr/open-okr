@@ -99,6 +99,28 @@ export const auditLog = pgTable("audit_log", {
 `;
     expect(collectSoftDeletableTables([schema])).toEqual(new Set(["goals"]));
   });
+
+  it("finds the real shipped schema, so the gate cannot go quietly empty", async () => {
+    // The registry is built by reading `packages/db/src/schema` from disk. When
+    // that read returned nothing, the lint still passed, reporting "0
+    // soft-deletable tables" and checking nothing at all. A gate that fails
+    // open is worse than no gate, so this reads the shipped schema the way the
+    // command does and insists on finding what is actually there.
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const schemaDir = join(import.meta.dirname, "../src/schema");
+
+    const sources = await Promise.all(
+      (await readdir(schemaDir))
+        .filter((file) => file.endsWith(".ts"))
+        .map((file) => readFile(join(schemaDir, file), "utf8")),
+    );
+
+    const tables = collectSoftDeletableTables(sources);
+    expect(tables.size).toBeGreaterThan(0);
+    expect(tables).toContain("workspaces");
+    expect(tables).toContain("workspaceMembers");
+  });
 });
 
 describe("lintSoftDeleteUsage", () => {

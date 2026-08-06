@@ -85,6 +85,74 @@ create table job_state (id bigint primary key);
     expect(problems.some((p) => p.includes("reason"))).toBe(true);
   });
 
+  describe("the tenant root", () => {
+    // `workspaces` is the one table that cannot carry a workspace_id, because
+    // it is what every other workspace_id points at. Marking it as
+    // infrastructure would excuse it from the policy checks too, which is the
+    // last thing that should happen to the table the whole floor rests on.
+    const ROOT = `
+-- openokr:tenant-root: the tenant root itself; every other workspace_id points here
+create table workspaces (
+  id uuid primary key,
+  name text not null,
+  deleted_at timestamptz
+);
+alter table workspaces enable row level security;
+alter table workspaces force row level security;
+create policy tenant_isolation on workspaces
+  using (id = nullif(current_setting('app.workspace_id', true), '')::uuid);
+`;
+
+    it("accepts a tenant root with no workspace_id but a full policy", () => {
+      expect(lintMigrationSql("0005_workspaces.sql", ROOT)).toEqual([]);
+    });
+
+    it("still requires the policy on a tenant root", () => {
+      const sql = ROOT.replace(/create policy[\s\S]*?;/, "");
+      expect(
+        lintMigrationSql("0005_workspaces.sql", sql).some((p) =>
+          p.includes("policy"),
+        ),
+      ).toBe(true);
+    });
+
+    it("still requires force on a tenant root", () => {
+      const sql = ROOT.replace(
+        "alter table workspaces force row level security;",
+        "",
+      );
+      expect(
+        lintMigrationSql("0005_workspaces.sql", sql).some((p) =>
+          p.includes("force"),
+        ),
+      ).toBe(true);
+    });
+
+    it("still requires soft delete on a tenant root", () => {
+      const sql = ROOT.replace(
+        "deleted_at timestamptz",
+        "closed_at timestamptz",
+      );
+      expect(
+        lintMigrationSql("0005_workspaces.sql", sql).some((p) =>
+          p.includes("deleted_at"),
+        ),
+      ).toBe(true);
+    });
+
+    it("requires a reason on the tenant-root marker too", () => {
+      const sql = ROOT.replace(
+        "-- openokr:tenant-root: the tenant root itself; every other workspace_id points here",
+        "-- openokr:tenant-root:",
+      );
+      expect(
+        lintMigrationSql("0005_workspaces.sql", sql).some((p) =>
+          p.includes("reason"),
+        ),
+      ).toBe(true);
+    });
+  });
+
   it("checks every table in a multi-table migration independently", () => {
     const sql = `${GOOD}\ncreate table bare (id uuid primary key);`;
     const problems = lintMigrationSql("0003_both.sql", sql);

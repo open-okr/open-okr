@@ -23,7 +23,7 @@ const globals = globalThis as typeof globalThis & {
   openokrAuth?: ReturnType<typeof createAuth>;
 };
 
-function getPool(): Pool {
+export function getPool(): Pool {
   globals.openokrPool ??= new Pool({
     connectionString: loadEnv().DATABASE_URL,
   });

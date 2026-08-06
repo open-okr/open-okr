@@ -1,5 +1,6 @@
 export const PACKAGE_NAME = "@openokr/db";
 
+export { idTimestamp, newId } from "./id.ts";
 export {
   type MigrationClient,
   MigrationError,
@@ -32,6 +33,14 @@ export {
 } from "./schema/auth.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
+  type QuietHours,
+  type Workspace,
+  type WorkspaceMember,
+  type WorkspaceSettings,
+  workspaceMembers,
+  workspaces,
+} from "./schema/workspaces.ts";
+export {
   activeOnly,
   includeDeleted,
   type SoftDeletable,
@@ -44,7 +53,11 @@ export {
   type SourceFile,
 } from "./soft-delete-lint.ts";
 export {
+  type TenantContext,
+  USER_SETTING,
   WORKSPACE_SETTING,
   type WorkspaceTx,
+  withContext,
+  withUser,
   withWorkspace,
 } from "./tenant.ts";
