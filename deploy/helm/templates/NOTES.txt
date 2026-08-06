@@ -1,0 +1,46 @@
+OpenOKR {{ .Chart.AppVersion }} is installed as {{ .Release.Name }}.
+
+{{- if .Values.ingress.enabled }}
+
+Open:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+No ingress is enabled, so nothing outside the cluster can reach this yet.
+Reach it locally with:
+
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "openokr.fullname" . }} 8080:{{ .Values.service.port }}
+
+then open http://localhost:8080
+{{- end }}
+
+The instance has not been set up. The first person to open it gets the
+first-run wizard, creates the owner account, and registration closes behind
+them.
+
+{{- if not .Values.secrets.existingSecret }}
+
+Back this up now, before anything else:
+
+  kubectl --namespace {{ .Release.Namespace }} get secret {{ printf "%s-secrets" (include "openokr.fullname" .) }} -o yaml
+
+It holds the key every stored credential is encrypted with. This chart keeps
+it across upgrades and across an uninstall, but it cannot recover it for you.
+Lose it and mail passwords, channel credentials and provider keys become
+unreadable.
+{{- end }}
+
+{{- if and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce") }}
+
+Storage is a ReadWriteOnce volume, so this release is pinned to one replica.
+Scaling it up needs a ReadWriteMany class or S3-compatible object storage.
+{{- end }}
+
+{{- if eq .Values.mail.transport "console" }}
+
+Mail is written to the pod log rather than sent. That is a working default,
+not an error: password reset links still work, you just read them with
+`kubectl logs`. Configure mail.* when you want real email.
+{{- end }}

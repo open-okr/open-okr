@@ -1,0 +1,35 @@
+apiVersion: v2
+name: openokr
+description: >-
+  OpenOKR on Kubernetes. Brings your own Postgres; deploys the application,
+  a migration hook and an optional ingress.
+type: application
+
+# The chart's own version, bumped when the templates change.
+version: 0.1.0
+
+# The application version this chart defaults to. Overridden per install with
+# image.tag, because customers pin versions and nothing is force-upgraded
+# (PLAN.md §170).
+appVersion: "0.1.0"
+
+kubeVersion: ">=1.27.0-0"
+
+home: https://github.com/open-okr/open-okr
+sources:
+  - https://github.com/open-okr/open-okr
+
+keywords:
+  - okr
+  - goals
+  - agentic
+
+maintainers:
+  - name: OpenOKR
+    url: https://github.com/open-okr/open-okr
+
+annotations:
+  # There is no bundled database on purpose. The enterprise tier brings their
+  # own Postgres, their own backups and their own single sign-on (PLAN.md
+  # §121), and a subchart here would be a stateful set nobody owns.
+  openokr.org/requires: "PostgreSQL 16 or newer, reachable from the cluster"

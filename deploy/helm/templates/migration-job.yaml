@@ -1,0 +1,84 @@
+{{- include "openokr.validate" . -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Named per revision, because a Helm hook Job cannot be patched: without a
+  # unique name the second upgrade fails on an immutable field.
+  name: {{ printf "%s-migrate-%d" (include "openokr.fullname" .) .Release.Revision }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    # Before the pods, on install and on upgrade. Running migrations here
+    # rather than on pod boot means a rollout waits for the schema instead of
+    # every replica racing for the advisory lock, and a failed migration stops
+    # the release rather than producing pods that serve a half-migrated schema.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    # The failed Job is kept on purpose: its logs are the only record of why a
+    # release stopped, and deleting it would leave an operator with nothing.
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  # Migrations are forward-only and take a Postgres advisory lock, so a retry
+  # is safe. Four attempts covers a database that is still starting.
+  backoffLimit: 4
+  # Cleaned up by Kubernetes a day later, long enough to read the logs.
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "openokr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Deliberately the default service account, with no token mounted. A
+      # pre-install hook runs before the chart's normal resources, so naming
+      # the chart's own ServiceAccount here would reference something that
+      # does not exist yet and the install would fail on the first run. This
+      # job talks to Postgres and to nothing else, so it needs no identity of
+      # its own.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          # The same runner the Compose target uses on boot, so both targets
+          # apply migrations through one piece of code.
+          command:
+            - node
+            - --experimental-strip-types
+            - --no-warnings
+            - ./migrator/deploy/docker/migrate.ts
+          workingDir: /app
+          env:
+            {{- include "openokr.commonEnv" . | nindent 12 }}
+            {{- if .Values.database.adminUrl }}
+            # Only the hook gets the owner role, so the application role never
+            # owns the tables.
+            - name: OPENOKR_APP_ROLE
+              value: openokr
+            {{- end }}
+          resources:
+            {{- toYaml .Values.migrationResources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
