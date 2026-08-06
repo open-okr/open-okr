@@ -1,0 +1,13 @@
+name: OpenOKR code scanning
+
+# The planning tools are standalone HTML sketches kept for reference. They are
+# not built, not served and not part of any deployment, and they account for
+# every open alert this repository has: forty findings that no fix would ever
+# ship. Left in scope, they bury the first real alert from application code.
+#
+# Scoping them out is not the same as declaring them safe. They are excluded
+# because they are not product, and if any of them ever becomes a served page
+# it comes back into scope with this line removed.
+paths-ignore:
+  - docs/development-plan/tools
+  - docs/stakeholder/mockups

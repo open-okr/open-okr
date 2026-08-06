@@ -229,6 +229,92 @@ create policy instance_settings_read on system_settings for select using (true);
     expect(problems.some((p) => p.includes("goals"))).toBe(false);
   });
 
+  /**
+   * Four ways the linter could pass a migration it should refuse. Each one is
+   * a gate that reports success while checking nothing, which is the failure
+   * shape Phase 1 met four times in its own tooling.
+   */
+  describe("holes a Phase 2 migration could walk through", () => {
+    it("does not accept a policy on a similarly named table", () => {
+      // `invitations` satisfying `invitation` is not hypothetical: Phase 2
+      // adds several near-identical singular and plural table names.
+      const sql = `
+create table invitation (
+  id uuid primary key,
+  workspace_id uuid not null,
+  deleted_at timestamptz
+);
+alter table invitation enable row level security;
+alter table invitation force row level security;
+create table invitations (
+  id uuid primary key,
+  workspace_id uuid not null,
+  deleted_at timestamptz
+);
+alter table invitations enable row level security;
+alter table invitations force row level security;
+create policy tenant_isolation on invitations
+  using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);
+`;
+      const problems = lintMigrationSql("0002_invites.sql", sql);
+      expect(
+        problems.some(
+          (p) => p.includes("table invitation:") && p.includes("no row-level"),
+        ),
+      ).toBe(true);
+    });
+
+    it("refuses a policy that reads using (true) on a workspace table", () => {
+      // Permissive policies combine with OR, so one `using (true)` defeats
+      // the tenant policy sitting beside it. That is precisely the shape 0008
+      // had to repair on workspace_members.
+      const sql = `${GOOD}
+create policy everyone_reads on goals for select using (true);
+`;
+      const problems = lintMigrationSql("0003_open.sql", sql);
+      expect(problems.some((p) => p.includes("using (true)"))).toBe(true);
+    });
+
+    it("still allows using (true) on an instance-scope table", () => {
+      // system_settings reads are deliberately instance-wide; its writes are
+      // what the admin check guards. The marker is the stated reason.
+      const sql = `
+-- openokr:instance-scope: settings sit above every workspace
+-- openokr:hard-delete: a setting is replaced, never tombstoned
+create table system_settings (
+  key text primary key,
+  value jsonb not null
+);
+alter table system_settings enable row level security;
+alter table system_settings force row level security;
+create policy settings_read on system_settings for select using (true);
+create policy settings_write on system_settings
+  for all
+  using (nullif(current_setting('app.instance_admin', true), '') = 'on');
+`;
+      expect(lintMigrationSql("0004_settings.sql", sql)).toEqual([]);
+    });
+
+    it("does not read a marker written without its colon", () => {
+      // "-- openokr:hard-delete is deliberately absent" is a sentence about a
+      // marker, not a marker. Reading it as one would waive the check the
+      // sentence exists to say is in force.
+      const sql = `
+-- openokr:hard-delete is deliberately absent, because rows here are kept
+create table notes (
+  id uuid primary key,
+  workspace_id uuid not null
+);
+alter table notes enable row level security;
+alter table notes force row level security;
+create policy tenant_isolation on notes
+  using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);
+`;
+      const problems = lintMigrationSql("0005_notes.sql", sql);
+      expect(problems.some((p) => p.includes("deleted_at"))).toBe(true);
+    });
+  });
+
   it("accepts the shipped fixture migration used by the isolation suite", async () => {
     const { readFile } = await import("node:fs/promises");
     const { join } = await import("node:path");

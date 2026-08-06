@@ -46,6 +46,20 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      # A tag reaches customers, so it gets more scrutiny than a pull request,
+      # not less. These three were only on the pull-request workflow, which
+      # meant a release could publish a chart or a compose target that nobody
+      # had installed since the last merge.
+      - name: Commit sign-off gate
+        run: pnpm check:signoff
+      - name: Chart checks
+        run: sh deploy/helm/check.sh
+      - name: Build the image and boot the compose target
+        run: |
+          docker build -f deploy/docker/Dockerfile -t openokr:release-check .
+          OPENOKR_IMAGE=openokr:release-check OPENOKR_SKIP_PULL=1 \
+            sh deploy/docker/smoke-test.sh
+
   publish:
     name: Build, publish and sign
     needs: verify
@@ -136,8 +150,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # Read-only, deliberately. Verification is what a customer does, and a
+      # customer has no ability to sign. A job that could mint a signing
+      # certificate is not checking the same thing they would.
       packages: read
-      id-token: write
     steps:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3

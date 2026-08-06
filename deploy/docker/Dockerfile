@@ -59,6 +59,18 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL=postgres://build:build@127.0.0.1:5432/build
 RUN pnpm --filter @openokr/web build
 
+# The two packages the key-rotation command needs that the standalone output
+# does not leave behind. Next compiles drizzle into its server bundle and
+# traces out only the native `pg`, so nothing importable remains for a script
+# run beside the server.
+#
+# Dereferenced with `cp -RL`, because pnpm's entries are symlinks into a
+# content-addressed store and a Docker COPY would copy the link rather than
+# what it points at.
+RUN mkdir -p /deps \
+  && cp -RL /repo/packages/db/node_modules/drizzle-orm /deps/drizzle-orm \
+  && cp -RL /repo/packages/config/node_modules/zod /deps/zod
+
 # ---------------------------------------------------------------------------
 # Runtime.
 # ---------------------------------------------------------------------------
@@ -89,6 +101,29 @@ COPY --from=build --chown=openokr:openokr /repo/apps/web/public ./apps/web/publi
 # workspace's packages to run a few hundred lines of SQL.
 COPY --from=build --chown=openokr:openokr /repo/packages/db/migrations ./migrator/packages/db/migrations
 COPY --from=build --chown=openokr:openokr /repo/packages/db/src ./migrator/packages/db/src
+
+# Key rotation runs from this layer too, and unlike the migration runner it
+# cannot use path imports all the way down: `rotate-keys.ts` needs
+# `@openokr/config` for the environment schema, and the rotation itself needs
+# `@openokr/db` for the settings table and the instance-admin wrapper.
+#
+# pnpm links workspace packages through a store that does not survive a COPY,
+# so those specifiers did not resolve inside the image and `openokr rotate-key`
+# failed on a missing module. It had never worked. The links are rebuilt here
+# against the copied sources, which is the same shape a checkout has, so the
+# command runs the same code the tests exercise.
+COPY --from=build --chown=openokr:openokr /repo/packages/db/package.json ./migrator/packages/db/package.json
+COPY --from=build --chown=openokr:openokr /repo/packages/config/src ./migrator/packages/config/src
+COPY --from=build --chown=openokr:openokr /repo/packages/config/package.json ./migrator/packages/config/package.json
+COPY --from=build --chown=openokr:openokr /repo/packages/core/src ./migrator/packages/core/src
+COPY --from=build --chown=openokr:openokr /repo/packages/core/package.json ./migrator/packages/core/package.json
+COPY --from=build --chown=openokr:openokr /deps/drizzle-orm ./migrator/node_modules/drizzle-orm
+COPY --from=build --chown=openokr:openokr /deps/zod ./migrator/node_modules/zod
+RUN mkdir -p /app/migrator/node_modules/@openokr \
+  && ln -s ../../packages/db /app/migrator/node_modules/@openokr/db \
+  && ln -s ../../packages/config /app/migrator/node_modules/@openokr/config \
+  && ln -s ../../packages/core /app/migrator/node_modules/@openokr/core \
+  && chown -R openokr:openokr /app/migrator/node_modules
 
 COPY --chown=openokr:openokr deploy/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Kept at its repository path inside the image, so the relative imports in it

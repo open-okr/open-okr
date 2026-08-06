@@ -29,6 +29,9 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-and-quality
+          # Scopes out the reference HTML that is not built or served. See the
+          # file for why, and for what would put it back in scope.
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Analyse
         uses: github/codeql-action/analyze@v4

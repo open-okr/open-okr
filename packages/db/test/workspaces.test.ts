@@ -260,7 +260,19 @@ describe("app.user_id: listing my own workspaces", () => {
 });
 
 describe("withContext", () => {
-  it("applies both settings at once, which provisioning needs", async () => {
+  /**
+   * The regression this file exists to hold.
+   *
+   * Both settings applied at once used to return the union: the scoped
+   * workspace OR every workspace the user belonged to. The Operation pipeline
+   * applies both on every write, so every read inside every operation was
+   * wider than the tenant floor. 0008 scopes the cross-workspace policies to
+   * transactions that name no workspace.
+   *
+   * An earlier version of this test asserted the union and called it correct,
+   * so the assertion below is the fix, not just a check on it.
+   */
+  it("does not widen past the workspace when both settings are applied", async () => {
     const wb = await workerDb();
 
     const rows = await withContext(
@@ -268,9 +280,50 @@ describe("withContext", () => {
       { workspaceId: WORKSPACE_A, userId: USER_ONE },
       (tx) => tx.select().from(workspaces),
     );
-    // The workspace setting alone would show Alpha; the user setting alone
-    // would show Alpha and Beta. Policies are permissive, so the union wins.
+    // Beta is the other workspace this user belongs to. Naming one workspace
+    // means one workspace.
+    expect(rows.map((row) => row.slug)).toEqual(["alpha"]);
+  });
+
+  it("does not widen past the workspace on workspace_members either", async () => {
+    const wb = await workerDb();
+
+    const rows = await withContext(
+      wb.db,
+      { workspaceId: WORKSPACE_A, userId: USER_ONE },
+      (tx) => tx.select().from(workspaceMembers),
+    );
+    // Two members in Alpha, and the same user's Beta membership must not
+    // appear. This is the read every operation performs to resolve its actor.
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.workspaceId === WORKSPACE_A)).toBe(true);
+  });
+
+  it("still answers the cross-workspace question when no workspace is named", async () => {
+    const wb = await workerDb();
+
+    const rows = await withContext(wb.db, { userId: USER_ONE }, (tx) =>
+      tx.select().from(workspaces),
+    );
+    // The switcher and the provisioning membership check both rely on this.
     expect(rows.map((row) => row.slug).sort()).toEqual(["alpha", "beta"]);
+  });
+
+  it("hides a soft-deleted membership from the cross-workspace read", async () => {
+    const wb = await workerDb();
+    await withWorkspace(wb.db, WORKSPACE_B, (tx) =>
+      tx
+        .update(workspaceMembers)
+        .set({ deletedAt: new Date() })
+        .where(eq(workspaceMembers.userId, USER_ONE)),
+    );
+
+    // 0005 filtered soft-deleted rows in own_workspaces but not in
+    // own_memberships, so a removed member kept reading their own row.
+    const memberships = await withContext(wb.db, { userId: USER_ONE }, (tx) =>
+      tx.select().from(workspaceMembers),
+    );
+    expect(memberships.map((row) => row.workspaceId)).toEqual([WORKSPACE_A]);
   });
 
   it("rejects a workspace id that is not a UUID before touching the database", async () => {

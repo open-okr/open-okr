@@ -63,7 +63,12 @@ const markersAbove = (
     if (!line.startsWith("--")) {
       break;
     }
-    const match = line.match(/^--\s*(openokr:[a-z-]+):?\s*(.*)$/);
+    // The colon is what makes a marker a marker. Without it,
+    // "-- openokr:hard-delete is deliberately absent" reads as the marker
+    // being present and waives the very check the sentence says is in force.
+    // A marker-shaped comment with no colon is therefore prose, and the table
+    // fails the underlying check, which is the safe direction to be wrong in.
+    const match = line.match(/^--\s*(openokr:[a-z-]+):\s*(.*)$/);
     if (match) {
       const [, marker, reason] = match as unknown as [string, string, string];
       if (reason.trim() === "") {
@@ -111,6 +116,36 @@ const tableStatements = (sql: string): TableStatement[] => {
 };
 
 const has = (sql: string, pattern: RegExp): boolean => pattern.test(sql);
+
+interface PolicyStatement {
+  readonly table: string;
+  /** From `create policy` to the terminating semicolon. */
+  readonly body: string;
+}
+
+/**
+ * Every `create policy` statement, with the table it applies to.
+ *
+ * Matching the table name inside the whole file, rather than pairing each
+ * policy with its table, let a policy on `invitations` satisfy the
+ * requirement for a table called `invitation`. Phase 2 adds several
+ * near-identical singular and plural names, so the pairing is now explicit.
+ */
+const policyStatements = (sql: string): PolicyStatement[] => {
+  const statements: PolicyStatement[] = [];
+  const pattern = /create\s+policy\s+"?[\w.]+"?\s+on\s+("?[\w.]+"?)/gi;
+  for (const match of sql.matchAll(pattern)) {
+    const end = sql.indexOf(";", match.index);
+    statements.push({
+      table: stripQuotes(match[1] as string),
+      body: sql.slice(match.index, end === -1 ? sql.length : end),
+    });
+  }
+  return statements;
+};
+
+/** `using (true)`, in any spacing. */
+const OPEN_USING = /\busing\s*\(\s*true\s*\)/i;
 
 /**
  * Lints one migration file's SQL. Returns human-readable problems; an empty
@@ -163,14 +198,26 @@ export function lintMigrationSql(fileName: string, sql: string): string[] {
             `so the table owner would bypass the tenant floor`,
         );
       }
-      if (
-        !has(
-          sql,
-          new RegExp(`create\\s+policy\\s+\\S+\\s+on\\s+"?${name}"?`, "i"),
-        )
-      ) {
+      const policies = policyStatements(sql).filter(
+        (policy) => policy.table === name,
+      );
+      if (policies.length === 0) {
         problems.push(
           `${label}: no row-level security policy created in the same migration file`,
+        );
+      }
+      // Postgres combines permissive policies with OR, so a single
+      // `using (true)` beside a tenant policy makes the tenant policy
+      // decorative. An instance-scope table is the one case where reading
+      // without a workspace is the point, and its marker states that.
+      if (
+        !table.markers.has(INSTANCE_SCOPE) &&
+        policies.some((policy) => OPEN_USING.test(policy.body))
+      ) {
+        problems.push(
+          `${label}: a policy reads "using (true)". Permissive policies are ` +
+            `combined with OR, so this grants every row to every request and ` +
+            `the tenant policy beside it stops meaning anything.`,
         );
       }
       if (
@@ -204,6 +251,15 @@ export interface MigrationLintResult {
 export interface MigrationLintSummary {
   readonly results: readonly MigrationLintResult[];
   readonly filesChecked: number;
+  /**
+   * Directories that yielded no `*.sql` file, whether missing or empty.
+   *
+   * Reported per directory rather than as one total. A renamed
+   * `packages/db/migrations` used to leave the aggregate non-zero because the
+   * test fixture directory still had files, so the gate stayed green while
+   * checking none of the real schema.
+   */
+  readonly emptyDirs: readonly string[];
 }
 
 /** Lints every `*.sql` file in the given directories. */
@@ -211,6 +267,7 @@ export async function lintMigrationDirs(
   dirs: readonly string[],
 ): Promise<MigrationLintSummary> {
   const results: MigrationLintResult[] = [];
+  const emptyDirs: string[] = [];
   let filesChecked = 0;
 
   for (const dir of dirs) {
@@ -220,9 +277,11 @@ export async function lintMigrationDirs(
       }
       throw error;
     });
-    for (const entry of entries
-      .filter((name) => name.endsWith(".sql"))
-      .sort()) {
+    const files = entries.filter((name) => name.endsWith(".sql")).sort();
+    if (files.length === 0) {
+      emptyDirs.push(dir);
+    }
+    for (const entry of files) {
       filesChecked += 1;
       const sql = await readFile(join(dir, entry), "utf8");
       const problems = lintMigrationSql(entry, sql);
@@ -232,5 +291,5 @@ export async function lintMigrationDirs(
     }
   }
 
-  return { results, filesChecked };
+  return { results, filesChecked, emptyDirs };
 }

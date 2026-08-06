@@ -80,7 +80,11 @@ echo "openokr: reached healthy in ${elapsed}s"
 pass "inside the 30-minute budget (${elapsed}s)"
 
 # --- migrations ran on boot ------------------------------------------------
-app_log | grep -q "applied 7 migration" \
+# The count is not pinned. It was, and adding a migration broke this check for
+# a reason that had nothing to do with what it tests. What matters is that the
+# boot applied a schema to an empty database, which the volume teardown in
+# cleanup guarantees. The cluster test makes the same check the same way.
+app_log | grep -qE "applied [0-9]+ migration" \
   || fail "migrations did not run on boot"
 pass "migrations ran on boot"
 
@@ -149,5 +153,28 @@ pass "re-running migrations is idempotent"
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the instance did not survive the upgrade"
 pass "the instance survived the upgrade"
+
+# --- key rotation ---------------------------------------------------------
+# A documented lifecycle command that had never run. The script pointed at a
+# file the image did not contain, so it failed on a missing module, and nothing
+# here exercised it. P2-T14 puts every AI provider key under this same root
+# key, so rotation needs to work before there is more to lose.
+key_before="$(grep '^OPENOKR_ENCRYPTION_KEY=' secrets/app.env | cut -d= -f2-)"
+
+./openokr rotate-key >/dev/null 2>&1 || fail "rotate-key failed"
+pass "the root key rotated"
+
+key_after="$(grep '^OPENOKR_ENCRYPTION_KEY=' secrets/app.env | cut -d= -f2-)"
+[ "$key_before" != "$key_after" ] || fail "rotate-key left the same key in place"
+pass "the stored root key actually changed"
+
+grep -q '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' secrets/app.env \
+  && fail "the previous key was left on the ring after a completed rotation"
+pass "the previous key was removed once rotation completed"
+
+# The point of the exercise: the instance still reads its own stored data.
+curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
+  || fail "the instance stopped working after rotation"
+pass "the instance still works after rotation"
 
 echo "openokr: all checks passed in ${elapsed}s"

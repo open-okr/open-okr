@@ -56,6 +56,39 @@ const politeServer = async (): Promise<number> => {
   return (listening.address() as { port: number }).port;
 };
 
+/**
+ * A server that advertises AUTH, refuses it, and quotes the credentials back.
+ *
+ * Real servers do this. The refusal text is the SMTP conversation, and the
+ * conversation contains the base64 AUTH line, so this is the one path where a
+ * password can reach an operator's screen. Every other test here fails at the
+ * socket, long before AUTH, which is why the redaction went unproven.
+ */
+const rejectingAuthServer = async (): Promise<number> => {
+  server = createServer((socket) => {
+    socket.write("220 localhost ESMTP test\r\n");
+    socket.on("data", (chunk) => {
+      const line = chunk.toString();
+      if (line.startsWith("EHLO") || line.startsWith("HELO")) {
+        socket.write("250-localhost\r\n250 AUTH PLAIN LOGIN\r\n");
+      } else if (line.startsWith("AUTH")) {
+        // Echo the client's own line back inside the error, transcript and all.
+        socket.write(`535 5.7.8 rejected: ${line.trim()}\r\n`);
+      } else if (line.startsWith("QUIT")) {
+        socket.write("221 Bye\r\n");
+        socket.end();
+      } else {
+        socket.write("250 OK\r\n");
+      }
+    });
+  });
+  const listening = server;
+  await new Promise<void>((resolve) =>
+    listening.listen(0, "127.0.0.1", resolve),
+  );
+  return (listening.address() as { port: number }).port;
+};
+
 describe("the connection test", () => {
   it("succeeds against a server that greets", async () => {
     const port = await politeServer();
@@ -119,6 +152,53 @@ describe("the connection test", () => {
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result)).not.toContain("hunter2");
   });
+
+  it("keeps the password out of a rejected AUTH transcript", async () => {
+    // Redacting base64(password) is not enough. AUTH PLAIN sends
+    // base64(NUL user NUL pass), and whether base64(pass) survives as a
+    // substring of that depends on byte alignment: base64 encodes in groups of
+    // three, so the password re-encodes identically only when the prefix
+    // length is a multiple of three.
+    //
+    // "postmaster" gives a seven-plus-two... twelve-byte prefix and happens to
+    // align, which is why the older redaction looked adequate. "admin" gives a
+    // seven-byte prefix and does not, so the password went out unredacted for
+    // roughly two usernames in three.
+    const port = await rejectingAuthServer();
+    const mailer = new SmtpMailer({
+      host: "127.0.0.1",
+      port,
+      secure: false,
+      from: "openokr@localhost",
+      user: "admin",
+      password: "hunter2",
+      requireTls: false,
+      timeoutMs: 2_000,
+    });
+
+    const result = await mailer.verify();
+    expect(result.ok).toBe(false);
+
+    const message = result.ok === false ? result.message : "";
+    expect(message).not.toContain("hunter2");
+    // And not in any encoding of it that appeared on the wire. AUTH PLAIN
+    // separates its fields with NUL, written here as an escape rather than
+    // a control character sitting invisibly in the source.
+    const NUL = "\u0000";
+    for (const encoded of [
+      Buffer.from("hunter2", "utf8").toString("base64"),
+      Buffer.from(`${NUL}admin${NUL}hunter2`, "utf8").toString("base64"),
+      Buffer.from(`admin${NUL}admin${NUL}hunter2`, "utf8").toString("base64"),
+    ]) {
+      expect(message).not.toContain(encoded);
+    }
+    // Anything base64 that survives must not decode to the password.
+    for (const token of message.match(/[A-Za-z0-9+/]{8,}={0,2}/g) ?? []) {
+      expect(Buffer.from(token, "base64").toString("utf8")).not.toContain(
+        "hunter2",
+      );
+    }
+  }, 10_000);
 });
 
 describe("sending", () => {
