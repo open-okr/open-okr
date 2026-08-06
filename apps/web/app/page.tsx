@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { APP_NAME } from "../lib/app-info";
 import { requireWorkspace } from "../lib/workspace";
+import { RenameWorkspace } from "./rename-workspace";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
 /**
@@ -18,6 +19,7 @@ export default async function HomePage() {
         Signed in as {session.user.name}, in {workspace.name}.
       </p>
       <WorkspaceSwitcher memberships={memberships} active={workspace} />
+      <RenameWorkspace name={workspace.name} />
       <p>
         <Link href="/account/security">Security settings</Link>
       </p>

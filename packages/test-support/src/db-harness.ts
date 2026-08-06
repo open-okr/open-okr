@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ensureRoles, runMigrations } from "@openokr/db";
+import { ensureRoles, grantAppPrivileges, runMigrations } from "@openokr/db";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
@@ -124,18 +124,11 @@ export default async function setupTemplateDatabase(): Promise<void> {
       await owner.connect();
       try {
         await runMigrations(owner, { dirs: MIGRATION_DIRS });
-        // The application role reads and writes data; it never owns tables
-        // and never gets DDL. Default privileges cover tables created by
-        // future migrations on top of a clone.
-        await owner.query(
-          `grant usage on schema public to ${testDbEnv.appRole}`,
-        );
-        await owner.query(
-          `grant select, insert, update, delete on all tables in schema public to ${testDbEnv.appRole}`,
-        );
-        await owner.query(
-          `alter default privileges in schema public grant select, insert, update, delete on tables to ${testDbEnv.appRole}`,
-        );
+        // The application role reads and writes data; it never owns tables and
+        // never gets DDL. The privilege model lives in packages/db so the
+        // tests and the first-run wizard grant exactly the same thing,
+        // including the append-only exception on the audit table.
+        await grantAppPrivileges(owner, { appRole: testDbEnv.appRole });
       } finally {
         await owner.end();
       }

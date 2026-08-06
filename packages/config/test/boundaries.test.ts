@@ -208,3 +208,88 @@ describe("checkBoundaries over several files", () => {
     ]);
   });
 });
+
+describe("the mutation rule: writes go through the Operation pipeline", () => {
+  const MUTATION = `await tx.update(workspaces).set({ name }).where(eq(workspaces.id, id));\n`;
+
+  test("fails a drizzle mutation in application code that never runs an operation", () => {
+    const violations = check(
+      "packages/core/src/workspaces/rename.ts",
+      MUTATION,
+    );
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("mutation-outside-operation");
+    expect(violations[0]?.message).toMatch(/Operation pipeline/);
+  });
+
+  test("allows a mutation in a file that runs the pipeline", () => {
+    // This is what an action handler looks like: the write is one statement
+    // inside the operation spec the pipeline executes.
+    const text = `import { runOperation } from "../operations/operation.ts";\nrunOperation(deps, { execute: async ({ tx }) => {\n${MUTATION}} });\n`;
+    expect(check("packages/core/src/actions/workspace.ts", text)).toEqual([]);
+  });
+
+  test("allows the database package, which implements the primitives", () => {
+    expect(check("packages/db/src/outbox.ts", MUTATION)).toEqual([]);
+  });
+
+  test("allows the pipeline itself to write the audit and activity rows", () => {
+    expect(
+      check("packages/core/src/operations/operation.ts", MUTATION),
+    ).toEqual([]);
+  });
+
+  test("catches insert and delete as well as update", () => {
+    expect(
+      check(
+        "packages/core/src/x.ts",
+        `await tx.insert(activities).values(a);\n`,
+      ),
+    ).toHaveLength(1);
+    expect(
+      check("packages/core/src/x.ts", `await tx.delete(goals).where(w);\n`),
+    ).toHaveLength(1);
+  });
+
+  test("ignores array and string methods that share those names", () => {
+    // `.delete(` on a Map or Set, and `.insert(` on an editor, are not writes.
+    const text = `seen.delete(key);\nconst next = list.insert(0, item);\neditor.update(state);\n`;
+    expect(check("packages/core/src/x.ts", text)).toEqual([]);
+  });
+
+  test("takes an explicit marker with a reason", () => {
+    const text = `// openokr:allow-mutation: the migration runner owns its own bookkeeping table\nawait tx.insert(migrations).values(row);\n`;
+    expect(check("packages/core/src/x.ts", text)).toEqual([]);
+  });
+
+  test("refuses a marker with no reason", () => {
+    const text = `// openokr:allow-mutation:\nawait tx.insert(migrations).values(row);\n`;
+    expect(check("packages/core/src/x.ts", text)).toHaveLength(1);
+  });
+
+  test("leaves the adapters package alone, which has no domain writes", () => {
+    expect(check("packages/adapters/src/drivers/cache.ts", MUTATION)).toEqual(
+      [],
+    );
+  });
+});
+
+describe("the mutation rule recognises the registry builder", () => {
+  const MUTATION = `await tx.update(workspaces).set({ name }).where(eq(workspaces.id, id));\n`;
+
+  test("allows a write declared with defineWriteAction", () => {
+    // A registry write action never names runOperation itself: the builder
+    // takes its operation spec and runs it. Requiring the literal call here
+    // would push every action file into an escape marker, which is how a lint
+    // stops being read.
+    const text = `import { defineWriteAction } from "./define.ts";\nexport const rename = defineWriteAction({ operation: () => ({ execute: async ({ tx }) => {\n${MUTATION}} }) });\n`;
+    expect(check("packages/core/src/actions/workspace.ts", text)).toEqual([]);
+  });
+
+  test("still fails an action file that only pretends to be one", () => {
+    const text = `export const rename = { async handler() {\n${MUTATION}} };\n`;
+    expect(check("packages/core/src/actions/workspace.ts", text)).toHaveLength(
+      1,
+    );
+  });
+});
