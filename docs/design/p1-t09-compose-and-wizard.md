@@ -134,6 +134,25 @@ down, which would have sent an operator to Postgres for the afternoon.
 **The rule this keeps proving:** a gate that cannot find its input must fail,
 not pass. Ask of every gate, "what does it print when it checks nothing?"
 
+## Found in review, fixed before merge
+
+A fresh-eyes pass over the finished task found that the mail work stopped one
+seam short of being real, plus one guard gap. All fixed on the open PR.
+
+| Found | Fix |
+|---|---|
+| `SmtpMailer` existed but nothing could construct it; `createAdapters` hardcoded the console driver | `createMailer` factory in adapters; `createAdapters` selects by config |
+| The seven `OPENOKR_MAIL_*` variables were documented and did nothing | `resolveMailSettings` in core: stored value, then environment, then default, password out of the sealed columns |
+| Password reset always printed to the console, even with SMTP configured | The app passes `sendResetPassword` through the resolved mailer, built per send so an admin change takes effect without a restart |
+| The wizard's mail probe hardcoded "not configured", so an env-configured server was reported as absent | The probe tests the resolved configuration live. Verified: a dead host shows `ECONNREFUSED` with the address |
+| `finishSetup` was callable without a session and took an unbounded instance name | Requires a signed-in caller and bounds the name. The auth layout stops redirecting to the wizard once an account exists, or the recovery path would be circular |
+| `verify()` was an SMTP-only method, so a probe needed driver knowledge | `verify()` is on the Mailer port; the console driver verifies as ok, because a working default is not a warning |
+
+The lesson is the mirror of the fail-open one: **a capability is not shipped
+until something can reach it.** The driver, the settings, the registry entries
+and the documentation all existed; the one missing piece was the seam that
+connects them, and every test passed without it.
+
 ## Seams for later tasks
 
 | Task | What changes here |

@@ -20,6 +20,18 @@ export interface SentMail {
   readonly messageId: string;
 }
 
+/** What a connection test may say. Never contains a credential. */
+export type MailVerifyResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string };
+
 export interface Mailer {
   send(message: MailMessage): Promise<SentMail>;
+  /**
+   * Proves the configuration without sending anything. The first-run wizard
+   * and the admin mail card call this, so an operator learns about a wrong
+   * port from a test button rather than from the first invitation that never
+   * arrives.
+   */
+  verify(): Promise<MailVerifyResult>;
 }

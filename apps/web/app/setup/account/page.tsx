@@ -30,12 +30,13 @@ export default async function SetupAccountPage() {
         <h1>Finish setup</h1>
         <p>
           An account already exists on this instance, but setup was never
-          recorded as finished. Finishing now closes registration, so everybody
-          after that first account joins by invitation.
+          recorded as finished. Sign in as that account if you are not already,
+          then finish here. Finishing closes registration, so everybody after
+          the first account joins by invitation.
         </p>
         <FinishSetup />
         <p>
-          <Link href="/sign-in">Sign in instead</Link>
+          <Link href="/sign-in">Sign in</Link>
         </p>
       </>
     );

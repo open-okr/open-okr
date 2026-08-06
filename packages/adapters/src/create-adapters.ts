@@ -13,6 +13,7 @@
  * schema, Drizzle, or the tenant wrapper; the host process passes a pool in.
  */
 
+import { createMailer, type MailerConfig } from "./create-mailer.ts";
 import { OffAIProvider } from "./drivers/ai/off.ts";
 import { InProcessCache } from "./drivers/cache/in-process.ts";
 import {
@@ -21,7 +22,6 @@ import {
 } from "./drivers/cache/postgres.ts";
 import { NoneChannel } from "./drivers/channel/none.ts";
 import { PgBossJobQueue } from "./drivers/jobs/pg-boss.ts";
-import { ConsoleMailer } from "./drivers/mail/console.ts";
 import { PostgresRealtime } from "./drivers/realtime/postgres.ts";
 import { PostgresSearch } from "./drivers/search/postgres.ts";
 import { LocalDiskStorage } from "./drivers/storage/local-disk.ts";
@@ -46,6 +46,9 @@ export interface AdapterOptions {
   /** In-process cache instead of the shared Postgres one. Single-process
    * deployments only: a rate limit in process memory is per instance. */
   readonly useInProcessCache?: boolean;
+  /** Resolved by the host from the §4.14 instance settings. Console when
+   * absent, which is the working default. */
+  readonly mail?: MailerConfig;
   readonly onError?: (error: unknown) => void;
 }
 
@@ -79,7 +82,7 @@ export function createAdapters(options: AdapterOptions): Adapters {
       root: options.storageRoot,
       signingSecret: options.storageSigningSecret,
     }),
-    mail: new ConsoleMailer(),
+    mail: createMailer(options.mail ?? { transport: "console" }),
     cache: options.useInProcessCache
       ? new InProcessCache()
       : new PostgresCache(options.pool),

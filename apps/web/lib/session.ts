@@ -11,7 +11,8 @@ import { getAuth } from "./auth";
  * page code that assumes a user.
  */
 
-const currentSession = async () => {
+/** The session, or null. For callers that refuse rather than redirect. */
+export const currentSession = async () => {
   // `headers()` first, deliberately. It is a dynamic API, so during a
   // prerender it bails the route out to request time before we touch the
   // database. Reading the auth instance first would instead try to open a

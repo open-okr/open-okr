@@ -17,6 +17,11 @@ import { getPool } from "../../lib/auth";
  * The redirect stops as soon as the wizard records completion, so an operator
  * who deliberately configured everything through environment variables and
  * finished setup never sees it again.
+ *
+ * It also stops once any account exists, even with setup unfinished. Finishing
+ * an interrupted wizard requires being signed in, so sign-in has to be
+ * reachable in that state or the recovery path would be circular: the wizard
+ * says sign in, and sign-in redirects to the wizard.
  */
 export const dynamic = "force-dynamic";
 
@@ -27,7 +32,7 @@ export default async function AuthLayout({
 }) {
   const state = await readSetupState(getPool());
 
-  if (!state.configured) {
+  if (!state.configured && !state.hasUser) {
     redirect("/setup");
   }
 

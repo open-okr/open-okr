@@ -16,7 +16,12 @@
  *      through.
  */
 import { createTransport, type Transporter } from "nodemailer";
-import type { Mailer, MailMessage, SentMail } from "../../ports/mail.ts";
+import type {
+  Mailer,
+  MailMessage,
+  MailVerifyResult,
+  SentMail,
+} from "../../ports/mail.ts";
 
 export interface SmtpOptions {
   readonly host: string;
@@ -34,10 +39,6 @@ export interface SmtpOptions {
   /** Applied to connection, greeting and socket alike. */
   readonly timeoutMs?: number;
 }
-
-export type VerifyResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly message: string };
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -102,7 +103,7 @@ export class SmtpMailer implements Mailer {
   }
 
   /** Opens a connection and completes the handshake, sending nothing. */
-  async verify(): Promise<VerifyResult> {
+  async verify(): Promise<MailVerifyResult> {
     try {
       await this.#transport.verify();
       return { ok: true };

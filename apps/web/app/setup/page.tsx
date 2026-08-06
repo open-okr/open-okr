@@ -6,6 +6,7 @@ import {
 } from "@openokr/core";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { getMailSettings, mailerFrom } from "../../lib/mail";
 import { CheckList } from "./check-list";
 
 /**
@@ -25,11 +26,19 @@ export const dynamic = "force-dynamic";
 export default async function SetupPage() {
   const pool = getPool();
 
+  // Mail is tested as it is actually resolved: an operator who set
+  // OPENOKR_MAIL_HOST in their compose override gets a live connection test
+  // against it, right here, before anything depends on it. With nothing
+  // configured, the console default reports itself honestly.
+  const mail = await getMailSettings();
+
   const tests = await runConnectionTests([
     databaseProbe(pool),
-    // Mail is not configured yet at this point in the wizard: this reports
-    // the honest default rather than testing a server nobody has named.
-    mailProbe({ configured: false }),
+    mailProbe({
+      configured: mail.transport === "smtp",
+      verify: () => mailerFrom(mail).verify(),
+      host: mail.host,
+    }),
     notInThisBuild("channel", "Phase 5"),
     notInThisBuild("ai", "Phase 6"),
   ]);

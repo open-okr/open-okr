@@ -3,6 +3,7 @@
 import { completeSetup, readSetupState } from "@openokr/core";
 import { getPool } from "../../../lib/auth";
 import { getKeyRing } from "../../../lib/secrets";
+import { currentSession } from "../../../lib/session";
 
 /**
  * Finishing setup, from the browser (P1-T09).
@@ -42,6 +43,32 @@ export async function finishSetup(
     return {
       ok: false,
       message: "Create the first account before finishing setup.",
+    };
+  }
+
+  // And the caller must be signed in as one. A server action is directly
+  // reachable whatever page rendered above it, and without this check an
+  // anonymous visitor could finish setup and name the instance during the
+  // window between the operator creating their account and clicking finish.
+  // The wizard's own flow always has a session here, because signing up
+  // signs you in.
+  if (!(await currentSession())) {
+    return {
+      ok: false,
+      message: "Sign in as the account you just created, then finish setup.",
+    };
+  }
+
+  // Validated at the boundary like any other external input. The bound is
+  // generous; the point is that an unbounded string cannot become a settings
+  // row.
+  if (
+    typeof input.instanceName !== "string" ||
+    input.instanceName.length > 120
+  ) {
+    return {
+      ok: false,
+      message: "The instance name must be 120 characters or fewer.",
     };
   }
 

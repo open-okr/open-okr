@@ -38,6 +38,23 @@ export function getAuth(): ReturnType<typeof createAuth> {
       pool: getPool(),
       secret: env.BETTER_AUTH_SECRET,
       baseUrl: env.BETTER_AUTH_URL,
+      // Through whatever mail is configured right now: SMTP when the instance
+      // has it, the console driver otherwise. Imported lazily because this
+      // module and lib/mail.ts import each other's pool accessor.
+      sendResetPassword: async ({ to, url }) => {
+        const { sendMail } = await import("./mail");
+        await sendMail({
+          to,
+          subject: "Reset your OpenOKR password",
+          text: [
+            "Someone asked to reset the password for this address.",
+            "",
+            `Reset it here: ${url}`,
+            "",
+            "If this was not you, ignore this message. The link expires.",
+          ].join("\n"),
+        });
+      },
       // Lets a server action set and clear the session cookie. Framework glue,
       // so it lives here rather than in packages/core, and Better Auth
       // requires it last in the plugin list.
