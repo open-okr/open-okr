@@ -136,7 +136,7 @@ docs/stakeholder    Stakeholder pack, and the reference mockups the UI tasks cit
 Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
-- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end
+- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs `pnpm db:up`, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs what ships rather than the development server. It rebuilds its own database on every run
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate

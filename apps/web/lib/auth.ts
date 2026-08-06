@@ -1,5 +1,6 @@
 import { loadEnv } from "@openokr/config";
 import { createAuth } from "@openokr/core";
+import { nextCookies } from "better-auth/next-js";
 import { Pool } from "pg";
 
 /**
@@ -37,6 +38,10 @@ export function getAuth(): ReturnType<typeof createAuth> {
       pool: getPool(),
       secret: env.BETTER_AUTH_SECRET,
       baseUrl: env.BETTER_AUTH_URL,
+      // Lets a server action set and clear the session cookie. Framework glue,
+      // so it lives here rather than in packages/core, and Better Auth
+      // requires it last in the plugin list.
+      plugins: [nextCookies()],
     });
   }
   return globals.openokrAuth;

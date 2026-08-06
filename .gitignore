@@ -27,3 +27,8 @@ coverage/
 
 # Next.js generates this and its contents differ between dev and build.
 next-env.d.ts
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/

@@ -23,11 +23,18 @@
     "check:licences": "node --experimental-strip-types --no-warnings scripts/check-licences.ts",
     "check:signoff": "node --experimental-strip-types --no-warnings scripts/check-signoff.ts",
     "flaky": "node --experimental-strip-types --no-warnings packages/test-support/bin/flaky.ts",
-    "audit:verify": "pnpm --filter @openokr/core audit:verify"
+    "audit:verify": "pnpm --filter @openokr/core audit:verify",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
+    "@openokr/db": "workspace:*",
+    "@openokr/test-support": "workspace:*",
+    "@playwright/test": "1.57.0",
+    "@types/pg": "catalog:",
     "knip": "6.31.0",
+    "pg": "catalog:",
     "turbo": "2.10.8",
     "vitest": "catalog:"
   }

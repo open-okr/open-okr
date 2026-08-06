@@ -14,6 +14,7 @@
 
 import { passkey } from "@better-auth/passkey";
 import { authSchema } from "@openokr/db";
+import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
@@ -50,6 +51,14 @@ export interface AuthOptions {
    * something else turn it off to stay independent of each other.
    */
   readonly rateLimit?: { readonly enabled: boolean };
+  /**
+   * Framework glue, supplied by the caller.
+   *
+   * `packages/core` knows nothing about Next.js, so the plugin that lets a
+   * server action set cookies belongs to the app rather than here. Better Auth
+   * requires it last, so these are appended after the built-in plugins.
+   */
+  readonly plugins?: readonly BetterAuthPlugin[];
 }
 
 /** Failed sign-in attempts allowed per window before the caller is refused. */
@@ -202,6 +211,7 @@ export function createAuth(options: AuthOptions) {
         rpName: "OpenOKR",
         origin: options.baseUrl,
       }),
+      ...(options.plugins ?? []),
     ],
   });
 }
