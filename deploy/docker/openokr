@@ -102,16 +102,56 @@ EOF
 DATABASE_URL=postgres://openokr:$db_password@db:5432/openokr
 BETTER_AUTH_SECRET=$(random_key)
 OPENOKR_ENCRYPTION_KEY=$(random_key)
-BETTER_AUTH_URL=${OPENOKR_URL:-http://localhost}
+BETTER_AUTH_URL=$(public_url)
 EOF
 
   chmod 600 "$APP_ENV" "$DB_ENV"
   log "secrets written to $SECRETS_DIR (mode 600). Back up $APP_ENV."
 }
 
+# The origin the browser will use. Passkeys are bound to it, and so are the
+# links in any mail the instance sends, so getting it wrong is not cosmetic.
+#
+# This used to read OPENOKR_URL, which nothing sets and nothing documents. The
+# documented variable is OPENOKR_DOMAIN, so a domain install wrote
+# http://localhost into app.env on its first run and kept it forever, because
+# secrets are generated once.
+public_url() {
+  if [ -n "${OPENOKR_DOMAIN:-}" ]; then
+    echo "https://$OPENOKR_DOMAIN"
+  else
+    echo "http://localhost"
+  fi
+}
+
+# Keeps BETTER_AUTH_URL in step with OPENOKR_DOMAIN on every `up`, not only on
+# the run that generated the secrets. An operator who adds a domain later would
+# otherwise have to know to edit app.env by hand.
+reconcile_public_url() {
+  [ -f "$APP_ENV" ] || return 0
+  wanted="$(public_url)"
+  current="$(grep '^BETTER_AUTH_URL=' "$APP_ENV" 2>/dev/null | cut -d= -f2-)"
+  [ "$current" = "$wanted" ] && return 0
+
+  log "updating BETTER_AUTH_URL from '${current:-unset}' to '$wanted'"
+  # `|| true` because grep reports "no lines matched" as a failure, and this
+  # script runs under `set -e`.
+  grep -v '^BETTER_AUTH_URL=' "$APP_ENV" > "$APP_ENV.next" || true
+  echo "BETTER_AUTH_URL=$wanted" >> "$APP_ENV.next"
+  mv "$APP_ENV.next" "$APP_ENV"
+  chmod 600 "$APP_ENV"
+
+  # Passkeys registered against the old origin will not work against the new
+  # one. That is a browser rule, not something this can migrate.
+  if [ -n "$current" ]; then
+    log "note: passkeys registered against $current must be re-enrolled"
+  fi
+}
+
 case "${1:-help}" in
   up)
     generate_secrets
+    reconcile_public_url
     # A bare hostname turns on automatic HTTPS; the default stays plain HTTP.
     if [ -n "${OPENOKR_DOMAIN:-}" ]; then
       OPENOKR_SITE="$OPENOKR_DOMAIN"

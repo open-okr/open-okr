@@ -65,6 +65,27 @@ settings and its documentation all existed, and nothing could reach any of it.
 not pass — ask what it prints when it checks nothing. And a capability is not
 shipped until something can reach it.
 
+## What the post-exit review found
+
+This checklist was written before a full review of Phase 1. That review, in
+`chore/p1-hardening`, found eleven more things and both rules held again.
+
+Two more gates that passed while checking nothing: the migration linter
+accepted a policy on `invitations` as a policy on a table called `invitation`
+and read a sentence about a marker as the marker itself, and the boundary gate
+did not cover `apps` at all while a direct mail send was already sitting there.
+
+One more capability nothing could reach: `./openokr rotate-key` had never run.
+It pointed at a file the image did not contain. The documentation, the helper
+and the rotation code were all correct and none of them had ever met.
+
+And a third rule worth adding, from the widest of the findings: **a test that
+asserts the current behaviour is not the same as a test that asserts the
+intended one.** Every read inside every operation was returning rows from
+other workspaces, and the reason it survived review is that a test named the
+union, described it in a comment, and passed. The tenant floor's proof said
+what the code did rather than what the rule required.
+
 ## Verdict
 
 Phase 1 exits. The skeleton runs on both targets, the tenant floor and the

@@ -28,9 +28,32 @@ pnpm install
 | `pnpm dead-code` | Fail on unused files, exports and dependencies |
 | `pnpm build` | Production build |
 
-All of these must pass before a change is reviewed. Continuous integration runs
-them again, plus a dependency licence gate, a commit sign-off gate, dependency
-review and code scanning.
+All of these must pass before a change is reviewed.
+
+Some need a database. `pnpm db:up` starts Postgres and PgBouncer in Docker,
+and `pnpm db:down` stops them.
+
+| Command | What it does |
+|---|---|
+| `pnpm db:up` / `pnpm db:down` | Start and stop the test database stack |
+| `pnpm db:migrate` | Apply migrations |
+| `pnpm db:lint` | The tenant floor and soft-delete checks on migrations |
+| `pnpm test:e2e` | Playwright, against a built standalone server |
+| `pnpm test:ci` | The whole repository as one suite, with the flakiness report |
+
+And the gates continuous integration runs, all of which you can run yourself:
+
+| Command | What it checks |
+|---|---|
+| `pnpm check:boundaries` | Vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline |
+| `pnpm check:licences` | Every dependency licence is on the allow list |
+| `pnpm check:signoff` | Commits carry a sign-off |
+| `pnpm audit:verify` | The append-only audit hash chain is intact |
+| `sh deploy/docker/smoke-test.sh` | The compose target boots from nothing and reaches a secured instance |
+| `sh deploy/helm/check.sh` | What the chart refuses, and that no credential lands in a pod spec |
+
+Continuous integration also runs dependency review and code scanning, which
+need GitHub and have no local equivalent.
 
 ## Environment
 

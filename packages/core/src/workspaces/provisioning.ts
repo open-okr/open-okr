@@ -263,10 +263,17 @@ async function insertWorkspaceAndMember(
     const slug = attempt === 0 ? base : `${base}-${randomSuffix()}`;
     try {
       return await tx.transaction(async (savepoint) => {
+        // openokr:allow-mutation: this helper is called from the provisioning
+        // operation at the top of this file and writes on the transaction that
+        // operation opened, so the audit and activity rows commit with it. The
+        // write is lexically outside the runOperation call, which is what the
+        // marker records.
         await savepoint
           .insert(workspaces)
           .values({ id: workspaceId, name, slug, settings });
 
+        // openokr:allow-mutation: the same transaction, and the same reason.
+        // The first member is written beside the workspace or not at all.
         await savepoint.insert(workspaceMembers).values({
           id: memberId,
           workspaceId,

@@ -145,16 +145,29 @@ Keep this list current once scaffolded.
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
-- `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:change`: migrations, demo data, the data-change runner
+- `pnpm db:migrate`: migrations
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
 - `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
 - `sh deploy/docker/smoke-test.sh`: boot the compose target from nothing and prove a clean server reaches a secured instance with an admin. Takes `OPENOKR_IMAGE`
 - `sh deploy/helm/check.sh`: the Helm chart's behaviour checks, no cluster needed. What the chart refuses, where migrations run, and that no credential lands in a pod spec
 - `sh deploy/helm/cluster-test.sh`: install the chart into a kind cluster, register a user and upgrade. Needs `kind create cluster` and the image loaded. Takes `OPENOKR_IMAGE_TAG`
 - `pnpm db:lint`: the migration linter (tenant floor, soft delete) and the soft-delete usage lint
-- `pnpm method:check`: the conformance suite comparing `packages/method` against METHOD.md
-- `pnpm import:csv` and `pnpm import:flowyteam`: the importers, dry-run by default
-- `pnpm gen:contract`: regenerate OpenAPI, the agent tool catalogue, the command line and the chat commands from the action registry
+
+### Commands that do not exist yet
+
+Each arrives with the task named beside it. Listed here so the intended name is
+settled, and so nobody documents a command as though it already runs. A command
+that is written down but absent has already cost this repository once: `pnpm
+test:e2e` was in this list for four tasks before P1-T08 built it.
+
+| Command | Arrives at | What it will do |
+|---|---|---|
+| `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
+| `pnpm db:change` | P2-T12 | The data-change runner, kept separate from schema migrations |
+| `pnpm gen:contract` | P2-T09 | Regenerate OpenAPI, the agent tool catalogue, the command line and the chat commands from the action registry |
+| `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
+| `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
+| `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |
 
 ## Definition of done for every task
 

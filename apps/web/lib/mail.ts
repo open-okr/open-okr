@@ -38,5 +38,11 @@ export async function sendMail(message: {
   text: string;
 }): Promise<void> {
   const settings = await getMailSettings();
+  // openokr:allow-side-effect: password reset is the only caller, and it has
+  // no domain transaction to attach an outbox row to. Better Auth asks for the
+  // mail while the person waits on the form, and a reset that is queued rather
+  // than sent reads as a broken button. Everything with a transaction behind
+  // it goes through the outbox: invitations at P2-T04, notifications at
+  // P2-T06. This marker is the reason those must not copy this line.
   await mailerFrom(settings).send(message);
 }

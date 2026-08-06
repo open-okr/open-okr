@@ -14,7 +14,7 @@ import { lintMigrationDirs } from "../migration-lint.ts";
 const migrations = join(import.meta.dirname, "../../migrations");
 const dirs = [migrations, ...process.argv.slice(2)];
 
-const { results, filesChecked } = await lintMigrationDirs(dirs);
+const { results, filesChecked, emptyDirs } = await lintMigrationDirs(dirs);
 
 if (results.length > 0) {
   for (const result of results) {
@@ -26,10 +26,15 @@ if (results.length > 0) {
   process.exit(1);
 }
 
-if (filesChecked === 0) {
-  process.stderr.write(
-    `No migrations found under ${migrations}. The lint checked nothing, which is not a pass.\n`,
-  );
+// Per directory, not in total. A renamed migrations directory used to leave
+// the total non-zero because the fixture directory still had files, so the
+// gate reported success having read none of the real schema.
+if (emptyDirs.length > 0) {
+  for (const dir of emptyDirs) {
+    process.stderr.write(
+      `No .sql files found under ${dir}. The lint checked nothing there, which is not a pass.\n`,
+    );
+  }
   process.exit(1);
 }
 

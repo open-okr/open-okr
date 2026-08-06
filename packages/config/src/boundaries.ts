@@ -104,12 +104,18 @@ const VENDOR_SDKS: readonly string[] = [
 const ADAPTERS_PREFIX = "packages/adapters/";
 
 /**
- * Packages whose write paths must not touch a driver. `packages/core` owns
- * the Operation pipeline; `packages/agents` proposes changes through it.
+ * Where write paths live. `packages/core` owns the Operation pipeline,
+ * `packages/agents` proposes changes through it, and `apps` holds the server
+ * actions and route handlers that call both.
+ *
+ * `apps` was missing, and a direct mail send in a server action was already
+ * sitting outside the rule as a result. Phase 2 adds invitation and
+ * notification sends in exactly that layer.
  */
 const WRITE_PATH_PREFIXES: readonly string[] = [
   "packages/core/",
   "packages/agents/",
+  "apps/",
 ];
 
 /**
@@ -252,25 +258,35 @@ const checkWritePathSideEffects = (
   const violations: BoundaryViolation[] = [];
   // A call on something that reads as a port: `jobs.enqueue(`,
   // `this.mailer.send(`, `adapters.channel.sendToChannel(`.
+  //
+  // The receiver may also be a call expression, as in
+  // `mailerFrom(settings).send(...)`. Anchoring on an identifier alone read
+  // straight past that shape, which is how the one direct mail send in the
+  // application went unseen.
   const pattern = new RegExp(
-    `\\b(\\w+)\\.(${SIDE_EFFECT_METHODS.join("|")})\\s*\\(`,
+    `(\\w+|\\))\\s*\\.\\s*(${SIDE_EFFECT_METHODS.join("|")})\\s*\\(`,
     "g",
   );
+  const lines = file.text.split("\n");
 
   for (const match of file.text.matchAll(pattern)) {
     const receiver = match[1] as string;
     const method = match[2] as string;
     const index = match.index;
+    const line = lineOf(file.text, index);
+    const lineText = lines[line - 1] ?? "";
 
     // `outbox.send(...)` style calls on the outbox itself are the correct
-    // path, as are enqueueOutbox helpers.
-    if (/outbox/i.test(receiver)) {
+    // path, as are enqueueOutbox helpers. A call-expression receiver has no
+    // name to read, so the statement it sits on is what gets checked.
+    if (/outbox/i.test(receiver === ")" ? lineText : receiver)) {
       continue;
     }
 
-    const line = lineOf(file.text, index);
-    const lineText = file.text.split("\n")[line - 1] ?? "";
     if (/openokr:allow-side-effect:\s*\S/.test(lineText)) {
+      continue;
+    }
+    if (hasMarkerAbove(lines, line, "allow-side-effect")) {
       continue;
     }
 
@@ -330,6 +346,16 @@ const MUTATION_ON_DB_HANDLE =
   /\b(?:tx|trx|db|database|savepoint|executor)\s*\.\s*(insert|update|delete)\s*\(\s*[A-Za-z_$][\w$]*\s*\)/g;
 
 /**
+ * A write sent as SQL text rather than built with Drizzle.
+ *
+ * `tx.execute(sql`update ...`)` and `client.query("insert into ...")` are the
+ * obvious way around a lint that only knows the builders, and neither was
+ * visible to it. Reads are left alone: only the three mutating verbs match.
+ */
+const RAW_SQL_MUTATION =
+  /\b(?:query|execute)\s*\(\s*(?:sql\s*)?["'`]\s*(insert\s+into|update|delete\s+from)\b/gi;
+
+/**
  * The line a statement begins on.
  *
  * Walks back to the last statement boundary, so a chain spread over five
@@ -371,6 +397,47 @@ const statementStartLine = (text: string, index: number): number => {
   return line;
 };
 
+/**
+ * The character span of every `runOperation(...)` and `defineWriteAction(...)`
+ * call in a file.
+ *
+ * A write inside one of these spans is the change the pipeline commits
+ * alongside its audit row. A write outside them is not, even in the same file.
+ *
+ * The rule used to exempt the whole file as soon as either name appeared
+ * anywhere in it, so a handler that declared one operation could carry any
+ * number of unrelated raw writes past the gate. Both spellings still count:
+ * `runOperation` runs a spec directly, and `defineWriteAction` is the registry
+ * builder that takes a spec and runs it, so a write action cannot be declared
+ * without one.
+ *
+ * Parentheses inside string literals can skew the balance. That makes this a
+ * strong net rather than a proof, which is the same standing the mutation
+ * patterns themselves have.
+ */
+const pipelineSpans = (text: string): [number, number][] => {
+  const spans: [number, number][] = [];
+  const opener = /\b(?:runOperation|defineWriteAction)\s*\(/g;
+
+  for (const match of text.matchAll(opener)) {
+    const open = match.index + match[0].length - 1;
+    let depth = 0;
+    for (let i = open; i < text.length; i++) {
+      const char = text[i];
+      if (char === "(") {
+        depth++;
+      } else if (char === ")") {
+        depth--;
+        if (depth === 0) {
+          spans.push([match.index, i]);
+          break;
+        }
+      }
+    }
+  }
+  return spans;
+};
+
 /** Checks the mutation rule for one file. */
 const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   if (!MUTATION_CHECKED_PREFIXES.some((p) => file.path.startsWith(p))) {
@@ -379,14 +446,10 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   if (MUTATION_ALLOWED_PREFIXES.some((p) => file.path.startsWith(p))) {
     return [];
   }
-  // A file that declares an operation is a handler: its writes are the change
-  // the pipeline commits alongside the audit row. Both spellings count.
-  // `runOperation` runs a spec directly; `defineWriteAction` is the registry
-  // builder that takes a spec and runs it, so a write action cannot be
-  // declared without one.
-  if (/\b(?:runOperation|defineWriteAction)\b/.test(file.text)) {
-    return [];
-  }
+
+  const spans = pipelineSpans(file.text);
+  const insidePipeline = (index: number): boolean =>
+    spans.some(([start, end]) => index >= start && index <= end);
 
   const violations: BoundaryViolation[] = [];
   const lines = file.text.split("\n");
@@ -394,9 +457,13 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   const matches = [
     ...file.text.matchAll(MUTATION_CHAIN),
     ...file.text.matchAll(MUTATION_ON_DB_HANDLE),
+    ...file.text.matchAll(RAW_SQL_MUTATION),
   ];
 
   for (const match of matches) {
+    if (insidePipeline(match.index)) {
+      continue;
+    }
     const method = match[1] as string;
     const line = lineOf(file.text, match.index);
     // Both patterns match the same statement at different lines: one lands on
