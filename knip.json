@@ -2,7 +2,12 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts"]
+      "entry": [
+        "scripts/*.ts",
+        "e2e/*.spec.ts",
+        "e2e/prepare-database.ts",
+        "deploy/docker/migrate.ts"
+      ]
     },
     "apps/web": {
       "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]

@@ -48,6 +48,36 @@ export {
   runOperation,
 } from "./operations/operation.ts";
 export {
+  environmentValue,
+  getInstanceSetting,
+  INSTANCE_SETTINGS,
+  type InstanceSettingDefinition,
+  SETUP_COMPLETED_AT,
+} from "./secrets/instance-registry.ts";
+export {
+  clearSetting,
+  type ResolvedSetting,
+  readSecret,
+  readSetting,
+  readSettingRows,
+  resolveSetting,
+  type SettingSource,
+  type SettingWrite,
+  writeSettings,
+} from "./secrets/instance-settings.ts";
+export {
+  decryptSecret,
+  encryptSecret,
+  type KeyRing,
+  KeyRingError,
+  type KeyRingSource,
+  newRootKey,
+  parseKeyRing,
+  rewrapSecret,
+  rootKeyFingerprint,
+  type SealedSecret,
+} from "./secrets/key-ring.ts";
+export {
   DEFAULT_QUIET_HOURS,
   INSTANCE_DEFAULT_LANGUAGE,
   isKnownTimezone,
@@ -58,6 +88,29 @@ export {
   type SettingDefinition,
   type SettingScope,
 } from "./settings/registry.ts";
+export {
+  type CompleteSetupInput,
+  type CompleteSetupResult,
+  completeSetup,
+} from "./setup/complete.ts";
+export {
+  blockingFailures,
+  type ConnectionOutcome,
+  type ConnectionProbe,
+  type ConnectionTest,
+  runConnectionTests,
+} from "./setup/connection-tests.ts";
+export {
+  databaseProbe,
+  type MailProbeOptions,
+  mailProbe,
+  notInThisBuild,
+} from "./setup/probes.ts";
+export {
+  readSetupState,
+  type SetupState,
+  setupRefusal,
+} from "./setup/state.ts";
 export {
   listMembershipsForUser,
   type Membership,

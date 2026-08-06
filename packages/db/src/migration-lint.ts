@@ -13,13 +13,19 @@
  *   -- openokr:not-tenant-scoped: <why this table holds no workspace data>
  *   -- openokr:hard-delete: <why rows are really removed>
  *   -- openokr:tenant-root: <why this table has no workspace_id of its own>
+ *   -- openokr:instance-scope: <why this table sits above every workspace>
  *
- * The third marker exists for exactly one table. `workspaces` cannot carry a
- * `workspace_id`, because it is what every other table's `workspace_id` points
- * at. Calling it infrastructure would excuse it from the policy and soft-delete
- * checks as well, which is the last thing that should happen to the table the
- * whole tenant floor rests on. So this marker drops the column requirement and
- * keeps every other one.
+ * The last two are for tables that genuinely cannot carry a `workspace_id`,
+ * for opposite reasons, and both keep every other check.
+ *
+ * `workspaces` is the tenant root: it is what every other table's
+ * `workspace_id` points at, so it cannot hold one.
+ *
+ * `system_settings` is instance scope: it sits above every workspace rather
+ * than beneath one. Calling either infrastructure would waive the policy and
+ * soft-delete checks too, and these are the tables the tenant floor rests on
+ * and the instance's credentials live in. So these markers drop the column
+ * requirement and nothing else.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -27,6 +33,7 @@ import { join } from "node:path";
 const NOT_TENANT_SCOPED = "openokr:not-tenant-scoped";
 const HARD_DELETE = "openokr:hard-delete";
 const TENANT_ROOT = "openokr:tenant-root";
+const INSTANCE_SCOPE = "openokr:instance-scope";
 
 interface TableStatement {
   readonly name: string;
@@ -117,10 +124,12 @@ export function lintMigrationSql(fileName: string, sql: string): string[] {
     problems.push(...table.problems.map((problem) => `${label}: ${problem}`));
 
     const infrastructure = table.markers.has(NOT_TENANT_SCOPED);
-    const tenantRoot = table.markers.has(TENANT_ROOT);
+    // Both waive the column and nothing else. See the file comment.
+    const unscopedByDesign =
+      table.markers.has(TENANT_ROOT) || table.markers.has(INSTANCE_SCOPE);
 
     if (!infrastructure) {
-      if (!tenantRoot && !/\bworkspace_id\b/i.test(table.body)) {
+      if (!unscopedByDesign && !/\bworkspace_id\b/i.test(table.body)) {
         problems.push(
           `${label}: business tables carry a workspace_id column. ` +
             `Infrastructure tables need an "-- ${NOT_TENANT_SCOPED}: <reason>" marker.`,
@@ -184,11 +193,26 @@ export interface MigrationLintResult {
   readonly problems: readonly string[];
 }
 
+/**
+ * What the lint found, and how much it looked at.
+ *
+ * The count is not decoration. A missing directory yields no files and no
+ * problems, which is indistinguishable from a clean pass unless the number of
+ * files checked is reported. Two gates in this repository have already
+ * announced success while inspecting nothing.
+ */
+export interface MigrationLintSummary {
+  readonly results: readonly MigrationLintResult[];
+  readonly filesChecked: number;
+}
+
 /** Lints every `*.sql` file in the given directories. */
 export async function lintMigrationDirs(
   dirs: readonly string[],
-): Promise<MigrationLintResult[]> {
+): Promise<MigrationLintSummary> {
   const results: MigrationLintResult[] = [];
+  let filesChecked = 0;
+
   for (const dir of dirs) {
     const entries = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") {
@@ -199,6 +223,7 @@ export async function lintMigrationDirs(
     for (const entry of entries
       .filter((name) => name.endsWith(".sql"))
       .sort()) {
+      filesChecked += 1;
       const sql = await readFile(join(dir, entry), "utf8");
       const problems = lintMigrationSql(entry, sql);
       if (problems.length > 0) {
@@ -206,5 +231,6 @@ export async function lintMigrationDirs(
       }
     }
   }
-  return results;
+
+  return { results, filesChecked };
 }

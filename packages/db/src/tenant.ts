@@ -69,10 +69,38 @@ export async function withUser<
   return withContext(db, { userId }, fn);
 }
 
-/** What a transaction is scoped to. At least one of the two is required. */
+/**
+ * Permits writes to instance settings for one transaction.
+ *
+ * The same shape as the tenant floor, applied to the table that sits above
+ * every workspace. Ordinary request paths never set it, so a stray write to
+ * `system_settings` from a request handler is refused by Postgres rather than
+ * caught in review. The wizard and instance administration set it on purpose.
+ */
+export const INSTANCE_ADMIN_SETTING = "app.instance_admin";
+
+/** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
   readonly userId?: string;
+  /** Opens instance-settings writes. Never set from a request handler. */
+  readonly instanceAdmin?: boolean;
+}
+
+/**
+ * Opens a transaction that may write instance settings.
+ *
+ * Deliberately separate from `withWorkspace` and `withUser`: instance settings
+ * are not workspace data, and a caller should have to name what it is doing.
+ */
+export async function withInstanceAdmin<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { instanceAdmin: true }, fn);
 }
 
 /**
@@ -93,7 +121,7 @@ export async function withContext<
   context: TenantContext,
   fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
 ): Promise<T> {
-  const { workspaceId, userId } = context;
+  const { workspaceId, userId, instanceAdmin } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
     throw new Error("Invalid workspace id: expected a UUID.");
@@ -103,9 +131,9 @@ export async function withContext<
   if (userId !== undefined && (userId === "" || userId.length > 255)) {
     throw new Error("Invalid user id: expected a non-empty identifier.");
   }
-  if (workspaceId === undefined && userId === undefined) {
+  if (workspaceId === undefined && userId === undefined && !instanceAdmin) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, or both.",
+      "A tenant context needs a workspace id, a user id, or instance admin.",
     );
   }
 
@@ -120,6 +148,11 @@ export async function withContext<
     if (userId !== undefined) {
       await tx.execute(
         sql`select set_config(${USER_SETTING}, ${userId}, true)`,
+      );
+    }
+    if (instanceAdmin) {
+      await tx.execute(
+        sql`select set_config(${INSTANCE_ADMIN_SETTING}, 'on', true)`,
       );
     }
     return fn(tx);

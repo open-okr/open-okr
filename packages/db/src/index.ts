@@ -44,6 +44,7 @@ export {
   verifications,
 } from "./schema/auth.ts";
 export { outbox } from "./schema/outbox.ts";
+export { systemSettings } from "./schema/system-settings.ts";
 export {
   type QuietHours,
   type Workspace,
@@ -65,11 +66,13 @@ export {
   type SourceFile,
 } from "./soft-delete-lint.ts";
 export {
+  INSTANCE_ADMIN_SETTING,
   type TenantContext,
   USER_SETTING,
   WORKSPACE_SETTING,
   type WorkspaceTx,
   withContext,
+  withInstanceAdmin,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

@@ -20,6 +20,13 @@ const PUBLIC_PREFIXES = [
   "/reset-password",
   "/backup-code",
   "/api/auth",
+  // The first-run wizard runs before anybody has an account, so it cannot sit
+  // behind a session. Its own layout refuses once the instance is configured,
+  // which is a database question and therefore not one this file can ask.
+  "/setup",
+  // The container health check has no session and must answer while the
+  // instance is still starting.
+  "/api/health",
 ];
 
 export function proxy(request: NextRequest) {

@@ -1,0 +1,60 @@
+# Reverse proxy for the compose target (P1-T09).
+#
+# Caddy gets and renews certificates by itself, so a real domain needs no
+# certificate step and no renewal timer. That is the whole reason it is here
+# rather than nginx.
+#
+# OPENOKR_SITE decides the mode:
+#
+#   http://localhost      plain HTTP, no certificate attempted (the default)
+#   okr.example.com       automatic HTTPS from Let's Encrypt
+#
+# Both come from the same file, so moving from a laptop to a server is one
+# environment variable and not a different configuration.
+
+{
+	# No `email` directive. Let's Encrypt does not require one, and Caddy
+	# refuses to start on an empty value, so a default of "" would break every
+	# deployment that did not set it. An operator who wants expiry warnings
+	# adds the line themselves.
+	#
+	# Caddy's own admin API. Off: nothing here reconfigures Caddy at runtime,
+	# and an open admin socket inside the network is a way to reconfigure the
+	# proxy from a compromised container.
+	admin off
+}
+
+{$OPENOKR_SITE} {
+	encode gzip zstd
+
+	# Strict transport security only when this site is actually served over
+	# TLS. Sending it over plain HTTP would pin a laptop's browser to HTTPS
+	# for localhost, which is a hard thing for someone to undo.
+	@secure expression {http.request.scheme} == 'https'
+	header @secure Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Clickjacking and MIME sniffing. The content security policy belongs with
+	# the application, which knows its own nonces (TECHNICAL-PLAN §8.2).
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		# Caddy announces itself by default. It does not need to.
+		-Server
+	}
+
+	reverse_proxy app:3000 {
+		# The application builds absolute URLs for passkeys and mail links, so
+		# it has to know how it was reached rather than that it was reached
+		# over plain HTTP inside the network.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+
+		# Long enough for a slow first paint on a cold instance, short enough
+		# that a hung request is not held open indefinitely.
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 60s
+		}
+	}
+}

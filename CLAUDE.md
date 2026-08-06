@@ -136,7 +136,7 @@ docs/stakeholder    Stakeholder pack, and the reference mockups the UI tasks cit
 Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
-- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs `pnpm db:up`, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs what ships rather than the development server. It rebuilds its own database on every run
+- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs `pnpm db:up`, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate
@@ -146,6 +146,9 @@ Keep this list current once scaffolded.
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
 - `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:change`: migrations, demo data, the data-change runner
+- `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
+- `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
+- `sh deploy/docker/smoke-test.sh`: boot the compose target from nothing and prove a clean server reaches a secured instance with an admin. Takes `OPENOKR_IMAGE`
 - `pnpm db:lint`: the migration linter (tenant floor, soft delete) and the soft-delete usage lint
 - `pnpm method:check`: the conformance suite comparing `packages/method` against METHOD.md
 - `pnpm import:csv` and `pnpm import:flowyteam`: the importers, dry-run by default

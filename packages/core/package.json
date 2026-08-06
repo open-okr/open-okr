@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts"
+    "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts",
+    "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",
