@@ -149,6 +149,8 @@ Keep this list current once scaffolded.
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
 - `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
 - `sh deploy/docker/smoke-test.sh`: boot the compose target from nothing and prove a clean server reaches a secured instance with an admin. Takes `OPENOKR_IMAGE`
+- `sh deploy/helm/check.sh`: the Helm chart's behaviour checks, no cluster needed. What the chart refuses, where migrations run, and that no credential lands in a pod spec
+- `sh deploy/helm/cluster-test.sh`: install the chart into a kind cluster, register a user and upgrade. Needs `kind create cluster` and the image loaded. Takes `OPENOKR_IMAGE_TAG`
 - `pnpm db:lint`: the migration linter (tenant floor, soft delete) and the soft-delete usage lint
 - `pnpm method:check`: the conformance suite comparing `packages/method` against METHOD.md
 - `pnpm import:csv` and `pnpm import:flowyteam`: the importers, dry-run by default

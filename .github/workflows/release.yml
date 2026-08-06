@@ -1,0 +1,184 @@
+name: Release
+
+# Only on a version tag. Nothing publishes on a push to main, so an image
+# reaching a registry is always a deliberate act (PLAN.md §170: customers pin
+# versions and nothing is force-upgraded).
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository }}
+
+jobs:
+  # The tag is not trusted to mean the code is good. Everything that gates a
+  # pull request gates a release too, and the image is not built until it
+  # passes.
+  verify:
+    name: Verify the tagged commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+
+      - name: Type check
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Dead code gate
+        run: pnpm dead-code
+      - name: Migration and soft-delete lint
+        run: pnpm db:lint
+      - name: Architecture boundary gate
+        run: pnpm check:boundaries
+      - name: Dependency licence gate
+        run: pnpm check:licences
+
+      - name: Start the test database stack
+        run: pnpm db:up
+      - name: Tests
+        run: pnpm test
+
+  publish:
+    name: Build, publish and sign
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Push to GitHub Container Registry.
+      packages: write
+      # The OIDC token cosign exchanges for a short-lived certificate. This is
+      # what makes keyless signing possible: there is no private key to store,
+      # rotate or leak, and the signature records which workflow at which
+      # commit produced the image.
+      id-token: write
+      # Lets the attestation be recorded against the repository.
+      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          # v1.2.3 publishes 1.2.3, 1.2 and 1. No `latest` on a prerelease.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          # Both architectures: a customer's cluster is as likely to be arm64
+          # as amd64, and a single-architecture image fails at pull time with a
+          # message nobody enjoys reading.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Records the commit and workflow that produced the image, so a
+          # published artefact can be traced back without trusting the tag.
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image
+        # Keyless: cosign exchanges the workflow's OIDC token for a short-lived
+        # certificate from Sigstore and records the signature in the public
+        # transparency log. Verifying proves which workflow, at which commit,
+        # built the image, rather than proving somebody held a key.
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "${REGISTRY}/${IMAGE}@${DIGEST}"
+
+      - name: Attest the build
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  # A published signature nobody checks is decoration. This verifies the
+  # signature from outside the publishing job, the same way a customer would.
+  verify-signature:
+    name: Verify the published signature
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${REGISTRY}/${IMAGE}@${DIGEST}"
+          echo "Signature verified for ${REGISTRY}/${IMAGE}@${DIGEST}"
+
+  chart:
+    name: Package the chart
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v4
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # The chart's appVersion follows the release, so `helm install` with
+          # no image.tag installs the version that was just published rather
+          # than whatever the chart was committed with.
+          helm package deploy/helm \
+            --version "$VERSION" \
+            --app-version "$VERSION" \
+            --destination dist
+
+      - name: Publish to the registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          VERSION="${GITHUB_REF_NAME#v}"
+          helm push "dist/openokr-${VERSION}.tgz" \
+            "oci://ghcr.io/${{ github.repository_owner }}/charts"

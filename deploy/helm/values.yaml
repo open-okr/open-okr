@@ -1,0 +1,140 @@
+# OpenOKR chart values.
+#
+# One value is required and has no default: the database. Everything else
+# resolves, because a chart that needs a page of configuration before it will
+# start is a chart nobody installs twice.
+#
+#   helm install openokr ./deploy/helm \
+#     --set database.url='postgres://user:pass@host:5432/openokr'
+
+image:
+  repository: ghcr.io/open-okr/open-okr
+  # Empty means the chart's appVersion. Pin this in production: customers pin
+  # versions and nothing is force-upgraded.
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# How many application pods. Migrations run in a hook rather than on pod boot,
+# and the migration runner takes a Postgres advisory lock, so more than one is
+# safe from the first install.
+replicaCount: 2
+
+database:
+  # Required. postgres:// or postgresql://, reachable from the cluster.
+  # Prefer existingSecret over this: a URL set here lands in the release's
+  # stored values, which anyone with `helm get values` can read.
+  url: ""
+  # A Secret holding the connection string. Takes precedence over url.
+  existingSecret: ""
+  existingSecretKey: "database-url"
+  # Optional owner-role connection used only by the migration hook, so the
+  # application role never owns the tables.
+  adminUrl: ""
+
+# The instance's public origin. Passkeys are bound to it, so it must be the
+# address people actually use. Defaults to the first ingress host when unset.
+publicUrl: ""
+
+secrets:
+  # A Secret holding BETTER_AUTH_SECRET and OPENOKR_ENCRYPTION_KEY. When empty,
+  # the chart generates both on first install and reads them back on upgrade,
+  # so an upgrade never rotates a key underneath stored data.
+  existingSecret: ""
+  authSecretKey: "better-auth-secret"
+  encryptionKeyKey: "encryption-key"
+
+# Instance settings. Every one has a working default; these bootstrap an
+# instance and are overridden by anything set later in the product.
+instance:
+  name: "OpenOKR"
+  language: "en"
+  telemetry: false
+  # auto | open | invite_only
+  registration: "auto"
+
+mail:
+  # console writes mail to the log and needs no server, which is why a fresh
+  # instance works with none of this set.
+  transport: "console"
+  host: ""
+  port: 587
+  secure: false
+  user: ""
+  from: "openokr@localhost"
+  # A Secret holding the SMTP password. Never put the password in values.
+  existingSecret: ""
+  existingSecretKey: "mail-password"
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: openokr.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+# Applied to the migration hook as well, which needs less.
+migrationResources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# File storage for the local-disk driver. A single ReadWriteOnce volume cannot
+# be shared by several pods, so this is off by default and the chart refuses
+# the unsafe combination rather than corrupting uploads quietly.
+persistence:
+  enabled: false
+  size: 10Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# Defaults are restrictive. The image runs as uid 1001 and writes only to its
+# storage mount and /tmp.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Keeps the deployment available during a rolling update and a node drain.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

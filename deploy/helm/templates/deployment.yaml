@@ -1,0 +1,155 @@
+{{- include "openokr.validate" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openokr.fullname" . }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "openokr.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "openokr.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "openokr.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            {{- include "openokr.commonEnv" . | nindent 12 }}
+            # Migrations run in the pre-install and pre-upgrade hook, not here.
+            # Without this every replica would race to migrate on every restart;
+            # the advisory lock makes that safe but not fast, and a rollout
+            # should not depend on it.
+            - name: OPENOKR_SKIP_MIGRATIONS
+              value: "1"
+            - name: BETTER_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openokr.secretName" . }}
+                  key: {{ .Values.secrets.authSecretKey }}
+            - name: BETTER_AUTH_URL
+              value: {{ include "openokr.publicUrl" . | quote }}
+            - name: OPENOKR_INSTANCE_NAME
+              value: {{ .Values.instance.name | quote }}
+            - name: OPENOKR_DEFAULT_LANGUAGE
+              value: {{ .Values.instance.language | quote }}
+            - name: OPENOKR_TELEMETRY
+              value: {{ .Values.instance.telemetry | quote }}
+            - name: OPENOKR_REGISTRATION
+              value: {{ .Values.instance.registration | quote }}
+            - name: OPENOKR_MAIL_TRANSPORT
+              value: {{ .Values.mail.transport | quote }}
+            {{- if eq .Values.mail.transport "smtp" }}
+            - name: OPENOKR_MAIL_HOST
+              value: {{ .Values.mail.host | quote }}
+            - name: OPENOKR_MAIL_PORT
+              value: {{ .Values.mail.port | quote }}
+            - name: OPENOKR_MAIL_SECURE
+              value: {{ .Values.mail.secure | quote }}
+            - name: OPENOKR_MAIL_USER
+              value: {{ .Values.mail.user | quote }}
+            - name: OPENOKR_MAIL_FROM
+              value: {{ .Values.mail.from | quote }}
+            {{- if .Values.mail.existingSecret }}
+            - name: OPENOKR_MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mail.existingSecret }}
+                  key: {{ .Values.mail.existingSecretKey }}
+            {{- end }}
+            {{- end }}
+            - name: OPENOKR_STORAGE_DIR
+              value: /app/storage
+          # Ready means the database answers, not merely that the port is open.
+          # A pod that is listening but cannot reach Postgres must not receive
+          # traffic during a rollout.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Deliberately more forgiving than readiness. A database blip should
+          # take a pod out of the load balancer, not restart it: restarting
+          # helps nothing and turns a brief outage into a crash loop.
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # The root filesystem is read-only, so anything the process writes
+            # needs a mount of its own.
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/apps/web/.next/cache
+            - name: storage
+              mountPath: /app/storage
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: storage
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-storage" (include "openokr.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

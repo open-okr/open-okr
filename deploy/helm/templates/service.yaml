@@ -1,0 +1,16 @@
+{{- include "openokr.validate" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openokr.fullname" . }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "openokr.selectorLabels" . | nindent 4 }}

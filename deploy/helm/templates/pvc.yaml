@@ -1,0 +1,21 @@
+{{- if .Values.persistence.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-storage" (include "openokr.fullname" .) }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+  annotations:
+    # Uploaded files outlive a `helm uninstall`. Deleting them is a deliberate
+    # act, not a side effect of removing a release.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}
+{{- end }}

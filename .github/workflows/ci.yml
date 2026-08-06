@@ -181,6 +181,38 @@ jobs:
           cd deploy/docker
           docker compose -p openokr logs --tail=200 || true
 
+  helm:
+    name: Helm chart
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+
+      - name: Chart checks
+        # Behaviour, not parsing: what the chart refuses, where migrations
+        # run, and that no credential lands in a pod spec.
+        run: sh deploy/helm/check.sh
+
+      - name: Build the image
+        run: docker build -f deploy/docker/Dockerfile -t openokr:ci .
+
+      - name: Create a cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: openokr-test
+          wait: 120s
+
+      - name: Load the image into the cluster
+        # No registry involved: the cluster runs the image this commit built.
+        run: kind load docker-image openokr:ci --name openokr-test
+
+      - name: Install the chart and use it
+        # Installs, waits for readiness, registers a user, then upgrades and
+        # checks the encryption key survived.
+        run: OPENOKR_IMAGE_TAG=ci sh deploy/helm/cluster-test.sh
+
   flakiness:
     name: Flakiness report
     needs: [scope, test]
@@ -247,7 +279,7 @@ jobs:
   # documentation-only skip can change without touching branch protection.
   ci:
     name: CI
-    needs: [scope, quality, test, e2e, deploy, flakiness, build, compliance]
+    needs: [scope, quality, test, e2e, deploy, helm, flakiness, build, compliance]
     if: always()
     runs-on: ubuntu-latest
     steps:
