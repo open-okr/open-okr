@@ -28,6 +28,18 @@ export {
   type SqlRunner,
 } from "./roles.ts";
 export {
+  type AccessBinding,
+  type AccessContext,
+  type AccessGroup,
+  type AccessGroupKind,
+  type AccessGroupMembership,
+  type AccessRoleTag,
+  accessBindings,
+  accessContexts,
+  accessGroupMemberships,
+  accessGroups,
+} from "./schema/access.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,

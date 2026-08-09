@@ -12,11 +12,13 @@
  * change, the access bindings, the activity row, the audit row and the outbox
  * row. The transaction here is that transaction, minus the parts whose tables
  * do not exist yet. When those land it gains statements rather than changing
- * shape. Deliberately missing until then, and recorded on the P1-T07 row:
+ * shape.
  *
- *   - the audit row, because the append-only audit table is P1-T07
- *   - the outbox row, because provisioning has no side effect to enqueue yet
- *   - the first member's access binding, because bindings are P2-T01
+ * P2-T01 closes the last gap: the workspace gets its own access context and
+ * `workspace_standard` group, and the first member gets a `member` group of
+ * their own with a `full` binding on that context. `can()`, which actually
+ * reads any of this, is P2-T02; until then `resolveActor` still resolves
+ * every active member to `full` by construction.
  */
 import {
   activeOnly,
@@ -28,6 +30,13 @@ import {
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import {
+  bindGroup,
+  ensureContext,
+  ensureMemberGroup,
+  ensureWorkspaceStandardGroup,
+} from "../access/contexts.ts";
+import { ACCESS_LEVELS } from "../access/levels.ts";
 import { runOperation } from "../operations/operation.ts";
 import {
   type ProvisioningContext,
@@ -287,6 +296,27 @@ async function insertWorkspaceAndMember(
           primaryChannel:
             memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
           quietHours: memberSettings.quietHours,
+        });
+
+        // The workspace is the first protected aggregate this workspace
+        // owns: its own access context, plus the standing groups an Operation
+        // wires up for any later aggregate. openokr:allow-mutation: same
+        // reason as the two inserts above, same transaction.
+        const contextId = await ensureContext(savepoint, {
+          workspaceId,
+          resourceType: "workspace",
+          resourceId: workspaceId,
+        });
+        await ensureWorkspaceStandardGroup(savepoint, { workspaceId });
+        const memberGroupId = await ensureMemberGroup(savepoint, {
+          workspaceId,
+          memberId,
+        });
+        await bindGroup(savepoint, {
+          workspaceId,
+          groupId: memberGroupId,
+          contextId,
+          level: ACCESS_LEVELS.full,
         });
 
         return { workspaceId, memberId, name, slug };

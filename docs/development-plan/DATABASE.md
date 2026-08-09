@@ -118,16 +118,18 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 **Two transaction-local settings.** Beside the tenant floor's `app.workspace_id`, these two tables carry a second, read-only policy keyed on `app.user_id`: a member may see their own membership rows and the workspaces those rows point at. It exists for one question, which the workspace switcher asks on every page: "which workspaces do I belong to". That question crosses tenants by definition, and the alternative is a privileged query stepping around the floor. Postgres combines permissive policies with OR, so this widens reads without loosening any write: neither policy carries a `with check`.
 
 ### access_contexts
-`resource_type`, `resource_id`. One per protected aggregate.
+`resource_type`, `resource_id`. One live row per protected aggregate, unique on `(workspace_id, resource_type, resource_id)`. Created inside the same Operation that creates the resource, via `ensureContext` in `packages/core/src/access/contexts.ts`.
 
 ### access_groups
-`kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?`.
+`kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?`. A check constraint pins each kind to the column that scopes it: `member` carries `member_id` and no `space_id`, `space_standard` carries `space_id` and no `member_id`, and `workspace_standard` and `anonymous` carry neither. Partial unique indexes give a workspace exactly one live `workspace_standard` group and one live `anonymous` group, a member exactly one live group of their own, and a space exactly one live group of its own. `space_id` carries no foreign key: spaces are P3-T01.
 
 ### access_group_memberships
-`group_id` to access_groups, `member_id` to workspace_members.
+`group_id` to access_groups, `member_id` to workspace_members. Enumerates who belongs to a group whose membership is real data rather than structural — `space_standard`, once spaces exist. Deliberately unused for `workspace_standard`: every active member of the workspace already belongs to it by definition, so a row per person would be state kept only to agree with `workspace_members`.
 
 ### access_bindings
-`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`).
+`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`). A group may hold at most one live untagged binding and one live binding per tag on a given context. Written through `bindGroup`, alongside `ensureContext` in the same file. `can()` and the access-aware getter that read these four tables back are P2-T02; until then every active member still resolves to `full` in the Operation pipeline.
+
+Workspace provisioning (P1-T06, wired for the access model in P2-T01) gives every new workspace its own context and `workspace_standard` group, and gives the first member a `member` group with a `full` binding on that context.
 
 ### invite_links
 `token_hash`, `mode` (`workspace` / `personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?`.

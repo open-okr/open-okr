@@ -4,7 +4,19 @@ import { PACKAGE_NAME as METHOD } from "@openokr/method";
 export const PACKAGE_NAME = "@openokr/core";
 export const DEPENDS_ON = [DB, METHOD] as const;
 
+export {
+  type BindGroupInput,
+  bindGroup,
+  type EnsureContextInput,
+  type EnsureMemberGroupInput,
+  type EnsureWorkspaceStandardGroupInput,
+  ensureContext,
+  ensureMemberGroup,
+  ensureWorkspaceStandardGroup,
+} from "./access/contexts.ts";
 export { ACCESS_LEVELS, type AccessLevel } from "./access/levels.ts";
+export { PERMISSIONS, type Permission } from "./access/permissions.ts";
+export { derivePrivacy, type PrivacyLabel } from "./access/privacy.ts";
 export {
   type ActionCallContext,
   type ActionDefinition,
