@@ -43,7 +43,12 @@ import { desc, eq, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
+import {
+  resolveMemberAccessLevel,
+  resolveSubjectContext,
+} from "../access/reads.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
+import { OperationError } from "./errors.ts";
 
 /** The transaction handed to an operation's `execute`. */
 export type OperationTx = Parameters<
@@ -63,7 +68,12 @@ export interface ActorInput {
 export interface ResolvedActor {
   readonly kind: ActorInput["kind"];
   readonly memberId: string | null;
-  readonly level: AccessLevel;
+  /**
+   * A plain number rather than `AccessLevel`: the resolved level can be `0`
+   * when the member reaches none of the three tiers on the workspace's own
+   * context, and `0` is not one of the four declared levels.
+   */
+  readonly level: number;
 }
 
 export interface ActivityInput {
@@ -123,16 +133,7 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
   ) => Promise<OperationOutcome<TResult>>;
 }
 
-/** A refusal, as opposed to something going wrong. */
-export class OperationError extends Error {
-  readonly code: "forbidden" | "not_found";
-
-  constructor(code: "forbidden" | "not_found", message: string) {
-    super(message);
-    this.name = "OperationError";
-    this.code = code;
-  }
-}
+export { OperationError };
 
 export interface OperationDeps {
   readonly pool: Pool;
@@ -198,9 +199,29 @@ async function resolveActor(
     );
   }
 
-  // P2-T02 replaces this line with the binding walk. Everything around it,
-  // including the comparison in runOperation, is already the real thing.
-  return { kind: actor.kind, memberId: member.id, level: ACCESS_LEVELS.full };
+  // The level an operation compares against is the member's access on the
+  // workspace's own context: every protected aggregate in Phase 2 either is
+  // the workspace or, once P3-T01 ships spaces, resolves its own context and
+  // authorises through that instead via the getter in packages/core/src/
+  // access/reads.ts. Provisioning always creates the workspace's context
+  // before any member exists, so a missing context here is not expected; it
+  // resolves to zero rather than throwing, which a bootstrap-only workspace
+  // mid-provisioning would otherwise turn into a crash instead of a refusal.
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    workspaceId,
+    workspaceId,
+  );
+  const level = context
+    ? await resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId: member.id,
+        contextId: context.contextId,
+      })
+    : 0;
+
+  return { kind: actor.kind, memberId: member.id, level };
 }
 
 /**

@@ -18,6 +18,20 @@ export { ACCESS_LEVELS, type AccessLevel } from "./access/levels.ts";
 export { PERMISSIONS, type Permission } from "./access/permissions.ts";
 export { derivePrivacy, type PrivacyLabel } from "./access/privacy.ts";
 export {
+  type AccessScopedResource,
+  type AccessScopeFilterInput,
+  type AnonymousContextInput,
+  accessScopeFilter,
+  can,
+  type GetAccessScopedInput,
+  getAccessScoped,
+  type MemberContextInput,
+  resolveAnonymousAccessLevel,
+  resolveMemberAccessLevel,
+  resolveSubjectContext,
+  type SubjectContext,
+} from "./access/reads.ts";
+export {
   type ActionCallContext,
   type ActionDefinition,
   defineReadAction,
