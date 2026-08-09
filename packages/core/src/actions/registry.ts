@@ -13,6 +13,17 @@
  */
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import { workspaceOverview } from "./overview.ts";
+import {
+  convertToGuest,
+  directory,
+  eraseMember,
+  orgChart,
+  possibleManagersFor,
+  restoreMember,
+  suspendMember,
+  updateMember,
+  updateOwnProfile,
+} from "./people.ts";
 import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
 
 /**
@@ -23,6 +34,15 @@ export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
   "workspace.provision": provisionWorkspace,
+  "people.updateOwnProfile": updateOwnProfile,
+  "people.updateMember": updateMember,
+  "people.suspend": suspendMember,
+  "people.restore": restoreMember,
+  "people.convertToGuest": convertToGuest,
+  "people.erase": eraseMember,
+  "people.directory": directory,
+  "people.orgChart": orgChart,
+  "people.possibleManagers": possibleManagersFor,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

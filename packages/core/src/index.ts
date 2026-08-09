@@ -74,6 +74,20 @@ export {
   runOperation,
 } from "./operations/operation.ts";
 export {
+  type ErasureExport,
+  isLastFullAccessHolder,
+  refuseIfLastOwner,
+  stripBindings,
+} from "./people/lifecycle.ts";
+export {
+  buildOrgChart,
+  type ManagerCycleCheckInput,
+  type OrgChartNode,
+  type PossibleManager,
+  possibleManagers,
+  wouldCreateManagerCycle,
+} from "./people/manager-chain.ts";
+export {
   environmentValue,
   getInstanceSetting,
   INSTANCE_SETTINGS,
