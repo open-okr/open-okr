@@ -11,6 +11,8 @@
  * One permission decision, everywhere: a surface cannot reach a capability
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
+
+import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
   acceptLink,
@@ -55,6 +57,9 @@ export const ACTION_MAP = {
   "invitations.revokeLink": revokeLink,
   "invitations.acceptLink": acceptLink,
   "invitations.joinByTrustedDomain": joinByTrustedDomain,
+  "blobs.prepareUpload": prepareUpload,
+  "blobs.claimUpload": claimUpload,
+  "blobs.getForDownload": getBlobForDownload,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

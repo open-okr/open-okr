@@ -185,39 +185,41 @@ type SubjectResolver = <
 
 /**
  * Resolves a resource straight to its own context: what
- * `ensureContext({ resourceType: "workspace", ... })` created for it.
+ * `ensureContext({ resourceType, ... })` created for it. Most subject types
+ * resolve this way; a sub-resource that inherits its parent's context
+ * instead (a comment, a check-in) gets its own resolver that looks the
+ * parent up rather than sharing this one.
  */
-const workspaceSubjectResolver: SubjectResolver = async (
-  tx,
-  subjectId,
-  workspaceId,
-) => {
-  const [row] = await tx
-    .select({ id: accessContexts.id })
-    .from(accessContexts)
-    .where(
-      activeOnly(
-        accessContexts,
-        eq(accessContexts.workspaceId, workspaceId),
-        eq(accessContexts.resourceType, "workspace"),
-        eq(accessContexts.resourceId, subjectId),
-      ),
-    )
-    .limit(1);
-  return row ? { contextId: row.id } : undefined;
+const ownContextResolver = (resourceType: string): SubjectResolver => {
+  return async (tx, subjectId, workspaceId) => {
+    const [row] = await tx
+      .select({ id: accessContexts.id })
+      .from(accessContexts)
+      .where(
+        activeOnly(
+          accessContexts,
+          eq(accessContexts.workspaceId, workspaceId),
+          eq(accessContexts.resourceType, resourceType),
+          eq(accessContexts.resourceId, subjectId),
+        ),
+      )
+      .limit(1);
+    return row ? { contextId: row.id } : undefined;
+  };
 };
 
 /**
  * The subject-to-context resolver (TECHNICAL-PLAN §4.1, "sub-resources
  * inherit"). Exhaustive and fail-closed: a subject type absent from this map
  * raises rather than defaulting to some context, so a new subject type
- * cannot ship unsecured by omission. `workspace` is the only resource that
- * exists before Phase 3; comments, check-ins, reactions, files and votes each
- * add their own entry as they land, resolving through their parent's
- * context rather than owning one.
+ * cannot ship unsecured by omission. `workspace` and `blob` are the only
+ * resources that exist before Phase 3; comments, check-ins, reactions and
+ * votes each add their own entry as they land, resolving through their
+ * parent's context rather than owning one.
  */
 const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
-  workspace: workspaceSubjectResolver,
+  workspace: ownContextResolver("workspace"),
+  blob: ownContextResolver("blob"),
 };
 
 export async function resolveSubjectContext<

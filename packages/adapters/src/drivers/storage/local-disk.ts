@@ -30,7 +30,6 @@ export class LocalDiskStorage implements FileStorage {
   readonly #secret: string;
   readonly #baseUrl: string;
   readonly #defaultExpiry: number;
-  readonly #contentTypes = new Map<string, string>();
 
   constructor(options: LocalDiskStorageOptions) {
     this.#root = resolve(options.root);
@@ -67,7 +66,6 @@ export class LocalDiskStorage implements FileStorage {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, body);
     const contentType = options?.contentType ?? "application/octet-stream";
-    this.#contentTypes.set(key, contentType);
     return { key, size: body.byteLength, contentType };
   }
 
@@ -87,7 +85,6 @@ export class LocalDiskStorage implements FileStorage {
     // `force` makes deleting an absent object a no-op, which keeps retries
     // and cleanup jobs simple.
     await rm(this.#resolve(key), { force: true });
-    this.#contentTypes.delete(key);
   }
 
   async signedUrl(key: string, expiresInSeconds?: number): Promise<string> {

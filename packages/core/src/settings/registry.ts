@@ -97,6 +97,15 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     resolve: () => [],
   },
   {
+    key: "storageQuotaBytes",
+    scope: "workspace",
+    why:
+      "5 GiB: enough for a small team's files on the local disk driver " +
+      "without configuration, small enough that a runaway upload loop is " +
+      "noticed. TECHNICAL-PLAN names no figure; P2-T05 picked this one.",
+    resolve: () => 5 * 1024 * 1024 * 1024,
+  },
+  {
     key: "primaryChannel",
     scope: "member",
     why: "Email, beside the always-on in-app inbox, until a chat identity is linked.",
@@ -116,6 +125,7 @@ export function resolveWorkspaceSettings(context: ProvisioningContext): {
   readonly language: string;
   readonly branding: Record<string, unknown>;
   readonly trustedEmailDomains: readonly string[];
+  readonly storageQuotaBytes: number;
   readonly [key: string]: unknown;
 } {
   return Object.fromEntries(

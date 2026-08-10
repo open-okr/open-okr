@@ -62,6 +62,32 @@ export {
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
 export {
+  type ClaimBlobInput,
+  type ClaimedBlob,
+  claimBlob,
+  discardOrphanedBlob,
+  findOrphanedBlobs,
+  generateStorageKey,
+  type OrphanedBlob,
+  type PrepareBlobInput,
+  type PreparedBlob,
+  prepareBlob,
+  QuotaExceededError,
+  ValidationFailedError,
+} from "./blobs/provisioning.ts";
+export {
+  checkQuota,
+  type QuotaCheckInput,
+  type QuotaCheckResult,
+  usedBytes,
+} from "./blobs/quota.ts";
+export {
+  ALLOWED_CONTENT_TYPES,
+  MAX_BLOB_BYTES,
+  type ValidationResult,
+  validateUpload,
+} from "./blobs/validation.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,

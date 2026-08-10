@@ -342,8 +342,16 @@ Every table references `session_id` to sessions.
 ### attachments
 `subject_type`, `subject_id`, `blob_id` to blobs, `position`.
 
-### blobs
-`filename`, `content_type`, `filesize`, `digest`, `storage_key`, `author_member_id` to workspace_members, `status` (`ok` / `scanning` / `quarantined`), `width?`, `height?`.
+### blobs *(built at P2-T05, ahead of `initiatives`/`tasks`/`attachments` above, which are still Phase 3)*
+`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`.
+
+`status` carries a fourth value beyond the three TECHNICAL-PLAN names: `pending`, the gap between prepare and claim that "prepare, upload, claim" needs somewhere to sit, and that the orphan cleanup job's own query targets. `filesize` and `digest` are null until claim fills them in.
+
+Each blob is its own protected aggregate: `prepareBlob` gives it an access context (`resourceType: "blob"`) and a `full` binding through the uploader's own `member` group, the same shape provisioning gives a workspace's first member. `blobs.getForDownload` resolves the key through `getAccessScoped` rather than trusting `author_member_id` alone, so a future sharing grant (a `workspace_standard` or `space_standard` binding on the same context) widens who can read it without this code changing.
+
+Byte accounting sums `filesize` over `ok`, `scanning` and `quarantined` rows (all three occupy real space; `pending` does not yet) against the workspace's `storageQuotaBytes` setting (§4.14, 5 GiB default — TECHNICAL-PLAN names no figure, P2-T05 picked one). A claim that would push the total past the quota is refused outright; one that crosses ninety percent without exceeding it is reported once, on the upload that crosses it, never again for the same workspace while it stays over that line.
+
+No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: all three need a new runtime dependency CLAUDE.md requires asking about first, so `claimBlob` accepts an optional `requiresScan` flag that would move a claim to `scanning` instead of `ok` — scaffolding for a scanner that does not exist yet, not a built capability.
 
 ## 13. Collaboration (domain J)
 

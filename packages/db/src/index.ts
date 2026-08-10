@@ -55,6 +55,7 @@ export {
   users,
   verifications,
 } from "./schema/auth.ts";
+export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
   type InviteLink,
   type InviteMode,
