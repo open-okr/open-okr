@@ -304,6 +304,9 @@ importers:
       '@openokr/method':
         specifier: workspace:*
         version: link:../method
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

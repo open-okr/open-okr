@@ -59,6 +59,18 @@ export {
   aiProviders,
 } from "./schema/ai.ts";
 export {
+  type AIFeatureSetting,
+  type AIModel,
+  type AIModelPolicy,
+  type AIPrompt,
+  aiFeatureSettings,
+  aiModelPolicies,
+  aiModels,
+  aiPrompts,
+  MODEL_TIERS,
+  type ModelTier,
+} from "./schema/ai-models.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,

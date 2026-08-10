@@ -13,7 +13,8 @@
   "dependencies": {
     "@openokr/adapters": "workspace:*",
     "@openokr/core": "workspace:*",
-    "@openokr/method": "workspace:*"
+    "@openokr/method": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

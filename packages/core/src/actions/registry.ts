@@ -23,6 +23,20 @@ import {
   setWorkspaceCredential,
   updateProviderConfig,
 } from "./ai.ts";
+import {
+  addCustomModel,
+  readFeatureSettings,
+  readModelCatalog,
+  readPrompt,
+  readTierRouting,
+  removeCustomModel,
+  removeTierPolicy,
+  restorePrompt,
+  setTierPolicy,
+  updateCustomModel,
+  updateFeatureSetting,
+  updatePrompt,
+} from "./ai-models.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
@@ -109,6 +123,18 @@ export const ACTION_MAP = {
   "ai.removePersonalCredential": removePersonalCredential,
   "ai.readOwnCredentialStatus": readOwnCredentialStatus,
   "ai.rotateCredentials": rotateCredentials,
+  "ai.readModelCatalog": readModelCatalog,
+  "ai.addCustomModel": addCustomModel,
+  "ai.updateCustomModel": updateCustomModel,
+  "ai.removeCustomModel": removeCustomModel,
+  "ai.readTierRouting": readTierRouting,
+  "ai.setTierPolicy": setTierPolicy,
+  "ai.removeTierPolicy": removeTierPolicy,
+  "ai.readFeatureSettings": readFeatureSettings,
+  "ai.updateFeatureSetting": updateFeatureSetting,
+  "ai.readPrompt": readPrompt,
+  "ai.updatePrompt": updatePrompt,
+  "ai.restorePrompt": restorePrompt,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

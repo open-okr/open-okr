@@ -84,7 +84,23 @@ export {
   type ActivityRenderer,
   renderActivity,
 } from "./activities/renderers.ts";
+export {
+  type ContextWindowGuardInput,
+  type ContextWindowGuardResult,
+  guardContextWindow,
+} from "./ai/context-guard.ts";
 export { maskKeyHint, sealCredentialKey } from "./ai/credentials.ts";
+export {
+  findSeededModel,
+  SEEDED_MODELS,
+  type SeededModel,
+  seededModelsForProvider,
+} from "./ai/model-catalog.ts";
+export {
+  DEFAULT_PROMPTS,
+  defaultPromptFor,
+  knownPromptKeys,
+} from "./ai/prompts.ts";
 export {
   type AICredentialSource,
   type ResolveAICredentialInput,
@@ -93,6 +109,12 @@ export {
   resolveAICredential,
   resolveDeploymentAISettings,
 } from "./ai/resolve.ts";
+export {
+  type ResolvedFeatureTier,
+  type ResolvedTierRoute,
+  resolveFeatureTier,
+  resolveTierRoute,
+} from "./ai/tier-routing.ts";
 export {
   type AuditRow,
   auditRowHash,

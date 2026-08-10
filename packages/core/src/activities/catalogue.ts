@@ -68,6 +68,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     examined: z.number().int(),
     rewrapped: z.number().int(),
   }),
+  "ai.custom_model_added": z.object({}).catchall(z.unknown()),
+  "ai.custom_model_updated": z.object({}).catchall(z.unknown()),
+  "ai.custom_model_removed": z.object({}),
+  "ai.tier_policy_set": z.object({}).catchall(z.unknown()),
+  "ai.tier_policy_removed": z.object({ tier: z.string() }),
+  "ai.feature_setting_updated": z.object({ featureKey: z.string() }),
+  "ai.prompt_updated": z.object({
+    promptKey: z.string(),
+    version: z.number().int(),
+  }),
+  "ai.prompt_restored": z.object({ promptKey: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

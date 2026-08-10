@@ -61,6 +61,20 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A personal key for ${asString(p.provider, "a provider")} was removed`,
   "ai.credentials_rotated": (p) =>
     `${Number(p.rewrapped ?? 0)} of ${Number(p.examined ?? 0)} AI credential(s) were re-wrapped onto the current key`,
+  "ai.custom_model_added": () => "A custom model was added to the catalogue",
+  "ai.custom_model_updated": () => "A custom model was updated",
+  "ai.custom_model_removed": () =>
+    "A custom model was removed from the catalogue",
+  "ai.tier_policy_set": (p) =>
+    `The "${asString(p.tier, "a")}" tier was mapped to ${asString(p.provider)}/${asString(p.modelId)}`,
+  "ai.tier_policy_removed": (p) =>
+    `The "${asString(p.tier, "a")}" tier's policy was removed`,
+  "ai.feature_setting_updated": (p) =>
+    `"${asString(p.featureKey, "A feature")}" settings were updated`,
+  "ai.prompt_updated": (p) =>
+    `A new version of "${asString(p.promptKey, "a prompt")}" was saved`,
+  "ai.prompt_restored": (p) =>
+    `"${asString(p.promptKey, "A prompt")}" was restored to its default`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */
