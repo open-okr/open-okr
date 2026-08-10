@@ -7,7 +7,9 @@ import {
 } from "@openokr/ui";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OpenOKR",
@@ -18,7 +20,14 @@ export const metadata: Metadata = {
 // and serves it from this origin — no runtime request to Google.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // proxy.ts's own strict CSP has no `unsafe-inline` for scripts in
+  // production — an inline <script> with no nonce is silently blocked by
+  // the browser, which is exactly what happened to the theme bootstrap
+  // below before this line existed. `x-nonce` is the same per-request
+  // value proxy.ts already generates and forwards for this.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -32,7 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
          * no-flash theme bootstrap has to run before hydration, which
          * only a synchronous inline script can do (Next's own documented
          * pattern for this). The string is generated, not user input. */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
       </head>
       <body>
         <ThemeProvider>

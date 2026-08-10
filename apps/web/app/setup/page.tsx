@@ -4,6 +4,7 @@ import {
   notInThisBuild,
   runConnectionTests,
 } from "@openokr/core";
+import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
@@ -45,18 +46,18 @@ export default async function SetupPage() {
 
   return (
     <>
-      <h1>Set up OpenOKR</h1>
-      <p>
+      <h1 className="text-lg font-bold text-ink">Set up OpenOKR</h1>
+      <p className="text-sm text-ink-3">
         Nothing here needs configuring. Every setting has a working default, so
         you can create your account and start. You can change any of it later.
       </p>
 
-      <h2>This deployment</h2>
+      <h2 className="mt-2 text-xs font-bold tracking-wide text-ink-4 uppercase">This deployment</h2>
       <CheckList tests={tests} />
 
-      <p>
-        <Link href="/setup/account">Create the first account</Link>
-      </p>
+      <Link href="/setup/account" className={cn(buttonVariants({ variant: "primary" }), "self-start")}>
+        Create the first account
+      </Link>
     </>
   );
 }

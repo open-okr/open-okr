@@ -1,7 +1,9 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FormError } from "../../(auth)/auth-card.tsx";
 import { finishSetup } from "./actions";
 
 /**
@@ -31,14 +33,10 @@ export function FinishSetup() {
 
   return (
     <>
-      <button type="button" onClick={finish} disabled={pending}>
+      <Button type="button" variant="primary" onClick={finish} disabled={pending} className="self-start">
         {pending ? "Finishing…" : "Finish setup"}
-      </button>
-      {error ? (
-        <p role="alert" style={{ color: "#b91c1c" }}>
-          {error}
-        </p>
-      ) : null}
+      </Button>
+      <FormError>{error}</FormError>
     </>
   );
 }

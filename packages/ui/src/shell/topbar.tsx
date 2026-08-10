@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode, Ref } from "react";
 import { Kbd } from "../components/kbd.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
