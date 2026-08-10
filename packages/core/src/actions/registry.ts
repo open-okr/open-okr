@@ -12,6 +12,7 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
+import { workspaceFeed } from "./activities.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
@@ -74,6 +75,7 @@ export const ACTION_MAP = {
   "notifications.getSettings": getNotificationSettings,
   "notifications.updateSettings": updateOwnNotificationSettings,
   "subscriptions.toggle": toggleSubscription,
+  "activities.workspaceFeed": workspaceFeed,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

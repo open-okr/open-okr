@@ -106,6 +106,11 @@ export const updateOwnProfile = defineWriteAction({
           kind: "member.profile_updated",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          // The name at the moment of the edit, not just the id: a feed
+          // entry has to read "Jane Doe updated their profile" without a
+          // second query, and it has to keep reading that after Jane
+          // renames herself or is later erased.
+          payload: { name: updated.name },
         },
         audit: {
           action: "people.updateOwnProfile",
@@ -184,6 +189,7 @@ export const updateMember = defineWriteAction({
           kind: "member.updated",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          payload: { name: updated.name },
         },
         audit: {
           action: "people.updateMember",
@@ -229,17 +235,19 @@ export const suspendMember = defineWriteAction({
         .returning({
           id: workspaceMembers.id,
           status: workspaceMembers.status,
+          name: workspaceMembers.name,
         });
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
       }
 
       return {
-        result: updated,
+        result: { id: updated.id, status: updated.status },
         activity: {
           kind: "member.suspended",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          payload: { name: updated.name },
         },
         audit: {
           action: "people.suspend",
@@ -273,6 +281,7 @@ export const restoreMember = defineWriteAction({
         .returning({
           id: workspaceMembers.id,
           status: workspaceMembers.status,
+          name: workspaceMembers.name,
         });
       if (!updated) {
         throw new OperationError(
@@ -282,11 +291,12 @@ export const restoreMember = defineWriteAction({
       }
 
       return {
-        result: updated,
+        result: { id: updated.id, status: updated.status },
         activity: {
           kind: "member.restored",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          payload: { name: updated.name },
         },
         audit: {
           action: "people.restore",
@@ -322,7 +332,7 @@ export const convertToGuest = defineWriteAction({
             eq(workspaceMembers.workspaceId, workspaceId),
           ),
         )
-        .returning({ id: workspaceMembers.id });
+        .returning({ id: workspaceMembers.id, name: workspaceMembers.name });
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
       }
@@ -333,6 +343,7 @@ export const convertToGuest = defineWriteAction({
           kind: "member.converted_to_guest",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          payload: { name: updated.name },
         },
         audit: {
           action: "people.convertToGuest",
@@ -437,6 +448,9 @@ export const eraseMember = defineWriteAction({
           kind: "member.erased",
           subjectType: "workspace_member",
           subjectId: updated.id,
+          // The name from before erasure: the whole point of erasure is
+          // that the row no longer carries it, so the feed entry has to.
+          payload: { name: loaded.name },
         },
         audit: {
           action: "people.erase",

@@ -47,6 +47,9 @@ import {
   resolveMemberAccessLevel,
   resolveSubjectContext,
 } from "../access/reads.ts";
+import { validateActivityPayload } from "../activities/catalogue.ts";
+import { resolveActivityContext } from "../activities/context.ts";
+import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
 import { OperationError } from "./errors.ts";
 
@@ -83,6 +86,15 @@ export interface ActivityInput {
   readonly payload?: Record<string, unknown>;
   readonly spaceId?: string;
   readonly contextId?: string;
+  /**
+   * Opts this activity into notification fan-out (P2-T06, P2-T07): every
+   * subscriber to `subjectType`/`subjectId` who still has access and is not
+   * the actor gets a notification. Off by default — most activities today
+   * have no subscribers to reach yet, and a workspace-level event like a
+   * rename is not, on its own, something every member should be notified
+   * about.
+   */
+  readonly notify?: boolean;
 }
 
 export interface AuditInput {
@@ -317,19 +329,46 @@ export async function runOperation<TResult, TLoaded = undefined>(
         loaded,
       });
 
-      // 5. The activity row.
-      await tx.insert(activities).values({
-        workspaceId: spec.workspaceId,
-        kind: outcome.activity.kind,
-        payload: outcome.activity.payload ?? {},
-        actorMemberId: actor.memberId,
-        actorKind: actor.kind,
-        subjectType: outcome.activity.subjectType,
-        subjectId: outcome.activity.subjectId,
-        spaceId: outcome.activity.spaceId ?? null,
-        contextId: outcome.activity.contextId ?? null,
-        at: new Date(),
-      });
+      // 5. The activity row. A kind outside the catalogue, or a payload that
+      //    does not match its own kind's schema, refuses here rather than
+      //    persisting — this is what makes "an event kind outside the
+      //    catalogue cannot be persisted" true of every write path at once
+      //    instead of every call site having to remember its own check.
+      const activityPayload = outcome.activity.payload ?? {};
+      validateActivityPayload(outcome.activity.kind, activityPayload);
+      const contextId =
+        outcome.activity.contextId ??
+        (await resolveActivityContext(
+          tx,
+          spec.workspaceId,
+          outcome.activity.subjectType,
+          outcome.activity.subjectId,
+        ));
+      const [insertedActivity] = await tx
+        .insert(activities)
+        .values({
+          workspaceId: spec.workspaceId,
+          kind: outcome.activity.kind,
+          payload: activityPayload,
+          actorMemberId: actor.memberId,
+          actorKind: actor.kind,
+          subjectType: outcome.activity.subjectType,
+          subjectId: outcome.activity.subjectId,
+          spaceId: outcome.activity.spaceId ?? null,
+          contextId: contextId ?? null,
+          at: new Date(),
+        })
+        .returning({ id: activities.id });
+
+      if (outcome.activity.notify) {
+        await fanOutActivity(tx, {
+          workspaceId: spec.workspaceId,
+          activityId: (insertedActivity as { id: string }).id,
+          subjectType: outcome.activity.subjectType,
+          subjectId: outcome.activity.subjectId,
+          actorMemberId: actor.memberId,
+        });
+      }
 
       // 6. The audit row, chained.
       await appendAudit(tx, spec.workspaceId, actor, outcome.audit);

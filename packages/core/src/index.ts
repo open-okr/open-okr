@@ -47,6 +47,37 @@ export {
   getAction,
 } from "./actions/registry.ts";
 export {
+  ACTIVITY_PAYLOAD_SCHEMAS,
+  type ActivityKind,
+  AGGREGATABLE_KINDS,
+  InvalidActivityPayloadError,
+  isTestScaffoldKind,
+  UnregisteredActivityKindError,
+  validateActivityPayload,
+} from "./activities/catalogue.ts";
+export { resolveActivityContext } from "./activities/context.ts";
+export {
+  type FanOutActivityInput,
+  fanOutActivity,
+} from "./activities/fanout.ts";
+export {
+  type AggregatedFeedItem,
+  aggregateFeed,
+  type FeedItem,
+  type QueryFeedInput,
+  queryFeed,
+} from "./activities/feed.ts";
+export {
+  type LiveActivityEvent,
+  toLiveActivityEvent,
+  workspaceFeedChannel,
+} from "./activities/live.ts";
+export {
+  ACTIVITY_RENDERERS,
+  type ActivityRenderer,
+  renderActivity,
+} from "./activities/renderers.ts";
+export {
   type AuditRow,
   auditRowHash,
   type ChainVerdict,
