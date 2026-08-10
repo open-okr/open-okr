@@ -2,6 +2,18 @@ packages:
   - apps/*
   - packages/*
 
+allowBuilds:
+  # Google's own SDK (P2-T13). Its `prepare` script targets a file the
+  # published tarball does not ship, so it is a no-op in this install; the
+  # package itself is Apache-2.0 and officially maintained.
+  '@google/genai': true
+  # A transitive dependency of @google/genai, and one of the most widely used
+  # packages in the ecosystem (gRPC, Firebase and others depend on it). No
+  # install-time script actually runs; pnpm flags it defensively because its
+  # manifest lists dev-only build scripts (bench, changelog) that never fire
+  # on a consumer install.
+  protobufjs: true
+
 catalog:
   # Pinned to 5.9.x by the P1-T01 decision. The 7.x bump (dependabot PR #5)
   # broke typecheck repo-wide; adopting 7.x is its own task, not a bot merge.
@@ -26,6 +38,14 @@ catalog:
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
   zod: 4.4.3
+  # AIProvider drivers (P2-T13), approved by the human, confined to
+  # packages/adapters like every vendor SDK. `openai`'s client also drives
+  # openrouter, ollama and openai-compatible: all three speak the same
+  # OpenAI-shaped chat completions API, just a different base URL and key,
+  # so one client covers four of the six real drivers.
+  "@anthropic-ai/sdk": ^0.116.0
+  openai: ^7.4.0
+  "@google/genai": ^2.16.0
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'

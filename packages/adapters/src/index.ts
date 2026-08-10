@@ -17,7 +17,24 @@ export {
   type Adapters,
   createAdapters,
 } from "./create-adapters.ts";
+export {
+  type AIProviderConfig,
+  createAIProvider,
+  defaultTierModelsFor,
+} from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
+// The mock driver is exported by name, the same way the socket server is:
+// infrastructure another package's own test suite constructs directly,
+// not something resolved through createAIProvider.
+export {
+  MockAIProvider,
+  type MockAIProviderOptions,
+  type RecordedCall,
+} from "./drivers/ai/mock.ts";
+export type {
+  ModelTier,
+  TierModelMap,
+} from "./drivers/ai/tier-map.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {
