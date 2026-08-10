@@ -46,6 +46,37 @@ catalog:
   "@anthropic-ai/sdk": ^0.116.0
   openai: ^7.4.0
   "@google/genai": ^2.16.0
+  # The design system (P2-T10), approved by the human alongside P2-T11's
+  # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
+  # SmoothUI on Motion; these are the concrete packages that stack resolves
+  # to. `clsx`/`tailwind-merge`/`class-variance-authority` are the standard
+  # shadcn/ui variant-and-class-merge trio, not a separate dependency
+  # decision — shadcn/ui itself does not ship as an installable package, it
+  # is components pulled into packages/ui at build time, and every one of
+  # them is written against this trio.
+  tailwindcss: ^4.3.3
+  "@tailwindcss/postcss": ^4.3.3
+  postcss: ^8.5.26
+  "@base-ui-components/react": 1.0.0-rc.0
+  motion: ^13.0.0
+  lucide-react: ^1.31.0
+  clsx: ^2.1.1
+  tailwind-merge: ^3.6.0
+  class-variance-authority: ^0.7.1
+  # The persisted client cache (P2-T10 item 9), part of the locked stack's
+  # "TanStack Query, Table and Virtual" line — its own persistence add-ons,
+  # not a new stack decision.
+  "@tanstack/react-query": ^5.101.4
+  "@tanstack/react-query-persist-client": ^5.101.4
+  "@tanstack/query-sync-storage-persister": ^5.101.4
+  # Test tooling for P2-T10's own required "keyboard and focus component
+  # tests" and accessibility checks (UIUX-PLAN.md §9) — inferred from the
+  # human's UI-dependency approval rather than asked separately, because
+  # without a DOM testing seam those acceptance tests cannot exist at all.
+  # Dev-only, never shipped.
+  jsdom: ^30.0.1
+  "@testing-library/react": ^16.3.2
+  "@testing-library/user-event": ^14.6.3
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'
@@ -67,3 +98,4 @@ minimumReleaseAgeExclude:
   - '@better-auth/prisma-adapter@1.6.26'
   - '@better-auth/telemetry@1.6.26'
   - better-auth@1.6.26
+  - lucide-react@1.31.0

@@ -2,16 +2,23 @@ import type { Membership } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { ACTIVE_WORKSPACE_COOKIE } from "../lib/workspace";
+import { WorkspaceSelect } from "./workspace-select.tsx";
 
 /**
- * The workspace switcher (UIUX-PLAN §5, the sidebar).
+ * The workspace switcher (UIUX-PLAN §3: "a workspace switcher sits at the
+ * top for members of more than one workspace", P2-T10).
  *
- * Behaviour only. The design system, the sidebar it belongs in and its visual
- * treatment arrive with P2-T10, which is recorded on that row.
+ * The brandmark always renders — a member with one workspace still needs
+ * to see which one they are in. Only the actual switching control (the
+ * `<select>` and its submit) is conditional on having somewhere else to
+ * switch to; a control with one option is noise, which is P1-T06's
+ * original reasoning and is unchanged here.
  *
- * It renders nothing for somebody who belongs to one workspace, which is every
- * self-hosted instance until invitations land. A control that only ever shows
- * one option is noise.
+ * A native `<select>` and a Server Function rather than a styled dropdown
+ * and a click handler: the choice works with JavaScript off, which
+ * S-35/P2-T10's own progressive-enhancement decision (see
+ * `(auth)/auth-card.tsx`) treats as worth keeping wherever it is this
+ * cheap.
  */
 
 /**
@@ -44,6 +51,14 @@ async function switchWorkspace(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (
+    (parts[0]?.[0] ?? "") +
+    (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")
+  ).toUpperCase();
+}
+
 export function WorkspaceSwitcher({
   memberships,
   active,
@@ -51,25 +66,35 @@ export function WorkspaceSwitcher({
   memberships: readonly Membership[];
   active: Membership;
 }) {
-  if (memberships.length < 2) {
-    return null;
-  }
-
   return (
-    <form action={switchWorkspace}>
-      <label htmlFor="workspaceId">Workspace</label>{" "}
-      <select
-        id="workspaceId"
-        name="workspaceId"
-        defaultValue={active.workspaceId}
+    <div className="flex items-center gap-2 rounded-lg p-1.5">
+      <span
+        aria-hidden="true"
+        className="grid size-7 flex-none place-items-center rounded-lg bg-gradient-to-br from-[#6366f1] via-brand to-[#7c3aed] text-sm font-extrabold text-white shadow-[0_2px_6px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]"
       >
-        {memberships.map((membership) => (
-          <option key={membership.workspaceId} value={membership.workspaceId}>
-            {membership.name}
-          </option>
-        ))}
-      </select>{" "}
-      <button type="submit">Switch</button>
-    </form>
+        {initialsOf(active.name)}
+      </span>
+      <div className="hidden min-w-0 flex-1 xl:block">
+        <div className="truncate text-sm font-semibold tracking-tight text-ink">
+          {active.name}
+        </div>
+        {memberships.length > 1 ? (
+          <form action={switchWorkspace}>
+            <label htmlFor="workspaceId" className="sr-only">
+              Workspace
+            </label>
+            <WorkspaceSelect
+              memberships={memberships}
+              activeWorkspaceId={active.workspaceId}
+            />
+            <noscript>
+              <button type="submit" className="text-xs text-ink-4 underline">
+                Switch
+              </button>
+            </noscript>
+          </form>
+        ) : null}
+      </div>
+    </div>
   );
 }

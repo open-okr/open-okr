@@ -11,10 +11,30 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openokr/method": "workspace:*"
+    "@openokr/method": "workspace:*",
+    "@base-ui-components/react": "catalog:",
+    "@tanstack/query-sync-storage-persister": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-persist-client": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "tailwind-merge": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "jsdom": "catalog:",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

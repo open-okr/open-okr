@@ -1,11 +1,12 @@
 /**
  * A wiring check, not a behaviour test.
  *
- * This package has no implementation yet. Asserting its name equals itself
- * proves only that the workspace link, the TypeScript path and the vitest
- * config all resolve, which is worth knowing before there is code to break.
- * It is replaced by real tests when the package is built, and should never be
- * read as coverage.
+ * Asserting the package's own name equals itself proves the workspace
+ * link, the TypeScript path and the vitest config all resolve — worth
+ * keeping now that there is real code (P2-T10), since a broken import
+ * graph would otherwise show up as confusing failures in every other test
+ * file instead of this one obvious one. The real coverage is the rest of
+ * this directory.
  */
 import { expect, test } from "vitest";
 import { PACKAGE_NAME } from "../src/index";

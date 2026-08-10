@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -38,9 +39,16 @@ export function SignUpForm() {
   return (
     <AuthCard
       title="Create your account"
-      footer={<Link href="/sign-in">Already have an account? Sign in</Link>}
+      footer={
+        <Link
+          href="/sign-in"
+          className="font-medium text-brand-600 hover:underline"
+        >
+          Already have an account? Sign in
+        </Link>
+      }
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-3">
         <Field label="Name" name="name" autoComplete="name" required />
         <Field
           label="Email"
@@ -49,21 +57,23 @@ export function SignUpForm() {
           autoComplete="email"
           required
         />
-        <Field
-          label="Password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          minLength={12}
-          required
-        />
-        <p style={{ fontSize: "0.875rem", color: "#52525b" }}>
-          At least 12 characters. A phrase you can remember beats a short
-          password you cannot.
-        </p>
-        <button type="submit" disabled={pending}>
+        <div className="flex flex-col gap-1">
+          <Field
+            label="Password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            minLength={12}
+            required
+          />
+          <p className="text-xs text-ink-3">
+            At least 12 characters. A phrase you can remember beats a short
+            password you cannot.
+          </p>
+        </div>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Creating…" : "Create account"}
-        </button>
+        </Button>
       </form>
       <FormError>{error}</FormError>
     </AuthCard>

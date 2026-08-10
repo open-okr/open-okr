@@ -1,10 +1,11 @@
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { requireAccessLevel } from "../../lib/access";
+import { requireAccessLevel } from "../../lib/access.ts";
+import { AppShellLayout } from "../../lib/app-shell.tsx";
 
 /**
- * The admin shell (screen S-36 skeleton, P2-T08).
+ * The admin shell (screen S-36 skeleton, P2-T08, restyled P2-T10).
  *
  * Two levels: this layout is the left-hand section navigation, and each
  * page under it is one card on the right with its own save. Gated once here
@@ -16,7 +17,10 @@ import { requireAccessLevel } from "../../lib/access";
  * requires `full`, but a lower-requirement card added later is hidden here
  * without this file changing.
  *
- * Unstyled on purpose: the design system arrives at P2-T10.
+ * This is a *second*, nested navigation, distinct from the primary
+ * sidebar's own single "Admin" link (`app-shell.tsx`): the primary sidebar
+ * never expands a submenu for it, matching §3's diagram, which shows
+ * "Admin" as one row with no visible children.
  */
 export default async function AdminLayout({
   children,
@@ -27,28 +31,27 @@ export default async function AdminLayout({
   const sections = navigationFor("admin", access.level);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "2rem",
-        margin: "3rem auto",
-        maxWidth: "48rem",
-      }}
-    >
-      <nav style={{ minWidth: "10rem" }}>
-        <h2>Admin</h2>
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {sections.map((item) => (
-            <li key={item.id}>
-              <Link href={item.href}>{item.label}</Link>
-            </li>
-          ))}
-        </ul>
-        <p>
-          <Link href="/">Back to workspace</Link>
-        </p>
-      </nav>
-      <main style={{ flex: 1 }}>{children}</main>
-    </div>
+    <AppShellLayout>
+      <div className="mx-auto flex max-w-3xl gap-8">
+        <nav aria-label="Admin sections" className="w-40 flex-none">
+          <h2 className="mb-2 text-xs font-bold tracking-wider text-ink-4 uppercase">
+            Admin
+          </h2>
+          <ul className="flex flex-col gap-0.5">
+            {sections.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={item.href}
+                  className="block rounded-md px-2.5 py-1.5 text-sm font-medium text-ink-2 hover:bg-raised"
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </AppShellLayout>
   );
 }

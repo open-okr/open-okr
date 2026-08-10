@@ -1,0 +1,13 @@
+{
+  "shell.search.label": "Search",
+  "shell.search.placeholder": "Search…",
+  "shell.shortcuts.overlayDescription": "Show keyboard shortcuts",
+  "shell.shortcuts.title": "Keyboard shortcuts",
+  "shell.shortcuts.empty": "No shortcuts are registered on this screen yet.",
+  "shell.shortcuts.close": "Close",
+  "shell.mobile.home": "Home",
+  "shell.mobile.review": "Review",
+  "shell.mobile.inbox": "Inbox",
+  "shell.mobile.search": "Search",
+  "shell.version.updateAvailable": "A new version is available. Reloading…"
+}

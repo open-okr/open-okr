@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
@@ -41,9 +42,12 @@ export default function ForgotPasswordPage() {
         title="Check your email"
         description="If that address has an account, a reset link is on its way. The link expires in an hour."
       >
-        <p>
-          <Link href="/sign-in">Back to sign in</Link>
-        </p>
+        <Link
+          href="/sign-in"
+          className="font-medium text-brand-600 hover:underline"
+        >
+          Back to sign in
+        </Link>
       </AuthCard>
     );
   }
@@ -52,9 +56,16 @@ export default function ForgotPasswordPage() {
     <AuthCard
       title="Reset your password"
       description="We will email you a link to set a new one."
-      footer={<Link href="/sign-in">Back to sign in</Link>}
+      footer={
+        <Link
+          href="/sign-in"
+          className="font-medium text-brand-600 hover:underline"
+        >
+          Back to sign in
+        </Link>
+      }
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label="Email"
           name="email"
@@ -62,9 +73,9 @@ export default function ForgotPasswordPage() {
           autoComplete="email"
           required
         />
-        <button type="submit" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Sending…" : "Send reset link"}
-        </button>
+        </Button>
       </form>
       <FormError>{error}</FormError>
     </AuthCard>

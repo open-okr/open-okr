@@ -1,13 +1,25 @@
-import type { ReactNode } from "react";
+import { Card, CardBody } from "@openokr/ui";
+import type { InputHTMLAttributes, ReactNode } from "react";
 
 /**
- * The single clean card every authentication screen sits in (screen S-35).
+ * The single clean card every authentication screen sits in (screen S-35,
+ * restyled P2-T10). §3: "A single clean card with workspace branding and a
+ * pre-authentication language switcher." Workspace branding and the
+ * language switcher are not built here — no branding colour reaches an
+ * unauthenticated request yet (S-36's branding card writes a workspace
+ * setting no sign-in-time code reads), and the language switcher needs a
+ * resolved instance/workspace default this route does not look up today —
+ * both flagged in STATUS.md rather than invented.
  *
- * Deliberately plain: the design system, its tokens and the string
- * catalogues arrive with P2-T10, and this screen is restyled there. What is
- * here now is the behaviour and the semantics — landmarks, labels, focus
- * order and error wiring — because those are what the rest of the task
- * depends on and what a later restyle should not have to reinvent.
+ * JavaScript stays required for every screen this wraps: this task's own
+ * "decide progressive enhancement" note is answered here. Passkey sign-in
+ * is one of the offered methods (§4.4), and WebAuthn has no server-only
+ * fallback at all — the ceremony is `navigator.credentials`, which cannot
+ * run without JavaScript on any browser. A parallel no-JS path for
+ * password-only sign-in would mean two divergent flows to keep in sync for
+ * a case (a modern browser with JavaScript disabled) that is vanishingly
+ * rare next to "no WebAuthn support," which the JS-required path already
+ * handles by falling back to a password.
  */
 export function AuthCard({
   title,
@@ -21,24 +33,19 @@ export function AuthCard({
   footer?: ReactNode;
 }) {
   return (
-    <main
-      style={{
-        maxWidth: "24rem",
-        margin: "4rem auto",
-        padding: "2rem",
-        border: "1px solid #d4d4d8",
-        borderRadius: "0.5rem",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      <h1 style={{ fontSize: "1.25rem", marginTop: 0 }}>{title}</h1>
-      {description ? <p style={{ color: "#52525b" }}>{description}</p> : null}
-      {children}
-      {footer ? (
-        <footer style={{ marginTop: "1.5rem", fontSize: "0.875rem" }}>
-          {footer}
-        </footer>
-      ) : null}
+    <main className="flex min-h-screen items-center justify-center bg-bg p-4.5">
+      <Card className="w-full max-w-sm">
+        <CardBody className="flex flex-col gap-1">
+          <h1 className="text-lg font-bold text-ink">{title}</h1>
+          {description ? (
+            <p className="text-sm text-ink-3">{description}</p>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-3">{children}</div>
+          {footer ? (
+            <footer className="mt-4 text-sm text-ink-3">{footer}</footer>
+          ) : null}
+        </CardBody>
+      </Card>
     </main>
   );
 }
@@ -53,7 +60,7 @@ export function FormError({ children }: { children: ReactNode }) {
     return null;
   }
   return (
-    <p role="alert" style={{ color: "#b91c1c", marginTop: "0.75rem" }}>
+    <p role="alert" className="text-sm font-medium text-bad">
       {children}
     </p>
   );
@@ -61,19 +68,23 @@ export function FormError({ children }: { children: ReactNode }) {
 
 export function Field({
   label,
+  className,
   ...input
-}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+}: {
+  label: string;
+  className?: string;
+} & InputHTMLAttributes<HTMLInputElement>) {
   const id = `field-${input.name}`;
   return (
-    <p>
-      <label htmlFor={id} style={{ display: "block", marginBottom: "0.25rem" }}>
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-sm font-medium text-ink-2">
         {label}
       </label>
       <input
         id={id}
-        style={{ width: "100%", padding: "0.5rem", boxSizing: "border-box" }}
+        className="h-7.5 w-full rounded-lg border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line"
         {...input}
       />
-    </p>
+    </div>
   );
 }

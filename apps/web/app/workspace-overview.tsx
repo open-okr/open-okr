@@ -1,11 +1,9 @@
-import { callAction, navigationFor, OperationError } from "@openokr/core";
-import Link from "next/link";
+import { callAction, OperationError } from "@openokr/core";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { notFound } from "next/navigation";
-import { resolveAccessLevelFor } from "../lib/access";
 import { getPool } from "../lib/auth";
 import type { ActiveWorkspace } from "../lib/workspace";
 import { RenameWorkspace } from "./rename-workspace";
-import { WorkspaceSwitcher } from "./workspace-switcher";
 
 /**
  * The proving dashboard's content (P1-T08).
@@ -23,7 +21,7 @@ export async function WorkspaceOverview({
 }: {
   active: ActiveWorkspace;
 }) {
-  const { session, workspace, memberships } = active;
+  const { session, workspace } = active;
 
   let overview: Awaited<ReturnType<typeof callAction<"workspace.overview">>>;
   try {
@@ -46,53 +44,38 @@ export async function WorkspaceOverview({
     throw error;
   }
 
-  // The module registry's own "hidden below the level" half: an admin link
-  // this member's level does not reach never renders, the same requirement
-  // the admin layout itself denies the route for if it is visited directly.
-  const level = await resolveAccessLevelFor(
-    workspace.workspaceId,
-    workspace.memberId,
-  );
-  const adminLinks = navigationFor("admin", level);
+  const fields: readonly [string, string][] = [
+    ["Workspace", `${overview.workspace.name} (${overview.workspace.slug})`],
+    ["State", overview.workspace.state],
+    ["Timezone", overview.workspace.timezone],
+    ["Language", overview.workspace.language],
+    [
+      "Your membership",
+      `${overview.member.kind}, ${overview.member.status}, notified by ${overview.member.primaryChannel}`,
+    ],
+  ];
 
   return (
-    <>
-      <p>
-        Signed in as <strong>{overview.member.name}</strong>, in{" "}
-        <strong>{overview.workspace.name}</strong>.
-      </p>
-
-      <dl>
-        <dt>Workspace</dt>
-        <dd>
-          {overview.workspace.name} ({overview.workspace.slug})
-        </dd>
-        <dt>State</dt>
-        <dd>{overview.workspace.state}</dd>
-        <dt>Timezone</dt>
-        <dd>{overview.workspace.timezone}</dd>
-        <dt>Language</dt>
-        <dd>{overview.workspace.language}</dd>
-        <dt>Your membership</dt>
-        <dd>
-          {overview.member.kind}, {overview.member.status}, notified by{" "}
-          {overview.member.primaryChannel}
-        </dd>
-      </dl>
-
-      <WorkspaceSwitcher memberships={memberships} active={workspace} />
-      <RenameWorkspace name={overview.workspace.name} />
-
-      {adminLinks.length > 0 && (
-        <p>
-          {adminLinks.map((item, index) => (
-            <span key={item.id}>
-              {index > 0 && " · "}
-              <Link href={item.href}>{item.label}</Link>
-            </span>
+    <Card>
+      <CardHeader>
+        <h1 className="text-lg font-bold text-ink">
+          Signed in as {overview.member.name}, in {overview.workspace.name}
+        </h1>
+      </CardHeader>
+      <CardBody className="flex flex-col gap-3.5">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          {fields.map(([label, value]) => (
+            <div
+              key={label}
+              className="col-span-2 grid grid-cols-[10rem_1fr] gap-x-4"
+            >
+              <dt className="text-ink-3">{label}</dt>
+              <dd className="tabular text-ink">{value}</dd>
+            </div>
           ))}
-        </p>
-      )}
-    </>
+        </dl>
+        <RenameWorkspace name={overview.workspace.name} />
+      </CardBody>
+    </Card>
   );
 }

@@ -1,0 +1,295 @@
+/*
+ * OpenOKR design tokens (UIUX-PLAN.md §2, P2-T10).
+ *
+ * Concrete values are the mockups' own proposed default
+ * (docs/stakeholder/mockups/src/style.css), per UIUX-PLAN.md §10: nothing
+ * here contradicts a §2 rule, and every value §2 does not pin a number to
+ * comes from that file. One deliberate exception, noted where it happens:
+ * the base text size. UIUX-PLAN.md §2 names "12, 13, 14 (base), 16, 18,
+ * 24, 30" — 14 is the base, not 13 — while the mockup's own body
+ * font-size is 13px. §10 says the specification wins on a disagreement,
+ * so this file uses 14; the mockup itself is not edited here, because
+ * doing so without re-rendering its PNGs (docs/stakeholder/mockups/README.md's
+ * own render step) would leave the source and its screenshots
+ * mismatched, which is worse than the discrepancy it would fix — recorded
+ * as a follow-up in STATUS.md instead, the other option §10 names.
+ *
+ * Semantic tokens (--ink, --ok, --brand, ...) are the single indirection
+ * theme switching needs: light values live on :root, dark values override
+ * them under [data-theme="dark"], and every component reaches a token
+ * through the Tailwind utility the @theme block below generates
+ * (bg-surface, text-ink-2, ...), never the raw --variable, so a component
+ * never has to know which theme is active.
+ */
+
+:root {
+  /* Brand: one workspace-themeable hue (§2). This is the product default;
+   * a workspace's own brand colour overrides --brand once branding
+   * settings (S-36) can supply one. */
+  --brand: #4f46e5;
+  --brand-600: #4338ca;
+  --brand-weak: #eef2ff;
+  --brand-line: #c7d2fe;
+
+  /* Neutral grey ramp (§2). */
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --ink-4: #94a3b8;
+  --line: #e4e9f2;
+  --line-2: #cdd6e4;
+  --bg: #f6f8fc;
+  --surface: #ffffff;
+  --raised: #eff3f9;
+
+  /* Semantic: success, warning, danger, info (§2). Never the only signal —
+   * every consumer pairs the colour with an icon or a label. */
+  --ok: #15803d;
+  --ok-bg: #e4f9ec;
+  --ok-dot: #22c55e;
+  --warn: #b45309;
+  --warn-bg: #fdf3d5;
+  --warn-dot: #f59e0b;
+  --bad: #b91c1c;
+  --bad-bg: #fde9e9;
+  --bad-dot: #ef4444;
+  --info: #1d4ed8;
+  --info-bg: #e3eefd;
+  --info-dot: #3b82f6;
+
+  /* Shape and elevation. Named --card-* rather than the --radius-* Tailwind
+   * theme namespace they feed, on purpose: @theme inline below maps
+   * --radius-lg to var(--card-radius-lg), and a custom property cannot
+   * reference itself by the same name, so the raw runtime-toggling token
+   * and the Tailwind-facing theme key must never share a name. Same reason
+   * motion uses --motion-* below rather than --duration and --ease directly. */
+  --card-radius: 10px;
+  --card-radius-lg: 14px;
+  --shadow-1:
+    0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-2:
+    0 2px 6px rgba(15, 23, 42, 0.05), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+
+  /* Motion (§2: "120 to 200 millisecond ease-out micro-transitions"). */
+  --motion-ease: cubic-bezier(0.22, 0.68, 0.32, 1);
+  --motion-fast: 120ms;
+  --motion-slow: 200ms;
+
+  /* Density (§2: "comfortable and compact densities, per user"). Every
+   * density-sensitive component reads one of these rather than a raw
+   * Tailwind spacing utility, so switching density is one attribute flip. */
+  --space-row-y: 10px;
+  --space-card-p: 16px;
+  --space-gap: 8px;
+}
+
+:root[data-density="compact"] {
+  --space-row-y: 6px;
+  --space-card-p: 12px;
+  --space-gap: 6px;
+}
+
+/*
+ * Dark mode (§2: "first class... light, dark or system"). "System" is
+ * resolved to a concrete "light" or "dark" before this ever matters — see
+ * theme-script.ts and theme-provider.tsx — so this file only has two
+ * states to define, not three.
+ */
+:root[data-theme="dark"] {
+  --brand-weak: #1e1b4b;
+  --brand-line: #3730a3;
+
+  --ink: #f1f5f9;
+  --ink-2: #cbd5e1;
+  --ink-3: #94a3b8;
+  --ink-4: #64748b;
+  --line: #1e293b;
+  --line-2: #334155;
+  --bg: #0b1220;
+  --surface: #111827;
+  --raised: #1a2332;
+
+  --ok-bg: #052e1b;
+  --warn-bg: #3a2a05;
+  --bad-bg: #3a0a0a;
+  --info-bg: #0b2545;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-2:
+    0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+}
+
+/* §2: "respects reduced motion." Never gates content — this only removes
+ * the animation, nothing it is attached to. `!important` is deliberate
+ * here, the one place in this file it is: a component's own animation
+ * class must never be able to win against this override by specificity. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat any component's own animation/transition class, see comment above */
+    animation-duration: 0.001ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    transition-duration: 0.001ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: see above */
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tailwind v4 is CSS-first: this maps the semantic tokens above onto the
+ * utility names Tailwind generates (bg-brand, text-ink-2, rounded-lg, ...).
+ * "inline" keeps each utility reading the live --variable rather than
+ * baking in the :root value, which is what lets [data-theme="dark"] and
+ * [data-density="compact"] repaint the same classes instead of needing a
+ * dark: variant on every one of them. */
+@theme inline {
+  --font-sans:
+    var(--font-inter), -apple-system, "SF Pro Text", "Helvetica Neue", Arial,
+    sans-serif;
+
+  --color-brand: var(--brand);
+  --color-brand-600: var(--brand-600);
+  --color-brand-weak: var(--brand-weak);
+  --color-brand-line: var(--brand-line);
+
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-ok-dot: var(--ok-dot);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-dot: var(--warn-dot);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-bad-dot: var(--bad-dot);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-dot: var(--info-dot);
+
+  --radius-md: var(--card-radius);
+  --radius-lg: var(--card-radius-lg);
+
+  --shadow-card: var(--shadow-1);
+  --shadow-popover: var(--shadow-2);
+
+  /* §2: "Scale 12, 13, 14 (base), 16, 18, 24, 30." */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+
+  --duration-fast: var(--motion-fast);
+  --duration-slow: var(--motion-slow);
+  --ease-out: var(--motion-ease);
+}
+
+/* Tailwind's dark: variant, retargeted from `.dark` to the attribute the
+ * theme provider actually sets, so `dark:` classes keep working the normal
+ * Tailwind way without a class-toggling library. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* §2: "Tabular numerals in every grid and score display." Applied by class
+ * rather than globally, since prose text should not go tabular. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Entrance motion (§2: "a surface may stagger its content in on first
+ * paint, settling within half a second"). Applied once, to shell chrome
+ * (.side/.topbar/.strip) and opt-in list entrances (.stagger) — never to a
+ * virtualised or data-heavy row, per §2's own exception, so these classes
+ * belong on the handful of components that mount once per navigation, not
+ * on anything that mounts on scroll.
+ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+@keyframes fall {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+@keyframes grow-bar {
+  from {
+    width: 0;
+  }
+}
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.side {
+  animation: slide-in 0.3s var(--motion-ease) backwards;
+}
+.topbar-shell {
+  animation: fall 0.3s var(--motion-ease) backwards;
+}
+.cycle-strip {
+  animation: fall 0.32s var(--motion-ease) 0.05s backwards;
+}
+.animate-grow-bar {
+  animation: grow-bar 0.55s var(--motion-ease) 0.18s backwards;
+}
+.animate-pop {
+  animation: pop 0.35s var(--motion-ease) backwards;
+}
+
+.stagger > * {
+  animation: rise 0.32s var(--motion-ease) backwards;
+}
+.stagger > *:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 0.14s;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 0.18s;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 0.22s;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 0.26s;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 0.3s;
+}
+.stagger > *:nth-child(n + 7) {
+  animation-delay: 0.34s;
+}
