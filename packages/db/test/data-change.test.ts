@@ -195,7 +195,13 @@ describe("runDataChanges", () => {
       scripts: [countingScript(resumed)],
     });
     expect(outcomes[0]?.rowsChanged).toBe(2); // only the remaining rows
-    expect(resumed.n).toBe(1); // one batch, not three
+    // Two calls, not the three a from-scratch run needs (2 + 2 + 0): the
+    // first finds exactly the two remaining rows and cannot yet tell that
+    // is all of them (its own `done` only turns true on a batch smaller
+    // than the limit), so a second, empty batch is what actually confirms
+    // completion. Resuming still skips the batch a from-scratch run would
+    // have spent on the two rows this test's own crash already committed.
+    expect(resumed.n).toBe(2);
 
     const afterResume = await client.query(
       "select count(*)::int as n from _counting_fixture where flagged",
@@ -258,17 +264,21 @@ describe("the sample script: backfilling member timezone", () => {
       dirs: [join(import.meta.dirname, "../migrations")],
     });
 
+    // Both tables' own id columns are deliberately without a database
+    // default (§3: "application-generated... a row arriving without an id
+    // is a bug, not something to paper over"), so a raw insert has to
+    // supply one itself the way the application layer always does.
     const workspace = await client.query<{ id: string }>(
-      `insert into workspaces (name, slug, settings)
-       values ('Acme', 'acme', '{"timezone": "Asia/Kuala_Lumpur"}'::jsonb)
+      `insert into workspaces (id, name, slug, settings)
+       values (gen_random_uuid(), 'Acme', 'acme', '{"timezone": "Asia/Kuala_Lumpur"}'::jsonb)
        returning id`,
     );
     const workspaceId = workspace.rows[0]?.id;
 
     await client.query(
-      `insert into workspace_members (workspace_id, name, kind, status, timezone)
-       values ($1, 'No Timezone', 'human', 'active', null),
-              ($1, 'Has Timezone', 'human', 'active', 'UTC')`,
+      `insert into workspace_members (id, workspace_id, name, kind, status, timezone)
+       values (gen_random_uuid(), $1, 'No Timezone', 'human', 'active', null),
+              (gen_random_uuid(), $1, 'Has Timezone', 'human', 'active', 'UTC')`,
       [workspaceId],
     );
 

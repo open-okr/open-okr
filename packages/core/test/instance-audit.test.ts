@@ -78,7 +78,7 @@ describe("recordInstanceAuditEvent", () => {
 
   it("appends the first row of the chain with the genesis prevHash", async () => {
     const wb = await workerDb();
-    await wb.admin.query("delete from instance_audit_events");
+    await wb.admin.query("truncate table instance_audit_events");
 
     await recordInstanceAuditEvent(wb.appPool, {
       action: "auth.rate_limited",
@@ -95,7 +95,7 @@ describe("recordInstanceAuditEvent", () => {
 
   it("chains a second event to the first rather than starting over", async () => {
     const wb = await workerDb();
-    await wb.admin.query("delete from instance_audit_events");
+    await wb.admin.query("truncate table instance_audit_events");
 
     await recordInstanceAuditEvent(wb.appPool, {
       action: "auth.rate_limited",
@@ -115,7 +115,7 @@ describe("recordInstanceAuditEvent", () => {
 
   it("survives concurrent writers without a duplicate sequence number", async () => {
     const wb = await workerDb();
-    await wb.admin.query("delete from instance_audit_events");
+    await wb.admin.query("truncate table instance_audit_events");
 
     await Promise.all(
       Array.from({ length: 5 }, (_, i) =>

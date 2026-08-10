@@ -62,7 +62,10 @@ export const backfillMemberTimezone: DataChangeScript = {
        )
        select
          (select count(*) from batch)::int as batch_size,
-         (select max(id) from batch) as last_id,
+         -- Not max(id): Postgres's max() aggregate has no uuid overload.
+         -- batch is already ordered by id ascending, so its last row is the
+         -- same answer.
+         (select id from batch order by id desc limit 1) as last_id,
          (select count(*) from updated)::int as updated_count`,
       [cursor, BATCH_SIZE],
     );

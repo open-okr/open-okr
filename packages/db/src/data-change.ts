@@ -183,8 +183,16 @@ export async function runDataChanges(
       await assertColumnsExist(client, script);
 
       let cursor = ledger?.cursor ?? null;
+      // Lifetime totals, persisted to the ledger across every resume.
       let batches = ledger?.batches ?? 0;
       let rowsChanged = ledger ? Number(ledger.rows_changed) : 0;
+      // This call's own contribution, reported back to this caller. Kept
+      // apart from the lifetime totals above: an operator re-running
+      // `pnpm db:change` on a script that already progressed through a
+      // prior, since-crashed invocation wants to know what THIS run did,
+      // not a total that keeps climbing across unrelated invocations.
+      let sessionBatches = 0;
+      let sessionRowsChanged = 0;
 
       for (;;) {
         await client.query("begin");
@@ -193,6 +201,8 @@ export async function runDataChanges(
           result = await script.runBatch(client, cursor);
           batches += 1;
           rowsChanged += result.rowsChanged;
+          sessionBatches += 1;
+          sessionRowsChanged += result.rowsChanged;
           cursor = result.done ? cursor : (result.cursor ?? cursor);
           await client.query(
             `update _data_changes
@@ -215,7 +225,11 @@ export async function runDataChanges(
         }
       }
 
-      outcomes.push({ name: script.name, batches, rowsChanged });
+      outcomes.push({
+        name: script.name,
+        batches: sessionBatches,
+        rowsChanged: sessionRowsChanged,
+      });
     }
     return outcomes;
   } finally {

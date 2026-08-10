@@ -11,6 +11,7 @@ import { loadEnv } from "@openokr/config";
 import pg from "pg";
 import { runDataChanges } from "../data-change.ts";
 import { backfillMemberTimezone } from "../data-changes/0001_backfill_member_timezone.ts";
+import { backfillWorkspaceStandardBinding } from "../data-changes/0002_backfill_workspace_standard_binding.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -19,7 +20,7 @@ const client = new pg.Client({ connectionString: url });
 await client.connect();
 try {
   const outcomes = await runDataChanges(client, {
-    scripts: [backfillMemberTimezone],
+    scripts: [backfillMemberTimezone, backfillWorkspaceStandardBinding],
   });
   process.stdout.write(
     outcomes.length === 0
