@@ -99,15 +99,32 @@ describe("workspace provisioning wires the access model", () => {
     expect(memberGroup).toBeDefined();
     expect(memberGroup.member_id).toBe(memberId);
 
+    // Two bindings now, not one: the founding member's own `full` grant, and
+    // workspace_standard's own `edit` grant every active member reaches
+    // through (packages/core/src/workspaces/provisioning.ts) — without
+    // which an ordinary later member could read nothing and edit nothing on
+    // the workspace's own context, found only once a real Postgres actually
+    // ran this suite.
     const bindings = await wb.admin.query(
       "select group_id, context_id, level, tag from access_bindings where workspace_id = $1",
       [workspaceId],
     );
-    expect(bindings.rows).toHaveLength(1);
-    expect(bindings.rows[0].level).toBe(ACCESS_LEVELS.full);
-    expect(bindings.rows[0].tag).toBeNull();
-    expect(bindings.rows[0].group_id).toBe(memberGroup.id);
-    expect(bindings.rows[0].context_id).toBe(contexts.rows[0].id);
+    expect(bindings.rows).toHaveLength(2);
+    const standardGroup = groups.rows.find(
+      (r) => r.kind === "workspace_standard",
+    );
+    const memberBinding = bindings.rows.find(
+      (r) => r.group_id === memberGroup.id,
+    );
+    const standardBinding = bindings.rows.find(
+      (r) => r.group_id === standardGroup.id,
+    );
+    expect(memberBinding.level).toBe(ACCESS_LEVELS.full);
+    expect(memberBinding.tag).toBeNull();
+    expect(memberBinding.context_id).toBe(contexts.rows[0].id);
+    expect(standardBinding.level).toBe(ACCESS_LEVELS.edit);
+    expect(standardBinding.tag).toBeNull();
+    expect(standardBinding.context_id).toBe(contexts.rows[0].id);
   });
 
   it("does not duplicate the workspace_standard or member group on a second call", async () => {
@@ -217,9 +234,10 @@ describe("privacy recomputes the moment a binding changes, because nothing cache
             .limit(1);
           const contextId = (context as { id: string }).id;
 
-          const workspaceGroupId = await ensureWorkspaceStandardGroup(tx, {
-            workspaceId,
-          });
+          // workspace_standard already has a live binding on this context
+          // from provisioning itself (packages/core/src/workspaces/
+          // provisioning.ts) — no need to create a second one here, and
+          // access_bindings_untagged_idx would refuse it if this did.
           // openokr:allow-mutation: test setup for a space-tier group, on the
           // same transaction the surrounding operation opened. Spaces
           // themselves are P3-T01; this exercises the space_standard kind
@@ -229,12 +247,6 @@ describe("privacy recomputes the moment a binding changes, because nothing cache
             .values({ workspaceId, kind: "space_standard", spaceId })
             .returning({ id: accessGroups.id });
 
-          await bindGroup(tx, {
-            workspaceId,
-            groupId: workspaceGroupId,
-            contextId,
-            level: ACCESS_LEVELS.view,
-          });
           await bindGroup(tx, {
             workspaceId,
             groupId: (spaceGroup as { id: string }).id,

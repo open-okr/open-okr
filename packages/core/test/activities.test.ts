@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { type WorkspaceTx, withWorkspace, workspaces } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
@@ -55,9 +56,23 @@ async function addMember(name: string): Promise<string> {
   return row.id;
 }
 
+/**
+ * `resourceType` defaults to the untracked "test-aggregate" — safe for
+ * plain feed-visibility, since `queryFeed` gates on this context's own
+ * stored id directly and never re-resolves by type. The fan-out test below
+ * passes "blob" instead, because *that* path goes through
+ * `resolveRecipients`'s `getAccessScoped`, whose `SUBJECT_RESOLVERS` map
+ * (access/reads.ts) is exhaustive and fail-closed — an unregistered type
+ * raises there rather than resolving. "blob" would be the wrong default
+ * here, though: `queryFeed`'s own liveness filter specifically checks a
+ * `blob` subject against the real `blobs` table, and this helper never
+ * creates one, so a "blob"-typed activity would be silently dropped as a
+ * dangling reference rather than shown.
+ */
 async function makeRestrictedActivity(
   resourceId: string,
   grantedMemberId: string,
+  resourceType = "test-aggregate",
 ): Promise<void> {
   const wb = await workerDb();
   await runOperation(
@@ -69,7 +84,7 @@ async function makeRestrictedActivity(
       async execute({ tx }) {
         const contextId = await ensureContext(tx, {
           workspaceId,
-          resourceType: "test-aggregate",
+          resourceType,
           resourceId,
         });
         const groupId = await ensureMemberGroup(tx, {
@@ -86,13 +101,13 @@ async function makeRestrictedActivity(
           result: undefined,
           activity: {
             kind: "test.restricted-note",
-            subjectType: "test-aggregate",
+            subjectType: resourceType,
             subjectId: resourceId,
             contextId,
           },
           audit: {
             action: "test.restricted-activity",
-            targetType: "test-aggregate",
+            targetType: resourceType,
           },
         };
       },
@@ -214,7 +229,7 @@ describe("access-scoped feed visibility", () => {
   it("hides a restricted-context activity from a member without access, and shows it to one with", async () => {
     const withAccess = await addMember("With Access");
     const withoutAccess = await addMember("Without Access");
-    await makeRestrictedActivity("secret-doc", withAccess);
+    await makeRestrictedActivity(randomUUID(), withAccess);
 
     const visibleTo = await withReadTx((tx) =>
       queryFeed(tx, { workspaceId, memberId: withAccess }),
@@ -366,7 +381,8 @@ describe("notification fan-out driven from activities", () => {
   it("notifies a subscriber when an operation opts its activity into fan-out", async () => {
     const wb = await workerDb();
     const subscriber = await addMember("Subscriber");
-    await makeRestrictedActivity("fanout-doc", subscriber);
+    const fanoutDoc = randomUUID();
+    await makeRestrictedActivity(fanoutDoc, subscriber, "blob");
 
     await runOperation(
       { pool: wb.appPool },
@@ -377,8 +393,8 @@ describe("notification fan-out driven from activities", () => {
         async execute({ tx }) {
           const listId = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "fanout-doc",
+            subjectType: "blob",
+            subjectId: fanoutDoc,
           });
           await subscribeMember(tx, {
             workspaceId,
@@ -390,13 +406,13 @@ describe("notification fan-out driven from activities", () => {
             result: undefined,
             activity: {
               kind: "test.fanout-trigger",
-              subjectType: "test-aggregate",
-              subjectId: "fanout-doc",
+              subjectType: "blob",
+              subjectId: fanoutDoc,
               notify: true,
             },
             audit: {
               action: "test.subscribe-and-notify",
-              targetType: "test-aggregate",
+              targetType: "blob",
             },
           };
         },

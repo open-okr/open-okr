@@ -316,7 +316,25 @@ async function insertWorkspaceAndMember(
           resourceType: "workspace",
           resourceId: workspaceId,
         });
-        await ensureWorkspaceStandardGroup(savepoint, { workspaceId });
+        // Every active member belongs to this group "by definition" (reads.ts's
+        // own words), but that is only true in practice once it actually holds
+        // a binding: without one, `resolveMemberAccessLevel` has nothing to
+        // find for anyone who is not the founding member, and an ordinary
+        // invited member resolves to zero on the workspace's own context —
+        // unable to read the overview or edit their own profile. `edit` is
+        // the ceiling: it covers self-service and reading the workspace
+        // aggregate, and stays below every `full`-gated admin action
+        // (settings, invitations, member lifecycle, rename).
+        const workspaceStandardGroupId = await ensureWorkspaceStandardGroup(
+          savepoint,
+          { workspaceId },
+        );
+        await bindGroup(savepoint, {
+          workspaceId,
+          groupId: workspaceStandardGroupId,
+          contextId,
+          level: ACCESS_LEVELS.edit,
+        });
         const memberGroupId = await ensureMemberGroup(savepoint, {
           workspaceId,
           memberId,

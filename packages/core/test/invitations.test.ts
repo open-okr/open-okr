@@ -231,9 +231,11 @@ describe("a single-use personal link", () => {
     );
     expect(outcome.memberId).toBeTruthy();
 
-    // Used once: a second person, even the same address re-registering under
-    // a new account, cannot accept it again.
-    await createUser("right-person-2", "personal@example.com", "Right Two");
+    // Used once: a second person cannot accept it again, even one who could
+    // otherwise have been invited by the same link. `users.email` is unique,
+    // so this cannot literally be the invited address again on a second
+    // account — the point is single-use, not the address matching.
+    await createUser("right-person-2", "someone-else-2@example.com", "Right Two");
     await expect(
       callAction(
         { pool: wb.appPool, ...actingAs("right-person-2") },

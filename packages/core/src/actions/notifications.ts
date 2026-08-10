@@ -111,7 +111,9 @@ export const markNotificationRead = defineWriteAction({
   summary: "Marks one of the signed-in member's own notifications read.",
   input: z.object({ notificationId: z.uuid() }),
   output: z.object({ id: z.uuid() }),
-  access: ACCESS_LEVELS.view,
+  // A write, so at least edit — every active member holds it on the
+  // workspace's own context through workspace_standard.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {
@@ -157,7 +159,8 @@ export const snoozeNotification = defineWriteAction({
     untilMinutes: z.number().int().positive(),
   }),
   output: z.object({ id: z.uuid(), snoozedUntil: z.string() }),
-  access: ACCESS_LEVELS.view,
+  // Same reasoning as markNotificationRead above.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {
@@ -255,7 +258,8 @@ export const updateOwnNotificationSettings = defineWriteAction({
       .optional(),
   }),
   output: settingsOutput,
-  access: ACCESS_LEVELS.view,
+  // A write, so at least edit — same reasoning as markNotificationRead above.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {
@@ -292,7 +296,8 @@ export const toggleSubscription = defineWriteAction({
     subscribe: z.boolean(),
   }),
   output: z.object({ subscribed: z.boolean() }),
-  access: ACCESS_LEVELS.view,
+  // Same reasoning as markNotificationRead above.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {

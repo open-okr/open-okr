@@ -48,6 +48,13 @@ export async function resolveMemberAccessLevel<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: MemberContextInput): Promise<number> {
   const result = await tx.execute<{ level: number }>(sql`
+    with actor as (
+      select kind from workspace_members
+       where id = ${input.memberId}
+         and workspace_id = ${input.workspaceId}
+         and status = 'active'
+         and deleted_at is null
+    )
     select coalesce(max(b.level), 0)::int as level
       from access_bindings b
       join access_groups g
@@ -57,18 +64,23 @@ export async function resolveMemberAccessLevel<
      where b.context_id = ${input.contextId}
        and b.workspace_id = ${input.workspaceId}
        and b.deleted_at is null
-       and exists (
-         select 1 from workspace_members m
-          where m.id = ${input.memberId}
-            and m.workspace_id = ${input.workspaceId}
-            and m.status = 'active'
-            and m.deleted_at is null
-       )
+       and exists (select 1 from actor)
        and (
          (g.kind = 'member' and g.member_id = ${input.memberId})
-         or g.kind = 'workspace_standard'
+         -- The two blanket tiers reach only a human member. A guest, an
+         -- agent or a placeholder never inherits general workspace-wide
+         -- access this way — an agent in particular must hold nothing but
+         -- its own named bindings (AI-NATIVE-PLAN §1.3: "no service account
+         -- with ambient authority"), and a guest converted from a fuller
+         -- kind must actually lose what workspace_standard would otherwise
+         -- hand straight back.
+         or (
+           g.kind = 'workspace_standard'
+           and exists (select 1 from actor where kind = 'human')
+         )
          or (
            g.kind = 'space_standard'
+           and exists (select 1 from actor where kind = 'human')
            and exists (
              select 1 from access_group_memberships gm
               where gm.group_id = g.id
@@ -197,9 +209,22 @@ export function accessScopeFilter(
        )
        and (
          (g.kind = 'member' and g.member_id = ${input.memberId})
-         or g.kind = 'workspace_standard'
+         -- The two blanket tiers reach only a human member, same restriction
+         -- and same reason as resolveMemberAccessLevel above: an agent must
+         -- never inherit ambient access, and a guest must actually lose it.
+         or (
+           g.kind = 'workspace_standard'
+           and exists (
+             select 1 from workspace_members m
+              where m.id = ${input.memberId} and m.kind = 'human'
+           )
+         )
          or (
            g.kind = 'space_standard'
+           and exists (
+             select 1 from workspace_members m
+              where m.id = ${input.memberId} and m.kind = 'human'
+           )
            and exists (
              select 1 from access_group_memberships gm
               where gm.group_id = g.id

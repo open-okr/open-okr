@@ -59,7 +59,12 @@ export const updateOwnProfile = defineWriteAction({
     bio: z.unknown().optional(),
   }),
   output: memberSummary,
-  access: ACCESS_LEVELS.view,
+  // A write, so at least edit (the registry's own invariant: "a write that
+  // only asked for view would be a silent escalation"). Every active member
+  // now holds edit on the workspace's own context through workspace_standard
+  // (packages/core/src/workspaces/provisioning.ts), which is what makes this
+  // reachable by an ordinary member and not just the founding admin.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {

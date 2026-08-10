@@ -223,7 +223,12 @@ export const acceptLink = defineWriteAction({
   summary: "Accept an invite link and join the workspace.",
   input: z.object({ token: z.string().min(1) }),
   output: z.object({ memberId: z.uuid() }),
-  access: ACCESS_LEVELS.view,
+  // Declarative only: `bootstrap: true` below makes `runOperation` treat the
+  // caller as `full` unconditionally, since there is no member yet to hold
+  // any real level. Declared as `edit` anyway so the registry's own
+  // invariant ("a write needs at least edit") stays true by inspection
+  // without needing to know which actions are bootstrap operations.
+  access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     bootstrap: true,
     async execute({ tx, workspaceId }) {
@@ -341,7 +346,8 @@ export const joinByTrustedDomain = defineWriteAction({
     "Join a workspace automatically because your email domain is trusted.",
   input: z.object({}),
   output: z.object({ memberId: z.uuid() }),
-  access: ACCESS_LEVELS.view,
+  // Declarative only: see acceptLink above, same bootstrap reasoning.
+  access: ACCESS_LEVELS.edit,
   operation: (context, _input) => ({
     bootstrap: true,
     async execute({ tx, workspaceId }) {

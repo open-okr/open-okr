@@ -25,7 +25,7 @@ export async function resolveAccessLevelFor(
   return resolveOwnWorkspaceAccessLevel(getPool(), workspaceId, memberId);
 }
 
-export async function currentAccessLevel(): Promise<CurrentAccess> {
+async function currentAccessLevel(): Promise<CurrentAccess> {
   const { workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,

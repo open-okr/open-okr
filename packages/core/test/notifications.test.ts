@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { type WorkspaceTx, withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -57,7 +58,18 @@ async function addMember(name: string): Promise<string> {
   return row.id;
 }
 
-/** Gives a member view access to a fresh context, so resolveRecipients keeps them. */
+/**
+ * Gives a member view access to a fresh context, so resolveRecipients keeps
+ * them. Uses "blob" as the subject type throughout this file, not because
+ * any of this is really about a blob, but because `getAccessScoped`'s own
+ * `SUBJECT_RESOLVERS` map (access/reads.ts) is deliberately exhaustive and
+ * fail-closed — an unregistered type raises rather than resolving, and
+ * `resolveRecipients` swallows that raise into "no access" via its own
+ * `.catch()`. A synthetic type here would silently resolve every recipient
+ * to zero access, passing for the wrong reason, caught only once a real
+ * Postgres actually ran this file. "blob" is real and already registered,
+ * and nothing here checks that the id maps to an actual blobs row.
+ */
 async function grantViewOnNewContext(
   memberId: string,
   resourceId: string,
@@ -72,7 +84,7 @@ async function grantViewOnNewContext(
       async execute({ tx }) {
         const contextId = await ensureContext(tx, {
           workspaceId,
-          resourceType: "test-aggregate",
+          resourceType: "blob",
           resourceId,
         });
         const groupId = await ensureMemberGroup(tx, { workspaceId, memberId });
@@ -86,10 +98,10 @@ async function grantViewOnNewContext(
           result: contextId,
           activity: {
             kind: "test.grant-view",
-            subjectType: "test-aggregate",
+            subjectType: "blob",
             subjectId: resourceId,
           },
-          audit: { action: "test.grant-view", targetType: "test-aggregate" },
+          audit: { action: "test.grant-view", targetType: "blob" },
         };
       },
     },
@@ -131,7 +143,8 @@ describe("notification settings default to TECHNICAL-PLAN §11's worked example"
 describe("a mention delivers immediately when opted", () => {
   it("creates an unbatched notification row for a mentioned, subscribed, access-holding member", async () => {
     const member = await addMember("Member");
-    await grantViewOnNewContext(member, "doc-1");
+    const doc1 = randomUUID();
+    await grantViewOnNewContext(member, doc1);
 
     const wb = await workerDb();
     await runOperation(
@@ -143,8 +156,8 @@ describe("a mention delivers immediately when opted", () => {
         async execute({ tx }) {
           const listId = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-1",
+            subjectType: "blob",
+            subjectId: doc1,
           });
           await subscribeMember(tx, {
             workspaceId,
@@ -154,23 +167,23 @@ describe("a mention delivers immediately when opted", () => {
           });
           const recipients = await resolveRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-1",
+            subjectType: "blob",
+            subjectId: doc1,
           });
           const outcome = await notifyRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-1",
+            subjectType: "blob",
+            subjectId: doc1,
             recipients,
           });
           return {
             result: outcome,
             activity: {
               kind: "test.notify",
-              subjectType: "test-aggregate",
-              subjectId: "doc-1",
+              subjectType: "blob",
+              subjectId: doc1,
             },
-            audit: { action: "test.notify", targetType: "test-aggregate" },
+            audit: { action: "test.notify", targetType: "blob" },
           };
         },
       },
@@ -221,8 +234,9 @@ describe("recipient resolution excludes a member who has lost access", () => {
   it("keeps a subscriber with access and drops one without", async () => {
     const withAccess = await addMember("With Access");
     const withoutAccess = await addMember("Without Access");
-    await grantViewOnNewContext(withAccess, "doc-2");
-    // withoutAccess is never granted a binding on doc-2's context.
+    const doc2 = randomUUID();
+    await grantViewOnNewContext(withAccess, doc2);
+    // withoutAccess is never granted a binding on doc2's context.
 
     const wb = await workerDb();
     const recipients = await runOperation(
@@ -234,8 +248,8 @@ describe("recipient resolution excludes a member who has lost access", () => {
         async execute({ tx }) {
           const listId = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-2",
+            subjectType: "blob",
+            subjectId: doc2,
           });
           await subscribeMember(tx, {
             workspaceId,
@@ -251,19 +265,19 @@ describe("recipient resolution excludes a member who has lost access", () => {
           });
           const resolved = await resolveRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-2",
+            subjectType: "blob",
+            subjectId: doc2,
           });
           return {
             result: resolved,
             activity: {
               kind: "test.subscribe-both",
-              subjectType: "test-aggregate",
-              subjectId: "doc-2",
+              subjectType: "blob",
+              subjectId: doc2,
             },
             audit: {
               action: "test.subscribe-both",
-              targetType: "test-aggregate",
+              targetType: "blob",
             },
           };
         },
@@ -275,7 +289,8 @@ describe("recipient resolution excludes a member who has lost access", () => {
 
   it("never includes the excluded author, even when they are subscribed", async () => {
     const author = await addMember("Author");
-    await grantViewOnNewContext(author, "doc-3");
+    const doc3 = randomUUID();
+    await grantViewOnNewContext(author, doc3);
 
     const wb = await workerDb();
     const recipients = await runOperation(
@@ -287,8 +302,8 @@ describe("recipient resolution excludes a member who has lost access", () => {
         async execute({ tx }) {
           const listId = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-3",
+            subjectType: "blob",
+            subjectId: doc3,
           });
           await subscribeMember(tx, {
             workspaceId,
@@ -298,20 +313,20 @@ describe("recipient resolution excludes a member who has lost access", () => {
           });
           const resolved = await resolveRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-3",
+            subjectType: "blob",
+            subjectId: doc3,
             excludeMemberId: author,
           });
           return {
             result: resolved,
             activity: {
               kind: "test.subscribe-author",
-              subjectType: "test-aggregate",
-              subjectId: "doc-3",
+              subjectType: "blob",
+              subjectId: doc3,
             },
             audit: {
               action: "test.subscribe-author",
-              targetType: "test-aggregate",
+              targetType: "blob",
             },
           };
         },
@@ -327,6 +342,7 @@ describe("re-diffing mentions on edit", () => {
     const mentionedA = await addMember("Mentioned A");
     const mentionedB = await addMember("Mentioned B");
     const watcher = await addMember("Watcher");
+    const doc4 = randomUUID();
 
     const wb = await workerDb();
     const listId = await runOperation(
@@ -338,8 +354,8 @@ describe("re-diffing mentions on edit", () => {
         async execute({ tx }) {
           const list = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-4",
+            subjectType: "blob",
+            subjectId: doc4,
           });
           await reconcileMentions(tx, {
             workspaceId,
@@ -356,12 +372,12 @@ describe("re-diffing mentions on edit", () => {
             result: list,
             activity: {
               kind: "test.mention-setup",
-              subjectType: "test-aggregate",
-              subjectId: "doc-4",
+              subjectType: "blob",
+              subjectId: doc4,
             },
             audit: {
               action: "test.mention-setup",
-              targetType: "test-aggregate",
+              targetType: "blob",
             },
           };
         },
@@ -395,7 +411,8 @@ describe("re-diffing mentions on edit", () => {
 describe("the bulk-suppression flag", () => {
   it("creates nothing when suppress is set, regardless of how many recipients resolved", async () => {
     const member = await addMember("Member");
-    await grantViewOnNewContext(member, "doc-5");
+    const doc5 = randomUUID();
+    await grantViewOnNewContext(member, doc5);
 
     const wb = await workerDb();
     const outcome = await runOperation(
@@ -407,8 +424,8 @@ describe("the bulk-suppression flag", () => {
         async execute({ tx }) {
           const listId = await ensureSubscriptionList(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-5",
+            subjectType: "blob",
+            subjectId: doc5,
           });
           await subscribeMember(tx, {
             workspaceId,
@@ -418,13 +435,13 @@ describe("the bulk-suppression flag", () => {
           });
           const recipients = await resolveRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-5",
+            subjectType: "blob",
+            subjectId: doc5,
           });
           const result = await notifyRecipients(tx, {
             workspaceId,
-            subjectType: "test-aggregate",
-            subjectId: "doc-5",
+            subjectType: "blob",
+            subjectId: doc5,
             recipients,
             suppress: true,
           });
@@ -432,12 +449,12 @@ describe("the bulk-suppression flag", () => {
             result,
             activity: {
               kind: "test.suppressed-notify",
-              subjectType: "test-aggregate",
-              subjectId: "doc-5",
+              subjectType: "blob",
+              subjectId: doc5,
             },
             audit: {
               action: "test.suppressed-notify",
-              targetType: "test-aggregate",
+              targetType: "blob",
             },
           };
         },
@@ -456,6 +473,7 @@ describe("the bulk-suppression flag", () => {
 describe("auto-subscribe excludes suspended, placeholder and agent members", () => {
   it("silently skips a suspended member rather than subscribing or erroring", async () => {
     const member = await addMember("Soon Suspended");
+    const doc6 = randomUUID();
     const wb = await workerDb();
     await wb.admin.query(
       "update workspace_members set status = 'suspended' where id = $1",
@@ -465,8 +483,8 @@ describe("auto-subscribe excludes suspended, placeholder and agent members", () 
     const listId = await withReadTx((tx) =>
       ensureSubscriptionList(tx, {
         workspaceId,
-        subjectType: "test-aggregate",
-        subjectId: "doc-6",
+        subjectType: "blob",
+        subjectId: doc6,
       }),
     );
     await withReadTx((tx) =>

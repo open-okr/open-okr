@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   accessGroups,
   activeOnly,
@@ -88,8 +89,16 @@ afterAll(async () => {
   await wb.close();
 });
 
-/** Creates a fresh context, isolated from the workspace's own. */
-async function makeContext(resourceId: string): Promise<string> {
+/**
+ * Creates a fresh context, isolated from the workspace's own.
+ *
+ * `label` is for readability at the call site only. `access_contexts.
+ * resource_id` is a real `uuid` column — a plain string like "matrix-2"
+ * fails the same way any other malformed uuid does, caught only once a real
+ * Postgres actually ran this file rather than every prior, database-less
+ * pass.
+ */
+async function makeContext(label: string): Promise<string> {
   const wb = await workerDb();
   return runOperation(
     { pool: wb.appPool },
@@ -98,6 +107,10 @@ async function makeContext(resourceId: string): Promise<string> {
       workspaceId,
       actor: { kind: "human", userId: OWNER },
       async execute({ tx }) {
+        // `activities.subject_id` is also a real uuid column, so the same
+        // generated value serves both — `label` never reaches storage, only
+        // this function's own log line if it ever needs one.
+        const resourceId = randomUUID();
         const contextId = await ensureContext(tx, {
           workspaceId,
           resourceType: "test-aggregate",
@@ -110,7 +123,11 @@ async function makeContext(resourceId: string): Promise<string> {
             subjectType: "test-aggregate",
             subjectId: resourceId,
           },
-          audit: { action: "test.make-context", targetType: "test-aggregate" },
+          audit: {
+            action: "test.make-context",
+            targetType: "test-aggregate",
+            payload: { label },
+          },
         };
       },
     },
@@ -144,7 +161,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind",
               subjectType: "test-aggregate",
-              subjectId: "matrix-1",
+              subjectId: contextId,
             },
             audit: { action: "test.bind", targetType: "test-aggregate" },
           };
@@ -195,7 +212,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind",
               subjectType: "test-aggregate",
-              subjectId: "matrix-2",
+              subjectId: contextId,
             },
             audit: { action: "test.bind", targetType: "test-aggregate" },
           };
@@ -253,7 +270,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind-space",
               subjectType: "test-aggregate",
-              subjectId: "matrix-3",
+              subjectId: contextId,
             },
             audit: { action: "test.bind-space", targetType: "test-aggregate" },
           };
@@ -306,7 +323,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind",
               subjectType: "test-aggregate",
-              subjectId: "matrix-4",
+              subjectId: contextId,
             },
             audit: { action: "test.bind", targetType: "test-aggregate" },
           };
@@ -324,7 +341,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
     expect(level).toBe(ACCESS_LEVELS.edit);
   });
 
-  it("resolves a guest-kind member through the same workspace_standard tier as anyone else", async () => {
+  it("never reaches a guest-kind member through workspace_standard, only a personal binding does", async () => {
     const guestId = await addMember("guest");
     const contextId = await makeContext("matrix-5");
 
@@ -350,7 +367,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind",
               subjectType: "test-aggregate",
-              subjectId: "matrix-5",
+              subjectId: contextId,
             },
             audit: { action: "test.bind", targetType: "test-aggregate" },
           };
@@ -358,12 +375,12 @@ describe("the permission matrix: maximum wins across every principal kind", () =
       },
     );
 
-    // Recorded rather than assumed: nothing in TECHNICAL-PLAN §4.1 excludes
-    // the guest kind from workspace_standard, and P2-T01 built no such
-    // exclusion. This is a real design question for a human to confirm
-    // before P2-T03 gives guests their convert-and-strip lifecycle: should a
-    // guest inherit the same workspace-wide tier a human does, or only ever
-    // reach what a personal binding names? Flagged in STATUS.md.
+    // Confirmed by the human (2026-08-10), closing the open question P2-T02
+    // originally recorded here: a guest (and an agent, and a placeholder)
+    // reaches nothing through the blanket workspace_standard/space_standard
+    // tiers, ever — only a personal (`member`-kind) binding names them
+    // anything. Safer for an external guest, and matches AI-NATIVE-PLAN
+    // §1.3's "no service account with ambient authority" for an agent.
     const level = await withReadTx((tx) =>
       resolveMemberAccessLevel(tx, {
         workspaceId,
@@ -371,7 +388,51 @@ describe("the permission matrix: maximum wins across every principal kind", () =
         contextId,
       }),
     );
-    expect(level).toBe(ACCESS_LEVELS.view);
+    expect(level).toBe(0);
+
+    // A personal binding still reaches them, because it names them directly
+    // rather than through either blanket tier.
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.grant-personal",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        async execute({ tx }) {
+          const memberGroupId = await ensureMemberGroup(tx, {
+            workspaceId,
+            memberId: guestId,
+          });
+          await bindGroup(tx, {
+            workspaceId,
+            groupId: memberGroupId,
+            contextId,
+            level: ACCESS_LEVELS.comment,
+          });
+          return {
+            result: undefined,
+            activity: {
+              kind: "test.grant-personal",
+              subjectType: "test-aggregate",
+              subjectId: contextId,
+            },
+            audit: {
+              action: "test.grant-personal",
+              targetType: "test-aggregate",
+            },
+          };
+        },
+      },
+    );
+
+    const personalLevel = await withReadTx((tx) =>
+      resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId: guestId,
+        contextId,
+      }),
+    );
+    expect(personalLevel).toBe(ACCESS_LEVELS.comment);
   });
 
   it("resolves the anonymous principal from the anonymous group alone, unaffected by member bindings", async () => {
@@ -414,7 +475,7 @@ describe("the permission matrix: maximum wins across every principal kind", () =
             activity: {
               kind: "test.bind-anonymous",
               subjectType: "test-aggregate",
-              subjectId: "matrix-6",
+              subjectId: contextId,
             },
             audit: {
               action: "test.bind-anonymous",
@@ -467,7 +528,7 @@ describe("suspension zeroes every read", () => {
             activity: {
               kind: "test.bind",
               subjectType: "test-aggregate",
-              subjectId: "suspend-1",
+              subjectId: contextId,
             },
             audit: { action: "test.bind", targetType: "test-aggregate" },
           };
@@ -555,7 +616,12 @@ describe("suspension zeroes every read", () => {
 describe("no existence oracle: forbidden and missing look identical", () => {
   it("a member with an insufficient level gets the same not-found as a nonexistent resource", async () => {
     const memberId = await addMember("human");
-    const contextId = await makeContext("oracle-1");
+    // "blob", not the synthetic "test-aggregate" makeContext uses elsewhere:
+    // getAccessScoped resolves resourceType through the real, exhaustive
+    // SUBJECT_RESOLVERS map, unlike queryFeed's own contextId shortcut, so
+    // this test needs a registered type its resourceId actually round-trips
+    // through, this call and the bind below sharing the same id.
+    const resourceId = randomUUID();
 
     const wb = await workerDb();
     await runOperation(
@@ -565,6 +631,11 @@ describe("no existence oracle: forbidden and missing look identical", () => {
         workspaceId,
         actor: { kind: "human", userId: OWNER },
         async execute({ tx }) {
+          const contextId = await ensureContext(tx, {
+            workspaceId,
+            resourceType: "blob",
+            resourceId,
+          });
           const groupId = await ensureMemberGroup(tx, {
             workspaceId,
             memberId,
@@ -579,10 +650,10 @@ describe("no existence oracle: forbidden and missing look identical", () => {
             result: undefined,
             activity: {
               kind: "test.bind",
-              subjectType: "test-aggregate",
-              subjectId: "oracle-1",
+              subjectType: "blob",
+              subjectId: resourceId,
             },
-            audit: { action: "test.bind", targetType: "test-aggregate" },
+            audit: { action: "test.bind", targetType: "blob" },
           };
         },
       },
@@ -592,8 +663,8 @@ describe("no existence oracle: forbidden and missing look identical", () => {
       getAccessScoped(tx, {
         workspaceId,
         memberId,
-        resourceType: "test-aggregate",
-        resourceId: "oracle-1",
+        resourceType: "blob",
+        resourceId,
         requires: ACCESS_LEVELS.edit,
       }),
     ).catch((error: unknown) => error);
@@ -601,8 +672,8 @@ describe("no existence oracle: forbidden and missing look identical", () => {
       getAccessScoped(tx, {
         workspaceId,
         memberId,
-        resourceType: "test-aggregate",
-        resourceId: "does-not-exist",
+        resourceType: "blob",
+        resourceId: randomUUID(),
         requires: ACCESS_LEVELS.view,
       }),
     ).catch((error: unknown) => error);
@@ -670,7 +741,7 @@ describe("the composable list filter scopes many rows the same way a single read
             activity: {
               kind: "test.bind-many",
               subjectType: "test-aggregate",
-              subjectId: "list",
+              subjectId: visibleContext,
             },
             audit: { action: "test.bind-many", targetType: "test-aggregate" },
           };

@@ -61,6 +61,12 @@ const rename = async (to: string, options: { fail?: boolean } = {}) => {
       workspaceId,
       actor: { kind: "human", userId: USER },
       async execute({ tx }) {
+        const [before] = await tx
+          .select({ name: workspaces.name })
+          .from(workspaces)
+          .where(eq(workspaces.id, workspaceId));
+        const from = before?.name ?? "";
+
         const [updated] = await tx
           .update(workspaces)
           .set({ name: to })
@@ -77,19 +83,19 @@ const rename = async (to: string, options: { fail?: boolean } = {}) => {
             kind: "workspace.renamed",
             subjectType: "workspace",
             subjectId: workspaceId,
-            payload: { to },
+            payload: { from, to },
           },
           audit: {
             action: "workspace.rename",
             targetType: "workspace",
             targetId: workspaceId,
-            payload: { to },
+            payload: { from, to },
           },
           outbox: [
             {
               topic: "workspace.renamed",
-              payload: { workspaceId, to },
-              idempotencyKey: `workspace.renamed:${workspaceId}:${to}`,
+              payload: { workspaceId, from, to },
+              idempotencyKey: `workspace.renamed:${workspaceId}:${from}:${to}`,
             },
           ],
         };

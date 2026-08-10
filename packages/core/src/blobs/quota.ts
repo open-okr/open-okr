@@ -9,7 +9,7 @@
  * each one; it already knows.
  */
 import { activeOnly, blobs, type WorkspaceTx } from "@openokr/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -26,13 +26,11 @@ export async function usedBytes<
     .where(
       and(
         activeOnly(blobs, eq(blobs.workspaceId, workspaceId)),
-        sql`${blobs.status} in ('ok', 'scanning', 'quarantined')`,
+        inArray(blobs.status, OCCUPYING_STATUSES),
       ),
     );
   return Number(row?.total ?? 0);
 }
-
-export const QUOTA_OCCUPYING_STATUSES = OCCUPYING_STATUSES;
 
 export interface QuotaCheckInput {
   readonly usedBeforeBytes: number;

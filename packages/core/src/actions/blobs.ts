@@ -67,7 +67,10 @@ export const prepareUpload = defineWriteAction({
     declaredSize: z.number().int().positive(),
   }),
   output: z.object({ blobId: z.uuid(), storageKey: z.string() }),
-  access: ACCESS_LEVELS.view,
+  // A write, so at least edit — every active member holds it on the
+  // workspace's own context through workspace_standard (see
+  // packages/core/src/workspaces/provisioning.ts).
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {
@@ -127,7 +130,8 @@ export const claimUpload = defineWriteAction({
     status: z.enum(["ok", "scanning"]),
     warningCrossed: z.boolean(),
   }),
-  access: ACCESS_LEVELS.view,
+  // Same reasoning as prepareUpload above.
+  access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const quotaBytes = await readQuotaBytes(tx, workspaceId);

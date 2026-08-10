@@ -383,3 +383,39 @@ describe("the directory, org chart and possible managers", () => {
     expect(candidates.map((c) => c.id)).not.toContain(a);
   });
 });
+
+describe("an ordinary member's own access", () => {
+  it("can update their own profile with no explicit grant", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Ordinary Member");
+
+    const updated = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+      },
+      "people.updateOwnProfile",
+      { timezone: "UTC" },
+    );
+    expect(updated.id).toBe(member);
+  });
+
+  it("is still refused a full-gated action on someone else", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Ordinary Member");
+    const other = await addMember("Someone Else");
+
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", memberId: member },
+        },
+        "people.updateMember",
+        { memberId: other, title: "Analyst" },
+      ),
+    ).rejects.toThrow();
+  });
+});
