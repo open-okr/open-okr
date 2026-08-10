@@ -1,6 +1,5 @@
-import { activities, type WorkspaceTx, withWorkspace } from "@openokr/db";
+import { type WorkspaceTx, withWorkspace } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
-import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { bindGroup, ensureMemberGroup } from "../src/access/contexts.ts";
