@@ -1,0 +1,80 @@
+"use client";
+
+import { isValidRichText, RICH_TEXT_SCHEMA_VERSION } from "@openokr/core";
+import { RichTextEditor } from "@openokr/ui";
+import { notFound } from "next/navigation";
+import { useState } from "react";
+
+/**
+ * The rich text editor preview (P2-T11, matching P2-T10's `/dev/components`
+ * precedent — dev-only, no attack surface in production). Search and
+ * upload are mocked here: `packages/ui` takes them as props rather than
+ * reaching for a real member search or P2-T05's upload pipeline itself
+ * (docs/design/rich-text-editor.md §6-7), and this page is the one place
+ * outside a real screen that supplies working ones to actually exercise
+ * the editor end to end.
+ */
+
+const MOCK_MEMBERS = [
+  { id: "member-1", label: "Ada Lovelace" },
+  { id: "member-2", label: "Grace Hopper" },
+  { id: "member-3", label: "Alan Turing" },
+];
+
+const MOCK_ENTITIES = [
+  { id: "abc123", label: "Q3 Growth objective" },
+  { id: "def456", label: "Activation rate" },
+];
+
+async function mockSearch(source: typeof MOCK_MEMBERS, query: string) {
+  return source.filter((item) =>
+    item.label.toLowerCase().includes(query.toLowerCase()),
+  );
+}
+
+async function mockUpload(file: File) {
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  return { blobId: `mock-${file.name}-${Date.now()}` };
+}
+
+export default function RichTextEditorPreviewPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
+  const [lastJson, setLastJson] = useState<unknown>(null);
+  const [validity, setValidity] = useState<"unknown" | "valid" | "invalid">(
+    "unknown",
+  );
+
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
+      <h1 className="text-2xl font-bold text-ink">Rich text editor</h1>
+      <p className="text-sm text-ink-3">
+        Type <code>@</code> for a member, <code>#</code> for an entity, or{" "}
+        <code>/</code> at the start of a line for block commands. Paste or drop
+        a file to try the attachment upload flow.
+      </p>
+      <div className="rounded-lg border border-line-2 bg-surface p-3">
+        <RichTextEditor
+          content={{ type: "doc", content: [{ type: "paragraph" }] }}
+          searchMembers={(query) => mockSearch(MOCK_MEMBERS, query)}
+          searchEntities={(query) => mockSearch(MOCK_ENTITIES, query)}
+          uploadFile={mockUpload}
+          validate={(json) => {
+            const valid = isValidRichText(json, RICH_TEXT_SCHEMA_VERSION);
+            setValidity(valid ? "valid" : "invalid");
+            return valid;
+          }}
+          onUpdate={setLastJson}
+        />
+      </div>
+      <p className="text-xs text-ink-4">
+        Last update validated as: <strong>{validity}</strong>
+      </p>
+      <pre className="max-h-64 overflow-auto rounded-lg bg-raised p-3 text-xs text-ink-2">
+        {JSON.stringify(lastJson, null, 2)}
+      </pre>
+    </div>
+  );
+}

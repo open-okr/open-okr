@@ -221,6 +221,32 @@ export {
   possibleManagers,
   wouldCreateManagerCycle,
 } from "./people/manager-chain.ts";
+export type { ExcerptResolvers } from "./rich-text/excerpt.ts";
+export { excerptRichText } from "./rich-text/excerpt.ts";
+export {
+  type ExtractedAttachment,
+  extractAttachments,
+  extractMentionIds,
+} from "./rich-text/extract.ts";
+export type { RichTextResolvers } from "./rich-text/render.ts";
+export { renderRichTextToHtml } from "./rich-text/render.ts";
+export {
+  isAllowedLinkHref,
+  LEAF_NODE_TYPES,
+  type Mark,
+  NESTING_RULES,
+  NODE_ATTRS_SCHEMAS,
+  NODE_TYPES,
+  type NodeType,
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+  type RichTextNode,
+} from "./rich-text/schema.ts";
+export {
+  isValidRichText,
+  parseRichText,
+  RichTextValidationError,
+} from "./rich-text/validate.ts";
 export {
   environmentValue,
   getInstanceSetting,

@@ -31,8 +31,26 @@ import {
   possibleManagers,
   wouldCreateManagerCycle,
 } from "../people/manager-chain.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { isKnownTimezone } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/** `null` clears the bio; anything else must be a valid rich text
+ * document (docs/design/rich-text-editor.md). Validated at the input
+ * boundary, same as `isKnownTimezone` below, rather than inside
+ * `execute()` — a bad document is refused before the transaction opens. */
+const bioInputSchema = z
+  .unknown()
+  .nullable()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    {
+      message: "bio must be a valid rich text document.",
+    },
+  )
+  .optional();
 
 const memberSummary = z.object({
   id: z.uuid(),
@@ -53,10 +71,7 @@ export const updateOwnProfile = defineWriteAction({
       .refine(isKnownTimezone, { message: "Unknown timezone." })
       .optional(),
     avatarBlobId: z.uuid().nullable().optional(),
-    // Editor JSON, validated and sanitised by the shared module the rich
-    // text editor task (P2-T11) delivers. Accepted loosely here rather than
-    // ahead of that module existing.
-    bio: z.unknown().optional(),
+    bio: bioInputSchema,
   }),
   output: memberSummary,
   // A write, so at least edit (the registry's own invariant: "a write that

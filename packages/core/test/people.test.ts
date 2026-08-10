@@ -8,6 +8,7 @@ import {
   resolveMemberAccessLevel,
   resolveSubjectContext,
 } from "../src/access/reads.ts";
+import { updateOwnProfile } from "../src/actions/people.ts";
 import { callAction } from "../src/actions/registry.ts";
 import { runOperation } from "../src/operations/operation.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -417,5 +418,42 @@ describe("an ordinary member's own access", () => {
         { memberId: other, title: "Analyst" },
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe("bio is validated as rich text (P2-T11)", () => {
+  it("accepts a valid rich text document", () => {
+    const result = updateOwnProfile.input.safeParse({
+      bio: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "Hi" }] },
+        ],
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null, which clears the bio", () => {
+    expect(updateOwnProfile.input.safeParse({ bio: null }).success).toBe(true);
+  });
+
+  it("accepts an absent bio — updating only the timezone leaves it untouched", () => {
+    expect(updateOwnProfile.input.safeParse({ timezone: "UTC" }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects a document with a node type outside the allow-list", () => {
+    const result = updateOwnProfile.input.safeParse({
+      bio: { type: "doc", content: [{ type: "video", attrs: { src: "x" } }] },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an arbitrary non-document value", () => {
+    expect(
+      updateOwnProfile.input.safeParse({ bio: "just a string" }).success,
+    ).toBe(false);
   });
 });
