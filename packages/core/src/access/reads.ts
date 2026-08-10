@@ -16,9 +16,16 @@
  * `getAccessScoped` for the single-resource read that resolves a subject to
  * its context first. `can()` is a one-line predicate over the first.
  */
-import { accessContexts, activeOnly, type WorkspaceTx } from "@openokr/db";
+import {
+  accessContexts,
+  activeOnly,
+  type WorkspaceTx,
+  withWorkspace,
+} from "@openokr/db";
 import { eq, type SQL, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import type { Pool } from "pg";
 import { OperationError } from "../operations/operation.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "./levels.ts";
 
@@ -83,6 +90,40 @@ export async function can<
   level: AccessLevel,
 ): Promise<boolean> {
   return (await resolveMemberAccessLevel(tx, input)) >= level;
+}
+
+/**
+ * The level a member holds on their own workspace's context, from a plain
+ * `Pool` rather than a transaction already open on one (TECHNICAL-PLAN
+ * §4.1, P2-T08). For a caller outside the Operation pipeline — the module
+ * registry's own consumer, filtering a navigation menu or denying a route —
+ * that has a workspace and a member id already and nothing else: the same
+ * shape `listMembershipsForUser` already gives read-only callers in
+ * `workspaces/memberships.ts`, so `apps/web` never has to open its own
+ * transaction to ask this.
+ */
+export async function resolveOwnWorkspaceAccessLevel(
+  pool: Pool,
+  workspaceId: string,
+  memberId: string,
+): Promise<number> {
+  const db = drizzle(pool);
+  return withWorkspace(db, workspaceId, async (tx) => {
+    const context = await resolveSubjectContext(
+      tx,
+      "workspace",
+      workspaceId,
+      workspaceId,
+    );
+    if (!context) {
+      return 0;
+    }
+    return resolveMemberAccessLevel(tx, {
+      workspaceId,
+      memberId,
+      contextId: context.contextId,
+    });
+  });
 }
 
 export interface AnonymousContextInput {

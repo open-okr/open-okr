@@ -92,10 +92,20 @@ export function defineWriteAction<
     runsThroughPipeline: true,
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
+      const spec = definition.operation(context, input);
       return runOperation<TOutput, TLoaded>(
         { pool: context.pool },
         {
-          ...definition.operation(context, input),
+          ...spec,
+          // The level this action was declared with is the level
+          // `runOperation` actually enforces. Before this line it fell back
+          // to its own `edit` default instead, silently under-enforcing
+          // every write action across Phase 2 that declares `full` (rename,
+          // suspend, restore, convert-to-guest, erase, invitation create and
+          // revoke) — an `edit`-level member could reach all of them. An
+          // `operation()` callback that sets `requires` itself, for a
+          // resource-level rule finer than one flat number, still wins.
+          requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,

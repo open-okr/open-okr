@@ -28,6 +28,7 @@ export {
   type MemberContextInput,
   resolveAnonymousAccessLevel,
   resolveMemberAccessLevel,
+  resolveOwnWorkspaceAccessLevel,
   resolveSubjectContext,
   type SubjectContext,
 } from "./access/reads.ts";
@@ -46,6 +47,12 @@ export {
   callAction,
   getAction,
 } from "./actions/registry.ts";
+export {
+  readWorkspaceSettings,
+  resetWorkspaceSettings,
+  updateWorkspaceBranding,
+  updateWorkspaceGeneralSettings,
+} from "./actions/settings.ts";
 export {
   ACTIVITY_PAYLOAD_SCHEMAS,
   type ActivityKind,
@@ -128,6 +135,15 @@ export {
   generateInviteToken,
   hashInviteToken,
 } from "./invitations/tokens.ts";
+export {
+  findNavigationItem,
+  isRouteAllowed,
+  MODULE_REGISTRY,
+  type ModuleDefinition,
+  type NavigationItem,
+  type NavigationSection,
+  navigationFor,
+} from "./modules/registry.ts";
 export {
   type EnsurePendingBatchInput,
   ensurePendingBatch,
@@ -232,16 +248,23 @@ export {
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
 export {
+  brandingSchema,
   DEFAULT_QUIET_HOURS,
+  findSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   isKnownTimezone,
+  languageSchema,
   type ProvisioningContext,
   resolveMemberSettings,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
   type SettingDefinition,
   type SettingScope,
+  settingsByCard,
+  timezoneSchema,
+  trustedEmailDomainsSchema,
 } from "./settings/registry.ts";
+export { resolveInstanceDefaultLanguage } from "./settings/workspace-defaults.ts";
 export {
   type CompleteSetupInput,
   type CompleteSetupResult,

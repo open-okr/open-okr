@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  findSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   resolveMemberSettings,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
+  settingsByCard,
 } from "../src/settings/registry.ts";
 
 /**
@@ -48,6 +50,49 @@ describe("the registry itself", () => {
     for (const setting of SETTINGS_REGISTRY) {
       expect(["workspace", "member"]).toContain(setting.scope);
     }
+  });
+
+  it("validates every setting's own default against its own write schema (P2-T08)", () => {
+    // The registry's `resolve` answers "does this default exist"; `schema`
+    // answers a stricter question for the admin write path. A default that
+    // fails its own setting's schema would make a fresh workspace's stored
+    // value invalid the moment an admin screen tried to round-trip it.
+    for (const setting of SETTINGS_REGISTRY) {
+      const result = setting.schema.safeParse(setting.resolve({}));
+      expect(
+        result.success,
+        `${setting.key}'s default does not validate against its own schema`,
+      ).toBe(true);
+    }
+  });
+
+  it("puts every card-bearing setting's card on a workspace-scoped entry (P2-T08)", () => {
+    for (const setting of SETTINGS_REGISTRY) {
+      if (setting.card !== undefined) {
+        expect(setting.scope).toBe("workspace");
+      }
+    }
+  });
+});
+
+describe("settingsByCard and findSetting (P2-T08)", () => {
+  it("finds a registered setting by key", () => {
+    expect(findSetting("timezone")?.scope).toBe("workspace");
+  });
+
+  it("returns nothing for a key outside the registry", () => {
+    expect(findSetting("doesNotExist")).toBeUndefined();
+  });
+
+  it("groups the general card's settings", () => {
+    const general = settingsByCard("general").map((setting) => setting.key);
+    expect(general).toEqual(
+      expect.arrayContaining(["timezone", "language", "trustedEmailDomains"]),
+    );
+  });
+
+  it("returns nothing for a card nothing is on", () => {
+    expect(settingsByCard("no-such-card")).toEqual([]);
   });
 });
 

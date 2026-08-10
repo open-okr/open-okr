@@ -43,6 +43,7 @@ import {
   resolveMemberSettings,
   resolveWorkspaceSettings,
 } from "../settings/registry.ts";
+import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 
 export interface WorkspaceUser {
   readonly id: string;
@@ -55,6 +56,8 @@ export interface CreateWorkspaceInput {
   readonly name?: string;
   /** The registering browser's timezone. Validated by the settings registry. */
   readonly timezone?: string;
+  /** Defaults to the instance's own resolved default language. */
+  readonly language?: string;
 }
 
 export interface ProvisionedWorkspace {
@@ -124,6 +127,13 @@ export async function createWorkspace(
   input: CreateWorkspaceInput,
 ): Promise<ProvisionedWorkspace> {
   const workspaceId = newId();
+  // The instance's own resolved default, so a fresh workspace's language
+  // sees `OPENOKR_DEFAULT_LANGUAGE` and an administered override the same
+  // way every other instance setting does, rather than the registry's
+  // hardcoded constant of last resort. Only asked for when the caller has no
+  // language of its own to offer.
+  const language =
+    input.language ?? (await resolveInstanceDefaultLanguage(pool));
 
   // A bootstrap operation: it creates the workspace it runs in, so there is no
   // member to authorise against and no workspace to load. Everything else is
@@ -142,11 +152,10 @@ export async function createWorkspace(
       actor: { kind: "system" },
       bootstrap: true,
       async execute({ tx }) {
-        const provisioned = await insertWorkspaceAndMember(
-          tx,
-          workspaceId,
-          input,
-        );
+        const provisioned = await insertWorkspaceAndMember(tx, workspaceId, {
+          ...input,
+          language,
+        });
         return {
           result: provisioned,
           activity: {

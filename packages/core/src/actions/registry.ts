@@ -42,6 +42,12 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
+import {
+  readWorkspaceSettings,
+  resetWorkspaceSettings,
+  updateWorkspaceBranding,
+  updateWorkspaceGeneralSettings,
+} from "./settings.ts";
 import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
 
 /**
@@ -76,6 +82,10 @@ export const ACTION_MAP = {
   "notifications.updateSettings": updateOwnNotificationSettings,
   "subscriptions.toggle": toggleSubscription,
   "activities.workspaceFeed": workspaceFeed,
+  "settings.readWorkspaceSettings": readWorkspaceSettings,
+  "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
+  "settings.updateWorkspaceBranding": updateWorkspaceBranding,
+  "settings.resetWorkspaceSettings": resetWorkspaceSettings,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

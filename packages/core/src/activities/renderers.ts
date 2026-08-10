@@ -38,6 +38,15 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "notification_settings.updated": () => "Notification settings were updated",
   "subscription.added": () => "Someone subscribed",
   "subscription.canceled": () => "Someone unsubscribed",
+  "workspace.general_settings_updated": (p) =>
+    `Workspace settings were updated (${
+      Array.isArray(p.keys) ? p.keys.join(", ") : "general"
+    })`,
+  "workspace.branding_updated": () => "Workspace branding was updated",
+  "workspace.settings_reset": (p) =>
+    `Workspace settings were reset to their defaults (${
+      Array.isArray(p.keys) ? p.keys.join(", ") : "general"
+    })`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

@@ -48,6 +48,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "notification_settings.updated": z.object({}),
   "subscription.added": z.object({}),
   "subscription.canceled": z.object({}),
+  "workspace.general_settings_updated": z
+    .object({ keys: z.array(z.string()) })
+    .catchall(z.unknown()),
+  "workspace.branding_updated": z.object({}).catchall(z.unknown()),
+  "workspace.settings_reset": z
+    .object({ keys: z.array(z.string()) })
+    .catchall(z.unknown()),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
@@ -63,6 +70,8 @@ export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
 export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
   "member.profile_updated",
   "member.updated",
+  "workspace.general_settings_updated",
+  "workspace.branding_updated",
 ]);
 
 export class UnregisteredActivityKindError extends Error {

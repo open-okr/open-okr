@@ -1,5 +1,7 @@
-import { callAction, OperationError } from "@openokr/core";
+import { callAction, navigationFor, OperationError } from "@openokr/core";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { resolveAccessLevelFor } from "../lib/access";
 import { getPool } from "../lib/auth";
 import type { ActiveWorkspace } from "../lib/workspace";
 import { RenameWorkspace } from "./rename-workspace";
@@ -44,6 +46,15 @@ export async function WorkspaceOverview({
     throw error;
   }
 
+  // The module registry's own "hidden below the level" half: an admin link
+  // this member's level does not reach never renders, the same requirement
+  // the admin layout itself denies the route for if it is visited directly.
+  const level = await resolveAccessLevelFor(
+    workspace.workspaceId,
+    workspace.memberId,
+  );
+  const adminLinks = navigationFor("admin", level);
+
   return (
     <>
       <p>
@@ -71,6 +82,17 @@ export async function WorkspaceOverview({
 
       <WorkspaceSwitcher memberships={memberships} active={workspace} />
       <RenameWorkspace name={overview.workspace.name} />
+
+      {adminLinks.length > 0 && (
+        <p>
+          {adminLinks.map((item, index) => (
+            <span key={item.id}>
+              {index > 0 && " · "}
+              <Link href={item.href}>{item.label}</Link>
+            </span>
+          ))}
+        </p>
+      )}
     </>
   );
 }
