@@ -170,9 +170,9 @@ PLAN §13 #6 and AI-NATIVE §12 A6, the embedding model and vector dimension, ar
 to the retrieval task (P4-T13). P2-T13 builds the embedding capability into the port surface
 without choosing a model. Keep the column swappable.
 
-### A documentation defect to raise before P2-T16
+### A documentation defect, found and fixed
 
-IMPLEMENTATION-PLAN.md P2-T16 cites `AI-NATIVE-PLAN.md §1.7`. **That section does not exist.**
+IMPLEMENTATION-PLAN.md P2-T16 cited `AI-NATIVE-PLAN.md §1.7`. **That section never existed.**
 AI-NATIVE-PLAN.md §1 is "The stance" and has no subsections. The real sources for metering, quotas
 and caps are:
 
@@ -180,8 +180,10 @@ and caps are:
 - AI-NATIVE-PLAN.md §7, the `ai_usage_events` table.
 - UIUX-PLAN.md screen S-37.
 
-Definition of Ready item 2 requires the specification source to exist, so this needs a human to
-correct the citation in IMPLEMENTATION-PLAN.md before P2-T16 starts. Do not let the agent guess.
+Definition of Ready item 2 requires the specification source to exist, so this needed a human
+decision before P2-T16 could start. The human reviewed this analysis and asked the agent to correct
+the citation directly (2026-08-10) rather than hold the task open; IMPLEMENTATION-PLAN.md now cites
+§4. Recorded here so the correction has a paper trail, not because the task is blocked any longer.
 
 ### Follow-ups Phase 2 rows already carry
 
@@ -691,10 +693,10 @@ the local model answered.
 
 **Depends on** P2-T14. Screen S-37. No mockup.
 
-**Blocked on a documentation fix.** IMPLEMENTATION-PLAN.md cites `AI-NATIVE-PLAN.md §1.7`, which
-does not exist. See §5 above. Get the citation corrected before starting.
+**The documentation defect §5 flagged is fixed.** IMPLEMENTATION-PLAN.md's citation now reads
+`AI-NATIVE-PLAN.md §4`, corrected 2026-08-10 with the human's explicit go-ahead.
 
-**Read instead**
+**Read**
 - AI-NATIVE-PLAN.md §4, the "Budgets and limits" and "Usage and logs" cards.
 - AI-NATIVE-PLAN.md §7, `ai_usage_events`.
 - UIUX-PLAN.md S-37.

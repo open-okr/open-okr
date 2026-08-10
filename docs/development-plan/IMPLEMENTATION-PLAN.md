@@ -228,7 +228,7 @@ Acceptance: Given an air-gapped workspace mapping every tier to a local model, w
 
 ### P2-T16: Usage metering, quotas and hard caps [M]
 Depends on: P2-T14
-Goal: cost visible and bounded (AI-NATIVE-PLAN.md §1.7, screen S-37).
+Goal: cost visible and bounded (AI-NATIVE-PLAN.md §4, "Budgets and limits", screen S-37).
 Deliverables: usage events per call with tokens, cost from the catalogue, latency, source and status; quotas per user, per agent and per workspace; a hard cap that disables features and halts running agents; the AI console (screen S-37) assembling the provider, models, features, budgets, prompts, privacy and usage cards from P2-T13 to P2-T16; anomaly flagging.
 Test plan: a call records tokens and cost accurately against the catalogue; crossing a quota disables the feature with a clear message; crossing a hard cap halts a running agent mid-flight with a log line.
 Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then it halts with an explanatory log entry and every manual path still works.

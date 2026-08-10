@@ -69,7 +69,7 @@ restart (P2-T17), and local-disk content types (P2-T05).
 | P2-T13 | AIProvider port + drivers | todo |  |  | Carries a P1 hardening follow-up: the port set has no agreed lifecycle. JobQueue and Realtime declare stop(); Mailer, Cache, Search, Channel and FileStorage declare nothing, and SmtpMailer.close() exists but is not on the port, so Adapters.close() leaks its connection pool. Settle the contract before a ninth driver with long-lived HTTP clients joins |
 | P2-T14 | AI configuration, keys, encryption and rotation | todo |  |  |  |
 | P2-T15 | Model catalogue, tier routing, structured output and prompts | todo |  |  |  |
-| P2-T16 | Usage metering, quotas and hard caps | todo |  |  |  |
+| P2-T16 | Usage metering, quotas and hard caps | todo |  |  | The blocking doc defect is closed: IMPLEMENTATION-PLAN.md's citation was `AI-NATIVE-PLAN.md §1.7`, which never existed (§1 has no subsections), corrected 2026-08-10 to `§4` ("Budgets and limits") with the human's explicit direction to fix it directly rather than hold the task open. Still depends on P2-T14, not yet started |
 | P2-T17 | Agent runtime: agents, runs, sandbox, proposals | todo |  |  | Carries a P1 hardening follow-up: PgBossJobQueue.stop() clears #running but not #started, so a start() after a stop() skips createQueue for every queue it has already seen and then sends into queues pg-boss no longer knows about. This is the first component likely to cycle the queue inside one process |
 
 ## Phase 3: The OKR core
