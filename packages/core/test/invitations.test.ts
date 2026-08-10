@@ -235,7 +235,11 @@ describe("a single-use personal link", () => {
     // otherwise have been invited by the same link. `users.email` is unique,
     // so this cannot literally be the invited address again on a second
     // account — the point is single-use, not the address matching.
-    await createUser("right-person-2", "someone-else-2@example.com", "Right Two");
+    await createUser(
+      "right-person-2",
+      "someone-else-2@example.com",
+      "Right Two",
+    );
     await expect(
       callAction(
         { pool: wb.appPool, ...actingAs("right-person-2") },
