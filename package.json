@@ -29,12 +29,12 @@
     "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.6",
+    "@biomejs/biome": "2.5.7",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.57.0",
     "@types/pg": "catalog:",
-    "knip": "6.31.0",
+    "knip": "6.32.0",
     "pg": "catalog:",
     "turbo": "2.10.8",
     "vitest": "catalog:"
