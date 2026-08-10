@@ -1,9 +1,9 @@
 "use client";
 
-import { isValidRichText, RICH_TEXT_SCHEMA_VERSION } from "@openokr/core";
 import { RichTextEditor } from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { useState } from "react";
+import { validateRichTextPreview } from "./actions.ts";
 
 /**
  * The rich text editor preview (P2-T11, matching P2-T10's `/dev/components`
@@ -13,6 +13,15 @@ import { useState } from "react";
  * (docs/design/rich-text-editor.md §6-7), and this page is the one place
  * outside a real screen that supplies working ones to actually exercise
  * the editor end to end.
+ *
+ * `validate` goes through `./actions.ts`'s Server Action, never a direct
+ * `@openokr/core` import here: this file is a Client Component (it needs
+ * `useState`), and `@openokr/core`'s barrel re-exports server-only
+ * Postgres/Drizzle code alongside the pure rich-text validator — an
+ * import straight from it broke the production build outright
+ * (`Module not found: Can't resolve 'net'`), caught by actually running
+ * `pnpm build` rather than only `tsc`, which has no opinion on what ends
+ * up in a browser bundle.
  */
 
 const MOCK_MEMBERS = [
@@ -61,8 +70,8 @@ export default function RichTextEditorPreviewPage() {
           searchMembers={(query) => mockSearch(MOCK_MEMBERS, query)}
           searchEntities={(query) => mockSearch(MOCK_ENTITIES, query)}
           uploadFile={mockUpload}
-          validate={(json) => {
-            const valid = isValidRichText(json, RICH_TEXT_SCHEMA_VERSION);
+          validate={async (json) => {
+            const valid = await validateRichTextPreview(json);
             setValidity(valid ? "valid" : "invalid");
             return valid;
           }}

@@ -41,8 +41,15 @@ export interface RichTextEditorProps {
   /** `packages/ui` cannot import `packages/core`'s `parseRichText`
    * (TECHNICAL-PLAN §1's own package table) — a host wires the real
    * validator in. A client-side early warning only; the write boundary's
-   * own validation is the actual enforcement. */
-  readonly validate?: (json: unknown) => boolean;
+   * own validation is the actual enforcement.
+   *
+   * Async, because the only way a real host ever has a validator to hand
+   * over is a Server Action or an API call — `@openokr/core` is
+   * server-only, so anything reaching it from a Client Component (this
+   * one) crosses a network boundary whether it looks like it or not. A
+   * synchronous signature here would be a promise this prop could never
+   * actually keep. */
+  readonly validate?: (json: unknown) => boolean | Promise<boolean>;
   readonly searchMembers?: (
     query: string,
   ) => Promise<readonly MentionSearchResult[]>;
