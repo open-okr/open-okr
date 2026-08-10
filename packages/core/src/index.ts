@@ -98,6 +98,49 @@ export {
   hashInviteToken,
 } from "./invitations/tokens.ts";
 export {
+  type EnsurePendingBatchInput,
+  ensurePendingBatch,
+} from "./notifications/batching.ts";
+export {
+  type NotifyRecipientsInput,
+  type NotifyRecipientsResult,
+  notifyRecipients,
+} from "./notifications/create.ts";
+export {
+  type Recipient,
+  type ResolveRecipientsInput,
+  resolveRecipients,
+} from "./notifications/recipients.ts";
+export {
+  DEFAULT_BATCH_WINDOW_MINUTES,
+  DEFAULT_DAILY_SUMMARY_TIME,
+  getOrCreateNotificationSettings,
+  type NotificationSettingsView,
+  type UpdateNotificationSettingsInput,
+  updateNotificationSettings,
+} from "./notifications/settings.ts";
+export {
+  type CancelSubscriptionInput,
+  cancelSubscription,
+  type EnsureSubscriptionListInput,
+  ensureSubscriptionList,
+  listSubscribers,
+  type ReconcileMentionsInput,
+  reconcileMentions,
+  type SubscribeMemberInput,
+  type Subscriber,
+  type SubscriptionReason,
+  subscribeMember,
+} from "./notifications/subscriptions.ts";
+export {
+  type DigestInput,
+  type DigestItem,
+  type MailContent,
+  type MentionNotificationInput,
+  renderDigest,
+  renderMentionNotification,
+} from "./notifications/templates.ts";
+export {
   type ActivityInput,
   type ActorInput,
   type AuditInput,

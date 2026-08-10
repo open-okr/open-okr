@@ -41,7 +41,7 @@ Additional conventions:
 
 | Table | Key columns | Tenancy | Notes |
 |---|---|---|---|
-| `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete |
+| `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?`, `dead_lettered_at?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete. `dead_lettered_at` (P2-T06, closing a P1-hardening follow-up) is set once a row reaches `maxAttempts`: before it existed, a row that could never succeed retried on the lease interval forever, invisible to anyone, because nothing read `last_error` and `attempts` had no ceiling. `OutboxRelay.listDeadLettered()` is the visibility this was missing |
 | `cache_entries` | `key` primary key, `value jsonb`, `expires_at?` | Not tenant scoped | The Postgres cache driver's storage. Callers namespace keys with the workspace id. Reads filter on expiry, so a missed sweep cannot serve stale data |
 | `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. Queries return identifiers and a rank; the caller reloads each hit through the access getter |
 
@@ -361,25 +361,27 @@ No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: a
 ### reactions
 `subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`.
 
-### subscription_lists
-`subject_type`, `subject_id`, `send_to_everyone bool`.
+### subscription_lists *(built at P2-T06, ahead of comments/reactions above, which are still Phase 3)*
+`subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact; built before anything creates one, the same way access contexts existed before spaces did.
 
-### subscriptions
-`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`.
+### subscriptions *(built at P2-T06)*
+`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring.
 
 ## 14. Feed, notifications and channels (domain K)
 
 ### activities
 `kind`, `payload jsonb`, `actor_member_id?` to workspace_members, `actor_kind`, `subject_type`, `subject_id`, `space_id?` to spaces, `context_id` to access_contexts, `at`.
 
-### notifications
-`recipient_member_id` to workspace_members, `activity_id?` to activities, `nudge_id?` to nudges, `reason`, `read_at?`, `channel`, `sent_at?`.
+### notifications *(built at P2-T06)*
+`recipient_member_id` to workspace_members, `activity_id?` to activities, `nudge_id?` (no foreign key: nudges are P4-T04), `batch_id?` to notification_batches, `reason`, `read_at?`, `snoozed_until?` (not in TECHNICAL-PLAN's column list: the inbox's own snooze action needs somewhere to record "hide until", distinct from `read_at`), `channel`, `sent_at?`.
 
-### notification_settings
-`member_id` to workspace_members, per-reason routing, `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`.
+### notification_settings *(built at P2-T06)*
+`member_id` to workspace_members, `routing jsonb` (per reason, falling back to the member's `primary_channel` when a reason is absent), `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`. Created lazily on first read or write, with defaults from TECHNICAL-PLAN §11's worked example (mentions immediate, everything else batched in thirty minutes, the daily summary at 08:00 local) — a member who never touches their settings still gets the documented default, because `getOrCreateNotificationSettings` always returns one.
 
-### notification_batches
-`member_id` to workspace_members, `channel`, `status`, `window_minutes`, `send_at`, `sent_at?`, `error?`.
+### notification_batches *(built at P2-T06)*
+`member_id` to workspace_members, `channel`, `status` (`pending` / `sent` / `failed` — `failed` is not in TECHNICAL-PLAN's list; a send attempt that errors has to land somewhere other than `pending` forever), `window_minutes`, `send_at`, `sent_at?`, `error?`. "Found or created under a row lock" is a partial unique index on `(workspace_id, member_id, channel) where status = 'pending'`, not an explicit `SELECT ... FOR UPDATE`: a losing concurrent insert falls back to reading the winning row.
+
+Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-PLAN's "and role obligations" is not built, because no role tag carries a notification meaning yet. Creating the rows (`notifyRecipients`) and driving the actual send are separate: nothing dispatches a `pending` batch or an unsent immediate row yet, and nothing calls `notifyRecipients` from an activity — "notification fan-out driven from activities" is P2-T07's own deliverable. Per-reason mail templates exist as pure string builders (`packages/core/src/notifications/templates.ts`), HTML and plain text, with no development preview page: there is no app shell yet (P2-T10) to serve one into.
 
 ### channel_connections
 `provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `credentials_ciphertext`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`.

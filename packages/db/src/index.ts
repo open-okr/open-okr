@@ -61,6 +61,21 @@ export {
   type InviteMode,
   inviteLinks,
 } from "./schema/invitations.ts";
+export {
+  type Notification,
+  type NotificationBatch,
+  type NotificationBatchStatus,
+  type NotificationRouting,
+  type NotificationSettingsRow,
+  notificationBatches,
+  notificationSettings,
+  notifications,
+  type Subscription,
+  type SubscriptionList,
+  type SubscriptionReason,
+  subscriptionLists,
+  subscriptions,
+} from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {

@@ -254,6 +254,70 @@ describe("OutboxRelay", () => {
     expect(seen[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("dead-letters a row once it reaches the attempt ceiling, and stops retrying it (P1 hardening)", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "mail.send", "mail.send:poison");
+
+    let dispatches = 0;
+    const deadLettered: string[] = [];
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 3,
+      dispatch: async () => {
+        dispatches++;
+        throw new Error("permanently broken");
+      },
+      onDeadLetter: (record) => deadLettered.push(record.idempotencyKey),
+    });
+
+    // Two attempts, each still under the ceiling of 3: fail and stay pending.
+    expect(await relay.drainOnce()).toBe(0);
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(2);
+    expect(deadLettered).toEqual([]);
+
+    // The third attempt reaches maxAttempts: dead-lettered instead of retried.
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(3);
+    expect(deadLettered).toEqual(["mail.send:poison"]);
+
+    const row = await wb.admin.query(
+      "select dead_lettered_at, available_at from outbox",
+    );
+    expect(row.rows[0].dead_lettered_at).toBeInstanceOf(Date);
+
+    // A poisoned row no longer competes for the relay's attention at all:
+    // no further dispatch, no matter how many more times it drains.
+    const dispatchesBefore = dispatches;
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(dispatchesBefore);
+  });
+
+  it("surfaces dead-lettered rows through listDeadLettered", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "mail.send", "mail.send:dl-1");
+    await enqueue(wb.admin, "mail.send", "mail.send:dl-2");
+
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 1,
+      dispatch: async () => {
+        throw new Error("nope");
+      },
+    });
+
+    // One drain claims both rows in the same batch; each reaches maxAttempts
+    // (1) on its first and only dispatch.
+    await relay.drainOnce();
+
+    const dead = await relay.listDeadLettered();
+    expect(dead.map((d) => d.idempotencyKey).sort()).toEqual([
+      "mail.send:dl-1",
+      "mail.send:dl-2",
+    ]);
+    expect(dead[0]?.lastError).toMatch(/nope/);
+  });
+
   it("start and stop drive the drain loop without overlapping runs", async () => {
     const wb = await workerDb();
     await enqueue(wb.admin, "t", "loop-1");

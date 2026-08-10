@@ -21,6 +21,14 @@ import {
   joinByTrustedDomain,
   revokeLink,
 } from "./invitations.ts";
+import {
+  getNotificationSettings,
+  listNotifications,
+  markNotificationRead,
+  snoozeNotification,
+  toggleSubscription,
+  updateOwnNotificationSettings,
+} from "./notifications.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
   convertToGuest,
@@ -60,6 +68,12 @@ export const ACTION_MAP = {
   "blobs.prepareUpload": prepareUpload,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
+  "notifications.list": listNotifications,
+  "notifications.markRead": markNotificationRead,
+  "notifications.snooze": snoozeNotification,
+  "notifications.getSettings": getNotificationSettings,
+  "notifications.updateSettings": updateOwnNotificationSettings,
+  "subscriptions.toggle": toggleSubscription,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

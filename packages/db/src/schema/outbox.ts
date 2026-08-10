@@ -28,6 +28,8 @@ export const outbox = pgTable(
       .notNull()
       .defaultNow(),
     lastError: text("last_error"),
+    /** Null while retryable. Set once the relay gives up (P2-T06). */
+    deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
   },
   (table) => [
     index("outbox_pending_idx").on(table.availableAt, table.createdAt),

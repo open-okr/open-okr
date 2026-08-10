@@ -50,24 +50,61 @@ export class PostgresRealtime implements Realtime {
   readonly #listeners = new Map<string, Set<Listener>>();
   #client: pg.Client | undefined;
   #connecting: Promise<pg.Client> | undefined;
+  /** True only inside `stop()`, so its own `end` event is not reported as a drop. */
+  #stopping = false;
 
   constructor(options: PostgresRealtimeOptions) {
     this.#options = options;
+  }
+
+  /**
+   * Drops the current connection state so the next call reconnects.
+   * Re-issues `listen` for every channel with a live subscriber once the new
+   * connection is up, because a dropped connection forgets every `listen` it
+   * held; without this, a reconnect would silently stop delivering to
+   * subscribers who never unsubscribed.
+   */
+  #reset(error: unknown): void {
+    this.#client = undefined;
+    this.#connecting = undefined;
+    if (!this.#stopping) {
+      this.#options.onError?.(error);
+    }
   }
 
   async #connection(): Promise<pg.Client> {
     if (this.#client) {
       return this.#client;
     }
+    // Not memoised across a failure: a rejected #connecting promise used to
+    // stay assigned forever (`??=` only replaces `undefined`), so one failed
+    // connect poisoned every later publish and subscribe for the life of the
+    // process. The catch below clears it before anything else can observe
+    // the rejection, so the next call gets a fresh attempt.
     this.#connecting ??= (async () => {
       const client = new pg.Client(this.#options.connectionOptions);
       client.on("notification", (message) => this.#dispatch(message));
-      client.on("error", (error) => this.#options.onError?.(error));
+      client.on("error", (error) => this.#reset(error));
+      client.on("end", () =>
+        this.#reset(new Error("Realtime connection closed")),
+      );
       await client.connect();
       this.#client = client;
       return client;
     })();
-    return this.#connecting;
+
+    try {
+      const client = await this.#connecting;
+      // A reconnect starts with no LISTENs on the new session; every
+      // identifier this driver still has subscribers for needs reissuing.
+      for (const identifier of this.#listeners.keys()) {
+        await client.query(`listen ${identifier}`);
+      }
+      return client;
+    } catch (error) {
+      this.#connecting = undefined;
+      throw error;
+    }
   }
 
   #dispatch(message: pg.Notification): void {
@@ -159,10 +196,12 @@ export class PostgresRealtime implements Realtime {
   }
 
   async stop(): Promise<void> {
+    this.#stopping = true;
     this.#listeners.clear();
     const client = this.#client;
     this.#client = undefined;
     this.#connecting = undefined;
     await client?.end();
+    this.#stopping = false;
   }
 }

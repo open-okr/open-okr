@@ -3,7 +3,8 @@ import {
   testDbEnv,
   workerDb,
 } from "@openokr/test-support/db";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import pg from "pg";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { PostgresRealtime } from "../src/drivers/realtime/postgres.ts";
 import { EventTooLargeError, MAX_EVENT_BYTES } from "../src/ports/realtime.ts";
 
@@ -170,6 +171,43 @@ describe("PostgresRealtime", () => {
     await bus.publish("workspace:w1:goals", { name: "goal.updated", data: {} });
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(received).toHaveLength(1);
+  });
+
+  it("does not poison later calls after one failed connect (P1 hardening)", async () => {
+    // Before the fix, a rejected #connecting promise stayed assigned
+    // forever: `??=` only replaces `undefined`, so one failed connect
+    // poisoned every later publish and subscribe for the life of the
+    // process, even once the underlying problem was gone. Simulated here by
+    // failing pg.Client.connect exactly once and letting it succeed after.
+    const realConnect = pg.Client.prototype.connect;
+    const spy = vi
+      .spyOn(pg.Client.prototype, "connect")
+      .mockImplementationOnce(() => {
+        throw new Error("simulated connect failure");
+      })
+      .mockImplementation(function (this: pg.Client, ...args: unknown[]) {
+        // biome-ignore lint/suspicious/noExplicitAny: delegating to the real overload set
+        return (realConnect as any).apply(this, args);
+      });
+
+    const bus = await realtime();
+    await expect(
+      bus.publish("workspace:w1:reconnect", { name: "x", data: {} }),
+    ).rejects.toThrow(/simulated connect failure/);
+
+    // The same instance, no new options: this only succeeds if the failed
+    // attempt did not leave #connecting permanently rejected.
+    const received: unknown[] = [];
+    await bus.subscribe("workspace:w1:reconnect", (event) =>
+      received.push(event),
+    );
+    await bus.publish("workspace:w1:reconnect", {
+      name: "goal.updated",
+      data: {},
+    });
+    await eventually(() => received.length === 1);
+
+    spy.mockRestore();
   });
 
   it("carries events between two separate connections", async () => {

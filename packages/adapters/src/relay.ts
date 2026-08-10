@@ -57,22 +57,39 @@ export interface OutboxRelayOptions {
    * while it is still in flight.
    */
   readonly leaseSeconds?: number;
+  /**
+   * Attempts before a row is dead-lettered instead of retried again. Before
+   * this existed, a row that could never succeed retried on the lease
+   * interval forever, invisible to anyone: `last_error` held the reason but
+   * nothing read it, and `attempts` climbed with no ceiling anywhere.
+   */
+  readonly maxAttempts?: number;
   /** Called when a drain itself fails, for logging. */
   readonly onError?: (error: unknown) => void;
+  /** Called the moment a row is dead-lettered, so it is surfaced somewhere rather than only sitting in the table. */
+  readonly onDeadLetter?: (record: OutboxRecord, error: unknown) => void;
 }
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_LEASE_SECONDS = 60;
+const DEFAULT_MAX_ATTEMPTS = 10;
 
 /** 2s, 4s, 8s ... capped at five minutes. */
 const defaultBackoff = (attempts: number): number =>
   Math.min(2 ** Math.min(attempts, 8), 300);
 
+export interface DeadLetteredOutboxRecord extends OutboxRecord {
+  readonly lastError: string | null;
+  readonly deadLetteredAt: Date;
+}
+
 export class OutboxRelay {
   readonly #pool: RelayPool;
-  readonly #options: Required<Omit<OutboxRelayOptions, "onError">> &
-    Pick<OutboxRelayOptions, "onError">;
+  readonly #options: Required<
+    Omit<OutboxRelayOptions, "onError" | "onDeadLetter">
+  > &
+    Pick<OutboxRelayOptions, "onError" | "onDeadLetter">;
   #timer: NodeJS.Timeout | undefined;
   #running = false;
   #draining: Promise<number> | undefined;
@@ -85,8 +102,39 @@ export class OutboxRelay {
       pollIntervalMs: options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
       backoffSeconds: options.backoffSeconds ?? defaultBackoff,
       leaseSeconds: options.leaseSeconds ?? DEFAULT_LEASE_SECONDS,
+      maxAttempts: options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       onError: options.onError,
+      onDeadLetter: options.onDeadLetter,
     };
+  }
+
+  /**
+   * Dead-lettered rows, newest first. The visibility `last_error` alone
+   * never gave: nothing queried for it before.
+   */
+  async listDeadLettered(limit = 50): Promise<DeadLetteredOutboxRecord[]> {
+    const client = await this.#pool.connect();
+    try {
+      const result = await client.query(
+        `select id, topic, payload, idempotency_key, attempts, last_error, dead_lettered_at
+           from outbox
+          where dead_lettered_at is not null
+          order by dead_lettered_at desc
+          limit $1`,
+        [limit],
+      );
+      return result.rows.map((row) => ({
+        id: row.id as string,
+        topic: row.topic as string,
+        payload: (row.payload ?? {}) as Record<string, unknown>,
+        idempotencyKey: row.idempotency_key as string,
+        attempts: row.attempts as number,
+        lastError: (row.last_error as string | null) ?? null,
+        deadLetteredAt: row.dead_lettered_at as Date,
+      }));
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -174,6 +222,7 @@ export class OutboxRelay {
             select id
               from outbox
              where delivered_at is null
+               and dead_lettered_at is null
                and available_at <= now()
              order by created_at, id
              limit $1
@@ -219,21 +268,39 @@ export class OutboxRelay {
     }
   }
 
-  /** Replaces the claim lease with the retry backoff and records why. The
-   * attempt was already counted when the row was claimed. */
+  /**
+   * Replaces the claim lease with the retry backoff and records why. The
+   * attempt was already counted when the row was claimed.
+   *
+   * Once `attempts` reaches the ceiling, this dead-letters the row instead:
+   * `available_at` stops moving, so it drops out of the claim query for
+   * good, and `onDeadLetter` fires so giving up is not a silent event.
+   */
   async #markFailed(record: OutboxRecord, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
-    const backoff = this.#options.backoffSeconds(record.attempts);
+    // Truncated: the text is diagnostic, and a driver can return a very
+    // large body.
+    const truncated = message.slice(0, 2000);
     const client = await this.#pool.connect();
     try {
+      if (record.attempts >= this.#options.maxAttempts) {
+        await client.query(
+          `update outbox
+              set last_error = $2, dead_lettered_at = now()
+            where id = $1`,
+          [record.id, truncated],
+        );
+        this.#options.onDeadLetter?.(record, error);
+        return;
+      }
+
+      const backoff = this.#options.backoffSeconds(record.attempts);
       await client.query(
         `update outbox
             set last_error = $2,
                 available_at = now() + make_interval(secs => $3::double precision)
           where id = $1`,
-        // Error text is truncated: it is diagnostic, and a driver can return
-        // a very large body.
-        [record.id, message.slice(0, 2000), backoff],
+        [record.id, truncated, backoff],
       );
     } finally {
       client.release();
