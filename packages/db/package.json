@@ -10,6 +10,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "migrate": "node --experimental-strip-types --no-warnings src/bin/migrate.ts",
+    "change": "node --experimental-strip-types --no-warnings src/bin/data-change.ts",
     "lint:migrations": "node --experimental-strip-types --no-warnings src/bin/lint-migrations.ts",
     "lint:soft-delete": "node --experimental-strip-types --no-warnings src/bin/lint-soft-delete.ts"
   },

@@ -1,6 +1,16 @@
 export const PACKAGE_NAME = "@openokr/db";
 
 export {
+  type ColumnExpectation,
+  type DataChangeBatchResult,
+  type DataChangeClient,
+  DataChangeError,
+  type DataChangeOutcome,
+  type DataChangeScript,
+  type RunDataChangesOptions,
+  runDataChanges,
+} from "./data-change.ts";
+export {
   APPEND_ONLY_TABLES,
   type GrantOptions,
   grantAppPrivileges,

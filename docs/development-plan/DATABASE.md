@@ -25,6 +25,7 @@ Additional conventions:
 - **Enumerated values** are TypeScript string unions stored as text with a check constraint.
 - **Derived columns** (progress, health, achievement, alignment score, next check-in, streak, quality score) are written by jobs driven from the outbox, never computed at render time.
 - **`_migrations`** is the forward-only migration runner's bookkeeping table (name, checksum, applied time), created by the runner itself rather than by a migration. Infrastructure, not business data: no `workspace_id`, no policy, invisible to the importer.
+- **`_data_changes`** (P2-T12) is the data-change runner's own ledger: name, a checksum over the script's frozen column expectations, its resumable `cursor`, `batches`/`rows_changed` so far, and `completed_at`. Same footing as `_migrations` — created by `pnpm db:change` itself, no `workspace_id`, no policy, invisible to the importer. See `docs/design/data-change-conventions.md` for how a script uses it.
 
 **Authentication tables.** Better Auth owns six tables, all global to the deployment rather than workspace-scoped (§2), and all hard-delete: a soft-deleted credential is a live credential wearing a deleted label. Their column and identifier conventions are Better Auth's own, because it owns the schema.
 
