@@ -1,5 +1,6 @@
 import { requireSession } from "../../../lib/session";
 import { SecuritySettings } from "./security-settings";
+import { Sessions } from "./sessions";
 
 /**
  * A protected page: `requireSession` redirects a signed-out visitor to sign
@@ -15,6 +16,7 @@ export default async function SecurityPage() {
       <SecuritySettings
         twoFactorEnabled={session.user.twoFactorEnabled === true}
       />
+      <Sessions />
     </main>
   );
 }

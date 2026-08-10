@@ -167,6 +167,21 @@ describe("InProcessCache", () => {
     expect(results[2]?.remaining).toBe(0);
     expect(results[3]?.resetSeconds).toBeGreaterThan(0);
   });
+
+  it("never grows past its cap, even for keys that never come back (P2-T09)", async () => {
+    // The unbounded-keyspace defect: a rate limit key per subject, most of
+    // whom never return to have their expired entry swept. A tiny cap makes
+    // the bound provable without inserting ten thousand real entries.
+    const cache = new InProcessCache({ maxEntries: 5 });
+    for (let i = 0; i < 50; i++) {
+      await cache.rateLimit(`address:${i}`, 10, 60);
+    }
+    // Reach in through the public surface only: the most recent subjects are
+    // still tracked (the eviction is FIFO, oldest first), the earliest ones
+    // are not.
+    expect((await cache.get("ratelimit:address:49")) as number).toBe(1);
+    expect(await cache.get("ratelimit:address:0")).toBeUndefined();
+  });
 });
 
 describe("PostgresCache", () => {

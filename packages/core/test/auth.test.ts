@@ -210,6 +210,58 @@ describe("registration and sign in", () => {
   });
 });
 
+describe("listing and revoking sessions (P2-T09)", () => {
+  it("lists every active session for the signed-in user", async () => {
+    const firstDevice = cookieFrom(await register());
+    await post("/sign-in/email", { email: EMAIL, password: PASSWORD });
+
+    const listed = await get("/list-sessions", { cookie: firstDevice });
+    expect(listed.status).toBe(200);
+    const sessions = (await listed.json()) as Array<{ token: string }>;
+    expect(sessions.length).toBe(2);
+  });
+
+  it("revokes one session by token, and its next request is rejected", async () => {
+    const firstDevice = cookieFrom(await register());
+    const secondDevice = cookieFrom(
+      await post("/sign-in/email", { email: EMAIL, password: PASSWORD }),
+    );
+
+    const listed = await get("/list-sessions", { cookie: firstDevice });
+    const sessions = (await listed.json()) as Array<{
+      token: string;
+      // Better Auth's own field name for which device issued a request last.
+      userAgent?: string;
+    }>;
+    expect(sessions).toHaveLength(2);
+
+    // Revoke the session behind `secondDevice`'s cookie by asking for it by
+    // token, from the *other* device — this is what an admin's "revoke this
+    // device" action does, not a self-revoke.
+    const secondSession = await get("/get-session", { cookie: secondDevice });
+    const secondBody = (await secondSession.json()) as {
+      session: { token: string };
+    };
+
+    const revoke = await post(
+      "/revoke-session",
+      { token: secondBody.session.token },
+      { cookie: firstDevice },
+    );
+    expect(revoke.status).toBe(200);
+
+    const after = await get("/get-session", { cookie: secondDevice });
+    expect(await after.json()).toBeNull();
+
+    // The other device is unaffected.
+    const stillIn = await get("/get-session", { cookie: firstDevice });
+    const stillInBody = (await stillIn.json()) as {
+      user: { email: string };
+    } | null;
+    expect(stillInBody?.user.email).toBe(EMAIL);
+  });
+});
+
 describe("session tokens at rest", () => {
   it("stores only hashes: a database copy cannot be replayed", async () => {
     // Two sessions, from registering and then signing in again.

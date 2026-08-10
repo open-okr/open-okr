@@ -48,7 +48,11 @@ import {
   updateWorkspaceBranding,
   updateWorkspaceGeneralSettings,
 } from "./settings.ts";
-import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
+import {
+  provisionWorkspace,
+  renameWorkspace,
+  setWorkspaceState,
+} from "./workspace.ts";
 
 /**
  * The registry, keyed by name so the typed client can infer an action's input
@@ -57,6 +61,7 @@ import { provisionWorkspace, renameWorkspace } from "./workspace.ts";
 export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
+  "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,
   "people.updateOwnProfile": updateOwnProfile,
   "people.updateMember": updateMember,

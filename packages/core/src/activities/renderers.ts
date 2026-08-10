@@ -18,6 +18,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
   "workspace.renamed": (p) =>
     `Workspace renamed from "${asString(p.from)}" to "${asString(p.to)}"`,
+  "workspace.state_changed": (p) =>
+    `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,

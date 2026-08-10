@@ -187,6 +187,7 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export { isRecoveryAction } from "./operations/freeze.ts";
 export {
   type ActivityInput,
   type ActorInput,

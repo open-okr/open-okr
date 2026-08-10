@@ -31,6 +31,10 @@ export const isTestScaffoldKind = (kind: string): boolean =>
 export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.provisioned": z.object({ name: z.string(), slug: z.string() }),
   "workspace.renamed": z.object({ from: z.string(), to: z.string() }),
+  "workspace.state_changed": z.object({
+    from: z.enum(["active", "read_only", "frozen"]),
+    to: z.enum(["active", "read_only", "frozen"]),
+  }),
   "member.profile_updated": z.object({ name: z.string() }),
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),

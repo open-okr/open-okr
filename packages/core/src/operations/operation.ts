@@ -38,6 +38,7 @@ import {
   type OutboxMessage,
   withContext,
   workspaceMembers,
+  workspaces,
 } from "@openokr/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -52,6 +53,7 @@ import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
 import { OperationError } from "./errors.ts";
+import { isRecoveryAction } from "./freeze.ts";
 
 /** The transaction handed to an operation's `execute`. */
 export type OperationTx = Parameters<
@@ -299,6 +301,29 @@ export async function runOperation<TResult, TLoaded = undefined>(
       ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
     },
     async (tx) => {
+      // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`
+      // collapses to view-only for every write except the recovery list.
+      // Checked ahead of everything else, including who is asking — a
+      // frozen workspace refuses the write before spending effort on an
+      // actor it will not matter to. A workspace with no row yet
+      // (`workspace.provision`, mid-transaction) has no state to collapse,
+      // so this is silent rather than a special case keyed on `bootstrap`.
+      if (!isRecoveryAction(spec.action)) {
+        const [current] = await tx
+          .select({ state: workspaces.state })
+          .from(workspaces)
+          .where(activeOnly(workspaces, eq(workspaces.id, spec.workspaceId)))
+          .limit(1);
+        if (current && current.state !== "active") {
+          throw new OperationError(
+            "forbidden",
+            current.state === "frozen"
+              ? "This workspace is frozen. Only member and settings management is allowed until it is reactivated."
+              : "This workspace is read-only. Only member and settings management is allowed until it is reactivated.",
+          );
+        }
+      }
+
       // 1. Who is asking, resolved against rows loaded in this transaction.
       const actor = spec.bootstrap
         ? ({
