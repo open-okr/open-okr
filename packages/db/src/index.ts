@@ -55,6 +55,11 @@ export {
   users,
   verifications,
 } from "./schema/auth.ts";
+export {
+  type InviteLink,
+  type InviteMode,
+  inviteLinks,
+} from "./schema/invitations.ts";
 export { outbox } from "./schema/outbox.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {

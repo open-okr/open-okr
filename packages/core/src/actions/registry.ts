@@ -12,6 +12,13 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import {
+  acceptLink,
+  createPersonalLink,
+  createWorkspaceLink,
+  joinByTrustedDomain,
+  revokeLink,
+} from "./invitations.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
   convertToGuest,
@@ -43,6 +50,11 @@ export const ACTION_MAP = {
   "people.directory": directory,
   "people.orgChart": orgChart,
   "people.possibleManagers": possibleManagersFor,
+  "invitations.createWorkspaceLink": createWorkspaceLink,
+  "invitations.createPersonalLink": createPersonalLink,
+  "invitations.revokeLink": revokeLink,
+  "invitations.acceptLink": acceptLink,
+  "invitations.joinByTrustedDomain": joinByTrustedDomain,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

@@ -118,8 +118,12 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
   /** The level this operation requires. Defaults to edit. */
   readonly requires?: AccessLevel;
   /**
-   * Bootstrap operations create the workspace they run in, so there is no
-   * member to authorise and no workspace to load. Only provisioning sets this.
+   * Bootstrap operations run before the acting person has a member row to
+   * resolve — either because the workspace itself doesn't exist yet
+   * (`workspace.provision`) or because this operation is what creates their
+   * membership (`invitations.acceptLink`, `invitations.joinByTrustedDomain`).
+   * `resolveActor` is skipped entirely and the actor is trusted with `full`;
+   * the operation's own logic is the whole of what authorises it.
    */
   readonly bootstrap?: boolean;
   /** Freshly loaded rows the authorisation and the change both depend on. */

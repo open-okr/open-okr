@@ -62,6 +62,16 @@ export {
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
 export {
+  type ProvisionedMember,
+  type ProvisionMemberInput,
+  provisionMemberForInvite,
+} from "./invitations/provisioning.ts";
+export {
+  emailDomain,
+  generateInviteToken,
+  hashInviteToken,
+} from "./invitations/tokens.ts";
+export {
   type ActivityInput,
   type ActorInput,
   type AuditInput,
