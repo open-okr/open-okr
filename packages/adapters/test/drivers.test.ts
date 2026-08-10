@@ -99,6 +99,10 @@ describe("LocalDiskStorage", () => {
       vi.useRealTimers();
     }
   });
+
+  it("stops cleanly (P1-hardening: the port set had no agreed lifecycle)", async () => {
+    await expect(storage.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("ConsoleMailer", () => {
@@ -125,6 +129,10 @@ describe("ConsoleMailer", () => {
       "a@example.com",
       "b@example.com",
     ]);
+  });
+
+  it("stops cleanly", async () => {
+    await expect(new ConsoleMailer().stop()).resolves.toBeUndefined();
   });
 });
 
@@ -182,6 +190,13 @@ describe("InProcessCache", () => {
     expect((await cache.get("ratelimit:address:49")) as number).toBe(1);
     expect(await cache.get("ratelimit:address:0")).toBeUndefined();
   });
+
+  it("stops cleanly, leaving stored entries untouched", async () => {
+    const cache = new InProcessCache();
+    await cache.set("k", "v");
+    await expect(cache.stop()).resolves.toBeUndefined();
+    expect(await cache.get("k")).toBe("v");
+  });
 });
 
 describe("PostgresCache", () => {
@@ -234,6 +249,15 @@ describe("PostgresCache", () => {
     expect((await cache.rateLimit("ip:1", 2, 60)).allowed).toBe(true);
     expect((await other.rateLimit("ip:1", 2, 60)).allowed).toBe(true);
     expect((await cache.rateLimit("ip:1", 2, 60)).allowed).toBe(false);
+  });
+
+  it("stops cleanly without touching the shared pool", async () => {
+    const wb = await workerDb();
+    const cache = new PostgresCache(wb.admin);
+    await expect(cache.stop()).resolves.toBeUndefined();
+    // The pool is not this driver's to close: a query still works after.
+    await cache.set("k", "v");
+    expect(await cache.get("k")).toBe("v");
   });
 });
 
@@ -377,6 +401,12 @@ describe("PostgresSearch", () => {
     });
     expect(hits.length).toBeLessThanOrEqual(1);
   });
+
+  it("stops cleanly without touching the shared pool", async () => {
+    const wb = await workerDb();
+    const search = new PostgresSearch(wb.admin);
+    await expect(search.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("OffAIProvider", () => {
@@ -416,6 +446,10 @@ describe("OffAIProvider", () => {
       }
     }).rejects.toBeInstanceOf(AIUnavailableError);
   });
+
+  it("stops cleanly", async () => {
+    await expect(ai.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("NoneChannel", () => {
@@ -440,5 +474,9 @@ describe("NoneChannel", () => {
       false,
     );
     expect(await channel.parseInbound("{}")).toBeNull();
+  });
+
+  it("stops cleanly", async () => {
+    await expect(channel.stop()).resolves.toBeUndefined();
   });
 });

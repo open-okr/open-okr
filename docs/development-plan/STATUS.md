@@ -47,8 +47,45 @@ placeholder package tests now say they are wiring checks rather than coverage.
 
 Five more findings are recorded on the Phase 2 rows they belong to rather than
 fixed here: realtime reconnection and the outbox dead-letter path (P2-T06),
-cache eviction (P2-T09), the port lifecycle contract (P2-T13), the job queue
+cache eviction (P2-T09), the port lifecycle contract (closed early, see the
+cross-phase gap review below, before P2-T13 needed it), the job queue
 restart (P2-T17), and local-disk content types (P2-T05).
+
+### Cross-phase gap review (between P2-T12 and P2-T13, 2026-08-10)
+
+Not a numbered task. The human asked for an audit of gaps between Phase 1 and
+Phase 2, then asked for all of them to be fixed directly rather than left for
+whichever later task would otherwise have carried them. On branch
+`chore/close-phase1-gaps`. Four fixes.
+
+| # | What was wrong | Fix |
+|---|---|---|
+| 1 | The port lifecycle contract had no agreement: `JobQueue` and `Realtime` declared `stop()`, the other six ports declared nothing, `SmtpMailer.close()` existed but was not on the `Mailer` port, and `Adapters.close()` only ever called two of eight drivers. Flagged since P1-hardening and carried on the P2-T13 row as "settle the contract before a ninth driver with long-lived HTTP clients joins" — which is exactly what P2-T13's AI provider drivers are | Every port (`Cache`, `Mailer`, `Search`, `Channel`, `FileStorage`, `AIProvider`, plus the two that already had it) now declares `stop(): Promise<void>`. Six drivers that own nothing to release no-op it; `SmtpMailer.stop()` wraps its existing `close()`. `Adapters.close()` calls all eight. A driver added later — the first AI provider driver among them — is shut down by construction rather than by remembering to wire it in |
+| 2 | Sign-in lockout has been enforced since P1-T05 without an audit entry, first because the audit spine did not exist (closed at P1-T07), then because `audit_events.workspace_id` is `not null` and a failed sign-in has no workspace to attach to — a fact about an email address and a caller address, resolved before any membership is known, that can implicate zero, one or several workspaces. Carried through P1-T07's row, then P2-T09's, each time deferred to "the P8-T03 open question" | A second, parallel chain: `instance_audit_events` (migration 0014), hash-chained the same way `audit_events` is but with no `workspace_id` and one sequence for the whole instance, read and written through the same `app.instance_admin` transaction-local flag `system_settings` already uses. `packages/core/src/audit/instance-chain.ts` is its hashing and append logic, parallel to `audit/chain.ts` rather than sharing it, because an instance row has no actor, target or workspace for that type to require. Better Auth's own rate limiter rejects a request from inside its router, before any hook, `onAPIError` or `onResponse` callback ever runs, so there is no extension point inside it that ever sees the 429 it produces (confirmed by tracing `better-call`'s router, not assumed); `apps/web/app/api/auth/[...all]/route.ts` wraps the handler instead and writes the entry when the response is a 429. Deliberately not recorded: the attempted email address, on §8.2's own "minimal personal data in logs" line — the path and the caller's address already show a lockout happened, where, and from where |
+| 3 | TECHNICAL-PLAN §1's package dependency table never listed `config` for any package, but `packages/core`, `packages/db` and `apps/web` all already reach it (mostly from command-line entry points: `migrate.ts`, `data-change.ts`, `verify-audit.ts`, `rotate-keys.ts`, plus `apps/web`'s own boot check). First noticed at P1-T02 ("confirm the TECHNICAL-PLAN §1 table allows it") and never confirmed in the four tasks since | Added a note under the table: `config` sits underneath it rather than inside it, available to every package the way `zod` is, because it is the shared environment and lint schema rather than a domain dependency. No code changed; the table was stale, not the imports |
+| 4 | Two stale task citations, found while fixing the above and while working on P2-T12: IMPLEMENTATION-PLAN.md's P2-T16 cited `AI-NATIVE-PLAN.md §1.7`, which does not exist (§1 has no subsections); CLAUDE.md's "commands that do not exist yet" table attributed `pnpm gen:contract` to P2-T09, which is unrelated (security baseline), when `packages/core`'s own registry names P5-T07 onward | Corrected both directly, with the human's explicit go-ahead. §1.7 is now §4 ("Budgets and limits"); `gen:contract` now cites P5-T07 (REST/OpenAPI/CLI, where the drift check it depends on is built), noting P5-T06 and P5-T09 as the chat-command and MCP-tool-catalogue projections of the same registry. Committed separately as `chore/fix-ai-native-plan-citations`, ahead of this row |
+
+Two items from the audit were surfaced but deliberately not treated as bugs to
+fix: P1-T08 and P1-T10 are still `in_review`, not `done` — CLAUDE.md reserves
+setting a task `done` for a human, so this is not the agent's row to change,
+only to flag. And mail has never been tested against a real SMTP server
+(carried since the P1-T09 exit checklist) — verifying that needs either a
+live external account or a local test SMTP catcher, neither of which this
+sandbox can add or prove without a human decision on the dependency.
+
+**Verified** under Node 22: typecheck (`packages/adapters`, `packages/db`,
+`packages/core`, `apps/web`), Biome, the boundary gate, the migration linter
+and the soft-delete lint all pass. `packages/config`'s own suite and, for the
+first time, `apps/web`'s own Vitest suite (it needs no database, unlike
+`packages/core`/`packages/db`) both ran and passed here, 16 tests including
+four new ones proving the lockout-audit wrapper: a 429 gets exactly one audit
+call with the right path and address, an ordinary response gets none, a
+failing audit write still returns the 429 rather than a 500, and the address
+falls back from `x-forwarded-for` to `x-real-ip` to a placeholder. **Not
+verified:** `packages/core/test/instance-audit.test.ts` and the `stop()`
+additions to `packages/adapters/test/{drivers,smtp}.test.ts` — no
+Docker/Postgres in this sandbox for those two packages, same gap as every
+prior Phase 2 row.
 
 ## Phase 2: Platform and agent spine
 

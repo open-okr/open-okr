@@ -110,4 +110,10 @@ export class InProcessCache implements Cache {
       resetSeconds,
     };
   }
+
+  async stop(): Promise<void> {
+    // Plain process memory: nothing to release. `#entries` is left as is
+    // rather than cleared, since a process about to exit has no more use for
+    // either state.
+  }
 }

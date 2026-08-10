@@ -92,6 +92,13 @@ export {
   GENESIS_HASH,
   verifyChain,
 } from "./audit/chain.ts";
+export {
+  type InstanceAuditRow,
+  instanceAuditRowHash,
+  type RecordInstanceAuditEventInput,
+  recordInstanceAuditEvent,
+  verifyInstanceChain,
+} from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export { type CurrentSession, getCurrentSession } from "./auth/session.ts";

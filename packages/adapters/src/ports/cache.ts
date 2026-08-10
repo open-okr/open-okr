@@ -26,4 +26,9 @@ export interface Cache {
     limit: number,
     windowSeconds: number,
   ): Promise<RateLimitResult>;
+  /** Releases whatever this driver holds open. Neither shipped driver owns a
+   * resource of its own (the Postgres one shares an injected pool, the
+   * in-process one is plain memory), so both no-op; declared on the port so a
+   * future driver that does own one is not exempt from being shut down. */
+  stop(): Promise<void>;
 }

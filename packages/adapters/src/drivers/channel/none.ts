@@ -58,4 +58,8 @@ export class NoneChannel implements Channel {
   capabilities(): ChannelCapabilities {
     return NO_CAPABILITIES;
   }
+
+  async stop(): Promise<void> {
+    // No connection was ever made.
+  }
 }

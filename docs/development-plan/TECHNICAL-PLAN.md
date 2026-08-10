@@ -31,6 +31,8 @@ Authority: below PLAN.md and METHOD.md, above IMPLEMENTATION-PLAN.md. Where this
 | `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
 | `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method` |
 
+`packages/config` (the shared TypeScript, lint and environment schema) is not listed in any row above because it sits underneath this table rather than inside it: every package and app may depend on it for `loadEnv()` and the shared lint/TypeScript config, the same way none of them list `zod` either. `packages/db`, `packages/core` and `apps/web` each already reach it from a command-line entry point or a boot-time check (P1-T02 confirmed this is allowed; this note is the missing line that confirmation was waiting on).
+
 ## 2. Multi-tenancy and identity
 
 - The tenant is a **workspace**. Every business row carries `workspace_id` and a row-level security policy keyed on a transaction-local setting, applied with `SET LOCAL` by the request-scoped database wrapper. Never at session level, never from client input.

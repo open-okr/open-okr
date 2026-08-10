@@ -67,6 +67,10 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
+  type InstanceAuditEvent,
+  instanceAuditEvents,
+} from "./schema/instance-audit.ts";
+export {
   type InviteLink,
   type InviteMode,
   inviteLinks,

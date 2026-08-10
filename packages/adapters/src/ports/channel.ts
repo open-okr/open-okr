@@ -84,4 +84,8 @@ export interface Channel {
   verifyInbound(request: InboundRequest): Promise<boolean>;
   parseInbound(payload: string): Promise<InboundMessage | null>;
   capabilities(): ChannelCapabilities;
+  /** Releases whatever this driver holds open. `NoneChannel` owns nothing; a
+   * real provider driver holding its own HTTP client or socket is not exempt
+   * from closing it. */
+  stop(): Promise<void>;
 }

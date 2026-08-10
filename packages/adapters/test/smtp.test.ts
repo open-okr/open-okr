@@ -239,3 +239,18 @@ describe("sending", () => {
     expect(failure).not.toContain("hunter2");
   });
 });
+
+describe("stop", () => {
+  it("releases the transport without throwing (P1-hardening: Adapters.close() used to skip this port)", async () => {
+    const port = await politeServer();
+    const mailer = new SmtpMailer({
+      host: "127.0.0.1",
+      port,
+      secure: false,
+      from: "openokr@localhost",
+      requireTls: false,
+    });
+
+    await expect(mailer.stop()).resolves.toBeUndefined();
+  });
+});

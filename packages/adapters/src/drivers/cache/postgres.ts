@@ -103,4 +103,9 @@ export class PostgresCache implements Cache {
     );
     return result.rowCount ?? 0;
   }
+
+  async stop(): Promise<void> {
+    // The pool is injected and owned by the host process; this driver never
+    // opens a connection of its own to close.
+  }
 }

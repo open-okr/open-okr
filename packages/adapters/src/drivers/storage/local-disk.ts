@@ -125,4 +125,9 @@ export class LocalDiskStorage implements FileStorage {
       .update(`${key}:${expires}`)
       .digest("hex");
   }
+
+  async stop(): Promise<void> {
+    // Every call above opens and closes its own file handle; nothing is
+    // held between calls.
+  }
 }

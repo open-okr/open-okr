@@ -160,6 +160,13 @@ Append-only is enforced three ways, each covering what the last does not. The ap
 ### system_settings *(singleton)*
 Mail configuration with encrypted secrets, instance flags.
 
+### instance_audit_events *(append-only, hash-chained for the whole instance, P1/P2-hardening)*
+`seq`, `action`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `seq`.
+
+The other half of `audit_events`: that chain is per workspace and requires one via a not-null `workspace_id`, which a sign-in lockout cannot supply — it is a fact about an email address and a caller address, resolved before any workspace membership is known, and can implicate zero, one or several workspaces. This is one sequence for the whole instance instead, closing the gap TECHNICAL-PLAN §8.2's "lockout with backoff and an audit entry" line carried open since P1-T05 (the audit spine did not exist yet), then since P1-T07 (the spine existed, but had no workspace-free row shape). `packages/core/src/audit/instance-chain.ts` is the hashing and append logic, parallel to `audit/chain.ts` rather than sharing it, since an instance row has no actor, target or workspace for that shape to require.
+
+Read and written through the same `app.instance_admin` transaction-local flag `system_settings` already uses, appended by `recordInstanceAuditEvent`, called from `apps/web/app/api/auth/[...all]/route.ts` whenever Better Auth's own rate limiter answers with a 429 — the only place that can see one, since Better Auth's router returns that response from inside itself before any hook or plugin callback runs. Append-only enforced the same two ways `audit_events` is: `grantAppPrivileges` revokes UPDATE and DELETE from the application role (`packages/db/src/grants.ts`'s `APPEND_ONLY_TABLES`), and a trigger refuses both from anybody at all, including the owner and a superuser.
+
 ## 5. Spaces (domain B)
 
 ### spaces
