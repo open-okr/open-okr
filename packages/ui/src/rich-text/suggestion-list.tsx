@@ -1,3 +1,7 @@
+"use client";
+
+import type { Editor } from "@tiptap/react";
+import { ReactRenderer } from "@tiptap/react";
 import {
   forwardRef,
   type ReactNode,
@@ -111,12 +115,7 @@ SuggestionList.displayName = "SuggestionList";
  */
 export function createSuggestionRender<TItem extends SuggestionItem>() {
   return function render() {
-    let renderer:
-      | import("@tiptap/react").ReactRenderer<
-          SuggestionListHandle,
-          SuggestionListProps
-        >
-      | null = null;
+    let renderer: ReactRenderer<SuggestionListHandle, SuggestionListProps> | null = null;
     let element: HTMLElement | null = null;
 
     function position(
@@ -133,16 +132,24 @@ export function createSuggestionRender<TItem extends SuggestionItem>() {
     }
 
     return {
-      async onStart(props: {
+      // Deliberately synchronous, not async: `renderer` used to be created
+      // after `await import("@tiptap/react")`, which meant a `/`'s
+      // synchronous `items()` result (unlike `@`'s async member search)
+      // could arrive via `onUpdate` *before* that await resolved. `renderer`
+      // was still null, `renderer?.updateProps(...)` silently did nothing,
+      // and the popup that finally mounted a tick later carried this
+      // call's original (often empty) items forever — reproduced directly
+      // by typing `/` and watching a real "No matches" that never
+      // recovers, not a theoretical race.
+      onStart(props: {
         items: readonly TItem[];
         // The suggestion plugin's own insertion trigger: calling this with
         // the chosen item is what actually runs the extension's configured
         // `command` (inserting the node). Not a separate business callback.
         command: (item: TItem) => void;
         clientRect?: (() => DOMRect | null) | null;
-        editor: import("@tiptap/react").Editor;
+        editor: Editor;
       }) {
-        const { ReactRenderer } = await import("@tiptap/react");
         renderer = new ReactRenderer(SuggestionList, {
           editor: props.editor,
           props: { items: props.items, command: props.command },

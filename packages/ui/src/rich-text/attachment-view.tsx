@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper } from "@tiptap/react";
 import { Loader2, Paperclip, X } from "lucide-react";

@@ -2,7 +2,7 @@
 
 import { RichTextEditor } from "@openokr/ui";
 import { notFound } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { validateRichTextPreview } from "./actions.ts";
 
 /**
@@ -46,6 +46,21 @@ async function mockUpload(file: File) {
   return { blobId: `mock-${file.name}-${Date.now()}` };
 }
 
+// Module-scope, not inline arrows recreated every render: `RichTextEditor`
+// only rebuilds its extension set (tearing down any in-progress suggestion
+// popup along with it) when `searchMembers`/`searchEntities` change
+// identity. `onUpdate` re-renders this page on every keystroke, so an
+// inline arrow here would recreate the mention/entity-link plugins mid-query
+// on every character typed — caught by actually typing into the running
+// editor and watching the popup break, not by any static check.
+function searchMembers(query: string) {
+  return mockSearch(MOCK_MEMBERS, query);
+}
+
+function searchEntities(query: string) {
+  return mockSearch(MOCK_ENTITIES, query);
+}
+
 export default function RichTextEditorPreviewPage() {
   if (process.env.NODE_ENV === "production") {
     notFound();
@@ -55,6 +70,12 @@ export default function RichTextEditorPreviewPage() {
   const [validity, setValidity] = useState<"unknown" | "valid" | "invalid">(
     "unknown",
   );
+
+  const validate = useCallback(async (json: unknown) => {
+    const valid = await validateRichTextPreview(json);
+    setValidity(valid ? "valid" : "invalid");
+    return valid;
+  }, []);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-6">
@@ -67,14 +88,10 @@ export default function RichTextEditorPreviewPage() {
       <div className="rounded-lg border border-line-2 bg-surface p-3">
         <RichTextEditor
           content={{ type: "doc", content: [{ type: "paragraph" }] }}
-          searchMembers={(query) => mockSearch(MOCK_MEMBERS, query)}
-          searchEntities={(query) => mockSearch(MOCK_ENTITIES, query)}
+          searchMembers={searchMembers}
+          searchEntities={searchEntities}
           uploadFile={mockUpload}
-          validate={async (json) => {
-            const valid = await validateRichTextPreview(json);
-            setValidity(valid ? "valid" : "invalid");
-            return valid;
-          }}
+          validate={validate}
           onUpdate={setLastJson}
         />
       </div>
