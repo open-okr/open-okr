@@ -85,6 +85,13 @@ export {
   renderActivity,
 } from "./activities/renderers.ts";
 export {
+  type BudgetCheckResult,
+  checkBudget,
+  checkFeatureAvailability,
+  type FeatureAvailability,
+  isOverHardCap,
+} from "./ai/budgets.ts";
+export {
   type ContextWindowGuardInput,
   type ContextWindowGuardResult,
   guardContextWindow,
@@ -115,6 +122,12 @@ export {
   resolveFeatureTier,
   resolveTierRoute,
 } from "./ai/tier-routing.ts";
+export {
+  type RecordUsageEventInput,
+  recordUsageEvent,
+  summariseUsage,
+  type UsageSummaryRow,
+} from "./ai/usage.ts";
 export {
   type AuditRow,
   auditRowHash,

@@ -71,6 +71,21 @@ export {
   type ModelTier,
 } from "./schema/ai-models.ts";
 export {
+  type AIBudget,
+  type AIUsageEvent,
+  aiBudgets,
+  aiUsageEvents,
+  BUDGET_METRICS,
+  BUDGET_PERIODS,
+  BUDGET_SCOPES,
+  type BudgetMetric,
+  type BudgetPeriod,
+  type BudgetScope,
+  USAGE_SOURCES,
+  type UsageSource,
+  type UsageStatus,
+} from "./schema/ai-usage.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,

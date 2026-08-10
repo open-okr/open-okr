@@ -75,6 +75,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A new version of "${asString(p.promptKey, "a prompt")}" was saved`,
   "ai.prompt_restored": (p) =>
     `"${asString(p.promptKey, "A prompt")}" was restored to its default`,
+  "ai.usage_recorded": (p) =>
+    `An AI call ran against ${asString(p.provider, "a provider")}/${asString(p.modelId, "a model")}`,
+  "ai.budget_set": (p) =>
+    `An AI budget was set for the "${asString(p.scope, "workspace")}" scope`,
+  "ai.budget_removed": () => "An AI budget was removed",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

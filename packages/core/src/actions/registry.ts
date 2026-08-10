@@ -37,6 +37,12 @@ import {
   updateFeatureSetting,
   updatePrompt,
 } from "./ai-models.ts";
+import {
+  readBudgets,
+  readUsageSummary,
+  removeBudget,
+  setBudget,
+} from "./ai-usage.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
@@ -135,6 +141,10 @@ export const ACTION_MAP = {
   "ai.readPrompt": readPrompt,
   "ai.updatePrompt": updatePrompt,
   "ai.restorePrompt": restorePrompt,
+  "ai.readBudgets": readBudgets,
+  "ai.setBudget": setBudget,
+  "ai.removeBudget": removeBudget,
+  "ai.readUsageSummary": readUsageSummary,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

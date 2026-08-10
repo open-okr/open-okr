@@ -79,6 +79,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     version: z.number().int(),
   }),
   "ai.prompt_restored": z.object({ promptKey: z.string() }),
+  "ai.usage_recorded": z
+    .object({ provider: z.string(), modelId: z.string() })
+    .catchall(z.unknown()),
+  "ai.budget_set": z.object({}).catchall(z.unknown()),
+  "ai.budget_removed": z.object({}),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
@@ -96,6 +101,9 @@ export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
   "member.updated",
   "workspace.general_settings_updated",
   "workspace.branding_updated",
+  // Every real AI call writes one of these; the feed would otherwise be
+  // mostly usage noise the instant a real feature calls a provider.
+  "ai.usage_recorded",
 ]);
 
 export class UnregisteredActivityKindError extends Error {
