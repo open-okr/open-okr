@@ -118,6 +118,31 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_MAIL_FROM",
     summary: "The From address on everything the instance sends.",
   },
+  {
+    key: "ai.deployment.provider",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_AI_PROVIDER",
+    summary:
+      "The deployment-wide fallback AI provider (§4.14: 'the deployment-level AI key'). Empty means no deployment default; AI is off until a workspace or member supplies their own key.",
+  },
+  {
+    key: "ai.deployment.apiKey",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_AI_API_KEY",
+    secret: true,
+    summary:
+      "The deployment-wide fallback provider's key. Envelope-encrypted, never returned to a page.",
+  },
+  {
+    key: "ai.deployment.baseUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_AI_BASE_URL",
+    summary:
+      "Base URL for the deployment default, when the provider needs one (ollama, openai-compatible).",
+  },
 ];
 
 const BY_KEY = new Map(

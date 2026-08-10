@@ -49,6 +49,18 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace settings were reset to their defaults (${
       Array.isArray(p.keys) ? p.keys.join(", ") : "general"
     })`,
+  "ai.provider_config_updated": (p) =>
+    `${asString(p.provider, "A provider")}'s configuration was updated`,
+  "ai.workspace_credential_set": (p) =>
+    `A workspace key was set for ${asString(p.provider, "a provider")}`,
+  "ai.workspace_credential_removed": (p) =>
+    `The workspace key for ${asString(p.provider, "a provider")} was removed`,
+  "ai.personal_credential_set": (p) =>
+    `A personal key was set for ${asString(p.provider, "a provider")}`,
+  "ai.personal_credential_removed": (p) =>
+    `A personal key for ${asString(p.provider, "a provider")} was removed`,
+  "ai.credentials_rotated": (p) =>
+    `${Number(p.rewrapped ?? 0)} of ${Number(p.examined ?? 0)} AI credential(s) were re-wrapped onto the current key`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

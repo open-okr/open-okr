@@ -84,6 +84,15 @@ export {
   type ActivityRenderer,
   renderActivity,
 } from "./activities/renderers.ts";
+export { maskKeyHint, sealCredentialKey } from "./ai/credentials.ts";
+export {
+  type AICredentialSource,
+  type ResolveAICredentialInput,
+  type ResolvedAICredential,
+  type ResolvedDeploymentAI,
+  resolveAICredential,
+  resolveDeploymentAISettings,
+} from "./ai/resolve.ts";
 export {
   type AuditRow,
   auditRowHash,

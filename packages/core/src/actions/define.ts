@@ -17,15 +17,21 @@ import {
   type OperationSpec,
   runOperation,
 } from "../operations/operation.ts";
+import type { KeyRing } from "../secrets/key-ring.ts";
 
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
 
-/** What every action needs to run: the database and who is asking. */
+/** What every action needs to run: the database and who is asking.
+ * `ring` is optional because only the handful of actions that seal or open a
+ * credential need it (P2-T14 onward) — every other action's context stays
+ * exactly as it was. A caller that omits it and reaches one of those
+ * actions gets a clear error from the action itself, not a silent no-op. */
 export interface ActionCallContext {
   readonly pool: Pool;
   readonly workspaceId: string;
   readonly actor: ActorInput;
+  readonly ring?: KeyRing;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

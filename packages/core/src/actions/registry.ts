@@ -13,6 +13,16 @@
  */
 
 import { workspaceFeed } from "./activities.ts";
+import {
+  readOwnCredentialStatus,
+  readProviderConfig,
+  removePersonalCredential,
+  removeWorkspaceCredential,
+  rotateCredentials,
+  setPersonalCredential,
+  setWorkspaceCredential,
+  updateProviderConfig,
+} from "./ai.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
@@ -91,6 +101,14 @@ export const ACTION_MAP = {
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
   "settings.resetWorkspaceSettings": resetWorkspaceSettings,
+  "ai.readProviderConfig": readProviderConfig,
+  "ai.updateProviderConfig": updateProviderConfig,
+  "ai.setWorkspaceCredential": setWorkspaceCredential,
+  "ai.removeWorkspaceCredential": removeWorkspaceCredential,
+  "ai.setPersonalCredential": setPersonalCredential,
+  "ai.removePersonalCredential": removePersonalCredential,
+  "ai.readOwnCredentialStatus": readOwnCredentialStatus,
+  "ai.rotateCredentials": rotateCredentials,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

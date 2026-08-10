@@ -59,6 +59,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.settings_reset": z
     .object({ keys: z.array(z.string()) })
     .catchall(z.unknown()),
+  "ai.provider_config_updated": z.object({ provider: z.string() }),
+  "ai.workspace_credential_set": z.object({ provider: z.string() }),
+  "ai.workspace_credential_removed": z.object({ provider: z.string() }),
+  "ai.personal_credential_set": z.object({ provider: z.string() }),
+  "ai.personal_credential_removed": z.object({ provider: z.string() }),
+  "ai.credentials_rotated": z.object({
+    examined: z.number().int(),
+    rewrapped: z.number().int(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

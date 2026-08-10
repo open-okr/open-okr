@@ -50,6 +50,15 @@ export {
   accessGroups,
 } from "./schema/access.ts";
 export {
+  AI_PROVIDER_KINDS,
+  type AICredential,
+  type AICredentialStatus,
+  type AIProviderConfig,
+  type AIProviderKind,
+  aiCredentials,
+  aiProviders,
+} from "./schema/ai.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,
