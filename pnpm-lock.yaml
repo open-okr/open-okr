@@ -301,16 +301,31 @@ importers:
       '@openokr/core':
         specifier: workspace:*
         version: link:../core
+      '@openokr/db':
+        specifier: workspace:*
+        version: link:../db
       '@openokr/method':
         specifier: workspace:*
         version: link:../method
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.3)(kysely@0.29.4)(pg@8.22.0)
+      pg:
+        specifier: 'catalog:'
+        version: 8.22.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@openokr/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

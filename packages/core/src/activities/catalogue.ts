@@ -84,6 +84,19 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     .catchall(z.unknown()),
   "ai.budget_set": z.object({}).catchall(z.unknown()),
   "ai.budget_removed": z.object({}),
+  "agent.created": z.object({}).catchall(z.unknown()),
+  "agent.enabled_changed": z.object({ enabled: z.boolean() }),
+  "agent.scope_bound": z.object({}).catchall(z.unknown()),
+  "agent.run_started": z.object({}).catchall(z.unknown()),
+  "agent.run_task_processed": z.object({
+    taskIndex: z.number().int(),
+    outcome: z.enum(["denied", "simulated", "proposed", "applied", "error"]),
+  }),
+  "agent.run_cancelled": z.object({}).catchall(z.unknown()),
+  "agent.run_completed": z.object({}).catchall(z.unknown()),
+  "agent.run_failed": z.object({}).catchall(z.unknown()),
+  "proposed_change.bulk_applied": z.object({}).catchall(z.unknown()),
+  "proposed_change.bulk_dismissed": z.object({}).catchall(z.unknown()),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

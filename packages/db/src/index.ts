@@ -50,6 +50,26 @@ export {
   accessGroups,
 } from "./schema/access.ts";
 export {
+  AGENT_AUTONOMIES,
+  AGENT_KINDS,
+  AGENT_RUN_STATUSES,
+  AGENT_SCHEDULES,
+  type Agent,
+  type AgentAutonomy,
+  type AgentKind,
+  type AgentRun,
+  type AgentRunLogEntry,
+  type AgentRunStatus,
+  type AgentSchedule,
+  type AgentTask,
+  agentRuns,
+  agents,
+  PROPOSED_CHANGE_STATUSES,
+  type ProposedChange,
+  type ProposedChangeStatus,
+  proposedChanges,
+} from "./schema/agents.ts";
+export {
   AI_PROVIDER_KINDS,
   type AICredential,
   type AICredentialStatus,

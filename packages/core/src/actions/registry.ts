@@ -14,6 +14,18 @@
 
 import { workspaceFeed } from "./activities.ts";
 import {
+  bindAgentScope,
+  bulkApplyProposedChanges,
+  bulkDismissProposedChanges,
+  cancelAgentRun,
+  createAgent,
+  listProposedChanges,
+  readAgentRun,
+  readAgents,
+  setAgentEnabled,
+  startAgentRun,
+} from "./agents.ts";
+import {
   readOwnCredentialStatus,
   readProviderConfig,
   removePersonalCredential,
@@ -145,6 +157,16 @@ export const ACTION_MAP = {
   "ai.setBudget": setBudget,
   "ai.removeBudget": removeBudget,
   "ai.readUsageSummary": readUsageSummary,
+  "agents.list": readAgents,
+  "agents.create": createAgent,
+  "agents.setEnabled": setAgentEnabled,
+  "agents.bindScope": bindAgentScope,
+  "agents.startRun": startAgentRun,
+  "agents.readRun": readAgentRun,
+  "agents.cancelRun": cancelAgentRun,
+  "proposals.list": listProposedChanges,
+  "proposals.bulkApply": bulkApplyProposedChanges,
+  "proposals.bulkDismiss": bulkDismissProposedChanges,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

@@ -13,11 +13,16 @@
   "dependencies": {
     "@openokr/adapters": "workspace:*",
     "@openokr/core": "workspace:*",
+    "@openokr/db": "workspace:*",
     "@openokr/method": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@openokr/test-support": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

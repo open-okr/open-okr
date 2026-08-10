@@ -80,6 +80,23 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "ai.budget_set": (p) =>
     `An AI budget was set for the "${asString(p.scope, "workspace")}" scope`,
   "ai.budget_removed": () => "An AI budget was removed",
+  "agent.created": (p) =>
+    `Agent "${asString(p.name, "New agent")}" was created`,
+  "agent.enabled_changed": (p) =>
+    `An agent was turned ${p.enabled ? "on" : "off"}`,
+  "agent.scope_bound": (p) =>
+    `An agent was granted access to a ${asString(p.resourceType, "resource")}`,
+  "agent.run_started": () => "An agent run started",
+  "agent.run_task_processed": (p) =>
+    `An agent run's task ${Number(p.taskIndex ?? 0) + 1} was ${asString(p.outcome, "processed")}`,
+  "agent.run_cancelled": () => "An agent run was cancelled",
+  "agent.run_completed": () => "An agent run completed",
+  "agent.run_failed": (p) =>
+    `An agent run failed${p.error ? `: ${asString(p.error)}` : ""}`,
+  "proposed_change.bulk_applied": (p) =>
+    `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
+  "proposed_change.bulk_dismissed": (p) =>
+    `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */
