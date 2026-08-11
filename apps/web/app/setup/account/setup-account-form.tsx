@@ -75,7 +75,13 @@ export function SetupAccountForm() {
 
       <Field label="Your name" name="name" autoComplete="name" required />
 
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+      <Field
+        label="Email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        required
+      />
 
       <div className="flex flex-col gap-1">
         <Field
@@ -87,7 +93,8 @@ export function SetupAccountForm() {
           required
         />
         <p className="text-xs text-ink-3">
-          At least 12 characters. A phrase you can remember beats a short password you cannot.
+          At least 12 characters. A phrase you can remember beats a short
+          password you cannot.
         </p>
       </div>
 

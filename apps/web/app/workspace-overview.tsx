@@ -59,7 +59,8 @@ export async function WorkspaceOverview({
     <Card>
       <CardHeader>
         <h1 className="text-lg font-bold text-ink">
-          Signed in as {overview.member.name}, in {overview.workspace.name}
+          Signed in as <strong>{overview.member.name}</strong>, in{" "}
+          <strong>{overview.workspace.name}</strong>
         </h1>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">

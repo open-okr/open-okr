@@ -20,7 +20,11 @@ export const metadata: Metadata = {
 // and serves it from this origin — no runtime request to Google.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   // proxy.ts's own strict CSP has no `unsafe-inline` for scripts in
   // production — an inline <script> with no nonce is silently blocked by
   // the browser, which is exactly what happened to the theme bootstrap
@@ -37,11 +41,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the
-         * no-flash theme bootstrap has to run before hydration, which
-         * only a synchronous inline script can do (Next's own documented
-         * pattern for this). The string is generated, not user input. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+        <script
+          nonce={nonce}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: the no-flash theme bootstrap has to run before hydration, which only a synchronous inline script can do (Next's own documented pattern for this); the string is generated, not user input
+          dangerouslySetInnerHTML={{ __html: themeInitScript() }}
+        />
       </head>
       <body>
         <ThemeProvider>

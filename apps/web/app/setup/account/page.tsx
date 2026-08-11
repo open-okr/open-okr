@@ -36,7 +36,10 @@ export default async function SetupAccountPage() {
           the first account joins by invitation.
         </p>
         <FinishSetup />
-        <Link href="/sign-in" className="text-sm font-medium text-brand-600 hover:underline">
+        <Link
+          href="/sign-in"
+          className="text-sm font-medium text-brand-600 hover:underline"
+        >
           Sign in
         </Link>
       </>
@@ -53,7 +56,10 @@ export default async function SetupAccountPage() {
 
       <SetupAccountForm />
 
-      <Link href="/setup" className={cn(buttonVariants({ variant: "ghost" }), "self-start")}>
+      <Link
+        href="/setup"
+        className={cn(buttonVariants({ variant: "ghost" }), "self-start")}
+      >
         Back
       </Link>
     </>

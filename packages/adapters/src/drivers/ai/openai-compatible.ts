@@ -147,6 +147,13 @@ export class OpenAiCompatibleProvider implements AIProvider {
     const response = await this.#client.embeddings.create({
       model: request.model,
       input: [...request.input],
+      // Explicit, not left to the SDK's own default: with no
+      // encoding_format given, the SDK asks the real OpenAI API for
+      // base64 and decodes it client-side, a shape "OpenAI-compatible"
+      // providers are not guaranteed to implement or decode the same way.
+      // "float" is the one format every target of this driver returns
+      // as plain numbers, so there is nothing to decode either way.
+      encoding_format: "float",
     });
     const vectors = response.data.map((item) => item.embedding);
     return {

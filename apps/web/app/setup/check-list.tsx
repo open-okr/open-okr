@@ -1,5 +1,5 @@
 import type { ConnectionTest } from "@openokr/core";
-import { type VerdictState, VerdictDot } from "@openokr/ui";
+import { VerdictDot, type VerdictState } from "@openokr/ui";
 
 /**
  * How a connection test reads to an operator (P1-T09, restyled P2-T10).

@@ -35,9 +35,17 @@ export default async function SetupLayout({
         <CardBody className="flex flex-col gap-3">
           {refusal ? (
             <>
-              <h1 className="text-lg font-bold text-ink">Setup is already done</h1>
+              <h1 className="text-lg font-bold text-ink">
+                Setup is already done
+              </h1>
               <p className="text-sm text-ink-3">{refusal}</p>
-              <Link href="/" className={cn(buttonVariants({ variant: "primary" }), "self-start")}>
+              <Link
+                href="/"
+                className={cn(
+                  buttonVariants({ variant: "primary" }),
+                  "self-start",
+                )}
+              >
                 Go to the instance
               </Link>
             </>

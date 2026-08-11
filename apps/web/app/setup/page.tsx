@@ -52,10 +52,15 @@ export default async function SetupPage() {
         you can create your account and start. You can change any of it later.
       </p>
 
-      <h2 className="mt-2 text-xs font-bold tracking-wide text-ink-4 uppercase">This deployment</h2>
+      <h2 className="mt-2 text-xs font-bold tracking-wide text-ink-4 uppercase">
+        This deployment
+      </h2>
       <CheckList tests={tests} />
 
-      <Link href="/setup/account" className={cn(buttonVariants({ variant: "primary" }), "self-start")}>
+      <Link
+        href="/setup/account"
+        className={cn(buttonVariants({ variant: "primary" }), "self-start")}
+      >
         Create the first account
       </Link>
     </>

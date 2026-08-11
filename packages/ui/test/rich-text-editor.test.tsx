@@ -37,7 +37,9 @@ describe("RichTextEditor", () => {
   });
 
   test("renders read-only when editable is false", async () => {
-    const { container } = render(<RichTextEditor content={SIMPLE_DOC} editable={false} />);
+    const { container } = render(
+      <RichTextEditor content={SIMPLE_DOC} editable={false} />,
+    );
     await waitFor(() => {
       expect(container.querySelector("[contenteditable]")).toBeTruthy();
     });

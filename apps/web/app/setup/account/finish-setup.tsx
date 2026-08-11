@@ -33,7 +33,13 @@ export function FinishSetup() {
 
   return (
     <>
-      <Button type="button" variant="primary" onClick={finish} disabled={pending} className="self-start">
+      <Button
+        type="button"
+        variant="primary"
+        onClick={finish}
+        disabled={pending}
+        className="self-start"
+      >
         {pending ? "Finishing…" : "Finish setup"}
       </Button>
       <FormError>{error}</FormError>

@@ -34,76 +34,75 @@ interface SuggestionListProps {
   readonly command: (item: SuggestionItem) => void;
 }
 
-const SuggestionList = forwardRef<
-  SuggestionListHandle,
-  SuggestionListProps
->(({ items, command }, ref) => {
-  const [selected, setSelected] = useState(0);
+const SuggestionList = forwardRef<SuggestionListHandle, SuggestionListProps>(
+  ({ items, command }, ref) => {
+    const [selected, setSelected] = useState(0);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `items` drives when this resets (a new result set arrived), not something the body reads.
-  useEffect(() => {
-    setSelected(0);
-  }, [items]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `items` drives when this resets (a new result set arrived), not something the body reads.
+    useEffect(() => {
+      setSelected(0);
+    }, [items]);
 
-  useImperativeHandle(ref, () => ({
-    onKeyDown({ event }) {
-      if (items.length === 0) {
-        return false;
-      }
-      if (event.key === "ArrowDown") {
-        setSelected((current) => (current + 1) % items.length);
-        return true;
-      }
-      if (event.key === "ArrowUp") {
-        setSelected((current) => (current + items.length - 1) % items.length);
-        return true;
-      }
-      if (event.key === "Enter") {
-        const item = items[selected];
-        if (item) {
-          command(item);
+    useImperativeHandle(ref, () => ({
+      onKeyDown({ event }) {
+        if (items.length === 0) {
+          return false;
         }
-        return true;
-      }
-      return false;
-    },
-  }));
+        if (event.key === "ArrowDown") {
+          setSelected((current) => (current + 1) % items.length);
+          return true;
+        }
+        if (event.key === "ArrowUp") {
+          setSelected((current) => (current + items.length - 1) % items.length);
+          return true;
+        }
+        if (event.key === "Enter") {
+          const item = items[selected];
+          if (item) {
+            command(item);
+          }
+          return true;
+        }
+        return false;
+      },
+    }));
 
-  if (items.length === 0) {
+    if (items.length === 0) {
+      return (
+        <div className="rounded-lg border border-line bg-surface p-2 text-sm text-ink-3 shadow-(--shadow-popover)">
+          No matches.
+        </div>
+      );
+    }
+
     return (
-      <div className="rounded-lg border border-line bg-surface p-2 text-sm text-ink-3 shadow-(--shadow-popover)">
-        No matches.
+      <div className="max-h-60 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-(--shadow-popover)">
+        {items.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-2",
+              index === selected
+                ? "bg-brand-weak text-brand-600"
+                : "hover:bg-raised",
+            )}
+            onMouseEnter={() => setSelected(index)}
+            onClick={() => command(item)}
+          >
+            {item.icon ? <span className="flex-none">{item.icon}</span> : null}
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {item.description ? (
+              <span className="flex-none truncate text-xs text-ink-4">
+                {item.description}
+              </span>
+            ) : null}
+          </button>
+        ))}
       </div>
     );
-  }
-
-  return (
-    <div className="max-h-60 w-64 overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-(--shadow-popover)">
-      {items.map((item, index) => (
-        <button
-          key={item.id}
-          type="button"
-          className={cn(
-            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-2",
-            index === selected
-              ? "bg-brand-weak text-brand-600"
-              : "hover:bg-raised",
-          )}
-          onMouseEnter={() => setSelected(index)}
-          onClick={() => command(item)}
-        >
-          {item.icon ? <span className="flex-none">{item.icon}</span> : null}
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          {item.description ? (
-            <span className="flex-none truncate text-xs text-ink-4">
-              {item.description}
-            </span>
-          ) : null}
-        </button>
-      ))}
-    </div>
-  );
-});
+  },
+);
 SuggestionList.displayName = "SuggestionList";
 
 /**
@@ -115,7 +114,10 @@ SuggestionList.displayName = "SuggestionList";
  */
 export function createSuggestionRender<TItem extends SuggestionItem>() {
   return function render() {
-    let renderer: ReactRenderer<SuggestionListHandle, SuggestionListProps> | null = null;
+    let renderer: ReactRenderer<
+      SuggestionListHandle,
+      SuggestionListProps
+    > | null = null;
     let element: HTMLElement | null = null;
 
     function position(
