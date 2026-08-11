@@ -1,0 +1,19 @@
+# Line endings are LF everywhere, in the object store and in the working tree.
+#
+# Without this, a Windows checkout with core.autocrlf=true writes CRLF, and
+# Biome, which defaults to LF, then reports a format error on every file it
+# reads. That produced 232 diagnostics with zero rule violations, which makes
+# `pnpm lint` unreadable locally while staying green in CI. A gate nobody can
+# read is a gate nobody runs.
+#
+# `text=auto` still detects binary files and leaves them alone. The explicit
+# `-text` lines below are belt and braces for the formats where a corrupted
+# byte is silent rather than obvious.
+* text=auto eol=lf
+
+*.png -text
+*.pdf -text
+*.pptx -text
+*.ico -text
+*.woff -text
+*.woff2 -text

@@ -20,13 +20,27 @@ Authority for every rule below is METHOD.md, then TECHNICAL-PLAN.md §4.3 to
 avoid deciding, the decision is recorded in the register below rather than made
 quietly inside a function.
 
+## 0. Approval
+
+**Approved 2026-08-11.** Every recommendation in the register below stands as
+written, including the six marked "practice". The three the gate flagged as worth
+arguing with (D-1, D-5, D-15) were put directly and approved unchanged.
+
+Two consequences follow from that and are now settled rather than open:
+
+| Settled | Effect |
+|---|---|
+| D-5 stands, so no forecast-window parameter enters METHOD.md §11 | The forecast fits over the cycle. The registry is unchanged by Phase 3 |
+| D-16 stands, so `alignment_findings.subject_goal_id` becomes nullable | A documented deviation from TECHNICAL-PLAN.md §4.5. DATABASE.md records it in the same change as the migration, at P3-T09 |
+
 ## 1. The decision register
 
 Fifteen points where the canon does not reach far enough to write the code. Each
 carries a recommendation. **A decision marked "practice" changes what the
 product tells users about their OKRs and needs an explicit answer before the
 task that depends on it starts. A decision marked "mechanical" can be taken as
-recommended unless you say otherwise.**
+recommended unless you say otherwise.** All fifteen were approved as written on
+2026-08-11; see §0.
 
 | # | Question | Kind | Recommendation | Blocks |
 |---|---|---|---|---|
