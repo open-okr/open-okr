@@ -9,11 +9,12 @@ import {
   type AccessRoleTag,
   accessBindings,
   accessContexts,
+  accessGroupMemberships,
   accessGroups,
   activeOnly,
   type WorkspaceTx,
 } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { AccessLevel } from "./levels.ts";
 
 /**
@@ -122,6 +123,113 @@ export async function ensureMemberGroup<
   return (row as { id: string }).id;
 }
 
+export interface EnsureSpaceStandardGroupInput {
+  readonly workspaceId: string;
+  readonly spaceId: string;
+}
+
+/**
+ * A space's one `space_standard` group (P3-T01). Unlike
+ * `workspace_standard`, membership of this group is real data: an
+ * `access_group_memberships` row per person, which is what
+ * `resolveMemberAccessLevel` checks before letting the tier reach them.
+ * Idempotent, and the unique index in migration 0019 is what makes it safe
+ * under two concurrent callers rather than only under one.
+ */
+export async function ensureSpaceStandardGroup<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: EnsureSpaceStandardGroupInput): Promise<string> {
+  const [existing] = await tx
+    .select({ id: accessGroups.id })
+    .from(accessGroups)
+    .where(
+      activeOnly(
+        accessGroups,
+        eq(accessGroups.workspaceId, input.workspaceId),
+        eq(accessGroups.kind, "space_standard"),
+        eq(accessGroups.spaceId, input.spaceId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    return existing.id;
+  }
+  // openokr:allow-mutation: same reason as ensureContext above.
+  const [row] = await tx
+    .insert(accessGroups)
+    .values({
+      workspaceId: input.workspaceId,
+      kind: "space_standard",
+      spaceId: input.spaceId,
+    })
+    .returning({ id: accessGroups.id });
+  return (row as { id: string }).id;
+}
+
+export interface GroupMembershipInput {
+  readonly workspaceId: string;
+  readonly groupId: string;
+  readonly memberId: string;
+}
+
+/**
+ * Puts a member in a group whose membership is data (P3-T01). Idempotent: a
+ * second call for the same pair returns the existing row rather than adding a
+ * duplicate, so joining a space twice is a no-op instead of an error.
+ */
+export async function addGroupMembership<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: GroupMembershipInput): Promise<string> {
+  const [existing] = await tx
+    .select({ id: accessGroupMemberships.id })
+    .from(accessGroupMemberships)
+    .where(
+      activeOnly(
+        accessGroupMemberships,
+        eq(accessGroupMemberships.workspaceId, input.workspaceId),
+        eq(accessGroupMemberships.groupId, input.groupId),
+        eq(accessGroupMemberships.memberId, input.memberId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    return existing.id;
+  }
+  // openokr:allow-mutation: same reason as ensureContext above.
+  const [row] = await tx
+    .insert(accessGroupMemberships)
+    .values({
+      workspaceId: input.workspaceId,
+      groupId: input.groupId,
+      memberId: input.memberId,
+    })
+    .returning({ id: accessGroupMemberships.id });
+  return (row as { id: string }).id;
+}
+
+/**
+ * Takes a member out of a group. Soft delete, so the fact that they were once
+ * in it survives for the feed and the audit trail, and
+ * `resolveMemberAccessLevel` stops finding them immediately because every tier
+ * it walks is filtered on `deleted_at is null`.
+ */
+export async function removeGroupMembership<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: GroupMembershipInput): Promise<void> {
+  // openokr:allow-mutation: same reason as ensureContext above.
+  await tx
+    .update(accessGroupMemberships)
+    .set({ deletedAt: sql`now()` })
+    .where(
+      activeOnly(
+        accessGroupMemberships,
+        eq(accessGroupMemberships.workspaceId, input.workspaceId),
+        eq(accessGroupMemberships.groupId, input.groupId),
+        eq(accessGroupMemberships.memberId, input.memberId),
+      ),
+    );
+}
+
 export interface BindGroupInput {
   readonly workspaceId: string;
   readonly groupId: string;
@@ -146,4 +254,39 @@ export async function bindGroup<
     })
     .returning({ id: accessBindings.id });
   return (row as { id: string }).id;
+}
+
+export interface UnbindGroupInput {
+  readonly workspaceId: string;
+  readonly groupId: string;
+  readonly contextId: string;
+  /** Narrows to bindings carrying this role tag. Omit for every binding. */
+  readonly tag?: AccessRoleTag;
+}
+
+/**
+ * Revokes a grant (P3-T01). Soft delete, for the same reason as
+ * `removeGroupMembership`: the level stops resolving at once, and the history
+ * of who held what survives.
+ *
+ * Used when a space role changes. A demoted manager loses the `full` binding
+ * their own member group held on the space, and keeps whatever
+ * `space_standard` gives every member of it.
+ */
+export async function unbindGroup<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: UnbindGroupInput): Promise<void> {
+  // openokr:allow-mutation: same reason as ensureContext above.
+  await tx
+    .update(accessBindings)
+    .set({ deletedAt: sql`now()` })
+    .where(
+      activeOnly(
+        accessBindings,
+        eq(accessBindings.workspaceId, input.workspaceId),
+        eq(accessBindings.groupId, input.groupId),
+        eq(accessBindings.contextId, input.contextId),
+        input.tag === undefined ? undefined : eq(accessBindings.tag, input.tag),
+      ),
+    );
 }

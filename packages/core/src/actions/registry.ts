@@ -91,6 +91,18 @@ import {
   updateWorkspaceGeneralSettings,
 } from "./settings.ts";
 import {
+  addSpaceMember,
+  archiveSpace,
+  createSpace,
+  joinSpace,
+  leaveSpace,
+  listSpaces,
+  readSpace,
+  removeSpaceMember,
+  setSpaceMemberRole,
+  updateSpace,
+} from "./spaces.ts";
+import {
   provisionWorkspace,
   renameWorkspace,
   setWorkspaceState,
@@ -167,6 +179,16 @@ export const ACTION_MAP = {
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
+  "spaces.list": listSpaces,
+  "spaces.read": readSpace,
+  "spaces.create": createSpace,
+  "spaces.update": updateSpace,
+  "spaces.archive": archiveSpace,
+  "spaces.addMember": addSpaceMember,
+  "spaces.setMemberRole": setSpaceMemberRole,
+  "spaces.removeMember": removeSpaceMember,
+  "spaces.join": joinSpace,
+  "spaces.leave": leaveSpace,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

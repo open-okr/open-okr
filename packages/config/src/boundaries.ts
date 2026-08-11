@@ -503,7 +503,7 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
  * getter's own row, not the table, so a caller cannot see more than the
  * getter would tell them.
  */
-const PROTECTED_TABLES: readonly string[] = ["workspaces"];
+const PROTECTED_TABLES: readonly string[] = ["workspaces", "spaces"];
 
 /**
  * Where a protected table's own row may legitimately be selected directly:

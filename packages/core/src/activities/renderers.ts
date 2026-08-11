@@ -97,6 +97,18 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
   "proposed_change.bulk_dismissed": (p) =>
     `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
+  "space.created": (p) =>
+    `Space "${asString(p.name, "New space")}" was created`,
+  "space.updated": (p) => `Space "${asString(p.name, "A space")}" was updated`,
+  "space.archived": (p) =>
+    `Space "${asString(p.name, "A space")}" was archived`,
+  "space.member_added": (p) =>
+    `${asString(p.name, "A member")} joined this space as ${asString(p.role, "a member")}`,
+  "space.member_removed": () => "A member was removed from this space",
+  "space.member_role_changed": (p) =>
+    `A member's role changed from ${asString(p.from, "member")} to ${asString(p.to, "member")}`,
+  "space.joined": () => "Someone joined this space",
+  "space.left": () => "Someone left this space",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

@@ -147,6 +147,15 @@ export {
   subscriptions,
 } from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  SPACE_ROLES,
+  type Space,
+  type SpaceMember,
+  type SpaceRole,
+  type SpaceSettings,
+  spaceMembers,
+  spaces,
+} from "./schema/spaces.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {
   type QuietHours,

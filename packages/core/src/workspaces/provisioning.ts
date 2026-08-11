@@ -19,6 +19,11 @@
  * their own with a `full` binding on that context. `can()`, which actually
  * reads any of this, is P2-T02; until then `resolveActor` still resolves
  * every active member to `full` by construction.
+ *
+ * P3-T01 adds the default space, named after the workspace with the first
+ * member as its manager (§4.14). Existing workspaces get theirs from the
+ * `0003_backfill_default_space` data-change script rather than from a check on
+ * every read.
  */
 import {
   activeOnly,
@@ -44,6 +49,7 @@ import {
   resolveWorkspaceSettings,
 } from "../settings/registry.ts";
 import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
+import { createSpaceInTx } from "../spaces/service.ts";
 
 export interface WorkspaceUser {
   readonly id: string;
@@ -344,6 +350,19 @@ async function insertWorkspaceAndMember(
           groupId: memberGroupId,
           contextId,
           level: ACCESS_LEVELS.full,
+        });
+
+        // TECHNICAL-PLAN §4.14: "One space named after the workspace, with the
+        // first member as its manager, who covers the coordinator's duties
+        // until one is named." Named after the workspace rather than something
+        // generic, and created here rather than offered as a choice, because no
+        // screen may block until a setting is chosen. There is deliberately no
+        // `defaultSpaceName` setting: §4.14 already answers the question, and a
+        // setting would be a second answer to it.
+        await createSpaceInTx(savepoint, {
+          workspaceId,
+          name,
+          managerMemberId: memberId,
         });
 
         return { workspaceId, memberId, name, slug };

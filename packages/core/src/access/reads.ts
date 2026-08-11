@@ -278,14 +278,15 @@ const ownContextResolver = (resourceType: string): SubjectResolver => {
  * The subject-to-context resolver (TECHNICAL-PLAN §4.1, "sub-resources
  * inherit"). Exhaustive and fail-closed: a subject type absent from this map
  * raises rather than defaulting to some context, so a new subject type
- * cannot ship unsecured by omission. `workspace` and `blob` are the only
- * resources that exist before Phase 3; comments, check-ins, reactions and
- * votes each add their own entry as they land, resolving through their
- * parent's context rather than owning one.
+ * cannot ship unsecured by omission. `workspace` and `blob` came from Phase 1
+ * and 2, `space` from P3-T01; comments, check-ins, reactions and votes each
+ * add their own entry as they land, resolving through their parent's context
+ * rather than owning one.
  */
 const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   workspace: ownContextResolver("workspace"),
   blob: ownContextResolver("blob"),
+  space: ownContextResolver("space"),
 };
 
 export async function resolveSubjectContext<

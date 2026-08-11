@@ -12,6 +12,7 @@ import pg from "pg";
 import { runDataChanges } from "../data-change.ts";
 import { backfillMemberTimezone } from "../data-changes/0001_backfill_member_timezone.ts";
 import { backfillWorkspaceStandardBinding } from "../data-changes/0002_backfill_workspace_standard_binding.ts";
+import { backfillDefaultSpace } from "../data-changes/0003_backfill_default_space.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -20,7 +21,11 @@ const client = new pg.Client({ connectionString: url });
 await client.connect();
 try {
   const outcomes = await runDataChanges(client, {
-    scripts: [backfillMemberTimezone, backfillWorkspaceStandardBinding],
+    scripts: [
+      backfillMemberTimezone,
+      backfillWorkspaceStandardBinding,
+      backfillDefaultSpace,
+    ],
   });
   process.stdout.write(
     outcomes.length === 0

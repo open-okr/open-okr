@@ -97,6 +97,25 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "agent.run_failed": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_applied": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_dismissed": z.object({}).catchall(z.unknown()),
+  // Spaces (P3-T01). The name is snapshotted for the same reason a member's is:
+  // a feed entry saying "renamed Marketing" has to keep saying that after the
+  // space is renamed again.
+  "space.created": z.object({ name: z.string() }),
+  "space.updated": z.object({ name: z.string() }),
+  "space.archived": z.object({ name: z.string() }),
+  "space.member_added": z.object({
+    name: z.string(),
+    role: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.member_removed": z.object({
+    role: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.member_role_changed": z.object({
+    from: z.enum(["member", "manager", "coordinator"]),
+    to: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.joined": z.object({}),
+  "space.left": z.object({}),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

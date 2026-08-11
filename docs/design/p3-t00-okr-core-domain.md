@@ -468,23 +468,38 @@ at-least-once.
 
 ## 8. Settings this phase adds
 
-Declared in TECHNICAL-PLAN.md §4.14 with a working default, so a fresh
-workspace needs no configuration (the hard rule in CLAUDE.md).
+**Corrected 2026-08-11, at the start of P3-T01.** The first draft of this
+section proposed four settings that TECHNICAL-PLAN.md §4.14 already answers, and
+§4.14 is the higher authority. The corrections are recorded rather than quietly
+applied, because the section was approved in its wrong form:
 
-| Key | Default | Added at |
+| First drafted | Actually | Why |
 |---|---|---|
-| `spaces.default_space_name` | "General" | P3-T01 |
-| `cycles.cadence` | `quarterly` | P3-T02 |
-| `cycles.timezone` | The workspace timezone | P3-T02 |
-| `cycles.auto_generate` | true | P3-T02 |
-| `goals.default_check_in_frequency` | `weekly` (§11) | P3-T02 |
-| `goals.check_in_anchor_day` | Monday (§11) | P3-T02 |
-| `kpis.weekly_period_start` | Monday, fixed, not overridable | P3-T12 |
-| `demo.enabled` | false | P3-T17 |
+| A `spaces.default_space_name` setting defaulting to "General" | **No setting.** The default space is named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named | §4.14's provisioning-defaults table says exactly that. A setting would be a second answer to a question already answered |
+| `goals.default_check_in_frequency` and `goals.check_in_anchor_day` as workspace settings | **§11 registry parameters in `rhythm_settings`** | §4.14 routes "frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings" to `rhythm_settings`. They are in §11 already, so they were never §4.14's to hold |
+| A `cycles.cadence` workspace setting, and a `cycles.auto_generate` toggle | **Neither.** Cadence is a column on the cycle. Generation reads the most recent cycle's cadence, falling back to `quarterly` when a workspace has none | §11 holds no cadence parameter and §4.14 holds no cycle settings. Inventing one would put the same fact in two places. A generation toggle is a setting nobody asked for |
+| A `kpis.weekly_period_start` setting | **No setting.** Monday, fixed | Decision D-12 already says KPI periods are calendar buckets. A fixed value is not a setting |
 
-Every numeric threshold, band, corridor and penalty is **not** in this table.
-Those live in the METHOD.md §11 registry, resolved through
-`packages/method`. A threshold appearing in the settings map would be a bug.
+What is actually left, then, is one entry:
+
+| Key | Scope | Default | Added at |
+|---|---|---|---|
+| `demoEnabled` | Instance or workspace, decided at the task | false | P3-T17 |
+
+Everything else Phase 3 needs is already answered: by §4.14's existing entries
+(the workspace timezone every date is read in), by §11's registry (every
+threshold, band, corridor, ladder and cap), or by a column on the row itself.
+
+Every numeric threshold, band, corridor and penalty is **not** a §4.14 setting.
+Those live in the METHOD.md §11 registry, resolved through `packages/method`. A
+threshold appearing in the settings map would be a bug.
+
+`spaces.settings` exists as a column from P3-T01 and starts empty. §4.14 gives it
+three future contents, each arriving with its own feature: team voting opt-in
+(P3-T07), the strictness override (Phase 4), and space defaults. There is no
+space visibility or privacy concept: §4.14 does not name one, so every space is
+discoverable by every human member of the workspace, which is what makes "join
+and leave" mean anything.
 
 ## 9. Acceptance criteria for this gate
 

@@ -50,6 +50,20 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "spaces",
+    navigation: [
+      {
+        id: "spaces",
+        label: "Spaces",
+        href: "/spaces",
+        section: "sidebar",
+        // Every human member can see that spaces exist and join one, which is
+        // what makes a team home a home rather than a locked room (P3-T01).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "account",
     navigation: [
       {
