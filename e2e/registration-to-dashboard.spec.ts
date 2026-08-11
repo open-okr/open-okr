@@ -127,6 +127,8 @@ test("the first paint is server-rendered, with no JavaScript at all", async ({
 
 test("signing out ends the session", async () => {
   await page.goto("/");
+  // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.
+  await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
 });

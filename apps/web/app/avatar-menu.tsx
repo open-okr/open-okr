@@ -22,7 +22,10 @@ export function AvatarMenu({
 }) {
   return (
     <Menu.Root>
-      <Menu.Trigger className="rounded-full outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand">
+      <Menu.Trigger
+        aria-label="Account menu"
+        className="rounded-full outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
+      >
         <Avatar name={name} />
       </Menu.Trigger>
       <Menu.Portal>

@@ -16,10 +16,6 @@
       "entry": ["bin/*.ts", "fixtures/**/vitest.config.ts"]
     },
     "packages/ui": {
-      // CLAUDE.md's locked stack: "SmoothUI on Motion". Installed ahead of
-      // the first SmoothUI component that animates with it, the same way
-      // the design system itself is added at build time before any screen
-      // uses it — not dead, just not wired to a consumer yet.
       "ignoreDependencies": ["motion"]
     }
   }
