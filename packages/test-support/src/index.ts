@@ -18,3 +18,14 @@ export {
   testId,
 } from "./flaky";
 export { FlakyReporter, type FlakyReporterOptions } from "./flaky-reporter";
+export {
+  cellBoolean,
+  cellJson,
+  cellList,
+  cellNumber,
+  type GoldenRow,
+  type GoldenTable,
+  loadGoldenTable,
+  loadGoldenTables,
+  parseGoldenTables,
+} from "./golden-table";
