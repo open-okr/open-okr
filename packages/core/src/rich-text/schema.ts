@@ -52,8 +52,6 @@ export const markSchema = z.discriminatedUnion("type", [
 
 export type Mark = z.infer<typeof markSchema>;
 
-export const marksArraySchema = z.array(markSchema).optional();
-
 /** Attribute schemas per node type. A node type absent from this map (and
  * absent from `LEAF_NODE_TYPES`/container handling in `validate.ts`) is
  * simply not on the allow-list — there is no default-accept path. */
@@ -160,13 +158,13 @@ export const NESTING_RULES: Readonly<
   // inline node types".
 };
 
-export interface RichTextTextNode {
+interface RichTextTextNode {
   readonly type: "text";
   readonly text: string;
   readonly marks?: readonly Mark[];
 }
 
-export interface RichTextElementNode {
+interface RichTextElementNode {
   readonly type: NodeType;
   readonly attrs?: Record<string, unknown>;
   readonly content?: readonly RichTextNode[];

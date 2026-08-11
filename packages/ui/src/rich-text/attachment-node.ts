@@ -9,7 +9,7 @@ import { mergeAttributes, Node } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { AttachmentView } from "./attachment-view.tsx";
 
-export type AttachmentStatus = "uploading" | "ready";
+type AttachmentStatus = "uploading" | "ready";
 
 export interface AttachmentAttrs {
   readonly filename: string;

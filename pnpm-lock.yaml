@@ -182,15 +182,6 @@ importers:
       '@openokr/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@tanstack/query-sync-storage-persister':
-        specifier: 'catalog:'
-        version: 5.101.4
-      '@tanstack/react-query':
-        specifier: 'catalog:'
-        version: 5.101.4(react@19.2.8)
-      '@tanstack/react-query-persist-client':
-        specifier: 'catalog:'
-        version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
       better-auth:
         specifier: 'catalog:'
         version: 1.6.26(drizzle-orm@0.45.2(@types/pg@8.20.3)(kysely@0.29.4)(pg@8.22.0))(next@16.3.0(@playwright/test@1.57.0)(@types/node@26.1.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(pg@8.22.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@4.1.10(@types/node@26.1.2)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.1.2)(jiti@2.7.0)(yaml@2.9.0)))
@@ -213,12 +204,6 @@ importers:
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.3.3
-      '@testing-library/react':
-        specifier: 'catalog:'
-        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@testing-library/user-event':
-        specifier: 'catalog:'
-        version: 14.6.3(@testing-library/dom@10.4.1)
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2

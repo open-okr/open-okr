@@ -25,16 +25,16 @@ export interface SuggestionItem {
   readonly icon?: ReactNode;
 }
 
-export interface SuggestionListHandle {
+interface SuggestionListHandle {
   onKeyDown(event: { readonly event: KeyboardEvent }): boolean;
 }
 
-export interface SuggestionListProps {
+interface SuggestionListProps {
   readonly items: readonly SuggestionItem[];
   readonly command: (item: SuggestionItem) => void;
 }
 
-export const SuggestionList = forwardRef<
+const SuggestionList = forwardRef<
   SuggestionListHandle,
   SuggestionListProps
 >(({ items, command }, ref) => {

@@ -18,9 +18,6 @@
     "@better-auth/passkey": "catalog:",
     "@openokr/ui": "workspace:*",
     "@base-ui-components/react": "catalog:",
-    "@tanstack/query-sync-storage-persister": "catalog:",
-    "@tanstack/react-query": "catalog:",
-    "@tanstack/react-query-persist-client": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
     "next": "16.3.0",
@@ -30,8 +27,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",
-    "@testing-library/react": "catalog:",
-    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "19.2.18",

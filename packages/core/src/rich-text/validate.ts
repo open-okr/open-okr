@@ -12,6 +12,7 @@
  */
 import { z } from "zod";
 import {
+  INLINE_NODE_TYPES,
   LEAF_NODE_TYPES,
   markSchema,
   NESTING_RULES,
@@ -19,7 +20,6 @@ import {
   type NodeType,
   RICH_TEXT_SCHEMA_VERSION,
   type RichTextDocument,
-  type RichTextNode,
 } from "./schema.ts";
 
 export class RichTextValidationError extends Error {
@@ -124,7 +124,7 @@ function validateChildren(
       }
       if (
         isNodeType(childRecord.type) &&
-        LEAF_NODE_TYPES.has(childRecord.type)
+        INLINE_NODE_TYPES.has(childRecord.type)
       ) {
         validateNode(childRecord, childPath);
         return;
@@ -241,5 +241,3 @@ export function isValidRichText(
     return false;
   }
 }
-
-export type { RichTextDocument, RichTextNode };

@@ -195,6 +195,27 @@ describe("parseRichText: rejects what is not on the allow-list", () => {
     );
   });
 
+  test("a horizontalRule nested inline inside a paragraph", () => {
+    // horizontalRule is a leaf node (LEAF_NODE_TYPES), but not one of the
+    // inline node types a paragraph/heading may hold alongside text
+    // (INLINE_NODE_TYPES) — it belongs at the document level only.
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "before" },
+            { type: "horizontalRule" },
+          ],
+        },
+      ],
+    };
+    expect(() => parseRichText(doc, RICH_TEXT_SCHEMA_VERSION)).toThrow(
+      RichTextValidationError,
+    );
+  });
+
   test("an unknown mark type", () => {
     const doc = {
       type: "doc",
