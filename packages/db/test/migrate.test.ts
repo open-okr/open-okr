@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -85,6 +86,60 @@ describe("runMigrations", () => {
     await expect(runMigrations(client, { dirs: [dir] })).rejects.toThrow(
       /0001_first\.sql/,
     );
+  });
+
+  /**
+   * The checksum answers "did anybody edit the SQL", and a carriage return is
+   * not an edit. Hashing raw bytes made the answer depend on the platform that
+   * checked the repository out, so adding `.gitattributes` on 2026-08-11 turned
+   * every already-applied migration in an existing Windows working tree into
+   * "was edited after it ran". The same would refuse an upgrade on any instance
+   * deployed from a Windows checkout.
+   */
+  it("accepts a migration whose line endings changed but whose SQL did not", async () => {
+    await write("0001_first.sql", "create table one (\r\n  id int\r\n);\r\n");
+    await runMigrations(client, { dirs: [dir] });
+
+    await write("0001_first.sql", "create table one (\n  id int\n);\n");
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
+  });
+
+  it("heals a ledger row the old runner wrote, once", async () => {
+    const crlf = "create table one (\r\n  id int\r\n);\r\n";
+    await write("0001_first.sql", crlf);
+    await runMigrations(client, { dirs: [dir] });
+
+    // What the pre-normalisation runner would have stored: the raw bytes. The
+    // current runner never writes this, so the ledger has to be put back into
+    // the old shape to prove it is still recognised.
+    const legacy = createHash("sha256").update(crlf).digest("hex");
+    await client.query("update _migrations set checksum = $1", [legacy]);
+
+    await write("0001_first.sql", "create table one (\n  id int\n);\n");
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
+
+    const healed = await client.query("select checksum from _migrations");
+    expect(healed.rows[0]?.checksum).not.toBe(legacy);
+    // Nothing legacy left to fall back on, and it still passes.
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
+  });
+
+  it("still refuses a real edit that also changed the line endings", async () => {
+    await write("0001_first.sql", "create table one (\r\n  id int\r\n);\r\n");
+    await runMigrations(client, { dirs: [dir] });
+
+    await write("0001_first.sql", "create table one (\n  id bigint\n);\n");
+    await expect(runMigrations(client, { dirs: [dir] })).rejects.toThrow(
+      /was edited after it ran/,
+    );
+  });
+
+  it("treats a trailing newline as no change either", async () => {
+    await write("0001_first.sql", "create table one (id int);");
+    await runMigrations(client, { dirs: [dir] });
+
+    await write("0001_first.sql", "create table one (id int);\n");
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
   });
 
   it("refuses a new migration that sorts before an applied one", async () => {

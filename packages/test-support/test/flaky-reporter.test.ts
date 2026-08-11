@@ -22,12 +22,20 @@ beforeAll(async () => {
     Object.entries(process.env).filter(([key]) => !key.startsWith("VITEST")),
   );
 
+  // `shell: true` on Windows only. A package manager resolves to `pnpm.cmd`
+  // there, which `execFile` will not find without the extension and which Node
+  // then refuses to spawn directly at all (the EINVAL guard added for
+  // CVE-2024-27980). Without this the suite exits `spawn pnpm ENOENT` on every
+  // Windows machine while passing in CI, which is the same defect
+  // `scripts/check-licences.ts` carried until 2026-08-11. Safe here because
+  // every argument is a literal or a path this file computed.
   await run(
     "pnpm",
     ["exec", "vitest", "run", "--config", join(fixtureDir, "vitest.config.ts")],
     {
       cwd: packageDir,
       env: { ...env, CI: "" },
+      shell: process.platform === "win32",
     },
   );
 }, 120_000);

@@ -32,3 +32,6 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /blob-report/
+# Scratch output from driving a browser by hand during verification. Session
+# debris, never a build artefact worth keeping.
+/.playwright-mcp/
