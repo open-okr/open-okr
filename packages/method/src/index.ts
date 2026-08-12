@@ -1,6 +1,15 @@
 export const PACKAGE_NAME = "@openokr/method";
 
 export {
+  guidanceForPhase,
+  HORIZONS,
+  type Horizon,
+  PHASE_GUIDANCE,
+  type PhaseGuidance,
+  SUGGESTED_TIMELINE,
+  type TimelineRow,
+} from "./guidance.ts";
+export {
   isTermKey,
   type ResolvedTerminology,
   resolveTerminology,

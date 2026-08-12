@@ -17,7 +17,6 @@ import {
   rhythmSettings,
   withContext,
   workspaceMembers,
-  workspaces,
 } from "@openokr/db";
 import {
   CHECK_IN_FREQUENCIES,
@@ -49,6 +48,7 @@ import {
   findCurrentCycle,
   readRhythmRow,
   resolveWorkspaceCadence,
+  workspaceTimeZone,
 } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -70,24 +70,6 @@ const cycleOutput = z.object({
 });
 
 export type CycleOutput = z.infer<typeof cycleOutput>;
-
-/** The workspace timezone, which every cycle bound is read in. */
-async function workspaceTimeZone(
-  tx: OperationTx,
-  workspaceId: string,
-): Promise<string> {
-  const [row] = await tx
-    .select({ settings: workspaces.settings })
-    // openokr:allow-raw-read: reads one setting off the workspace row inside an
-    // Operation that has already authorised the acting member. The getter does
-    // not return settings, and every cycle date is meaningless without this one.
-    .from(workspaces)
-    .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
-    .limit(1);
-  const settings = (row?.settings ?? {}) as Record<string, unknown>;
-  const timezone = settings.timezone;
-  return typeof timezone === "string" && timezone !== "" ? timezone : "UTC";
-}
 
 /** Resolves the acting member, or refuses the way every other read does. */
 async function actingMember(

@@ -125,6 +125,66 @@ test("the first paint is server-rendered, with no JavaScript at all", async ({
   }
 });
 
+/**
+ * The cycle workspace (P3-T03). Same session, because the instance allows one
+ * registration and this is its account.
+ *
+ * What only a browser can settle here: the eight phases render from computed
+ * completion rather than a stored flag, ticking a pack item moves the count
+ * through the Operation pipeline and back, and opening a blocked phase names
+ * what is blocking it. That last one is the task's acceptance criterion.
+ */
+test("the cycle workspace computes the eight phases from the rows", async () => {
+  await page.goto("/cycle");
+
+  await expect(
+    page.getByRole("heading", { name: "Phase 1 · Prepare" }),
+  ).toBeVisible();
+  // A quarterly cycle, so phase 0 does not apply. Three states, not two.
+  await expect(
+    page.getByRole("img", { name: "Phase 0 does not apply to this cycle" }),
+  ).toBeVisible();
+  // Every word of the guidance comes from packages/method.
+  await expect(
+    page.getByText("Refuse to run Phase 4 without a complete input pack"),
+  ).toBeVisible();
+});
+
+test("ticking a pack item moves the count", async () => {
+  await page.goto("/cycle");
+
+  await expect(page.getByText("0 of 7", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: 'Mark "Mission, vision and current strategy documents" as gathered',
+    })
+    .click();
+  await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 of 10", { exact: true })).toBeVisible();
+
+  // It is a row in the database, not component state: a fresh document reads
+  // the same answer back.
+  await page.reload();
+  await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
+});
+
+test("opening phase 4 names what is blocking drafting", async () => {
+  // The acceptance criterion: "Given a quarterly cycle whose input pack has two
+  // items missing, when the facilitator opens Phase 4, then drafting is blocked
+  // with the two missing items named and a link to gather them."
+  await page.goto("/cycle?phase=4");
+
+  await expect(page.getByText("This phase is blocked by earlier work")).toBeVisible();
+  await expect(
+    page.getByText(/Input pack item 4 is missing: Customer feedback/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Input pack item 7 is missing: Open risks/),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Go and gather what is missing" }).click();
+  await expect(page).toHaveURL("/cycle?phase=1");
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.

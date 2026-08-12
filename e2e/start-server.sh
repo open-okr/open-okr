@@ -18,6 +18,11 @@ fi
 
 node --experimental-strip-types --no-warnings e2e/prepare-database.ts
 
+# Windows writes the traced pnpm links as the wrong type, which stops the
+# standalone server before it binds. A no-op on Linux and macOS.
+node --experimental-strip-types --no-warnings e2e/repair-standalone-links.ts \
+  apps/web/.next/standalone/node_modules
+
 mkdir -p "$STANDALONE/.next"
 cp -r apps/web/.next/static "$STANDALONE/.next/"
 [ -d apps/web/public ] && cp -r apps/web/public "$STANDALONE/" || true

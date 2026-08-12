@@ -173,6 +173,25 @@ user-settable boolean.
 Working days for Phase 1 mean Monday to Friday in the workspace timezone. No
 holiday calendar. Recorded as a known simplification.
 
+**Each predicate also reports its conditions tally**, added in P3-T03 because
+UIUX-PLAN.md §4 S-04 asks the phase rail for a progress bar and a bar needs a
+denominator. `met` and `total` count only the conditions that could be evaluated,
+so a phase waiting on a table that does not exist yet reports 0 of 0 rather than
+a share of a denominator nobody can move. Every entry in `missing` is exactly one
+unmet condition, which is what makes `met` a subtraction rather than a second
+count that could drift from the first.
+
+| Phase | Total conditions |
+|---|---|
+| 0 | 3 with a frame (mission, strategy, the 2 to 5 count), 1 without. Plus 1 for the company objective once goals exist. 0 in a quarterly cycle |
+| 1 | 10 always: the two roles, the seven §2.6 items, the distribution and its lead time |
+| 2 | 3, or 2 when `first_cycle` is true and there is nothing to score |
+| 3 | Annual 4, quarterly 2 |
+| 4 | 1 once P4-T01 ships, 0 until then |
+| 5 | The gates that can be judged, plus publication. A gate nobody can evaluate is not in the denominator, so the bar cannot fill by having fewer things checkable |
+| 6 | 2 once P4-T04 ships, 0 until then |
+| 7 | 1 per shipped input, so 0 today |
+
 ### 3.5 The six publish gates
 
 METHOD.md §4.5, one `cycle_gate_state` row per gate, recomputed on every write
@@ -210,6 +229,40 @@ terminology labels.
 goal is 4 days past its due date, **then** it does not read `outdated`, and
 changing the override back to 3 makes it read `outdated` on the next render
 with no restart.
+
+### 3.7 The cycle workspace surface
+
+Added in P3-T03. UIUX-PLAN.md §4 S-04 in three regions, at `/cycle`.
+
+| Region | Holds | Source |
+|---|---|---|
+| Left rail | The eight phases, each with a mark, the §2.2 output it produces, and a bar on the one being viewed | `workflow.read`'s `phases`, and `PHASE_GUIDANCE` for the output |
+| Centre | The viewed phase's work, what is still needed, and what cannot be checked yet | `workflow.read` |
+| Right rail | The phase's key output, the §9 guidance, and the §2.1 mode note | `packages/method/src/guidance.ts` |
+
+Two phase numbers, kept apart. `cycles.phase` is where the facilitator says the
+work is, and it drives the strip and the default view. `?phase=` is what the
+reader is looking at. Reading one is never a claim about the other.
+
+**Facilitator guidance is data in `packages/method`, not text in a component.**
+METHOD.md is the only source of OKR practice, so a rail that wrote its own tips
+would be a second one. §9's guidance is stored split at its own sentence
+boundaries: joining a phase's sentences with ". " reproduces the document's cell,
+which is what the P4-T01 conformance suite compares.
+
+**The mockup's per-phase percentage is a count here.** `02-cycle-workspace` shows
+"57%" on the current phase. The rail shows "1 of 10" over the same bar, because a
+facilitator can act on a count and cannot act on a rounded share.
+
+**The strip appears only when all three hold**: a cycle exists, its status is
+`planning`, and a `publication_deadline` is set. §3 calls it a countdown, and a
+countdown with no target is decoration. Its blocking line is the first reason
+with a count of the rest; the panel on the page lists them all.
+
+**Given** a quarterly cycle in planning with a deadline nineteen days out and no
+sponsor named, **when** any authenticated page renders, **then** the strip reads
+the phase, the first blocking reason, and nineteen days to publish, and it
+disappears once the set is published.
 
 ## 4. Goals
 

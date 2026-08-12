@@ -16,6 +16,7 @@ import {
   type RhythmSettingsRow,
   rhythmSettings,
   type WorkspaceTx,
+  workspaces,
 } from "@openokr/db";
 import { and, desc, eq } from "drizzle-orm";
 import { OperationError } from "../operations/operation.ts";
@@ -38,6 +39,30 @@ type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
  * practises is the cadence its cycles have.
  */
 const FALLBACK_CADENCE: CycleCadence = "quarterly";
+
+/**
+ * The workspace timezone, which every cycle bound and every countdown is read
+ * in. UTC when unset, because a workspace that never chose one still has cycles.
+ *
+ * Shared rather than repeated: the cycle actions and the workflow actions both
+ * answer date questions, and two copies of "which timezone is this workspace in"
+ * is one copy too many.
+ */
+export async function workspaceTimeZone<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, workspaceId: string): Promise<string> {
+  const [row] = await tx
+    .select({ settings: workspaces.settings })
+    // openokr:allow-raw-read: reads one setting off the workspace row inside an
+    // Operation that has already authorised the acting member. The getter does
+    // not return settings, and every cycle date is meaningless without this one.
+    .from(workspaces)
+    .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+    .limit(1);
+  const settings = (row?.settings ?? {}) as Record<string, unknown>;
+  const timezone = settings.timezone;
+  return typeof timezone === "string" && timezone !== "" ? timezone : "UTC";
+}
 
 export async function resolveWorkspaceCadence<
   TSchema extends Record<string, unknown> = Record<string, never>,

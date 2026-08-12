@@ -32,8 +32,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { localDateIn, parseLocalDate } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   ensurePackItemsInTx,
   evaluateWorkflow,
@@ -61,6 +62,10 @@ const phaseResult = z.object({
   state: z.enum(["pass", "todo", "not_applicable"]),
   missing: z.array(z.string()),
   blocked: z.array(z.string()),
+  conditions: z.object({
+    met: z.number().int(),
+    total: z.number().int(),
+  }),
 });
 
 const gateResult = z.object({
@@ -126,6 +131,52 @@ async function actingMember(
   return member.id;
 }
 
+/** A named role, or null where nobody holds it yet. */
+async function memberSummary(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string | null,
+): Promise<{ id: string; name: string } | null> {
+  if (!memberId) {
+    return null;
+  }
+  const [row] = await tx
+    .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, memberId),
+      ),
+    )
+    .limit(1);
+  return row ? { id: row.id, name: row.name } : null;
+}
+
+/**
+ * Calendar days from today to a local deadline date, in the workspace timezone.
+ *
+ * The countdown is computed on the server for the same reason the cycle bounds
+ * are: the deadline is a date in the workspace's calendar, and a browser in
+ * another timezone would count from the wrong today.
+ */
+async function daysToDeadline(
+  tx: OperationTx,
+  workspaceId: string,
+  deadline: string | null,
+): Promise<number | null> {
+  if (!deadline) {
+    return null;
+  }
+  const timeZone = await workspaceTimeZone(tx, workspaceId);
+  const today = localDateIn(new Date(), timeZone);
+  const target = parseLocalDate(deadline);
+  const asUtc = (date: { year: number; month: number; day: number }): number =>
+    Date.UTC(date.year, date.month - 1, date.day);
+  return Math.round((asUtc(target) - asUtc(today)) / 86_400_000);
+}
+
 export const readWorkflow = defineReadAction({
   name: "workflow.read",
   summary:
@@ -140,8 +191,31 @@ export const readWorkflow = defineReadAction({
     startsOn: z.string(),
     endsOn: z.string(),
     publicationDeadline: z.string().nullable(),
+    /**
+     * Calendar days from today to the publication deadline, read in the
+     * workspace timezone. Negative once it has passed, null when none is set.
+     * Computed here rather than in a browser: a reader in another timezone is
+     * still planning this workspace's cycle.
+     */
+    daysToDeadline: z.number().int().nullable(),
     publishedAt: z.string().nullable(),
+    packDistributedAt: z.string().nullable(),
+    firstCycle: z.boolean(),
+    sponsor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    facilitator: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     publishable: z.boolean(),
+    /**
+     * The §11 parameters the phase panels state out loud, resolved for this
+     * workspace. A surface that read the canon defaults instead would tell a
+     * workspace that deviates the wrong number.
+     */
+    asks: z.object({
+      strategicIssues: z.number().int(),
+      priorities: z.object({
+        low: z.number().int(),
+        high: z.number().int(),
+      }),
+    }),
     phases: z.array(phaseResult),
     gates: z.array(gateResult),
     packItems: z.array(
@@ -258,10 +332,34 @@ export const readWorkflow = defineReadAction({
           startsOn: cycle.startsOn,
           endsOn: cycle.endsOn,
           publicationDeadline: cycle.publicationDeadline,
+          daysToDeadline: await daysToDeadline(
+            tx,
+            context.workspaceId,
+            cycle.publicationDeadline,
+          ),
           publishedAt: cycle.publishedAt
             ? new Date(cycle.publishedAt).toISOString()
             : null,
+          packDistributedAt: cycle.packDistributedAt
+            ? new Date(cycle.packDistributedAt).toISOString()
+            : null,
+          firstCycle: cycle.firstCycle,
+          sponsor: await memberSummary(
+            tx,
+            context.workspaceId,
+            cycle.sponsorId,
+          ),
+          facilitator: await memberSummary(
+            tx,
+            context.workspaceId,
+            cycle.facilitatorId,
+          ),
           publishable: snapshot.publishable,
+          asks: {
+            strategicIssues:
+              rhythm.thresholds["quality.strategicIssueBounds"].low,
+            priorities: rhythm.thresholds["quality.priorityBounds"],
+          },
           phases: snapshot.phases.map((result) => ({
             ...result,
             missing: [...result.missing],

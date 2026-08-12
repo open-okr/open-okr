@@ -534,6 +534,119 @@ describe("the workflow actions", () => {
   });
 });
 
+describe("the publication countdown", () => {
+  /** Today in a timezone, worked out here rather than borrowed from the code. */
+  function localToday(timeZone: string): string {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    return parts;
+  }
+
+  async function setTimeZone(timeZone: string): Promise<void> {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update workspaces set settings = jsonb_set(settings, '{timezone}', to_jsonb($2::text)) where id = $1`,
+      [workspaceId, timeZone],
+    );
+  }
+
+  async function setDeadline(date: string): Promise<void> {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update cycles set publication_deadline = $2 where id = $1",
+      [cycleId, date],
+    );
+  }
+
+  it("is null while no deadline is set", async () => {
+    const wb = await workerDb();
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(read.publicationDeadline).toBeNull();
+    expect(read.daysToDeadline).toBeNull();
+  });
+
+  // Two timezones fourteen hours apart. Each is checked against its own
+  // independently computed "today", so when the two disagree about what day it
+  // is the two counts differ and both are still right. That disagreement is the
+  // whole point: a countdown read from the reader's clock would be wrong for
+  // every workspace but one.
+  for (const timeZone of ["Pacific/Kiritimati", "Pacific/Midway"]) {
+    it(`counts from today in ${timeZone}`, async () => {
+      const wb = await workerDb();
+      await setTimeZone(timeZone);
+
+      const today = localToday(timeZone);
+      await setDeadline(today);
+      const onTheDay = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.read",
+        { cycleId },
+      );
+      expect(onTheDay.daysToDeadline).toBe(0);
+
+      const ahead = new Date(`${today}T00:00:00Z`);
+      ahead.setUTCDate(ahead.getUTCDate() + 19);
+      await setDeadline(ahead.toISOString().slice(0, 10));
+      const nineteenDays = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.read",
+        { cycleId },
+      );
+      expect(nineteenDays.daysToDeadline).toBe(19);
+
+      const behind = new Date(`${today}T00:00:00Z`);
+      behind.setUTCDate(behind.getUTCDate() - 3);
+      await setDeadline(behind.toISOString().slice(0, 10));
+      const overdue = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.read",
+        { cycleId },
+      );
+      expect(overdue.daysToDeadline).toBe(-3);
+    });
+  }
+});
+
+describe("the roles the workspace can see", () => {
+  it("names the sponsor and the facilitator, and says so when nobody holds them", async () => {
+    const wb = await workerDb();
+    const empty = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(empty.sponsor).toBeNull();
+    expect(empty.facilitator).toBeNull();
+
+    const [member] = (
+      await wb.admin.query<{ id: string; name: string }>(
+        "select id, name from workspace_members where workspace_id = $1 limit 1",
+        [workspaceId],
+      )
+    ).rows;
+    await wb.admin.query(
+      "update cycles set sponsor_id = $2, facilitator_id = $2 where id = $1",
+      [cycleId, member?.id],
+    );
+
+    const named = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(named.sponsor?.name).toBe(member?.name);
+    expect(named.facilitator?.id).toBe(member?.id);
+  });
+});
+
 describe("the pack items table itself", () => {
   it("refuses a second row for the same item", async () => {
     await inOperation((tx) => ensurePackItemsInTx(tx, workspaceId, cycleId));

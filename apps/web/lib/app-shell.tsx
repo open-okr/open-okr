@@ -2,6 +2,7 @@ import { loadEnv } from "@openokr/config";
 import { navigationFor } from "@openokr/core";
 import {
   AppShell,
+  CycleStrip,
   KeyboardRegistryProvider,
   MobileTabBar,
   ShortcutOverlay,
@@ -10,13 +11,15 @@ import {
   Topbar,
   TopbarSearch,
 } from "@openokr/ui";
-import { Home, Inbox, Settings, Shield } from "lucide-react";
+import { Home, Inbox, RefreshCw, Settings, Shield } from "lucide-react";
+import { headers } from "next/headers";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
+import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { requireWorkspace } from "./workspace.ts";
 
@@ -39,11 +42,37 @@ import { requireWorkspace } from "./workspace.ts";
 
 const ICONS: Readonly<Record<string, ReactNode>> = {
   overview: <Home className="size-full" />,
+  cycle: <RefreshCw className="size-full" />,
   "account-security": <Shield className="size-full" />,
 };
 
 function iconFor(id: string): ReactNode {
   return ICONS[id] ?? <Inbox className="size-full" />;
+}
+
+/**
+ * Which navigation item the reader is on.
+ *
+ * The longest registered href that prefixes the current path wins, so
+ * `/spaces/abc` marks Spaces rather than nothing, and `/` only ever matches
+ * itself. The path arrives as a request header from `proxy.ts`, because a server
+ * component cannot ask the router where it is.
+ */
+function activeItemId(
+  path: string,
+  items: readonly { id: string; href: string }[],
+): string | null {
+  let best: { id: string; href: string } | null = null;
+  for (const item of items) {
+    const matches =
+      item.href === "/"
+        ? path === "/"
+        : path === item.href || path.startsWith(`${item.href}/`);
+    if (matches && (!best || item.href.length > best.href.length)) {
+      best = item;
+    }
+  }
+  return best?.id ?? null;
 }
 
 function LinkComponent({
@@ -63,13 +92,24 @@ export async function AppShellLayout({
 }: {
   readonly children: ReactNode;
 }) {
-  const { workspace, memberships } = await requireWorkspace();
+  const { session, workspace, memberships } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
     workspace.memberId,
   );
   const sidebarItems = navigationFor("sidebar", level);
   const adminItems = navigationFor("admin", level);
+  const strip = await loadCycleStrip(
+    workspace.workspaceId,
+    session.user.id,
+    level,
+  );
+
+  const path = (await headers()).get("x-openokr-path") ?? "/";
+  const active = activeItemId(path, [
+    ...sidebarItems,
+    { id: "admin", href: "/admin" },
+  ]);
 
   const groups: SidebarGroup[] = [
     {
@@ -79,7 +119,7 @@ export async function AppShellLayout({
         label: item.label,
         href: item.href,
         icon: iconFor(item.id),
-        active: item.href === "/",
+        active: item.id === active,
       })),
     },
   ];
@@ -92,6 +132,7 @@ export async function AppShellLayout({
           label: "Admin",
           href: "/admin",
           icon: <Settings className="size-full" />,
+          active: active === "admin",
         },
       ],
     });
@@ -122,6 +163,15 @@ export async function AppShellLayout({
             }
           />
         }
+        cycleStrip={
+          strip ? (
+            <CycleStrip
+              phase={strip.phaseLabel}
+              blocking={strip.blocking}
+              dueInDays={strip.dueInDays}
+            />
+          ) : undefined
+        }
         mobileTabBar={
           <MobileTabBar
             linkComponent={LinkComponent}
@@ -130,7 +180,7 @@ export async function AppShellLayout({
               label: item.label,
               href: item.href,
               icon: iconFor(item.id),
-              active: item.href === "/",
+              active: item.id === active,
             }))}
           />
         }

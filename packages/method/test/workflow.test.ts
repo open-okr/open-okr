@@ -626,3 +626,56 @@ describe("opening a phase", () => {
     expect(outcome.allowed).toBe(true);
   });
 });
+
+describe("the conditions tally the rail draws its bar from", () => {
+  it("counts ten conditions in phase 1: two roles, seven items, one distribution", () => {
+    expect(phase(base(), 1)?.conditions).toEqual({ met: 10, total: 10 });
+  });
+
+  it("moves with the work, one condition at a time", () => {
+    const bare = base({
+      sponsorId: null,
+      facilitatorId: null,
+      packItems: fullPack.map((item) => ({ ...item, gathered: false })),
+      packDistributedAt: null,
+    });
+    expect(phase(bare, 1)?.conditions).toEqual({ met: 0, total: 10 });
+
+    const halfway = base({
+      facilitatorId: null,
+      packItems: fullPack.map((item) =>
+        item.itemKey > 4 ? { ...item, gathered: false } : item,
+      ),
+      packDistributedAt: null,
+    });
+    // Sponsor and four items: five of ten.
+    expect(phase(halfway, 1)?.conditions).toEqual({ met: 5, total: 10 });
+  });
+
+  it("reports nothing to count for a phase that does not apply", () => {
+    // Phase 0 in a quarterly cycle. A bar over zero conditions is not 100%
+    // complete, it is not a bar, and the rail has to be able to tell.
+    expect(phase(base(), 0)?.conditions).toEqual({ met: 0, total: 0 });
+  });
+
+  it("leaves an unshipped input out of the denominator", () => {
+    // Phase 4 waits on P4-T01. Counting it as one unmet condition out of one
+    // would report the cycle as behind on work nobody can do yet.
+    expect(phase(base(), 4)?.conditions).toEqual({ met: 0, total: 0 });
+  });
+
+  it("counts only the gates that can be judged, plus publication", () => {
+    // No goals table, so gates 1 to 5 are unevaluable and only gate 6 counts.
+    const result = phase(base(), 5);
+    expect(result?.conditions.total).toBe(2);
+    expect(result?.conditions.met).toBe(1);
+  });
+
+  it("drops prior scoring from phase 2 when this is a first cycle", () => {
+    expect(phase(base({ firstCycle: true }), 2)?.conditions.total).toBe(2);
+    expect(
+      phase(base({ firstCycle: false, priorScores: [{ score: 0.7 }] }), 2)
+        ?.conditions.total,
+    ).toBe(3);
+  });
+});

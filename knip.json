@@ -6,6 +6,7 @@
         "scripts/*.ts",
         "e2e/*.spec.ts",
         "e2e/prepare-database.ts",
+        "e2e/repair-standalone-links.ts",
         "deploy/docker/migrate.ts"
       ]
     },

@@ -38,6 +38,16 @@ export interface PhaseResult {
    * wrong with the cycle.
    */
   readonly blocked: readonly string[];
+  /**
+   * How many of this phase's conditions hold, out of the ones that could be
+   * evaluated at all. This is what the S-04 rail's progress bar shows.
+   *
+   * `total` counts evaluated conditions only, so a phase waiting on a table
+   * that does not exist reports 0 of 0 rather than a share of a denominator
+   * nobody can move. Every entry in `missing` is exactly one unmet condition,
+   * which is what makes `met` the subtraction it looks like.
+   */
+  readonly conditions: { readonly met: number; readonly total: number };
 }
 
 export interface GateResult {
@@ -208,20 +218,44 @@ export function workingDaysBetween(from: string, to: string): number {
 /** A local `YYYY-MM-DD` from an instant, in UTC. Only used for the pack lead. */
 const utcDateOf = (value: Date): string => value.toISOString().slice(0, 10);
 
+/**
+ * The conditions tally for a phase.
+ *
+ * Each predicate counts the conditions it actually evaluated, and every entry it
+ * pushed into `missing` is one of them failing, so `met` is a subtraction rather
+ * than a second count that could drift from the first.
+ */
+const conditionsOf = (
+  total: number,
+  missing: readonly string[],
+): { met: number; total: number } => ({
+  met: Math.max(0, total - missing.length),
+  total,
+});
+
 function phaseZero(input: CycleWorkflowInput): PhaseResult {
   const base = { phase: 0, title: PHASE_TITLES[0] } as const;
   if (input.mode !== "annual") {
     // §2.2: "Phase 0 runs only in an annual cycle."
-    return { ...base, state: "not_applicable", missing: [], blocked: [] };
+    return {
+      ...base,
+      state: "not_applicable",
+      missing: [],
+      blocked: [],
+      conditions: { met: 0, total: 0 },
+    };
   }
 
   const missing: string[] = [];
   const blocked: string[] = [];
   const frame = input.frame;
+  let total = 0;
 
   if (!frame) {
+    total += 1;
     missing.push("No annual frame exists yet");
   } else {
+    total += 3;
     if (!frame.hasMission) {
       missing.push("The mission is not written");
     }
@@ -238,6 +272,7 @@ function phaseZero(input: CycleWorkflowInput): PhaseResult {
   if (input.goals === undefined) {
     blocked.push("Company objectives arrive at P3-T04");
   } else {
+    total += 1;
     const anchored = input.goals.filter(
       (goal) => goal.level === "company" && goal.keyResults.length > 0,
     );
@@ -248,7 +283,13 @@ function phaseZero(input: CycleWorkflowInput): PhaseResult {
 
   const state =
     blocked.length > 0 ? "todo" : missing.length === 0 ? "pass" : "todo";
-  return { ...base, state, missing, blocked };
+  return {
+    ...base,
+    state,
+    missing,
+    blocked,
+    conditions: conditionsOf(total, missing),
+  };
 }
 
 function phaseOne(
@@ -302,6 +343,8 @@ function phaseOne(
     state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
+    // Two roles, the seven §2.6 items, and the distribution with its lead time.
+    conditions: conditionsOf(2 + INPUT_PACK_ITEMS.length + 1, missing),
   };
 }
 
@@ -344,6 +387,9 @@ function phaseTwo(
     state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
+    // Baseline health and the ranked issues, plus prior scoring unless this is
+    // declared a first cycle, where there is nothing to score.
+    conditions: conditionsOf(input.firstCycle ? 2 : 3, missing),
   };
 }
 
@@ -383,6 +429,9 @@ function phaseThree(
       state: missing.length === 0 ? "pass" : "todo",
       missing,
       blocked: [],
+      // The priority count, their success statements, the not-doing list and
+      // the recorded agreement.
+      conditions: conditionsOf(4, missing),
     };
   }
 
@@ -418,6 +467,8 @@ function phaseThree(
     state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
+    // The revalidation record, and the focus areas chosen for the quarter.
+    conditions: conditionsOf(2, missing),
   };
 }
 
@@ -429,15 +480,18 @@ function phaseFour(input: CycleWorkflowInput): PhaseResult {
       state: "todo",
       missing: [],
       blocked: ["The §4 quality checks arrive at P4-T01"],
+      conditions: { met: 0, total: 0 },
     };
   }
+  const missing = input.qualityChecksPass
+    ? []
+    : ["Some objectives or key results do not pass the §4 quality checks"];
   return {
     ...base,
     state: input.qualityChecksPass ? "pass" : "todo",
-    missing: input.qualityChecksPass
-      ? []
-      : ["Some objectives or key results do not pass the §4 quality checks"],
+    missing,
     blocked: [],
+    conditions: conditionsOf(1, missing),
   };
 }
 
@@ -470,6 +524,13 @@ function phaseFive(
     state: missing.length === 0 && blocked.length === 0 ? "pass" : "todo",
     missing,
     blocked,
+    // Every gate that could be judged, plus publication itself. A gate nobody
+    // can evaluate is not in the denominator, so the bar cannot fill by having
+    // fewer things checkable.
+    conditions: conditionsOf(
+      gates.filter((gate) => gate.evaluable).length + 1,
+      missing,
+    ),
   };
 }
 
@@ -481,6 +542,7 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
       state: "todo",
       missing: [],
       blocked: ["Sessions and the decision log arrive at P4-T04"],
+      conditions: { met: 0, total: 0 },
     };
   }
   const missing: string[] = [];
@@ -495,6 +557,7 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
     state: missing.length === 0 ? "pass" : "todo",
     missing,
     blocked: [],
+    conditions: conditionsOf(2, missing),
   };
 }
 
@@ -503,16 +566,24 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   const missing: string[] = [];
   const blocked: string[] = [];
 
+  let total = 0;
+
   if (input.allKeyResultsScored === undefined) {
     blocked.push("Key result scores arrive at P3-T04");
-  } else if (!input.allKeyResultsScored) {
-    missing.push("Not every key result is scored");
+  } else {
+    total += 1;
+    if (!input.allKeyResultsScored) {
+      missing.push("Not every key result is scored");
+    }
   }
 
   if (input.retrospectiveWritten === undefined) {
     blocked.push("The cycle retrospective arrives at P4-T08");
-  } else if (!input.retrospectiveWritten) {
-    missing.push("The retrospective is not written");
+  } else {
+    total += 1;
+    if (!input.retrospectiveWritten) {
+      missing.push("The retrospective is not written");
+    }
   }
 
   return {
@@ -520,6 +591,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
     state: missing.length === 0 && blocked.length === 0 ? "pass" : "todo",
     missing,
     blocked,
+    conditions: conditionsOf(total, missing),
   };
 }
 

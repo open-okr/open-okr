@@ -108,6 +108,11 @@ function next(request: NextRequest): NextResponse {
   const { nonce, header } = buildContentSecurityPolicy();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  // The path, forwarded the same way, so the shell can mark the navigation item
+  // the reader is actually on. A server component has no `usePathname`, and
+  // making the whole sidebar a client component to learn one string would send
+  // the navigation to the browser for no other reason.
+  requestHeaders.set("x-openokr-path", request.nextUrl.pathname);
   requestHeaders.set("Content-Security-Policy", header);
 
   return applySecurityHeaders(

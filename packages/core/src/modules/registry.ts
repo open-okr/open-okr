@@ -50,6 +50,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "cycle",
+    navigation: [
+      {
+        id: "cycle",
+        label: "Cycle",
+        href: "/cycle",
+        section: "sidebar",
+        // Every member can watch the cycle being planned. The writes on the
+        // screen each ask for edit access of their own, so a reader sees the
+        // workflow without being handed a control they cannot use (P3-T03).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "spaces",
     navigation: [
       {
