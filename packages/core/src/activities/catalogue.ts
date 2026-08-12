@@ -116,6 +116,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "space.joined": z.object({}),
   "space.left": z.object({}),
+  // Cycles and the rhythm (P3-T02).
+  "cycle.created": z.object({ name: z.string() }),
+  "cycle.resolved": z.object({ name: z.string() }),
+  "cycle.updated": z.object({ name: z.string() }),
+  "cycle.archived": z.object({ name: z.string() }),
+  "rhythm.updated": z.object({ keys: z.array(z.string()) }),
+  "frame.set": z.object({ yearLabel: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

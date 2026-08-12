@@ -13,6 +13,7 @@ import { runDataChanges } from "../data-change.ts";
 import { backfillMemberTimezone } from "../data-changes/0001_backfill_member_timezone.ts";
 import { backfillWorkspaceStandardBinding } from "../data-changes/0002_backfill_workspace_standard_binding.ts";
 import { backfillDefaultSpace } from "../data-changes/0003_backfill_default_space.ts";
+import { backfillRhythmAndCycle } from "../data-changes/0004_backfill_rhythm_and_cycle.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -25,6 +26,7 @@ try {
       backfillMemberTimezone,
       backfillWorkspaceStandardBinding,
       backfillDefaultSpace,
+      backfillRhythmAndCycle,
     ],
   });
   process.stdout.write(

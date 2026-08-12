@@ -42,6 +42,10 @@ import {
   ensureWorkspaceStandardGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import {
+  ensureCurrentCycleInTx,
+  ensureRhythmSettingsInTx,
+} from "../cycles/service.ts";
 import { runOperation } from "../operations/operation.ts";
 import {
   type ProvisioningContext,
@@ -363,6 +367,17 @@ async function insertWorkspaceAndMember(
           workspaceId,
           name,
           managerMemberId: memberId,
+        });
+
+        // The rhythm and the first cycle (P3-T02). §4.14's hard rule is that a
+        // fresh workspace practises the full method with nothing configured, and
+        // a planning tool with no time box to plan in does not. Every column on
+        // `rhythm_settings` defaults to the §11 canon, so the row is the canon.
+        await ensureRhythmSettingsInTx(savepoint, workspaceId);
+        await ensureCurrentCycleInTx(savepoint, {
+          workspaceId,
+          timeZone: settings.timezone as string,
+          now: new Date(),
         });
 
         return { workspaceId, memberId, name, slug };

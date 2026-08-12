@@ -109,6 +109,17 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A member's role changed from ${asString(p.from, "member")} to ${asString(p.to, "member")}`,
   "space.joined": () => "Someone joined this space",
   "space.left": () => "Someone left this space",
+  "cycle.created": (p) =>
+    `Cycle "${asString(p.name, "a new cycle")}" was created`,
+  "cycle.resolved": (p) =>
+    `Cycle "${asString(p.name, "the current cycle")}" was opened`,
+  "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
+  "cycle.archived": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was archived`,
+  "rhythm.updated": (p) =>
+    `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "frame.set": (p) =>
+    `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

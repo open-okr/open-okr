@@ -56,6 +56,18 @@ import {
   setBudget,
 } from "./ai-usage.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
+import {
+  archiveCycle,
+  createCycle,
+  ensureCurrentCycle,
+  listCycles,
+  readAnnualFrame,
+  readCurrentCycle,
+  readRhythmSettings,
+  setAnnualFrame,
+  updateCycle,
+  updateRhythmSettings,
+} from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
   acceptLink,
@@ -189,6 +201,16 @@ export const ACTION_MAP = {
   "spaces.removeMember": removeSpaceMember,
   "spaces.join": joinSpace,
   "spaces.leave": leaveSpace,
+  "cycles.list": listCycles,
+  "cycles.current": readCurrentCycle,
+  "cycles.ensureCurrent": ensureCurrentCycle,
+  "cycles.create": createCycle,
+  "cycles.update": updateCycle,
+  "cycles.archive": archiveCycle,
+  "rhythm.read": readRhythmSettings,
+  "rhythm.update": updateRhythmSettings,
+  "frame.read": readAnnualFrame,
+  "frame.set": setAnnualFrame,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

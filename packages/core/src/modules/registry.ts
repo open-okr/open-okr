@@ -92,6 +92,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         section: "admin",
         minLevel: ACCESS_LEVELS.full,
       },
+      {
+        id: "admin-rhythm",
+        label: "Rhythm and thresholds",
+        href: "/admin/rhythm",
+        section: "admin",
+        // §4.14 governs this card with the `manage_coaching` permission. Until
+        // named permissions land, workspace admin is the closest honest level.
+        minLevel: ACCESS_LEVELS.full,
+      },
     ],
   },
 ];
