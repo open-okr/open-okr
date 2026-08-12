@@ -32,7 +32,7 @@
     "@biomejs/biome": "2.5.7",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
-    "@playwright/test": "1.57.0",
+    "@playwright/test": "1.62.1",
     "@types/pg": "catalog:",
     "knip": "6.32.0",
     "pg": "catalog:",
