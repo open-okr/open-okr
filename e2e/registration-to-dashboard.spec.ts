@@ -185,6 +185,91 @@ test("opening phase 4 names what is blocking drafting", async () => {
   await expect(page).toHaveURL("/cycle?phase=1");
 });
 
+/**
+ * Goals and key results (P3-T04).
+ *
+ * The task's acceptance criterion end to end: a goal with a champion, a reviewer
+ * and key results persists at zero percent and pending, and closing it requires
+ * and produces a retrospective. The refusal is checked on the server rather than
+ * through the browser's own `required` attribute, which would never let the
+ * request leave.
+ */
+test("drafting a goal with key results persists at zero percent and pending", async () => {
+  await page.goto("/cycle?phase=4");
+
+  await page
+    .getByRole("textbox", { name: "The objective" })
+    .fill("Make mobile the way our customers prefer to reach us");
+  await page
+    .getByRole("textbox", { name: "What it contributes to" })
+    .fill("Carries the annual mobile thrust");
+  await page.getByRole("button", { name: "Add objective" }).click();
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Make mobile the way our customers prefer to reach us",
+    }),
+  ).toBeVisible();
+
+  for (const [title, baseline, target] of [
+    ["Raise mobile activation from 41% to 60%", "41", "60"],
+    ["Cut median first response from 6h to 2h", "6", "2"],
+  ] as const) {
+    await page.getByRole("textbox", { name: "The key result" }).fill(title);
+    await page.getByRole("spinbutton", { name: "Baseline" }).fill(baseline);
+    await page.getByRole("spinbutton", { name: "Target" }).fill(target);
+    await page.getByRole("button", { name: "Add key result" }).click();
+    // Exact, because the row's own title is also inside the label of the field
+    // that records a new value for it.
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+  }
+
+  // The current value starts at the baseline, so progress is 0 rather than
+  // undefined, and health is pending because no check-in has been published.
+  // The progress bar carries the number as an accessible value, which is a
+  // single element where the rendered "0%" is not.
+  await expect(page.getByText("pending")).toBeVisible();
+  await expect(page.getByRole("progressbar").first()).toHaveAttribute(
+    "aria-valuenow",
+    "0",
+  );
+});
+
+test("closing a goal requires a retrospective and keeps it on reopen", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+
+  // The server refuses an empty retrospective. The textarea's own `required`
+  // would stop the request, so the field is filled with whitespace, which passes
+  // the browser and fails the rule.
+  await page.getByRole("textbox", { name: "The retrospective" }).fill("   ");
+  await page.getByRole("button", { name: "Close this goal" }).click();
+  // Filtered rather than the bare role: Next's own route announcer is also an
+  // alert, so the page has two and only one of them is ours.
+  await expect(
+    page.getByRole("alert").filter({ hasText: "retrospective" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("textbox", { name: "The retrospective" })
+    .fill("Activation moved. Onboarding did the work, not the campaign.");
+  await page.getByRole("button", { name: "Close this goal" }).click();
+
+  await expect(page.getByText("closed · achieved")).toBeVisible();
+  await expect(
+    page.getByText("Activation moved. Onboarding did the work"),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Reopen this goal" }).click();
+  // Exact: the page also explains that every goal reads pending until P3-T05.
+  await expect(page.getByText("pending", { exact: true })).toBeVisible();
+  // The account of what happened survives the reopen.
+  await expect(
+    page.getByText("Activation moved. Onboarding did the work"),
+  ).toBeVisible();
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.

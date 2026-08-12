@@ -272,6 +272,10 @@ export {
   extractAttachments,
   extractMentionIds,
 } from "./rich-text/extract.ts";
+export {
+  isBlankText,
+  richTextFromPlainText,
+} from "./rich-text/from-text.ts";
 export type { RichTextResolvers } from "./rich-text/render.ts";
 export { renderRichTextToHtml } from "./rich-text/render.ts";
 export {

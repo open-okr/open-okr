@@ -68,8 +68,15 @@ export interface KeyResultSnapshot {
   readonly id: string;
   readonly title: string;
   readonly capacity: "fits" | "tight" | "exceeds" | null;
-  /** The §5.4 dependency register entries hanging off this key result. */
-  readonly dependencies: readonly {
+  /**
+   * The §5.4 dependency register entries hanging off this key result.
+   *
+   * Undefined means the register does not exist yet (P3-T09), which is a
+   * different fact from an empty one: an empty list says somebody looked and
+   * found none, and gate 4 may pass on it. Undefined says nobody can look, and
+   * gate 4 reports itself unevaluable instead.
+   */
+  readonly dependencies?: readonly {
     readonly confirmed: boolean;
     readonly riskOwnerId: string | null;
   }[];
@@ -679,10 +686,18 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
   // 4. Every dependency is confirmed, or logged with a named risk owner.
   if (goals === undefined) {
     results.push(unevaluable(4, goalsBlocked));
+  } else if (
+    goals.some((goal) =>
+      goal.keyResults.some((keyResult) => keyResult.dependencies === undefined),
+    )
+  ) {
+    results.push(
+      unevaluable(4, "the §5.4 dependency register arrives at P3-T09"),
+    );
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults.flatMap((keyResult) =>
-        keyResult.dependencies
+        (keyResult.dependencies ?? [])
           .filter(
             (dependency) => !dependency.confirmed && !dependency.riskOwnerId,
           )

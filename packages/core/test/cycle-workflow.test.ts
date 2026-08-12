@@ -140,9 +140,10 @@ describe("the snapshot handed to the rules", () => {
     expect(input.facilitatorId).toBeNull();
     expect(input.hasBaselineHealth).toBe(false);
     expect(input.issues).toEqual([]);
-    // Goals do not exist in this build, and the snapshot must say so rather
-    // than claim an empty set.
-    expect(input.goals).toBeUndefined();
+    // Goals exist since P3-T04, so an empty set is now a real answer rather
+    // than an absent table. A cycle nobody has drafted in has no goals, and the
+    // gates that read them can say so.
+    expect(input.goals).toEqual([]);
   });
 
   it("counts issues and reads their impact", async () => {
@@ -198,7 +199,7 @@ describe("the snapshot handed to the rules", () => {
 });
 
 describe("the gate rows", () => {
-  it("are six, and record that four cannot be evaluated yet", async () => {
+  it("are six, and record which cannot be evaluated yet", async () => {
     const { gates } = await snapshot();
     await inOperation((tx) =>
       recomputeGateState(tx, workspaceId, cycleId, gates),
@@ -216,12 +217,19 @@ describe("the gate rows", () => {
     );
 
     expect(rows.rows).toHaveLength(6);
-    // Gates 1, 3, 4 and 5 all read goals, which arrive at P3-T04.
-    for (const gateKey of [1, 3, 4, 5]) {
+    // Since P3-T04 the goals table exists, so gates 1, 3 and 5 evaluate against
+    // an empty set rather than refusing to answer.
+    for (const gateKey of [1, 3, 5]) {
       const row = rows.rows.find((entry) => entry.gate_key === gateKey);
-      expect(row?.evaluable, `gate ${gateKey}`).toBe(false);
-      expect(row?.detail.blocked).toMatch(/P3-T04/);
+      expect(row?.evaluable, `gate ${gateKey}`).toBe(true);
     }
+    // Gate 4 answers on an empty set, because a cycle with no key results has
+    // no dependencies to confirm. It stops being answerable the moment a key
+    // result exists, since the §5.4 register that would hold its dependencies is
+    // P3-T09. "Nothing to check" and "cannot check" are different, and this is
+    // the first case.
+    const four = rows.rows.find((entry) => entry.gate_key === 4);
+    expect(four?.evaluable).toBe(true);
     // Gate 2 waits for the quality engine, gate 6 answers today.
     expect(rows.rows.find((entry) => entry.gate_key === 2)?.evaluable).toBe(
       false,
@@ -447,7 +455,7 @@ describe("the workflow actions", () => {
     await callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
       cycleId,
     }).catch((error: unknown) => {
-      expect(String(error)).toMatch(/P3-T04/);
+      expect(String(error)).toMatch(/P4-T01/);
     });
   });
 

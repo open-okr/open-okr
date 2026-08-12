@@ -679,3 +679,48 @@ describe("the conditions tally the rail draws its bar from", () => {
     ).toBe(3);
   });
 });
+
+describe("gate 4 and the dependency register", () => {
+  it("cannot be judged while a key result's dependencies are unknown", () => {
+    // Goals exist (P3-T04) but the §5.4 register does not (P3-T09). An empty
+    // list would claim somebody looked; undefined says nobody can.
+    const withGoals = base({
+      goals: [
+        goal({
+          keyResults: [
+            {
+              id: "k1",
+              title: "Raise activation from 41% to 60%",
+              capacity: "fits",
+            },
+          ],
+        }),
+      ],
+    });
+    const gate = publishGates(withGoals)[3];
+    expect(gate?.gateKey).toBe(4);
+    expect(gate?.evaluable).toBe(false);
+    expect(gate?.passed).toBe(false);
+    expect(gate?.detail.blocked).toMatch(/P3-T09/);
+  });
+
+  it("passes once the register exists and holds nothing unconfirmed", () => {
+    const withRegister = base({
+      goals: [
+        goal({
+          keyResults: [
+            {
+              id: "k1",
+              title: "Raise activation from 41% to 60%",
+              capacity: "fits",
+              dependencies: [],
+            },
+          ],
+        }),
+      ],
+    });
+    const gate = publishGates(withRegister)[3];
+    expect(gate?.evaluable).toBe(true);
+    expect(gate?.passed).toBe(true);
+  });
+});

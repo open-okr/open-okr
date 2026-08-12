@@ -7,6 +7,7 @@ import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
+import { Drafting } from "./drafting.tsx";
 import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
@@ -88,6 +89,23 @@ export default async function CyclePage({
 
   const phase = workflow.phases[viewing];
   const work = phaseWorkAllowed(viewing, workflow.phases);
+
+  // Only phase 4 needs the set and the member list, and only phase 4 pays for
+  // reading them.
+  const draft =
+    viewing === 4
+      ? {
+          goals: (
+            await callAction(context, "goals.list", {
+              cycleId: workflow.cycleId,
+              includeClosed: false,
+            })
+          ).goals,
+          members: (await callAction(context, "people.directory", {})).map(
+            (member) => ({ id: member.id, name: member.name }),
+          ),
+        }
+      : { goals: [], members: [] };
 
   return (
     <AppShellLayout>
@@ -193,17 +211,24 @@ export default async function CyclePage({
             />
           ) : null}
 
-          {viewing === 0 || viewing === 4 || viewing === 6 || viewing === 7 ? (
+          {viewing === 4 ? (
+            <Drafting
+              cycleId={workflow.cycleId}
+              goals={draft.goals}
+              members={draft.members}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {viewing === 0 || viewing === 6 || viewing === 7 ? (
             <Card>
               <CardBody>
                 <p className="text-sm text-ink-3">
                   {viewing === 0
                     ? "The annual strategy surface arrives with the frame editor at P4-T02."
-                    : viewing === 4
-                      ? "Drafting arrives with objectives and key results at P3-T04, and the quality coaching at P4-T02."
-                      : viewing === 6
-                        ? "The running cadence arrives with check-ins at P3-T07 and sessions at P4-T04."
-                        : "Closing a cycle arrives with scoring at P3-T05 and the review at P4-T08."}
+                    : viewing === 6
+                      ? "The running cadence arrives with check-ins at P3-T07 and sessions at P4-T04."
+                      : "Closing a cycle arrives with scoring at P3-T05 and the review at P4-T08."}
                 </p>
               </CardBody>
             </Card>

@@ -83,6 +83,21 @@ import {
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import {
+  closeGoal,
+  createGoal,
+  createKeyResult,
+  listGoals,
+  moveGoalToCycle,
+  readGoal,
+  readKeyResultHistory,
+  reassignGoalRole,
+  recordKeyResultValue,
+  reopenGoal,
+  unlinkKeyResultKpi,
+  updateGoal,
+  updateKeyResult,
+} from "./goals.ts";
+import {
   acceptLink,
   createPersonalLink,
   createWorkspaceLink,
@@ -235,6 +250,19 @@ export const ACTION_MAP = {
   "workflow.setCapacityNotes": setCapacityNotes,
   "workflow.calibrate": calibrateCycle,
   "workflow.publish": publishCycle,
+  "goals.list": listGoals,
+  "goals.read": readGoal,
+  "goals.create": createGoal,
+  "goals.update": updateGoal,
+  "goals.close": closeGoal,
+  "goals.reopen": reopenGoal,
+  "goals.reassignRole": reassignGoalRole,
+  "goals.moveToCycle": moveGoalToCycle,
+  "goals.addKeyResult": createKeyResult,
+  "goals.updateKeyResult": updateKeyResult,
+  "goals.recordValue": recordKeyResultValue,
+  "goals.unlinkKpi": unlinkKeyResultKpi,
+  "goals.keyResultHistory": readKeyResultHistory,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

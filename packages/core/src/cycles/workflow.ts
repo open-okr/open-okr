@@ -27,6 +27,8 @@ import {
   cyclePriorScores,
   cycleRevalidations,
   cycles,
+  goals,
+  keyResults,
   newId,
   type WorkspaceTx,
 } from "@openokr/db";
@@ -34,13 +36,14 @@ import {
   type CycleWorkflowInput,
   canPublish,
   type GateResult,
+  type GoalSnapshot,
   INPUT_PACK_ITEMS,
   type PhaseResult,
   phaseCompletion,
   publishGates,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -55,11 +58,11 @@ export interface WorkflowSnapshot {
 /**
  * Everything the workflow reads, in one pass over the cycle's children.
  *
- * Goals, the quality engine, sessions and the cycle retrospective are left
- * `undefined` rather than defaulted, because `packages/method` treats "no rows"
- * and "no such table yet" as different facts and only one of them lets a gate
- * pass. Each becomes a real field as its task lands: P3-T04, P4-T01, P4-T04 and
- * P4-T08.
+ * The quality engine, sessions and the cycle retrospective are left `undefined`
+ * rather than defaulted, because `packages/method` treats "no rows" and "no such
+ * table yet" as different facts and only one of them lets a gate pass. Each
+ * becomes a real field as its task lands: P4-T01, P4-T04 and P4-T08. Goals
+ * stopped being one of them at P3-T04.
  */
 export async function loadWorkflowInput<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -222,7 +225,86 @@ export async function loadWorkflowInput<
     focusKeyResultCount: focusRows.length,
     hasCapacityNotes: Boolean(capacity?.cuts),
     frame,
+    goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
   };
+}
+
+/**
+ * The cycle's goals as the gates need to see them (P3-T04).
+ *
+ * This is the field that was `undefined` through P3-T03, and supplying it is what
+ * makes phases 0, 3 and 4 and gates 1, 3 and 5 evaluable at all.
+ *
+ * `dependencies` stays undefined on every key result, because the §5.4 register
+ * arrives at P3-T09. That keeps gate 4 honestly unevaluable rather than passing
+ * it on an empty list nobody could have filled in.
+ */
+async function loadGoalSnapshots<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycleId: string,
+): Promise<GoalSnapshot[]> {
+  const rows = await tx
+    .select({
+      id: goals.id,
+      title: goals.title,
+      level: goals.level,
+      championId: goals.championId,
+      reviewerId: goals.reviewerId,
+      parentGoalId: goals.parentGoalId,
+      parentKeyResultId: goals.parentKeyResultId,
+      contributionStatement: goals.contributionStatement,
+    })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, workspaceId),
+        eq(goals.cycleId, cycleId),
+      ),
+    );
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const children = await tx
+    .select({
+      id: keyResults.id,
+      goalId: keyResults.goalId,
+      title: keyResults.title,
+      capacity: keyResults.capacity,
+    })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        inArray(
+          keyResults.goalId,
+          rows.map((row) => row.id),
+        ),
+      ),
+    );
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    level: row.level,
+    championId: row.championId,
+    reviewerId: row.reviewerId,
+    hasParent: Boolean(row.parentGoalId ?? row.parentKeyResultId),
+    contributionStatement: row.contributionStatement,
+    keyResults: children
+      .filter((child) => child.goalId === row.id)
+      .map((child) => ({
+        id: child.id,
+        title: child.title,
+        capacity: child.capacity,
+      })),
+  }));
 }
 
 async function loadFrameSnapshot<
@@ -263,15 +345,31 @@ async function loadFrameSnapshot<
       ),
     );
 
+  // The key results of the annual cycles that sit under this frame. §2.3's
+  // quarterly phase 3 reads this to decide whether "focus areas chosen" means
+  // picking annual key results or writing a focus note: with nothing to point at,
+  // a note is the only honest answer (P3-T04).
+  const annualKeyResults = await tx
+    .select({ id: keyResults.id })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(cycles, eq(cycles.id, goals.cycleId))
+    .where(
+      and(
+        activeOnly(keyResults, eq(keyResults.workspaceId, workspaceId)),
+        isNull(goals.deletedAt),
+        eq(cycles.frameId, frame.id),
+        eq(cycles.mode, "annual"),
+      ),
+    );
+
   return {
     hasMission: Boolean(frame.mission),
     hasStrategy: Boolean(frame.strategy),
     strategyCount: strategies.length,
     notDoingWritten: Boolean(frame.notDoing),
     agreed: frame.agreed,
-    // Annual key results arrive with goals at P3-T04. Zero here means "the frame
-    // has none to point at", which is the branch §2.3's quarterly phase 3 reads.
-    annualKeyResultCount: 0,
+    annualKeyResultCount: annualKeyResults.length,
   };
 }
 

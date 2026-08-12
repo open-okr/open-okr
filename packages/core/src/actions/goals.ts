@@ -1,0 +1,1426 @@
+/**
+ * Goal and key result actions (TECHNICAL-PLAN §4.4, §14, METHOD.md §2.5, §4,
+ * P3-T04).
+ *
+ * Every read goes through the access getter on the goal's own context, so a goal
+ * somebody cannot see reads as not found rather than as forbidden. Every write
+ * goes through the Operation pipeline, which is what makes the change, the
+ * activity row, the audit row and the outbox row one transaction.
+ *
+ * **Creating a goal asks for edit on the workspace, not on the goal.** The goal
+ * does not exist yet, so there is no context to check. That is the same shape
+ * `spaces.create` already uses.
+ */
+import {
+  activeOnly,
+  CAPACITY_VERDICTS,
+  cycles,
+  GOAL_CLOSE_DECISIONS,
+  GOAL_LEVELS,
+  GOAL_OWNER_KINDS,
+  GOAL_SUCCESS_STATUSES,
+  goalRetrospectives,
+  goals,
+  INDICATOR_TYPES,
+  KEY_RESULT_DIRECTIONS,
+  keyResults,
+  keyResultValues,
+  withContext,
+  workspaceMembers,
+} from "@openokr/db";
+import { asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { z } from "zod";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
+import {
+  asNumber,
+  clampWeight,
+  closeGoalInTx,
+  createGoalInTx,
+  createKeyResultInTx,
+  type GoalRole,
+  reassignRoleInTx,
+  recordValueInTx,
+  reopenGoalInTx,
+  unlinkKpiInTx,
+  wouldCloseAlignmentLoop,
+} from "../goals/service.ts";
+import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
+import { defineReadAction, defineWriteAction } from "./define.ts";
+
+const richText = z
+  .unknown()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    { message: "not valid editor JSON for the current rich text schema" },
+  );
+
+const timeframe = z.object({
+  startsOn: z.string(),
+  endsOn: z.string(),
+  label: z.string().optional(),
+});
+
+const keyResultOutput = z.object({
+  id: z.uuid(),
+  goalId: z.uuid(),
+  title: z.string(),
+  unit: z.string().nullable(),
+  direction: z.enum(KEY_RESULT_DIRECTIONS),
+  indicatorType: z.enum(INDICATOR_TYPES),
+  baselineValue: z.number(),
+  targetValue: z.number(),
+  currentValue: z.number(),
+  dueOn: z.string().nullable(),
+  ownerId: z.uuid().nullable(),
+  weight: z.number(),
+  kpiId: z.uuid().nullable(),
+  capacity: z.enum(CAPACITY_VERDICTS).nullable(),
+  progressPct: z.number(),
+  confidence: z.number().nullable(),
+  score: z.number().nullable(),
+  carryForward: z.boolean(),
+  position: z.number().int(),
+});
+
+const goalOutput = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  description: z.unknown().nullable(),
+  cycleId: z.uuid().nullable(),
+  timeframe: timeframe.nullable(),
+  level: z.enum(GOAL_LEVELS),
+  ownerKind: z.enum(GOAL_OWNER_KINDS),
+  spaceId: z.uuid().nullable(),
+  memberId: z.uuid().nullable(),
+  champion: z.object({ id: z.uuid(), name: z.string() }),
+  reviewer: z.object({ id: z.uuid(), name: z.string() }),
+  parentGoalId: z.uuid().nullable(),
+  parentKeyResultId: z.uuid().nullable(),
+  weight: z.number(),
+  contributionStatement: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  successStatus: z.enum(GOAL_SUCCESS_STATUSES).nullable(),
+  closeDecision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
+  closeReason: z.string().nullable(),
+  progressPct: z.number(),
+  health: z.string(),
+  position: z.number().int(),
+  keyResults: z.array(keyResultOutput),
+  /** Present once the goal has been closed at least once. Kept on reopen. */
+  retrospective: z
+    .object({ id: z.uuid(), body: z.unknown(), updatedAt: z.string() })
+    .nullable(),
+});
+
+/** Resolves the acting member, refusing the way every other read does. */
+async function actingMember(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<string> {
+  if (!userId) {
+    throw new OperationError("not_found", "No such workspace.");
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError("not_found", "No such workspace.");
+  }
+  return member.id;
+}
+
+/** The level the acting member holds on one goal, or not-found. */
+async function requireGoalAccess(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  goalId: string,
+  requires: number,
+): Promise<{ contextId: string; level: number }> {
+  return getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "goal",
+    resourceId: goalId,
+    requires: requires as never,
+  });
+}
+
+function keyResultRow(row: {
+  id: string;
+  goalId: string;
+  title: string;
+  unit: string | null;
+  direction: (typeof KEY_RESULT_DIRECTIONS)[number];
+  indicatorType: (typeof INDICATOR_TYPES)[number];
+  baselineValue: string;
+  targetValue: string;
+  currentValue: string;
+  dueOn: string | null;
+  ownerId: string | null;
+  weight: string;
+  kpiId: string | null;
+  capacity: (typeof CAPACITY_VERDICTS)[number] | null;
+  progressPct: string;
+  confidence: string | null;
+  score: string | null;
+  carryForward: boolean;
+  position: number;
+}) {
+  return {
+    ...row,
+    baselineValue: asNumber(row.baselineValue) ?? 0,
+    targetValue: asNumber(row.targetValue) ?? 0,
+    currentValue: asNumber(row.currentValue) ?? 0,
+    weight: asNumber(row.weight) ?? 0,
+    progressPct: asNumber(row.progressPct) ?? 0,
+    confidence: asNumber(row.confidence),
+    score: asNumber(row.score),
+  };
+}
+
+const GOAL_COLUMNS = {
+  id: goals.id,
+  title: goals.title,
+  description: goals.description,
+  cycleId: goals.cycleId,
+  timeframe: goals.timeframe,
+  level: goals.level,
+  ownerKind: goals.ownerKind,
+  spaceId: goals.spaceId,
+  memberId: goals.memberId,
+  championId: goals.championId,
+  reviewerId: goals.reviewerId,
+  parentGoalId: goals.parentGoalId,
+  parentKeyResultId: goals.parentKeyResultId,
+  weight: goals.weight,
+  contributionStatement: goals.contributionStatement,
+  closedAt: goals.closedAt,
+  successStatus: goals.successStatus,
+  closeDecision: goals.closeDecision,
+  closeReason: goals.closeReason,
+  progressPct: goals.progressPct,
+  health: goals.health,
+  position: goals.position,
+} as const;
+
+const KEY_RESULT_COLUMNS = {
+  id: keyResults.id,
+  goalId: keyResults.goalId,
+  title: keyResults.title,
+  unit: keyResults.unit,
+  direction: keyResults.direction,
+  indicatorType: keyResults.indicatorType,
+  baselineValue: keyResults.baselineValue,
+  targetValue: keyResults.targetValue,
+  currentValue: keyResults.currentValue,
+  dueOn: keyResults.dueOn,
+  ownerId: keyResults.ownerId,
+  weight: keyResults.weight,
+  kpiId: keyResults.kpiId,
+  capacity: keyResults.capacity,
+  progressPct: keyResults.progressPct,
+  confidence: keyResults.confidence,
+  score: keyResults.score,
+  carryForward: keyResults.carryForward,
+  position: keyResults.position,
+} as const;
+
+/** Names for the two roles, so a card reads as a sentence without a second query. */
+async function memberNames(
+  tx: OperationTx,
+  workspaceId: string,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  if (ids.length === 0) {
+    return new Map();
+  }
+  const rows = await tx
+    .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        inArray(workspaceMembers.id, [...ids]),
+      ),
+    );
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+export const listGoals = defineReadAction({
+  name: "goals.list",
+  summary:
+    "Goals in a cycle, or the whole workspace, with their key results attached.",
+  input: z.object({
+    cycleId: z.uuid().optional(),
+    /** Closed goals are excluded unless asked for: a set is what is live in it. */
+    includeClosed: z.boolean().default(false),
+    level: z.enum(GOAL_LEVELS).optional(),
+  }),
+  output: z.object({ goals: z.array(goalOutput) }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+
+        const filters = [eq(goals.workspaceId, context.workspaceId)];
+        if (input.cycleId) {
+          filters.push(eq(goals.cycleId, input.cycleId));
+        }
+        if (input.level) {
+          filters.push(eq(goals.level, input.level));
+        }
+        if (!input.includeClosed) {
+          filters.push(isNull(goals.closedAt));
+        }
+
+        const rows = await tx
+          .select(GOAL_COLUMNS)
+          .from(goals)
+          .where(activeOnly(goals, ...filters))
+          .orderBy(asc(goals.position), asc(goals.createdAt));
+
+        // Every goal is filtered through the getter rather than trusted from the
+        // list query. A list is a read of many protected aggregates, and §4.1
+        // does not exempt it from the one chokepoint.
+        const visible = [];
+        for (const row of rows) {
+          try {
+            await requireGoalAccess(
+              tx,
+              context.workspaceId,
+              memberId,
+              row.id,
+              ACCESS_LEVELS.view,
+            );
+            visible.push(row);
+          } catch (error) {
+            if (error instanceof OperationError && error.code === "not_found") {
+              continue;
+            }
+            throw error;
+          }
+        }
+
+        const ids = visible.map((row) => row.id);
+        const children =
+          ids.length === 0
+            ? []
+            : await tx
+                .select(KEY_RESULT_COLUMNS)
+                .from(keyResults)
+                .where(
+                  activeOnly(
+                    keyResults,
+                    eq(keyResults.workspaceId, context.workspaceId),
+                    inArray(keyResults.goalId, ids),
+                  ),
+                )
+                .orderBy(asc(keyResults.position));
+
+        const names = await memberNames(
+          tx,
+          context.workspaceId,
+          visible.flatMap((row) => [row.championId, row.reviewerId]),
+        );
+
+        return {
+          goals: visible.map((row) => ({
+            ...row,
+            weight: asNumber(row.weight) ?? 0,
+            progressPct: asNumber(row.progressPct) ?? 0,
+            closedAt: row.closedAt
+              ? new Date(row.closedAt).toISOString()
+              : null,
+            champion: {
+              id: row.championId,
+              name: names.get(row.championId) ?? "Unknown",
+            },
+            reviewer: {
+              id: row.reviewerId,
+              name: names.get(row.reviewerId) ?? "Unknown",
+            },
+            keyResults: children
+              .filter((child) => child.goalId === row.id)
+              .map(keyResultRow),
+            retrospective: null,
+          })),
+        };
+      },
+    );
+  },
+});
+
+export const readGoal = defineReadAction({
+  name: "goals.read",
+  summary:
+    "One goal with its key results and its retrospective, if it has one.",
+  input: z.object({ id: z.uuid() }),
+  output: goalOutput,
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such goal.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireGoalAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.id,
+          ACCESS_LEVELS.view,
+        );
+
+        const [row] = await tx
+          .select(GOAL_COLUMNS)
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              eq(goals.id, input.id),
+            ),
+          )
+          .limit(1);
+        if (!row) {
+          throw new OperationError("not_found", "No such goal.");
+        }
+
+        const children = await tx
+          .select(KEY_RESULT_COLUMNS)
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(keyResults.goalId, input.id),
+            ),
+          )
+          .orderBy(asc(keyResults.position));
+
+        const [retro] = await tx
+          .select({
+            id: goalRetrospectives.id,
+            body: goalRetrospectives.body,
+            updatedAt: goalRetrospectives.updatedAt,
+          })
+          .from(goalRetrospectives)
+          .where(
+            activeOnly(
+              goalRetrospectives,
+              eq(goalRetrospectives.workspaceId, context.workspaceId),
+              eq(goalRetrospectives.goalId, input.id),
+            ),
+          )
+          .limit(1);
+
+        const names = await memberNames(tx, context.workspaceId, [
+          row.championId,
+          row.reviewerId,
+        ]);
+
+        return {
+          ...row,
+          weight: asNumber(row.weight) ?? 0,
+          progressPct: asNumber(row.progressPct) ?? 0,
+          closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
+          champion: {
+            id: row.championId,
+            name: names.get(row.championId) ?? "Unknown",
+          },
+          reviewer: {
+            id: row.reviewerId,
+            name: names.get(row.reviewerId) ?? "Unknown",
+          },
+          keyResults: children.map(keyResultRow),
+          retrospective: retro
+            ? {
+                id: retro.id,
+                body: retro.body,
+                updatedAt: new Date(retro.updatedAt).toISOString(),
+              }
+            : null,
+        };
+      },
+    );
+  },
+});
+
+export const readKeyResultHistory = defineReadAction({
+  name: "goals.keyResultHistory",
+  summary:
+    "One key result's value history, newest first. Drives the sparkline.",
+  input: z.object({
+    keyResultId: z.uuid(),
+    limit: z.number().int().min(1).max(500).default(100),
+  }),
+  output: z.object({
+    values: z.array(
+      z.object({
+        id: z.uuid(),
+        value: z.number(),
+        at: z.string(),
+        source: z.string(),
+        note: z.string().nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such key result.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+
+        // A key result is a sub-resource: authorisation resolves through the
+        // goal that owns it (§4.1, "sub-resources inherit").
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await requireGoalAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          owner.goalId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            id: keyResultValues.id,
+            value: keyResultValues.value,
+            at: keyResultValues.at,
+            source: keyResultValues.source,
+            note: keyResultValues.note,
+          })
+          .from(keyResultValues)
+          .where(
+            activeOnly(
+              keyResultValues,
+              eq(keyResultValues.workspaceId, context.workspaceId),
+              eq(keyResultValues.keyResultId, input.keyResultId),
+            ),
+          )
+          .orderBy(desc(keyResultValues.at))
+          .limit(input.limit);
+
+        return {
+          values: rows.map((row) => ({
+            id: row.id,
+            value: asNumber(row.value) ?? 0,
+            at: new Date(row.at).toISOString(),
+            source: row.source,
+            note: row.note,
+          })),
+        };
+      },
+    );
+  },
+});
+
+export const createGoal = defineWriteAction({
+  name: "goals.create",
+  summary:
+    "Creates a goal with its champion, its reviewer and its access context.",
+  input: z
+    .object({
+      title: z.string().trim().min(1).max(500),
+      description: richText.optional(),
+      cycleId: z.uuid().optional(),
+      timeframe: timeframe.optional(),
+      level: z.enum(GOAL_LEVELS),
+      ownerKind: z.enum(GOAL_OWNER_KINDS).default("workspace"),
+      spaceId: z.uuid().optional(),
+      memberId: z.uuid().optional(),
+      championId: z.uuid(),
+      reviewerId: z.uuid(),
+      parentGoalId: z.uuid().optional(),
+      parentKeyResultId: z.uuid().optional(),
+      weight: z.number().default(1),
+      contributionStatement: z.string().trim().max(1000).optional(),
+    })
+    // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
+    // constraint violation. The database enforces the same thing underneath.
+    .refine((value) => Boolean(value.cycleId) !== Boolean(value.timeframe), {
+      message:
+        "A goal sits in a cycle or carries its own timeframe, not both and not neither.",
+    })
+    .refine((value) => !(value.parentGoalId && value.parentKeyResultId), {
+      message: "A goal aligns to one parent, not two.",
+    }),
+  output: z.object({ id: z.uuid(), title: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      // A parent has to be one this writer can actually see, resolved through
+      // the getter so an invisible parent reads as not found (§4.2).
+      if (input.parentGoalId) {
+        await requireGoalAccess(
+          tx,
+          workspaceId,
+          memberId,
+          input.parentGoalId,
+          ACCESS_LEVELS.view,
+        );
+      }
+      if (input.parentKeyResultId) {
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.parentKeyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        await requireGoalAccess(
+          tx,
+          workspaceId,
+          memberId,
+          owner.goalId,
+          ACCESS_LEVELS.view,
+        );
+      }
+
+      if (input.cycleId) {
+        const [cycle] = await tx
+          .select({ status: cycles.status })
+          .from(cycles)
+          .where(
+            activeOnly(
+              cycles,
+              eq(cycles.workspaceId, workspaceId),
+              eq(cycles.id, input.cycleId),
+            ),
+          )
+          .limit(1);
+        if (!cycle) {
+          throw new OperationError("not_found", "No such cycle.");
+        }
+        if (cycle.status === "closed") {
+          throw new OperationError(
+            "forbidden",
+            "That cycle is closed. Its set does not change after the archive.",
+          );
+        }
+      }
+
+      const created = await createGoalInTx(tx, {
+        workspaceId,
+        title: input.title,
+        description: input.description,
+        cycleId: input.cycleId ?? null,
+        timeframe: input.timeframe ?? null,
+        level: input.level,
+        ownerKind: input.ownerKind,
+        spaceId: input.spaceId ?? null,
+        memberId: input.memberId ?? null,
+        championId: input.championId,
+        reviewerId: input.reviewerId,
+        parentGoalId: input.parentGoalId ?? null,
+        parentKeyResultId: input.parentKeyResultId ?? null,
+        weight: input.weight,
+        contributionStatement: input.contributionStatement ?? null,
+      });
+
+      return {
+        result: { id: created.id, title: created.title },
+        activity: {
+          kind: "goal.created",
+          subjectType: "goal",
+          subjectId: created.id,
+          payload: { title: created.title, level: input.level },
+        },
+        audit: {
+          action: "goals.create",
+          targetType: "goal",
+          targetId: created.id,
+          payload: { title: created.title, level: input.level },
+        },
+      };
+    },
+  }),
+});
+
+export const updateGoal = defineWriteAction({
+  name: "goals.update",
+  summary: "Edits a goal's own fields, including its alignment pointer.",
+  input: z.object({
+    id: z.uuid(),
+    title: z.string().trim().min(1).max(500).optional(),
+    description: richText.optional(),
+    level: z.enum(GOAL_LEVELS).optional(),
+    weight: z.number().optional(),
+    contributionStatement: z.string().trim().max(1000).nullable().optional(),
+    /** Null clears the alignment. A goal with no parent is an island, not an error. */
+    parentGoalId: z.uuid().nullable().optional(),
+    parentKeyResultId: z.uuid().nullable().optional(),
+    checkInFrequency: z
+      .enum(["daily", "weekly", "biweekly", "monthly"])
+      .nullable()
+      .optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (input.parentGoalId && input.parentKeyResultId) {
+        throw new OperationError(
+          "forbidden",
+          "A goal aligns to one parent, not two.",
+        );
+      }
+
+      if (input.parentGoalId) {
+        await requireGoalAccess(
+          tx,
+          workspaceId,
+          memberId,
+          input.parentGoalId,
+          ACCESS_LEVELS.view,
+        );
+        if (input.parentGoalId === input.id) {
+          throw new OperationError(
+            "forbidden",
+            "That would make the alignment circular.",
+          );
+        }
+        if (
+          await wouldCloseAlignmentLoop(
+            tx,
+            workspaceId,
+            input.id,
+            input.parentGoalId,
+          )
+        ) {
+          throw new OperationError(
+            "forbidden",
+            "That would make the alignment circular.",
+          );
+        }
+      }
+
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.title !== undefined) {
+        patch.title = input.title;
+      }
+      if (input.description !== undefined) {
+        patch.description = input.description;
+        patch.descriptionVersion =
+          input.description === null ? null : RICH_TEXT_SCHEMA_VERSION;
+      }
+      if (input.level !== undefined) {
+        patch.level = input.level;
+      }
+      if (input.weight !== undefined) {
+        patch.weight = String(clampWeight(input.weight));
+      }
+      if (input.contributionStatement !== undefined) {
+        patch.contributionStatement =
+          input.contributionStatement?.trim() || null;
+      }
+      if (input.checkInFrequency !== undefined) {
+        patch.checkInFrequency = input.checkInFrequency;
+      }
+      // Setting either pointer clears the other, because at most one can hold.
+      if (input.parentGoalId !== undefined) {
+        patch.parentGoalId = input.parentGoalId;
+        patch.parentKeyResultId = null;
+      }
+      if (input.parentKeyResultId !== undefined) {
+        patch.parentKeyResultId = input.parentKeyResultId;
+        patch.parentGoalId = null;
+      }
+
+      const [updated] = await tx
+        .update(goals)
+        .set(patch)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .returning({ id: goals.id, title: goals.title });
+      if (!updated) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+
+      return {
+        result: { id: updated.id },
+        activity: {
+          kind: "goal.updated",
+          subjectType: "goal",
+          subjectId: updated.id,
+          payload: { title: updated.title },
+        },
+        audit: {
+          action: "goals.update",
+          targetType: "goal",
+          targetId: updated.id,
+          payload: {
+            keys: Object.keys(patch).filter((key) => key !== "updatedAt"),
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const closeGoal = defineWriteAction({
+  name: "goals.close",
+  summary:
+    "Closes a goal with an outcome, a keep/modify/abandon decision and a retrospective.",
+  input: z.object({
+    id: z.uuid(),
+    successStatus: z.enum(GOAL_SUCCESS_STATUSES),
+    closeDecision: z.enum(GOAL_CLOSE_DECISIONS),
+    closeReason: z.string().trim().max(2000).optional(),
+    retrospectiveBody: richText,
+  }),
+  output: z.object({ id: z.uuid(), successStatus: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      // §4.3 will not close a goal with no account of what happened. Refused
+      // here in words rather than left to the not-null column.
+      if (input.retrospectiveBody === null) {
+        throw new OperationError(
+          "forbidden",
+          "Closing a goal needs a retrospective. What happened, and what would you do differently?",
+        );
+      }
+
+      await closeGoalInTx(tx, {
+        workspaceId,
+        goalId: input.id,
+        closedById: memberId,
+        successStatus: input.successStatus,
+        closeDecision: input.closeDecision,
+        closeReason: input.closeReason ?? null,
+        retrospectiveBody: input.retrospectiveBody,
+      });
+
+      return {
+        result: { id: input.id, successStatus: input.successStatus },
+        activity: {
+          kind: "goal.closed",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: {
+            successStatus: input.successStatus,
+            closeDecision: input.closeDecision,
+          },
+        },
+        audit: {
+          action: "goals.close",
+          targetType: "goal",
+          targetId: input.id,
+          payload: {
+            successStatus: input.successStatus,
+            closeDecision: input.closeDecision,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const reopenGoal = defineWriteAction({
+  name: "goals.reopen",
+  summary:
+    "Reopens a closed goal, clearing its outcome and keeping its retrospective.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      await reopenGoalInTx(tx, { workspaceId, goalId: input.id });
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "goal.reopened",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: {},
+        },
+        audit: {
+          action: "goals.reopen",
+          targetType: "goal",
+          targetId: input.id,
+          payload: {},
+        },
+      };
+    },
+  }),
+});
+
+export const reassignGoalRole = defineWriteAction({
+  name: "goals.reassignRole",
+  summary:
+    "Moves the champion or the reviewer to another member, rebinding access with it.",
+  input: z.object({
+    id: z.uuid(),
+    role: z.enum(["champion", "reviewer"]),
+    memberId: z.uuid(),
+  }),
+  output: z.object({ id: z.uuid(), role: z.string() }),
+  // Full, not edit: naming who owns and who reviews a goal is administering it,
+  // and the champion is the one who holds full on their own goal.
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const actor = await actingMember(tx, workspaceId, context.actor.userId);
+      const { contextId } = await requireGoalAccess(
+        tx,
+        workspaceId,
+        actor,
+        input.id,
+        ACCESS_LEVELS.full,
+      );
+
+      const [goal] = await tx
+        .select({
+          championId: goals.championId,
+          reviewerId: goals.reviewerId,
+        })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!goal) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+
+      const role = input.role as GoalRole;
+      const fromMemberId =
+        role === "champion" ? goal.championId : goal.reviewerId;
+
+      await reassignRoleInTx(tx, {
+        workspaceId,
+        goalId: input.id,
+        contextId,
+        role,
+        fromMemberId,
+        toMemberId: input.memberId,
+      });
+
+      return {
+        result: { id: input.id, role },
+        activity: {
+          kind: "goal.role_reassigned",
+          subjectType: "goal",
+          subjectId: input.id,
+          payload: { role },
+        },
+        audit: {
+          action: "goals.reassignRole",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { role, from: fromMemberId, to: input.memberId },
+        },
+      };
+    },
+  }),
+});
+
+export const moveGoalToCycle = defineWriteAction({
+  name: "goals.moveToCycle",
+  summary:
+    "Moves a goal into another cycle, taking its check-in history with it.",
+  input: z.object({ id: z.uuid(), cycleId: z.uuid() }),
+  output: z.object({ id: z.uuid(), cycleId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [target] = await tx
+        .select({ status: cycles.status })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.workspaceId, workspaceId),
+            eq(cycles.id, input.cycleId),
+          ),
+        )
+        .limit(1);
+      if (!target) {
+        throw new OperationError("not_found", "No such cycle.");
+      }
+      // §4.5: planning or active only. A closed cycle is a record.
+      if (target.status !== "planning" && target.status !== "active") {
+        throw new OperationError(
+          "forbidden",
+          "A goal cannot move into a cycle that is closing or closed.",
+        );
+      }
+
+      const [moved] = await tx
+        .update(goals)
+        .set({ cycleId: input.cycleId, timeframe: null, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .returning({ id: goals.id, title: goals.title });
+      if (!moved) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+
+      return {
+        result: { id: moved.id, cycleId: input.cycleId },
+        activity: {
+          kind: "goal.moved_to_cycle",
+          subjectType: "goal",
+          subjectId: moved.id,
+          payload: { title: moved.title },
+        },
+        audit: {
+          action: "goals.moveToCycle",
+          targetType: "goal",
+          targetId: moved.id,
+          payload: { cycleId: input.cycleId },
+        },
+      };
+    },
+  }),
+});
+
+export const createKeyResult = defineWriteAction({
+  name: "goals.addKeyResult",
+  summary:
+    "Adds a key result to a goal, with its baseline recorded as history.",
+  input: z.object({
+    goalId: z.uuid(),
+    title: z.string().trim().min(1).max(500),
+    unit: z.string().trim().max(60).optional(),
+    direction: z.enum(KEY_RESULT_DIRECTIONS),
+    indicatorType: z.enum(INDICATOR_TYPES),
+    baselineValue: z.number(),
+    targetValue: z.number(),
+    currentValue: z.number().optional(),
+    dueOn: z.string().optional(),
+    ownerId: z.uuid().optional(),
+    weight: z.number().default(1),
+    kpiId: z.uuid().optional(),
+    capacity: z.enum(CAPACITY_VERDICTS).optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const created = await createKeyResultInTx(tx, {
+        workspaceId,
+        goalId: input.goalId,
+        title: input.title,
+        unit: input.unit ?? null,
+        direction: input.direction,
+        indicatorType: input.indicatorType,
+        baselineValue: input.baselineValue,
+        targetValue: input.targetValue,
+        currentValue: input.currentValue,
+        dueOn: input.dueOn ?? null,
+        ownerId: input.ownerId ?? null,
+        weight: input.weight,
+        kpiId: input.kpiId ?? null,
+        capacity: input.capacity ?? null,
+        authorMemberId: memberId,
+      });
+
+      return {
+        result: { id: created.id },
+        activity: {
+          kind: "key_result.created",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          payload: { title: input.title },
+        },
+        audit: {
+          action: "goals.addKeyResult",
+          targetType: "key_result",
+          targetId: created.id,
+          payload: { goalId: input.goalId, title: input.title },
+        },
+      };
+    },
+  }),
+});
+
+export const updateKeyResult = defineWriteAction({
+  name: "goals.updateKeyResult",
+  summary:
+    "Edits a key result's definition. The current value has its own action, because it is history.",
+  input: z.object({
+    id: z.uuid(),
+    title: z.string().trim().min(1).max(500).optional(),
+    unit: z.string().trim().max(60).nullable().optional(),
+    direction: z.enum(KEY_RESULT_DIRECTIONS).optional(),
+    indicatorType: z.enum(INDICATOR_TYPES).optional(),
+    baselineValue: z.number().optional(),
+    targetValue: z.number().optional(),
+    dueOn: z.string().nullable().optional(),
+    ownerId: z.uuid().nullable().optional(),
+    weight: z.number().optional(),
+    capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
+    carryForward: z.boolean().optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.title !== undefined) {
+        patch.title = input.title;
+      }
+      if (input.unit !== undefined) {
+        patch.unit = input.unit?.trim() || null;
+      }
+      if (input.direction !== undefined) {
+        patch.direction = input.direction;
+      }
+      if (input.indicatorType !== undefined) {
+        patch.indicatorType = input.indicatorType;
+      }
+      if (input.baselineValue !== undefined) {
+        patch.baselineValue = String(input.baselineValue);
+      }
+      if (input.targetValue !== undefined) {
+        patch.targetValue = String(input.targetValue);
+      }
+      if (input.dueOn !== undefined) {
+        patch.dueOn = input.dueOn;
+      }
+      if (input.ownerId !== undefined) {
+        patch.ownerId = input.ownerId;
+      }
+      if (input.weight !== undefined) {
+        patch.weight = String(clampWeight(input.weight));
+      }
+      if (input.capacity !== undefined) {
+        patch.capacity = input.capacity;
+      }
+      if (input.carryForward !== undefined) {
+        patch.carryForward = input.carryForward;
+      }
+
+      await tx
+        .update(keyResults)
+        .set(patch)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        );
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "key_result.updated",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: {},
+        },
+        audit: {
+          action: "goals.updateKeyResult",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: {
+            keys: Object.keys(patch).filter((key) => key !== "updatedAt"),
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const recordKeyResultValue = defineWriteAction({
+  name: "goals.recordValue",
+  summary: "Moves a key result's value and records the movement as history.",
+  input: z.object({
+    id: z.uuid(),
+    value: z.number(),
+    note: z.string().trim().max(500).optional(),
+  }),
+  output: z.object({ id: z.uuid(), value: z.number() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      await recordValueInTx(tx, {
+        workspaceId,
+        keyResultId: input.id,
+        value: input.value,
+        source: "manual",
+        authorMemberId: memberId,
+        note: input.note ?? null,
+      });
+
+      return {
+        result: { id: input.id, value: input.value },
+        activity: {
+          kind: "key_result.value_recorded",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: { value: input.value },
+        },
+        audit: {
+          action: "goals.recordValue",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { value: input.value },
+        },
+      };
+    },
+  }),
+});
+
+export const unlinkKeyResultKpi = defineWriteAction({
+  name: "goals.unlinkKpi",
+  summary: "Unlinks a KPI, keeping the value it last reported as a manual one.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      await unlinkKpiInTx(tx, {
+        workspaceId,
+        keyResultId: input.id,
+        authorMemberId: memberId,
+      });
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "key_result.kpi_unlinked",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: {},
+        },
+        audit: {
+          action: "goals.unlinkKpi",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: {},
+        },
+      };
+    },
+  }),
+});

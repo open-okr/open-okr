@@ -140,6 +140,23 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Cycle "${asString(p.name, "a cycle")}" was published`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
+  "goal.created": (p) =>
+    `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
+  "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
+  "goal.closed": (p) =>
+    `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
+  "goal.reopened": () => "The goal was reopened",
+  "goal.role_reassigned": (p) =>
+    `The goal's ${asString(p.role, "role")} was reassigned`,
+  "goal.moved_to_cycle": (p) =>
+    `Goal "${asString(p.title, "a goal")}" was moved to another cycle`,
+  "key_result.created": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was added`,
+  "key_result.updated": () => "A key result was edited",
+  "key_result.value_recorded": (p) =>
+    `A key result moved to ${Number(p.value ?? 0)}`,
+  "key_result.kpi_unlinked": () =>
+    "A key result was unlinked from its KPI and keeps the last value it reported",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

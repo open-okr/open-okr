@@ -140,6 +140,22 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.capacity_recorded": z.object({}),
   "cycle.calibrated": z.object({}),
   "cycle.published": z.object({ name: z.string() }),
+  // Goals and key results (P3-T04). A goal's title is snapshotted for the same
+  // reason a member's name is: "closed Raise activation" has to keep reading that
+  // way after the goal is renamed or erased.
+  "goal.created": z.object({ title: z.string(), level: z.string() }),
+  "goal.updated": z.object({ title: z.string() }),
+  "goal.closed": z.object({
+    successStatus: z.enum(["achieved", "missed"]),
+    closeDecision: z.enum(["keep", "modify", "abandon"]),
+  }),
+  "goal.reopened": z.object({}),
+  "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
+  "goal.moved_to_cycle": z.object({ title: z.string() }),
+  "key_result.created": z.object({ title: z.string() }),
+  "key_result.updated": z.object({}),
+  "key_result.value_recorded": z.object({ value: z.number() }),
+  "key_result.kpi_unlinked": z.object({}),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

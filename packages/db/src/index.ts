@@ -166,6 +166,33 @@ export {
   rhythmSettings,
 } from "./schema/cycles.ts";
 export {
+  CAPACITY_VERDICTS,
+  type CapacityVerdict,
+  GOAL_CLOSE_DECISIONS,
+  GOAL_HEALTH,
+  GOAL_OWNER_KINDS,
+  GOAL_SUCCESS_STATUSES,
+  type Goal,
+  type GoalCloseDecision,
+  type GoalHealth,
+  type GoalOwnerKind,
+  type GoalRetrospective,
+  type GoalSuccessStatus,
+  type GoalTimeframe,
+  goalRetrospectives,
+  goals,
+  INDICATOR_TYPES,
+  type IndicatorType,
+  KEY_RESULT_DIRECTIONS,
+  type KeyResult,
+  type KeyResultDirection,
+  type KeyResultValue,
+  keyResults,
+  keyResultValues,
+  VALUE_SOURCES,
+  type ValueSource,
+} from "./schema/goals.ts";
+export {
   type InstanceAuditEvent,
   instanceAuditEvents,
 } from "./schema/instance-audit.ts";

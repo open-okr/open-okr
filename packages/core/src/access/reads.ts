@@ -287,6 +287,10 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   workspace: ownContextResolver("workspace"),
   blob: ownContextResolver("blob"),
   space: ownContextResolver("space"),
+  // P3-T04. A key result is deliberately absent: it inherits its goal's context,
+  // and its callers resolve the owning goal first so the not-found answer covers
+  // "no such key result" and "not yours to see" identically.
+  goal: ownContextResolver("goal"),
 };
 
 export async function resolveSubjectContext<
