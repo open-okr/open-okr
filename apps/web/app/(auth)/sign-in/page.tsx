@@ -97,7 +97,7 @@ export default function SignInPage() {
           Lost your phone? Use a backup code on the{" "}
           <Link
             href="/backup-code"
-            className="font-medium text-brand-600 hover:underline"
+            className="font-medium text-brand-text hover:underline"
           >
             backup code page
           </Link>
@@ -114,14 +114,14 @@ export default function SignInPage() {
         <>
           <Link
             href="/forgot-password"
-            className="font-medium text-brand-600 hover:underline"
+            className="font-medium text-brand-text hover:underline"
           >
             Forgot your password?
           </Link>
           {" · "}
           <Link
             href="/sign-up"
-            className="font-medium text-brand-600 hover:underline"
+            className="font-medium text-brand-text hover:underline"
           >
             Create an account
           </Link>

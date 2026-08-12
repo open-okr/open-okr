@@ -70,7 +70,7 @@ export function WorkspaceSwitcher({
     <div className="flex items-center gap-2 rounded-lg p-1.5">
       <span
         aria-hidden="true"
-        className="grid size-7 flex-none place-items-center rounded-lg bg-gradient-to-br from-[#6366f1] via-brand to-[#7c3aed] text-sm font-extrabold text-white shadow-[0_2px_6px_rgba(79,70,229,0.28),inset_0_1px_0_rgba(255,255,255,0.25)]"
+        className="grid size-7 flex-none place-items-center rounded-lg bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed] text-sm font-extrabold text-on-brand shadow-brand-hover"
       >
         {initialsOf(active.name)}
       </span>

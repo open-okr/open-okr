@@ -19,8 +19,8 @@
   td { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: middle }
   tr:last-child td { border-bottom: 0 }
   tr { transition: background .15s var(--ease) }
-  tr:not(:first-child):hover { background: #F4F7FD }
-  .cut { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r); padding: 10px 12px; }
+  tr:not(:first-child):hover { background: var(--raised) }
+  .cut { background: var(--warn-bg); border: 1px solid var(--warn-dot); border-radius: var(--r); padding: 10px 12px; }
 </style>
 
 <div class="app">
@@ -76,11 +76,11 @@
             <div class="card-b" style="padding:12px 14px">
               <div class="cut">
                 <div class="row" style="align-items:flex-start;gap:9px">
-                  <svg class="ic" style="width:15px;height:15px;color:#B45309;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                  <svg class="ic" style="width:15px;height:15px;color:var(--warn);margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
                   <div class="grow">
-                    <div class="h3" style="color:#92400E">What did you cut?</div>
-                    <div class="tiny" style="color:#92400E;margin-top:2px">One key result exceeds capacity and this field is empty. A plan where nothing was cut is a plan that has not been made. Required before gate 5 turns green.</div>
-                    <div style="margin-top:8px;border:1px dashed #FCD34D;border-radius:6px;padding:7px 9px;background:#fff;font-size:11.5px;color:var(--ink-4)">Name the initiative you are dropping, and who was told…</div>
+                    <div class="h3" style="color:var(--warn)">What did you cut?</div>
+                    <div class="tiny" style="color:var(--warn);margin-top:2px">One key result exceeds capacity and this field is empty. A plan where nothing was cut is a plan that has not been made. Required before gate 5 turns green.</div>
+                    <div style="margin-top:8px;border:1px dashed var(--warn-dot);border-radius:6px;padding:7px 9px;background:#fff;font-size:11.5px;color:var(--ink-4)">Name the initiative you are dropping, and who was told…</div>
                   </div>
                 </div>
               </div>

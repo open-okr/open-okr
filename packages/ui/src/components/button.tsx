@@ -13,23 +13,30 @@ export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border",
     "text-sm font-semibold transition-[border-color,box-shadow,transform] duration-fast ease-out",
-    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-strong",
     "disabled:pointer-events-none disabled:bg-raised disabled:border-line disabled:text-ink-4 disabled:shadow-none",
   ],
   {
     variants: {
       variant: {
+        // Shadows come from tokens rather than inline rgba: the brand-tinted
+        // ones are mixed from --brand, so a workspace that sets its own brand
+        // colour gets a glow in its hue instead of a stranded indigo one.
         default: [
-          "border-line-2 bg-surface text-ink-2 shadow-[0_1px_2px_rgba(15,23,42,0.05)]",
-          "hover:border-ink-4 hover:-translate-y-px hover:shadow-[0_2px_6px_rgba(15,23,42,0.08)]",
+          "border-line-2 bg-surface text-ink-2 shadow-control",
+          "hover:border-ink-4 hover:-translate-y-px hover:shadow-control-hover",
         ],
         primary: [
-          "border-brand-600 bg-brand text-white shadow-[0_1px_3px_rgba(79,70,229,0.28)]",
-          "hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(79,70,229,0.28)]",
+          "border-brand-600 bg-brand text-on-brand shadow-brand",
+          "hover:bg-brand-600 hover:-translate-y-px hover:shadow-brand-hover",
+          "active:bg-brand-700",
         ],
+        // The secondary/AI button: a surface fill with brand text, per the
+        // colour system's own recipe. Its label is --brand-text, not --brand,
+        // because it is text (rule 5).
         ai: [
-          "border-brand-line bg-surface text-brand-600 shadow-[0_1px_2px_rgba(79,70,229,0.1)]",
-          "hover:border-brand hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(79,70,229,0.18)]",
+          "border-brand-line bg-surface text-brand-text shadow-control",
+          "hover:border-brand-strong hover:-translate-y-px hover:shadow-brand",
         ],
         ghost: "border-transparent bg-transparent text-ink-2 hover:bg-raised",
       },

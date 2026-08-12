@@ -4,7 +4,7 @@
 <title>The coaching card</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  html, body { width: 860px; height: 430px; background: #EEF1F5; }
+  html, body { width: 860px; height: 430px; background: var(--raised); }
   .stage { padding: 22px; height: 100%; }
   .pop { background: #fff; border: 1px solid var(--line); border-radius: 14px;
     box-shadow: 0 14px 40px rgba(15,23,42,.14), 0 2px 8px rgba(15,23,42,.07); overflow: hidden;
@@ -13,7 +13,7 @@
   .field { animation: fall .3s var(--ease) backwards; }
   .caret-bar { animation: blink 1.1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0 } }
-  .pop-h { padding: 13px 17px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; background: #FFFBFB }
+  .pop-h { padding: 13px 17px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 9px; background: var(--bad-bg) }
   .pop-b { padding: 16px 17px; }
   .vchip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 5px;
     font-size: 11px; font-weight: 800; letter-spacing: .3px; }
@@ -21,8 +21,8 @@
   .ex { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 13px; }
   .exbox { border: 1px solid var(--line); border-radius: 9px; padding: 11px; }
   .exbox .lbl { font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px }
-  .exbox.w { background: #FEF2F2; border-color: #FECACA } .exbox.w .lbl { color: var(--bad) }
-  .exbox.s { background: #F0FDF4; border-color: #BBF7D0 } .exbox.s .lbl { color: var(--ok) }
+  .exbox.w { background: var(--bad-bg); border-color: var(--bad-dot) } .exbox.w .lbl { color: var(--bad) }
+  .exbox.s { background: var(--ok-bg); border-color: var(--ok-dot) } .exbox.s .lbl { color: var(--ok) }
   .exbox .txt { font-size: 13px; color: var(--ink); line-height: 1.4; font-weight: 550 }
   .field { border: 1px solid var(--line-2); border-radius: 9px; padding: 10px 13px; background: #fff;
     display: flex; align-items: center; gap: 10px; margin-bottom: 13px; box-shadow: var(--shadow); }

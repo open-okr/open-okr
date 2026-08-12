@@ -30,6 +30,36 @@ describe("Chip", () => {
     );
     expect(screen.getByText("On track")).toBeTruthy();
   });
+
+  /**
+   * This is the assertion the status palette leans on.
+   *
+   * The dots are deliberately saturated rather than contrast-maximised, and
+   * the justification is that WCAG 1.4.11 exempts a graphic whose meaning is
+   * carried elsewhere (UIUX-PLAN.md §7). That exemption is only true while
+   * the dot really is decorative: hidden from assistive technology, and
+   * never the whole content of the chip. If either stops holding, the
+   * palette owes 3:1 and the tokens have to change.
+   */
+  test("the dot is hidden from assistive technology", () => {
+    const { container } = render(
+      <Chip tone="warn" dot>
+        At risk
+      </Chip>,
+    );
+    const dot = container.querySelector("[aria-hidden='true']");
+    expect(dot).toBeTruthy();
+    // The chip's accessible name comes from the label alone.
+    expect(container.textContent).toBe("At risk");
+  });
+
+  test("a dot without a label carries no state at all", () => {
+    // Not a supported usage, asserted so the failure is loud rather than a
+    // silently unlabelled colour. A chip with a dot and no children has no
+    // text for anyone to read, which is exactly what rule 4 forbids.
+    const { container } = render(<Chip tone="bad" dot />);
+    expect(container.textContent).toBe("");
+  });
 });
 
 describe("Bar", () => {

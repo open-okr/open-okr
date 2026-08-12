@@ -29,11 +29,16 @@ export function CycleStrip({
   return (
     <div
       className={cn(
-        "cycle-strip flex flex-none items-center gap-3 border-b border-[#ddd9f8] bg-gradient-to-r from-brand-weak via-[#f4f1fe] to-[#f6f4fe] px-4.5 py-1.5 text-sm text-brand-600",
+        // The three hand-mixed indigo tints this strip used to carry are
+        // gone: they were the light theme's brand hue written out by hand,
+        // so they survived a theme change and a workspace brand override
+        // unchanged. --brand-weak fading to --surface gets the same wash
+        // from tokens that follow both.
+        "cycle-strip flex flex-none items-center gap-3 border-b border-brand-line bg-gradient-to-r from-brand-weak to-surface px-4.5 py-1.5 text-sm text-brand-text",
         className,
       )}
     >
-      <span className="rounded-full border border-brand-line bg-white/80 px-2.5 py-px font-bold shadow-[0_1px_2px_rgba(79,70,229,0.08)]">
+      <span className="rounded-full border border-brand-line bg-surface/80 px-2.5 py-px font-bold shadow-control">
         {phase}
       </span>
       {blocking ? (
