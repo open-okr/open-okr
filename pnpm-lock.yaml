@@ -424,6 +424,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@openokr/test-support':
+        specifier: workspace:*
+        version: link:../test-support
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.2

@@ -12,9 +12,8 @@ import { addKeyResult, createGoal, recordValue } from "./goal-actions.ts";
  * here is the object: a goal with a champion, a reviewer and key results that
  * carry a baseline, a target and a direction.
  *
- * Progress reads 0 on everything until the scoring cascade lands at P3-T05.
- * Showing a bar at 0 rather than hiding it is deliberate: the shape of the screen
- * should not change when the numbers start moving.
+ * Progress is real since P3-T05: the bar is the weighted average of the key
+ * results, recomputed in the same transaction as the write that moved it.
  */
 
 export interface DraftGoal {

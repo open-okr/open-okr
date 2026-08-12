@@ -228,7 +228,7 @@ export default async function CyclePage({
                     ? "The annual strategy surface arrives with the frame editor at P4-T02."
                     : viewing === 6
                       ? "The running cadence arrives with check-ins at P3-T07 and sessions at P4-T04."
-                      : "Closing a cycle arrives with scoring at P3-T05 and the review at P4-T08."}
+                      : "Scoring every key result and writing the cycle retrospective arrive with the review at P4-T08. The arithmetic behind the scores is already here."}
                 </p>
               </CardBody>
             </Card>

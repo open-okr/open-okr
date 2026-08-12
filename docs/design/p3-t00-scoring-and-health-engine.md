@@ -1,8 +1,16 @@
 # P3-T00: the scoring and health engine
 
 Part two of the Phase 3 design gate. Authority: METHOD.md §3 and
-TECHNICAL-PLAN.md §6.2. Implemented at P3-T05, in `packages/core`, as pure
-functions over a loaded graph.
+TECHNICAL-PLAN.md §6.2. Implemented at P3-T05 as pure functions over a loaded
+graph.
+
+**Where it landed, corrected at P3-T05.** This document said `packages/core`.
+The arithmetic went to `packages/method/src/scoring.ts` instead, because every
+function in it is a METHOD.md §3 rule taking a §11 threshold as an argument, and
+the repository rule is that those live in the method package and nowhere else.
+The same code has to run in the browser as somebody types, on the server before a
+write, and inside the agents. What is in `packages/core/src/scoring/recompute.ts`
+is the half that needs rows: loading the graph and writing the derived columns.
 
 Read [p3-t00-okr-core-domain.md](p3-t00-okr-core-domain.md) first for the
 decision register. Decisions D-1, D-2, D-3, D-4, D-5 and D-13 land here.
@@ -18,7 +26,7 @@ recomputeGoal(graph, change, thresholds) -> { goals: GoalDerived[], keyResults: 
 | Pure | No database, no clock, no network. The clock is an argument (`now`), the thresholds are an argument |
 | Total | Every input produces an answer. Nothing throws on bad data. Impossible states become a diagnostic and a defined value |
 | Rounding | Stored percentages carry 2 decimals, rounded half away from zero. Rounding happens once, at the boundary, never between cascade levels |
-| Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting |
+| Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure |
 
 Three numbers stay separate everywhere and are never averaged together
 (METHOD.md §3): progress is backward-looking 0 to 100%, confidence is
@@ -359,6 +367,14 @@ never on one key result.
 | exactly at the ambitious floor | 0.25 | ambitious |
 | just below ambitious | 0.2499 | moonshot |
 | pure fantasy | 0 | moonshot |
+
+Both upper bands are worded "above" in §3.2, so each excludes its own boundary
+and 0.75 belongs to the sweet spot rather than to comfortable. §11 holds three of
+the four boundaries this table needs: 0.90, 0.75 and 0.25. The fourth, the sweet
+spot floor at 0.40, is read from `scoring.confidenceLow`, the same number in the
+same section, rather than written down twice. If the two are ever meant to move
+apart, §11 needs a `scoring.draftSweetSpot` parameter, and that is a METHOD.md
+decision.
 
 ## 11. Acceptance criteria
 

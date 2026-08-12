@@ -94,8 +94,9 @@ export default async function GoalPage({
             </p>
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
-                Progress and health are computed by the scoring cascade, which
-                arrives at P3-T05. Until then every goal reads 0% and pending.
+                Nothing has moved yet. Progress is the weighted average of the
+                key results, recomputed on every write, and health follows the
+                §3.5 precedence rather than a formula over progress.
               </p>
             ) : null}
           </CardBody>

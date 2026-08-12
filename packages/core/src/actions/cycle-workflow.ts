@@ -45,6 +45,7 @@ import {
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
+import { recomputeForCycle } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** Editor JSON, validated before it reaches storage. Never Markdown. */
@@ -992,6 +993,13 @@ export const publishCycle = defineWriteAction({
       }
 
       const at = new Date();
+      // Publication is the moment the set becomes the thing everybody reads, so
+      // every derived column in it is settled here rather than on the next write
+      // to each goal (P3-T05).
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      await recomputeForCycle(tx, workspaceId, input.cycleId, thresholds, at);
       await tx
         .update(cycles)
         .set({ publishedAt: at, status: "active", phase: 6, updatedAt: at })

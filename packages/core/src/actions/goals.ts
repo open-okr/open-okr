@@ -33,6 +33,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import {
   asNumber,
   clampWeight,
@@ -49,6 +51,7 @@ import {
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
+import { recomputeForGoal } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const richText = z
@@ -142,6 +145,23 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
+}
+
+/**
+ * Recomputes the derived columns after a write, in the same transaction.
+ *
+ * Every write below that can move a number calls this, and nothing else writes
+ * `progress_pct`, `health` or `forecast` (P3-T05). It is a function rather than a
+ * line repeated eleven times, so a write added later cannot leave the cascade
+ * stale above it.
+ */
+async function recompute(
+  tx: OperationTx,
+  workspaceId: string,
+  goalId: string,
+): Promise<void> {
+  const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  await recomputeForGoal(tx, workspaceId, goalId, rhythm.thresholds);
 }
 
 /** The level the acting member holds on one goal, or not-found. */
@@ -684,6 +704,8 @@ export const createGoal = defineWriteAction({
         contributionStatement: input.contributionStatement ?? null,
       });
 
+      await recompute(tx, workspaceId, created.id);
+
       return {
         result: { id: created.id, title: created.title },
         activity: {
@@ -821,6 +843,8 @@ export const updateGoal = defineWriteAction({
         throw new OperationError("not_found", "No such goal.");
       }
 
+      await recompute(tx, workspaceId, updated.id);
+
       return {
         result: { id: updated.id },
         activity: {
@@ -889,6 +913,8 @@ export const closeGoal = defineWriteAction({
         retrospectiveBody: input.retrospectiveBody,
       });
 
+      await recompute(tx, workspaceId, input.id);
+
       return {
         result: { id: input.id, successStatus: input.successStatus },
         activity: {
@@ -937,6 +963,7 @@ export const reopenGoal = defineWriteAction({
       );
 
       await reopenGoalInTx(tx, { workspaceId, goalId: input.id });
+      await recompute(tx, workspaceId, input.id);
 
       return {
         result: { id: input.id },
@@ -1090,6 +1117,8 @@ export const moveGoalToCycle = defineWriteAction({
         throw new OperationError("not_found", "No such goal.");
       }
 
+      await recompute(tx, workspaceId, moved.id);
+
       return {
         result: { id: moved.id, cycleId: input.cycleId },
         activity: {
@@ -1162,6 +1191,8 @@ export const createKeyResult = defineWriteAction({
         capacity: input.capacity ?? null,
         authorMemberId: memberId,
       });
+
+      await recompute(tx, workspaceId, input.goalId);
 
       return {
         result: { id: created.id },
@@ -1277,6 +1308,8 @@ export const updateKeyResult = defineWriteAction({
           ),
         );
 
+      await recompute(tx, workspaceId, owner.goalId);
+
       return {
         result: { id: input.id },
         activity: {
@@ -1346,6 +1379,8 @@ export const recordKeyResultValue = defineWriteAction({
         note: input.note ?? null,
       });
 
+      await recompute(tx, workspaceId, owner.goalId);
+
       return {
         result: { id: input.id, value: input.value },
         activity: {
@@ -1405,6 +1440,8 @@ export const unlinkKeyResultKpi = defineWriteAction({
         keyResultId: input.id,
         authorMemberId: memberId,
       });
+
+      await recompute(tx, workspaceId, owner.goalId);
 
       return {
         result: { id: input.id },

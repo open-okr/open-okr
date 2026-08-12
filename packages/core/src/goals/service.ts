@@ -20,9 +20,9 @@
  * member's bindings stop resolving.
  *
  * **Derived columns are not written here.** `progress_pct`, `health` and
- * `forecast` belong to the scoring cascade at P3-T05. A goal created here reads
- * 0% and `pending`, which is what §4.1 says a goal with no published check-in
- * is.
+ * `forecast` belong to the scoring cascade in `scoring/recompute.ts`, which the
+ * actions call in the same transaction (P3-T05). A goal created here reads 0% and
+ * `pending`, and stays that way until something moves.
  */
 import {
   activeOnly,
@@ -497,8 +497,9 @@ export async function closeGoalInTx<
  * Reopens a goal (§4.3).
  *
  * Clears the outcome and the decision, keeps the retrospective, and puts health
- * back to `pending`. Recomputing it from the check-in cascade is P3-T05's job,
- * and `pending` is the honest reading until there is a cascade to ask.
+ * back to `pending`, and the caller's recompute settles it: the §3.5 precedence
+ * puts staleness above the last check-in, so a reopened goal that is already
+ * overdue reads `outdated` rather than `pending`.
  */
 export async function reopenGoalInTx<
   TSchema extends Record<string, unknown> = Record<string, never>,

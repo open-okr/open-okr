@@ -715,3 +715,177 @@ describe("the workflow snapshot now that goals exist", () => {
     void keyResults;
   });
 });
+
+describe("the scoring cascade against real rows", () => {
+  /**
+   * The task's acceptance criteria (P3-T05), driven through the actions so the
+   * derived columns are read back from the database rather than from the engine's
+   * return value. The engine's own arithmetic is proved against the golden masters
+   * in `packages/method`; what this file proves is that the rows agree.
+   */
+  it("scores a goal at eighty percent from key results weighted two and one", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+
+    // 100% and 40%, weighted 2 and 1. The plan's own example.
+    const first = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.addKeyResult",
+      {
+        goalId: created.id,
+        title: "Raise activation from 0 to 100",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 100,
+        weight: 2,
+      },
+    );
+    const second = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.addKeyResult",
+      {
+        goalId: created.id,
+        title: "Cut cost per ticket from 0 to 100",
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 0,
+        targetValue: 100,
+        weight: 1,
+      },
+    );
+
+    await callAction({ pool: wb.appPool, ...context() }, "goals.recordValue", {
+      id: first.id,
+      value: 100,
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "goals.recordValue", {
+      id: second.id,
+      value: 40,
+    });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.progressPct).toBe(80);
+    expect(read.keyResults.find((kr) => kr.id === first.id)?.progressPct).toBe(
+      100,
+    );
+    expect(read.keyResults.find((kr) => kr.id === second.id)?.progressPct).toBe(
+      40,
+    );
+  });
+
+  it("reads outdated for a stale goal, whatever its last status said", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    // Four days past due against the canon three-day grace. Check-ins arrive at
+    // P3-T07, so the last status is not in play yet; the rule that matters here
+    // is that staleness outranks whatever rule 3 would have said.
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() - interval '4 days' where id = $1",
+      [created.id],
+    );
+
+    // Any write recomputes, so the staleness is picked up by the next one.
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: created.id,
+      title: "Make mobile the way our customers prefer to reach us",
+    });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.health).toBe("outdated");
+  });
+
+  it("rolls a child's progress into its parent", async () => {
+    const wb = await workerDb();
+    const parent = await createGoal({ title: "Parent" });
+    await callAction({ pool: wb.appPool, ...context() }, "goals.addKeyResult", {
+      goalId: parent.id,
+      title: "Parent measure",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 0,
+      targetValue: 100,
+      weight: 1,
+    });
+
+    const child = await createGoal({
+      title: "Child",
+      parentGoalId: parent.id,
+    });
+    const childKeyResult = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.addKeyResult",
+      {
+        goalId: child.id,
+        title: "Child measure",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 100,
+        weight: 1,
+      },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "goals.recordValue", {
+      id: childKeyResult.id,
+      value: 100,
+    });
+
+    // The parent's own measure sits at 0, the child at 100, both weight 1.
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: parent.id },
+    );
+    expect(read.progressPct).toBe(50);
+  });
+
+  it("writes a forecast that flags a decaying key result", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    const keyResult = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.addKeyResult",
+      {
+        goalId: created.id,
+        title: "Raise activation from 0 to 100",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 100,
+        weight: 1,
+      },
+    );
+
+    // Three rising but decaying points. The status still looks fine; the forecast
+    // is what says it will miss.
+    for (const [days, value] of [
+      [21, 0],
+      [14, 10],
+      [7, 12],
+    ] as const) {
+      await wb.admin.query(
+        `insert into key_result_values (id, workspace_id, key_result_id, value, at, source)
+         values (gen_random_uuid(), $1, $2, $3, now() - ($4 || ' days')::interval, 'manual')`,
+        [workspaceId, keyResult.id, value, days],
+      );
+    }
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: created.id,
+      title: "Make mobile the way our customers prefer to reach us",
+    });
+
+    const forecast = await wb.admin.query<{
+      forecast: Record<string, unknown>;
+    }>("select forecast from key_results where id = $1", [keyResult.id]);
+    expect(forecast.rows[0]?.forecast).not.toBeNull();
+    expect(forecast.rows[0]?.forecast?.trendingOffTrack).toBe(true);
+  });
+});
