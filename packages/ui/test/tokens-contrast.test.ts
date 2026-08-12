@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -19,12 +18,10 @@ import { describe, expect, it } from "vitest";
  * re-themed token instead of pinning the colour it happens to hold today.
  */
 
-// Resolved from the Vitest root (this package) rather than import.meta.url,
-// which the jsdom environment rewrites to an http URL that node:fs cannot open.
-const tokens = readFileSync(
-  resolve(process.cwd(), "src/styles/tokens.css"),
-  "utf8",
-);
+// The path is inlined by `define` in vitest.config.ts rather than derived
+// here: neither process.cwd() nor import.meta.url is the same under `pnpm
+// test` and `pnpm test:ci`. See test/globals.d.ts.
+const tokens = readFileSync(__TOKENS_CSS_PATH__, "utf8");
 
 /**
  * Reads the custom properties from one selector block. Deliberately a small
