@@ -17,6 +17,23 @@ corepack enable   # once per machine; makes the pinned pnpm available
 pnpm install
 ```
 
+### Editor tooling
+
+`.mcp.json` declares the Model Context Protocol servers an AI coding assistant
+picks up in this repository. They are development aids only. Nothing in the
+build, the tests or the shipped product depends on them, and they are fetched on
+demand with `npx`, so they add no dependency to the lockfile.
+
+| Server | What it is for |
+|---|---|
+| `next-devtools` | Next.js App Router guidance while working in `apps/web` |
+| `better-icons` | Searching icon libraries when picking an icon for a screen |
+
+`better-icons` is a search tool, not a source of runtime code. The icon set stays
+`lucide-react`, and a new icon dependency needs human approval like any other. If
+an icon has no lucide equivalent, vendor the single SVG into `packages/ui` rather
+than adding a library.
+
 ## Commands
 
 | Command | What it does |
