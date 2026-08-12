@@ -14,13 +14,18 @@ import { type NextRequest, NextResponse } from "next/server";
  * still calls `requireSession`, which validates the session for real. A
  * forged cookie gets past here and is refused there.
  *
- * The headers are unconditional: a strict content security policy with a
- * fresh nonce per response (`'unsafe-eval'` only in development, where React
- * needs `eval` to reconstruct server error stacks — neither React nor Next
- * uses it in production), plus transport, frame and referrer policy. Nonce
- * CSP needs every page dynamically rendered, which every page under this
- * proxy already is: `requireSession`/`requireWorkspace` call `headers()`, a
- * dynamic API, before anything else.
+ * Every response carries a strict content security policy with a fresh nonce,
+ * plus transport, frame and referrer policy. Nonce CSP needs every page
+ * dynamically rendered, which every page under this proxy already is:
+ * `requireSession`/`requireWorkspace` call `headers()`, a dynamic API, before
+ * anything else.
+ *
+ * Three directives differ in development, each for a stated reason on
+ * `buildContentSecurityPolicy` below: `'unsafe-eval'` is added because React
+ * needs `eval` to reconstruct server error stacks and neither React nor Next
+ * uses it in production, `style-src` accepts inline styles the dev bundler
+ * injects, and `upgrade-insecure-requests` is left out because it makes every
+ * development host other than `localhost` unusable.
  */
 const PUBLIC_PREFIXES = [
   "/sign-in",
@@ -38,7 +43,24 @@ const PUBLIC_PREFIXES = [
   "/api/health",
 ];
 
-/** A fresh nonce and the CSP header built around it, one pair per request. */
+/**
+ * A fresh nonce and the CSP header built around it, one pair per request.
+ *
+ * **`upgrade-insecure-requests` is production-only.** It tells the browser to
+ * fetch every subresource over https, which is right for a deployed instance and
+ * unusable in development: browsers exempt `localhost` and `127.0.0.1` from the
+ * upgrade and nothing else. So a developer serving the app on any other name
+ * over http gets every stylesheet and script requested over https, refused, and
+ * a page rendered as raw HTML with no styling at all.
+ *
+ * Two ordinary development setups hit that. A local domain through a reverse
+ * proxy (`http://openokr.test`), and testing on a real phone over the LAN
+ * address (`http://192.168.1.20:3000`), which is the only way to check the
+ * mobile tab bar on a real device. Neither is exotic and both were broken.
+ *
+ * Production is untouched: the directive is still sent whenever `NODE_ENV` is
+ * not development, which is what the Docker and Helm targets both run as.
+ */
 function buildContentSecurityPolicy(): { nonce: string; header: string } {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
@@ -52,8 +74,7 @@ function buildContentSecurityPolicy(): { nonce: string; header: string } {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';
-    upgrade-insecure-requests;
+    frame-ancestors 'none';${isDev ? "" : "\n    upgrade-insecure-requests;"}
   `;
   return { nonce, header: cspHeader.replace(/\s{2,}/g, " ").trim() };
 }
