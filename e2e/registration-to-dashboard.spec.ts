@@ -276,6 +276,47 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
   ).toBeVisible();
 });
 
+/**
+ * The check-in walker (P3-T07).
+ *
+ * What a browser settles here is that the walker reports honestly rather than
+ * inventing work: it lists only goals the reader champions that are due, and a
+ * goal reached directly shows its own history even when it is not.
+ *
+ * The publish path is deliberately not driven from here. Making a goal due needs
+ * the database, which this suite has no access to by design, and a goal created
+ * today with a Monday anchor is due next Monday, so the assertion would pass or
+ * fail depending on the day it ran. That path is covered by the core suite against
+ * real rows instead.
+ */
+test("the check-in walker lists only what is actually due", async () => {
+  await page.goto("/check-in");
+
+  await expect(page.getByRole("heading", { name: "Check in" })).toBeVisible();
+  // The goal created earlier is due next Monday, so nothing is inside the
+  // two-day window and the walker says so rather than offering it.
+  await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
+  await expect(page.getByText("0 due")).toBeVisible();
+});
+
+test("a goal reached directly shows its history and refuses a draft", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+  const goalId = new URL(page.url()).pathname.split("/").pop() as string;
+
+  await page.goto(`/check-in?goal=${goalId}`);
+  await expect(page.getByText("This goal is not due")).toBeVisible();
+  // No composer, because opening one on a goal already reported on would leave an
+  // empty draft behind every time somebody looked at the page.
+  await expect(
+    page.getByRole("button", { name: "Publish" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Check-in history" }),
+  ).toBeVisible();
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.

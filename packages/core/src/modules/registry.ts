@@ -65,6 +65,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "check-in",
+    navigation: [
+      {
+        id: "check-in",
+        label: "Check in",
+        href: "/check-in",
+        section: "sidebar",
+        // Every member can reach it. The walker only ever lists the goals they
+        // champion, so a member with nothing due sees an empty list rather than
+        // somebody else's obligations (P3-T07).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "spaces",
     navigation: [
       {

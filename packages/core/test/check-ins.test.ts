@@ -603,3 +603,90 @@ describe("confidence votes", () => {
     expect(after.rows[0]).toEqual(before.rows[0]);
   });
 });
+
+describe("the due list the walker reads", () => {
+  it("offers a goal only to the member who champions it", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() + interval '2 hours' where id = $1",
+      [goalId],
+    );
+
+    const mine = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(mine.goals.map((goal) => goal.id)).toEqual([goalId]);
+    expect(mine.goals[0]?.keyResultCount).toBe(1);
+    expect(mine.goals[0]?.hasOpenDraft).toBe(false);
+
+    // The reviewer can read the goal and cannot check it in. METHOD.md §2.5 puts
+    // the check-in on the champion, so offering it to anybody else would be
+    // asking the wrong person.
+    const theirs = await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(theirs.goals).toEqual([]);
+  });
+
+  it("reports an open draft so the walker can be resumed", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() + interval '2 hours' where id = $1",
+      [goalId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "goals.startCheckIn", {
+      goalId,
+    });
+
+    const due = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(due.goals[0]?.hasOpenDraft).toBe(true);
+  });
+
+  it("leaves out a goal that is not due yet, and a closed one", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() + interval '10 days' where id = $1",
+      [goalId],
+    );
+    const ahead = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(ahead.goals).toEqual([]);
+
+    // Overdue is always in, however far past.
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() - interval '30 days' where id = $1",
+      [goalId],
+    );
+    const overdue = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(overdue.goals[0]?.daysPastDue).toBe(30);
+
+    // A closed goal is never due, so it never appears.
+    await callAction({ pool: wb.appPool, ...context() }, "goals.close", {
+      id: goalId,
+      successStatus: "achieved",
+      closeDecision: "keep",
+      retrospectiveBody: richText("Landed."),
+    });
+    const closed = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 2 },
+    );
+    expect(closed.goals).toEqual([]);
+  });
+});

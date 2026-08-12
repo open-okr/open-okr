@@ -14,6 +14,7 @@
 import {
   activeOnly,
   CAPACITY_VERDICTS,
+  checkIns,
   cycles,
   GOAL_CLOSE_DECISIONS,
   GOAL_LEVELS,
@@ -28,7 +29,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -513,6 +514,143 @@ export const readGoal = defineReadAction({
                 updatedAt: new Date(retro.updatedAt).toISOString(),
               }
             : null,
+        };
+      },
+    );
+  },
+});
+
+export const listDueGoals = defineReadAction({
+  name: "goals.due",
+  summary:
+    "The goals this member champions that are due a check-in, soonest first. Drives the session walker.",
+  input: z.object({
+    /** Days ahead to count as due soon. 0 is "due or overdue only". */
+    withinDays: z.number().int().min(0).max(30).default(2),
+  }),
+  output: z.object({
+    goals: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        level: z.enum(GOAL_LEVELS),
+        health: z.string(),
+        progressPct: z.number(),
+        nextCheckInOn: z.string().nullable(),
+        daysPastDue: z.number().int().nullable(),
+        keyResultCount: z.number().int(),
+        hasOpenDraft: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+        const now = new Date();
+
+        // The champion's own goals. METHOD.md §2.5: the champion posts the
+        // check-ins, so a walker that offered somebody else's goals would be
+        // asking the wrong person.
+        const rows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            level: goals.level,
+            health: goals.health,
+            progressPct: goals.progressPct,
+            nextCheckInAt: goals.nextCheckInAt,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              eq(goals.championId, memberId),
+              isNull(goals.closedAt),
+              isNotNull(goals.nextCheckInAt),
+            ),
+          )
+          .orderBy(asc(goals.nextCheckInAt));
+
+        const visible = [];
+        for (const row of rows) {
+          const days = daysPastDue(row.nextCheckInAt, now, timeZone);
+          // Due, overdue, or due inside the lead the caller asked for.
+          if (days === null || days < -input.withinDays) {
+            continue;
+          }
+          try {
+            await requireGoalAccess(
+              tx,
+              context.workspaceId,
+              memberId,
+              row.id,
+              ACCESS_LEVELS.view,
+            );
+          } catch (error) {
+            if (error instanceof OperationError && error.code === "not_found") {
+              continue;
+            }
+            throw error;
+          }
+          visible.push({ row, days });
+        }
+
+        const ids = visible.map((entry) => entry.row.id);
+        const counts =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({ id: keyResults.id, goalId: keyResults.goalId })
+                .from(keyResults)
+                .where(
+                  activeOnly(
+                    keyResults,
+                    eq(keyResults.workspaceId, context.workspaceId),
+                    inArray(keyResults.goalId, ids),
+                  ),
+                );
+        const drafts =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({ subjectId: checkIns.subjectId })
+                .from(checkIns)
+                .where(
+                  activeOnly(
+                    checkIns,
+                    eq(checkIns.workspaceId, context.workspaceId),
+                    eq(checkIns.authorMemberId, memberId),
+                    eq(checkIns.state, "draft"),
+                    inArray(checkIns.subjectId, ids),
+                  ),
+                );
+        const withDraft = new Set(drafts.map((row) => row.subjectId));
+
+        return {
+          goals: visible.map(({ row, days }) => ({
+            id: row.id,
+            title: row.title,
+            level: row.level,
+            health: row.health,
+            progressPct: asNumber(row.progressPct) ?? 0,
+            nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
+            daysPastDue: days,
+            keyResultCount: counts.filter((entry) => entry.goalId === row.id)
+              .length,
+            hasOpenDraft: withDraft.has(row.id),
+          })),
         };
       },
     );
