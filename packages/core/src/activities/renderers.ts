@@ -118,6 +118,26 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Cycle "${asString(p.name, "a cycle")}" was archived`,
   "rhythm.updated": (p) =>
     `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "cycle.pack_item_set": (p) =>
+    `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
+  "cycle.pack_distributed": () => "The input pack was distributed",
+  "cycle.issue_added": (p) =>
+    `A strategic issue was added at impact ${Number(p.impact ?? 0)}`,
+  "cycle.issue_reranked": (p) =>
+    `A strategic issue was reranked to impact ${Number(p.impact ?? 0)}`,
+  "cycle.priority_added": (p) =>
+    p.promoted
+      ? "An issue was promoted into a priority"
+      : "A priority was added",
+  "cycle.revalidated": (p) =>
+    p.changed
+      ? "The annual frame was revalidated with a change"
+      : "The annual frame was revalidated and holds",
+  "cycle.baseline_health_set": () => "Baseline health was recorded",
+  "cycle.capacity_recorded": () => "What was cut was recorded",
+  "cycle.calibrated": () => "The cycle was calibrated mid-flight",
+  "cycle.published": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was published`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
 };

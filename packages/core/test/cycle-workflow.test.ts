@@ -386,6 +386,154 @@ describe("opening phase 4 against real rows", () => {
   });
 });
 
+describe("the workflow actions", () => {
+  it("recomputes the gate rows on a pack-item write, without being asked", async () => {
+    const wb = await workerDb();
+    // No gate rows exist until something writes. One ordinary workflow write is
+    // what §4.3's "recomputed on every relevant write" means.
+    const before = await wb.admin.query<{ n: number }>(
+      "select count(*)::int as n from cycle_gate_state where cycle_id = $1",
+      [cycleId],
+    );
+    expect(before.rows[0]?.n).toBe(0);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.setPackItem",
+      { cycleId, itemKey: 3, gathered: true },
+    );
+
+    const after = await wb.admin.query<{ n: number }>(
+      "select count(*)::int as n from cycle_gate_state where cycle_id = $1",
+      [cycleId],
+    );
+    expect(after.rows[0]?.n).toBe(6);
+  });
+
+  it("reads the phases, the gates and the pack in one call", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "workflow.addIssue", {
+      cycleId,
+      text: "Onboarding drops half of new sign-ups",
+      impact: 5,
+      source: "manual",
+    });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(read.phases).toHaveLength(8);
+    expect(read.gates).toHaveLength(6);
+    expect(read.packItems).toHaveLength(7);
+    expect(read.issues[0]?.impact).toBe(5);
+    expect(read.publishable).toBe(false);
+  });
+
+  it("refuses to publish while a gate cannot be evaluated, and says which", async () => {
+    // The guard that matters most: a set must never publish through a gate that
+    // is red or cannot answer. Four of them read goals, which do not exist yet.
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
+        cycleId,
+      }),
+    ).rejects.toThrow(/all six gates are green/i);
+  });
+
+  it("names the blocked gates in the refusal rather than failing silently", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
+      cycleId,
+    }).catch((error: unknown) => {
+      expect(String(error)).toMatch(/P3-T04/);
+    });
+  });
+
+  it("refuses a change to a revalidation marked as changed with no note", async () => {
+    // §2.1: the frame is revalidated, never rewritten. A change with no note is
+    // a rewrite nobody recorded.
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.setRevalidation",
+        {
+          cycleId,
+          holds: false,
+          changed: true,
+        },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("accepts a revalidation that holds, and phase 3 then passes", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.setRevalidation",
+      { cycleId, holds: true, changed: false, focusNote: "Mobile activation" },
+    );
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(read.phases[3]?.state).toBe("pass");
+  });
+
+  it("allows one calibration and refuses the second in words", async () => {
+    // §7.6 allows one. The unique index would refuse the second anyway; the
+    // action turns a constraint violation into a sentence somebody can read.
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
+      cycleId,
+      reason: "The market moved under the set",
+    });
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "workflow.calibrate", {
+        cycleId,
+        reason: "Again",
+      }),
+    ).rejects.toThrow(/already been calibrated/i);
+  });
+
+  it("promotes an issue into a priority in one write", async () => {
+    const wb = await workerDb();
+    const issue = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.addIssue",
+      {
+        cycleId,
+        text: "Support cost per ticket is climbing",
+        impact: 4,
+        source: "manual",
+      },
+    );
+    const priority = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.addPriority",
+      {
+        cycleId,
+        text: "Make support cheaper per ticket",
+        successStatement: "Cost per ticket down a third by year end",
+        fromIssueId: issue.id,
+      },
+    );
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    );
+    expect(read.priorities).toHaveLength(1);
+    expect(
+      read.issues.find((entry) => entry.id === issue.id)?.promotedToPriorityId,
+    ).toBe(priority.id);
+  });
+});
+
 describe("the pack items table itself", () => {
   it("refuses a second row for the same item", async () => {
     await inOperation((tx) => ensurePackItemsInTx(tx, workspaceId, cycleId));

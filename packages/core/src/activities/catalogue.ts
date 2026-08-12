@@ -123,6 +123,23 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.archived": z.object({ name: z.string() }),
   "rhythm.updated": z.object({ keys: z.array(z.string()) }),
   "frame.set": z.object({ yearLabel: z.string() }),
+  // The guided cycle workflow (P3-T03).
+  "cycle.pack_item_set": z.object({
+    itemKey: z.number().int(),
+    gathered: z.boolean(),
+  }),
+  "cycle.pack_distributed": z.object({ name: z.string() }),
+  "cycle.issue_added": z.object({
+    impact: z.number().int(),
+    source: z.string(),
+  }),
+  "cycle.issue_reranked": z.object({ impact: z.number().int() }),
+  "cycle.priority_added": z.object({ promoted: z.boolean() }),
+  "cycle.revalidated": z.object({ holds: z.boolean(), changed: z.boolean() }),
+  "cycle.baseline_health_set": z.object({}),
+  "cycle.capacity_recorded": z.object({}),
+  "cycle.calibrated": z.object({}),
+  "cycle.published": z.object({ name: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

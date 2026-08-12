@@ -426,7 +426,14 @@ export async function ensurePackItemsInTx<
   }
 }
 
-/** The pack rows in §2.6 order, with the item's own words beside each. */
+/**
+ * All seven §2.6 items in order, whether or not a row exists for one.
+ *
+ * The list is canon, not data: §2.6 names the seven, and a cycle nobody has
+ * opened yet has simply gathered none of them. Returning only the rows would
+ * make the phase 1 surface show an empty list until something wrote, and the
+ * alternative, having a read create the rows, is a read that writes.
+ */
 export async function readPackItems<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, workspaceId: string, cycleId: string) {
@@ -447,8 +454,17 @@ export async function readPackItems<
     )
     .orderBy(asc(cyclePackItems.itemKey));
 
-  return rows.map((row) => ({
-    ...row,
-    label: INPUT_PACK_ITEMS[row.itemKey - 1] ?? `Item ${row.itemKey}`,
-  }));
+  const byKey = new Map(rows.map((row) => [row.itemKey, row]));
+
+  return INPUT_PACK_ITEMS.map((label, index) => {
+    const itemKey = index + 1;
+    const row = byKey.get(itemKey);
+    return {
+      id: row?.id ?? null,
+      itemKey,
+      label,
+      gathered: row?.gathered ?? false,
+      note: row?.note ?? null,
+    };
+  });
 }

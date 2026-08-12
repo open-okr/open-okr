@@ -57,6 +57,19 @@ import {
 } from "./ai-usage.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
+  addIssue,
+  addPriority,
+  calibrateCycle,
+  distributePack,
+  publishCycle,
+  readWorkflow,
+  setBaselineHealth,
+  setCapacityNotes,
+  setIssueImpact,
+  setPackItem,
+  setRevalidation,
+} from "./cycle-workflow.ts";
+import {
   archiveCycle,
   createCycle,
   ensureCurrentCycle,
@@ -211,6 +224,17 @@ export const ACTION_MAP = {
   "rhythm.update": updateRhythmSettings,
   "frame.read": readAnnualFrame,
   "frame.set": setAnnualFrame,
+  "workflow.read": readWorkflow,
+  "workflow.setPackItem": setPackItem,
+  "workflow.distributePack": distributePack,
+  "workflow.addIssue": addIssue,
+  "workflow.setIssueImpact": setIssueImpact,
+  "workflow.addPriority": addPriority,
+  "workflow.setRevalidation": setRevalidation,
+  "workflow.setBaselineHealth": setBaselineHealth,
+  "workflow.setCapacityNotes": setCapacityNotes,
+  "workflow.calibrate": calibrateCycle,
+  "workflow.publish": publishCycle,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;
