@@ -21,7 +21,7 @@ function ResetPasswordForm() {
         footer={
           <Link
             href="/forgot-password"
-            className="font-medium text-brand-600 hover:underline"
+            className="font-medium text-brand-text hover:underline"
           >
             Ask for a new link
           </Link>

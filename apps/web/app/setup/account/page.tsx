@@ -38,7 +38,7 @@ export default async function SetupAccountPage() {
         <FinishSetup />
         <Link
           href="/sign-in"
-          className="text-sm font-medium text-brand-600 hover:underline"
+          className="text-sm font-medium text-brand-text hover:underline"
         >
           Sign in
         </Link>

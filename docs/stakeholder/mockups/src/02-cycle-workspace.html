@@ -26,7 +26,7 @@
   .box.n { border-color: var(--bad-dot); border-style: dashed; }
   .pk .t { font-size: 12.5px; font-weight: 570; }
   .pk .d { font-size: 11.5px; color: var(--ink-3); }
-  .blocked { background: #FFF7ED; border: 1px solid #FED7AA; border-radius: var(--r); padding: 11px 12px; }
+  .blocked { background: var(--warn-bg); border: 1px solid var(--warn-dot); border-radius: var(--r); padding: 11px 12px; }
   .tl { display: grid; grid-template-columns: 58px 1fr 74px; gap: 8px; padding: 6px 0; font-size: 12px; border-bottom: 1px solid var(--line) }
   .tl:last-child { border: 0 }
   .guide li { font-size: 12px; color: var(--ink-2); margin: 0 0 7px 15px; line-height: 1.5; }
@@ -93,10 +93,10 @@
               <span class="sub" style="margin-left:auto">Completion is computed, never self-reported</span></div>
             <div class="card-b" style="padding:12px 14px">
               <div class="blocked row" style="align-items:flex-start;gap:9px">
-                <svg class="ic" style="width:16px;height:16px;color:#C2410C;margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                <svg class="ic" style="width:16px;height:16px;color:var(--warn);margin-top:1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
                 <div>
-                  <div class="h3" style="color:#9A3412">Drafting stays locked until the input pack is complete</div>
-                  <div class="tiny" style="color:#9A3412;margin-top:2px">A planning session without inputs produces objectives written from opinion. Missing: customer and market signal, capacity and constraints, the distribution confirmation.</div>
+                  <div class="h3" style="color:var(--warn)">Drafting stays locked until the input pack is complete</div>
+                  <div class="tiny" style="color:var(--warn);margin-top:2px">A planning session without inputs produces objectives written from opinion. Missing: customer and market signal, capacity and constraints, the distribution confirmation.</div>
                 </div>
               </div>
             </div>

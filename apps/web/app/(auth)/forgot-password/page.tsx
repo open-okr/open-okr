@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
       >
         <Link
           href="/sign-in"
-          className="font-medium text-brand-600 hover:underline"
+          className="font-medium text-brand-text hover:underline"
         >
           Back to sign in
         </Link>
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
       footer={
         <Link
           href="/sign-in"
-          className="font-medium text-brand-600 hover:underline"
+          className="font-medium text-brand-text hover:underline"
         >
           Back to sign in
         </Link>

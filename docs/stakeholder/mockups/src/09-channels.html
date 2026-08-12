@@ -4,7 +4,7 @@
 <title>Channels: the coach reaches you where you work</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  html, body { height: 830px; background: #EEF1F5; }
+  html, body { height: 830px; background: var(--raised); }
   .stage { padding: 26px 30px; }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .win { background: #fff; border-radius: 14px; box-shadow: 0 6px 22px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06); overflow: hidden;
@@ -34,20 +34,20 @@
   .sbtns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap }
   .sbtn { border: 1px solid var(--line-2); background: #fff; border-radius: 5px; padding: 4px 9px; font-size: 11px; font-weight: 650; color: var(--ink-2) }
   .sbtn.g { background: #007A5A; border-color: #007A5A; color: #fff }
-  .sbtn.b { background: #4F46E5; border-color: #4F46E5; color: #fff }
+  .sbtn.b { background: var(--brand); border-color: var(--brand); color: #fff }
   .prov { font-size: 10px; color: var(--ink-4); margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line) }
   .bub { max-width: 88%; padding: 8px 10px; border-radius: 12px; font-size: 11.5px; line-height: 1.45; margin-bottom: 8px; position: relative }
-  .bub.in { background: #fff; border: 1px solid #E6EBF0; border-bottom-left-radius: 3px }
+  .bub.in { background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 3px }
   .bub.out { background: #D9FDD3; margin-left: auto; border-bottom-right-radius: 3px }
   .bub .tm { font-size: 9px; color: var(--ink-4); text-align: right; margin-top: 3px }
   .wa { background: #EFE7DE; padding: 12px; }
-  .tg { background: #E8EDF2; padding: 12px; }
+  .tg { background: var(--line); padding: 12px; }
   .bub.tgin { background: #fff; border: 0 }
   .bub.tgout { background: #E3F1FD; margin-left: auto }
   .ikb { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px }
   .ikb span { background: #F1F5F9; border-radius: 6px; padding: 5px; font-size: 10.5px; font-weight: 650; text-align: center; color: #2563EB }
   .ikb span.full { grid-column: 1/-1 }
-  .card2 { border: 1px solid #E1E4E8; border-radius: 8px; padding: 11px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06) }
+  .card2 { border: 1px solid var(--line); border-radius: 8px; padding: 11px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.06) }
   .lead { font-size: 13px; color: var(--ink-2); line-height: 1.55 }
 </style>
 
@@ -78,7 +78,7 @@
               <div class="facts">
                 <span class="k">Now</span><span class="v">17 days</span>
                 <span class="k">Last confidence</span><span class="v" style="color:var(--bad)">0.3 low</span>
-                <span class="k">Last check-in</span><span class="v" style="color:#C2410C">11 days ago</span>
+                <span class="k">Last check-in</span><span class="v" style="color:var(--warn)">11 days ago</span>
                 <span class="k">Escalation</span><span class="v">Step 3 of 5 · reviewer</span>
               </div>
             </div>

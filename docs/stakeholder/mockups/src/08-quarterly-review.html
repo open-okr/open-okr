@@ -29,8 +29,8 @@
   .stg.on .t { color: var(--brand-600) }
   .stg .m { font-size: 10px; color: var(--ink-4); font-variant-numeric: tabular-nums }
   .act { font-size: 9.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--ink-4); padding: 9px 9px 3px }
-  .diag { border-radius: var(--r-lg); padding: 15px 17px; background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-    border: 1px solid #FCD34D }
+  .diag { border-radius: var(--r-lg); padding: 15px 17px; background: linear-gradient(135deg, var(--warn-bg) 0%, var(--warn-bg) 100%);
+    border: 1px solid var(--warn-dot) }
   .cause { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 11px; margin-bottom: 9px; background: #fff }
   .pick { border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 7px; font-size: 10.5px; font-weight: 600; background: #fff; color: var(--ink-2) }
   .pick.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand-600) }
@@ -106,21 +106,21 @@
         <div class="col stagger" style="gap:13px;min-width:0">
           <div class="diag">
             <div class="row" style="gap:9px;margin-bottom:9px">
-              <svg style="width:17px;height:17px;color:#92400E" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
-              <div class="h2" style="color:#78350F">The diagnostic</div>
-              <span class="chip" style="margin-left:auto;background:#fff;color:#92400E">Cycle score 0.58 · rhythm 3.8 of 5</span>
+              <svg style="width:17px;height:17px;color:var(--warn)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <div class="h2" style="color:var(--warn)">The diagnostic</div>
+              <span class="chip" style="margin-left:auto;background:#fff;color:var(--warn)">Cycle score 0.58 · rhythm 3.8 of 5</span>
             </div>
-            <div style="font-size:15px;font-weight:700;color:#78350F;letter-spacing:-.2px;margin-bottom:6px">
+            <div style="font-size:15px;font-weight:700;color:var(--warn);letter-spacing:-.2px;margin-bottom:6px">
               A strategy or OKR-quality problem, not a people problem.
             </div>
-            <div style="font-size:12.5px;color:#78350F;line-height:1.55">
+            <div style="font-size:12.5px;color:var(--warn);line-height:1.55">
               You scored below 0.7 while running the rhythm well: nine weeks of check-ins, blockers named and cleared, commitments closed honestly.
               The team did the practice and still missed. That points at the key results themselves, or the strategy behind them.
               <b>Fix the key results before you push the team.</b>
             </div>
             <div class="row" style="margin-top:11px">
-              <span class="tiny" style="color:#92400E">Computed from your data. It is the same answer with AI switched off.</span>
-              <div class="btn sm" style="margin-left:auto;background:#fff;border-color:#FCD34D;color:#92400E">See how this is computed</div>
+              <span class="tiny" style="color:var(--warn)">Computed from your data. It is the same answer with AI switched off.</span>
+              <div class="btn sm" style="margin-left:auto;background:#fff;border-color:var(--warn-dot);color:var(--warn)">See how this is computed</div>
             </div>
           </div>
 
@@ -191,15 +191,15 @@
             <div class="card-h"><div class="h3">Process health</div><span class="chip" style="margin-left:auto"><i class="dot n"></i>Anonymous · 6 of 6</span></div>
             <div class="card-b" style="padding:6px 14px 12px">
               <div class="ph"><span class="tiny">OKRs stayed visible and drove decisions</span><span class="tiny num" style="font-weight:750">4.2</span>
-                <div class="bar"><i class="ok" style="width:84%"></i></div></div>
+                <div class="bar"><i style="width:84%"></i></div></div>
               <div class="ph"><span class="tiny">A real check-in cadence, not a status report</span><span class="tiny num" style="font-weight:750">4.5</span>
-                <div class="bar"><i class="ok" style="width:90%"></i></div></div>
+                <div class="bar"><i style="width:90%"></i></div></div>
               <div class="ph"><span class="tiny">Key results measured outcomes, not activity</span><span class="tiny num" style="font-weight:750;color:var(--bad)">2.6</span>
-                <div class="bar"><i class="bad" style="width:52%"></i></div></div>
+                <div class="bar"><i style="width:52%"></i></div></div>
               <div class="ph"><span class="tiny">Few enough OKRs that focus was possible</span><span class="tiny num" style="font-weight:750">3.8</span>
-                <div class="bar"><i class="warn" style="width:76%"></i></div></div>
+                <div class="bar"><i style="width:76%"></i></div></div>
               <div class="ph"><span class="tiny">We said so early when things went off track</span><span class="tiny num" style="font-weight:750">3.9</span>
-                <div class="bar"><i class="warn" style="width:78%"></i></div></div>
+                <div class="bar"><i style="width:78%"></i></div></div>
               <div style="margin-top:11px;background:var(--brand-weak);border:1px solid var(--brand-line);border-radius:var(--r);padding:9px 10px">
                 <div class="tiny" style="color:var(--brand-600);font-weight:700;margin-bottom:2px">Lowest statement becomes next cycle's process priority</div>
                 <div class="tiny" style="color:var(--brand-600)">"Key results measured outcomes, not activity" scored 2.6. It is already placed in Phase 3 of Q3 planning.</div>

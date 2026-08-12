@@ -42,7 +42,7 @@ export function SignUpForm() {
       footer={
         <Link
           href="/sign-in"
-          className="font-medium text-brand-600 hover:underline"
+          className="font-medium text-brand-text hover:underline"
         >
           Already have an account? Sign in
         </Link>
