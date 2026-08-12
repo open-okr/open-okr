@@ -6,7 +6,7 @@ import {
   themeInitScript,
 } from "@openokr/ui";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
@@ -16,9 +16,36 @@ export const metadata: Metadata = {
   description: "Your OKR coach, built in. Open source, AI-native.",
 };
 
-// §2: "Inter, self-hosted." `next/font/google` fetches once at build time
-// and serves it from this origin — no runtime request to Google.
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+/**
+ * §2: "Geist, self-hosted." The file is committed at `app/fonts/`, straight
+ * from Vercel's own release, rather than fetched by `next/font/google`.
+ *
+ * Both self-host what the browser downloads. The difference is the *build*:
+ * `next/font/google` reaches fonts.googleapis.com while it runs, so an
+ * air-gapped build fails. See `app/fonts/README.md` for the version, the
+ * source and the checksum.
+ *
+ * One variable file covers 100 to 900, so `weight` is the range rather than a
+ * list, and there is one request instead of nine. `display: "swap"` keeps text
+ * readable while it loads: a 68 KB font must never blank the page.
+ */
+const geistSans = localFont({
+  src: "./fonts/Geist-Variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+  variable: "--font-sans-face",
+  // The stack tokens.css falls back through, declared here too so the metrics
+  // Next computes for its size-adjust fallback come from the same face the
+  // browser would actually use.
+  fallback: [
+    "-apple-system",
+    "SF Pro Text",
+    "Helvetica Neue",
+    "Arial",
+    "sans-serif",
+  ],
+});
 
 export default async function RootLayout({
   children,
@@ -35,7 +62,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={inter.variable}
+      className={geistSans.variable}
       data-theme="light"
       data-density="comfortable"
       suppressHydrationWarning

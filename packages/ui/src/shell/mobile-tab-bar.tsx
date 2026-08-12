@@ -55,7 +55,7 @@ export function MobileTabBar({ items, linkComponent }: MobileTabBarProps) {
           href={item.href}
           className={cn(
             "flex flex-1 flex-col items-center gap-0.5 py-1.5 text-xs font-medium text-ink-3",
-            item.active && "text-brand-600",
+            item.active && "text-brand-text",
           )}
         >
           <span className="size-5" aria-hidden="true">

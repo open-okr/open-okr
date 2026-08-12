@@ -6,7 +6,7 @@
 <style>
   .wrap { display: grid; grid-template-columns: 1fr 336px; gap: 16px; height: 100%; }
   .objcard { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); margin-bottom: 13px; }
-  .objcard.hot { border-color: #FCA5A5; box-shadow: 0 0 0 3px rgba(239,68,68,.07), var(--shadow); }
+  .objcard.hot { border-color: var(--bad-dot); box-shadow: 0 0 0 3px rgba(239,68,68,.07), var(--shadow); }
   .objhead { padding: 11px 14px; display: flex; gap: 10px; align-items: flex-start; }
   .objtitle { font-size: 15.5px; font-weight: 660; letter-spacing: -.2px; }
   .editing { border-bottom: 2px solid var(--brand); padding-bottom: 1px; }
@@ -34,13 +34,13 @@
     box-shadow: 0 12px 34px rgba(15,23,42,.16), 0 2px 8px rgba(15,23,42,.08); z-index: 5; overflow: hidden; }
   .pop:before { content:''; position: absolute; top: -6px; left: 40px; width: 11px; height: 11px; background: #fff;
     border-left: 1px solid var(--line); border-top: 1px solid var(--line); transform: rotate(45deg); }
-  .pop-h { padding: 10px 13px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; background: #FFFBFB }
+  .pop-h { padding: 10px 13px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; background: var(--bad-bg) }
   .pop-b { padding: 12px 13px; }
   .ex { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
   .exbox { border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
   .exbox .lbl { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 4px }
-  .exbox.w { background: #FEF2F2; border-color: #FECACA } .exbox.w .lbl { color: var(--bad) }
-  .exbox.s { background: #F0FDF4; border-color: #BBF7D0 } .exbox.s .lbl { color: var(--ok) }
+  .exbox.w { background: var(--bad-bg); border-color: var(--bad-dot) } .exbox.w .lbl { color: var(--bad) }
+  .exbox.s { background: var(--ok-bg); border-color: var(--ok-dot) } .exbox.s .lbl { color: var(--ok) }
   .exbox .txt { font-size: 11.5px; color: var(--ink-2); line-height: 1.4 }
 
   .meter { display: flex; align-items: center; gap: 10px }
@@ -133,7 +133,7 @@
               <div class="row" style="justify-content:flex-end"><span class="chip ok"><i class="dot"></i>Passing</span></div>
             </div>
 
-            <div class="krrow" style="background:var(--warn-bg);border-top-color:#FDE68A">
+            <div class="krrow" style="background:var(--warn-bg);border-top-color:var(--warn-dot)">
               <div class="row" style="grid-column:1/-1;gap:8px">
                 <span class="vd warn"></span>
                 <span style="font-size:12px;color:var(--warn);font-weight:600">KR-4 · Every key result here is lagging. You will only find out at the end of the cycle whether it worked. Add a leading indicator you can steer weekly.</span>
@@ -173,8 +173,8 @@
             <div class="card-b">
               <div class="meter">
                 <svg class="ring" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#E2E8F0" stroke-width="5"/>
-                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--track)" stroke-width="5"/>
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--warn-dot)" stroke-width="5" stroke-linecap="round"
                     stroke-dasharray="60 97.4" transform="rotate(-90 18 18)"/>
                 </svg>
                 <div class="grow">

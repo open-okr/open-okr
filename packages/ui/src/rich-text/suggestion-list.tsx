@@ -84,7 +84,7 @@ const SuggestionList = forwardRef<SuggestionListHandle, SuggestionListProps>(
             className={cn(
               "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-2",
               index === selected
-                ? "bg-brand-weak text-brand-600"
+                ? "bg-brand-weak text-brand-text"
                 : "hover:bg-raised",
             )}
             onMouseEnter={() => setSelected(index)}

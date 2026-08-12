@@ -20,7 +20,7 @@
   .krl { display: flex; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--line); align-items: center;
     transition: background .15s var(--ease) }
   .krl:last-child { border-bottom: 0 }
-  .krl:hover { background: #F4F7FD }
+  .krl:hover { background: var(--raised) }
   .krl.sel { background: var(--brand-weak) }
   .krl.sel:hover { background: var(--brand-weak) }
   .krl .t { font-size: 12px; font-weight: 570; line-height: 1.3 }
@@ -29,7 +29,7 @@
   .sc.ok { background: var(--ok-bg); color: var(--ok) } .sc.wa { background: var(--warn-bg); color: var(--warn) }
   .sc.bd { background: var(--bad-bg); color: var(--bad) } .sc.no { background: var(--raised); color: var(--ink-4) }
   .vote { display: flex; align-items: center; gap: 7px; padding: 5px 0 }
-  .blk { border: 1px solid #FECACA; background: #FFFBFB; border-radius: var(--r); padding: 10px 11px; margin-bottom: 9px }
+  .blk { border: 1px solid var(--bad-dot); background: var(--bad-bg); border-radius: var(--r); padding: 10px 11px; margin-bottom: 9px }
   .pick { border: 1px solid var(--line-2); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; background: #fff }
   .pick.on { border-color: var(--brand); background: var(--brand-weak); color: var(--brand-600) }
   .sparkw { display: flex; align-items: flex-end; gap: 3px; height: 34px }
@@ -127,14 +127,14 @@
               <div class="tiny mut">Champion Priya Nair · now 26% · leading</div>
 
               <svg viewBox="0 0 220 118" width="100%" style="margin:6px 0 0">
-                <path d="M32 96 A78 78 0 0 1 85.9 21.8" fill="none" stroke="#EF4444" stroke-width="15" stroke-linecap="round"/>
-                <path d="M85.9 21.8 A78 78 0 0 1 155.9 32.9" fill="none" stroke="#F59E0B" stroke-width="15"/>
-                <path d="M155.9 32.9 A78 78 0 0 1 188 96" fill="none" stroke="#22C55E" stroke-width="15" stroke-linecap="round"/>
-                <g class="needle"><line x1="110" y1="96" x2="71.2" y2="42.6" stroke="#0F172A" stroke-width="3" stroke-linecap="round"/></g>
-                <circle cx="110" cy="96" r="6" fill="#0F172A"/>
-                <text x="30" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">LOW</text>
-                <text x="104" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">MED</text>
-                <text x="168" y="112" font-size="9.5" fill="#94A3B8" font-family="-apple-system,sans-serif">HIGH</text>
+                <path d="M32 96 A78 78 0 0 1 85.9 21.8" fill="none" stroke="var(--bad-dot)" stroke-width="15" stroke-linecap="round"/>
+                <path d="M85.9 21.8 A78 78 0 0 1 155.9 32.9" fill="none" stroke="var(--warn-dot)" stroke-width="15"/>
+                <path d="M155.9 32.9 A78 78 0 0 1 188 96" fill="none" stroke="var(--ok-dot)" stroke-width="15" stroke-linecap="round"/>
+                <g class="needle"><line x1="110" y1="96" x2="71.2" y2="42.6" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/></g>
+                <circle cx="110" cy="96" r="6" fill="var(--ink)"/>
+                <text x="30" y="112" font-size="9.5" fill="var(--ink-4)" font-family="-apple-system,sans-serif">LOW</text>
+                <text x="104" y="112" font-size="9.5" fill="var(--ink-4)" font-family="-apple-system,sans-serif">MED</text>
+                <text x="168" y="112" font-size="9.5" fill="var(--ink-4)" font-family="-apple-system,sans-serif">HIGH</text>
               </svg>
               <div class="row" style="justify-content:center;gap:8px;margin:-4px 0 8px">
                 <span class="num" style="font-size:26px;font-weight:800;letter-spacing:-.5px">0.3</span>

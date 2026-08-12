@@ -6,7 +6,7 @@
 <style>
   .wrap { display: grid; grid-template-columns: 1fr 356px; gap: 16px; height: calc(100% - 52px); }
   .canvas { position: relative; height: 406px; flex: none; background:
-      radial-gradient(circle, #DDE3EA 1px, transparent 1px) 0 0/18px 18px, var(--surface);
+      radial-gradient(circle, var(--line) 1px, transparent 1px) 0 0/18px 18px, var(--surface);
     border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
   .canvas > svg { position: absolute; inset: 0 }
   .kn { position: absolute; width: 218px; background: #fff; border: 1px solid var(--line-2); border-radius: 10px;
@@ -75,7 +75,7 @@
         <div class="col" style="gap:14px;min-width:0">
           <div class="canvas stagger">
             <svg viewBox="0 0 790 406" preserveAspectRatio="none" width="100%" height="406">
-              <g stroke="#94A3B8" stroke-width="1.4" fill="none">
+              <g stroke="var(--ink-4)" stroke-width="1.4" fill="none">
                 <path d="M230 204 H260 V106 H290 M230 204 H260 V302 H290"/>
                 <path d="M500 106 H530 V57 H560 M500 106 H530 V155 H560"/>
                 <path d="M500 302 H530 V253 H560 M500 302 H530 V351 H560"/>
@@ -192,13 +192,13 @@
               <div class="krline">
                 <div><div class="t">Improve renewal touch coverage from 71% to 90%</div>
                   <div class="n">Checked in 2 days ago: "top 50 accounts assigned"</div></div>
-                <div><div class="bar" style="margin-top:3px"><i class="warn" style="width:42%"></i></div>
+                <div><div class="bar" style="margin-top:3px"><i style="width:42%"></i></div>
                   <div class="tiny num mut" style="margin-top:4px">now 79% · 42%</div></div>
               </div>
               <div class="krline">
                 <div><div class="t">Improve product adoption depth from 3.4 to 5.0 modules</div>
                   <div class="n">Checked in 1 day ago: "guided tours live for two modules"</div></div>
-                <div><div class="bar" style="margin-top:3px"><i class="ok" style="width:56%"></i></div>
+                <div><div class="bar" style="margin-top:3px"><i style="width:56%"></i></div>
                   <div class="tiny num mut" style="margin-top:4px">now 4.3 · 56%</div></div>
               </div>
 

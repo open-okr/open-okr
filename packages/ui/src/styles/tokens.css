@@ -1,18 +1,19 @@
 /*
- * OpenOKR design tokens (UIUX-PLAN.md §2, P2-T10).
+ * OpenOKR design tokens (UIUX-PLAN.md §2, P2-T10; palette adopted from
+ * docs/design/colour-system.md).
  *
- * Concrete values are the mockups' own proposed default
- * (docs/stakeholder/mockups/src/style.css), per UIUX-PLAN.md §10: nothing
- * here contradicts a §2 rule, and every value §2 does not pin a number to
- * comes from that file. One deliberate exception, noted where it happens:
- * the base text size. UIUX-PLAN.md §2 names "12, 13, 14 (base), 16, 18,
- * 24, 30" — 14 is the base, not 13 — while the mockup's own body
- * font-size is 13px. §10 says the specification wins on a disagreement,
- * so this file uses 14; the mockup itself is not edited here, because
- * doing so without re-rendering its PNGs (docs/stakeholder/mockups/README.md's
- * own render step) would leave the source and its screenshots
- * mismatched, which is worse than the discrepancy it would fix — recorded
- * as a follow-up in STATUS.md instead, the other option §10 names.
+ * Read the five rules in that document before adding a colour here. The
+ * two that constrain this file most:
+ *
+ *   - red, amber and green are reserved for status. Nothing decorative,
+ *     no brand surface and no progress fill may use them
+ *   - progress is not health. --brand fills a progress bar; a status
+ *     token never does
+ *
+ * Every value below is a stop in the ramp that document publishes, and
+ * every pair a component can put together is asserted by
+ * test/tokens-contrast.test.ts, which parses this file. A value edited
+ * here that drops a pair below its ratio fails that test.
  *
  * Semantic tokens (--ink, --ok, --brand, ...) are the single indirection
  * theme switching needs: light values live on :root, dark values override
@@ -20,30 +21,72 @@
  * through the Tailwind utility the @theme block below generates
  * (bg-surface, text-ink-2, ...), never the raw --variable, so a component
  * never has to know which theme is active.
+ *
+ * The base text size deliberately deviates from the mockups
+ * (docs/stakeholder/mockups/src/style.css), which use 13px where
+ * UIUX-PLAN.md §2 names "12, 13, 14 (base), 16, 18, 24, 30". §10 says the
+ * specification wins, so this file uses 14.
  */
 
 :root {
   /* Brand: one workspace-themeable hue (§2). This is the product default;
    * a workspace's own brand colour overrides --brand once branding
-   * settings (S-36) can supply one. */
+   * settings (S-36) can supply one.
+   *
+   * --brand is a fill. --brand-text is the one to reach for on text, per
+   * rule 5: a fill and a label owe different contrast, so they are
+   * different tokens. --brand-text is the indigo links already used. */
   --brand: #4f46e5;
-  --brand-600: #4338ca;
-  --brand-weak: #eef2ff;
-  --brand-line: #c7d2fe;
+  --brand-600: #4338ca; /* hover on a brand fill */
+  --brand-700: #3730a3; /* pressed */
+  --brand-text: #4338ca; /* links and brand-coloured text */
+  --brand-weak: #eef2ff; /* selected rows, tags, empty states */
+  --brand-line: #c7d2fe; /* the soft halo around a focused control */
+
+  /* The brand hue at whatever weight clears 3:1 on the surfaces of the
+   * current theme. Three things need that and are not fills you put text
+   * on: the progress fill (rule 2 — the only colour a progress bar ever
+   * takes), the focus indicator, and an active navigation marker.
+   *
+   * It equals --brand in light and lifts in dark, because --brand on a
+   * dark card is 2.33:1 against the track: a focus ring nobody can find
+   * and a progress bar that vanishes. --brand-line is the halo drawn
+   * around the indicator, never the indicator itself. */
+  --brand-strong: #4f46e5;
+
+  /* Text on --brand or darker. White on both themes: --brand does not move
+   * between them, so its label must not either. Never --surface, which is
+   * near-black in dark. */
+  --on-brand: #ffffff;
 
   /* Neutral grey ramp (§2). */
   --ink: #0f172a;
   --ink-2: #334155;
-  --ink-3: #64748b;
-  --ink-4: #94a3b8;
+  --ink-3: #617087; /* owners, metadata, timestamps. Two steps below the
+                     * ramp's #64748b, which lands at 4.48 on --bg and 4.27
+                     * on --raised. Secondary text sits on both constantly. */
+  --ink-4: #94a3b8; /* placeholders and disabled labels only. Deliberately
+                     * below 4.5 — the two cases WCAG 1.4.3 exempts. */
   --line: #e4e9f2;
   --line-2: #cdd6e4;
   --bg: #f6f8fc;
   --surface: #ffffff;
   --raised: #eff3f9;
+  --track: #e7ecf4; /* the unfilled part of a progress bar */
 
   /* Semantic: success, warning, danger, info (§2). Never the only signal —
-   * every consumer pairs the colour with an icon or a label. */
+   * every consumer pairs the colour with an icon or a label.
+   *
+   * Three stops each, because a pill needs a background, a label and a dot
+   * that each answer to something different: --ok/--warn/--bad are the
+   * label on the matching -bg and owe 4.5:1, --*-bg is that background,
+   * and --*-dot is the saturated indicator.
+   *
+   * The dots are vibrant rather than contrast-maximised, and that is a
+   * decision, not an oversight: see UIUX-PLAN.md §7. A dot never carries
+   * meaning on its own (rule 4), so WCAG 1.4.11 does not bind it, and
+   * darkening these until it did cost the scale the legibility that makes
+   * on-track read as on-track at a glance. */
   --ok: #15803d;
   --ok-bg: #e4f9ec;
   --ok-dot: #22c55e;
@@ -65,10 +108,29 @@
    * motion uses --motion-* below rather than --duration and --ease directly. */
   --card-radius: 10px;
   --card-radius-lg: 14px;
-  --shadow-1:
-    0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-2:
-    0 2px 6px rgba(15, 23, 42, 0.05), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+
+  /* Elevation. A card gets none: it is separated from --bg by its border
+   * and its lighter surface, which is what the colour system's own
+   * anti-patterns ask for. A shadow survives only where a border cannot do
+   * the job — a layer floating over arbitrary content (menu, dialog,
+   * popover) — and on controls, where it is a 1px edge rather than a lift.
+   *
+   * Both control shadows are mixed from a token rather than written as a
+   * raw rgba, so a workspace that overrides --brand gets a glow in its own
+   * hue instead of a leftover indigo one.
+   *
+   * Named --elev-* rather than --shadow-*, for the same reason --card-radius
+   * is not --radius-lg: @theme inline below maps --shadow-popover to one of
+   * these, and a custom property cannot reference itself by its own name. */
+  --elev-popover:
+    0 2px 6px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 12px 32px -8px color-mix(in srgb, var(--ink) 18%, transparent);
+  --elev-control: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent);
+  --elev-control-hover: 0 2px 6px
+    color-mix(in srgb, var(--ink) 10%, transparent);
+  --elev-brand: 0 1px 3px color-mix(in srgb, var(--brand) 28%, transparent);
+  --elev-brand-hover: 0 3px 10px
+    color-mix(in srgb, var(--brand) 28%, transparent);
 
   /* Motion (§2: "120 to 200 millisecond ease-out micro-transitions"). */
   --motion-ease: cubic-bezier(0.22, 0.68, 0.32, 1);
@@ -96,6 +158,12 @@
  * states to define, not three.
  */
 :root[data-theme="dark"] {
+  /* --brand itself does not move: it carries white at 6.29:1 on either
+   * theme, so a primary button is the same colour in both, and so are its
+   * hover and pressed stops. What inverts is the pair that never carries
+   * text. */
+  --brand-text: #818cf8;
+  --brand-strong: #818cf8;
   --brand-weak: #1e1b4b;
   --brand-line: #3730a3;
 
@@ -108,15 +176,30 @@
   --bg: #0b1220;
   --surface: #111827;
   --raised: #1a2332;
+  --track: #1e293b;
 
+  /* The status labels invert and the backgrounds deepen. Before this block
+   * existed, only the -bg values were overridden: --ok, --warn, --bad and
+   * --info kept their light values, which put a 700-weight label on a 900
+   * background at 2.6 to 3.0:1 on every dark screen in the product. The
+   * dots need no override — they are saturated enough to read on dark
+   * already. --bad and --info lift one stop further than their dots
+   * because #ef4444 and #3b82f6 as *text* miss 4.5:1 on --raised. */
+  --ok: #22c55e;
   --ok-bg: #052e1b;
+  --warn: #f59e0b;
   --warn-bg: #3a2a05;
+  --bad: #f87171;
   --bad-bg: #3a0a0a;
+  --info: #60a5fa;
   --info-bg: #0b2545;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.24);
-  --shadow-2:
+  /* Shadows are mixed from --ink, which is near-white on this theme, so
+   * the light-mode definitions would glow rather than recede. */
+  --elev-popover:
     0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+  --elev-control: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-control-hover: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 /* §2: "respects reduced motion." Never gates content — this only removes
@@ -145,14 +228,23 @@
  * [data-density="compact"] repaint the same classes instead of needing a
  * dark: variant on every one of them. */
 @theme inline {
+  /* Geist (§2). apps/web/app/layout.tsx loads the committed
+   * apps/web/app/fonts/Geist-Variable.woff2 into --font-sans-face.
+   * The variable is named for the face rather than the role, because
+   * --font-sans is the Tailwind theme key this maps it onto and a custom
+   * property cannot reference itself. */
   --font-sans:
-    var(--font-inter), -apple-system, "SF Pro Text", "Helvetica Neue", Arial,
-    sans-serif;
+    var(--font-sans-face), -apple-system, "SF Pro Text", "Helvetica Neue",
+    Arial, sans-serif;
 
   --color-brand: var(--brand);
   --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-text: var(--brand-text);
   --color-brand-weak: var(--brand-weak);
   --color-brand-line: var(--brand-line);
+  --color-on-brand: var(--on-brand);
 
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -163,6 +255,7 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
+  --color-track: var(--track);
 
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
@@ -180,8 +273,11 @@
   --radius-md: var(--card-radius);
   --radius-lg: var(--card-radius-lg);
 
-  --shadow-card: var(--shadow-1);
-  --shadow-popover: var(--shadow-2);
+  --shadow-popover: var(--elev-popover);
+  --shadow-control: var(--elev-control);
+  --shadow-control-hover: var(--elev-control-hover);
+  --shadow-brand: var(--elev-brand);
+  --shadow-brand-hover: var(--elev-brand-hover);
 
   /* §2: "Scale 12, 13, 14 (base), 16, 18, 24, 30." */
   --text-xs: 12px;

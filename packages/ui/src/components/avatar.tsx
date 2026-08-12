@@ -30,17 +30,30 @@ const sizeClass: Record<AvatarSize, string> = {
   lg: "size-[30px] text-[11.5px]",
 };
 
+/**
+ * Identity colours, and the one palette in the product that is allowed to
+ * be decorative. Two constraints shape it:
+ *
+ *   - rule 1 reserves red, amber and green for status, so no avatar may be
+ *     any of them. The teal and lime the colour system warns about are out
+ *     for the same reason: at 20px they read as on-track
+ *   - the initials are white, so every fill clears 4.5:1 against white.
+ *     #6265f0 and #0b7eb2 are the two that had to be darkened for it
+ *
+ * That leaves the blue-to-pink arc plus one warm neutral, which is eight
+ * distinguishable hues without borrowing a meaning from the status scale.
+ */
 const toneClass: Record<AvatarTone, string> = {
-  a1: "bg-[#6366f1]",
-  a2: "bg-[#0ea5e9]",
-  a3: "bg-[#14b8a6]",
-  a4: "bg-[#f59e0b]",
-  a5: "bg-[#ec4899]",
-  a6: "bg-[#8b5cf6]",
-  a7: "bg-[#64748b]",
-  a8: "bg-[#10b981]",
-  bot: "bg-gradient-to-br from-[#6366f1] via-brand to-[#7c3aed]",
-  bot2: "bg-gradient-to-br from-[#0ea5e9] to-[#14b8a6]",
+  a1: "bg-[#6265f0]",
+  a2: "bg-[#4338ca]",
+  a3: "bg-[#2563eb]",
+  a4: "bg-[#0b7eb2]",
+  a5: "bg-[#7c3aed]",
+  a6: "bg-[#a21caf]",
+  a7: "bg-[#db2777]",
+  a8: "bg-[#6b6a63]",
+  bot: "bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed]",
+  bot2: "bg-gradient-to-br from-[#2563eb] to-[#a21caf]",
 };
 
 /** Deterministic, not random: the same member always resolves to the same
@@ -93,7 +106,7 @@ export function Avatar({
     <BaseAvatar.Root
       className={cn(
         "grid place-items-center rounded-full font-bold tracking-wide text-white",
-        "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)]",
+        "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ink)_6%,transparent)]",
         sizeClass[size],
         toneClass[tone ?? avatarToneFor(name)],
         className,
