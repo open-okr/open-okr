@@ -72,11 +72,30 @@ export default function ComponentsPreviewPage() {
         <CardHeader>
           <h2 className="text-base font-bold text-ink">Bars</h2>
         </CardHeader>
-        <CardBody className="flex flex-col gap-2">
-          <Bar value={72} />
-          <Bar value={90} tone="ok" />
-          <Bar value={45} tone="warn" />
-          <Bar value={12} tone="bad" />
+        <CardBody className="flex flex-col gap-2.5">
+          {/*
+            Progress is not health (colour system rule 2), so the fill has
+            one colour and health rides beside it in a chip. The pair below
+            is the case that makes the rule worth having: 90 percent done
+            and off track, because the deadline is tomorrow. A bar coloured
+            by health would show that as a reassuring green.
+          */}
+          {(
+            [
+              [72, "ok", "On track"],
+              [90, "bad", "Off track"],
+              [45, "warn", "At risk"],
+              [12, "neutral", "Not started"],
+            ] as const
+          ).map(([value, tone, label]) => (
+            <div key={label} className="flex items-center gap-2.5">
+              <Bar value={value} className="flex-1" />
+              <span className="tabular w-9 text-xs text-ink-3">{value}%</span>
+              <Chip tone={tone} dot>
+                {label}
+              </Chip>
+            </div>
+          ))}
         </CardBody>
       </Card>
 

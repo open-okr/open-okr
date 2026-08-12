@@ -66,6 +66,14 @@ export function FormError({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The one input skin every authentication field wears. Exported so a field
+ * that has to build its own input (the password reveal in
+ * `password-field.tsx`) cannot drift from this one.
+ */
+export const fieldInputClass =
+  "h-7.5 w-full rounded-lg border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
+
 export function Field({
   label,
   className,
@@ -80,11 +88,7 @@ export function Field({
       <label htmlFor={id} className="text-sm font-medium text-ink-2">
         {label}
       </label>
-      <input
-        id={id}
-        className="h-7.5 w-full rounded-lg border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line"
-        {...input}
-      />
+      <input id={id} className={fieldInputClass} {...input} />
     </div>
   );
 }

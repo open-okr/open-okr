@@ -91,7 +91,7 @@ export default async function CheckInPage({
                       <span
                         className={
                           active
-                            ? "text-sm font-bold text-brand-600"
+                            ? "text-sm font-bold text-brand-text"
                             : "text-sm font-semibold text-ink"
                         }
                       >
@@ -103,20 +103,16 @@ export default async function CheckInPage({
                         {goal.daysPastDue !== null && goal.daysPastDue > 0
                           ? `${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
                           : `due ${goal.nextCheckInOn}`}
-                        {goal.hasOpenDraft ? " · draft open" : ""}
+                        {goal.hasOpenDraft ? " · draft open" : ""} ·{" "}
+                        {goal.health.replace("_", " ")}
                       </span>
                       <span className="flex items-center gap-2">
+                        {/* No tone on the fill. Rule 2 of the colour system: progress is
+                            not health, and a goal can be at 90 percent and still
+                            be off track. The health word sits beside it instead. */}
                         <Bar
                           value={goal.progressPct}
                           className="h-1.5 flex-1"
-                          tone={
-                            goal.health === "off_track"
-                              ? "bad"
-                              : goal.health === "caution" ||
-                                  goal.health === "outdated"
-                                ? "warn"
-                                : "default"
-                          }
                         />
                         <span className="text-xs font-semibold text-ink-3">
                           {Math.round(goal.progressPct)}%

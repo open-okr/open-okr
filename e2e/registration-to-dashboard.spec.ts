@@ -44,10 +44,12 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
   await expect(page).toHaveURL("/");
-  // The heading role, not a text match. `getByText("Signed in as")` matched two
-  // elements under Playwright 1.62: the panel streams in behind a Suspense
-  // boundary, and for an instant the pre-hydration and post-hydration headings
-  // both exist. The role locator names one element and cannot race that.
+  // The heading role, not a text match. Under Playwright 1.62 a bare
+  // `getByText("Signed in as")` resolves to two elements and strict mode rejects
+  // it. Two things on this page carry the phrase: the panel streams in behind a
+  // Suspense boundary, and Next mirrors heading text into its route announcer.
+  // The page has exactly one level-1 heading, so naming it by role is
+  // unambiguous whichever of the two produced the second match.
   await expect(
     page.getByRole("heading", { level: 1, name: /Signed in as/ }),
   ).toBeVisible();

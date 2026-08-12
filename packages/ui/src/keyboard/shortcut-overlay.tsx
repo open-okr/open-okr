@@ -67,7 +67,7 @@ export function ShortcutOverlay() {
               <p className="text-sm text-ink-3">{t("shell.shortcuts.empty")}</p>
             ) : null}
           </div>
-          <Dialog.Close className="mt-4 text-sm font-semibold text-brand-600 hover:underline">
+          <Dialog.Close className="mt-4 text-sm font-semibold text-brand-text hover:underline">
             {t("shell.shortcuts.close")}
           </Dialog.Close>
         </Dialog.Popup>

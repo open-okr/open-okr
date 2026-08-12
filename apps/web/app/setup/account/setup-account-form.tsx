@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { Field, FormError } from "../../(auth)/auth-card.tsx";
+import { PasswordField } from "../../(auth)/password-field.tsx";
 import { finishSetup } from "./actions";
 
 /**
@@ -84,10 +85,9 @@ export function SetupAccountForm() {
       />
 
       <div className="flex flex-col gap-1">
-        <Field
+        <PasswordField
           label="Password"
           name="password"
-          type="password"
           autoComplete="new-password"
           minLength={12}
           required

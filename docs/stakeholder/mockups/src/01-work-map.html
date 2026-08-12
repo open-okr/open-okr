@@ -12,17 +12,17 @@
     padding: 8px 14px; border-bottom: 1px solid var(--line); align-items: center;
     transition: background .15s var(--ease); }
   .tr:last-child { border-bottom: 0 }
-  .tr:not(.alt) { background: #F8FAFD }
-  .tr:hover { background: #F1F5FC }
+  .tr:not(.alt) { background: var(--bg) }
+  .tr:hover { background: var(--bg) }
   .tname { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .tw { flex: none; }
   .caret { width: 12px; height: 12px; color: var(--ink-4); flex: none; }
   .kind { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; color: var(--ink-4);
     border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; flex: none; background: var(--surface); }
-  .kind.o { color: var(--brand-600); border-color: var(--brand-line); background: var(--brand-weak) }
-  .kind.k { color: #0E7490; border-color: #A5F3FC; background: #ECFEFF }
-  .kind.i { color: #7C3AED; border-color: #DDD6FE; background: #F5F3FF }
-  .kind.p { color: #B45309; border-color: #FDE68A; background: #FFFBEB }
+  .kind.o { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-weak) }
+  .kind.k { color: #1D4FD8; border-color: #C7D6FA; background: #EFF3FE }
+  .kind.i { color: var(--brand-text); border-color: var(--brand-line); background: var(--brand-weak) }
+  .kind.p { color: #A21CAF; border-color: #EFC5F3; background: #FCF0FD }
   .ttl { font-size: 12.5px; font-weight: 560; }
   .ttl.o { font-weight: 650; font-size: 13px; }
   .next { font-size: 11.5px; color: var(--ink-3); }
@@ -86,7 +86,7 @@
         </div>
         <div class="row" style="gap:22px">
           <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">On track</div><div class="stat"><b style="color:var(--ok)">61%</b><span class="tiny mut">of KRs</span></div></div>
-          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Outdated</div><div class="stat"><b style="color:#C2410C">3</b><span class="tiny mut">goals</span></div></div>
+          <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Outdated</div><div class="stat"><b style="color:var(--warn)">3</b><span class="tiny mut">goals</span></div></div>
           <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Alignment</div><div class="stat"><b>73</b><span class="tiny mut">/100</span></div></div>
           <div class="col"><div class="tiny mut4" style="font-weight:700;letter-spacing:.4px;text-transform:uppercase">Streak</div><div class="stat"><b>9</b><span class="tiny mut">weeks</span></div></div>
         </div>
@@ -110,7 +110,7 @@
           </div>
           <div><span class="chip ok"><i class="dot"></i>On track</span></div>
           <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
-          <div class="row"><div class="bar grow"><i class="ok" style="width:64%"></i></div><span class="tiny num mut">64%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:64%"></i></div><span class="tiny num mut">64%</span></div>
           <div class="next trunc">Confirm 2 dependencies</div>
           <div class="row"><div class="av a1 sm">SL</div><div class="av a7 sm">MR</div></div>
         </div>
@@ -119,7 +119,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Grow ASEAN mid-market ARR from RM 8.2m to RM 12.0m</span></div>
           <div><span class="chip ok"><i class="dot"></i>On track</span></div>
           <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
-          <div class="row"><div class="bar grow"><i class="ok" style="width:58%"></i></div><span class="tiny num mut">58%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:58%"></i></div><span class="tiny num mut">58%</span></div>
           <div class="next trunc num">RM 10.4m of RM 12.0m</div>
           <div class="row"><div class="av a2 sm">JT</div></div>
         </div>
@@ -128,7 +128,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Raise win rate against Meridian from 22% to 35%</span></div>
           <div><span class="chip warn"><i class="dot"></i>Caution</span></div>
           <div><span class="chip warn"><i class="dot"></i>Med 0.6</span></div>
-          <div class="row"><div class="bar grow"><i class="warn" style="width:39%"></i></div><span class="tiny num mut">39%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:39%"></i></div><span class="tiny num mut">39%</span></div>
           <div class="next trunc">Blocker: pricing sign-off</div>
           <div class="row"><div class="av a5 sm">PN</div></div>
         </div>
@@ -140,7 +140,7 @@
           </div>
           <div><span class="chip out"><svg class="ic" style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Outdated 11d</span></div>
           <div><span class="chip"><i class="dot n"></i>Med 0.5</span></div>
-          <div class="row"><div class="bar grow"><i class="warn" style="width:41%"></i></div><span class="tiny num mut">41%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:41%"></i></div><span class="tiny num mut">41%</span></div>
           <div class="next trunc" style="color:var(--bad);font-weight:600">Escalated to sponsor</div>
           <div class="row"><div class="av a3 sm">DK</div><div class="av a7 sm">MR</div></div>
         </div>
@@ -149,7 +149,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Cut median time-to-first-value from 21 days to 7 days</span></div>
           <div><span class="chip out"><svg class="ic" style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Outdated</span></div>
           <div><span class="chip bad"><i class="dot"></i>Low 0.3</span></div>
-          <div class="row"><div class="bar grow"><i class="bad" style="width:29%"></i></div><span class="tiny num mut">29%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:29%"></i></div><span class="tiny num mut">29%</span></div>
           <div class="next trunc num">17 days · target 7</div>
           <div class="row"><div class="av a3 sm">DK</div></div>
         </div>
@@ -170,7 +170,7 @@
           </div>
           <div><span class="chip bad"><i class="dot"></i>Off track</span></div>
           <div><span class="chip bad"><i class="dot"></i>Low 0.3</span></div>
-          <div class="row"><div class="bar grow"><i class="bad" style="width:22%"></i></div><span class="tiny num mut">22%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:22%"></i></div><span class="tiny num mut">22%</span></div>
           <div class="next trunc" style="color:var(--bad);font-weight:600">Blocker 26h · escalated</div>
           <div class="row"><div class="av a4 sm">FA</div><div class="av a1 sm">SL</div></div>
         </div>
@@ -179,7 +179,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind p">KPI</span><span class="ttl trunc">Expansion revenue · drives net revenue retention</span></div>
           <div><span class="chip bad"><i class="dot"></i>Unhealthy 43%</span></div>
           <div><span class="chip brand"><i class="dot"></i>Recovering</span></div>
-          <div class="row"><div class="bar grow"><i class="bad" style="width:43%"></i></div><span class="tiny num mut">43%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:43%"></i></div><span class="tiny num mut">43%</span></div>
           <div class="next trunc" style="color:var(--brand-600);font-weight:600">Recovery OKR live</div>
           <div class="row"><div class="av a4 sm">FA</div></div>
         </div>
@@ -191,7 +191,7 @@
           </div>
           <div><span class="chip ok"><i class="dot"></i>On track</span></div>
           <div><span class="chip ok"><i class="dot"></i>High 0.9</span></div>
-          <div class="row"><div class="bar grow"><i class="ok" style="width:76%"></i></div><span class="tiny num mut">76%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:76%"></i></div><span class="tiny num mut">76%</span></div>
           <div class="next trunc">Check-in due Friday</div>
           <div class="row"><div class="av a6 sm">RH</div><div class="av a2 sm">JT</div></div>
         </div>
@@ -200,7 +200,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Move platform p95 latency from 840ms to under 300ms</span></div>
           <div><span class="chip ok"><i class="dot"></i>On track</span></div>
           <div><span class="chip ok"><i class="dot"></i>High 0.9</span></div>
-          <div class="row"><div class="bar grow"><i class="ok" style="width:81%"></i></div><span class="tiny num mut">81%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:81%"></i></div><span class="tiny num mut">81%</span></div>
           <div class="next trunc num">395ms · target 300ms</div>
           <div class="row"><div class="av a6 sm">RH</div></div>
         </div>
@@ -209,7 +209,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Raise deploy frequency from 3 to 20 per week</span></div>
           <div><span class="chip ok"><i class="dot"></i>On track</span></div>
           <div><span class="chip ok"><i class="dot"></i>High 0.8</span></div>
-          <div class="row"><div class="bar grow"><i class="ok" style="width:70%"></i></div><span class="tiny num mut">70%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:70%"></i></div><span class="tiny num mut">70%</span></div>
           <div class="next trunc num">15 of 20 per week</div>
           <div class="row"><div class="av a2 sm">JT</div></div>
         </div>
@@ -218,7 +218,7 @@
           <div class="tname" style="padding-left:24px"><span class="kind k">KR</span><span class="ttl trunc">Cut change-failure rate from 18% to under 5%</span></div>
           <div><span class="chip warn"><i class="dot"></i>Caution</span></div>
           <div><span class="chip warn"><i class="dot"></i>Med 0.6</span></div>
-          <div class="row"><div class="bar grow"><i class="warn" style="width:52%"></i></div><span class="tiny num mut">52%</span></div>
+          <div class="row"><div class="bar grow"><i style="width:52%"></i></div><span class="tiny num mut">52%</span></div>
           <div class="next trunc num">11% · target 5%</div>
           <div class="row"><div class="av a8 sm">LW</div></div>
         </div>

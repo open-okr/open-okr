@@ -98,7 +98,7 @@ export function Sidebar({
                 "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-2 transition-colors duration-fast ease-out",
                 "hover:bg-ink/[0.045] md:justify-center xl:justify-start",
                 item.active &&
-                  "bg-brand-weak font-semibold text-brand-600 shadow-[inset_0_0_0_1px_rgba(79,70,229,0.12)] hover:bg-brand-weak",
+                  "bg-brand-weak font-semibold text-brand-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_12%,transparent)] hover:bg-brand-weak",
               )}
             >
               <span

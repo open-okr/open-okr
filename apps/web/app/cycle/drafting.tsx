@@ -90,7 +90,7 @@ export function Drafting({
                 {goal.health.replace("_", " ")}
               </Chip>
               <a
-                className="text-xs text-brand-600 underline"
+                className="text-xs text-brand-text underline"
                 href={`/goals/${goal.id}`}
               >
                 Open

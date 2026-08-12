@@ -17,6 +17,65 @@ corepack enable   # once per machine; makes the pinned pnpm available
 pnpm install
 ```
 
+## Running it locally
+
+Postgres is the only service you need. `pnpm db:up` starts one in Docker on
+port 55432, chosen so a Postgres already installed on this machine is never
+touched. It ships no application database, so create one once:
+
+```sh
+pnpm db:up
+docker exec openokr-test-postgres-1 psql -U postgres -c "CREATE DATABASE openokr;"
+```
+
+The settings live in `apps/web/.env`, not the repository root. Nothing here
+loads a dotenv file: Next.js reads `apps/web/.env` by itself, and a file at the
+root is silently ignored.
+
+```sh
+cp .env.example apps/web/.env
+```
+
+The command line tools read the process environment rather than that file, so
+migrations take the connection string inline:
+
+```sh
+DATABASE_URL=postgres://postgres:postgres@localhost:55432/openokr pnpm db:migrate
+pnpm dev
+```
+
+Open http://localhost:3000. A database with no account in it redirects to
+`/setup`, the first-run wizard. The account you create there claims the
+instance, becomes its admin, and gets a workspace provisioned automatically.
+
+Everything else has a working default, so nothing above needs editing to boot.
+Mail is written to the log rather than sent, the session secret falls back to a
+development placeholder that production refuses to start with, and the
+encryption key is regenerated per process. That last one means anything sealed
+locally, such as a stored provider key, stops opening after a restart. Set
+`OPENOKR_ENCRYPTION_KEY` if you need it to survive one.
+
+The database keeps its data in memory, so `pnpm db:down` discards it. Starting
+again means repeating the `CREATE DATABASE` and `pnpm db:migrate` above.
+`pnpm dev` on its own leaves it alone.
+
+## Editor tooling
+
+`.mcp.json` declares the Model Context Protocol servers an AI coding assistant
+picks up in this repository. They are development aids only. Nothing in the
+build, the tests or the shipped product depends on them, and they are fetched on
+demand with `npx`, so they add no dependency to the lockfile.
+
+| Server | What it is for |
+|---|---|
+| `next-devtools` | Next.js App Router guidance while working in `apps/web` |
+| `better-icons` | Searching icon libraries when picking an icon for a screen |
+
+`better-icons` is a search tool, not a source of runtime code. The icon set stays
+`lucide-react`, and a new icon dependency needs human approval like any other. If
+an icon has no lucide equivalent, vendor the single SVG into `packages/ui` rather
+than adding a library.
+
 ## Commands
 
 | Command | What it does |

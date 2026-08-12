@@ -26,7 +26,7 @@ export default async function SignUpPage() {
         footer={
           <Link
             href="/sign-in"
-            className="font-medium text-brand-600 hover:underline"
+            className="font-medium text-brand-text hover:underline"
           >
             Back to sign in
           </Link>
