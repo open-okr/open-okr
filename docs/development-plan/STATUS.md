@@ -197,6 +197,51 @@ carries the task identifier. `main` still ends at Phase 1 and no Phase 2 work
 has been reviewed or merged by anyone. That review debt is the largest risk
 crossing into Phase 3 and is recorded in full in the exit checklist.
 
+## The reference mockups, and when each one arrives
+
+**Asked and answered on 2026-08-12.** "Make the UI match the mockups" was put
+directly, and the answer is that it cannot be done ahead of the tasks: all eleven
+mockups in `docs/stakeholder/mockups/png/` map to screens that do not exist yet,
+and UIUX-PLAN.md §10's own table names the owning task for each. A Work Map row
+needs goals, key results, initiatives and KPIs, which arrive at P3-T04, P5-T01
+and P3-T12.
+
+**The decision: follow the plan order.** Each mockup is opened at the start of
+its own task, as CLAUDE.md already requires, and the screen is built when the
+model behind it exists. Building the eleven now against mock data was considered
+and rejected: it would be torn out again when the real task ran.
+
+| Mockup | Arrives with |
+|---|---|
+| 02-cycle-workspace | P3-T03 |
+| 10-review-inbox | P3-T08 |
+| 05-alignment-studio | P3-T10, with P3-T09's findings |
+| 01-work-map | P3-T11 |
+| 06-kpi-recovery | P3-T14 |
+| 04-gates-capacity | P4-T03 |
+| 03-draft-coach, 03b-rule-card | P4-T02 |
+| 07-weekly-session | P4-T07 |
+| 08-quarterly-review | P4-T10 |
+| 09-channels | P5-T02 to P5-T05 |
+
+Five of the eleven are satisfied by the end of Phase 3. The rest belong to
+Phase 4 and Phase 5.
+
+**Three shell gaps found while comparing, each recorded against its owner
+rather than fixed on the spot.** They are gaps against UIUX-PLAN.md §3, the
+specification, not against the picture:
+
+| Gap | Owner | Why not now |
+|---|---|---|
+| The sidebar lists one `Spaces` link; §3 asks for the spaces themselves nested under it | P3-T11 | Spaces exist, so this one is buildable today. Deferred because P3-T11 replaces the `/` route and reworks the primary nav anyway, and touching the shell twice for it is worse than once |
+| §3 shows three separated nav blocks; the module registry (P2-T08) has `section` but no grouping, so the structure cannot be expressed | P3-T11 | Same reason. It is a registry change plus a shell change, and P3-T11 is where the nav is next opened |
+| The topbar shows the workspace name; §3 asks for a breadcrumb | P3-T11 | Same |
+
+The cycle strip is **already** on P3-T03's card ("the cycle strip in the shell").
+Its component exists in `packages/ui` from P2-T10 and its data exists from
+P3-T02, so only the wiring is left, and "what is blocking it" needs P3-T03's own
+gate state.
+
 ## Phase 3: The OKR core
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
@@ -212,7 +257,7 @@ crossing into Phase 3 and is recorded in full in the exit checklist.
 | P3-T08 | Review inbox | todo |  |  |  |
 | P3-T09 | Alignment: parents, dependencies, the alignment engine | todo |  |  |  |
 | P3-T10 | Goal surfaces: explorer, detail, alignment studio | todo |  |  |  |
-| P3-T11 | Work Map | todo |  |  | Carries a P1-T08 follow-up: the proving dashboard at / is scaffolding, deliberately thin and unstyled. S-01 is the real home and replaces this route entirely here |
+| P3-T11 | Work Map | todo |  |  | Carries a P1-T08 follow-up: the proving dashboard at / is scaffolding, deliberately thin and unstyled. S-01 is the real home and replaces this route entirely here. **Also carries three shell gaps against UIUX-PLAN.md §3, found on 2026-08-12 and deferred here because this task reworks the primary nav anyway:** the sidebar needs the workspace's spaces nested under `Spaces` rather than one flat link (spaces have existed since P3-T01, so this is buildable and only waiting on the nav being opened), the module registry needs a grouping concept so §3's three separated blocks can be expressed at all (it has `section` and nothing finer), and the topbar needs a breadcrumb in place of the workspace name |
 | P3-T12 | KPIs: categories, records, grid | todo |  |  |  |
 | P3-T13 | KPI formula engine | todo |  |  |  |
 | P3-T14 | KPI trees, corridors, recovery OKRs | todo |  |  |  |
