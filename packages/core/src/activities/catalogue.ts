@@ -156,6 +156,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.kpi_unlinked": z.object({}),
+  // The staleness sweep (P3-T06). A health flip nobody triggered still has to be
+  // visible: it is the product saying a goal went quiet, not a person acting.
+  "cadence.staleness_swept": z.object({
+    examined: z.number().int(),
+    flipped: z.number().int(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

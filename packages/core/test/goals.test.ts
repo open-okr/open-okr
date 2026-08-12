@@ -4,11 +4,14 @@ import {
   type WorkspaceTx,
   withWorkspace,
 } from "@openokr/db";
+import { canonThresholds } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { sweepStaleness } from "../src/cadence/service.ts";
+import { runOperation } from "../src/operations/operation.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -106,6 +109,35 @@ beforeEach(async () => {
   );
   secondMemberId = second.rows[0]?.id as string;
 });
+
+/** Runs a helper on a real Operation transaction, the way a job would. */
+async function inOperationForWorkspace<T>(
+  fn: (
+    tx: Parameters<Parameters<typeof runOperation>[1]["execute"]>[0]["tx"],
+  ) => Promise<T>,
+): Promise<T> {
+  const wb = await workerDb();
+  return runOperation(
+    { pool: wb.appPool },
+    {
+      action: "test.sweep",
+      workspaceId,
+      actor: { kind: "system" },
+      async execute({ tx }) {
+        const result = await fn(tx);
+        return {
+          result,
+          activity: {
+            kind: "test.sweep",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+          },
+          audit: { action: "test.sweep", targetType: "workspace" },
+        };
+      },
+    },
+  );
+}
 
 afterAll(async () => {
   const wb = await workerDb();
@@ -887,5 +919,125 @@ describe("the scoring cascade against real rows", () => {
     }>("select forecast from key_results where id = $1", [keyResult.id]);
     expect(forecast.rows[0]?.forecast).not.toBeNull();
     expect(forecast.rows[0]?.forecast?.trendingOffTrack).toBe(true);
+  });
+});
+
+describe("the cadence on a goal", () => {
+  /**
+   * The wiring half of P3-T06. `test/cadence.test.ts` proves the arithmetic
+   * against the golden masters with no database; this proves the four §8 events
+   * that touch a row actually touch it.
+   */
+  it("stamps the first due date at creation, in the future", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    const row = await wb.admin.query<{ next_check_in_at: Date | null }>(
+      "select next_check_in_at from goals where id = $1",
+      [created.id],
+    );
+    const due = row.rows[0]?.next_check_in_at;
+    expect(due).not.toBeNull();
+    // Strictly after today: the anchor day is a deadline, and a goal created on
+    // its own anchor day has not had a period to report on yet.
+    expect(new Date(due as Date).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("clears the due date on close and restarts it on reopen", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+
+    await callAction({ pool: wb.appPool, ...context() }, "goals.close", {
+      id: created.id,
+      successStatus: "achieved",
+      closeDecision: "keep",
+      retrospectiveBody: richText("Landed."),
+    });
+    const closed = await wb.admin.query<{ next_check_in_at: Date | null }>(
+      "select next_check_in_at from goals where id = $1",
+      [created.id],
+    );
+    // A closed goal is never due, and a date left on it would make the sweep
+    // report an archive as neglected.
+    expect(closed.rows[0]?.next_check_in_at).toBeNull();
+
+    await callAction({ pool: wb.appPool, ...context() }, "goals.reopen", {
+      id: created.id,
+    });
+    const reopened = await wb.admin.query<{ next_check_in_at: Date | null }>(
+      "select next_check_in_at from goals where id = $1",
+      [created.id],
+    );
+    expect(reopened.rows[0]?.next_check_in_at).not.toBeNull();
+    expect(
+      new Date(reopened.rows[0]?.next_check_in_at as Date).getTime(),
+    ).toBeGreaterThan(Date.now());
+  });
+
+  it("restarts the rhythm when the frequency changes, never overdue", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() - interval '30 days' where id = $1",
+      [created.id],
+    );
+
+    await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+      id: created.id,
+      checkInFrequency: "monthly",
+    });
+
+    const row = await wb.admin.query<{ next_check_in_at: Date }>(
+      "select next_check_in_at from goals where id = $1",
+      [created.id],
+    );
+    // §8: a frequency change counts from today, so it never leaves a goal
+    // instantly overdue.
+    expect(
+      new Date(row.rows[0]?.next_check_in_at as Date).getTime(),
+    ).toBeGreaterThan(Date.now());
+  });
+
+  it("sweeps a neglected goal to outdated, and is idempotent", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    // Past the canon three-day grace with nothing published.
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() - interval '9 days', health = 'on_track' where id = $1",
+      [created.id],
+    );
+
+    const first = await inOperationForWorkspace(async (tx) =>
+      sweepStaleness(tx, workspaceId, canonThresholds(), new Date()),
+    );
+    expect(first.flipped).toBe(1);
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: created.id },
+    );
+    expect(read.health).toBe("outdated");
+
+    // A second run examines the same row and changes nothing.
+    const second = await inOperationForWorkspace(async (tx) =>
+      sweepStaleness(tx, workspaceId, canonThresholds(), new Date()),
+    );
+    expect(second.examined).toBe(1);
+    expect(second.flipped).toBe(0);
+  });
+
+  it("leaves a goal inside its grace window alone", async () => {
+    const wb = await workerDb();
+    const created = await createGoal();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() - interval '2 days', health = 'on_track' where id = $1",
+      [created.id],
+    );
+
+    const swept = await inOperationForWorkspace(async (tx) =>
+      sweepStaleness(tx, workspaceId, canonThresholds(), new Date()),
+    );
+    expect(swept.examined).toBe(0);
+    expect(swept.flipped).toBe(0);
   });
 });

@@ -35,6 +35,8 @@ import {
   trendForecast,
 } from "@openokr/method";
 import { asc, eq, inArray, or } from "drizzle-orm";
+import { daysPastDue } from "../cadence/service.ts";
+import { workspaceTimeZone } from "../cycles/service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -310,6 +312,9 @@ async function recomputeScoring<
 
   const cascade = cascadeProgress(cascadeInput);
   const graceDays = thresholds["cadence.stalenessGraceDays"];
+  // Staleness is counted in the workspace's calendar, not in absolute hours: a
+  // goal due at 23:59 local is one day overdue at any hour of the next day.
+  const timeZone = await workspaceTimeZone(tx, workspaceId);
 
   let keyResultsWritten = 0;
   for (const row of keyResultRows) {
@@ -331,7 +336,7 @@ async function recomputeScoring<
   let goalsWritten = 0;
   for (const row of goalRows) {
     const progress = cascade.goals.get(row.id) ?? 0;
-    const health = healthFor(row, graceDays, now);
+    const health = healthFor(row, graceDays, now, timeZone);
     // openokr:allow-mutation: same transaction as above.
     await tx
       .update(goals)
@@ -379,17 +384,13 @@ function healthFor(
   },
   graceDays: number,
   now: Date,
+  timeZone: string,
 ): GoalHealth {
-  const due = row.nextCheckInAt ? new Date(row.nextCheckInAt) : null;
-  const daysPastDue = due
-    ? Math.floor((now.getTime() - due.getTime()) / 86_400_000)
-    : null;
-
   return goalHealth({
     closed: row.closedAt !== null,
     successStatus: row.successStatus,
     latestStatus: null,
-    daysPastDue,
+    daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
     graceDays,
   });
 }

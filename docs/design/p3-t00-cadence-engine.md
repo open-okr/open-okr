@@ -2,7 +2,18 @@
 
 Part three of the Phase 3 design gate. Authority: METHOD.md §7 and §11,
 TECHNICAL-PLAN.md §6.3, REQUIREMENTS.md §51. Implemented at P3-T06 in
-`packages/core` as pure date arithmetic.
+`packages/core/src/cadence/engine.ts` as pure date arithmetic, with the row
+reading and writing beside it in `service.ts`.
+
+**One correction from the implementation.** The escalation ladder in §7 went to
+`packages/method/src/escalation.ts` rather than into the core engine. Which roles
+it widens to is §11 practice, and practice lives in the method package. The date
+arithmetic stayed in core, where the local-date primitives already were.
+
+**The sweep in §5 is a command, not a job.** No scheduler host runs in the
+application yet, so `pnpm cadence:sweep` is how it runs, the same shape
+`pnpm audit:verify` already has. It goes through the Operation pipeline per
+workspace, so a health flip nobody triggered is still audited.
 
 This is the engine that makes health honest. If the next due date is wrong,
 staleness is wrong, and a neglected goal quietly stays green. That is the one

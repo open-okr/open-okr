@@ -27,7 +27,8 @@
     "flaky": "node --experimental-strip-types --no-warnings packages/test-support/bin/flaky.ts",
     "audit:verify": "pnpm --filter @openokr/core audit:verify",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",

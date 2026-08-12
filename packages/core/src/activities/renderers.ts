@@ -157,6 +157,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A key result moved to ${Number(p.value ?? 0)}`,
   "key_result.kpi_unlinked": () =>
     "A key result was unlinked from its KPI and keeps the last value it reported",
+  "cadence.staleness_swept": (p) =>
+    `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

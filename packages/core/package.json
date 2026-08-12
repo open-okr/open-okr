@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts",
-    "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts"
+    "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts",
+    "cadence:sweep": "node --experimental-strip-types --no-warnings src/bin/sweep-staleness.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",

@@ -33,8 +33,14 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import {
+  clearDue,
+  daysPastDue,
+  dueLocalDate,
+  stampFirstDue,
+} from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow } from "../cycles/service.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   asNumber,
   clampWeight,
@@ -112,6 +118,10 @@ const goalOutput = z.object({
   closeReason: z.string().nullable(),
   progressPct: z.number(),
   health: z.string(),
+  /** The local date the next check-in is due, in the workspace calendar. */
+  nextCheckInOn: z.string().nullable(),
+  /** Negative before it, 0 on the day. Null when no cadence is set. */
+  daysPastDue: z.number().int().nullable(),
   position: z.number().int(),
   keyResults: z.array(keyResultOutput),
   /** Present once the goal has been closed at least once. Kept on reopen. */
@@ -236,6 +246,7 @@ const GOAL_COLUMNS = {
   closeReason: goals.closeReason,
   progressPct: goals.progressPct,
   health: goals.health,
+  nextCheckInAt: goals.nextCheckInAt,
   position: goals.position,
 } as const;
 
@@ -368,6 +379,10 @@ export const listGoals = defineReadAction({
           context.workspaceId,
           visible.flatMap((row) => [row.championId, row.reviewerId]),
         );
+        // The due date is a date in the workspace calendar, so it is read in the
+        // workspace timezone rather than the reader's.
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+        const now = new Date();
 
         return {
           goals: visible.map((row) => ({
@@ -377,6 +392,8 @@ export const listGoals = defineReadAction({
             closedAt: row.closedAt
               ? new Date(row.closedAt).toISOString()
               : null,
+            nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
+            daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
             champion: {
               id: row.championId,
               name: names.get(row.championId) ?? "Unknown",
@@ -470,12 +487,16 @@ export const readGoal = defineReadAction({
           row.championId,
           row.reviewerId,
         ]);
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+        const now = new Date();
 
         return {
           ...row,
           weight: asNumber(row.weight) ?? 0,
           progressPct: asNumber(row.progressPct) ?? 0,
           closedAt: row.closedAt ? new Date(row.closedAt).toISOString() : null,
+          nextCheckInOn: dueLocalDate(row.nextCheckInAt, timeZone),
+          daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
           champion: {
             id: row.championId,
             name: names.get(row.championId) ?? "Unknown",
@@ -704,6 +725,18 @@ export const createGoal = defineWriteAction({
         contributionStatement: input.contributionStatement ?? null,
       });
 
+      // The rhythm starts at creation (§8 of the cadence design), and the
+      // recompute below reads the due date this stamps.
+      const rhythmSettings = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      await stampFirstDue(
+        tx,
+        workspaceId,
+        created.id,
+        rhythmSettings.thresholds,
+        new Date(),
+      );
       await recompute(tx, workspaceId, created.id);
 
       return {
@@ -843,6 +876,18 @@ export const updateGoal = defineWriteAction({
         throw new OperationError("not_found", "No such goal.");
       }
 
+      if (input.checkInFrequency !== undefined) {
+        // §8: a frequency change counts from today, so changing it never makes a
+        // goal instantly overdue.
+        const changed = resolveRhythm(await readRhythmRow(tx, workspaceId));
+        await stampFirstDue(
+          tx,
+          workspaceId,
+          updated.id,
+          changed.thresholds,
+          new Date(),
+        );
+      }
       await recompute(tx, workspaceId, updated.id);
 
       return {
@@ -913,6 +958,9 @@ export const closeGoal = defineWriteAction({
         retrospectiveBody: input.retrospectiveBody,
       });
 
+      // A closed goal is never due. Leaving a date on it would make the sweep
+      // report an archive as neglected.
+      await clearDue(tx, workspaceId, input.id);
       await recompute(tx, workspaceId, input.id);
 
       return {
@@ -963,6 +1011,15 @@ export const reopenGoal = defineWriteAction({
       );
 
       await reopenGoalInTx(tx, { workspaceId, goalId: input.id });
+      // §8: a reopened goal is never instantly overdue.
+      const reopenRhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      await stampFirstDue(
+        tx,
+        workspaceId,
+        input.id,
+        reopenRhythm.thresholds,
+        new Date(),
+      );
       await recompute(tx, workspaceId, input.id);
 
       return {

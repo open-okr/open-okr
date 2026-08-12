@@ -88,6 +88,18 @@ export default async function GoalPage({
                 {Math.round(goal.progressPct)}%
               </span>
             </div>
+            {goal.nextCheckInOn ? (
+              <p className="text-xs text-ink-3">
+                Next check-in due {goal.nextCheckInOn}
+                {goal.daysPastDue !== null && goal.daysPastDue > 0
+                  ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
+                  : ""}
+              </p>
+            ) : (
+              <p className="text-xs text-ink-3">
+                No check-in is due. A closed goal never is.
+              </p>
+            )}
             <p className="text-xs text-ink-3">
               {goal.contributionStatement ??
                 "No parent and no contribution statement, so publish gate 3 is red."}

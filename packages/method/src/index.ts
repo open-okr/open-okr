@@ -1,6 +1,11 @@
 export const PACKAGE_NAME = "@openokr/method";
 
 export {
+  type Escalation,
+  type EscalationRole,
+  escalation,
+} from "./escalation.ts";
+export {
   guidanceForPhase,
   HORIZONS,
   type Horizon,
