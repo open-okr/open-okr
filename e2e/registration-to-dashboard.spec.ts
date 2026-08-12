@@ -44,7 +44,13 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
   await expect(page).toHaveURL("/");
-  await expect(page.getByText("Signed in as")).toBeVisible();
+  // The heading, not any element containing the phrase: Next's route
+  // announcer (a visually hidden live region) also carries the page's
+  // heading text, so a bare getByText finds two elements and strict mode
+  // rejects it.
+  await expect(
+    page.getByRole("heading", { name: /Signed in as/ }),
+  ).toBeVisible();
   // Exact, because "Ada Lovelace" is also a prefix of the workspace name
   // and a loose match would find two elements.
   await expect(
