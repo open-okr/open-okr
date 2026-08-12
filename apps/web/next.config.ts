@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
     "@openokr/method",
     "@openokr/ui",
   ],
+  // Next's own dev-only overlay (route/bundler info, preferences), never
+  // shipped to production. Off by explicit request: its own UI is not
+  // OpenOKR's design system and is not this codebase's to fix.
+  devIndicators: false,
 };
 
 export default nextConfig;

@@ -12,11 +12,13 @@
  * change, the access bindings, the activity row, the audit row and the outbox
  * row. The transaction here is that transaction, minus the parts whose tables
  * do not exist yet. When those land it gains statements rather than changing
- * shape. Deliberately missing until then, and recorded on the P1-T07 row:
+ * shape.
  *
- *   - the audit row, because the append-only audit table is P1-T07
- *   - the outbox row, because provisioning has no side effect to enqueue yet
- *   - the first member's access binding, because bindings are P2-T01
+ * P2-T01 closes the last gap: the workspace gets its own access context and
+ * `workspace_standard` group, and the first member gets a `member` group of
+ * their own with a `full` binding on that context. `can()`, which actually
+ * reads any of this, is P2-T02; until then `resolveActor` still resolves
+ * every active member to `full` by construction.
  */
 import {
   activeOnly,
@@ -28,12 +30,20 @@ import {
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import {
+  bindGroup,
+  ensureContext,
+  ensureMemberGroup,
+  ensureWorkspaceStandardGroup,
+} from "../access/contexts.ts";
+import { ACCESS_LEVELS } from "../access/levels.ts";
 import { runOperation } from "../operations/operation.ts";
 import {
   type ProvisioningContext,
   resolveMemberSettings,
   resolveWorkspaceSettings,
 } from "../settings/registry.ts";
+import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 
 export interface WorkspaceUser {
   readonly id: string;
@@ -46,6 +56,8 @@ export interface CreateWorkspaceInput {
   readonly name?: string;
   /** The registering browser's timezone. Validated by the settings registry. */
   readonly timezone?: string;
+  /** Defaults to the instance's own resolved default language. */
+  readonly language?: string;
 }
 
 export interface ProvisionedWorkspace {
@@ -115,6 +127,13 @@ export async function createWorkspace(
   input: CreateWorkspaceInput,
 ): Promise<ProvisionedWorkspace> {
   const workspaceId = newId();
+  // The instance's own resolved default, so a fresh workspace's language
+  // sees `OPENOKR_DEFAULT_LANGUAGE` and an administered override the same
+  // way every other instance setting does, rather than the registry's
+  // hardcoded constant of last resort. Only asked for when the caller has no
+  // language of its own to offer.
+  const language =
+    input.language ?? (await resolveInstanceDefaultLanguage(pool));
 
   // A bootstrap operation: it creates the workspace it runs in, so there is no
   // member to authorise against and no workspace to load. Everything else is
@@ -133,11 +152,10 @@ export async function createWorkspace(
       actor: { kind: "system" },
       bootstrap: true,
       async execute({ tx }) {
-        const provisioned = await insertWorkspaceAndMember(
-          tx,
-          workspaceId,
-          input,
-        );
+        const provisioned = await insertWorkspaceAndMember(tx, workspaceId, {
+          ...input,
+          language,
+        });
         return {
           result: provisioned,
           activity: {
@@ -287,6 +305,45 @@ async function insertWorkspaceAndMember(
           primaryChannel:
             memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
           quietHours: memberSettings.quietHours,
+        });
+
+        // The workspace is the first protected aggregate this workspace
+        // owns: its own access context, plus the standing groups an Operation
+        // wires up for any later aggregate. openokr:allow-mutation: same
+        // reason as the two inserts above, same transaction.
+        const contextId = await ensureContext(savepoint, {
+          workspaceId,
+          resourceType: "workspace",
+          resourceId: workspaceId,
+        });
+        // Every active member belongs to this group "by definition" (reads.ts's
+        // own words), but that is only true in practice once it actually holds
+        // a binding: without one, `resolveMemberAccessLevel` has nothing to
+        // find for anyone who is not the founding member, and an ordinary
+        // invited member resolves to zero on the workspace's own context —
+        // unable to read the overview or edit their own profile. `edit` is
+        // the ceiling: it covers self-service and reading the workspace
+        // aggregate, and stays below every `full`-gated admin action
+        // (settings, invitations, member lifecycle, rename).
+        const workspaceStandardGroupId = await ensureWorkspaceStandardGroup(
+          savepoint,
+          { workspaceId },
+        );
+        await bindGroup(savepoint, {
+          workspaceId,
+          groupId: workspaceStandardGroupId,
+          contextId,
+          level: ACCESS_LEVELS.edit,
+        });
+        const memberGroupId = await ensureMemberGroup(savepoint, {
+          workspaceId,
+          memberId,
+        });
+        await bindGroup(savepoint, {
+          workspaceId,
+          groupId: memberGroupId,
+          contextId,
+          level: ACCESS_LEVELS.full,
         });
 
         return { workspaceId, memberId, name, slug };

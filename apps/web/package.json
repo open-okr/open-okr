@@ -17,17 +17,23 @@
     "@openokr/method": "workspace:*",
     "@better-auth/passkey": "catalog:",
     "@openokr/ui": "workspace:*",
+    "@base-ui-components/react": "catalog:",
     "better-auth": "catalog:",
+    "lucide-react": "catalog:",
     "next": "16.3.0",
     "pg": "catalog:",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "jsdom": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

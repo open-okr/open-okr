@@ -5,8 +5,16 @@
     // harness without a package dependency, which would cycle back through
     // test-support.
     "paths": {
-      "@openokr/test-support/db": ["../test-support/src/db-harness.ts"]
+      "@openokr/test-support/db": ["../test-support/src/db-harness.ts"],
+      "@openokr/test-support/db-fixtures": [
+        "../test-support/fixtures/db/schema.ts"
+      ]
     }
   },
-  "include": ["src", "test", "../test-support/src"]
+  "include": [
+    "src",
+    "test",
+    "../test-support/src",
+    "../test-support/fixtures/db"
+  ]
 }

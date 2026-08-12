@@ -62,4 +62,8 @@ export class OffAIProvider implements AIProvider {
   capabilities(_model: string): ModelCapabilities {
     return UNAVAILABLE;
   }
+
+  async stop(): Promise<void> {
+    // No provider was ever reached.
+  }
 }

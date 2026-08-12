@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -17,9 +18,16 @@ function ResetPasswordForm() {
       <AuthCard
         title="That link has expired"
         description="Reset links last an hour and can be used once."
-        footer={<Link href="/forgot-password">Ask for a new link</Link>}
+        footer={
+          <Link
+            href="/forgot-password"
+            className="font-medium text-brand-600 hover:underline"
+          >
+            Ask for a new link
+          </Link>
+        }
       >
-        <p />
+        {null}
       </AuthCard>
     );
   }
@@ -45,7 +53,7 @@ function ResetPasswordForm() {
 
   return (
     <AuthCard title="Choose a new password">
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label="New password"
           name="password"
@@ -54,9 +62,9 @@ function ResetPasswordForm() {
           minLength={12}
           required
         />
-        <button type="submit" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Set password"}
-        </button>
+        </Button>
       </form>
       <FormError>{error}</FormError>
     </AuthCard>

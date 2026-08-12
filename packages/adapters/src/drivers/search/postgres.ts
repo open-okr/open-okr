@@ -97,4 +97,9 @@ export class PostgresSearch implements Search {
       rank: Number(row.rank),
     }));
   }
+
+  async stop(): Promise<void> {
+    // The pool is injected and owned by the host process; nothing of this
+    // driver's own to close.
+  }
 }

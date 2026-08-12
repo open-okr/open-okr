@@ -52,4 +52,8 @@ export class ConsoleMailer implements Mailer {
 
     return { messageId };
   }
+
+  async stop(): Promise<void> {
+    // Nothing open: this driver never leaves the process.
+  }
 }

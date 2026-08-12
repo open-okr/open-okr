@@ -14,6 +14,9 @@
     },
     "packages/test-support": {
       "entry": ["bin/*.ts", "fixtures/**/vitest.config.ts"]
+    },
+    "packages/ui": {
+      "ignoreDependencies": ["motion"]
     }
   }
 }

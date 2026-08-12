@@ -25,6 +25,7 @@ Additional conventions:
 - **Enumerated values** are TypeScript string unions stored as text with a check constraint.
 - **Derived columns** (progress, health, achievement, alignment score, next check-in, streak, quality score) are written by jobs driven from the outbox, never computed at render time.
 - **`_migrations`** is the forward-only migration runner's bookkeeping table (name, checksum, applied time), created by the runner itself rather than by a migration. Infrastructure, not business data: no `workspace_id`, no policy, invisible to the importer.
+- **`_data_changes`** (P2-T12) is the data-change runner's own ledger: name, a checksum over the script's frozen column expectations, its resumable `cursor`, `batches`/`rows_changed` so far, and `completed_at`. Same footing as `_migrations` — created by `pnpm db:change` itself, no `workspace_id`, no policy, invisible to the importer. See `docs/design/data-change-conventions.md` for how a script uses it.
 
 **Authentication tables.** Better Auth owns six tables, all global to the deployment rather than workspace-scoped (§2), and all hard-delete: a soft-deleted credential is a live credential wearing a deleted label. Their column and identifier conventions are Better Auth's own, because it owns the schema.
 
@@ -41,7 +42,7 @@ Additional conventions:
 
 | Table | Key columns | Tenancy | Notes |
 |---|---|---|---|
-| `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete |
+| `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?`, `dead_lettered_at?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete. `dead_lettered_at` (P2-T06, closing a P1-hardening follow-up) is set once a row reaches `maxAttempts`: before it existed, a row that could never succeed retried on the lease interval forever, invisible to anyone, because nothing read `last_error` and `attempts` had no ceiling. `OutboxRelay.listDeadLettered()` is the visibility this was missing |
 | `cache_entries` | `key` primary key, `value jsonb`, `expires_at?` | Not tenant scoped | The Postgres cache driver's storage. Callers namespace keys with the workspace id. Reads filter on expiry, so a missed sweep cannot serve stale data |
 | `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. Queries return identifiers and a rank; the caller reloads each hit through the access getter |
 
@@ -107,6 +108,12 @@ The one table that cannot carry a `workspace_id`, because it is what every other
 
 `slug` is unique across the instance because it addresses the workspace in a URL. Row-level security hides other workspaces from a reader, but the unique index still refuses a duplicate, which is what makes a slug dependable. Provisioning therefore does not look before it writes: it writes, and retries with a suffix if the index refuses.
 
+**`settings` (§4.14, P2-T08).** The workspace-scoped half of `SETTINGS_REGISTRY` (`packages/core/src/settings/registry.ts`): `timezone`, `language`, `branding`, `trustedEmailDomains`, `storageQuotaBytes`. Every entry now carries a Zod `schema` (what an admin write validates against, stricter than the fallback `resolve()` a fresh workspace gets) and an optional `card` naming the S-36 admin card it is edited from — `general` for `timezone`/`language`/`trustedEmailDomains`, `branding` for `branding`. `storageQuotaBytes` has no card yet: no S-36 card names one, so it resets only by key, not by card, until a storage admin screen claims it. `settings.updateWorkspaceGeneral`, `settings.updateWorkspaceBranding`, `settings.readWorkspaceSettings` and `settings.resetWorkspaceSettings` (`packages/core/src/actions/settings.ts`) are the writers and reader; the workspace's `name`/`slug` columns stay on the existing `workspace.rename` action rather than gaining a second writer.
+
+The workspace `language` default now resolves through the instance's own `instance.language` setting (`resolveInstanceDefaultLanguage`, `packages/core/src/settings/workspace-defaults.ts`) rather than the hardcoded `INSTANCE_DEFAULT_LANGUAGE` constant, so `OPENOKR_DEFAULT_LANGUAGE` and an administered instance override both reach a freshly provisioned workspace. An explicit `language` passed to `createWorkspace` still wins over both.
+
+**`state` (§4.1, §8.2, P2-T09) is now enforced, not just stored.** `runOperation` (`packages/core/src/operations/operation.ts`) loads it ahead of everything else in every write, and refuses with `forbidden` when it is not `active` unless the action is on the freeze overlay's recovery list (`packages/core/src/operations/freeze.ts`: every `people.*` and `settings.*` action, plus `workspace.setState` itself so the freeze can be lifted). `read_only` and `frozen` are treated identically, matching TECHNICAL-PLAN §4.1's own wording ("not active" collapses to view-only). `workspace.setState` (`actions/workspace.ts`) is the one writer, gated at `full` like `workspace.rename`. Reads are unaffected by construction: a read action never opens a transaction through `runOperation`.
+
 ### users *(global, no workspace_id)*
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
@@ -118,19 +125,23 @@ Unique on `(workspace_id, user_id)` for live rows, so one person has at most one
 **Two transaction-local settings.** Beside the tenant floor's `app.workspace_id`, these two tables carry a second, read-only policy keyed on `app.user_id`: a member may see their own membership rows and the workspaces those rows point at. It exists for one question, which the workspace switcher asks on every page: "which workspaces do I belong to". That question crosses tenants by definition, and the alternative is a privileged query stepping around the floor. Postgres combines permissive policies with OR, so this widens reads without loosening any write: neither policy carries a `with check`.
 
 ### access_contexts
-`resource_type`, `resource_id`. One per protected aggregate.
+`resource_type`, `resource_id`. One live row per protected aggregate, unique on `(workspace_id, resource_type, resource_id)`. Created inside the same Operation that creates the resource, via `ensureContext` in `packages/core/src/access/contexts.ts`.
 
 ### access_groups
-`kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?`.
+`kind` (`member` / `workspace_standard` / `space_standard` / `anonymous`), `member_id?`, `space_id?`. A check constraint pins each kind to the column that scopes it: `member` carries `member_id` and no `space_id`, `space_standard` carries `space_id` and no `member_id`, and `workspace_standard` and `anonymous` carry neither. Partial unique indexes give a workspace exactly one live `workspace_standard` group and one live `anonymous` group, a member exactly one live group of their own, and a space exactly one live group of its own. `space_id` carries no foreign key: spaces are P3-T01.
 
 ### access_group_memberships
-`group_id` to access_groups, `member_id` to workspace_members.
+`group_id` to access_groups, `member_id` to workspace_members. Enumerates who belongs to a group whose membership is real data rather than structural — `space_standard`, once spaces exist. Deliberately unused for `workspace_standard`: every active member of the workspace already belongs to it by definition, so a row per person would be state kept only to agree with `workspace_members`.
 
 ### access_bindings
-`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`).
+`group_id` to access_groups, `context_id` to access_contexts, `level` (10 view, 40 comment, 70 edit, 100 full), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`). A group may hold at most one live untagged binding and one live binding per tag on a given context. Written through `bindGroup`, alongside `ensureContext` in the same file. `can()` and the access-aware getter that read these four tables back (`packages/core/src/access/reads.ts`) are P2-T02: `resolveMemberAccessLevel` walks the three reachable tiers and takes the maximum, and `resolveActor` in the Operation pipeline uses it in place of the placeholder `full` it returned before that task.
+
+Workspace provisioning (P1-T06, wired for the access model in P2-T01) gives every new workspace its own context and `workspace_standard` group, and gives the first member a `member` group with a `full` binding on that context.
 
 ### invite_links
-`token_hash`, `mode` (`workspace` / `personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?`.
+`mode` (`workspace` / `personal`), `token_hash` (SHA-256 hex of a raw token that is never itself stored), `email?` (set for `personal`, null for `workspace`: a personal link's one addressee), `allowed_domains text[]?` (meaningful for `workspace` only), `invited_by_member_id?`, `member_id?` (filled in when the link produces a member, so a used personal link cannot be replayed), `use_count`, `max_uses?` (null is unlimited), `expires_at?`, `revoked_at?`.
+
+Unique on `(workspace_id, token_hash)` for live rows: acceptance always names its workspace (by slug, in the URL) before it ever looks the token up, so the lookup is tenant-scoped like any other read rather than needing a global index. `invitations.acceptLink` and `invitations.joinByTrustedDomain` (P2-T04) are both `bootstrap` operations: the person accepting has no member row yet, so there is nothing for the ordinary actor resolution to find, and the operation's own validation of the link (or of `workspaces.settings.trustedEmailDomains`) is the entire authorisation. Both funnel into the one shared `provisionMemberForInvite` in `packages/core/src/invitations/provisioning.ts`, which every joining path calls rather than inserting into `workspace_members` itself.
 
 ### audit_events *(append-only, hash-chained per workspace)*
 `seq`, `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id?`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `(workspace_id, seq)`.
@@ -148,6 +159,13 @@ Append-only is enforced three ways, each covering what the last does not. The ap
 
 ### system_settings *(singleton)*
 Mail configuration with encrypted secrets, instance flags.
+
+### instance_audit_events *(append-only, hash-chained for the whole instance, P1/P2-hardening)*
+`seq`, `action`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `seq`.
+
+The other half of `audit_events`: that chain is per workspace and requires one via a not-null `workspace_id`, which a sign-in lockout cannot supply — it is a fact about an email address and a caller address, resolved before any workspace membership is known, and can implicate zero, one or several workspaces. This is one sequence for the whole instance instead, closing the gap TECHNICAL-PLAN §8.2's "lockout with backoff and an audit entry" line carried open since P1-T05 (the audit spine did not exist yet), then since P1-T07 (the spine existed, but had no workspace-free row shape). `packages/core/src/audit/instance-chain.ts` is the hashing and append logic, parallel to `audit/chain.ts` rather than sharing it, since an instance row has no actor, target or workspace for that shape to require.
+
+Read and written through the same `app.instance_admin` transaction-local flag `system_settings` already uses, appended by `recordInstanceAuditEvent`, called from `apps/web/app/api/auth/[...all]/route.ts` whenever Better Auth's own rate limiter answers with a 429 — the only place that can see one, since Better Auth's router returns that response from inside itself before any hook or plugin callback runs. Append-only enforced the same two ways `audit_events` is: `grantAppPrivileges` revokes UPDATE and DELETE from the application role (`packages/db/src/grants.ts`'s `APPEND_ONLY_TABLES`), and a trigger refuses both from anybody at all, including the owner and a superuser.
 
 ## 5. Spaces (domain B)
 
@@ -338,8 +356,16 @@ Every table references `session_id` to sessions.
 ### attachments
 `subject_type`, `subject_id`, `blob_id` to blobs, `position`.
 
-### blobs
-`filename`, `content_type`, `filesize`, `digest`, `storage_key`, `author_member_id` to workspace_members, `status` (`ok` / `scanning` / `quarantined`), `width?`, `height?`.
+### blobs *(built at P2-T05, ahead of `initiatives`/`tasks`/`attachments` above, which are still Phase 3)*
+`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`.
+
+`status` carries a fourth value beyond the three TECHNICAL-PLAN names: `pending`, the gap between prepare and claim that "prepare, upload, claim" needs somewhere to sit, and that the orphan cleanup job's own query targets. `filesize` and `digest` are null until claim fills them in.
+
+Each blob is its own protected aggregate: `prepareBlob` gives it an access context (`resourceType: "blob"`) and a `full` binding through the uploader's own `member` group, the same shape provisioning gives a workspace's first member. `blobs.getForDownload` resolves the key through `getAccessScoped` rather than trusting `author_member_id` alone, so a future sharing grant (a `workspace_standard` or `space_standard` binding on the same context) widens who can read it without this code changing.
+
+Byte accounting sums `filesize` over `ok`, `scanning` and `quarantined` rows (all three occupy real space; `pending` does not yet) against the workspace's `storageQuotaBytes` setting (§4.14, 5 GiB default — TECHNICAL-PLAN names no figure, P2-T05 picked one). A claim that would push the total past the quota is refused outright; one that crosses ninety percent without exceeding it is reported once, on the upload that crosses it, never again for the same workspace while it stays over that line.
+
+No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: all three need a new runtime dependency CLAUDE.md requires asking about first, so `claimBlob` accepts an optional `requiresScan` flag that would move a claim to `scanning` instead of `ok` — scaffolding for a scanner that does not exist yet, not a built capability.
 
 ## 13. Collaboration (domain J)
 
@@ -349,25 +375,29 @@ Every table references `session_id` to sessions.
 ### reactions
 `subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`.
 
-### subscription_lists
-`subject_type`, `subject_id`, `send_to_everyone bool`.
+### subscription_lists *(built at P2-T06, ahead of comments/reactions above, which are still Phase 3)*
+`subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact; built before anything creates one, the same way access contexts existed before spaces did.
 
-### subscriptions
-`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`.
+### subscriptions *(built at P2-T06)*
+`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring.
 
 ## 14. Feed, notifications and channels (domain K)
 
 ### activities
 `kind`, `payload jsonb`, `actor_member_id?` to workspace_members, `actor_kind`, `subject_type`, `subject_id`, `space_id?` to spaces, `context_id` to access_contexts, `at`.
 
-### notifications
-`recipient_member_id` to workspace_members, `activity_id?` to activities, `nudge_id?` to nudges, `reason`, `read_at?`, `channel`, `sent_at?`.
+The typed catalogue lives in code (`packages/core/src/activities/catalogue.ts`), not in a migration: a Zod schema per registered `kind`, checked by `runOperation` itself before the row is inserted, so an unregistered kind or a payload that does not match its own kind's schema fails the whole write rather than landing in the table. P2-T08 adds `workspace.general_settings_updated`, `workspace.branding_updated` (both aggregatable) and `workspace.settings_reset` (narrative: a reset is its own event, not folded into a run of edits); P2-T09 adds `workspace.state_changed` (narrative — freezing, unfreezing and re-freezing are three distinct events, not one repeated). Renderers for all four are in `packages/core/src/activities/renderers.ts`. `kind`-prefixed `test.*` activities are exempt — every prior Phase 2 task's tests write throwaway kinds as scaffolding for exercising the pipeline, not as product events, and a kind in that shape can never collide with a real one. `context_id` is filled automatically when the caller does not set one, by wrapping the P2-T02 subject-to-context resolver so an unresolvable context returns `undefined` instead of raising: raising here would abort a write over a feed column, so this fails toward "not shown in a context-filtered feed" instead. A `null` `context_id` reads as workspace-public, the same way the workspace's own context does. Aggregation (`packages/core/src/activities/feed.ts`) collapses consecutive rows of the same kind, same actor and same subject when the kind is in `AGGREGATABLE_KINDS`; every kind is narrative (never collapsed) unless explicitly added there. Notification fan-out from an activity is opt-in per write: `ActivityInput.notify` (default `false`), because most activities today have no subscriber to reach and a workspace-level event is not, on its own, something every member should be notified about.
 
-### notification_settings
-`member_id` to workspace_members, per-reason routing, `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`.
+### notifications *(built at P2-T06)*
+`recipient_member_id` to workspace_members, `activity_id?` to activities, `nudge_id?` (no foreign key: nudges are P4-T04), `batch_id?` to notification_batches, `reason`, `read_at?`, `snoozed_until?` (not in TECHNICAL-PLAN's column list: the inbox's own snooze action needs somewhere to record "hide until", distinct from `read_at`), `channel`, `sent_at?`.
 
-### notification_batches
-`member_id` to workspace_members, `channel`, `status`, `window_minutes`, `send_at`, `sent_at?`, `error?`.
+### notification_settings *(built at P2-T06)*
+`member_id` to workspace_members, `routing jsonb` (per reason, falling back to the member's `primary_channel` when a reason is absent), `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`. Created lazily on first read or write, with defaults from TECHNICAL-PLAN §11's worked example (mentions immediate, everything else batched in thirty minutes, the daily summary at 08:00 local) — a member who never touches their settings still gets the documented default, because `getOrCreateNotificationSettings` always returns one.
+
+### notification_batches *(built at P2-T06)*
+`member_id` to workspace_members, `channel`, `status` (`pending` / `sent` / `failed` — `failed` is not in TECHNICAL-PLAN's list; a send attempt that errors has to land somewhere other than `pending` forever), `window_minutes`, `send_at`, `sent_at?`, `error?`. "Found or created under a row lock" is a partial unique index on `(workspace_id, member_id, channel) where status = 'pending'`, not an explicit `SELECT ... FOR UPDATE`: a losing concurrent insert falls back to reading the winning row.
+
+Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-PLAN's "and role obligations" is not built, because no role tag carries a notification meaning yet. Creating the rows (`notifyRecipients`) and driving the actual send are separate: nothing dispatches a `pending` batch or an unsent immediate row yet, and nothing calls `notifyRecipients` from an activity — "notification fan-out driven from activities" is P2-T07's own deliverable. Per-reason mail templates exist as pure string builders (`packages/core/src/notifications/templates.ts`), HTML and plain text, with no development preview page: there is no app shell yet (P2-T10) to serve one into.
 
 ### channel_connections
 `provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `credentials_ciphertext`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`.

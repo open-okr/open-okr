@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -77,7 +78,7 @@ export default function SignInPage() {
         title="Enter your code"
         description="Open your authenticator app and enter the six-digit code."
       >
-        <form onSubmit={verify}>
+        <form onSubmit={verify} className="flex flex-col gap-3">
           <Field
             label="Six-digit code"
             name="code"
@@ -87,14 +88,20 @@ export default function SignInPage() {
             value={code}
             onChange={(event) => setCode(event.target.value)}
           />
-          <button type="submit" disabled={pending}>
+          <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "Checking…" : "Verify"}
-          </button>
+          </Button>
         </form>
         <FormError>{error}</FormError>
-        <p style={{ marginTop: "1rem", fontSize: "0.875rem" }}>
+        <p className="text-sm text-ink-3">
           Lost your phone? Use a backup code on the{" "}
-          <Link href="/backup-code">backup code page</Link>.
+          <Link
+            href="/backup-code"
+            className="font-medium text-brand-600 hover:underline"
+          >
+            backup code page
+          </Link>
+          .
         </p>
       </AuthCard>
     );
@@ -105,13 +112,23 @@ export default function SignInPage() {
       title="Sign in to OpenOKR"
       footer={
         <>
-          <Link href="/forgot-password">Forgot your password?</Link>
+          <Link
+            href="/forgot-password"
+            className="font-medium text-brand-600 hover:underline"
+          >
+            Forgot your password?
+          </Link>
           {" · "}
-          <Link href="/sign-up">Create an account</Link>
+          <Link
+            href="/sign-up"
+            className="font-medium text-brand-600 hover:underline"
+          >
+            Create an account
+          </Link>
         </>
       }
     >
-      <form onSubmit={signIn}>
+      <form onSubmit={signIn} className="flex flex-col gap-3">
         <Field
           label="Email"
           name="email"
@@ -126,16 +143,14 @@ export default function SignInPage() {
           autoComplete="current-password"
           required
         />
-        <button type="submit" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Signing in…" : "Sign in"}
-        </button>
+        </Button>
       </form>
 
-      <p style={{ marginTop: "1rem" }}>
-        <button type="button" onClick={signInWithPasskey}>
-          Sign in with a passkey
-        </button>
-      </p>
+      <Button type="button" variant="default" onClick={signInWithPasskey}>
+        Sign in with a passkey
+      </Button>
 
       <FormError>{error}</FormError>
     </AuthCard>

@@ -146,6 +146,7 @@ Keep this list current once scaffolded.
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
 - `pnpm db:migrate`: migrations
+- `pnpm db:change`: the data-change runner. Batched, resumable, idempotent-by-ledger backfills, kept out of schema migrations. Scripts declare the columns and types they depend on and the runner checks every one before each run, so a later migration cannot silently change what an old script does
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
 - `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
 - `sh deploy/docker/smoke-test.sh`: boot the compose target from nothing and prove a clean server reaches a secured instance with an admin. Takes `OPENOKR_IMAGE`
@@ -163,8 +164,7 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 | Command | Arrives at | What it will do |
 |---|---|---|
 | `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
-| `pnpm db:change` | P2-T12 | The data-change runner, kept separate from schema migrations |
-| `pnpm gen:contract` | P2-T09 | Regenerate OpenAPI, the agent tool catalogue, the command line and the chat commands from the action registry |
+| `pnpm gen:contract` | P5-T07 | Regenerate OpenAPI and the command line from the action registry, with the drift check against committed artifacts that task builds. The chat command surface (P5-T06) and the MCP tool catalogue (P5-T09) are their own generated projections of the same registry, each landing with its own task |
 | `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
 | `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
 | `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |

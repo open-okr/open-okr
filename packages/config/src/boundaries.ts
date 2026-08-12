@@ -35,7 +35,8 @@ export interface BoundaryViolation {
     | "vendor-sdk"
     | "driver-import"
     | "write-path-side-effect"
-    | "mutation-outside-operation";
+    | "mutation-outside-operation"
+    | "protected-read-outside-getter";
   readonly message: string;
 }
 
@@ -495,6 +496,90 @@ const checkMutations = (file: BoundarySourceFile): BoundaryViolation[] => {
   return violations;
 };
 
+/**
+ * Tables read through the access-aware getter (TECHNICAL-PLAN §4.1, §8.1
+ * layer 2, P2-T02), keyed by nothing but their own name: this list grows one
+ * entry per resource type as later phases add protected aggregates. Read the
+ * getter's own row, not the table, so a caller cannot see more than the
+ * getter would tell them.
+ */
+const PROTECTED_TABLES: readonly string[] = ["workspaces"];
+
+/**
+ * Where a protected table's own row may legitimately be selected directly:
+ * the database layer, the getter itself, and the Operation pipeline, which
+ * enforces access before a single write and may need the row's own columns
+ * for its audit payload.
+ */
+const PROTECTED_READ_ALLOWED_PREFIXES: readonly string[] = [
+  "packages/db/",
+  "packages/core/src/access/",
+  "packages/core/src/operations/",
+];
+
+/** Packages whose reads of a protected table must go through the getter. */
+const PROTECTED_READ_CHECKED_PREFIXES: readonly string[] = [
+  "packages/core/",
+  "packages/agents/",
+  "packages/importer/",
+  "apps/",
+];
+
+const PROTECTED_READ = new RegExp(
+  `\\.from\\s*\\(\\s*(${PROTECTED_TABLES.join("|")})\\s*\\)`,
+  "g",
+);
+
+/**
+ * Checks the protected-read rule for one file.
+ *
+ * A read inside a `runOperation`/`defineWriteAction` span is exempt: the
+ * pipeline already authorises before any write, using the same getter this
+ * rule protects. Everywhere else, reading a protected table's row directly
+ * bypasses the one thing the getter guarantees: not-found on forbidden, with
+ * suspended members excluded (§8.1 layer 2).
+ */
+const checkProtectedReads = (file: BoundarySourceFile): BoundaryViolation[] => {
+  if (!PROTECTED_READ_CHECKED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+  if (PROTECTED_READ_ALLOWED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+
+  const spans = pipelineSpans(file.text);
+  const insidePipeline = (index: number): boolean =>
+    spans.some(([start, end]) => index >= start && index <= end);
+
+  const violations: BoundaryViolation[] = [];
+  const lines = file.text.split("\n");
+  for (const match of file.text.matchAll(PROTECTED_READ)) {
+    if (insidePipeline(match.index)) {
+      continue;
+    }
+    // Anchored on the `.from(...)` line itself, not `statementStartLine`:
+    // that walk stops at the first `{` or `}` it meets going backward, which
+    // is the closing brace of a `.select({ ... })` argument long before the
+    // statement's own start when one precedes the match, as it almost always
+    // does here. The marker sits directly above the line naming the table.
+    const line = lineOf(file.text, match.index);
+    if (hasMarkerAbove(lines, line, "allow-raw-read")) {
+      continue;
+    }
+    violations.push({
+      path: file.path,
+      line,
+      rule: "protected-read-outside-getter",
+      message:
+        `reads ${match[1]} directly. Protected tables are read through the ` +
+        `access-aware getter in packages/core/src/access, which excludes ` +
+        `suspended members and returns not-found on forbidden.`,
+    });
+  }
+
+  return violations;
+};
+
 export function checkBoundaries(
   files: readonly BoundarySourceFile[],
 ): BoundaryViolation[] {
@@ -502,5 +587,6 @@ export function checkBoundaries(
     ...checkImports(file),
     ...checkWritePathSideEffects(file),
     ...checkMutations(file),
+    ...checkProtectedReads(file),
   ]);
 }

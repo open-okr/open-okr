@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { APP_NAME } from "../lib/app-info";
+import { AppShellLayout } from "../lib/app-shell.tsx";
 import { requireWorkspace } from "../lib/workspace";
 import { OverviewSkeleton } from "./overview-skeleton";
-import { SignOut } from "./sign-out";
 import { WorkspaceOverview } from "./workspace-overview";
 
 /**
@@ -24,17 +22,12 @@ export default async function HomePage() {
   const active = await requireWorkspace();
 
   return (
-    <main style={{ maxWidth: "32rem", margin: "3rem auto", padding: "0 1rem" }}>
-      <h1>{APP_NAME}</h1>
-
-      <Suspense fallback={<OverviewSkeleton />}>
-        <WorkspaceOverview active={active} />
-      </Suspense>
-
-      <p>
-        <Link href="/account/security">Security settings</Link>
-      </p>
-      <SignOut />
-    </main>
+    <AppShellLayout>
+      <div className="stagger mx-auto flex max-w-2xl flex-col gap-4.5">
+        <Suspense fallback={<OverviewSkeleton />}>
+          <WorkspaceOverview active={active} />
+        </Suspense>
+      </div>
+    </AppShellLayout>
   );
 }

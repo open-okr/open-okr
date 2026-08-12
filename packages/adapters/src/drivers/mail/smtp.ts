@@ -188,8 +188,8 @@ export class SmtpMailer implements Mailer {
     }
   }
 
-  /** Releases pooled sockets. Called on process shutdown. */
-  close(): void {
+  /** Releases pooled sockets. */
+  async stop(): Promise<void> {
     this.#transport.close();
   }
 }

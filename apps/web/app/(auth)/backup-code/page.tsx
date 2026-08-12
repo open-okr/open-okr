@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -37,18 +38,25 @@ export default function BackupCodePage() {
     <AuthCard
       title="Use a backup code"
       description="Each code works once. Generate a fresh set afterwards."
-      footer={<Link href="/sign-in">Back to sign in</Link>}
+      footer={
+        <Link
+          href="/sign-in"
+          className="font-medium text-brand-600 hover:underline"
+        >
+          Back to sign in
+        </Link>
+      }
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label="Backup code"
           name="code"
           autoComplete="one-time-code"
           required
         />
-        <button type="submit" disabled={pending}>
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Checking…" : "Verify"}
-        </button>
+        </Button>
       </form>
       <FormError>{error}</FormError>
     </AuthCard>

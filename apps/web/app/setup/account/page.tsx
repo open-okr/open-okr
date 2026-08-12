@@ -1,4 +1,5 @@
 import { readSetupState } from "@openokr/core";
+import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
 import { FinishSetup } from "./finish-setup";
@@ -27,34 +28,40 @@ export default async function SetupAccountPage() {
   if (state.hasUser) {
     return (
       <>
-        <h1>Finish setup</h1>
-        <p>
+        <h1 className="text-lg font-bold text-ink">Finish setup</h1>
+        <p className="text-sm text-ink-3">
           An account already exists on this instance, but setup was never
           recorded as finished. Sign in as that account if you are not already,
           then finish here. Finishing closes registration, so everybody after
           the first account joins by invitation.
         </p>
         <FinishSetup />
-        <p>
-          <Link href="/sign-in">Sign in</Link>
-        </p>
+        <Link
+          href="/sign-in"
+          className="text-sm font-medium text-brand-600 hover:underline"
+        >
+          Sign in
+        </Link>
       </>
     );
   }
 
   return (
     <>
-      <h1>Create the first account</h1>
-      <p>
+      <h1 className="text-lg font-bold text-ink">Create the first account</h1>
+      <p className="text-sm text-ink-3">
         This account owns the instance. Registration closes once it exists, so
         everybody after you joins by invitation.
       </p>
 
       <SetupAccountForm />
 
-      <p>
-        <Link href="/setup">Back</Link>
-      </p>
+      <Link
+        href="/setup"
+        className={cn(buttonVariants({ variant: "ghost" }), "self-start")}
+      >
+        Back
+      </Link>
     </>
   );
 }

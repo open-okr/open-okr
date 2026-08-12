@@ -430,3 +430,70 @@ describe("side effects reached through a call expression", () => {
     ).toEqual([]);
   });
 });
+
+describe("protected-read rule (P2-T02)", () => {
+  const READ = `const rows = await tx.select().from(workspaces).where(eq(workspaces.id, id));\n`;
+
+  test("fails a raw read of a protected table in an action file", () => {
+    const violations = check("packages/core/src/actions/overview.ts", READ);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({
+      rule: "protected-read-outside-getter",
+    });
+  });
+
+  test("fails the same read in an app server component", () => {
+    expect(check("apps/web/app/dashboard/page.tsx", READ)).toHaveLength(1);
+  });
+
+  test("allows the read inside the getter's own module", () => {
+    expect(check("packages/core/src/access/reads.ts", READ)).toEqual([]);
+  });
+
+  test("allows the read inside packages/db, which implements the tables", () => {
+    expect(check("packages/db/src/schema/workspaces.ts", READ)).toEqual([]);
+  });
+
+  test("allows the read inside the Operation pipeline itself", () => {
+    expect(check("packages/core/src/operations/operation.ts", READ)).toEqual(
+      [],
+    );
+  });
+
+  test("allows the read inside a defineWriteAction operation, which authorises before it runs", () => {
+    const text = `import { defineWriteAction } from "./define.ts";\nexport const rename = defineWriteAction({ operation: () => ({ load: async ({ tx }) => {\n${READ}} }) });\n`;
+    expect(check("packages/core/src/actions/workspace.ts", text)).toEqual([]);
+  });
+
+  test("an escape marker with a reason silences one read", () => {
+    const text = `// openokr:allow-raw-read: access already confirmed above; this loads display fields only\n${READ}`;
+    expect(check("packages/core/src/actions/overview.ts", text)).toEqual([]);
+  });
+
+  test("the marker still works when a multi-line select precedes .from", () => {
+    // Reproduces the real shape in overview.ts: a `.select({ ... })` object
+    // argument spanning several lines sits between the statement's own start
+    // and `.from(...)`. `statementStartLine` cannot be reused here — it stops
+    // at the closing brace of that object, which lands it back on the `.from`
+    // line itself — so the marker has to sit directly above `.from`, not
+    // above the statement.
+    const multiLine = `const rows = await tx\n  .select({ id: workspaces.id, name: workspaces.name })\n  .from(workspaces)\n  .where(eq(workspaces.id, id));\n`;
+    expect(
+      check("packages/core/src/actions/overview.ts", multiLine),
+    ).toHaveLength(1);
+
+    const withMarker = `const rows = await tx\n  .select({ id: workspaces.id, name: workspaces.name })\n  // openokr:allow-raw-read: access already confirmed above\n  .from(workspaces)\n  .where(eq(workspaces.id, id));\n`;
+    expect(check("packages/core/src/actions/overview.ts", withMarker)).toEqual(
+      [],
+    );
+  });
+
+  test("does not flag reads of a table that is not on the protected list", () => {
+    expect(
+      check(
+        "packages/core/src/actions/overview.ts",
+        `await tx.select().from(workspaceMembers);\n`,
+      ),
+    ).toEqual([]);
+  });
+});

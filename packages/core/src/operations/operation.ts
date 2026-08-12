@@ -38,12 +38,22 @@ import {
   type OutboxMessage,
   withContext,
   workspaceMembers,
+  workspaces,
 } from "@openokr/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
+import {
+  resolveMemberAccessLevel,
+  resolveSubjectContext,
+} from "../access/reads.ts";
+import { validateActivityPayload } from "../activities/catalogue.ts";
+import { resolveActivityContext } from "../activities/context.ts";
+import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
+import { OperationError } from "./errors.ts";
+import { isRecoveryAction } from "./freeze.ts";
 
 /** The transaction handed to an operation's `execute`. */
 export type OperationTx = Parameters<
@@ -63,7 +73,12 @@ export interface ActorInput {
 export interface ResolvedActor {
   readonly kind: ActorInput["kind"];
   readonly memberId: string | null;
-  readonly level: AccessLevel;
+  /**
+   * A plain number rather than `AccessLevel`: the resolved level can be `0`
+   * when the member reaches none of the three tiers on the workspace's own
+   * context, and `0` is not one of the four declared levels.
+   */
+  readonly level: number;
 }
 
 export interface ActivityInput {
@@ -73,6 +88,15 @@ export interface ActivityInput {
   readonly payload?: Record<string, unknown>;
   readonly spaceId?: string;
   readonly contextId?: string;
+  /**
+   * Opts this activity into notification fan-out (P2-T06, P2-T07): every
+   * subscriber to `subjectType`/`subjectId` who still has access and is not
+   * the actor gets a notification. Off by default — most activities today
+   * have no subscribers to reach yet, and a workspace-level event like a
+   * rename is not, on its own, something every member should be notified
+   * about.
+   */
+  readonly notify?: boolean;
 }
 
 export interface AuditInput {
@@ -108,8 +132,12 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
   /** The level this operation requires. Defaults to edit. */
   readonly requires?: AccessLevel;
   /**
-   * Bootstrap operations create the workspace they run in, so there is no
-   * member to authorise and no workspace to load. Only provisioning sets this.
+   * Bootstrap operations run before the acting person has a member row to
+   * resolve — either because the workspace itself doesn't exist yet
+   * (`workspace.provision`) or because this operation is what creates their
+   * membership (`invitations.acceptLink`, `invitations.joinByTrustedDomain`).
+   * `resolveActor` is skipped entirely and the actor is trusted with `full`;
+   * the operation's own logic is the whole of what authorises it.
    */
   readonly bootstrap?: boolean;
   /** Freshly loaded rows the authorisation and the change both depend on. */
@@ -123,16 +151,7 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
   ) => Promise<OperationOutcome<TResult>>;
 }
 
-/** A refusal, as opposed to something going wrong. */
-export class OperationError extends Error {
-  readonly code: "forbidden" | "not_found";
-
-  constructor(code: "forbidden" | "not_found", message: string) {
-    super(message);
-    this.name = "OperationError";
-    this.code = code;
-  }
-}
+export { OperationError };
 
 export interface OperationDeps {
   readonly pool: Pool;
@@ -198,9 +217,29 @@ async function resolveActor(
     );
   }
 
-  // P2-T02 replaces this line with the binding walk. Everything around it,
-  // including the comparison in runOperation, is already the real thing.
-  return { kind: actor.kind, memberId: member.id, level: ACCESS_LEVELS.full };
+  // The level an operation compares against is the member's access on the
+  // workspace's own context: every protected aggregate in Phase 2 either is
+  // the workspace or, once P3-T01 ships spaces, resolves its own context and
+  // authorises through that instead via the getter in packages/core/src/
+  // access/reads.ts. Provisioning always creates the workspace's context
+  // before any member exists, so a missing context here is not expected; it
+  // resolves to zero rather than throwing, which a bootstrap-only workspace
+  // mid-provisioning would otherwise turn into a crash instead of a refusal.
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    workspaceId,
+    workspaceId,
+  );
+  const level = context
+    ? await resolveMemberAccessLevel(tx, {
+        workspaceId,
+        memberId: member.id,
+        contextId: context.contextId,
+      })
+    : 0;
+
+  return { kind: actor.kind, memberId: member.id, level };
 }
 
 /**
@@ -262,6 +301,29 @@ export async function runOperation<TResult, TLoaded = undefined>(
       ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
     },
     async (tx) => {
+      // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`
+      // collapses to view-only for every write except the recovery list.
+      // Checked ahead of everything else, including who is asking — a
+      // frozen workspace refuses the write before spending effort on an
+      // actor it will not matter to. A workspace with no row yet
+      // (`workspace.provision`, mid-transaction) has no state to collapse,
+      // so this is silent rather than a special case keyed on `bootstrap`.
+      if (!isRecoveryAction(spec.action)) {
+        const [current] = await tx
+          .select({ state: workspaces.state })
+          .from(workspaces)
+          .where(activeOnly(workspaces, eq(workspaces.id, spec.workspaceId)))
+          .limit(1);
+        if (current && current.state !== "active") {
+          throw new OperationError(
+            "forbidden",
+            current.state === "frozen"
+              ? "This workspace is frozen. Only member and settings management is allowed until it is reactivated."
+              : "This workspace is read-only. Only member and settings management is allowed until it is reactivated.",
+          );
+        }
+      }
+
       // 1. Who is asking, resolved against rows loaded in this transaction.
       const actor = spec.bootstrap
         ? ({
@@ -292,19 +354,46 @@ export async function runOperation<TResult, TLoaded = undefined>(
         loaded,
       });
 
-      // 5. The activity row.
-      await tx.insert(activities).values({
-        workspaceId: spec.workspaceId,
-        kind: outcome.activity.kind,
-        payload: outcome.activity.payload ?? {},
-        actorMemberId: actor.memberId,
-        actorKind: actor.kind,
-        subjectType: outcome.activity.subjectType,
-        subjectId: outcome.activity.subjectId,
-        spaceId: outcome.activity.spaceId ?? null,
-        contextId: outcome.activity.contextId ?? null,
-        at: new Date(),
-      });
+      // 5. The activity row. A kind outside the catalogue, or a payload that
+      //    does not match its own kind's schema, refuses here rather than
+      //    persisting — this is what makes "an event kind outside the
+      //    catalogue cannot be persisted" true of every write path at once
+      //    instead of every call site having to remember its own check.
+      const activityPayload = outcome.activity.payload ?? {};
+      validateActivityPayload(outcome.activity.kind, activityPayload);
+      const contextId =
+        outcome.activity.contextId ??
+        (await resolveActivityContext(
+          tx,
+          spec.workspaceId,
+          outcome.activity.subjectType,
+          outcome.activity.subjectId,
+        ));
+      const [insertedActivity] = await tx
+        .insert(activities)
+        .values({
+          workspaceId: spec.workspaceId,
+          kind: outcome.activity.kind,
+          payload: activityPayload,
+          actorMemberId: actor.memberId,
+          actorKind: actor.kind,
+          subjectType: outcome.activity.subjectType,
+          subjectId: outcome.activity.subjectId,
+          spaceId: outcome.activity.spaceId ?? null,
+          contextId: contextId ?? null,
+          at: new Date(),
+        })
+        .returning({ id: activities.id });
+
+      if (outcome.activity.notify) {
+        await fanOutActivity(tx, {
+          workspaceId: spec.workspaceId,
+          activityId: (insertedActivity as { id: string }).id,
+          subjectType: outcome.activity.subjectType,
+          subjectId: outcome.activity.subjectId,
+          actorMemberId: actor.memberId,
+        });
+      }
 
       // 6. The audit row, chained.
       await appendAudit(tx, spec.workspaceId, actor, outcome.audit);

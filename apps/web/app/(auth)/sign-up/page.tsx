@@ -23,9 +23,16 @@ export default async function SignUpPage() {
     return (
       <AuthCard
         title="Registration is closed"
-        footer={<Link href="/sign-in">Back to sign in</Link>}
+        footer={
+          <Link
+            href="/sign-in"
+            className="font-medium text-brand-600 hover:underline"
+          >
+            Back to sign in
+          </Link>
+        }
       >
-        <p>{REGISTRATION_CLOSED_MESSAGE}</p>
+        <p className="text-sm text-ink-2">{REGISTRATION_CLOSED_MESSAGE}</p>
       </AuthCard>
     );
   }

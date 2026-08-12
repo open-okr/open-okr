@@ -39,4 +39,8 @@ export interface Search {
     workspaceId: string,
   ): Promise<void>;
   query(query: SearchQuery): Promise<SearchHit[]>;
+  /** Releases whatever this driver holds open. The shipped driver shares an
+   * injected pool it does not own, so it no-ops; declared here so a future
+   * driver that owns a connection of its own is not exempt from closing it. */
+  stop(): Promise<void>;
 }

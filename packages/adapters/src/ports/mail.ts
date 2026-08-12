@@ -34,4 +34,8 @@ export interface Mailer {
    * arrives.
    */
   verify(): Promise<MailVerifyResult>;
+  /** Releases whatever this driver holds open. The console driver holds
+   * nothing; the SMTP driver holds pooled sockets that outlive the process
+   * otherwise. Call on process shutdown. */
+  stop(): Promise<void>;
 }

@@ -11,8 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "catalog:",
+    "@google/genai": "catalog:",
     "@openokr/config": "workspace:*",
     "nodemailer": "catalog:",
+    "openai": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "ws": "catalog:"

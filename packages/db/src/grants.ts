@@ -17,7 +17,10 @@ import type { SqlRunner } from "./roles.ts";
  * The database also refuses these through a trigger, which covers the owner
  * and a superuser as well. Grants are the first of the two, not the only one.
  */
-export const APPEND_ONLY_TABLES: readonly string[] = ["audit_events"];
+export const APPEND_ONLY_TABLES: readonly string[] = [
+  "audit_events",
+  "instance_audit_events",
+];
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 

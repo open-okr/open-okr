@@ -99,6 +99,10 @@ describe("LocalDiskStorage", () => {
       vi.useRealTimers();
     }
   });
+
+  it("stops cleanly (P1-hardening: the port set had no agreed lifecycle)", async () => {
+    await expect(storage.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("ConsoleMailer", () => {
@@ -125,6 +129,10 @@ describe("ConsoleMailer", () => {
       "a@example.com",
       "b@example.com",
     ]);
+  });
+
+  it("stops cleanly", async () => {
+    await expect(new ConsoleMailer().stop()).resolves.toBeUndefined();
   });
 });
 
@@ -166,6 +174,28 @@ describe("InProcessCache", () => {
     expect(results.map((r) => r.allowed)).toEqual([true, true, true, false]);
     expect(results[2]?.remaining).toBe(0);
     expect(results[3]?.resetSeconds).toBeGreaterThan(0);
+  });
+
+  it("never grows past its cap, even for keys that never come back (P2-T09)", async () => {
+    // The unbounded-keyspace defect: a rate limit key per subject, most of
+    // whom never return to have their expired entry swept. A tiny cap makes
+    // the bound provable without inserting ten thousand real entries.
+    const cache = new InProcessCache({ maxEntries: 5 });
+    for (let i = 0; i < 50; i++) {
+      await cache.rateLimit(`address:${i}`, 10, 60);
+    }
+    // Reach in through the public surface only: the most recent subjects are
+    // still tracked (the eviction is FIFO, oldest first), the earliest ones
+    // are not.
+    expect((await cache.get("ratelimit:address:49")) as number).toBe(1);
+    expect(await cache.get("ratelimit:address:0")).toBeUndefined();
+  });
+
+  it("stops cleanly, leaving stored entries untouched", async () => {
+    const cache = new InProcessCache();
+    await cache.set("k", "v");
+    await expect(cache.stop()).resolves.toBeUndefined();
+    expect(await cache.get("k")).toBe("v");
   });
 });
 
@@ -219,6 +249,15 @@ describe("PostgresCache", () => {
     expect((await cache.rateLimit("ip:1", 2, 60)).allowed).toBe(true);
     expect((await other.rateLimit("ip:1", 2, 60)).allowed).toBe(true);
     expect((await cache.rateLimit("ip:1", 2, 60)).allowed).toBe(false);
+  });
+
+  it("stops cleanly without touching the shared pool", async () => {
+    const wb = await workerDb();
+    const cache = new PostgresCache(wb.admin);
+    await expect(cache.stop()).resolves.toBeUndefined();
+    // The pool is not this driver's to close: a query still works after.
+    await cache.set("k", "v");
+    expect(await cache.get("k")).toBe("v");
   });
 });
 
@@ -362,6 +401,12 @@ describe("PostgresSearch", () => {
     });
     expect(hits.length).toBeLessThanOrEqual(1);
   });
+
+  it("stops cleanly without touching the shared pool", async () => {
+    const wb = await workerDb();
+    const search = new PostgresSearch(wb.admin);
+    await expect(search.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("OffAIProvider", () => {
@@ -401,6 +446,10 @@ describe("OffAIProvider", () => {
       }
     }).rejects.toBeInstanceOf(AIUnavailableError);
   });
+
+  it("stops cleanly", async () => {
+    await expect(ai.stop()).resolves.toBeUndefined();
+  });
 });
 
 describe("NoneChannel", () => {
@@ -425,5 +474,9 @@ describe("NoneChannel", () => {
       false,
     );
     expect(await channel.parseInbound("{}")).toBeNull();
+  });
+
+  it("stops cleanly", async () => {
+    await expect(channel.stop()).resolves.toBeUndefined();
   });
 });

@@ -1,6 +1,16 @@
 export const PACKAGE_NAME = "@openokr/db";
 
 export {
+  type ColumnExpectation,
+  type DataChangeBatchResult,
+  type DataChangeClient,
+  DataChangeError,
+  type DataChangeOutcome,
+  type DataChangeScript,
+  type RunDataChangesOptions,
+  runDataChanges,
+} from "./data-change.ts";
+export {
   APPEND_ONLY_TABLES,
   type GrantOptions,
   grantAppPrivileges,
@@ -28,6 +38,74 @@ export {
   type SqlRunner,
 } from "./roles.ts";
 export {
+  type AccessBinding,
+  type AccessContext,
+  type AccessGroup,
+  type AccessGroupKind,
+  type AccessGroupMembership,
+  type AccessRoleTag,
+  accessBindings,
+  accessContexts,
+  accessGroupMemberships,
+  accessGroups,
+} from "./schema/access.ts";
+export {
+  AGENT_AUTONOMIES,
+  AGENT_KINDS,
+  AGENT_RUN_STATUSES,
+  AGENT_SCHEDULES,
+  type Agent,
+  type AgentAutonomy,
+  type AgentKind,
+  type AgentRun,
+  type AgentRunLogEntry,
+  type AgentRunStatus,
+  type AgentSchedule,
+  type AgentTask,
+  agentRuns,
+  agents,
+  PROPOSED_CHANGE_STATUSES,
+  type ProposedChange,
+  type ProposedChangeStatus,
+  proposedChanges,
+} from "./schema/agents.ts";
+export {
+  AI_PROVIDER_KINDS,
+  type AICredential,
+  type AICredentialStatus,
+  type AIProviderConfig,
+  type AIProviderKind,
+  aiCredentials,
+  aiProviders,
+} from "./schema/ai.ts";
+export {
+  type AIFeatureSetting,
+  type AIModel,
+  type AIModelPolicy,
+  type AIPrompt,
+  aiFeatureSettings,
+  aiModelPolicies,
+  aiModels,
+  aiPrompts,
+  MODEL_TIERS,
+  type ModelTier,
+} from "./schema/ai-models.ts";
+export {
+  type AIBudget,
+  type AIUsageEvent,
+  aiBudgets,
+  aiUsageEvents,
+  BUDGET_METRICS,
+  BUDGET_PERIODS,
+  BUDGET_SCOPES,
+  type BudgetMetric,
+  type BudgetPeriod,
+  type BudgetScope,
+  USAGE_SOURCES,
+  type UsageSource,
+  type UsageStatus,
+} from "./schema/ai-usage.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,
@@ -43,6 +121,31 @@ export {
   users,
   verifications,
 } from "./schema/auth.ts";
+export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
+export {
+  type InstanceAuditEvent,
+  instanceAuditEvents,
+} from "./schema/instance-audit.ts";
+export {
+  type InviteLink,
+  type InviteMode,
+  inviteLinks,
+} from "./schema/invitations.ts";
+export {
+  type Notification,
+  type NotificationBatch,
+  type NotificationBatchStatus,
+  type NotificationRouting,
+  type NotificationSettingsRow,
+  notificationBatches,
+  notificationSettings,
+  notifications,
+  type Subscription,
+  type SubscriptionList,
+  type SubscriptionReason,
+  subscriptionLists,
+  subscriptions,
+} from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {

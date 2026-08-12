@@ -38,6 +38,16 @@ const optional = <T extends z.ZodTypeAny>(schema: T) =>
  */
 export const DEVELOPMENT_AUTH_SECRET = "openokr-insecure-development-secret";
 
+/**
+ * Falls back to a value that changes on every process start when
+ * `APP_BUILD_ID` is unset, which makes "restart" a legitimate (if coarse)
+ * stand-in for "new deployment" (P2-T10's stale-tab reload, UIUX-PLAN.md
+ * §3: "a version mismatch after a deployment triggers one reload").
+ * Computed once at module load, not per call, so every request this
+ * process ever serves embeds the same id until it actually restarts.
+ */
+const PROCESS_BUILD_ID = crypto.randomUUID();
+
 /** Secrets that must never reach production, whatever their source. */
 const PLACEHOLDER_SECRETS = new Set([DEVELOPMENT_AUTH_SECRET]);
 
@@ -86,6 +96,13 @@ const envSchema = z.object({
   ),
 
   PORT: optional(z.coerce.number().int().positive().max(65535).default(3000)),
+
+  /** Names a deployment for the stale-tab reload (P2-T10). Set this to the
+   * release identifier (a git SHA, a build number) in any environment
+   * that deploys more than one process instance per release — the
+   * per-process fallback default only distinguishes "restarted", not "the
+   * same release on a different instance". */
+  APP_BUILD_ID: optional(z.string().min(1).default(PROCESS_BUILD_ID)),
 });
 
 export type Env = z.infer<typeof envSchema>;

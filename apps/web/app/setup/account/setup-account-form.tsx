@@ -1,8 +1,10 @@
 "use client";
 
+import { Button } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
+import { Field, FormError } from "../../(auth)/auth-card.tsx";
 import { finishSetup } from "./actions";
 
 /**
@@ -63,40 +65,38 @@ export function SetupAccountForm() {
   };
 
   return (
-    <form onSubmit={submit}>
-      <label htmlFor="instanceName">What should this instance be called?</label>
-      <input
-        id="instanceName"
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <Field
+        label="What should this instance be called?"
         name="instanceName"
         defaultValue="OpenOKR"
         autoComplete="off"
       />
 
-      <label htmlFor="name">Your name</label>
-      <input id="name" name="name" autoComplete="name" required />
+      <Field label="Your name" name="name" autoComplete="name" required />
 
-      <label htmlFor="email">Email</label>
-      <input
-        id="email"
+      <Field
+        label="Email"
         name="email"
         type="email"
         autoComplete="email"
         required
       />
 
-      <label htmlFor="password">Password</label>
-      <input
-        id="password"
-        name="password"
-        type="password"
-        autoComplete="new-password"
-        minLength={12}
-        required
-      />
-      <p style={{ fontSize: "0.875rem", color: "#52525b" }}>
-        At least 12 characters. A phrase you can remember beats a short password
-        you cannot.
-      </p>
+      <div className="flex flex-col gap-1">
+        <Field
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          required
+        />
+        <p className="text-xs text-ink-3">
+          At least 12 characters. A phrase you can remember beats a short
+          password you cannot.
+        </p>
+      </div>
 
       {/*
         The wizard is specified to offer demo data. There is none to offer
@@ -105,15 +105,11 @@ export function SetupAccountForm() {
         its absence, so the offer lands with the content. Recorded on P3-T01.
       */}
 
-      <button type="submit" disabled={pending}>
+      <Button type="submit" variant="primary" disabled={pending}>
         {pending ? "Setting up…" : "Finish setup"}
-      </button>
+      </Button>
 
-      {error ? (
-        <p role="alert" style={{ color: "#b91c1c" }}>
-          {error}
-        </p>
-      ) : null}
+      <FormError>{error}</FormError>
     </form>
   );
 }

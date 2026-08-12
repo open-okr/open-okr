@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import "../../../packages/ui/src/styles/tokens.css";
+
+/* packages/ui/src lives outside apps/web's own tree, so Tailwind v4's
+ * automatic content detection (which scans relative to this file) never
+ * reaches it on its own. */
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+* {
+  border-color: var(--color-line);
+}

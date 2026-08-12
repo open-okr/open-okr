@@ -17,15 +17,21 @@ import {
   type OperationSpec,
   runOperation,
 } from "../operations/operation.ts";
+import type { KeyRing } from "../secrets/key-ring.ts";
 
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
 
-/** What every action needs to run: the database and who is asking. */
+/** What every action needs to run: the database and who is asking.
+ * `ring` is optional because only the handful of actions that seal or open a
+ * credential need it (P2-T14 onward) — every other action's context stays
+ * exactly as it was. A caller that omits it and reaches one of those
+ * actions gets a clear error from the action itself, not a silent no-op. */
 export interface ActionCallContext {
   readonly pool: Pool;
   readonly workspaceId: string;
   readonly actor: ActorInput;
+  readonly ring?: KeyRing;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
@@ -92,10 +98,20 @@ export function defineWriteAction<
     runsThroughPipeline: true,
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
+      const spec = definition.operation(context, input);
       return runOperation<TOutput, TLoaded>(
         { pool: context.pool },
         {
-          ...definition.operation(context, input),
+          ...spec,
+          // The level this action was declared with is the level
+          // `runOperation` actually enforces. Before this line it fell back
+          // to its own `edit` default instead, silently under-enforcing
+          // every write action across Phase 2 that declares `full` (rename,
+          // suspend, restore, convert-to-guest, erase, invitation create and
+          // revoke) — an `edit`-level member could reach all of them. An
+          // `operation()` callback that sets `requires` itself, for a
+          // resource-level rule finer than one flat number, still wins.
+          requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,

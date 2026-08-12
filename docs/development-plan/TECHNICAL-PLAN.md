@@ -31,6 +31,8 @@ Authority: below PLAN.md and METHOD.md, above IMPLEMENTATION-PLAN.md. Where this
 | `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
 | `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method` |
 
+`packages/config` (the shared TypeScript, lint and environment schema) is not listed in any row above because it sits underneath this table rather than inside it: every package and app may depend on it for `loadEnv()` and the shared lint/TypeScript config, the same way none of them list `zod` either. `packages/db`, `packages/core` and `apps/web` each already reach it from a command-line entry point or a boot-time check (P1-T02 confirmed this is allowed; this note is the missing line that confirmation was waiting on).
+
 ## 2. Multi-tenancy and identity
 
 - The tenant is a **workspace**. Every business row carries `workspace_id` and a row-level security policy keyed on a transaction-local setting, applied with `SET LOCAL` by the request-scoped database wrapper. Never at session level, never from client input.
@@ -388,6 +390,8 @@ Keep current in every schema change.
 | Not imported | Webhooks, search caches, notification rows, attendance and human-resources modules | Recorded in the report |
 | No legacy source | `audit_events`, `activities` | Written by the Operation pipeline as the import runs, so the import's own writes are audited like any other. A source system's history is not replayed into the chain: the chain records what this instance did, and importing somebody else's audit trail would make it describe events that never happened here. Source history that matters is recorded in the import report |
 | No legacy source | `outbox`, `cache_entries`, `search_documents` | Infrastructure, not user data. The outbox is written by the Operation pipeline as the import runs, the cache is derived, and the search index is rebuilt from the imported rows afterwards |
+| No legacy source | `access_contexts`, `access_groups`, `access_group_memberships`, `access_bindings` | No source table maps to these directly; they are written by the Operation pipeline as each imported aggregate is created, the same way a row created in the product gets them. Row 383's `kpi_shares` view scope becomes bindings on the imported KPI's own context, not a replay of a source access table |
+| No legacy source | `invite_links` | Joining is an OpenOKR concept with no FlowyTeam or spreadsheet analogue. An imported person is a `workspace_members` row with `user_id` null until they register and claim it, the same path row 392 describes; nothing invites them to do so |
 | `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.

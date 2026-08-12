@@ -13,8 +13,28 @@ interface Entry {
   readonly expiresAt: number | undefined;
 }
 
+/**
+ * The unbounded-keyspace defect this bound closes (P2-T09, TECHNICAL-PLAN
+ * §8.2): `#live` only ever expires an entry when that exact key is read
+ * again, and `rateLimit` mints one counter key per subject — an IP address,
+ * a member id, whatever the caller passes. A subject that calls in once and
+ * never returns (an attacker trying one address, most invitees) leaves its
+ * entry sitting in `#entries` for the life of the process; nothing sweeps.
+ * A hard cap turns "grows forever" into "grows to here and stops": once
+ * full, the oldest-inserted entry is evicted to make room, `Map` iteration
+ * order being insertion order. Generous rather than exact — this driver is
+ * documented as the single-container default, not the one a deployment
+ * leans on for precision under sustained abuse; `PostgresCache` is that one.
+ */
+const DEFAULT_MAX_ENTRIES = 10_000;
+
 export class InProcessCache implements Cache {
   readonly #entries = new Map<string, Entry>();
+  readonly #maxEntries: number;
+
+  constructor(options: { readonly maxEntries?: number } = {}) {
+    this.#maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+  }
 
   #live(key: string): Entry | undefined {
     const entry = this.#entries.get(key);
@@ -28,6 +48,19 @@ export class InProcessCache implements Cache {
     return entry;
   }
 
+  /** Evicts the oldest-inserted entries until back at the cap. A `set` on an
+   * already-present key does not move it, so this is FIFO over first-seen
+   * order rather than a true LRU — cheap, and enough to bound memory. */
+  #evictOverflow(): void {
+    while (this.#entries.size > this.#maxEntries) {
+      const oldestKey = this.#entries.keys().next().value;
+      if (oldestKey === undefined) {
+        break;
+      }
+      this.#entries.delete(oldestKey);
+    }
+  }
+
   async get<T = unknown>(key: string): Promise<T | undefined> {
     return this.#live(key)?.value as T | undefined;
   }
@@ -38,6 +71,7 @@ export class InProcessCache implements Cache {
       expiresAt:
         ttlSeconds === undefined ? undefined : Date.now() + ttlSeconds * 1000,
     });
+    this.#evictOverflow();
   }
 
   async delete(key: string): Promise<void> {
@@ -54,6 +88,7 @@ export class InProcessCache implements Cache {
         current?.expiresAt ??
         (ttlSeconds === undefined ? undefined : Date.now() + ttlSeconds * 1000),
     });
+    this.#evictOverflow();
     return next;
   }
 
@@ -74,5 +109,11 @@ export class InProcessCache implements Cache {
       remaining: Math.max(0, limit - used),
       resetSeconds,
     };
+  }
+
+  async stop(): Promise<void> {
+    // Plain process memory: nothing to release. `#entries` is left as is
+    // rather than cleared, since a process about to exit has no more use for
+    // either state.
   }
 }

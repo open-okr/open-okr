@@ -82,6 +82,9 @@ export interface AIProvider {
   embed(request: EmbedRequest): Promise<EmbedResponse>;
   extract(request: ExtractRequest): Promise<ChatResponse>;
   capabilities(model: string): ModelCapabilities;
+  /** Releases whatever this driver holds open. The off driver owns nothing; a
+   * real vendor driver's long-lived HTTP client is not exempt from closing. */
+  stop(): Promise<void>;
 }
 
 /** Thrown when a feature calls a provider that is off or lacks a capability.

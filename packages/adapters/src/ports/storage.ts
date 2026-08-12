@@ -22,6 +22,9 @@ export interface FileStorage {
   /** A time-limited URL. `expiresInSeconds` defaults to the driver's own default. */
   signedUrl(key: string, expiresInSeconds?: number): Promise<string>;
   delete(key: string): Promise<void>;
+  /** Releases whatever this driver holds open. Local disk owns nothing; an
+   * S3-compatible driver holding its own HTTP client is not exempt. */
+  stop(): Promise<void>;
 }
 
 export class ObjectNotFoundError extends Error {

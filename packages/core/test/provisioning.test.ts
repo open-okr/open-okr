@@ -301,3 +301,78 @@ describe("workspace naming", () => {
     expect(provisioned.slug.length).toBeGreaterThan(0);
   });
 });
+
+describe("the workspace language default (P2-T08)", () => {
+  const ENV_KEY = "OPENOKR_DEFAULT_LANGUAGE";
+  const previous = process.env[ENV_KEY];
+
+  afterAll(() => {
+    if (previous === undefined) {
+      delete process.env[ENV_KEY];
+    } else {
+      process.env[ENV_KEY] = previous;
+    }
+  });
+
+  it("falls back to the registry constant with no instance setting or environment", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('lang-plain', 'Plain', 'lang-plain@example.com')",
+    );
+    const provisioned = await createWorkspace(wb.appPool, {
+      user: { id: "lang-plain", name: "Plain" },
+    });
+    const workspace = await wb.admin.query(
+      "select settings from workspaces where id = $1",
+      [provisioned.workspaceId],
+    );
+    expect((workspace.rows[0].settings as { language: string }).language).toBe(
+      "en",
+    );
+  });
+
+  it("lets OPENOKR_DEFAULT_LANGUAGE override the constant, the same as every other instance setting", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('lang-env', 'Env', 'lang-env@example.com')",
+    );
+    process.env[ENV_KEY] = "ms";
+    try {
+      const provisioned = await createWorkspace(wb.appPool, {
+        user: { id: "lang-env", name: "Env" },
+      });
+      const workspace = await wb.admin.query(
+        "select settings from workspaces where id = $1",
+        [provisioned.workspaceId],
+      );
+      expect(
+        (workspace.rows[0].settings as { language: string }).language,
+      ).toBe("ms");
+    } finally {
+      delete process.env[ENV_KEY];
+    }
+  });
+
+  it("still lets an explicit caller-supplied language win over the environment", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('lang-explicit', 'Explicit', 'lang-explicit@example.com')",
+    );
+    process.env[ENV_KEY] = "ms";
+    try {
+      const provisioned = await createWorkspace(wb.appPool, {
+        user: { id: "lang-explicit", name: "Explicit" },
+        language: "fr",
+      });
+      const workspace = await wb.admin.query(
+        "select settings from workspaces where id = $1",
+        [provisioned.workspaceId],
+      );
+      expect(
+        (workspace.rows[0].settings as { language: string }).language,
+      ).toBe("fr");
+    } finally {
+      delete process.env[ENV_KEY];
+    }
+  });
+});

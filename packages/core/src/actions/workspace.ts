@@ -85,6 +85,73 @@ export const renameWorkspace = defineWriteAction({
   }),
 });
 
+export const setWorkspaceState = defineWriteAction({
+  name: "workspace.setState",
+  summary:
+    "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
+  input: z.object({ state: z.enum(["active", "read_only", "frozen"]) }),
+  output: workspaceSummary.extend({
+    state: z.enum(["active", "read_only", "frozen"]),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    // On the freeze overlay's own recovery list (packages/core/src/
+    // operations/freeze.ts): the one write that must survive a freeze is
+    // the one that lifts it, so this action itself never refuses on the
+    // workspace's own state, only on the caller's access level.
+    async load({ tx, workspaceId }) {
+      const [current] = await tx
+        .select({
+          name: workspaces.name,
+          slug: workspaces.slug,
+          state: workspaces.state,
+        })
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      if (!current) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      return current;
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const [updated] = await tx
+        .update(workspaces)
+        .set({ state: input.state, updatedAt: new Date() })
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .returning({
+          name: workspaces.name,
+          slug: workspaces.slug,
+          state: workspaces.state,
+        });
+      if (!updated) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      return {
+        result: {
+          workspaceId,
+          name: updated.name,
+          slug: updated.slug,
+          state: updated.state,
+        },
+        activity: {
+          kind: "workspace.state_changed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { from: loaded.state, to: updated.state },
+        },
+        audit: {
+          action: "workspace.set_state",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { from: loaded.state, to: updated.state },
+        },
+      };
+    },
+  }),
+});
+
 /**
  * Provisioning, declared here so an audit row reading `workspace.provision`
  * resolves back to a contract like every other action.

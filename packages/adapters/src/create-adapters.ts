@@ -74,23 +74,41 @@ export function createAdapters(options: AdapterOptions): Adapters {
     connectionOptions: { connectionString: options.databaseUrl },
     onError: options.onError,
   });
+  const storage = new LocalDiskStorage({
+    root: options.storageRoot,
+    signingSecret: options.storageSigningSecret,
+  });
+  const mail = createMailer(options.mail ?? { transport: "console" });
+  const cache = options.useInProcessCache
+    ? new InProcessCache()
+    : new PostgresCache(options.pool);
+  const search = new PostgresSearch(options.pool);
+  const ai = new OffAIProvider();
+  const channel = new NoneChannel();
 
   return {
     jobs,
     realtime,
-    storage: new LocalDiskStorage({
-      root: options.storageRoot,
-      signingSecret: options.storageSigningSecret,
-    }),
-    mail: createMailer(options.mail ?? { transport: "console" }),
-    cache: options.useInProcessCache
-      ? new InProcessCache()
-      : new PostgresCache(options.pool),
-    search: new PostgresSearch(options.pool),
-    ai: new OffAIProvider(),
-    channel: new NoneChannel(),
+    storage,
+    mail,
+    cache,
+    search,
+    ai,
+    channel,
+    // Every port declares `stop()` now (P2-hardening), not just the two that
+    // used to: a driver added later that owns a real resource is shut down
+    // by construction rather than by remembering to add it here too.
     async close() {
-      await Promise.all([jobs.stop(), realtime.stop()]);
+      await Promise.all([
+        jobs.stop(),
+        realtime.stop(),
+        storage.stop(),
+        mail.stop(),
+        cache.stop(),
+        search.stop(),
+        ai.stop(),
+        channel.stop(),
+      ]);
     },
   };
 }

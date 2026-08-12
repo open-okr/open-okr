@@ -112,8 +112,15 @@ export default async function setupTemplateDatabase(): Promise<void> {
       await client.query(
         `drop database if exists ${testDbEnv.templateDatabase} with (force)`,
       );
+      // Explicit UTF8: `template1`'s own encoding is whatever the cluster
+      // happened to initialise with, which on at least one real Windows
+      // Postgres install is WIN1252, not UTF8 — found when a CJK-content
+      // test failed to insert against a real database for the first time.
+      // `template0` carries no locale-specific data, so it accepts an
+      // encoding different from its own without Postgres refusing the copy.
       await client.query(
-        `create database ${testDbEnv.templateDatabase} owner ${testDbEnv.ownerRole}`,
+        `create database ${testDbEnv.templateDatabase} owner ${testDbEnv.ownerRole} ` +
+          `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
       );
 
       // Migrations run as the owner role, exactly as production will, so an
