@@ -1,11 +1,6 @@
 import {
-  cellJson,
-  cellNumber,
-  loadGoldenTables,
-} from "@openokr/test-support/golden-table";
-import { describe, expect, it } from "vitest";
-import {
   type CascadeGoal,
+  canonThresholds,
   cascadeProgress,
   confidenceBand,
   draftVerdict,
@@ -18,11 +13,23 @@ import {
   scoreBand,
   trendForecast,
   weightedProgress,
-} from "../src/scoring.ts";
-import { canonThresholds } from "../src/thresholds.ts";
+} from "@openokr/method";
+import {
+  cellJson,
+  cellNumber,
+  loadGoldenTables,
+} from "@openokr/test-support/golden-table";
+import { describe, expect, it } from "vitest";
 
 /**
  * The scoring and health engine against its own golden masters (P3-T05).
+ *
+ * In `packages/core` rather than `packages/method`, where the functions live. The
+ * golden-table reader is in `packages/test-support`, which depends on core, so a
+ * method test that used it made the workspace graph circular:
+ * method to test-support to core to method. Turbo refuses that on `build`, and the
+ * failure hid behind a cache replay for two tasks. The cadence golden masters
+ * already sat here for the same reason.
  *
  * Every matrix here is read out of `docs/design/p3-t00-scoring-and-health-engine.md`
  * at run time rather than retyped. That document is the fixture: changing a number

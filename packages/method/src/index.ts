@@ -28,6 +28,7 @@ export {
   type GoalHealth,
   goalHealth,
   type HealthInput,
+  type KeyResultDirection,
   type KeyResultProgressInput,
   keyResultProgress,
   type PortfolioVerdict,

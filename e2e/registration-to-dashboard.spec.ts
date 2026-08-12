@@ -44,7 +44,13 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
   await expect(page).toHaveURL("/");
-  await expect(page.getByText("Signed in as")).toBeVisible();
+  // The heading role, not a text match. `getByText("Signed in as")` matched two
+  // elements under Playwright 1.62: the panel streams in behind a Suspense
+  // boundary, and for an instant the pre-hydration and post-hydration headings
+  // both exist. The role locator names one element and cannot race that.
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Signed in as/ }),
+  ).toBeVisible();
   // Exact, because "Ada Lovelace" is also a prefix of the workspace name
   // and a loose match would find two elements.
   await expect(
