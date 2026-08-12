@@ -10,7 +10,7 @@
  * | `workspace_standard` | view | An OKR set nobody can read is not an OKR set. Alignment, the explorer and the cycle's own gates all assume the set is visible, and METHOD.md §5.1 has children naming parents they would otherwise be unable to find |
  * | The owner space's `space_standard` | edit | Working in the space is working on its goals |
  * | The champion's own group | full, tagged `champion` | METHOD.md §2.5: exactly one per goal, never a team. Owning a goal includes naming who reviews it |
- * | The reviewer's own group | comment, tagged `reviewer` | Acknowledging a check-in is not editing the goal. The tag is what the review inbox finds them by, not the level |
+ * | The reviewer's own group | edit, tagged `reviewer` | Acknowledging a check-in is a write, and §14 requires edit for every write. The tag is what the review inbox finds them by; the level is what lets them close the loop |
  *
  * A workspace administrator holds nothing here by virtue of being one. That is
  * the same rule spaces already follow: an admin who is not a space manager holds
@@ -315,7 +315,12 @@ export type GoalRole = "champion" | "reviewer";
 /** What each role holds. The tag matters more than the level for the reviewer. */
 const ROLE_LEVEL: Readonly<Record<GoalRole, number>> = {
   champion: ACCESS_LEVELS.full,
-  reviewer: ACCESS_LEVELS.comment,
+  // Edit, not comment. Acknowledging a check-in is a write, and §14 requires edit
+  // for every write, so a reviewer who could only comment could not do the one
+  // thing the role exists for. Recorded as a question rather than settled: it
+  // gives a reviewer editing rights on the goal as a side effect, which is more
+  // than the role needs.
+  reviewer: ACCESS_LEVELS.edit,
 };
 
 async function bindRole<

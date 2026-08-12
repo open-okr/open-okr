@@ -123,6 +123,19 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
+  CHECK_IN_STATES,
+  CHECK_IN_STATUSES,
+  type CheckIn,
+  type CheckInSnapshot,
+  type CheckInState,
+  type CheckInStatus,
+  type CheckInVote,
+  checkInSnapshots,
+  checkIns,
+  checkInVotes,
+  type SnapshotEntry,
+} from "./schema/check-ins.ts";
+export {
   type CycleBaselineHealth,
   type CycleCalibration,
   type CycleCapacityNote,
@@ -202,9 +215,11 @@ export {
   inviteLinks,
 } from "./schema/invitations.ts";
 export {
+  NOTIFICATION_REASONS,
   type Notification,
   type NotificationBatch,
   type NotificationBatchStatus,
+  type NotificationReason,
   type NotificationRouting,
   type NotificationSettingsRow,
   notificationBatches,

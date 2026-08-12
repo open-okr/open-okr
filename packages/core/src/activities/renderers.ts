@@ -157,6 +157,25 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `A key result moved to ${Number(p.value ?? 0)}`,
   "key_result.kpi_unlinked": () =>
     "A key result was unlinked from its KPI and keeps the last value it reported",
+  "check_in.draft_opened": (p) =>
+    p.reopened
+      ? "A draft check-in was reopened"
+      : "A draft check-in was started",
+  "check_in.published": (p) =>
+    `A check-in was published as ${asString(p.status, "on track").replace("_", " ")}`,
+  "check_in.edited": () => "A check-in was edited inside its window",
+  "check_in.deleted": (p) =>
+    p.rolledBack
+      ? "The latest check-in was deleted and the goal rolled back to what it said before"
+      : "A check-in was deleted",
+  "check_in.acknowledged": (p) =>
+    p.repeat
+      ? "A check-in was already acknowledged"
+      : "The reviewer acknowledged a check-in",
+  "check_in.vote_cast": (p) =>
+    p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
+  "check_in.votes_revealed": (p) =>
+    `${Number(p.revealed ?? 0)} confidence vote(s) were revealed together`,
   "cadence.staleness_swept": (p) =>
     `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
 };

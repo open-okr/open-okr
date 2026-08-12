@@ -156,6 +156,18 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
   "key_result.kpi_unlinked": z.object({}),
+  // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing
+  // about the goal, because a draft is silent about the goal by design.
+  "check_in.draft_opened": z.object({ reopened: z.boolean() }),
+  "check_in.published": z.object({
+    status: z.enum(["on_track", "caution", "off_track"]),
+    valuesWritten: z.number().int(),
+  }),
+  "check_in.edited": z.object({}),
+  "check_in.deleted": z.object({ rolledBack: z.boolean() }),
+  "check_in.acknowledged": z.object({ repeat: z.boolean() }),
+  "check_in.vote_cast": z.object({ changed: z.boolean() }),
+  "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be
   // visible: it is the product saying a goal went quiet, not a person acting.
   "cadence.staleness_swept": z.object({

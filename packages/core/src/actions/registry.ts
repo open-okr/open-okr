@@ -57,6 +57,17 @@ import {
 } from "./ai-usage.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
+  acknowledgeCheckIn,
+  castConfidenceVote,
+  deleteCheckIn,
+  editCheckIn,
+  listCheckIns,
+  publishCheckIn,
+  readConfidenceVotes,
+  revealConfidenceVotes,
+  startCheckIn,
+} from "./check-ins.ts";
+import {
   addIssue,
   addPriority,
   calibrateCycle,
@@ -263,6 +274,15 @@ export const ACTION_MAP = {
   "goals.recordValue": recordKeyResultValue,
   "goals.unlinkKpi": unlinkKeyResultKpi,
   "goals.keyResultHistory": readKeyResultHistory,
+  "goals.checkIns": listCheckIns,
+  "goals.startCheckIn": startCheckIn,
+  "goals.publishCheckIn": publishCheckIn,
+  "goals.editCheckIn": editCheckIn,
+  "goals.deleteCheckIn": deleteCheckIn,
+  "goals.acknowledgeCheckIn": acknowledgeCheckIn,
+  "goals.vote": castConfidenceVote,
+  "goals.revealVotes": revealConfidenceVotes,
+  "goals.readVotes": readConfidenceVotes,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

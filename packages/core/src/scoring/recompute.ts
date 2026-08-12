@@ -36,6 +36,7 @@ import {
 } from "@openokr/method";
 import { asc, eq, inArray, or } from "drizzle-orm";
 import { daysPastDue } from "../cadence/service.ts";
+import { latestPublishedStatus } from "../check-ins/service.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -315,6 +316,9 @@ async function recomputeScoring<
   // Staleness is counted in the workspace's calendar, not in absolute hours: a
   // goal due at 23:59 local is one day overdue at any hour of the next day.
   const timeZone = await workspaceTimeZone(tx, workspaceId);
+  // Health rule 3: the latest published check-in's status. It arrived with
+  // check-ins at P3-T07; before that the precedence answered on rules 1, 2 and 4.
+  const latestStatus = await latestPublishedStatus(tx, workspaceId, goalIds);
 
   let keyResultsWritten = 0;
   for (const row of keyResultRows) {
@@ -336,7 +340,13 @@ async function recomputeScoring<
   let goalsWritten = 0;
   for (const row of goalRows) {
     const progress = cascade.goals.get(row.id) ?? 0;
-    const health = healthFor(row, graceDays, now, timeZone);
+    const health = healthFor(
+      row,
+      graceDays,
+      now,
+      timeZone,
+      latestStatus.get(row.id) ?? null,
+    );
     // openokr:allow-mutation: same transaction as above.
     await tx
       .update(goals)
@@ -371,10 +381,9 @@ const GOAL_COLUMNS = {
 /**
  * §3.5's precedence, over the rows this build has.
  *
- * The published check-in's status is the third rule and check-ins arrive at
- * P3-T07, so `latestStatus` is null here. That is honest rather than convenient:
- * rules 1, 2 and 4 answer completely on their own, and a goal past its grace
- * reads `outdated` today for the same reason it will then.
+ * All four rules answer now. The one worth restating is that rule 2 sits above
+ * rule 3: a goal whose last check-in said `on_track` reads `outdated` once its
+ * grace passes, which is the plan's own acceptance criterion.
  */
 function healthFor(
   row: {
@@ -385,11 +394,12 @@ function healthFor(
   graceDays: number,
   now: Date,
   timeZone: string,
+  latestStatus: "on_track" | "caution" | "off_track" | null,
 ): GoalHealth {
   return goalHealth({
     closed: row.closedAt !== null,
     successStatus: row.successStatus,
-    latestStatus: null,
+    latestStatus,
     daysPastDue: daysPastDue(row.nextCheckInAt, now, timeZone),
     graceDays,
   });
