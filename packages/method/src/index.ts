@@ -28,6 +28,22 @@ export {
   type TimelineRow,
 } from "./guidance.ts";
 export {
+  KPI_DIRECTIONS,
+  KPI_FREQUENCIES,
+  KPI_STATES,
+  type KpiAchievement,
+  type KpiCorridor,
+  type KpiDiagnostic,
+  type KpiDirection,
+  type KpiFrequency,
+  type KpiState,
+  kpiAchievement,
+  kpiState,
+  type LocalDate,
+  normalisePeriod,
+  type RecoveryLink,
+} from "./kpi.ts";
+export {
   type CascadeGoal,
   type CascadeResult,
   type ConfidenceBand,

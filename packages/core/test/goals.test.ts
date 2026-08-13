@@ -581,6 +581,18 @@ describe("the value history", () => {
   it("refuses a manual value on a KPI-linked key result", async () => {
     const wb = await workerDb();
     const created = await createGoal();
+    // A real KPI row. This used to be a synthetic uuid with a comment saying
+    // "KPIs arrive at P3-T12", and P3-T12's foreign key now refuses it, which is
+    // the stronger test: the link it drives is a link to something that exists.
+    // P3-T01 hit the same thing when `spaces` landed.
+    const kpi = await wb.admin.query<{ id: string }>(
+      `insert into kpis (id, workspace_id, short_id, title, frequency, direction)
+       values (gen_random_uuid(), $1, 'kpi-cost', 'Support cost per ticket',
+               'monthly', 'lower_better')
+       returning id`,
+      [workspaceId],
+    );
+    const kpiId = kpi.rows[0]?.id as string;
     const keyResult = await callAction(
       { pool: wb.appPool, ...context() },
       "goals.addKeyResult",
@@ -592,9 +604,7 @@ describe("the value history", () => {
         baselineValue: 12,
         targetValue: 8,
         weight: 1,
-        // KPIs arrive at P3-T12, so this is a plain uuid until then. The refusal
-        // it drives is real either way.
-        kpiId: "00000000-0000-4000-8000-0000000000aa",
+        kpiId,
       },
     );
 
