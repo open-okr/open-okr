@@ -172,6 +172,22 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.repeat
       ? "A check-in was already acknowledged"
       : "The reviewer acknowledged a check-in",
+  "alignment.dependency_added": (p) =>
+    p.note
+      ? "Two goals were linked as depending on each other, with a note"
+      : "Two goals were linked as depending on each other",
+  "alignment.dependency_removed": () =>
+    "A dependency between two goals was removed",
+  "alignment.register_added": (p) =>
+    `A key result was recorded as depending on ${String(p.provider ?? "another team")}`,
+  "alignment.register_confirmed": () =>
+    "The providing team confirmed a dependency",
+  "alignment.register_risk_owned": () =>
+    "A risk owner was named for an unconfirmed dependency",
+  "alignment.register_removed": () =>
+    "A dependency was removed from the register",
+  "alignment.finding_dismissed": (p) =>
+    `An alignment finding was dismissed (${String(p.ruleKey ?? "no rule")})`,
   "check_in.vote_cast": (p) =>
     p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
   "check_in.votes_revealed": (p) =>

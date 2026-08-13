@@ -1,7 +1,27 @@
 # P3-T00: the alignment engine
 
 Part five of the Phase 3 design gate. Authority: METHOD.md §5,
-TECHNICAL-PLAN.md §4.5 and §6.5. Implemented at P3-T09 in `packages/core`.
+TECHNICAL-PLAN.md §4.5 and §6.5.
+
+**Implemented at P3-T09, and in two places rather than the one this document
+first named.** The arithmetic is in `packages/method/src/alignment.ts`, not
+`packages/core`: every function in it is a §5.2 rule taking a §11 threshold as an
+argument, and the repository rule puts those in the method package and nowhere
+else, so the same code runs in the browser as somebody drags a goal onto a new
+parent. `packages/core/src/alignment/service.ts` is the half that needs rows: it
+loads the graph and reconciles the findings table. The scoring engine moved for
+the same reason at P3-T05.
+
+**Decision D-16 is settled as recommended**: `alignment_findings.subject_goal_id`
+is nullable, and TECHNICAL-PLAN.md §4.5 and DATABASE.md say so.
+
+**§7's outbox is not how recomputation runs yet.** No relay host drains the
+outbox, so a topic with no consumer would be a pending row nobody reads.
+Recompute runs inside the writing transaction through one entry point, which is
+the call P3-T05 made for the scoring cascade and the stronger guarantee besides:
+there is no window where the studio shows a score the rows no longer support.
+The trigger table below is still exactly what fires it, and a relay host will
+call the same function.
 
 Deterministic and fully available with the AI provider off. The Coach agent adds
 semantic findings into the same table at P4-T03, which is why the table has a

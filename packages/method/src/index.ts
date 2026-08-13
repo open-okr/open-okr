@@ -1,6 +1,19 @@
 export const PACKAGE_NAME = "@openokr/method";
 
 export {
+  ALIGNMENT_LEVEL_ORDER,
+  type AlignmentFinding,
+  type AlignmentGoal,
+  type AlignmentGraph,
+  type AlignmentPenalties,
+  type AlignmentResult,
+  type AlignmentRuleKey,
+  type AlignmentScope,
+  type AlignmentSeverity,
+  alignmentHealthy,
+  alignmentScore,
+} from "./alignment.ts";
+export {
   type Escalation,
   type EscalationRole,
   escalation,

@@ -688,11 +688,13 @@ describe("the workflow snapshot now that goals exist", () => {
     expect(gateOne?.evaluable).toBe(true);
     expect(gateOne?.passed).toBe(true);
 
-    // Gate 4 stays unevaluable: the §5.4 dependency register is P3-T09, and an
-    // empty list would claim somebody had checked.
+    // Gate 4 was unevaluable here until P3-T09, because an empty list would have
+    // claimed somebody had checked when the §5.4 register did not exist. It does
+    // now, so an empty register is a real answer: this key result has no
+    // dependencies, and there is nothing unconfirmed to block on.
     const gateFour = read.gates.find((gate) => gate.gateKey === 4);
-    expect(gateFour?.evaluable).toBe(false);
-    expect(gateFour?.blocked).toMatch(/P3-T09/);
+    expect(gateFour?.evaluable).toBe(true);
+    expect(gateFour?.passed).toBe(true);
   });
 
   it("reports gate 3 red for a goal with no parent and no contribution", async () => {

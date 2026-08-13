@@ -166,6 +166,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "check_in.edited": z.object({}),
   "check_in.deleted": z.object({ rolledBack: z.boolean() }),
   "check_in.acknowledged": z.object({ repeat: z.boolean() }),
+  // Alignment (P3-T09). Every one of these changes the structure, which is what
+  // the score reads, so each is worth a line in the feed even though none of
+  // them moves a number a reader watches.
+  "alignment.dependency_added": z.object({ note: z.boolean() }),
+  "alignment.dependency_removed": z.object({}),
+  "alignment.register_added": z.object({ provider: z.string() }),
+  "alignment.register_confirmed": z.object({}),
+  "alignment.register_risk_owned": z.object({}),
+  "alignment.register_removed": z.object({}),
+  "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
   "check_in.vote_cast": z.object({ changed: z.boolean() }),
   "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be

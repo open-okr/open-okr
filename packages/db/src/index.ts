@@ -106,6 +106,24 @@ export {
   type UsageStatus,
 } from "./schema/ai-usage.ts";
 export {
+  ALIGNMENT_FINDING_KINDS,
+  ALIGNMENT_FINDING_SCOPES,
+  ALIGNMENT_FINDING_SOURCES,
+  ALIGNMENT_FINDING_STATES,
+  ALIGNMENT_SEVERITIES,
+  type AlignmentFindingKind,
+  type AlignmentFindingRow,
+  type AlignmentFindingScope,
+  type AlignmentFindingSource,
+  type AlignmentFindingState,
+  type AlignmentSeverity,
+  alignmentFindings,
+  type GoalDependencyRow,
+  goalDependencies,
+  type KeyResultDependencyRow,
+  keyResultDependencies,
+} from "./schema/alignment.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,

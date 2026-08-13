@@ -55,6 +55,16 @@ import {
   removeBudget,
   setBudget,
 } from "./ai-usage.ts";
+import {
+  addGoalDependency,
+  addKeyResultDependency,
+  confirmKeyResultDependency,
+  dismissAlignmentFinding,
+  readAlignment,
+  removeGoalDependency,
+  removeKeyResultDependency,
+  setDependencyRiskOwner,
+} from "./alignment.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
   acknowledgeCheckIn,
@@ -286,6 +296,14 @@ export const ACTION_MAP = {
   "goals.vote": castConfidenceVote,
   "goals.revealVotes": revealConfidenceVotes,
   "goals.readVotes": readConfidenceVotes,
+  "goals.addDependency": addGoalDependency,
+  "goals.removeDependency": removeGoalDependency,
+  "goals.addKeyResultDependency": addKeyResultDependency,
+  "goals.confirmDependency": confirmKeyResultDependency,
+  "goals.setDependencyRiskOwner": setDependencyRiskOwner,
+  "goals.removeKeyResultDependency": removeKeyResultDependency,
+  "alignment.read": readAlignment,
+  "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;
 
