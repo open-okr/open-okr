@@ -269,7 +269,7 @@ gate state.
 
 | Task | Title | Status | Branch / PR | Updated | Notes |
 |---|---|---|---|---|---|
-| P4-T00 | Coaching design gate | todo |  |  | Needs an explicit design approval. Rule corpus and trigger catalogue reviewed line by line |
+| P4-T00 | Coaching design gate | in_progress | agung | 2026-08-14 | **Started in parallel with remaining P3 work (P3-T14 to P3-T17).** Three design documents, 50 of 58 deliverable items have no Phase 3 dependency and can be written now. See `docs/design/p4-parallel-readiness.md` for the full analysis. **Deliverable 1 drafted:** `docs/design/p4-t00-method-package.md` covers the 26-check quality catalogue with every condition row, word list and coaching prompt from METHOD.md SS4; the strength score with strictness; all band tables cross-checked against existing `scoring.ts`; the blocker taxonomy (5 types), root-cause taxonomy (8 causes), process-health statements, management-retro questions and the rhythm diagnostic; the coach watch list (20 situations, each with a rule key); and an 8-entry OKR corpus with expected verdicts. One section blocked: SS6.5 recovery corridor behaviour (awaits P3-T14). **Still to draft:** `p4-t00-agent-design.md` (triggers, escalation, personas, deterministic-with-AI-off spec) and `p4-t00-session-design.md` (weekly, monthly and quarterly state machines). Four items across these two await P3-T14, P3-T15, P3-T16 and P3-T17. Approval waits until all 58 items are filled in |
 | P4-T01 | The method package | todo |  |  |  |
 | P4-T02 | The quality engine and Draft Coach surfaces | todo |  |  |  |
 | P4-T03 | Publish gates | todo |  |  |  |
