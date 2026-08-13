@@ -42,6 +42,10 @@ async function run(
   }
   revalidatePath(`/goals/${goalId}`);
   revalidatePath("/cycle");
+  // The explorer and the canvas read the same numbers, and S-14's acceptance
+  // criterion is that a value recorded here moves both (P3-T10).
+  revalidatePath("/goals");
+  revalidatePath("/goals/studio");
   return NO_ERROR;
 }
 
@@ -126,4 +130,33 @@ export async function reassignRole(
       memberId: String(formData.get("memberId") ?? ""),
     }),
   );
+}
+
+/**
+ * Records a new value and confidence for one key result (S-14, P3-T10).
+ *
+ * The one write on this page that moves a number, and it goes through
+ * `goals.recordValue` so the value history, the cascade and the goal's health
+ * all follow from it. §5.2 measures structure, so the alignment score
+ * deliberately does not move.
+ *
+ * **Confidence is not settable here, and that is the method rather than a
+ * missing parameter.** §3.2 puts confidence on the check-in, where it arrives
+ * with a narrative and a status. An input that let somebody drop a key result to
+ * 0.2 with no sentence attached would be the one number in the product that can
+ * change without anybody saying why.
+ */
+export async function recordValue(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const goalId = String(formData.get("goalId") ?? "");
+  const keyResultId = String(formData.get("keyResultId") ?? "");
+  const value = Number(formData.get("value"));
+  if (!Number.isFinite(value)) {
+    return { error: "A value has to be a number." };
+  }
+  return run(goalId, async (context) => {
+    await callAction(context, "goals.recordValue", { id: keyResultId, value });
+  });
 }

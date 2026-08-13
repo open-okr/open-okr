@@ -104,6 +104,7 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { readGoalRelations } from "./goal-relations.ts";
 import {
   closeGoal,
   createGoal,
@@ -305,6 +306,7 @@ export const ACTION_MAP = {
   "goals.removeKeyResultDependency": removeKeyResultDependency,
   "alignment.read": readAlignment,
   "alignment.graph": readAlignmentGraph,
+  "goals.relations": readGoalRelations,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;
