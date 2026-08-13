@@ -12,6 +12,7 @@ import {
   TopbarSearch,
 } from "@openokr/ui";
 import {
+  BarChart3,
   CheckCircle2,
   ClipboardCheck,
   Home,
@@ -55,6 +56,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   review: <ClipboardCheck className="size-full" />,
   cycle: <RefreshCw className="size-full" />,
   goals: <Target className="size-full" />,
+  kpis: <BarChart3 className="size-full" />,
   "check-in": <CheckCircle2 className="size-full" />,
   "account-security": <Shield className="size-full" />,
 };

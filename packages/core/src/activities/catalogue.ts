@@ -176,6 +176,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_risk_owned": z.object({}),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
+  // KPIs (P3-T12). Recording a value is worth a line: it is the one write that
+  // moves a corridor state, and a state change is what a nudge reads later.
+  "kpi.category_created": z.object({ name: z.string() }),
+  "kpi.created": z.object({ title: z.string(), frequency: z.string() }),
+  "kpi.value_recorded": z.object({
+    periodStart: z.string(),
+    created: z.boolean(),
+  }),
   "check_in.vote_cast": z.object({ changed: z.boolean() }),
   "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be

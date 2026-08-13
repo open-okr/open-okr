@@ -129,6 +129,12 @@ import {
   revokeLink,
 } from "./invitations.ts";
 import {
+  createKpi,
+  createKpiCategory,
+  readKpiGrid,
+  recordKpiValue,
+} from "./kpis.ts";
+import {
   getNotificationSettings,
   listNotifications,
   markNotificationRead,
@@ -307,6 +313,10 @@ export const ACTION_MAP = {
   "alignment.read": readAlignment,
   "alignment.graph": readAlignmentGraph,
   "goals.relations": readGoalRelations,
+  "kpis.createCategory": createKpiCategory,
+  "kpis.create": createKpi,
+  "kpis.record": recordKpiValue,
+  "kpis.grid": readKpiGrid,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

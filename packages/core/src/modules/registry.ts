@@ -95,6 +95,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "kpis",
+    navigation: [
+      {
+        id: "kpis",
+        label: "KPIs",
+        href: "/kpis",
+        section: "sidebar",
+        // Every member reads the grid. A measure nobody can see is not a
+        // shared measure, which is the same reason a company objective binds
+        // workspace_standard at view (P3-T12).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "check-in",
     navigation: [
       {

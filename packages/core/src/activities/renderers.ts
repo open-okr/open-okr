@@ -188,6 +188,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
     `An alignment finding was dismissed (${String(p.ruleKey ?? "no rule")})`,
+  "kpi.category_created": (p) =>
+    `A KPI category "${String(p.name ?? "")}" was added`,
+  "kpi.created": (p) =>
+    `A ${String(p.frequency ?? "")} KPI "${String(p.title ?? "")}" was added`,
+  "kpi.value_recorded": (p) =>
+    p.created
+      ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
+      : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
   "check_in.vote_cast": (p) =>
     p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
   "check_in.votes_revealed": (p) =>
