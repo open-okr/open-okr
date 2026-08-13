@@ -169,16 +169,28 @@ describe("the score against real rows", () => {
       spaceId: spaceB,
       parentGoalId: company,
     });
-    // The orphan: a team goal with no parent.
+    const wb = await workerDb();
+    const third = await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.create",
+      { name: "Customer Success" },
+    );
+    // The siloed department: nothing in its subtree links outward.
+    await makeGoal({
+      title: "Cut churn in the mid-market book",
+      level: "department",
+      spaceId: third.id,
+      parentGoalId: company,
+    });
+    // The orphan: a team goal with no parent. It belongs to no department, so
+    // it is not what the silo finding is about.
     await makeGoal({
       title: "Cut first response time",
       level: "team",
       spaceId: spaceA,
     });
 
-    const wb = await workerDb();
-    // One link between the two departments, so exactly one silo remains: the
-    // orphan's own team goal belongs to no department at all.
+    // One link, between the first two departments only.
     await callAction(
       { pool: wb.appPool, ...context() },
       "goals.addDependency",
@@ -186,13 +198,27 @@ describe("the score against real rows", () => {
     );
 
     const result = await read();
-    expect(result.score).toBe(88);
+    // 100 minus 12 for the orphan and 8 for the silo, which is the number the
+    // plan itself quotes and the design document's acceptance criterion.
+    expect(result.score).toBe(80);
     expect(result.healthy).toBe(true);
-    // 100 minus one orphan. Both departments are linked, so neither is siloed.
-    expect(result.findings.map((finding) => finding.ruleKey)).toEqual(["AL-1"]);
-    expect(result.findings[0]?.subjectGoalTitle).toBe(
-      "Cut first response time",
-    );
+    expect(result.findings.map((finding) => finding.ruleKey).sort()).toEqual([
+      "AL-1",
+      "AL-6",
+    ]);
+    // Each one opens the goal responsible, which is the whole point of a
+    // finding carrying a subject.
+    expect(
+      result.findings.every((finding) => finding.subjectGoalTitle !== null),
+    ).toBe(true);
+    expect(
+      result.findings.find((finding) => finding.ruleKey === "AL-1")
+        ?.subjectGoalTitle,
+    ).toBe("Cut first response time");
+    expect(
+      result.findings.find((finding) => finding.ruleKey === "AL-6")
+        ?.subjectGoalTitle,
+    ).toBe("Cut churn in the mid-market book");
   });
 
   it("has no score at all when the cycle has no goals", async () => {
