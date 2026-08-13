@@ -80,6 +80,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "goals",
+    navigation: [
+      {
+        id: "goals",
+        label: "Goals",
+        href: "/goals",
+        section: "sidebar",
+        // Every member can read the set. An OKR set nobody can read is not one,
+        // which is the same reason a goal's context binds `workspace_standard`
+        // at view (P3-T04). The writes on each row ask for their own access.
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "check-in",
     navigation: [
       {

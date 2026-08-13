@@ -825,6 +825,200 @@ export const dismissAlignmentFinding = defineWriteAction({
   }),
 });
 
+export const readAlignmentGraph = defineReadAction({
+  name: "alignment.graph",
+  summary:
+    "The cascade as nodes and edges, for the alignment studio canvas (S-16).",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    nodes: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        level: z.string(),
+        owner: z.string(),
+        parentGoalId: z.uuid().nullable(),
+        keyResultCount: z.number().int(),
+        dependencyCount: z.number().int(),
+        health: z.string(),
+        progressPct: z.number(),
+        /** Below company level with no parent: §5.2's AL-1, drawn on the card. */
+        unaligned: z.boolean(),
+        closed: z.boolean(),
+      }),
+    ),
+    edges: z.array(z.object({ id: z.uuid(), from: z.uuid(), to: z.uuid() })),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+
+        const rows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            level: goals.level,
+            spaceId: goals.spaceId,
+            memberId: goals.memberId,
+            parentGoalId: goals.parentGoalId,
+            parentKeyResultId: goals.parentKeyResultId,
+            health: goals.health,
+            progressPct: goals.progressPct,
+            closedAt: goals.closedAt,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              eq(goals.cycleId, input.cycleId),
+            ),
+          );
+
+        // Only what this reader may see. A canvas is a picture of the whole
+        // organisation, and a picture is exactly the wrong place to leak one.
+        const visible = [];
+        for (const row of rows) {
+          try {
+            await getAccessScoped(tx, {
+              workspaceId: context.workspaceId,
+              memberId,
+              resourceType: "goal",
+              resourceId: row.id,
+              requires: ACCESS_LEVELS.view as never,
+            });
+            visible.push(row);
+          } catch (error) {
+            if (error instanceof OperationError && error.code === "not_found") {
+              continue;
+            }
+            throw error;
+          }
+        }
+
+        const ids = visible.map((row) => row.id);
+        if (ids.length === 0) {
+          return { nodes: [], edges: [] };
+        }
+
+        const keyResultRows = await tx
+          .select({ id: keyResults.id, goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              inArray(keyResults.goalId, ids),
+            ),
+          );
+        const countByGoal = new Map<string, number>();
+        const ownerOfKeyResult = new Map<string, string>();
+        for (const row of keyResultRows) {
+          countByGoal.set(row.goalId, (countByGoal.get(row.goalId) ?? 0) + 1);
+          ownerOfKeyResult.set(row.id, row.goalId);
+        }
+
+        const linkRows = await tx
+          .select({
+            id: goalDependencies.id,
+            from: goalDependencies.fromGoalId,
+            to: goalDependencies.toGoalId,
+          })
+          .from(goalDependencies)
+          .where(
+            activeOnly(
+              goalDependencies,
+              eq(goalDependencies.workspaceId, context.workspaceId),
+            ),
+          );
+        // Both ends must be on the canvas, or the edge would point at nothing.
+        const onCanvas = new Set(ids);
+        const edges = linkRows.filter(
+          (row) => onCanvas.has(row.from) && onCanvas.has(row.to),
+        );
+        const degree = new Map<string, number>();
+        for (const edge of edges) {
+          degree.set(edge.from, (degree.get(edge.from) ?? 0) + 1);
+          degree.set(edge.to, (degree.get(edge.to) ?? 0) + 1);
+        }
+
+        const spaceNames = new Map(
+          (
+            await tx
+              .select({ id: spaces.id, name: spaces.name })
+              // openokr:allow-raw-read: names only, and every human member holds
+              // `view` on every space through the `workspace_standard` binding
+              // P3-T01 gives them, so this discloses nothing the spaces list
+              // does not. The card needs an owner's name, not an identifier.
+              .from(spaces)
+              .where(
+                activeOnly(spaces, eq(spaces.workspaceId, context.workspaceId)),
+              )
+          ).map((row) => [row.id, row.name]),
+        );
+        const memberNames = new Map(
+          (
+            await tx
+              .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+              .from(workspaceMembers)
+              .where(
+                activeOnly(
+                  workspaceMembers,
+                  eq(workspaceMembers.workspaceId, context.workspaceId),
+                ),
+              )
+          ).map((row) => [row.id, row.name]),
+        );
+
+        return {
+          nodes: visible.map((row) => {
+            // A key result parent hangs the child off the goal that owns it, so
+            // the canvas draws one connector rather than a dangling stub.
+            const parentGoalId =
+              row.parentGoalId ??
+              (row.parentKeyResultId
+                ? (ownerOfKeyResult.get(row.parentKeyResultId) ?? null)
+                : null);
+            return {
+              id: row.id,
+              title: row.title,
+              level: row.level,
+              owner:
+                (row.spaceId
+                  ? spaceNames.get(row.spaceId)
+                  : row.memberId
+                    ? memberNames.get(row.memberId)
+                    : "the workspace") ?? "the workspace",
+              parentGoalId,
+              keyResultCount: countByGoal.get(row.id) ?? 0,
+              dependencyCount: degree.get(row.id) ?? 0,
+              health: row.health,
+              progressPct: Number(row.progressPct),
+              unaligned: row.level !== "company" && parentGoalId === null,
+              closed: row.closedAt !== null,
+            };
+          }),
+          edges: edges.map((edge) => ({
+            id: edge.id,
+            from: edge.from,
+            to: edge.to,
+          })),
+        };
+      },
+    );
+  },
+});
+
 export const readAlignment = defineReadAction({
   name: "alignment.read",
   summary:

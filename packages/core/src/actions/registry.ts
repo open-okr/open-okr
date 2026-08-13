@@ -61,6 +61,7 @@ import {
   confirmKeyResultDependency,
   dismissAlignmentFinding,
   readAlignment,
+  readAlignmentGraph,
   removeGoalDependency,
   removeKeyResultDependency,
   setDependencyRiskOwner,
@@ -303,6 +304,7 @@ export const ACTION_MAP = {
   "goals.setDependencyRiskOwner": setDependencyRiskOwner,
   "goals.removeKeyResultDependency": removeKeyResultDependency,
   "alignment.read": readAlignment,
+  "alignment.graph": readAlignmentGraph,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

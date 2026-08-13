@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Settings,
   Shield,
+  Target,
 } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -53,6 +54,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   overview: <Home className="size-full" />,
   review: <ClipboardCheck className="size-full" />,
   cycle: <RefreshCw className="size-full" />,
+  goals: <Target className="size-full" />,
   "check-in": <CheckCircle2 className="size-full" />,
   "account-security": <Shield className="size-full" />,
 };
