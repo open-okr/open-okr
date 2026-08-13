@@ -259,6 +259,12 @@ export {
   kpis,
 } from "./schema/kpis.ts";
 export {
+  EMBEDDABLE_ENTITY_TYPES,
+  type EmbeddableEntityType,
+  type Embedding,
+  embeddings,
+} from "./schema/embeddings.ts";
+export {
   NOTIFICATION_REASONS,
   type Notification,
   type NotificationBatch,
