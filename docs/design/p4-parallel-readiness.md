@@ -172,8 +172,19 @@ that is a process decision.
 | Deliverable | Document | Status | Blocked items remaining |
 |---|---|---|---|
 | Method package design | `docs/design/p4-t00-method-package.md` | **drafted** | 1 (SS6.5 recovery corridors, P3-T14) |
-| Agent design | `docs/design/p4-t00-agent-design.md` | not started | 4 |
-| Session design | `docs/design/p4-t00-session-design.md` | not started | 3 |
+| Agent design | `docs/design/p4-t00-agent-design.md` | **drafted** | 4 (2 triggers P3-T14, comments P3-T16, demo P3-T17) |
+| Session design | `docs/design/p4-t00-session-design.md` | **drafted** | 3 (feed-forward P3-T15, minutes P3-T16) |
+
+### P4-T13 (Embeddings): implementation started (updated 2026-08-14)
+
+| Component | File | Status |
+|---|---|---|
+| Migration | `packages/db/migrations/0028_embeddings.sql` | done |
+| Schema | `packages/db/src/schema/embeddings.ts` | done |
+| Chunker | `packages/core/src/embeddings/chunker.ts` | done |
+| Embedding service | `packages/core/src/embeddings/service.ts` | done |
+| Chunker tests | `packages/core/test/embeddings-chunker.test.ts` | written, not yet run (DB harness OOM) |
+| Integration tests | | not started |
 
 ### Recommended parallel plan
 
