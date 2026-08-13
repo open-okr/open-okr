@@ -7,13 +7,15 @@ import {
 } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { accessProbes } from "@openokr/test-support/db-fixtures";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  addGroupMembership,
   bindGroup,
   ensureContext,
   ensureMemberGroup,
+  ensureSpaceStandardGroup,
   ensureWorkspaceStandardGroup,
 } from "../src/access/contexts.ts";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
@@ -26,6 +28,7 @@ import {
   resolveSubjectContext,
 } from "../src/access/reads.ts";
 import { OperationError, runOperation } from "../src/operations/operation.ts";
+import { createSpaceInTx } from "../src/spaces/service.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -235,7 +238,6 @@ describe("the permission matrix: maximum wins across every principal kind", () =
     const enrolled = await addMember("human");
     const outsider = await addMember("human");
     const contextId = await makeContext("matrix-3");
-    const spaceId = "00000000-0000-4000-8000-000000000002";
 
     const wb = await workerDb();
     await runOperation(
@@ -245,20 +247,30 @@ describe("the permission matrix: maximum wins across every principal kind", () =
         workspaceId,
         actor: { kind: "human", userId: OWNER },
         async execute({ tx }) {
-          // openokr:allow-mutation: test setup for a space-tier group, its
-          // enrolment and its binding, all on the transaction this operation
-          // opened. Spaces themselves are P3-T01; there is no member-facing
-          // helper for either write because nothing creates a space_standard
-          // group yet outside a test.
-          const [spaceGroup] = await tx
-            .insert(accessGroups)
-            .values({ workspaceId, kind: "space_standard", spaceId })
-            .returning({ id: accessGroups.id });
-          const groupId = (spaceGroup as { id: string }).id;
-          await tx.execute(sql`
-            insert into access_group_memberships (id, workspace_id, group_id, member_id)
-            values (gen_random_uuid(), ${workspaceId}, ${groupId}, ${enrolled})
-          `);
+          // A real space, through the real helpers. This used to insert a
+          // `space_standard` group with a synthetic uuid for `space_id` and
+          // enrol a member with hand-written SQL, on the grounds that "spaces
+          // themselves are P3-T01" and no helper existed. Both excuses expired
+          // at P3-T01: the column now carries a foreign key, so a synthetic id
+          // is refused outright, and `createSpaceInTx`, `ensureSpaceStandardGroup`
+          // and `addGroupMembership` are the real writes.
+          //
+          // The group is still bound to this test's own synthetic context
+          // rather than to the space's, because what is under test is how the
+          // space_standard tier resolves, not how a space wires itself up.
+          const space = await createSpaceInTx(tx, {
+            workspaceId,
+            name: "Matrix Space",
+          });
+          const groupId = await ensureSpaceStandardGroup(tx, {
+            workspaceId,
+            spaceId: space.id,
+          });
+          await addGroupMembership(tx, {
+            workspaceId,
+            groupId,
+            memberId: enrolled,
+          });
           await bindGroup(tx, {
             workspaceId,
             groupId,

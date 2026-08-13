@@ -141,8 +141,15 @@ interface PnpmLicensePackage {
 
 type PnpmLicensesOutput = Record<string, PnpmLicensePackage[]>;
 
+// Windows resolves a package manager to `pnpm.cmd`, which `execFile` will not
+// find without the extension, and which Node then refuses to spawn directly at
+// all (the `EINVAL` guard added for CVE-2024-27980). A shell is the only way in
+// on that platform. Safe here because every argument is a literal below: no
+// input reaches the command line. Without this the gate exits non-zero on every
+// Windows machine while passing in CI, which is a gate nobody can reach.
 const { stdout } = await run("pnpm", ["licenses", "list", "--json", "--prod"], {
   maxBuffer: 32 * 1024 * 1024,
+  shell: process.platform === "win32",
 });
 
 const byLicence = JSON.parse(stdout) as PnpmLicensesOutput;

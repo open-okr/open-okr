@@ -11,6 +11,7 @@
  */
 import {
   activeOnly,
+  type Subscription,
   subscriptionLists,
   subscriptions,
   type WorkspaceTx,
@@ -58,7 +59,10 @@ export async function ensureSubscriptionList<
   return (row as { id: string }).id;
 }
 
-export type SubscriptionReason = "invited" | "joined" | "mentioned" | "role";
+// The one list lives on the table (P3-T07). This was a hand-written copy of it,
+// and a copy of a policy is a policy nobody owns: widening the column for the
+// review obligation left this narrower and the two disagreed.
+export type SubscriptionReason = Subscription["reason"];
 
 export interface SubscribeMemberInput {
   readonly workspaceId: string;

@@ -1,10 +1,5 @@
-import {
-  type AccessGroupKind,
-  accessContexts,
-  accessGroups,
-} from "@openokr/db";
+import type { AccessGroupKind } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
-import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   bindGroup,
@@ -82,32 +77,51 @@ describe("workspace provisioning wires the access model", () => {
       "select id, resource_type, resource_id from access_contexts where workspace_id = $1",
       [workspaceId],
     );
-    expect(contexts.rows).toHaveLength(1);
-    expect(contexts.rows[0].resource_type).toBe("workspace");
-    expect(contexts.rows[0].resource_id).toBe(workspaceId);
+    // Two contexts since P3-T01: the workspace's own, and the default space's
+    // (TECHNICAL-PLAN §4.14, "one space named after the workspace"). The
+    // assertions below are about the workspace's own, so they name it rather
+    // than trusting row order.
+    expect(contexts.rows).toHaveLength(2);
+    expect(contexts.rows.map((r) => r.resource_type).sort()).toEqual([
+      "space",
+      "workspace",
+    ]);
+    const workspaceContext = contexts.rows.find(
+      (r) => r.resource_type === "workspace",
+    );
+    expect(workspaceContext).toBeDefined();
+    expect(workspaceContext.resource_id).toBe(workspaceId);
 
     const groups = await wb.admin.query(
       "select id, kind, member_id from access_groups where workspace_id = $1 order by kind",
       [workspaceId],
     );
-    expect(groups.rows).toHaveLength(2);
+    // Three groups since P3-T01: the default space brings its own
+    // `space_standard`, whose membership is real data rather than structural.
+    expect(groups.rows).toHaveLength(3);
     expect(groups.rows.map((r) => r.kind)).toEqual([
       "member",
+      "space_standard",
       "workspace_standard",
     ]);
     const memberGroup = groups.rows.find((r) => r.kind === "member");
     expect(memberGroup).toBeDefined();
     expect(memberGroup.member_id).toBe(memberId);
 
-    // Two bindings now, not one: the founding member's own `full` grant, and
-    // workspace_standard's own `edit` grant every active member reaches
-    // through (packages/core/src/workspaces/provisioning.ts) — without
-    // which an ordinary later member could read nothing and edit nothing on
-    // the workspace's own context, found only once a real Postgres actually
-    // ran this suite.
+    // Two bindings on the workspace's own context: the founding member's own
+    // `full` grant, and workspace_standard's `edit` grant every active member
+    // reaches through (packages/core/src/workspaces/provisioning.ts) — without
+    // which an ordinary later member could read nothing and edit nothing on the
+    // workspace's own context, found only once a real Postgres actually ran
+    // this suite.
+    //
+    // Scoped by context rather than counted across the workspace. The default
+    // space's context carries three bindings of its own since P3-T01, and
+    // folding them into this number would turn a precise assertion about
+    // provisioning into a total somebody has to keep adjusting.
     const bindings = await wb.admin.query(
-      "select group_id, context_id, level, tag from access_bindings where workspace_id = $1",
-      [workspaceId],
+      "select group_id, context_id, level, tag from access_bindings where workspace_id = $1 and context_id = $2",
+      [workspaceId, workspaceContext.id],
     );
     expect(bindings.rows).toHaveLength(2);
     const standardGroup = groups.rows.find(
@@ -121,10 +135,10 @@ describe("workspace provisioning wires the access model", () => {
     );
     expect(memberBinding.level).toBe(ACCESS_LEVELS.full);
     expect(memberBinding.tag).toBeNull();
-    expect(memberBinding.context_id).toBe(contexts.rows[0].id);
+    expect(memberBinding.context_id).toBe(workspaceContext.id);
     expect(standardBinding.level).toBe(ACCESS_LEVELS.edit);
     expect(standardBinding.tag).toBeNull();
-    expect(standardBinding.context_id).toBe(contexts.rows[0].id);
+    expect(standardBinding.context_id).toBe(workspaceContext.id);
   });
 
   it("does not duplicate the workspace_standard or member group on a second call", async () => {
@@ -156,7 +170,9 @@ describe("workspace provisioning wires the access model", () => {
       "select count(*)::int as n from access_groups where workspace_id = $1",
       [workspaceId],
     );
-    expect(groups.rows[0].n).toBe(2);
+    // Three, not two: the default space's own space_standard group is here
+    // too since P3-T01, and re-ensuring the other two must not add a fourth.
+    expect(groups.rows[0].n).toBe(3);
   });
 
   it("rolls back every access row an operation wrote when it fails afterwards", async () => {
@@ -203,15 +219,28 @@ describe("workspace provisioning wires the access model", () => {
 describe("privacy recomputes the moment a binding changes, because nothing caches it", () => {
   it("drops from workspace to space visibility the instant the workspace binding is revoked", async () => {
     const wb = await workerDb();
-    const spaceId = "00000000-0000-4000-8000-000000000001";
 
+    // The default space's own context, which since P3-T01 already carries
+    // exactly the three tiers this test needs: workspace_standard at view for
+    // discovery, space_standard at edit for participation, and the founding
+    // manager's own member group at full.
+    //
+    // This used to build that shape by hand, inserting a space_standard group
+    // with a synthetic uuid for `space_id` because "spaces themselves are
+    // P3-T01". They are not any more, the column carries a foreign key, and a
+    // test that asserts against real rows beats one that asserts against rows
+    // it invented.
     const liveKinds = async (): Promise<AccessGroupKind[]> => {
       const rows = await wb.admin.query<{ kind: AccessGroupKind }>(
         `select g.kind
            from access_bindings b
            join access_groups g on g.id = b.group_id
           where b.context_id = (
-            select id from access_contexts where workspace_id = $1 limit 1
+            select id from access_contexts
+             where workspace_id = $1
+               and resource_type = 'space'
+               and deleted_at is null
+             limit 1
           )
             and b.deleted_at is null
             and g.deleted_at is null`,
@@ -219,53 +248,6 @@ describe("privacy recomputes the moment a binding changes, because nothing cache
       );
       return rows.rows.map((row) => row.kind);
     };
-
-    await runOperation(
-      { pool: wb.appPool },
-      {
-        action: "test.wire-tiers",
-        workspaceId,
-        actor: { kind: "human", userId: USER },
-        async execute({ tx }) {
-          const [context] = await tx
-            .select({ id: accessContexts.id })
-            .from(accessContexts)
-            .where(eq(accessContexts.workspaceId, workspaceId))
-            .limit(1);
-          const contextId = (context as { id: string }).id;
-
-          // workspace_standard already has a live binding on this context
-          // from provisioning itself (packages/core/src/workspaces/
-          // provisioning.ts) — no need to create a second one here, and
-          // access_bindings_untagged_idx would refuse it if this did.
-          // openokr:allow-mutation: test setup for a space-tier group, on the
-          // same transaction the surrounding operation opened. Spaces
-          // themselves are P3-T01; this exercises the space_standard kind
-          // ahead of a space existing to create one.
-          const [spaceGroup] = await tx
-            .insert(accessGroups)
-            .values({ workspaceId, kind: "space_standard", spaceId })
-            .returning({ id: accessGroups.id });
-
-          await bindGroup(tx, {
-            workspaceId,
-            groupId: (spaceGroup as { id: string }).id,
-            contextId,
-            level: ACCESS_LEVELS.edit,
-          });
-
-          return {
-            result: undefined,
-            activity: {
-              kind: "test.wire-tiers",
-              subjectType: "workspace",
-              subjectId: workspaceId,
-            },
-            audit: { action: "test.wire-tiers", targetType: "workspace" },
-          };
-        },
-      },
-    );
 
     expect(derivePrivacy(await liveKinds())).toBe("workspace");
 

@@ -1,3 +1,16 @@
+// An acknowledgement obligation is not an invitation, a join, a mention or a
+// role change (P3-T07). `review` is the reviewer's own obligation, which the
+// review inbox filters on; `check_in` is the fan-out to subscribers.
+export const NOTIFICATION_REASONS = [
+  "invited",
+  "joined",
+  "mentioned",
+  "role",
+  "review",
+  "check_in",
+] as const;
+export type NotificationReason = (typeof NOTIFICATION_REASONS)[number];
+
 import {
   boolean,
   integer,
@@ -45,7 +58,7 @@ export const subscriptions = pgTable("subscriptions", {
     .notNull()
     .references(() => workspaceMembers.id, { onDelete: "cascade" }),
   reason: text("reason", {
-    enum: ["invited", "joined", "mentioned", "role"],
+    enum: NOTIFICATION_REASONS,
   }).notNull(),
   canceled: boolean("canceled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -127,7 +140,7 @@ export const notifications = pgTable("notifications", {
     onDelete: "set null",
   }),
   reason: text("reason", {
-    enum: ["invited", "joined", "mentioned", "role"],
+    enum: NOTIFICATION_REASONS,
   }).notNull(),
   readAt: timestamp("read_at", { withTimezone: true }),
   snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),

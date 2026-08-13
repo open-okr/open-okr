@@ -34,7 +34,6 @@ import {
   runOperation,
 } from "@openokr/core";
 import {
-  type Agent,
   type AgentRun,
   type AgentRunLogEntry,
   activeOnly,
@@ -57,11 +56,6 @@ export interface ProcessNextTaskResult {
   readonly finished: boolean;
   readonly status: AgentRun["status"];
   readonly logEntry: AgentRunLogEntry;
-}
-
-interface LoadedRun {
-  readonly run: AgentRun;
-  readonly agent: Agent;
 }
 
 const DENIED_MESSAGE = "No such resource, or this agent has no access to it.";

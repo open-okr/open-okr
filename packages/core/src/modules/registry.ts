@@ -50,6 +50,50 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "cycle",
+    navigation: [
+      {
+        id: "cycle",
+        label: "Cycle",
+        href: "/cycle",
+        section: "sidebar",
+        // Every member can watch the cycle being planned. The writes on the
+        // screen each ask for edit access of their own, so a reader sees the
+        // workflow without being handed a control they cannot use (P3-T03).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "check-in",
+    navigation: [
+      {
+        id: "check-in",
+        label: "Check in",
+        href: "/check-in",
+        section: "sidebar",
+        // Every member can reach it. The walker only ever lists the goals they
+        // champion, so a member with nothing due sees an empty list rather than
+        // somebody else's obligations (P3-T07).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "spaces",
+    navigation: [
+      {
+        id: "spaces",
+        label: "Spaces",
+        href: "/spaces",
+        section: "sidebar",
+        // Every human member can see that spaces exist and join one, which is
+        // what makes a team home a home rather than a locked room (P3-T01).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "account",
     navigation: [
       {
@@ -76,6 +120,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Branding",
         href: "/admin/branding",
         section: "admin",
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-rhythm",
+        label: "Rhythm and thresholds",
+        href: "/admin/rhythm",
+        section: "admin",
+        // §4.14 governs this card with the `manage_coaching` permission. Until
+        // named permissions land, workspace admin is the closest honest level.
         minLevel: ACCESS_LEVELS.full,
       },
     ],

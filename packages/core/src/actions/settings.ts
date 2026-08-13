@@ -243,7 +243,7 @@ const resetInput = z.union([
 function settingsToReset(input: z.infer<typeof resetInput>) {
   if ("key" in input) {
     const setting = findSetting(input.key);
-    if (!setting || setting.scope !== "workspace") {
+    if (setting?.scope !== "workspace") {
       throw new OperationError(
         "not_found",
         `"${input.key}" is not a workspace setting.`,

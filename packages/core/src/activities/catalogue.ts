@@ -97,6 +97,83 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "agent.run_failed": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_applied": z.object({}).catchall(z.unknown()),
   "proposed_change.bulk_dismissed": z.object({}).catchall(z.unknown()),
+  // Spaces (P3-T01). The name is snapshotted for the same reason a member's is:
+  // a feed entry saying "renamed Marketing" has to keep saying that after the
+  // space is renamed again.
+  "space.created": z.object({ name: z.string() }),
+  "space.updated": z.object({ name: z.string() }),
+  "space.archived": z.object({ name: z.string() }),
+  "space.member_added": z.object({
+    name: z.string(),
+    role: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.member_removed": z.object({
+    role: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.member_role_changed": z.object({
+    from: z.enum(["member", "manager", "coordinator"]),
+    to: z.enum(["member", "manager", "coordinator"]),
+  }),
+  "space.joined": z.object({}),
+  "space.left": z.object({}),
+  // Cycles and the rhythm (P3-T02).
+  "cycle.created": z.object({ name: z.string() }),
+  "cycle.resolved": z.object({ name: z.string() }),
+  "cycle.updated": z.object({ name: z.string() }),
+  "cycle.archived": z.object({ name: z.string() }),
+  "rhythm.updated": z.object({ keys: z.array(z.string()) }),
+  "frame.set": z.object({ yearLabel: z.string() }),
+  // The guided cycle workflow (P3-T03).
+  "cycle.pack_item_set": z.object({
+    itemKey: z.number().int(),
+    gathered: z.boolean(),
+  }),
+  "cycle.pack_distributed": z.object({ name: z.string() }),
+  "cycle.issue_added": z.object({
+    impact: z.number().int(),
+    source: z.string(),
+  }),
+  "cycle.issue_reranked": z.object({ impact: z.number().int() }),
+  "cycle.priority_added": z.object({ promoted: z.boolean() }),
+  "cycle.revalidated": z.object({ holds: z.boolean(), changed: z.boolean() }),
+  "cycle.baseline_health_set": z.object({}),
+  "cycle.capacity_recorded": z.object({}),
+  "cycle.calibrated": z.object({}),
+  "cycle.published": z.object({ name: z.string() }),
+  // Goals and key results (P3-T04). A goal's title is snapshotted for the same
+  // reason a member's name is: "closed Raise activation" has to keep reading that
+  // way after the goal is renamed or erased.
+  "goal.created": z.object({ title: z.string(), level: z.string() }),
+  "goal.updated": z.object({ title: z.string() }),
+  "goal.closed": z.object({
+    successStatus: z.enum(["achieved", "missed"]),
+    closeDecision: z.enum(["keep", "modify", "abandon"]),
+  }),
+  "goal.reopened": z.object({}),
+  "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
+  "goal.moved_to_cycle": z.object({ title: z.string() }),
+  "key_result.created": z.object({ title: z.string() }),
+  "key_result.updated": z.object({}),
+  "key_result.value_recorded": z.object({ value: z.number() }),
+  "key_result.kpi_unlinked": z.object({}),
+  // Check-ins (P3-T07). A draft emits only that a composer was opened; nothing
+  // about the goal, because a draft is silent about the goal by design.
+  "check_in.draft_opened": z.object({ reopened: z.boolean() }),
+  "check_in.published": z.object({
+    status: z.enum(["on_track", "caution", "off_track"]),
+    valuesWritten: z.number().int(),
+  }),
+  "check_in.edited": z.object({}),
+  "check_in.deleted": z.object({ rolledBack: z.boolean() }),
+  "check_in.acknowledged": z.object({ repeat: z.boolean() }),
+  "check_in.vote_cast": z.object({ changed: z.boolean() }),
+  "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
+  // The staleness sweep (P3-T06). A health flip nobody triggered still has to be
+  // visible: it is the product saying a goal went quiet, not a person acting.
+  "cadence.staleness_swept": z.object({
+    examined: z.number().int(),
+    flipped: z.number().int(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

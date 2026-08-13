@@ -97,6 +97,87 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${Number(p.appliedCount ?? 0)} proposed change(s) were applied`,
   "proposed_change.bulk_dismissed": (p) =>
     `${Number(p.dismissedCount ?? 0)} proposed change(s) were dismissed`,
+  "space.created": (p) =>
+    `Space "${asString(p.name, "New space")}" was created`,
+  "space.updated": (p) => `Space "${asString(p.name, "A space")}" was updated`,
+  "space.archived": (p) =>
+    `Space "${asString(p.name, "A space")}" was archived`,
+  "space.member_added": (p) =>
+    `${asString(p.name, "A member")} joined this space as ${asString(p.role, "a member")}`,
+  "space.member_removed": () => "A member was removed from this space",
+  "space.member_role_changed": (p) =>
+    `A member's role changed from ${asString(p.from, "member")} to ${asString(p.to, "member")}`,
+  "space.joined": () => "Someone joined this space",
+  "space.left": () => "Someone left this space",
+  "cycle.created": (p) =>
+    `Cycle "${asString(p.name, "a new cycle")}" was created`,
+  "cycle.resolved": (p) =>
+    `Cycle "${asString(p.name, "the current cycle")}" was opened`,
+  "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
+  "cycle.archived": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was archived`,
+  "rhythm.updated": (p) =>
+    `Rhythm settings were updated (${Array.isArray(p.keys) ? p.keys.join(", ") : "thresholds"})`,
+  "cycle.pack_item_set": (p) =>
+    `Input pack item ${Number(p.itemKey ?? 0)} was marked ${p.gathered ? "gathered" : "missing"}`,
+  "cycle.pack_distributed": () => "The input pack was distributed",
+  "cycle.issue_added": (p) =>
+    `A strategic issue was added at impact ${Number(p.impact ?? 0)}`,
+  "cycle.issue_reranked": (p) =>
+    `A strategic issue was reranked to impact ${Number(p.impact ?? 0)}`,
+  "cycle.priority_added": (p) =>
+    p.promoted
+      ? "An issue was promoted into a priority"
+      : "A priority was added",
+  "cycle.revalidated": (p) =>
+    p.changed
+      ? "The annual frame was revalidated with a change"
+      : "The annual frame was revalidated and holds",
+  "cycle.baseline_health_set": () => "Baseline health was recorded",
+  "cycle.capacity_recorded": () => "What was cut was recorded",
+  "cycle.calibrated": () => "The cycle was calibrated mid-flight",
+  "cycle.published": (p) =>
+    `Cycle "${asString(p.name, "a cycle")}" was published`,
+  "frame.set": (p) =>
+    `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
+  "goal.created": (p) =>
+    `${asString(p.level, "A")} goal "${asString(p.title, "a goal")}" was created`,
+  "goal.updated": (p) => `Goal "${asString(p.title, "a goal")}" was edited`,
+  "goal.closed": (p) =>
+    `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
+  "goal.reopened": () => "The goal was reopened",
+  "goal.role_reassigned": (p) =>
+    `The goal's ${asString(p.role, "role")} was reassigned`,
+  "goal.moved_to_cycle": (p) =>
+    `Goal "${asString(p.title, "a goal")}" was moved to another cycle`,
+  "key_result.created": (p) =>
+    `Key result "${asString(p.title, "a key result")}" was added`,
+  "key_result.updated": () => "A key result was edited",
+  "key_result.value_recorded": (p) =>
+    `A key result moved to ${Number(p.value ?? 0)}`,
+  "key_result.kpi_unlinked": () =>
+    "A key result was unlinked from its KPI and keeps the last value it reported",
+  "check_in.draft_opened": (p) =>
+    p.reopened
+      ? "A draft check-in was reopened"
+      : "A draft check-in was started",
+  "check_in.published": (p) =>
+    `A check-in was published as ${asString(p.status, "on track").replace("_", " ")}`,
+  "check_in.edited": () => "A check-in was edited inside its window",
+  "check_in.deleted": (p) =>
+    p.rolledBack
+      ? "The latest check-in was deleted and the goal rolled back to what it said before"
+      : "A check-in was deleted",
+  "check_in.acknowledged": (p) =>
+    p.repeat
+      ? "A check-in was already acknowledged"
+      : "The reviewer acknowledged a check-in",
+  "check_in.vote_cast": (p) =>
+    p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
+  "check_in.votes_revealed": (p) =>
+    `${Number(p.revealed ?? 0)} confidence vote(s) were revealed together`,
+  "cadence.staleness_swept": (p) =>
+    `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

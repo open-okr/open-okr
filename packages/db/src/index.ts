@@ -123,6 +123,89 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
+  CHECK_IN_STATES,
+  CHECK_IN_STATUSES,
+  type CheckIn,
+  type CheckInSnapshot,
+  type CheckInState,
+  type CheckInStatus,
+  type CheckInVote,
+  checkInSnapshots,
+  checkIns,
+  checkInVotes,
+  type SnapshotEntry,
+} from "./schema/check-ins.ts";
+export {
+  type CycleBaselineHealth,
+  type CycleCalibration,
+  type CycleCapacityNote,
+  type CycleFocusKeyResult,
+  type CycleGateStateRow,
+  type CycleIssue,
+  type CyclePackItem,
+  type CyclePriority,
+  type CyclePriorScore,
+  type CycleRevalidation,
+  cycleBaselineHealth,
+  cycleCalibrations,
+  cycleCapacityNotes,
+  cycleFocusKeyResults,
+  cycleGateState,
+  cycleIssues,
+  cyclePackItems,
+  cyclePriorities,
+  cyclePriorScores,
+  cycleRevalidations,
+  ISSUE_SOURCES,
+  type IssueSource,
+} from "./schema/cycle-workflow.ts";
+export {
+  type AnnualFrame,
+  type AnnualStrategy,
+  annualFrames,
+  annualStrategies,
+  CYCLE_CADENCES,
+  CYCLE_MODES,
+  CYCLE_STATUSES,
+  type Cycle,
+  type CycleCadence,
+  type CycleMode,
+  type CycleSessionDate,
+  type CycleStatus,
+  cycles,
+  GOAL_LEVELS,
+  type GoalLevel,
+  type RhythmSettingsRow,
+  rhythmSettings,
+} from "./schema/cycles.ts";
+export {
+  CAPACITY_VERDICTS,
+  type CapacityVerdict,
+  GOAL_CLOSE_DECISIONS,
+  GOAL_HEALTH,
+  GOAL_OWNER_KINDS,
+  GOAL_SUCCESS_STATUSES,
+  type Goal,
+  type GoalCloseDecision,
+  type GoalHealth,
+  type GoalOwnerKind,
+  type GoalRetrospective,
+  type GoalSuccessStatus,
+  type GoalTimeframe,
+  goalRetrospectives,
+  goals,
+  INDICATOR_TYPES,
+  type IndicatorType,
+  KEY_RESULT_DIRECTIONS,
+  type KeyResult,
+  type KeyResultDirection,
+  type KeyResultValue,
+  keyResults,
+  keyResultValues,
+  VALUE_SOURCES,
+  type ValueSource,
+} from "./schema/goals.ts";
+export {
   type InstanceAuditEvent,
   instanceAuditEvents,
 } from "./schema/instance-audit.ts";
@@ -132,9 +215,11 @@ export {
   inviteLinks,
 } from "./schema/invitations.ts";
 export {
+  NOTIFICATION_REASONS,
   type Notification,
   type NotificationBatch,
   type NotificationBatchStatus,
+  type NotificationReason,
   type NotificationRouting,
   type NotificationSettingsRow,
   notificationBatches,
@@ -147,6 +232,15 @@ export {
   subscriptions,
 } from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  SPACE_ROLES,
+  type Space,
+  type SpaceMember,
+  type SpaceRole,
+  type SpaceSettings,
+  spaceMembers,
+  spaces,
+} from "./schema/spaces.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {
   type QuietHours,

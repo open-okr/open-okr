@@ -24,6 +24,28 @@ const nextConfig: NextConfig = {
   // shipped to production. Off by explicit request: its own UI is not
   // OpenOKR's design system and is not this codebase's to fix.
   devIndicators: false,
+  /**
+   * Hostnames other than `localhost` that may request dev-only assets.
+   *
+   * Next blocks cross-origin requests to `/_next/*` in development by default,
+   * which is right: without it any page you visit could pull this dev server's
+   * internals. The cost is that developing on any other hostname fails in a way
+   * that looks like a styling bug rather than a security control. Every asset
+   * returns 403, so the page renders as raw unstyled HTML, and the reason is a
+   * warning in the terminal nobody is reading.
+   *
+   * Two ordinary setups need this. A local domain through a reverse proxy, and
+   * a phone on the same network hitting the LAN address, which is the only way
+   * to check the mobile tab bar on a real device.
+   *
+   * Comma-separated, from the environment rather than hardcoded, because the
+   * hostname is one developer's choice and not a property of the project. It has
+   * no effect on a production build.
+   */
+  allowedDevOrigins: (process.env.OPENOKR_DEV_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin !== ""),
 };
 
 export default nextConfig;

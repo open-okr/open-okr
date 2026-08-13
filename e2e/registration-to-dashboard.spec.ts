@@ -44,12 +44,14 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
   await expect(page).toHaveURL("/");
-  // The heading, not any element containing the phrase: Next's route
-  // announcer (a visually hidden live region) also carries the page's
-  // heading text, so a bare getByText finds two elements and strict mode
-  // rejects it.
+  // The heading role, not a text match. Under Playwright 1.62 a bare
+  // `getByText("Signed in as")` resolves to two elements and strict mode rejects
+  // it. Two things on this page carry the phrase: the panel streams in behind a
+  // Suspense boundary, and Next mirrors heading text into its route announcer.
+  // The page has exactly one level-1 heading, so naming it by role is
+  // unambiguous whichever of the two produced the second match.
   await expect(
-    page.getByRole("heading", { name: /Signed in as/ }),
+    page.getByRole("heading", { level: 1, name: /Signed in as/ }),
   ).toBeVisible();
   // Exact, because "Ada Lovelace" is also a prefix of the workspace name
   // and a loose match would find two elements.
@@ -129,6 +131,192 @@ test("the first paint is server-rendered, with no JavaScript at all", async ({
   } finally {
     await plain.close();
   }
+});
+
+/**
+ * The cycle workspace (P3-T03). Same session, because the instance allows one
+ * registration and this is its account.
+ *
+ * What only a browser can settle here: the eight phases render from computed
+ * completion rather than a stored flag, ticking a pack item moves the count
+ * through the Operation pipeline and back, and opening a blocked phase names
+ * what is blocking it. That last one is the task's acceptance criterion.
+ */
+test("the cycle workspace computes the eight phases from the rows", async () => {
+  await page.goto("/cycle");
+
+  await expect(
+    page.getByRole("heading", { name: "Phase 1 · Prepare" }),
+  ).toBeVisible();
+  // A quarterly cycle, so phase 0 does not apply. Three states, not two.
+  await expect(
+    page.getByRole("img", { name: "Phase 0 does not apply to this cycle" }),
+  ).toBeVisible();
+  // Every word of the guidance comes from packages/method.
+  await expect(
+    page.getByText("Refuse to run Phase 4 without a complete input pack"),
+  ).toBeVisible();
+});
+
+test("ticking a pack item moves the count", async () => {
+  await page.goto("/cycle");
+
+  await expect(page.getByText("0 of 7", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: 'Mark "Mission, vision and current strategy documents" as gathered',
+    })
+    .click();
+  await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 of 10", { exact: true })).toBeVisible();
+
+  // It is a row in the database, not component state: a fresh document reads
+  // the same answer back.
+  await page.reload();
+  await expect(page.getByText("1 of 7", { exact: true })).toBeVisible();
+});
+
+test("opening phase 4 names what is blocking drafting", async () => {
+  // The acceptance criterion: "Given a quarterly cycle whose input pack has two
+  // items missing, when the facilitator opens Phase 4, then drafting is blocked
+  // with the two missing items named and a link to gather them."
+  await page.goto("/cycle?phase=4");
+
+  await expect(page.getByText("This phase is blocked by earlier work")).toBeVisible();
+  await expect(
+    page.getByText(/Input pack item 4 is missing: Customer feedback/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Input pack item 7 is missing: Open risks/),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Go and gather what is missing" }).click();
+  await expect(page).toHaveURL("/cycle?phase=1");
+});
+
+/**
+ * Goals and key results (P3-T04).
+ *
+ * The task's acceptance criterion end to end: a goal with a champion, a reviewer
+ * and key results persists at zero percent and pending, and closing it requires
+ * and produces a retrospective. The refusal is checked on the server rather than
+ * through the browser's own `required` attribute, which would never let the
+ * request leave.
+ */
+test("drafting a goal with key results persists at zero percent and pending", async () => {
+  await page.goto("/cycle?phase=4");
+
+  await page
+    .getByRole("textbox", { name: "The objective" })
+    .fill("Make mobile the way our customers prefer to reach us");
+  await page
+    .getByRole("textbox", { name: "What it contributes to" })
+    .fill("Carries the annual mobile thrust");
+  await page.getByRole("button", { name: "Add objective" }).click();
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Make mobile the way our customers prefer to reach us",
+    }),
+  ).toBeVisible();
+
+  for (const [title, baseline, target] of [
+    ["Raise mobile activation from 41% to 60%", "41", "60"],
+    ["Cut median first response from 6h to 2h", "6", "2"],
+  ] as const) {
+    await page.getByRole("textbox", { name: "The key result" }).fill(title);
+    await page.getByRole("spinbutton", { name: "Baseline" }).fill(baseline);
+    await page.getByRole("spinbutton", { name: "Target" }).fill(target);
+    await page.getByRole("button", { name: "Add key result" }).click();
+    // Exact, because the row's own title is also inside the label of the field
+    // that records a new value for it.
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+  }
+
+  // The current value starts at the baseline, so progress is 0 rather than
+  // undefined, and health is pending because no check-in has been published.
+  // The progress bar carries the number as an accessible value, which is a
+  // single element where the rendered "0%" is not.
+  await expect(page.getByText("pending")).toBeVisible();
+  await expect(page.getByRole("progressbar").first()).toHaveAttribute(
+    "aria-valuenow",
+    "0",
+  );
+});
+
+test("closing a goal requires a retrospective and keeps it on reopen", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+
+  // The server refuses an empty retrospective. The textarea's own `required`
+  // would stop the request, so the field is filled with whitespace, which passes
+  // the browser and fails the rule.
+  await page.getByRole("textbox", { name: "The retrospective" }).fill("   ");
+  await page.getByRole("button", { name: "Close this goal" }).click();
+  // Filtered rather than the bare role: Next's own route announcer is also an
+  // alert, so the page has two and only one of them is ours.
+  await expect(
+    page.getByRole("alert").filter({ hasText: "retrospective" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("textbox", { name: "The retrospective" })
+    .fill("Activation moved. Onboarding did the work, not the campaign.");
+  await page.getByRole("button", { name: "Close this goal" }).click();
+
+  await expect(page.getByText("closed · achieved")).toBeVisible();
+  await expect(
+    page.getByText("Activation moved. Onboarding did the work"),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Reopen this goal" }).click();
+  // Exact: the page also explains that every goal reads pending until P3-T05.
+  await expect(page.getByText("pending", { exact: true })).toBeVisible();
+  // The account of what happened survives the reopen.
+  await expect(
+    page.getByText("Activation moved. Onboarding did the work"),
+  ).toBeVisible();
+});
+
+/**
+ * The check-in walker (P3-T07).
+ *
+ * What a browser settles here is that the walker reports honestly rather than
+ * inventing work: it lists only goals the reader champions that are due, and a
+ * goal reached directly shows its own history even when it is not.
+ *
+ * The publish path is deliberately not driven from here. Making a goal due needs
+ * the database, which this suite has no access to by design, and a goal created
+ * today with a Monday anchor is due next Monday, so the assertion would pass or
+ * fail depending on the day it ran. That path is covered by the core suite against
+ * real rows instead.
+ */
+test("the check-in walker lists only what is actually due", async () => {
+  await page.goto("/check-in");
+
+  await expect(page.getByRole("heading", { name: "Check in" })).toBeVisible();
+  // The goal created earlier is due next Monday, so nothing is inside the
+  // two-day window and the walker says so rather than offering it.
+  await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
+  await expect(page.getByText("0 due")).toBeVisible();
+});
+
+test("a goal reached directly shows its history and refuses a draft", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+  const goalId = new URL(page.url()).pathname.split("/").pop() as string;
+
+  await page.goto(`/check-in?goal=${goalId}`);
+  await expect(page.getByText("This goal is not due")).toBeVisible();
+  // No composer, because opening one on a goal already reported on would leave an
+  // empty draft behind every time somebody looked at the page.
+  await expect(
+    page.getByRole("button", { name: "Publish" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Check-in history" }),
+  ).toBeVisible();
 });
 
 test("signing out ends the session", async () => {
