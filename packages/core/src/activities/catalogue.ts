@@ -184,6 +184,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     periodStart: z.string(),
     created: z.boolean(),
   }),
+  "kpi.formula_set": z.object({ references: z.number().int() }),
   "check_in.vote_cast": z.object({ changed: z.boolean() }),
   "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be

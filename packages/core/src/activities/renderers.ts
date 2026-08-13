@@ -196,6 +196,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.created
       ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
       : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
+  "kpi.formula_set": (p) =>
+    `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
   "check_in.vote_cast": (p) =>
     p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
   "check_in.votes_revealed": (p) =>

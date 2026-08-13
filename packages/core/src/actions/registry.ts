@@ -133,6 +133,7 @@ import {
   createKpiCategory,
   readKpiGrid,
   recordKpiValue,
+  setKpiFormulaAction,
 } from "./kpis.ts";
 import {
   getNotificationSettings,
@@ -317,6 +318,7 @@ export const ACTION_MAP = {
   "kpis.create": createKpi,
   "kpis.record": recordKpiValue,
   "kpis.grid": readKpiGrid,
+  "kpis.setFormula": setKpiFormulaAction,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

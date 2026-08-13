@@ -25,10 +25,16 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import { asc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import {
+  cascadeFromKpi,
+  evaluateKpiForPeriod,
+  setKpiFormula,
+} from "../kpis/formula.ts";
 import {
   loadKpiRecords,
   recomputeKpi,
@@ -269,6 +275,20 @@ export const recordKpiValue = defineWriteAction({
         authorMemberId: memberId,
       });
 
+      // Everything downstream, in topological order, then each one's corridor
+      // state. A dependent recomputed before its source would fold a stale
+      // number into the answer (design §7).
+      const touched = await cascadeFromKpi(
+        tx,
+        workspaceId,
+        input.kpiId,
+        record.periodStart,
+        memberId,
+      );
+      for (const dependentId of touched) {
+        await recomputeKpi(tx, workspaceId, dependentId);
+      }
+
       const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
 
       return {
@@ -423,4 +443,88 @@ export const readKpiGrid = defineReadAction({
       },
     );
   },
+});
+
+export const setKpiFormulaAction = defineWriteAction({
+  name: "kpis.setFormula",
+  summary:
+    "Makes a KPI calculated from a formula over other KPIs, refusing self-reference and cycles.",
+  input: z.object({
+    kpiId: z.uuid(),
+    /** The stored tree. Validated by the engine, never parsed from a string. */
+    formula: z.unknown(),
+    /** Any date inside the period to evaluate straight away. */
+    on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+  output: z.object({
+    id: z.uuid(),
+    references: z.array(z.uuid()),
+    value: z.number().nullable(),
+    diagnostic: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const [kpi] = await tx
+        .select({ id: kpis.id, frequency: kpis.frequency })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+      if (!kpi) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      const { references } = await setKpiFormula(
+        tx,
+        workspaceId,
+        input.kpiId,
+        input.formula,
+      );
+
+      // Evaluated immediately, so the grid never shows a calculated KPI with a
+      // formula and no value for the period the author was looking at.
+      const period = normalisePeriod(kpi.frequency as KpiFrequency, input.on);
+      const evaluated = await evaluateKpiForPeriod(
+        tx,
+        workspaceId,
+        input.kpiId,
+        period,
+        memberId,
+      );
+      await recomputeKpi(tx, workspaceId, input.kpiId);
+
+      return {
+        result: {
+          id: input.kpiId,
+          references: [...references],
+          value: evaluated.value,
+          diagnostic: evaluated.diagnostic,
+        },
+        activity: {
+          kind: "kpi.formula_set" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: { references: references.length },
+        },
+        audit: {
+          action: "kpis.setFormula",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: { references: references.length },
+        },
+      };
+    },
+  }),
 });

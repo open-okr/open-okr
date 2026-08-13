@@ -162,6 +162,10 @@ export const kpiRecords = pgTable("kpi_records", {
   targetValue: numeric("target_value"),
   actualValue: numeric("actual_value"),
   remark: text("remark"),
+  /** Why this period has no actual value, when a formula could not produce one. */
+  diagnostic: text("diagnostic", {
+    enum: ["missing_source", "divide_by_zero", "negative_target"],
+  }),
   authorMemberId: uuid("author_member_id")
     .notNull()
     .references(() => workspaceMembers.id),
@@ -200,6 +204,29 @@ export const kpiShares = pgTable("kpi_shares", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
+export const kpiDependencies = pgTable("kpi_dependencies", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  /** The calculated KPI whose formula holds the reference. */
+  dependentKpiId: uuid("dependent_kpi_id")
+    .notNull()
+    .references(() => kpis.id, { onDelete: "cascade" }),
+  /** The KPI it reads. */
+  dependsOnKpiId: uuid("depends_on_kpi_id")
+    .notNull()
+    .references(() => kpis.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export type KpiDependencyRow = typeof kpiDependencies.$inferSelect;
 export type KpiCategoryRow = typeof kpiCategories.$inferSelect;
 export type KpiRow = typeof kpis.$inferSelect;
 export type KpiRecordRow = typeof kpiRecords.$inferSelect;

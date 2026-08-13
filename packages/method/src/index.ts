@@ -44,6 +44,28 @@ export {
   type RecoveryLink,
 } from "./kpi.ts";
 export {
+  aggregateForPeriod,
+  type CascadeResult as KpiCascadeResult,
+  cascadeOrder,
+  type DependencyEdge,
+  KPI_AGGREGATES,
+  type KpiAggregate,
+  type SourceRecord,
+} from "./kpi-aggregate.ts";
+export {
+  evaluateFormula,
+  FORMULA_MAX_DEPTH,
+  FORMULA_MAX_NODES,
+  FORMULA_MAX_REFERENCES,
+  type FormulaDiagnostic,
+  type FormulaNode,
+  type FormulaProblem,
+  type FormulaResult,
+  type FormulaShape,
+  formulaNodeSchema,
+  validateFormula,
+} from "./kpi-formula.ts";
+export {
   type CascadeGoal,
   type CascadeResult,
   type ConfidenceBand,
