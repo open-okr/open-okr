@@ -145,7 +145,12 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
-export { type CurrentSession, getCurrentSession } from "./auth/session.ts";
+export {
+  type CurrentSession,
+  getCurrentSession,
+  listUserSessions,
+  type UserSession,
+} from "./auth/session.ts";
 export {
   hashSessionToken,
   withHashedSessionTokens,

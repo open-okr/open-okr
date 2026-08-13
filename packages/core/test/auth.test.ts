@@ -2,6 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
+import { getCurrentSession, listUserSessions } from "../src/auth/session.ts";
 
 /**
  * Authentication end to end against a real database (P1-T05 test plan):
@@ -211,6 +212,25 @@ describe("registration and sign in", () => {
 });
 
 describe("listing and revoking sessions (P2-T09)", () => {
+  /**
+   * Puts every stored session outside Better Auth's freshness window, which
+   * is one day by default while these sessions live for thirty (`createAuth`).
+   * Signing in a moment ago is the only state the rest of this file exercises,
+   * so without this the freshness rules below never fire.
+   */
+  const ageEverySession = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update sessions set created_at = now() - interval '2 days'",
+    );
+  };
+
+  const currentSessionFor = async (cookie: string) => {
+    const session = await getCurrentSession(auth, new Headers({ cookie }));
+    expect(session).not.toBeNull();
+    return session as NonNullable<typeof session>;
+  };
+
   it("lists every active session for the signed-in user", async () => {
     const firstDevice = cookieFrom(await register());
     await post("/sign-in/email", { email: EMAIL, password: PASSWORD });
@@ -259,6 +279,87 @@ describe("listing and revoking sessions (P2-T09)", () => {
       user: { email: string };
     } | null;
     expect(stillInBody?.user.email).toBe(EMAIL);
+  });
+
+  /**
+   * The freshness rule, pinned as the reason the security page cannot read
+   * its list through the endpoint. Better Auth gates `/list-sessions` on a
+   * session having been created within `freshAge` (one day), so a month-long
+   * session answers 403 for its remaining twenty-nine days. Raising
+   * `freshAge` is not the answer: the same setting decides whether deleting
+   * an account still demands the password.
+   */
+  it("refuses the /list-sessions endpoint once the session is no longer fresh", async () => {
+    const cookie = cookieFrom(await register());
+    await ageEverySession();
+
+    const listed = await get("/list-sessions", { cookie });
+    expect(listed.status).toBe(403);
+  });
+
+  it("lists sessions for a signed-in user whose session is no longer fresh", async () => {
+    const firstDevice = cookieFrom(await register());
+    await post("/sign-in/email", { email: EMAIL, password: PASSWORD });
+    await ageEverySession();
+
+    const current = await currentSessionFor(firstDevice);
+    const sessions = await listUserSessions(auth, current.user.id);
+
+    expect(sessions).toHaveLength(2);
+    // What the list is for: naming a device and saying when it signed in.
+    for (const session of sessions) {
+      expect(session.id).toBeTruthy();
+      expect(session.createdAt).toBeInstanceOf(Date);
+    }
+    // Newest first, so the most recent sign-in is not buried.
+    expect(sessions[0]?.createdAt.getTime()).toBeGreaterThanOrEqual(
+      sessions[1]?.createdAt.getTime() as number,
+    );
+  });
+
+  it("revokes a listed session while no session is fresh", async () => {
+    const firstDevice = cookieFrom(await register());
+    const secondDevice = cookieFrom(
+      await post("/sign-in/email", { email: EMAIL, password: PASSWORD }),
+    );
+    await ageEverySession();
+
+    // Exactly what the security page does: list, then post back the token of
+    // a row the user picked.
+    const current = await currentSessionFor(firstDevice);
+    const sessions = await listUserSessions(auth, current.user.id);
+    const other = sessions.find((session) => session.id !== current.session.id);
+    expect(other).toBeDefined();
+
+    const revoke = await post(
+      "/revoke-session",
+      { token: other?.token },
+      { cookie: firstDevice },
+    );
+    expect(revoke.status).toBe(200);
+
+    expect(
+      await (await get("/get-session", { cookie: secondDevice })).json(),
+    ).toBeNull();
+    const stillIn = (await (
+      await get("/get-session", { cookie: firstDevice })
+    ).json()) as { user: { email: string } } | null;
+    expect(stillIn?.user.email).toBe(EMAIL);
+  });
+
+  it("leaves another user's sessions alone", async () => {
+    const mine = cookieFrom(await register());
+    await post("/sign-up/email", {
+      email: "someone-else@example.com",
+      password: PASSWORD,
+      name: "Someone Else",
+    });
+    await ageEverySession();
+
+    const current = await currentSessionFor(mine);
+    const sessions = await listUserSessions(auth, current.user.id);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.id).toBe(current.session.id);
   });
 });
 

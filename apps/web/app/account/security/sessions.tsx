@@ -1,3 +1,4 @@
+import { listUserSessions, type UserSession } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getAuth } from "../../../lib/auth";
@@ -8,17 +9,15 @@ import { getAuth } from "../../../lib/auth";
  * A server action rather than the browser SDK: consistent with how every
  * other write on this page's neighbours works (`rename-workspace.tsx`,
  * `general-settings-form.tsx`), and it means this list needs no client
- * bundle of its own. `auth.api.listSessions`/`revokeSession` are Better
- * Auth's own core endpoints — no plugin, no migration — reached the same
- * way `getCurrentSession` already reaches `auth.api.getSession`.
+ * bundle of its own.
+ *
+ * The read goes through `listUserSessions` rather than Better Auth's
+ * `/list-sessions` endpoint, which refuses any session over a day old and so
+ * made this page fail for most of a session's thirty-day life. That function
+ * carries the full reasoning. Revoking still goes through the endpoint, which
+ * asks only that the session be real, and checks the token belongs to the
+ * caller before it deletes anything.
  */
-
-interface SessionRow {
-  readonly token: string;
-  readonly createdAt: string | Date;
-  readonly userAgent?: string | null;
-  readonly ipAddress?: string | null;
-}
 
 async function revoke(formData: FormData): Promise<void> {
   "use server";
@@ -33,11 +32,15 @@ async function revoke(formData: FormData): Promise<void> {
   revalidatePath("/account/security");
 }
 
-export async function Sessions() {
-  const requestHeaders = await headers();
-  const sessions = (await getAuth().api.listSessions({
-    headers: requestHeaders,
-  })) as SessionRow[];
+export async function Sessions({ userId }: { userId: string }) {
+  let sessions: UserSession[] | null = null;
+  try {
+    sessions = await listUserSessions(getAuth(), userId);
+  } catch {
+    // The rest of the page is about staying safe, so it has to render even
+    // when this one list cannot be read.
+    sessions = null;
+  }
 
   return (
     <section style={{ fontFamily: "system-ui, sans-serif" }}>
@@ -45,20 +48,28 @@ export async function Sessions() {
       <p>
         Every device currently signed in. Revoking one signs it out immediately.
       </p>
-      <ul>
-        {sessions.map((session) => (
-          <li key={session.token}>
-            {session.userAgent ?? "Unknown device"}
-            {session.ipAddress ? ` — ${session.ipAddress}` : ""}
-            {" — since "}
-            {new Date(session.createdAt).toLocaleString()}{" "}
-            <form action={revoke} style={{ display: "inline" }}>
-              <input type="hidden" name="token" value={session.token} />
-              <button type="submit">Revoke</button>
-            </form>
-          </li>
-        ))}
-      </ul>
+      {sessions === null ? (
+        <p role="status">
+          This list could not be read just now. Reload the page to try again.
+        </p>
+      ) : sessions.length === 0 ? (
+        <p>No other device is signed in.</p>
+      ) : (
+        <ul>
+          {sessions.map((session) => (
+            <li key={session.id}>
+              {session.userAgent ?? "Unknown device"}
+              {session.ipAddress ? ` (${session.ipAddress})` : ""}
+              {", since "}
+              {session.createdAt.toLocaleString()}{" "}
+              <form action={revoke} style={{ display: "inline" }}>
+                <input type="hidden" name="token" value={session.token} />
+                <button type="submit">Revoke</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
