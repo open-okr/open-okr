@@ -1,3 +1,5 @@
+import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
+
 /**
  * The studio canvas's pure geometry (S-16, P3-T10).
  *
@@ -21,11 +23,18 @@ export interface Placed<TNode extends LayoutNode> {
   readonly y: number;
 }
 
-export const LEVELS = ["company", "department", "team", "individual"] as const;
+/**
+ * The level order, from METHOD.md §4.3 AL-3 through the method package.
+ *
+ * Imported rather than repeated. This list decides what a level skip is and what
+ * row a card sits on, and two copies of it would let a canvas disagree with the
+ * score that judges the same tree.
+ */
+const LEVELS = ALIGNMENT_LEVEL_ORDER;
 
 export const CARD_WIDTH = 220;
 export const CARD_HEIGHT = 96;
-export const COLUMN_GAP = 28;
+const COLUMN_GAP = 28;
 export const ROW_GAP = 96;
 
 /**

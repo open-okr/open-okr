@@ -1,5 +1,9 @@
 import { callAction } from "@openokr/core";
-import { canonThresholds, confidenceBand } from "@openokr/method";
+import {
+  ALIGNMENT_LEVEL_ORDER,
+  canonThresholds,
+  confidenceBand,
+} from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
@@ -25,8 +29,6 @@ type Goal = Awaited<
   ReturnType<typeof callAction<"goals.list">>
 >["goals"][number];
 
-const LEVELS = ["company", "department", "team", "individual"] as const;
-
 export default async function GoalsPage({
   searchParams,
 }: {
@@ -51,7 +53,7 @@ export default async function GoalsPage({
   });
   const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
 
-  const level = LEVELS.find((entry) => entry === query.level);
+  const level = ALIGNMENT_LEVEL_ORDER.find((entry) => entry === query.level);
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
 
@@ -203,7 +205,7 @@ function Filters({
         <Tab href={href({ level: null })} active={level === null}>
           All
         </Tab>
-        {LEVELS.map((entry) => (
+        {ALIGNMENT_LEVEL_ORDER.map((entry) => (
           <Tab
             key={entry}
             href={href({ level: entry })}
