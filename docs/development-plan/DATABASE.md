@@ -233,9 +233,14 @@ At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the
 `key_result_id` to key_results, `value numeric`, `at`, `author_member_id` to workspace_members, `check_in_id?` to check_ins, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`).
 
 ### check_ins
-`subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot jsonb`, `session_id?` to sessions, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.
+`subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot_id?` to check_in_snapshots, `session_id?` to sessions, `reviewer_member_id?` to workspace_members, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.
 
-The snapshot is immutable and holds, per key result at publish time: identifier, value, previous value, progress percentage, confidence and previous confidence.
+`reviewer_member_id` is the reviewer as of publication, and it is what the review inbox reads. A reassignment moves it only while the check-in is unacknowledged, so a closed loop keeps the member who closed it (P3-T08).
+
+### check_in_snapshots
+`check_in_id` to check_ins, `entries jsonb`, `at`.
+
+The snapshot is immutable, which is why it is a table rather than a column: an edit inside the window writes a new row and keeps the old one, so the difference a reviewer already read cannot change under them. `check_ins.snapshot_id` points at the newest. Each entry holds, per key result at publish time: identifier, value, previous value, progress percentage, confidence and previous confidence.
 
 ### check_in_votes
 `check_in_id?` to check_ins, `key_result_id` to key_results, `session_id?` to sessions, `member_id` to workspace_members, `confidence numeric`, `revealed_at?`.

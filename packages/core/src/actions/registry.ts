@@ -136,6 +136,7 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
+import { reviewInbox } from "./review.ts";
 import {
   readWorkspaceSettings,
   resetWorkspaceSettings,
@@ -285,6 +286,7 @@ export const ACTION_MAP = {
   "goals.vote": castConfidenceVote,
   "goals.revealVotes": revealConfidenceVotes,
   "goals.readVotes": readConfidenceVotes,
+  "review.inbox": reviewInbox,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

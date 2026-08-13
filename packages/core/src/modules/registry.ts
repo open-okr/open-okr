@@ -50,6 +50,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "review",
+    navigation: [
+      {
+        id: "review",
+        label: "Review",
+        href: "/review",
+        section: "sidebar",
+        // Every member reaches it, and every member sees a different page: the
+        // inbox only ever lists what the reader themselves owes, so there is
+        // nothing here to withhold from anybody (P3-T08).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "cycle",
     navigation: [
       {

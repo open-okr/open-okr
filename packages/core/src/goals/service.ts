@@ -27,6 +27,7 @@
 import {
   activeOnly,
   type CapacityVerdict,
+  checkIns,
   type GoalCloseDecision,
   type GoalLevel,
   type GoalOwnerKind,
@@ -43,7 +44,7 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNull } from "drizzle-orm";
 import {
   bindGroup,
   ensureContext,
@@ -359,11 +360,17 @@ export interface ReassignRoleInput {
 /**
  * A role change is a rebind, not a column update (§4.4).
  *
- * Four of the five steps that section lists happen here: unbind, bind, update
- * the column, and stamp the time the change happened. The fifth, reassigning
- * pending obligations, needs the review inbox and lands with it at P3-T08; the
- * timestamp is what lets that task read "the reviewer as of publication" rather
- * than guessing.
+ * All five steps that section lists happen here: unbind, bind, update the
+ * column, reassign every pending obligation of that role, and the audit event
+ * the caller writes.
+ *
+ * The fourth step is narrower than it sounds, and the narrowness is the point.
+ * Only an **open** obligation moves. An acknowledged check-in keeps the reviewer
+ * who closed it, so a new reviewer inherits the work still to do and never the
+ * work somebody else already finished. That is what makes both halves of §4.4
+ * true at once: "reassign every pending obligation" and "a reviewer change never
+ * retroactively creates an obligation for a check-in published before the
+ * change".
  */
 export async function reassignRoleInTx<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -404,6 +411,25 @@ export async function reassignRoleInTx<
         : { reviewerId: input.toMemberId, updatedAt: new Date() },
     )
     .where(activeOnly(goals, eq(goals.id, input.goalId)));
+
+  if (input.role === "reviewer") {
+    // Step 4. A published check-in nobody has acknowledged is the only pending
+    // obligation this role has today; blockers and commitments arrive at P3-T09
+    // and P4-T07 and will need their own line here.
+    // openokr:allow-mutation: the calling Operation's own transaction.
+    await tx
+      .update(checkIns)
+      .set({ reviewerMemberId: input.toMemberId, updatedAt: new Date() })
+      .where(
+        activeOnly(
+          checkIns,
+          eq(checkIns.workspaceId, input.workspaceId),
+          eq(checkIns.subjectId, input.goalId),
+          eq(checkIns.state, "published"),
+          isNull(checkIns.acknowledgedAt),
+        ),
+      );
+  }
 }
 
 export interface CloseGoalInput {

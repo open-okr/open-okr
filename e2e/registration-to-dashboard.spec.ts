@@ -319,6 +319,55 @@ test("a goal reached directly shows its history and refuses a draft", async () =
   ).toBeVisible();
 });
 
+/**
+ * The review inbox (P3-T08, S-02).
+ *
+ * What only a browser settles: that the obligation is computed from the goal
+ * created earlier in this file and reaches the screen with an action attached,
+ * and that the four sources no phase has built are named on the page rather than
+ * quietly missing.
+ *
+ * The acknowledgement half is not driven here, for the reason P3-T07 recorded
+ * about publishing: it needs a goal that is actually due, and a goal created
+ * today with a Monday anchor is due next Monday, so the assertion would pass or
+ * fail depending on the day it ran. The core suite covers that path against real
+ * rows, including the reassignment case no browser test could set up.
+ */
+test("the review inbox lists what this member owes, with an action on each", async () => {
+  await page.goto("/review");
+
+  await expect(
+    page.getByRole("heading", { name: "What you owe", level: 1 }),
+  ).toBeVisible();
+
+  const row = page.getByText(
+    'Post your check-in on "Make mobile the way our customers prefer to reach us"',
+  );
+  await expect(row).toBeVisible();
+  // Scoped to `main`: the sidebar's own nav item is also called "Check in", and
+  // an unscoped role locator matches both. Worth keeping as a named collision
+  // rather than renaming either, because both labels are the right words.
+  await expect(
+    page.getByRole("main").getByRole("link", { name: "Check in" }),
+  ).toBeVisible();
+
+  // Named, not hidden. A page that showed two of six sources without saying so
+  // would look complete while failing to mention a blocker somebody owns.
+  await expect(page.getByText("Blockers you own")).toBeVisible();
+  await expect(page.getByText("Sessions to run")).toBeVisible();
+});
+
+test("the review action opens the composer for that goal", async () => {
+  await page.goto("/review");
+  await page
+    .getByRole("main")
+    .getByRole("link", { name: "Check in" })
+    .first()
+    .click();
+  // The goal id, not the bare walker: the row's action opens the goal it names.
+  await expect(page).toHaveURL(/\/check-in\?goal=/);
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.

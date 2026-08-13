@@ -103,21 +103,35 @@ export function Sidebar({
             >
               <span
                 className={cn(
-                  "size-[15px] flex-none opacity-75",
+                  "relative size-[15px] flex-none opacity-75",
                   item.active && "opacity-100",
                 )}
                 aria-hidden="true"
               >
                 {item.icon}
+                {/* Below xl the rail is icons only, and the count beside the
+                    label goes with the label. A dot on the icon keeps the
+                    signal: a badge that disappears at laptop widths is a badge
+                    that fails exactly the people it is for. The number returns
+                    with the label, and the accessible name below carries it at
+                    every width. */}
+                {item.badge !== undefined ? (
+                  <span className="absolute -top-1 -right-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden" />
+                ) : null}
               </span>
               <span className="hidden truncate xl:inline">{item.label}</span>
               {item.badge !== undefined ? (
-                <Chip
-                  tone={item.active ? "brand" : "bad"}
-                  className="ml-auto hidden xl:inline-flex"
-                >
-                  {item.badge}
-                </Chip>
+                <>
+                  {/* Read out at every width, including the collapsed rail
+                      where the dot alone says "something", not "how much". */}
+                  <span className="sr-only">{item.badge} waiting on you</span>
+                  <Chip
+                    tone={item.active ? "brand" : "bad"}
+                    className="ml-auto hidden xl:inline-flex"
+                  >
+                    {item.badge}
+                  </Chip>
+                </>
               ) : null}
             </Link>
           ))}

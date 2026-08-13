@@ -41,6 +41,9 @@ async function run(
   }
   revalidatePath("/check-in");
   revalidatePath("/cycle");
+  // Publishing, acknowledging and deleting all move an obligation, so the inbox
+  // and the sidebar badge it drives are recomputed with them (P3-T08).
+  revalidatePath("/review");
   return NO_ERROR;
 }
 

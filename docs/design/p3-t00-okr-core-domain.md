@@ -341,8 +341,29 @@ update.
 
 All five in one transaction through the Operation pipeline. A reviewer change
 never retroactively creates an obligation for a check-in published before the
-change: the review inbox reads the reviewer as of the check-in's publication,
-which is why the reassignment records its own timestamp.
+change: the review inbox reads the reviewer as of the check-in's publication.
+
+**How that is stored, settled at P3-T08.** This section originally said the
+reassignment "records its own timestamp", implying a column on the goal and a
+comparison against `published_at`. That cannot satisfy both halves of this
+section at once. A timestamp makes step 4 impossible, because a new reviewer
+would see nothing published before their appointment, including the open loop
+they are supposed to inherit; and it fails this section's own acceptance
+criterion below, which expects them to owe exactly one.
+
+So the reviewer of record lives on the check-in, as
+`check_ins.reviewer_member_id`, stamped at publication. The two rules then act
+on different rows and neither has to be weakened:
+
+| Row | On reassignment |
+|---|---|
+| Published, unacknowledged | Moves to the incoming reviewer. This is step 4 |
+| Published, acknowledged | Untouched. It keeps the member who actually closed it |
+| Draft | Null, and stays null. Publication is what creates the obligation |
+
+`goals.reviewer_id` remains the answer to "who reviews this goal", and it is no
+longer the answer to "who owes this acknowledgement". Only the second question
+decides what appears in an inbox, and only the check-in can answer it.
 
 **Given** a goal whose reviewer has one unacknowledged check-in from today and
 one from last month, already acknowledged, **when** the reviewer is replaced,

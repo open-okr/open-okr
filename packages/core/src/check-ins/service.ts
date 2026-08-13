@@ -302,6 +302,11 @@ export async function publishCheckInInTx<
       narrative: input.narrative as never,
       narrativeVersion: RICH_TEXT_SCHEMA_VERSION,
       snapshotId,
+      // The reviewer of record (P3-T08). Stamped here rather than read from the
+      // goal later, because publication is the moment the obligation is created
+      // and the goal's reviewer can change afterwards. An edit inside the window
+      // re-publishes through this same path, so it never orphans the obligation.
+      reviewerMemberId: goal.reviewerId,
       updatedAt: input.now,
     })
     .where(activeOnly(checkIns, eq(checkIns.id, input.checkInId)));

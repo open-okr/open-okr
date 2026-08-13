@@ -240,11 +240,7 @@ async function CheckInForGoal({
 
       <Votes votes={votes} canReveal={canEdit} />
 
-      <Timeline
-        checkIns={timeline.checkIns}
-        reviewerId={goal.reviewer.id}
-        canEdit={canEdit}
-      />
+      <Timeline checkIns={timeline.checkIns} canEdit={canEdit} />
     </>
   );
 }
