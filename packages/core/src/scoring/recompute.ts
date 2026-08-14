@@ -23,6 +23,7 @@ import {
   goals,
   keyResults,
   keyResultValues,
+  kpis,
   type WorkspaceTx,
 } from "@openokr/db";
 import {
@@ -38,6 +39,8 @@ import { asc, eq, inArray, or } from "drizzle-orm";
 import { daysPastDue } from "../cadence/service.ts";
 import { latestPublishedStatus } from "../check-ins/service.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
+import { recomputeKpi } from "../kpis/service.ts";
+import type { OperationTx } from "../operations/operation.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -53,6 +56,8 @@ const asNumber = (value: string | number | null): number => {
 export interface RecomputeResult {
   readonly goalsWritten: number;
   readonly keyResultsWritten: number;
+  /** Recovering KPIs whose effective health followed a goal that moved. */
+  readonly kpisWritten: number;
   /** `cycle:<child>-><parent>` for every alignment loop the cascade broke. */
   readonly diagnostics: readonly string[];
 }
@@ -99,7 +104,12 @@ async function recomputeScoring<
       )
       .limit(1);
     if (!goal) {
-      return { goalsWritten: 0, keyResultsWritten: 0, diagnostics: [] };
+      return {
+        goalsWritten: 0,
+        keyResultsWritten: 0,
+        kpisWritten: 0,
+        diagnostics: [],
+      };
     }
     cycleId = goal.cycleId;
     if (!cycleId) {
@@ -110,7 +120,12 @@ async function recomputeScoring<
   }
 
   if (!cycleId && !onlyGoalId) {
-    return { goalsWritten: 0, keyResultsWritten: 0, diagnostics: [] };
+    return {
+      goalsWritten: 0,
+      keyResultsWritten: 0,
+      kpisWritten: 0,
+      diagnostics: [],
+    };
   }
 
   // The cycle's own bounds, which are the forecast horizon.
@@ -151,7 +166,12 @@ async function recomputeScoring<
         );
 
   if (seed.length === 0) {
-    return { goalsWritten: 0, keyResultsWritten: 0, diagnostics: [] };
+    return {
+      goalsWritten: 0,
+      keyResultsWritten: 0,
+      kpisWritten: 0,
+      diagnostics: [],
+    };
   }
 
   // Children aligned from outside the cycle still roll into it, so the graph is
@@ -265,17 +285,50 @@ async function recomputeScoring<
     { projected: number; trendingOffTrack: boolean } | null
   >();
 
+  // Decision D-4 and design §10: a linked key result reads the KPI's **real**
+  // achievement, clamped to 0 to 100, and never the effective figure. A
+  // recovery key result reading its own KPI's effective health would feed its
+  // own progress back into itself.
+  const linkedKpiIds = [
+    ...new Set(
+      keyResultRows
+        .map((row) => row.kpiId)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const kpiAchievementById = new Map<string, number>();
+  if (linkedKpiIds.length > 0) {
+    const linked = await tx
+      .select({ id: kpis.id, achievementPct: kpis.achievementPct })
+      .from(kpis)
+      .where(
+        activeOnly(
+          kpis,
+          eq(kpis.workspaceId, workspaceId),
+          inArray(kpis.id, linkedKpiIds),
+        ),
+      );
+    for (const row of linked) {
+      if (row.achievementPct !== null) {
+        kpiAchievementById.set(
+          row.id,
+          Math.min(100, Math.max(0, Number(row.achievementPct))),
+        );
+      }
+    }
+  }
+
   for (const row of keyResultRows) {
     const baseline = asNumber(row.baselineValue);
     const target = asNumber(row.targetValue);
     const current = asNumber(row.currentValue);
     const direction = row.direction;
 
-    // A KPI-linked key result reads the KPI's achievement (decision D-4). KPIs
-    // arrive at P3-T12, so until then a linked key result keeps the progress it
-    // already had rather than being recomputed from a value nobody owns.
+    // A KPI with no achievement at all has measured nothing, so the key result
+    // keeps the progress it had rather than dropping to zero: a KPI nobody has
+    // recorded is unmeasured, not failing.
     const progress = row.kpiId
-      ? asNumber(row.progressPct)
+      ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
       : keyResultProgress({ direction, baseline, target, current });
     keyResultProgressById.set(row.id, progress);
 
@@ -359,9 +412,33 @@ async function recomputeScoring<
     goalsWritten += 1;
   }
 
+  // METHOD.md 6.5: a recovering KPI's displayed health moves with its recovery
+  // goal's progress, so the goal that just moved has to push it. Here rather
+  // than in a write path, because progress changes through several of them and
+  // every one ends up here. Same argument P3-T05 made for the cascade itself.
+  const recovering =
+    goalIds.length === 0
+      ? []
+      : await tx
+          .select({ id: kpis.id })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, workspaceId),
+              inArray(kpis.recoveryGoalId, goalIds),
+            ),
+          );
+  let kpisWritten = 0;
+  for (const kpi of recovering) {
+    await recomputeKpi(tx as OperationTx, workspaceId, kpi.id, now);
+    kpisWritten += 1;
+  }
+
   return {
     goalsWritten,
     keyResultsWritten,
+    kpisWritten,
     diagnostics: cascade.diagnostics,
   };
 }

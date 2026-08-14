@@ -252,11 +252,13 @@ export {
   type KpiShareRow,
   type KpiStateValue,
   type KpiTier,
+  type KpiTreeRow,
   kpiCategories,
   kpiDependencies,
   kpiRecords,
   kpiShares,
   kpis,
+  kpiTrees,
 } from "./schema/kpis.ts";
 export {
   NOTIFICATION_REASONS,
