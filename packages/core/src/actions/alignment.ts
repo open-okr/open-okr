@@ -327,21 +327,28 @@ export const removeGoalDependency = defineWriteAction({
         row.toGoalId,
         ACCESS_LEVELS.view,
       ).catch(() => null);
-      const editable = await Promise.all([
-        requireGoal(
-          tx,
-          workspaceId,
-          memberId,
-          row.fromGoalId,
-          ACCESS_LEVELS.edit,
-        )
-          .then(() => true)
-          .catch(() => false),
-        requireGoal(tx, workspaceId, memberId, row.toGoalId, ACCESS_LEVELS.edit)
-          .then(() => true)
-          .catch(() => false),
-      ]);
-      if (!editable.some(Boolean)) {
+      // Sequential, not `Promise.all`: both checks read through the same
+      // transaction, which is one connection, and two queries started on it at
+      // once queue inside the driver today and throw under `pg` 9.
+      const fromEditable = await requireGoal(
+        tx,
+        workspaceId,
+        memberId,
+        row.fromGoalId,
+        ACCESS_LEVELS.edit,
+      )
+        .then(() => true)
+        .catch(() => false);
+      const toEditable = await requireGoal(
+        tx,
+        workspaceId,
+        memberId,
+        row.toGoalId,
+        ACCESS_LEVELS.edit,
+      )
+        .then(() => true)
+        .catch(() => false);
+      if (!fromEditable && !toEditable) {
         throw new OperationError("not_found", "No such dependency.");
       }
 
