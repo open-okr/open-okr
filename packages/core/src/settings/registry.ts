@@ -188,6 +188,14 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     resolve: () => DEFAULT_QUIET_HOURS,
     schema: quietHoursSchema,
   },
+  {
+    key: "demoEnabled",
+    scope: "workspace",
+    why: "Off. Demo data is opted into, never assumed. The wizard offers the checkbox (P3-T17), and the seed command reads it.",
+    resolve: () => false,
+    schema: z.boolean(),
+    card: "general",
+  },
 ];
 
 /** Every workspace-scoped setting on one S-36 admin card, in registry order. */
