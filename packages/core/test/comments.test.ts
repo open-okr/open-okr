@@ -97,15 +97,11 @@ describe("comments", () => {
     const wb = await workerDb();
     const goalId = await createGoal();
 
-    await callAction(
-      { pool: wb.appPool, ...context() },
-      "comments.create",
-      {
-        subjectType: "goal" as const,
-        subjectId: goalId,
-        body: richText("First comment on this goal."),
-      },
-    );
+    await callAction({ pool: wb.appPool, ...context() }, "comments.create", {
+      subjectType: "goal" as const,
+      subjectId: goalId,
+      body: richText("First comment on this goal."),
+    });
 
     const list = await callAction(
       { pool: wb.appPool, ...context() },
@@ -130,11 +126,9 @@ describe("comments", () => {
       },
     );
 
-    await callAction(
-      { pool: wb.appPool, ...context() },
-      "comments.delete",
-      { commentId: created.id },
-    );
+    await callAction({ pool: wb.appPool, ...context() }, "comments.delete", {
+      commentId: created.id,
+    });
 
     const list = await callAction(
       { pool: wb.appPool, ...context() },
@@ -188,15 +182,11 @@ describe("reactions", () => {
     const wb = await workerDb();
     const goalId = await createGoal();
 
-    await callAction(
-      { pool: wb.appPool, ...context() },
-      "reactions.add",
-      {
-        subjectType: "goal",
-        subjectId: goalId,
-        emoji: "\u{1F44D}",
-      },
-    );
+    await callAction({ pool: wb.appPool, ...context() }, "reactions.add", {
+      subjectType: "goal",
+      subjectId: goalId,
+      emoji: "\u{1F44D}",
+    });
 
     const groups = await callAction(
       { pool: wb.appPool, ...context() },
@@ -212,16 +202,16 @@ describe("reactions", () => {
     const wb = await workerDb();
     const goalId = await createGoal();
 
-    await callAction(
-      { pool: wb.appPool, ...context() },
-      "reactions.add",
-      { subjectType: "goal", subjectId: goalId, emoji: "\u{1F44D}" },
-    );
-    await callAction(
-      { pool: wb.appPool, ...context() },
-      "reactions.add",
-      { subjectType: "goal", subjectId: goalId, emoji: "\u{1F44D}" },
-    );
+    await callAction({ pool: wb.appPool, ...context() }, "reactions.add", {
+      subjectType: "goal",
+      subjectId: goalId,
+      emoji: "\u{1F44D}",
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "reactions.add", {
+      subjectType: "goal",
+      subjectId: goalId,
+      emoji: "\u{1F44D}",
+    });
 
     const groups = await callAction(
       { pool: wb.appPool, ...context() },

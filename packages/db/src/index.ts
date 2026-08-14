@@ -141,14 +141,6 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
-  type Comment,
-  COMMENT_SUBJECT_TYPES,
-  type CommentSubjectType,
-  comments,
-  type Reaction,
-  reactions,
-} from "./schema/comments.ts";
-export {
   CHECK_IN_STATES,
   CHECK_IN_STATUSES,
   type CheckIn,
@@ -161,6 +153,14 @@ export {
   checkInVotes,
   type SnapshotEntry,
 } from "./schema/check-ins.ts";
+export {
+  COMMENT_SUBJECT_TYPES,
+  type Comment,
+  type CommentSubjectType,
+  comments,
+  type Reaction,
+  reactions,
+} from "./schema/comments.ts";
 export {
   type CycleBaselineHealth,
   type CycleCalibration,
@@ -204,6 +204,12 @@ export {
   type RhythmSettingsRow,
   rhythmSettings,
 } from "./schema/cycles.ts";
+export {
+  EMBEDDABLE_ENTITY_TYPES,
+  type EmbeddableEntityType,
+  type Embedding,
+  embeddings,
+} from "./schema/embeddings.ts";
 export {
   CAPACITY_VERDICTS,
   type CapacityVerdict,
@@ -268,12 +274,6 @@ export {
   kpis,
   kpiTrees,
 } from "./schema/kpis.ts";
-export {
-  EMBEDDABLE_ENTITY_TYPES,
-  type EmbeddableEntityType,
-  type Embedding,
-  embeddings,
-} from "./schema/embeddings.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,

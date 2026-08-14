@@ -14,7 +14,7 @@
  * through the access-aware getter.
  */
 import type { Pool } from "pg";
-import { chunkText, contentHash, type ChunkOptions } from "./chunker.ts";
+import { type ChunkOptions, chunkText, contentHash } from "./chunker.ts";
 
 export interface EmbedContentInput {
   readonly workspaceId: string;
@@ -38,13 +38,11 @@ export interface RetrievalHit {
   readonly score: number;
 }
 
-export interface EmbedFunction {
-  (input: readonly string[]): Promise<{
-    readonly vectors: readonly (readonly number[])[];
-    readonly dimensions: number;
-    readonly model: string;
-  }>;
-}
+export type EmbedFunction = (input: readonly string[]) => Promise<{
+  readonly vectors: readonly (readonly number[])[];
+  readonly dimensions: number;
+  readonly model: string;
+}>;
 
 const DEFAULT_RETRIEVAL_LIMIT = 10;
 
@@ -95,10 +93,9 @@ export class EmbeddingService {
 
     const client = await this.#pool.connect();
     try {
-      await client.query(
-        "select set_config('app.workspace_id', $1, true)",
-        [input.workspaceId],
-      );
+      await client.query("select set_config('app.workspace_id', $1, true)", [
+        input.workspaceId,
+      ]);
 
       for (const chunk of chunks) {
         const hash = contentHash(chunk.content);

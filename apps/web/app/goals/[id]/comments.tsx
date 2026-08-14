@@ -6,17 +6,11 @@
  * Shows comments, a composer with mention support, and reactions per comment.
  * Each comment is deep-linkable via #comment-{id}.
  */
-import { Button, Card, CardBody } from "@openokr/ui";
+import { Button } from "@openokr/ui";
 // Rich text editor and mention extensions will be wired in once the
 // comment thread component uses the full TipTap editor. For now the
 // composer uses a plain textarea that wraps input into editor JSON.
-import {
-  useCallback,
-  useOptimistic,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useCallback, useState, useTransition } from "react";
 
 export interface CommentData {
   readonly id: string;
@@ -49,8 +43,10 @@ interface CommentThreadProps {
 }
 
 export function CommentThread({
-  subjectType,
-  subjectId,
+  // subjectType and subjectId are carried for the parent component to pass
+  // down to the composer and reaction actions; the thread itself renders by list.
+  subjectType: _subjectType,
+  subjectId: _subjectId,
   comments,
   currentMemberId,
   onPost,
@@ -59,16 +55,7 @@ export function CommentThread({
   onReact,
 }: CommentThreadProps) {
   const [isPending, startTransition] = useTransition();
-  const [composerBody, setComposerBody] = useState<unknown>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  const handlePost = useCallback(() => {
-    if (!composerBody) return;
-    startTransition(async () => {
-      await onPost(composerBody);
-      setComposerBody(null);
-    });
-  }, [composerBody, onPost]);
 
   const handleEdit = useCallback(
     (commentId: string, body: unknown) => {
@@ -150,9 +137,7 @@ export function CommentThread({
             <button
               type="button"
               className="text-xs text-fg-tertiary hover:text-fg-secondary"
-              onClick={() =>
-                handleReact("comment", comment.id, "\u{1F44D}")
-              }
+              onClick={() => handleReact("comment", comment.id, "\u{1F44D}")}
             >
               +1
             </button>
@@ -213,7 +198,11 @@ function CommentBody({ body }: { body: unknown }) {
         if (n.type === "paragraph" && Array.isArray(n.content)) {
           const text = n.content
             .map((c) => {
-              const child = c as { text?: string; type?: string; attrs?: { label?: string } };
+              const child = c as {
+                text?: string;
+                type?: string;
+                attrs?: { label?: string };
+              };
               if (child.type === "mention") {
                 return `@${child.attrs?.label ?? "someone"}`;
               }
@@ -221,6 +210,7 @@ function CommentBody({ body }: { body: unknown }) {
             })
             .join("");
           return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: paragraph nodes have no stable id
             <p key={i} className="text-sm">
               {text}
             </p>
@@ -254,9 +244,7 @@ function CommentEditor({
       <textarea
         className="w-full min-h-[80px] rounded border border-border bg-bg-primary p-2 text-sm text-fg-primary placeholder:text-fg-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent"
         placeholder={placeholder ?? "Write something..."}
-        defaultValue={
-          initialBody ? extractPlainText(initialBody) : ""
-        }
+        defaultValue={initialBody ? extractPlainText(initialBody) : ""}
         onChange={(e) => {
           // Wrap plain text in a minimal rich-text document
           setBody({

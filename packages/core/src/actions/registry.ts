@@ -68,16 +68,6 @@ import {
 } from "./alignment.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
-  addReactionAction,
-  createCommentAction,
-  deleteCommentAction,
-  listCommentsAction,
-  listReactionsAction,
-  previewNotifyAction,
-  removeReactionAction,
-  updateCommentAction,
-} from "./comments.ts";
-import {
   acknowledgeCheckIn,
   castConfidenceVote,
   deleteCheckIn,
@@ -88,6 +78,16 @@ import {
   revealConfidenceVotes,
   startCheckIn,
 } from "./check-ins.ts";
+import {
+  addReactionAction,
+  createCommentAction,
+  deleteCommentAction,
+  listCommentsAction,
+  listReactionsAction,
+  previewNotifyAction,
+  removeReactionAction,
+  updateCommentAction,
+} from "./comments.ts";
 import {
   addIssue,
   addPriority,

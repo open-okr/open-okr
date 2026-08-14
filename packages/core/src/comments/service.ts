@@ -14,20 +14,19 @@
  */
 import {
   activeOnly,
-  comments,
   type CommentSubjectType,
+  comments,
   reactions,
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { extractMentionIds } from "../rich-text/extract.ts";
-import { excerptRichText } from "../rich-text/excerpt.ts";
+import { and, eq } from "drizzle-orm";
 import {
   ensureSubscriptionList,
   reconcileMentions,
   subscribeMember,
 } from "../notifications/subscriptions.ts";
+import { extractMentionIds } from "../rich-text/extract.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -147,11 +146,7 @@ export async function updateComment<
 
 export async function deleteComment<
   TSchema extends Record<string, unknown> = Record<string, never>,
->(
-  tx: AnyTx<TSchema>,
-  workspaceId: string,
-  commentId: string,
-): Promise<void> {
+>(tx: AnyTx<TSchema>, workspaceId: string, commentId: string): Promise<void> {
   // openokr:allow-mutation: soft delete
   await tx
     .update(comments)
@@ -196,7 +191,10 @@ export async function listComments<
       createdAt: comments.createdAt,
     })
     .from(comments)
-    .innerJoin(workspaceMembers, eq(workspaceMembers.id, comments.authorMemberId))
+    .innerJoin(
+      workspaceMembers,
+      eq(workspaceMembers.id, comments.authorMemberId),
+    )
     .where(
       activeOnly(
         comments,
@@ -227,10 +225,10 @@ export async function listComments<
 export async function previewNotify<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(
-  tx: AnyTx<TSchema>,
-  workspaceId: string,
-  subjectType: string,
-  subjectId: string,
+  _tx: AnyTx<TSchema>,
+  _workspaceId: string,
+  _subjectType: string,
+  _subjectId: string,
   body: unknown,
 ): Promise<readonly string[]> {
   const mentionIds = extractMentionIds(body);
@@ -296,11 +294,7 @@ export async function addReaction<
 
 export async function removeReaction<
   TSchema extends Record<string, unknown> = Record<string, never>,
->(
-  tx: AnyTx<TSchema>,
-  workspaceId: string,
-  reactionId: string,
-): Promise<void> {
+>(tx: AnyTx<TSchema>, workspaceId: string, reactionId: string): Promise<void> {
   // openokr:allow-mutation: soft delete
   await tx
     .update(reactions)
@@ -347,10 +341,7 @@ export async function listReactions<
       ),
     );
 
-  const groups = new Map<
-    string,
-    { memberIds: string[]; own: boolean }
-  >();
+  const groups = new Map<string, { memberIds: string[]; own: boolean }>();
 
   for (const row of rows) {
     const group = groups.get(row.emoji) ?? { memberIds: [], own: false };

@@ -10,7 +10,6 @@ import {
   COMMENT_SUBJECT_TYPES,
   comments,
   reactions,
-  type WorkspaceTx,
   withWorkspace,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
@@ -31,6 +30,13 @@ import {
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+function requireMemberId(memberId: string | null | undefined): string {
+  if (!memberId) {
+    throw new OperationError("forbidden", "A system actor cannot do this.");
+  }
+  return memberId;
+}
 
 const subjectTypeSchema = z.enum(COMMENT_SUBJECT_TYPES);
 
@@ -61,7 +67,7 @@ export const listCommentsAction = defineReadAction({
     return withWorkspace(db, ctx.workspaceId, async (tx) => {
       await getAccessScoped(tx, {
         workspaceId: ctx.workspaceId,
-        memberId: ctx.actor.memberId!,
+        memberId: requireMemberId(ctx.actor.memberId),
         resourceType: input.subjectType,
         resourceId: input.subjectId,
       });
@@ -99,7 +105,7 @@ export const listReactionsAction = defineReadAction({
         ctx.workspaceId,
         input.subjectType,
         input.subjectId,
-        ctx.actor.memberId!,
+        requireMemberId(ctx.actor.memberId),
       );
     });
   },
@@ -149,7 +155,7 @@ export const createCommentAction = defineWriteAction({
         workspaceId,
         subjectType: input.subjectType,
         subjectId: input.subjectId,
-        authorMemberId: actor.memberId!,
+        authorMemberId: requireMemberId(actor.memberId),
         body: input.body,
       });
       return {
@@ -160,7 +166,10 @@ export const createCommentAction = defineWriteAction({
           subjectId: result.id,
           payload: {
             subjectType: input.subjectType,
-            excerpt: excerptRichText(input.body as Parameters<typeof excerptRichText>[0], 120),
+            excerpt: excerptRichText(
+              input.body as Parameters<typeof excerptRichText>[0],
+              120,
+            ),
           },
         },
         audit: {
@@ -218,7 +227,10 @@ export const updateCommentAction = defineWriteAction({
           subjectId: input.commentId,
           payload: {
             subjectType: comment.subjectType,
-            excerpt: excerptRichText(input.body as Parameters<typeof excerptRichText>[0], 120),
+            excerpt: excerptRichText(
+              input.body as Parameters<typeof excerptRichText>[0],
+              120,
+            ),
           },
         },
         audit: {
@@ -240,7 +252,7 @@ export const deleteCommentAction = defineWriteAction({
   access: ACCESS_LEVELS.comment,
   safety: "destructive",
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId, actor }) {
+    async execute({ tx, workspaceId }) {
       const [comment] = await tx
         .select({
           authorMemberId: comments.authorMemberId,
@@ -294,7 +306,7 @@ export const addReactionAction = defineWriteAction({
         workspaceId,
         subjectType: input.subjectType,
         subjectId: input.subjectId,
-        memberId: actor.memberId!,
+        memberId: requireMemberId(actor.memberId),
         emoji: input.emoji,
       });
       return {
