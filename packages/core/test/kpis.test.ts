@@ -361,3 +361,286 @@ describe("refusals", () => {
     ).rejects.toThrow(/calculated/i);
   });
 });
+
+/**
+ * The recovery loop against real rows (P3-T14, METHOD.md §6.5, design §8 and §9).
+ *
+ * `kpi-recovery-golden.test.ts` proves the rules with no database at all. What
+ * is checked here is the half a pure test cannot: that the tree handed to the
+ * walk is what the rows say, that the objective is a real goal with a real
+ * access context, and that effective health moves when the recovery does.
+ */
+describe("recovery OKRs", () => {
+  const DRIVERS = [
+    {
+      title: "Activation rate",
+      direction: "higher_better",
+      value: 41,
+      target: 60,
+    },
+    {
+      title: "Onboarding time",
+      direction: "lower_better",
+      value: 9,
+      target: 4,
+    },
+    { title: "Support cost", direction: "lower_better", value: 18, target: 11 },
+  ] as const;
+
+  const makeChild = async (input: {
+    parentKpiId: string;
+    title: string;
+    indicatorType: "leading" | "lagging";
+    direction?: "higher_better" | "lower_better";
+    targetDefault?: number;
+  }) => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "kpis.create", {
+      title: input.title,
+      indicatorType: input.indicatorType,
+      tier: "input",
+      aggregate: "sum",
+      ownerKind: "workspace",
+      frequency: "monthly",
+      direction: input.direction ?? "higher_better",
+      parentKpiId: input.parentKpiId,
+      ...(input.targetDefault === undefined
+        ? {}
+        : { targetDefault: input.targetDefault }),
+    });
+  };
+
+  const record = async (kpiId: string, actualValue: number) => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "kpis.record", {
+      kpiId,
+      on: "2026-08-11",
+      actualValue,
+    });
+  };
+
+  const currentCycleId = async (): Promise<string> => {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    return cycle?.id as string;
+  };
+
+  /** An unhealthy root with three leading children, values recorded. */
+  const unhealthyTree = async () => {
+    const root = await makeKpi({
+      title: "Operating margin",
+      frequency: "monthly",
+      targetDefault: 100,
+    });
+    // Sixty percent of target, which is below the seventy percent watch floor.
+    await record(root.id, 60);
+    for (const driver of DRIVERS) {
+      const child = await makeChild({
+        parentKpiId: root.id,
+        title: driver.title,
+        indicatorType: "leading",
+        direction: driver.direction,
+        targetDefault: driver.target,
+      });
+      await record(child.id, driver.value);
+    }
+    return root;
+  };
+
+  /**
+   * The acceptance criterion: "Given an unhealthy KPI, when the owner launches
+   * recovery, then a goal exists whose key results are its leading drivers, the
+   * KPI reads recovering, and the recovery board shows it with its progress."
+   */
+  it("turns three leading drivers into three key results and flips the KPI to recovering", async () => {
+    const wb = await workerDb();
+    const root = await unhealthyTree();
+    expect((await record(root.id, 60)).state).toBe("unhealthy");
+
+    const launched = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId: root.id, cycleId: await currentCycleId() },
+    );
+
+    expect(launched.keyResultIds).toHaveLength(3);
+    // The achievement at launch is the floor every later projection is measured
+    // from, so it is stamped rather than recomputed afterwards.
+    expect(launched.startedPct).toBe(60);
+
+    const goal = await wb.admin.query<{ title: string }>(
+      "select title from goals where id = $1",
+      [launched.goalId],
+    );
+    expect(goal.rows[0]?.title).toBe("Bring Operating margin back to 100");
+
+    const written = await wb.admin.query<{
+      title: string;
+      baseline_value: string;
+      target_value: string;
+      direction: string;
+    }>(
+      "select title, baseline_value, target_value, direction from key_results where goal_id = $1 order by position",
+      [launched.goalId],
+    );
+    expect(written.rows.map((row) => row.title)).toEqual([
+      "Improve Activation rate from 41 to 60",
+      "Improve Onboarding time from 9 to 4",
+      "Improve Support cost from 18 to 11",
+    ]);
+    expect(written.rows.map((row) => Number(row.baseline_value))).toEqual([
+      41, 9, 18,
+    ]);
+    expect(written.rows.map((row) => Number(row.target_value))).toEqual([
+      60, 4, 11,
+    ]);
+    // A lower-is-better driver becomes a key result that reduces.
+    expect(written.rows.map((row) => row.direction)).toEqual([
+      "increase",
+      "reduce",
+      "reduce",
+    ]);
+
+    const kpi = await wb.admin.query<{
+      state: string;
+      recovery_started_pct: string;
+    }>("select state, recovery_started_pct from kpis where id = $1", [root.id]);
+    expect(kpi.rows[0]?.state).toBe("recovering");
+    expect(Number(kpi.rows[0]?.recovery_started_pct)).toBe(60);
+  });
+
+  it("descends through lagging children to their nearest leading descendants", async () => {
+    const wb = await workerDb();
+    const root = await makeKpi({ title: "Revenue", targetDefault: 100 });
+    await record(root.id, 60);
+    const lagging = await makeChild({
+      parentKpiId: root.id,
+      title: "Pipeline",
+      indicatorType: "lagging",
+      targetDefault: 50,
+    });
+    await record(lagging.id, 30);
+    const leading = await makeChild({
+      parentKpiId: lagging.id,
+      title: "Qualified leads",
+      indicatorType: "leading",
+      targetDefault: 140,
+    });
+    await record(leading.id, 80);
+
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.recoveryDraft",
+      { kpiId: root.id },
+    );
+    expect(draft?.keyResults.map((keyResult) => keyResult.title)).toEqual([
+      "Improve Qualified leads from 80 to 140",
+    ]);
+  });
+
+  it("gives a subtree with no leading KPI one placeholder key result", async () => {
+    const wb = await workerDb();
+    const root = await makeKpi({ title: "Revenue", targetDefault: 100 });
+    await record(root.id, 60);
+
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.recoveryDraft",
+      { kpiId: root.id },
+    );
+    expect(draft?.keyResults).toHaveLength(1);
+    expect(draft?.keyResults[0]?.title).toBe(
+      "define the first leading driver to move",
+    );
+    expect(draft?.keyResults[0]?.sourceKpiId).toBeNull();
+  });
+
+  it("refuses a second recovery while the first is open", async () => {
+    const wb = await workerDb();
+    const root = await unhealthyTree();
+    const cycleId = await currentCycleId();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId: root.id, cycleId },
+    );
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "kpis.launchRecovery", {
+        kpiId: root.id,
+        cycleId,
+      }),
+    ).rejects.toThrow(/already has a recovery/i);
+  });
+
+  it("raises effective health as the recovery progresses while the real number lags", async () => {
+    const wb = await workerDb();
+    const root = await unhealthyTree();
+    const launched = await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId: root.id, cycleId: await currentCycleId() },
+    );
+
+    const before = await wb.admin.query<{
+      achievement_pct: string;
+      effective_pct: string;
+    }>("select achievement_pct, effective_pct from kpis where id = $1", [
+      root.id,
+    ]);
+    // Nothing has moved yet, so the projection sits on the starting point.
+    expect(Number(before.rows[0]?.effective_pct)).toBe(60);
+
+    // Move the first key result all the way to its target. One of three, so the
+    // recovery goal reads a third done.
+    const first = launched.keyResultIds[0] as string;
+    await callAction({ pool: wb.appPool, ...context() }, "goals.recordValue", {
+      id: first,
+      value: 60,
+    });
+
+    const after = await wb.admin.query<{
+      achievement_pct: string;
+      effective_pct: string;
+      state: string;
+    }>("select achievement_pct, effective_pct, state from kpis where id = $1", [
+      root.id,
+    ]);
+    // The real number has not moved: nobody recorded a new margin.
+    expect(Number(after.rows[0]?.achievement_pct)).toBe(60);
+    // The projection has: 60 + (1/3 × (90 − 60)) = 70.
+    expect(Number(after.rows[0]?.effective_pct)).toBeGreaterThan(60);
+    expect(Number(after.rows[0]?.effective_pct)).toBeCloseTo(70, 1);
+    expect(after.rows[0]?.state).toBe("recovering");
+  });
+
+  it("proposes closing the recovery exactly once, on the real number", async () => {
+    const wb = await workerDb();
+    const root = await unhealthyTree();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "kpis.launchRecovery",
+      { kpiId: root.id, cycleId: await currentCycleId() },
+    );
+
+    // Back inside the healthy corridor on the real measurement.
+    await record(root.id, 92);
+    const first = await wb.admin.query<{ recovery_close_proposed_at: string }>(
+      "select recovery_close_proposed_at from kpis where id = $1",
+      [root.id],
+    );
+    const stamp = first.rows[0]?.recovery_close_proposed_at;
+    expect(stamp).not.toBeNull();
+
+    // A second recompute must not propose again.
+    await record(root.id, 95);
+    const second = await wb.admin.query<{ recovery_close_proposed_at: string }>(
+      "select recovery_close_proposed_at from kpis where id = $1",
+      [root.id],
+    );
+    expect(second.rows[0]?.recovery_close_proposed_at).toEqual(stamp);
+  });
+});

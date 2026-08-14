@@ -185,6 +185,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     created: z.boolean(),
   }),
   "kpi.formula_set": z.object({ references: z.number().int() }),
+  // The recovery loop (P3-T14). Launching one is a commitment by the team, so
+  // it belongs in the feed beside the objectives it creates.
+  "kpi.tree_created": z.object({ name: z.string() }),
+  "kpi.updated": z.object({ fields: z.array(z.string()) }),
+  "kpi.recovery_launched": z.object({
+    goalId: z.string(),
+    keyResults: z.number().int(),
+  }),
   "check_in.vote_cast": z.object({ changed: z.boolean() }),
   "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be

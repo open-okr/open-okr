@@ -1,10 +1,13 @@
-import { activeOnly, kpiRecords, kpis, newId } from "@openokr/db";
+import { activeOnly, goals, kpiRecords, kpis, newId } from "@openokr/db";
 import {
   type KpiDirection,
   type KpiFrequency,
   kpiAchievement,
+  kpiEffectiveHealth,
   kpiState,
   normalisePeriod,
+  type RecoveryLink,
+  shouldProposeRecoveryClose,
 } from "@openokr/method";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import type { OperationTx } from "../operations/operation.ts";
@@ -117,8 +120,48 @@ export async function upsertKpiRecord(
 
 export interface KpiRecomputeResult {
   readonly achievementPct: number | null;
+  /** §6.5's displayed figure. Equal to achievement unless a recovery is open. */
+  readonly effectivePct: number | null;
   readonly state: string;
   readonly diagnostic: string | null;
+  /** True when this recompute raised §6.5's closure proposal, at most once. */
+  readonly closureProposed: boolean;
+}
+
+/**
+ * How a KPI's recovery goal stands, in the three values §6.4's precedence reads.
+ *
+ * A goal that was deleted counts as no recovery at all rather than a closed one:
+ * a deleted recovery is one nobody ever ran, and leaving the KPI reading
+ * `recovering` because of a row that is gone would strand it there forever.
+ */
+async function loadRecovery(
+  tx: OperationTx,
+  workspaceId: string,
+  recoveryGoalId: string | null,
+): Promise<{ link: RecoveryLink; progress: number }> {
+  if (!recoveryGoalId) {
+    return { link: "none", progress: 0 };
+  }
+  const [goal] = await tx
+    .select({ closedAt: goals.closedAt, progressPct: goals.progressPct })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, workspaceId),
+        eq(goals.id, recoveryGoalId),
+      ),
+    )
+    .limit(1);
+  if (!goal) {
+    return { link: "none", progress: 0 };
+  }
+  return {
+    link: goal.closedAt === null ? "open" : "closed",
+    // The goal's progress is a percentage; §6.5's projection wants a fraction.
+    progress: Math.min(1, Math.max(0, Number(goal.progressPct) / 100)),
+  };
 }
 
 /**
@@ -131,14 +174,17 @@ export interface KpiRecomputeResult {
  * record, falling back to the KPI's default: a period recorded without a target
  * is measured against the standing one rather than against nothing.
  *
- * The effective figure (design §4) and the recovery link belong to P3-T14. Until
- * then the recovery argument is always `none`, so `recovering` is unreachable,
- * which is honest: no recovery goal can exist yet.
+ * The effective figure (design §4) is the displayed one while a recovery is
+ * open: the higher of real achievement and §6.5's projection. Both are stored,
+ * because every surface that shows one has to be able to show the other beside
+ * it, and a screen that showed only the projection would be reporting the
+ * recovery's own progress as if it were the metric.
  */
 export async function recomputeKpi(
   tx: OperationTx,
   workspaceId: string,
   kpiId: string,
+  now: Date = new Date(),
 ): Promise<KpiRecomputeResult> {
   const [kpi] = await tx
     .select({
@@ -147,6 +193,8 @@ export async function recomputeKpi(
       healthyPct: kpis.healthyPct,
       watchPct: kpis.watchPct,
       recoveryGoalId: kpis.recoveryGoalId,
+      recoveryStartedPct: kpis.recoveryStartedPct,
+      recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
     })
     .from(kpis)
     .where(
@@ -154,7 +202,13 @@ export async function recomputeKpi(
     )
     .limit(1);
   if (!kpi) {
-    return { achievementPct: null, state: "no_data", diagnostic: null };
+    return {
+      achievementPct: null,
+      effectivePct: null,
+      state: "no_data",
+      diagnostic: null,
+      closureProposed: false,
+    };
   }
 
   const [latest] = await tx
@@ -188,11 +242,36 @@ export async function recomputeKpi(
     actual,
     target,
   );
-  // P3-T14 supplies the real recovery link. `none` until then, because no
-  // recovery goal can exist yet and claiming otherwise would be inventing one.
-  const state = kpiState(achievement.pct, "none", {
-    healthyPct: Number(kpi.healthyPct),
+  const healthyPct = Number(kpi.healthyPct);
+  const recovery = await loadRecovery(tx, workspaceId, kpi.recoveryGoalId);
+  const state = kpiState(achievement.pct, recovery.link, {
+    healthyPct,
     watchPct: Number(kpi.watchPct),
+  });
+
+  // Effective health only exists while a recovery is open. A closed one leaves
+  // the KPI reading whatever it actually reached, which is the honest outcome
+  // whether the recovery worked or not.
+  const effective =
+    recovery.link === "open"
+      ? kpiEffectiveHealth({
+          achievementPct: achievement.pct,
+          startPct: Number(kpi.recoveryStartedPct ?? achievement.pct ?? 0),
+          recoveryProgress: recovery.progress,
+          healthyPct,
+        })
+      : null;
+  const effectivePct = effective ? effective.pct : achievement.pct;
+
+  // §6.5's closure end, and it reads **real** achievement rather than the
+  // effective figure on purpose: the projection rises with the recovery's own
+  // progress, so closing on it would close a recovery because the recovery was
+  // going well, which is circular. The stamp is the "exactly once".
+  const closureProposed = shouldProposeRecoveryClose({
+    achievementPct: achievement.pct,
+    recovery: recovery.link,
+    alreadyProposed: kpi.recoveryCloseProposedAt !== null,
+    healthyPct,
   });
 
   // openokr:allow-mutation: same transaction.
@@ -200,8 +279,10 @@ export async function recomputeKpi(
     .update(kpis)
     .set({
       achievementPct: achievement.pct === null ? null : String(achievement.pct),
+      effectivePct: effectivePct === null ? null : String(effectivePct),
       state,
-      updatedAt: new Date(),
+      ...(closureProposed ? { recoveryCloseProposedAt: now } : {}),
+      updatedAt: now,
     })
     .where(
       activeOnly(kpis, eq(kpis.workspaceId, workspaceId), eq(kpis.id, kpiId)),
@@ -209,8 +290,10 @@ export async function recomputeKpi(
 
   return {
     achievementPct: achievement.pct,
+    effectivePct,
     state,
-    diagnostic: achievement.diagnostic,
+    diagnostic: achievement.diagnostic ?? effective?.diagnostic ?? null,
+    closureProposed,
   };
 }
 

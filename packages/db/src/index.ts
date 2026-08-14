@@ -252,11 +252,13 @@ export {
   type KpiShareRow,
   type KpiStateValue,
   type KpiTier,
+  type KpiTreeRow,
   kpiCategories,
   kpiDependencies,
   kpiRecords,
   kpiShares,
   kpis,
+  kpiTrees,
 } from "./schema/kpis.ts";
 export {
   EMBEDDABLE_ENTITY_TYPES,
@@ -282,6 +284,18 @@ export {
   subscriptions,
 } from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  type PerformanceSnapshotRow,
+  PORTFOLIO_VERDICTS,
+  type PortfolioVerdictValue,
+  performanceSnapshots,
+  type ScorecardSettingsRow,
+  type ScoreEntryRow,
+  SNAPSHOT_OWNER_KINDS,
+  type SnapshotOwnerKind,
+  scorecardSettings,
+  scoreEntries,
+} from "./schema/scorecard.ts";
 export {
   SPACE_ROLES,
   type Space,

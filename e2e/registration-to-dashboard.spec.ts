@@ -378,6 +378,82 @@ test("the review action opens the composer for that goal", async () => {
   await expect(page).toHaveURL(/\/check-in\?goal=/);
 });
 
+/**
+ * The KPI recovery loop, end to end (P3-T14, METHOD.md §6.4 to §6.6).
+ *
+ * The database-backed suite proves the drafter against rows. What only a
+ * browser can settle is that the three screens agree with each other: a value
+ * typed into the grid puts the KPI on the recovery board, one click there
+ * produces a real objective, and the tree draws the result.
+ */
+test("a KPI recorded below the corridor reaches the recovery board", async () => {
+  await page.goto("/kpis");
+  await page.getByLabel("What is being measured").fill("Operating margin");
+  await page.getByLabel("Standing target").fill("100");
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: "Add", exact: true })
+    .first()
+    .click();
+
+  // The period the cell belongs to is the workspace's own answer, so the
+  // locator matches on the KPI rather than on a date this spec would have to
+  // compute the same way the server does.
+  const cell = page.getByRole("textbox", {
+    name: /^Operating margin, period beginning/,
+  });
+  await expect(cell).toBeVisible();
+  await cell.fill("60");
+  await cell.press("Enter");
+
+  await page.goto("/kpis/recovery");
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Operating margin" }),
+  ).toBeVisible();
+  // Sixty of a hundred is below the seventy percent watch floor.
+  await expect(page.getByText("unhealthy").first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Launch recovery" }),
+  ).toBeVisible();
+});
+
+test("launching recovery creates the objective and flips the KPI", async () => {
+  await page.goto("/kpis/recovery");
+  await page.getByRole("button", { name: "Launch recovery" }).click();
+
+  // The objective is named from the KPI and its target, per METHOD.md §6.5.
+  await expect(
+    page.getByRole("link", { name: "Bring Operating margin back to 100" }),
+  ).toBeVisible();
+  await expect(page.getByText("recovering").first()).toBeVisible();
+  // The subtree holds no leading driver yet, so §6.5's placeholder is the one
+  // key result rather than the product inventing a driver nobody named.
+  await expect(page.getByText("1 key result")).toBeVisible();
+});
+
+test("the tree draws the driver added under a node, and the detail reads it back", async () => {
+  await page.goto("/kpis/trees?tree=none");
+  const row = page.getByRole("listitem").filter({ hasText: "Operating margin" });
+  await row.getByRole("link", { name: "add driver" }).click();
+
+  await page.getByLabel("What the driver measures").fill("Qualified leads");
+  await page.getByRole("button", { name: "Add the driver" }).click();
+
+  const driver = page.getByRole("listitem").filter({ hasText: "Qualified leads" });
+  await expect(driver).toBeVisible();
+  // A driver is leading and input tier: something a team can act on this week.
+  await expect(driver.getByText("leading · input")).toBeVisible();
+
+  await driver.getByRole("link", { name: "open" }).click();
+  await expect(page).toHaveURL(/\/kpis\/[0-9a-f-]{36}$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Qualified leads" }),
+  ).toBeVisible();
+  // The corridor is stated in words, not only in colour.
+  await expect(page.getByText(/healthy at 90%, watch at 70%/)).toBeVisible();
+  await expect(page.getByText("Nothing recorded yet.")).toBeVisible();
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.
