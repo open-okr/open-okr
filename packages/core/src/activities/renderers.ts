@@ -199,6 +199,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "kpi.formula_set": (p) =>
     `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
   "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,
+  "cycle.snapshotted": (p) =>
+    `A cycle's performance was recorded in ${Number(p.snapshots ?? 0)} snapshot(s)${
+      p.verdict ? `, reading ${String(p.verdict)}` : " and no verdict"
+    }`,
+  "cycle.fed_forward": (p) =>
+    `The next cycle inherited ${Number(p.priorScores ?? 0)} prior score(s) and ${Number(p.issues ?? 0)} carried issue(s)`,
   "kpi.updated": (p) =>
     `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
   "kpi.recovery_launched": (p) =>

@@ -14,7 +14,9 @@ import {
   CYCLE_CADENCES,
   cycles,
   GOAL_LEVELS,
+  performanceSnapshots,
   rhythmSettings,
+  scorecardSettings,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -29,6 +31,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { archiveCycleInTx, feedForwardInTx } from "../cycles/archive.ts";
 import {
   cyclePeriodFor,
   formatLocalDate,
@@ -912,6 +915,184 @@ export const setAnnualFrame = defineWriteAction({
             superseded: Boolean(
               current && current.yearLabel !== input.yearLabel,
             ),
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Not `cycles.archive`: that name is taken, and it means something else. The
+ * action above soft-deletes a cycle. This one records what the cycle achieved,
+ * which METHOD.md §8.9 calls archiving and the plan calls the archive job. Two
+ * different acts cannot share one verb, so the newer one is named for what it
+ * writes.
+ */
+export const snapshotCycle = defineWriteAction({
+  name: "cycles.snapshot",
+  summary:
+    "Records what a cycle achieved: the result, the band counts and the portfolio verdict, one snapshot per owner.",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.object({
+    snapshots: z.number().int(),
+    resultValue: z.number().nullable(),
+    verdict: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const result = await archiveCycleInTx(
+        tx,
+        workspaceId,
+        input.cycleId,
+        rhythm.thresholds,
+      );
+      return {
+        result,
+        activity: {
+          kind: "cycle.snapshotted" as const,
+          subjectType: "cycle" as const,
+          subjectId: input.cycleId,
+          payload: {
+            snapshots: result.snapshots,
+            verdict: result.verdict,
+          },
+        },
+        audit: {
+          action: "cycles.archive",
+          targetType: "cycle",
+          targetId: input.cycleId,
+          payload: { snapshots: result.snapshots },
+        },
+      };
+    },
+  }),
+});
+
+export const readScorecard = defineReadAction({
+  name: "cycles.scorecard",
+  summary:
+    "Every archived cycle's result with its band counts and verdict, oldest first. Drives the scorecard.",
+  input: z.object({}),
+  output: z.object({
+    rows: z.array(
+      z.object({
+        cycleId: z.uuid(),
+        cycleName: z.string(),
+        startsOn: z.string(),
+        resultValue: z.number().nullable(),
+        verdict: z.string().nullable(),
+        fullyAchieved: z.number().int(),
+        strong: z.number().int(),
+        partial: z.number().int(),
+        little: z.number().int(),
+      }),
+    ),
+    pointsEnabled: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // The workspace scope only. A space or a member reads their own trend
+        // from their own page; a scorecard that mixed the three would add
+        // numbers that answer different questions.
+        const rows = await tx
+          .select({
+            cycleId: performanceSnapshots.cycleId,
+            cycleName: cycles.name,
+            startsOn: cycles.startsOn,
+            resultValue: performanceSnapshots.resultValue,
+            verdict: performanceSnapshots.verdict,
+            fullyAchieved: performanceSnapshots.fullyAchievedCount,
+            strong: performanceSnapshots.strongCount,
+            partial: performanceSnapshots.partialCount,
+            little: performanceSnapshots.littleCount,
+          })
+          .from(performanceSnapshots)
+          .innerJoin(cycles, eq(cycles.id, performanceSnapshots.cycleId))
+          .where(
+            activeOnly(
+              performanceSnapshots,
+              eq(performanceSnapshots.workspaceId, context.workspaceId),
+              eq(performanceSnapshots.ownerKind, "workspace"),
+            ),
+          )
+          .orderBy(asc(cycles.startsOn));
+
+        const [settings] = await tx
+          .select({ enabled: scorecardSettings.enabled })
+          .from(scorecardSettings)
+          .where(
+            activeOnly(
+              scorecardSettings,
+              eq(scorecardSettings.workspaceId, context.workspaceId),
+            ),
+          )
+          .limit(1);
+
+        return {
+          rows: rows.map((row) => ({
+            ...row,
+            resultValue:
+              row.resultValue === null ? null : Number(row.resultValue),
+          })),
+          // No row means off, which is the default and needs no row to say so.
+          pointsEnabled: settings?.enabled ?? false,
+        };
+      },
+    );
+  },
+});
+
+export const feedForwardCycle = defineWriteAction({
+  name: "cycles.feedForward",
+  summary:
+    "Hands METHOD.md §8.9's inheritance to the next cycle: prior scores, carried work as issues at impact four, and the annual frame.",
+  input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
+  output: z.object({
+    priorScores: z.number().int(),
+    issues: z.number().int(),
+    frameCarried: z.boolean(),
+    /** Rows of the mapping this build cannot fill, each naming its task. */
+    waiting: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const result = await feedForwardInTx(
+        tx,
+        workspaceId,
+        input.fromCycleId,
+        input.toCycleId,
+      );
+      return {
+        result: { ...result, waiting: [...result.waiting] },
+        activity: {
+          kind: "cycle.fed_forward" as const,
+          subjectType: "cycle" as const,
+          subjectId: input.toCycleId,
+          payload: {
+            priorScores: result.priorScores,
+            issues: result.issues,
+          },
+        },
+        audit: {
+          action: "cycles.feedForward",
+          targetType: "cycle",
+          targetId: input.toCycleId,
+          payload: {
+            from: input.fromCycleId,
+            priorScores: result.priorScores,
+            issues: result.issues,
           },
         },
       };
