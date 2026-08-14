@@ -140,6 +140,7 @@ import {
   readRecoveryDraft,
   recordKpiValue,
   setKpiFormulaAction,
+  updateKpi,
 } from "./kpis.ts";
 import {
   getNotificationSettings,
@@ -331,6 +332,7 @@ export const ACTION_MAP = {
   "kpis.recoveryBoard": readRecoveryBoard,
   "kpis.tree": readKpiTree,
   "kpis.detail": readKpiDetail,
+  "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

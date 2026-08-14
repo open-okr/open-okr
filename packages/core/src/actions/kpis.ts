@@ -535,6 +535,178 @@ export const setKpiFormulaAction = defineWriteAction({
   }),
 });
 
+export const updateKpi = defineWriteAction({
+  name: "kpis.update",
+  summary:
+    "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
+  input: z.object({
+    kpiId: z.uuid(),
+    title: z.string().trim().min(1).max(500).optional(),
+    unit: z.string().trim().max(60).nullable().optional(),
+    direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+    indicatorType: z.enum(["leading", "lagging"]).optional(),
+    tier: z.enum(KPI_TIERS).optional(),
+    targetDefault: z.number().nullable().optional(),
+    /** Null detaches it, which makes it a root of its own. */
+    parentKpiId: z.uuid().nullable().optional(),
+    treeId: z.uuid().nullable().optional(),
+    categoryId: z.uuid().nullable().optional(),
+    healthyPct: z.number().min(0).max(200).optional(),
+    watchPct: z.number().min(0).max(200).optional(),
+  }),
+  output: z.object({
+    id: z.uuid(),
+    state: z.string(),
+    achievementPct: z.number().nullable(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      await actingMember(tx, workspaceId, context.actor.userId);
+
+      const [existing] = await tx
+        .select({
+          id: kpis.id,
+          healthyPct: kpis.healthyPct,
+          watchPct: kpis.watchPct,
+        })
+        .from(kpis)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        )
+        .limit(1);
+      if (!existing) {
+        throw new OperationError("not_found", "No such KPI.");
+      }
+
+      if (input.parentKpiId === input.kpiId) {
+        // The database refuses it too. This says why rather than surfacing a
+        // constraint name to somebody rearranging a tree.
+        throw new OperationError(
+          "forbidden",
+          "A KPI cannot drive itself. Pick a different parent, or detach it.",
+        );
+      }
+
+      if (input.parentKpiId) {
+        // A cycle would make the recovery walk and the tree render loop
+        // forever. Refused against the graph as it would be, before the write,
+        // the same way P3-T13 refuses a formula cycle.
+        const all = await tx
+          .select({ id: kpis.id, parentKpiId: kpis.parentKpiId })
+          .from(kpis)
+          .where(activeOnly(kpis, eq(kpis.workspaceId, workspaceId)));
+        const parentOf = new Map(
+          all.map((row) => [row.id, row.parentKpiId] as const),
+        );
+        parentOf.set(input.kpiId, input.parentKpiId);
+        const seen = new Set<string>();
+        let cursor: string | null | undefined = input.kpiId;
+        while (cursor) {
+          if (seen.has(cursor)) {
+            throw new OperationError(
+              "forbidden",
+              "That would make the tree loop back on itself. A driver cannot end up driving its own parent.",
+            );
+          }
+          seen.add(cursor);
+          cursor = parentOf.get(cursor) ?? null;
+        }
+      }
+
+      const healthyPct = input.healthyPct ?? Number(existing.healthyPct);
+      const watchPct = input.watchPct ?? Number(existing.watchPct);
+      if (watchPct > healthyPct) {
+        throw new OperationError(
+          "forbidden",
+          "The watch threshold cannot sit above the healthy threshold. Both bands are read from below.",
+        );
+      }
+
+      const set: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.title !== undefined) {
+        set.title = input.title;
+      }
+      if (input.unit !== undefined) {
+        set.unit = input.unit;
+      }
+      if (input.direction !== undefined) {
+        set.direction = input.direction;
+      }
+      if (input.indicatorType !== undefined) {
+        set.indicatorType = input.indicatorType;
+      }
+      if (input.tier !== undefined) {
+        set.tier = input.tier;
+      }
+      if (input.targetDefault !== undefined) {
+        set.targetDefault =
+          input.targetDefault === null ? null : String(input.targetDefault);
+      }
+      if (input.parentKpiId !== undefined) {
+        set.parentKpiId = input.parentKpiId;
+      }
+      if (input.treeId !== undefined) {
+        set.treeId = input.treeId;
+      }
+      if (input.categoryId !== undefined) {
+        set.categoryId = input.categoryId;
+      }
+      if (input.healthyPct !== undefined) {
+        set.healthyPct = String(input.healthyPct);
+      }
+      if (input.watchPct !== undefined) {
+        set.watchPct = String(input.watchPct);
+      }
+
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(kpis)
+        .set(set)
+        .where(
+          activeOnly(
+            kpis,
+            eq(kpis.workspaceId, workspaceId),
+            eq(kpis.id, input.kpiId),
+          ),
+        );
+
+      // Direction, target and the corridor all change what the same records
+      // mean, so the derived columns are recomputed rather than left describing
+      // the KPI as it was before the edit.
+      const recomputed = await recomputeKpi(tx, workspaceId, input.kpiId);
+
+      return {
+        result: {
+          id: input.kpiId,
+          state: recomputed.state,
+          achievementPct: recomputed.achievementPct,
+        },
+        activity: {
+          kind: "kpi.updated" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            fields: Object.keys(set).filter((key) => key !== "updatedAt"),
+          },
+        },
+        audit: {
+          action: "kpis.update",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: {
+            fields: Object.keys(set).filter((key) => key !== "updatedAt"),
+          },
+        },
+      };
+    },
+  }),
+});
+
 export const createKpiTree = defineWriteAction({
   name: "kpis.createTree",
   summary:
@@ -789,7 +961,13 @@ export const readKpiTree = defineReadAction({
   name: "kpis.tree",
   summary:
     "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
-  input: z.object({ treeId: z.uuid().optional() }),
+  /**
+   * Absent means the first tree, which is what a bare visit should show. An
+   * explicit null means the KPIs in no tree at all, which is a real set
+   * somebody has to be able to reach: without it, naming one tree would hide
+   * every unfiled KPI and there would be nothing left to file.
+   */
+  input: z.object({ treeId: z.uuid().nullable().optional() }),
   output: z.object({
     trees: z.array(z.object({ id: z.uuid(), name: z.string() })),
     treeId: z.uuid().nullable(),
@@ -834,7 +1012,8 @@ export const readKpiTree = defineReadAction({
         // No tree named, so the first one. A workspace with none still gets a
         // canvas: every KPI that belongs to no tree is the unfiled set, which
         // is what a workspace looks like straight after an import.
-        const treeId = input.treeId ?? trees[0]?.id ?? null;
+        const treeId =
+          input.treeId === null ? null : (input.treeId ?? trees[0]?.id ?? null);
         const rows = await tx
           .select({
             id: kpis.id,
