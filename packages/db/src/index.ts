@@ -279,6 +279,18 @@ export {
 } from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
+  type PerformanceSnapshotRow,
+  PORTFOLIO_VERDICTS,
+  type PortfolioVerdictValue,
+  performanceSnapshots,
+  type ScorecardSettingsRow,
+  type ScoreEntryRow,
+  SNAPSHOT_OWNER_KINDS,
+  type SnapshotOwnerKind,
+  scorecardSettings,
+  scoreEntries,
+} from "./schema/scorecard.ts";
+export {
   SPACE_ROLES,
   type Space,
   type SpaceMember,
