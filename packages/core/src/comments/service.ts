@@ -181,7 +181,7 @@ export async function listComments<
 >(
   tx: AnyTx<TSchema>,
   workspaceId: string,
-  subjectType: string,
+  subjectType: CommentSubjectType,
   subjectId: string,
 ): Promise<CommentRow[]> {
   const rows = await tx
@@ -190,7 +190,7 @@ export async function listComments<
       subjectType: comments.subjectType,
       subjectId: comments.subjectId,
       authorMemberId: comments.authorMemberId,
-      authorName: workspaceMembers.displayName,
+      authorName: workspaceMembers.name,
       body: comments.body,
       editedAt: comments.editedAt,
       createdAt: comments.createdAt,
