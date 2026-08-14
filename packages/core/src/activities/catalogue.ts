@@ -189,6 +189,18 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // it belongs in the feed beside the objectives it creates.
   "kpi.tree_created": z.object({ name: z.string() }),
   "kpi.updated": z.object({ fields: z.array(z.string()) }),
+  // Closing a cycle out (P3-T15). Both are worth a line in the feed: one
+  // records what happened, the other decides what the next cycle inherits.
+  // `cycle.archived` above is P3-T02's soft delete. This is §8.9's archive,
+  // which records what the cycle achieved, so it is named for what it writes.
+  "cycle.snapshotted": z.object({
+    snapshots: z.number().int(),
+    verdict: z.string().nullable(),
+  }),
+  "cycle.fed_forward": z.object({
+    priorScores: z.number().int(),
+    issues: z.number().int(),
+  }),
   "kpi.recovery_launched": z.object({
     goalId: z.string(),
     keyResults: z.number().int(),

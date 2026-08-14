@@ -110,6 +110,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "scorecard",
+    navigation: [
+      {
+        id: "scorecard",
+        label: "Scorecard",
+        href: "/scorecard",
+        section: "sidebar",
+        // The result of every closed cycle, which is a shared record rather
+        // than a private one: a team that cannot see how the last quarter went
+        // cannot learn from it (P3-T15).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "check-in",
     navigation: [
       {
