@@ -188,6 +188,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // The recovery loop (P3-T14). Launching one is a commitment by the team, so
   // it belongs in the feed beside the objectives it creates.
   "kpi.tree_created": z.object({ name: z.string() }),
+  "kpi.updated": z.object({ fields: z.array(z.string()) }),
   "kpi.recovery_launched": z.object({
     goalId: z.string(),
     keyResults: z.number().int(),

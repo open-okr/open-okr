@@ -431,7 +431,11 @@ async function recomputeScoring<
           );
   let kpisWritten = 0;
   for (const kpi of recovering) {
-    await recomputeKpi(tx as OperationTx, workspaceId, kpi.id, now);
+    // The two transaction types are the same object at run time and differ
+    // only in a schema type parameter neither side uses, so the cast goes
+    // through `unknown`: TypeScript cannot see that `Record<string, never>`
+    // and an inferred schema describe the same client.
+    await recomputeKpi(tx as unknown as OperationTx, workspaceId, kpi.id, now);
     kpisWritten += 1;
   }
 

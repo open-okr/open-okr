@@ -199,6 +199,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "kpi.formula_set": (p) =>
     `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
   "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,
+  "kpi.updated": (p) =>
+    `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
   "kpi.recovery_launched": (p) =>
     `A recovery objective with ${Number(p.keyResults ?? 0)} key result(s) was launched`,
   "check_in.vote_cast": (p) =>
