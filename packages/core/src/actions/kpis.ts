@@ -14,27 +14,33 @@
  */
 import {
   activeOnly,
+  goals,
   KPI_AGGREGATES,
   KPI_DIRECTION_VALUES,
   KPI_FREQUENCY_VALUES,
   KPI_OWNER_KINDS,
   KPI_TIERS,
+  keyResults,
   kpiCategories,
   kpis,
+  kpiTrees,
   newId,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
   setKpiFormula,
 } from "../kpis/formula.ts";
+import { draftRecoveryForKpi, launchRecoveryInTx } from "../kpis/recovery.ts";
 import {
   loadKpiRecords,
   recomputeKpi,
@@ -527,4 +533,413 @@ export const setKpiFormulaAction = defineWriteAction({
       };
     },
   }),
+});
+
+export const createKpiTree = defineWriteAction({
+  name: "kpis.createTree",
+  summary:
+    "Names a driver tree. The parent pointers shape it; this row is the tree itself.",
+  input: z.object({
+    name: z.string().trim().min(1).max(120),
+    rootKpiId: z.uuid().optional(),
+  }),
+  output: z.object({ id: z.uuid(), name: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      await actingMember(tx, workspaceId, context.actor.userId);
+      const id = newId();
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx.insert(kpiTrees).values({
+        id,
+        workspaceId,
+        name: input.name,
+        rootKpiId: input.rootKpiId ?? null,
+      });
+      if (input.rootKpiId) {
+        // The root belongs to the tree it roots. Saying so here means nobody
+        // has to remember a second call.
+        // openokr:allow-mutation: same transaction.
+        await tx
+          .update(kpis)
+          .set({ treeId: id, updatedAt: new Date() })
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, workspaceId),
+              eq(kpis.id, input.rootKpiId),
+            ),
+          );
+      }
+      return {
+        result: { id, name: input.name },
+        activity: {
+          kind: "kpi.tree_created" as const,
+          subjectType: "workspace" as const,
+          subjectId: workspaceId,
+          payload: { name: input.name },
+        },
+        audit: {
+          action: "kpis.createTree",
+          targetType: "kpi_tree",
+          targetId: id,
+          payload: { name: input.name },
+        },
+      };
+    },
+  }),
+});
+
+export const launchKpiRecovery = defineWriteAction({
+  name: "kpis.launchRecovery",
+  summary:
+    "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
+  input: z.object({
+    kpiId: z.uuid(),
+    /** The cycle the objective lives in. The caller resolves the current one. */
+    cycleId: z.uuid(),
+  }),
+  output: z.object({
+    goalId: z.uuid(),
+    keyResultIds: z.array(z.uuid()),
+    startedPct: z.number().nullable(),
+    state: z.string(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const launched = await launchRecoveryInTx(tx, {
+        workspaceId,
+        kpiId: input.kpiId,
+        memberId,
+        cycleId: input.cycleId,
+        spaceId: null,
+        keyResultCap: Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
+      });
+
+      return {
+        result: {
+          goalId: launched.goalId,
+          keyResultIds: [...launched.keyResultIds],
+          startedPct: launched.startedPct,
+          state: "recovering",
+        },
+        activity: {
+          kind: "kpi.recovery_launched" as const,
+          subjectType: "kpi" as const,
+          subjectId: input.kpiId,
+          payload: {
+            goalId: launched.goalId,
+            keyResults: launched.keyResultIds.length,
+          },
+        },
+        audit: {
+          action: "kpis.launchRecovery",
+          targetType: "kpi",
+          targetId: input.kpiId,
+          payload: { goalId: launched.goalId },
+        },
+      };
+    },
+  }),
+});
+
+export const readRecoveryBoard = defineReadAction({
+  name: "kpis.recoveryBoard",
+  summary:
+    "Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19.",
+  input: z.object({}),
+  output: z.object({
+    cards: z.array(
+      z.object({
+        kpiId: z.uuid(),
+        shortId: z.string(),
+        title: z.string(),
+        treeId: z.uuid().nullable(),
+        treeName: z.string().nullable(),
+        state: z.string(),
+        achievementPct: z.number().nullable(),
+        effectivePct: z.number().nullable(),
+        healthyPct: z.number(),
+        watchPct: z.number(),
+        unit: z.string().nullable(),
+        recovery: z
+          .object({
+            goalId: z.uuid(),
+            title: z.string(),
+            progressPct: z.number(),
+            closed: z.boolean(),
+            keyResults: z.number().int(),
+            startedPct: z.number().nullable(),
+            closeProposed: z.boolean(),
+          })
+          .nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // METHOD.md §6.6: one list across every tree, unhealthy or recovering.
+        // A healthy KPI is not on the board, which is what stops it becoming a
+        // second grid nobody reads.
+        const rows = await tx
+          .select({
+            id: kpis.id,
+            shortId: kpis.shortId,
+            title: kpis.title,
+            treeId: kpis.treeId,
+            treeName: kpiTrees.name,
+            state: kpis.state,
+            achievementPct: kpis.achievementPct,
+            effectivePct: kpis.effectivePct,
+            healthyPct: kpis.healthyPct,
+            watchPct: kpis.watchPct,
+            unit: kpis.unit,
+            recoveryGoalId: kpis.recoveryGoalId,
+            recoveryStartedPct: kpis.recoveryStartedPct,
+            recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
+            goalTitle: goals.title,
+            goalProgress: goals.progressPct,
+            goalClosedAt: goals.closedAt,
+          })
+          .from(kpis)
+          .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
+          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              inArray(kpis.state, ["unhealthy", "recovering"]),
+            ),
+          )
+          .orderBy(asc(kpis.title));
+
+        const counts = new Map<string, number>();
+        const goalIds = rows
+          .map((row) => row.recoveryGoalId)
+          .filter((id): id is string => id !== null);
+        if (goalIds.length > 0) {
+          const keyResultRows = await tx
+            .select({ id: keyResults.id, goalId: keyResults.goalId })
+            .from(keyResults)
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, context.workspaceId),
+                inArray(keyResults.goalId, goalIds),
+              ),
+            );
+          for (const row of keyResultRows) {
+            counts.set(row.goalId, (counts.get(row.goalId) ?? 0) + 1);
+          }
+        }
+
+        return {
+          cards: rows.map((row) => ({
+            kpiId: row.id,
+            shortId: row.shortId,
+            title: row.title,
+            treeId: row.treeId,
+            treeName: row.treeName,
+            state: row.state,
+            achievementPct:
+              row.achievementPct === null ? null : Number(row.achievementPct),
+            effectivePct:
+              row.effectivePct === null ? null : Number(row.effectivePct),
+            healthyPct: Number(row.healthyPct),
+            watchPct: Number(row.watchPct),
+            unit: row.unit,
+            recovery:
+              row.recoveryGoalId && row.goalTitle
+                ? {
+                    goalId: row.recoveryGoalId,
+                    title: row.goalTitle,
+                    progressPct: Number(row.goalProgress ?? 0),
+                    closed: row.goalClosedAt !== null,
+                    keyResults: counts.get(row.recoveryGoalId) ?? 0,
+                    startedPct:
+                      row.recoveryStartedPct === null
+                        ? null
+                        : Number(row.recoveryStartedPct),
+                    closeProposed: row.recoveryCloseProposedAt !== null,
+                  }
+                : null,
+          })),
+        };
+      },
+    );
+  },
+});
+
+export const readKpiTree = defineReadAction({
+  name: "kpis.tree",
+  summary:
+    "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
+  input: z.object({ treeId: z.uuid().optional() }),
+  output: z.object({
+    trees: z.array(z.object({ id: z.uuid(), name: z.string() })),
+    treeId: z.uuid().nullable(),
+    nodes: z.array(
+      z.object({
+        id: z.uuid(),
+        parentKpiId: z.uuid().nullable(),
+        title: z.string(),
+        unit: z.string().nullable(),
+        indicatorType: z.string(),
+        tier: z.string(),
+        direction: z.string(),
+        state: z.string(),
+        achievementPct: z.number().nullable(),
+        effectivePct: z.number().nullable(),
+        healthyPct: z.number(),
+        watchPct: z.number(),
+        targetDefault: z.number().nullable(),
+        recoveryGoalId: z.uuid().nullable(),
+        recoveryProgressPct: z.number().nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const trees = await tx
+          .select({ id: kpiTrees.id, name: kpiTrees.name })
+          .from(kpiTrees)
+          .where(
+            activeOnly(kpiTrees, eq(kpiTrees.workspaceId, context.workspaceId)),
+          )
+          .orderBy(asc(kpiTrees.position), asc(kpiTrees.name));
+
+        // No tree named, so the first one. A workspace with none still gets a
+        // canvas: every KPI that belongs to no tree is the unfiled set, which
+        // is what a workspace looks like straight after an import.
+        const treeId = input.treeId ?? trees[0]?.id ?? null;
+        const rows = await tx
+          .select({
+            id: kpis.id,
+            parentKpiId: kpis.parentKpiId,
+            title: kpis.title,
+            unit: kpis.unit,
+            indicatorType: kpis.indicatorType,
+            tier: kpis.tier,
+            direction: kpis.direction,
+            state: kpis.state,
+            achievementPct: kpis.achievementPct,
+            effectivePct: kpis.effectivePct,
+            healthyPct: kpis.healthyPct,
+            watchPct: kpis.watchPct,
+            targetDefault: kpis.targetDefault,
+            recoveryGoalId: kpis.recoveryGoalId,
+            recoveryProgress: goals.progressPct,
+            position: kpis.position,
+          })
+          .from(kpis)
+          .leftJoin(goals, eq(goals.id, kpis.recoveryGoalId))
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              treeId === null ? isNull(kpis.treeId) : eq(kpis.treeId, treeId),
+            ),
+          )
+          .orderBy(asc(kpis.position), asc(kpis.title));
+
+        return {
+          trees,
+          treeId,
+          nodes: rows.map((row) => ({
+            id: row.id,
+            parentKpiId: row.parentKpiId,
+            title: row.title,
+            unit: row.unit,
+            indicatorType: row.indicatorType,
+            tier: row.tier,
+            direction: row.direction,
+            state: row.state,
+            achievementPct:
+              row.achievementPct === null ? null : Number(row.achievementPct),
+            effectivePct:
+              row.effectivePct === null ? null : Number(row.effectivePct),
+            healthyPct: Number(row.healthyPct),
+            watchPct: Number(row.watchPct),
+            targetDefault:
+              row.targetDefault === null ? null : Number(row.targetDefault),
+            recoveryGoalId: row.recoveryGoalId,
+            recoveryProgressPct:
+              row.recoveryProgress === null
+                ? null
+                : Number(row.recoveryProgress),
+          })),
+        };
+      },
+    );
+  },
+});
+
+export const readRecoveryDraft = defineReadAction({
+  name: "kpis.recoveryDraft",
+  summary:
+    "The recovery objective a KPI would get, so it can be read before it is committed to.",
+  input: z.object({ kpiId: z.uuid() }),
+  output: z
+    .object({
+      objective: z.string(),
+      keyResults: z.array(
+        z.object({
+          title: z.string(),
+          direction: z.string(),
+          baseline: z.number(),
+          target: z.number(),
+          ownerMemberId: z.uuid().nullable(),
+          sourceKpiId: z.uuid().nullable(),
+        }),
+      ),
+    })
+    .nullable(),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const rhythm = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const draft = await draftRecoveryForKpi(
+          tx,
+          context.workspaceId,
+          input.kpiId,
+          Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
+        );
+        return draft
+          ? { objective: draft.objective, keyResults: [...draft.keyResults] }
+          : null;
+      },
+    );
+  },
 });
