@@ -131,9 +131,16 @@ import {
 import {
   createKpi,
   createKpiCategory,
+  createKpiTree,
+  launchKpiRecovery,
+  readKpiDetail,
   readKpiGrid,
+  readKpiTree,
+  readRecoveryBoard,
+  readRecoveryDraft,
   recordKpiValue,
   setKpiFormulaAction,
+  updateKpi,
 } from "./kpis.ts";
 import {
   getNotificationSettings,
@@ -319,6 +326,13 @@ export const ACTION_MAP = {
   "kpis.record": recordKpiValue,
   "kpis.grid": readKpiGrid,
   "kpis.setFormula": setKpiFormulaAction,
+  "kpis.createTree": createKpiTree,
+  "kpis.launchRecovery": launchKpiRecovery,
+  "kpis.recoveryDraft": readRecoveryDraft,
+  "kpis.recoveryBoard": readRecoveryBoard,
+  "kpis.tree": readKpiTree,
+  "kpis.detail": readKpiDetail,
+  "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

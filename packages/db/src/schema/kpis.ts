@@ -63,6 +63,28 @@ export type KpiOwnerKind = (typeof KPI_OWNER_KINDS)[number];
 export const KPI_SHARE_ACCESS = ["read", "update"] as const;
 export type KpiShareAccess = (typeof KPI_SHARE_ACCESS)[number];
 
+export const kpiTrees = pgTable("kpi_trees", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: jsonb("description"),
+  descriptionVersion: integer("description_version"),
+  /** Nullable: a tree is named before anybody decides what sits at the top. */
+  rootKpiId: uuid("root_kpi_id"),
+  position: integer("position").notNull().default(0),
+  legacyType: text("legacy_type"),
+  legacyId: text("legacy_id"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
 export const kpiCategories = pgTable("kpi_categories", {
   id: uuid("id").primaryKey().$defaultFn(newId),
   workspaceId: uuid("workspace_id")
@@ -87,8 +109,10 @@ export const kpis = pgTable("kpis", {
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   shortId: text("short_id").notNull(),
-  /** No foreign key: P3-T14 decides whether a tree is a row or a parent chain. */
-  treeId: uuid("tree_id"),
+  /** The named tree this KPI belongs to. The parent chain shapes it (P3-T14). */
+  treeId: uuid("tree_id").references(() => kpiTrees.id, {
+    onDelete: "set null",
+  }),
   categoryId: uuid("category_id").references(() => kpiCategories.id, {
     onDelete: "set null",
   }),
@@ -135,6 +159,13 @@ export const kpis = pgTable("kpis", {
     onDelete: "set null",
   }),
   recoveryStartedPct: numeric("recovery_started_pct"),
+  /**
+   * When the closure proposal was raised, so §6.5's "exactly once" has
+   * somewhere to remember it. Cleared on launch and on close.
+   */
+  recoveryCloseProposedAt: timestamp("recovery_close_proposed_at", {
+    withTimezone: true,
+  }),
   startsOn: date("starts_on"),
   endsOn: date("ends_on"),
   position: integer("position").notNull().default(0),
@@ -227,6 +258,7 @@ export const kpiDependencies = pgTable("kpi_dependencies", {
 });
 
 export type KpiDependencyRow = typeof kpiDependencies.$inferSelect;
+export type KpiTreeRow = typeof kpiTrees.$inferSelect;
 export type KpiCategoryRow = typeof kpiCategories.$inferSelect;
 export type KpiRow = typeof kpis.$inferSelect;
 export type KpiRecordRow = typeof kpiRecords.$inferSelect;
