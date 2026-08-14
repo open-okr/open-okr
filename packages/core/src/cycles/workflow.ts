@@ -88,62 +88,68 @@ export async function loadWorkflowInput<
 ): Promise<CycleWorkflowInput> {
   const cycleId = cycle.id;
 
-  const [packItems, priorScores, issues, priorities, focusRows] =
-    await Promise.all([
-      tx
-        .select({
-          itemKey: cyclePackItems.itemKey,
-          gathered: cyclePackItems.gathered,
-        })
-        .from(cyclePackItems)
-        .where(
-          activeOnly(
-            cyclePackItems,
-            eq(cyclePackItems.workspaceId, workspaceId),
-            eq(cyclePackItems.cycleId, cycleId),
-          ),
-        ),
-      tx
-        .select({ score: cyclePriorScores.score })
-        .from(cyclePriorScores)
-        .where(
-          activeOnly(
-            cyclePriorScores,
-            eq(cyclePriorScores.workspaceId, workspaceId),
-            eq(cyclePriorScores.cycleId, cycleId),
-          ),
-        ),
-      tx
-        .select({ impact: cycleIssues.impact })
-        .from(cycleIssues)
-        .where(
-          activeOnly(
-            cycleIssues,
-            eq(cycleIssues.workspaceId, workspaceId),
-            eq(cycleIssues.cycleId, cycleId),
-          ),
-        ),
-      tx
-        .select({ successStatement: cyclePriorities.successStatement })
-        .from(cyclePriorities)
-        .where(
-          activeOnly(
-            cyclePriorities,
-            eq(cyclePriorities.workspaceId, workspaceId),
-            eq(cyclePriorities.cycleId, cycleId),
-          ),
-        ),
-      tx
-        .select({ id: cycleFocusKeyResults.id })
-        .from(cycleFocusKeyResults)
-        .where(
-          activeOnly(
-            cycleFocusKeyResults,
-            eq(cycleFocusKeyResults.workspaceId, workspaceId),
-            eq(cycleFocusKeyResults.cycleId, cycleId),
-          ),
-        ),
-    ]);
+  // One await per query, deliberately, and never `Promise.all`. A transaction
+  // is a single connection: five queries started together on it do not run in
+  // parallel, they queue inside the driver, and `pg` 9 removes that queue and
+  // throws on the second one instead. Sequential costs nothing here because the
+  // queue was serialising them anyway.
+  const packItems = await tx
+    .select({
+      itemKey: cyclePackItems.itemKey,
+      gathered: cyclePackItems.gathered,
+    })
+    .from(cyclePackItems)
+    .where(
+      activeOnly(
+        cyclePackItems,
+        eq(cyclePackItems.workspaceId, workspaceId),
+        eq(cyclePackItems.cycleId, cycleId),
+      ),
+    );
+
+  const priorScores = await tx
+    .select({ score: cyclePriorScores.score })
+    .from(cyclePriorScores)
+    .where(
+      activeOnly(
+        cyclePriorScores,
+        eq(cyclePriorScores.workspaceId, workspaceId),
+        eq(cyclePriorScores.cycleId, cycleId),
+      ),
+    );
+
+  const issues = await tx
+    .select({ impact: cycleIssues.impact })
+    .from(cycleIssues)
+    .where(
+      activeOnly(
+        cycleIssues,
+        eq(cycleIssues.workspaceId, workspaceId),
+        eq(cycleIssues.cycleId, cycleId),
+      ),
+    );
+
+  const priorities = await tx
+    .select({ successStatement: cyclePriorities.successStatement })
+    .from(cyclePriorities)
+    .where(
+      activeOnly(
+        cyclePriorities,
+        eq(cyclePriorities.workspaceId, workspaceId),
+        eq(cyclePriorities.cycleId, cycleId),
+      ),
+    );
+
+  const focusRows = await tx
+    .select({ id: cycleFocusKeyResults.id })
+    .from(cycleFocusKeyResults)
+    .where(
+      activeOnly(
+        cycleFocusKeyResults,
+        eq(cycleFocusKeyResults.workspaceId, workspaceId),
+        eq(cycleFocusKeyResults.cycleId, cycleId),
+      ),
+    );
 
   const [baseline] = await tx
     .select({

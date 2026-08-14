@@ -6,6 +6,7 @@ import {
 } from "@openokr/db";
 import { canonThresholds, phaseWorkAllowed } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
+import { measureQueryOverlap } from "@openokr/test-support/query-overlap";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -132,6 +133,16 @@ describe("the input pack rows", () => {
 });
 
 describe("the snapshot handed to the rules", () => {
+  it("runs one query at a time on the transaction's own connection", async () => {
+    // A transaction is one connection. Starting a second query on it before
+    // the first has answered works today only because `pg` 8 queues it, and
+    // that queue is deprecated: `pg` 9 throws instead. The snapshot load is
+    // the widest read in this package, so it is where the rule is proved.
+    const { overlap } = await measureQueryOverlap(() => snapshot());
+    expect(overlap.queries).toBeGreaterThan(0);
+    expect(overlap.peak).toBe(1);
+  });
+
   it("reads a fresh cycle as quarterly, unpublished and unprepared", async () => {
     const { input } = await snapshot();
     expect(input.mode).toBe("quarterly");
