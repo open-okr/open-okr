@@ -1,25 +1,80 @@
-# Phase 4 split: Agung and Obed
+# The work split: Agung and Obed
 
-Who takes which task in Phase 4, what can run at the same time, and what has to
-wait. Written 2026-08-14.
+Who takes which task, what can run at the same time, and what has to wait.
+Covers the rest of Phase 3 and all of Phase 4. Written 2026-08-14.
 
 `IMPLEMENTATION-PLAN.md` is the authority. This file only reads its dependency
 lines and turns them into two lanes. If the two ever disagree, the plan wins and
 this file gets fixed.
 
-## Read this first
+## Phase 3: the last four tasks
 
-Phase 4 has not started and cannot start yet. Two things gate it.
+| Task | Size | Owner | Depends on | Can start |
+|---|---|---|---|---|
+| P3-T14 KPI trees, corridors, recovery OKRs | L | **Agung** | P3-T13, P3-T05 | Now |
+| P3-T15 Scorecard, cycle archive and feed-forward | M | **Agung** | P3-T05, P3-T12 | Now |
+| P3-T16 Comments, reactions and discussion wiring | M | **Obed** | P3-T01, P2-T07 | Now |
+| P3-T17 Demo workspace builder and seed | M | **Obed** | P3-T15 | After Agung's P3-T15 |
+
+Three of the four can start today. Only P3-T17 waits, and it waits on the other
+lane.
+
+### Two things about P3-T17 worth settling before it starts
+
+**Its declared dependency understates what it needs.** The plan lists P3-T15
+only, but its own deliverables name "KPI trees with one unhealthy KPI and an
+active recovery OKR", which is P3-T14's work. In practice P3-T17 needs both of
+Agung's tasks finished, not one.
+
+**It also inherits a Phase 1 follow-up.** The first-run wizard is specified to
+offer demo data and does not. That offer lands with the seed, per the note on
+the P3-T17 row in `STATUS.md`.
+
+### Migration numbers, agreed up front
+
+The last migration in the tree is 0027. Both lanes add one, and two people
+picking a number independently will collide.
+
+| Task | Migration | Holds |
+|---|---|---|
+| P3-T14 | 0028 | KPI trees, recovery columns |
+| P3-T16 | 0029 | Comments and reactions |
+
+Whoever lands second checks the number is still free before writing the file.
+
+### The leftovers on the `in_review` rows
+
+Four Phase 3 rows are `in_review` with named work still outstanding. They follow
+the subject, not the row number.
+
+| Leftover | Sits on row | Owner | Why |
+|---|---|---|---|
+| The formula builder screen | P3-T13 | Agung | P3-T14's own card already lists it under the KPI detail |
+| Row sparklines, category subtotals, per-frequency columns, filters, `kpi_shares` | P3-T12 | Agung | Same KPI surfaces P3-T14 rebuilds |
+| Sparkline overlapping its row, the sparse-data forecast question | P3-T10 | Obed | Goal-page layout, next to the comment wiring |
+| Work Map virtualisation, scope tabs, KPI tiles | P3-T11 | Obed | Same tree P3-T16 hangs comments off. KPI tiles wait for P3-T14 |
+
+### One open question for the human
+
+The forecast is faithful arithmetic and poor advice on sparse data: three values
+inside two days, projected six weeks out, reads 672 for a key result whose
+target is 60. Whether METHOD.md §3.6 should require a minimum span before a
+forecast is shown at all is a practice decision, not a developer's.
+
+## Phase 4: read this first
+
+Phase 4 cannot start yet. Two things gate it.
 
 | Gate | State on 2026-08-14 |
 |---|---|
-| Phase 3 complete | Not yet. P3-T14, P3-T15, P3-T16 and P3-T17 are `todo`, and P3-T10 to P3-T13 are `in_review` with named leftovers |
+| Phase 3 complete | The four tasks above |
 | P4-T00 design gate approved | Not written. It needs an explicit "design approved" from the human, with the rule corpus and trigger catalogue reviewed line by line |
 
 One task is exempt. **P4-T13 depends on P2-T15 only**, which shipped in Phase 2,
-so it can start today without touching anything Phase 3 still owes.
+so it can start today without touching anything Phase 3 still owes. That makes
+it the natural landing place for whoever finishes their Phase 3 lane first.
 
-## The dependency map
+## The Phase 4 dependency map
 
 | Task | Size | Depends on | Unblocks |
 |---|---|---|---|
@@ -43,36 +98,39 @@ so it can start today without touching anything Phase 3 still owes.
 Two lanes are genuinely independent. The retrieval lane (T13, then T14) shares
 nothing with the coaching lane (T01 through T12). They meet once, at T15.
 
-## The split
+## The Phase 4 split
 
-**Agung takes the method core and the sessions. Obed takes retrieval, the
-coach surfaces and the agents.**
+**Agung takes the method core and the sessions. Obed takes retrieval, the coach
+surfaces and the agents.**
 
-The reasoning: the session chain is seven tasks that cannot be split, so it
-belongs to one person from the start. The retrieval lane needs the least
-knowledge of existing Phase 3 code, so it is the cleanest place for a second
-person to begin. Obed then keeps everything that builds on the AI plumbing he
-wrote.
+The reasoning: the session chain is six tasks that cannot be split, so it belongs
+to one person from the start. The retrieval lane needs the least knowledge of
+existing Phase 3 code. Obed then keeps everything that builds on the AI plumbing
+he wrote.
 
 | Stage | Agung | Obed | Runs at the same time? |
 |---|---|---|---|
-| 0 | Finish Phase 3: P3-T14, T15, T16, T17 and the leftovers | **P4-T13 embeddings and retrieval** | Yes, starting today |
-| 1 | P4-T00 design gate, then wait for approval | P4-T13, then P4-T14 copilot | Yes |
+| 0 | P3-T14, then P3-T15 | P3-T16, then P3-T17 once P3-T15 lands | Yes, except P3-T17 |
+| 1 | P4-T00 design gate, then wait for approval | **P4-T13 embeddings and retrieval** | Yes |
 | 2 | P4-T01 method package | P4-T14 copilot | Yes |
 | 3 | P4-T04 nudge engine | P4-T02 Draft Coach, then P4-T03 publish gates | Yes |
 | 4 | P4-T07, T08, T09, T10, T11, T12 in that order | P4-T05 Champion, then P4-T06 Coach, then P4-T15 assists | Yes |
 
-Final tally: nine tasks for Agung, seven for Obed, and five of Obed's seven are
-size L, so the load is closer than the count suggests.
+Across both phases: eleven tasks for Agung, nine for Obed, and five of Obed's
+are size L, so the load is closer than the count suggests.
+
+If Obed finishes P3-T16 before Agung finishes P3-T15, he starts P4-T13 rather
+than waiting. It is the one Phase 4 task with no Phase 3 dependency at all.
 
 ### Handoffs
 
-Only two moments where one lane waits on the other.
+Three moments where one lane waits on the other.
 
 | Handoff | From | To | What has to be true |
 |---|---|---|---|
-| T01 to T02 | Agung | Obed | The method package exports the twenty-six-check catalogue and the threshold registry, and its conformance suite passes |
-| T04 to T05 | Agung | Obed | The nudge table, the rule registry and the escalation ladders are in, with the trigger catalogue resolving rule keys |
+| P3-T15 to P3-T17 | Agung | Obed | The archive writes performance snapshots and the feed-forward opens the next cycle. In practice P3-T14 also has to be in, because the demo seeds a KPI tree with a live recovery OKR |
+| P4-T01 to P4-T02 | Agung | Obed | The method package exports the twenty-six-check catalogue and the threshold registry, and its conformance suite passes |
+| P4-T04 to P4-T05 | Agung | Obed | The nudge table, the rule registry and the escalation ladders are in, with the trigger catalogue resolving rule keys |
 
 Everything else inside a lane is that lane's own business.
 
@@ -80,16 +138,22 @@ Everything else inside a lane is that lane's own business.
 
 | Area | Owner | Note |
 |---|---|---|
-| `packages/method` | Agung during T01, shared after | Nobody else edits it while T01 is open. After that, any change is a message to the other lane, because both read it |
-| `packages/agents` | Obed | T05 and T06 |
-| `packages/adapters` ai and embedding drivers | Obed | T13 |
-| Session tables and screens S-22 to S-25 | Agung | T07 to T12 |
-| Nudge tables, review-inbox surfaces, admin S-36 nudge card | Agung | T04 |
-| Goal page coach strip, drafting surface S-09, alignment studio review tab | Obed | T02 and T06 both write here, and both are Obed's |
-| Copilot panel S-39 | Obed | T14 |
+| `packages/method` KPI rules | Agung | P3-T14 |
+| `packages/method` everything else | Agung during P4-T01, shared after | Nobody else edits it while T01 is open. After that, any change is a message to the other lane, because both read it |
+| KPI screens S-18, S-19, S-20, S-21 | Agung | P3-T14 |
+| Cycle archive, scorecard, feed-forward | Agung | P3-T15 |
+| Comment and reaction tables and every surface that renders them | Obed | P3-T16 |
+| The demo builder and `pnpm db:seed` | Obed | P3-T17. It reads everything and owns nothing, so it lands last |
+| `packages/agents` | Obed | P4-T05, P4-T06 |
+| `packages/adapters` ai and embedding drivers | Obed | P4-T13 |
+| Session tables and screens S-22 to S-25 | Agung | P4-T07 to T12 |
+| Nudge tables, review-inbox surfaces, admin S-36 nudge card | Agung | P4-T04 |
+| Goal page coach strip, drafting surface S-09, alignment studio review tab | Obed | P4-T02 and P4-T06 both write here, and both are his |
+| Copilot panel S-39 | Obed | P4-T14 |
 
-The one shared file with a real collision risk is `packages/method`. Everything
-else lands in one lane or the other.
+Two shared files carry a real collision risk: `packages/method`, and the goal
+page, where P3-T16 hangs comments on a page P3-T14 does not touch but P4-T02
+later rewrites. Everything else lands in one lane or the other.
 
 ## Two decisions the human has to make
 
@@ -103,21 +167,13 @@ to one branch without stepping on each other. The options:
 | A shared `phase4` integration branch both merge into | One more branch to keep green, and a defined delivery point for each handoff |
 | Two git worktrees over the same clone | No extra branches, but two working directories and two node module trees on one machine |
 
-**2. Who takes the long chain.** T01 to T12 is eight tasks deep and mostly size
-L. It sets the floor for how long Phase 4 takes no matter how many people work
-on it. The split above gives it to Agung. Swap the lanes if Obed has more time.
+This one is now urgent rather than theoretical: both lanes start work in Phase 3,
+today.
 
-## What blocks what, outside Phase 4
-
-| Blocker | Blocks | Why |
-|---|---|---|
-| P3-T15 scorecard and feed-forward | P4-T12 | The minutes task writes back through the feed-forward that P3-T15 builds |
-| P3-T04 goals and key results | P4-T02 | Already done |
-| P3-T03, P3-T07, P3-T08 | P4-T03, P4-T07, P4-T04 | Already done |
-| P1-T07 | P4-T14 | Already done |
-
-So the only outstanding cross-phase blocker for this split is P3-T15, and it
-sits at the very end of Agung's lane.
+**2. Who takes the long chain.** P4-T01 to P4-T12 is eight tasks deep and mostly
+size L. It sets the floor for how long Phase 4 takes no matter how many people
+work on it. The split above gives it to Agung. Swap the lanes if Obed has more
+time.
 
 ## AI credentials: what needs them and when
 
@@ -130,7 +186,7 @@ for building the product.
 | P4-T13 | An embedding provider, or a local embedding model | First. This is the earliest task that cannot be finished without one |
 | P4-T14 | A chat provider, for streaming answers | After T13 |
 | P4-T05, P4-T06, P4-T15 | A chat provider, to verify drafting and rewriting | Stage 4 |
-| P4-T01 to P4-T04, P4-T07 to P4-T12 | Nothing | These are deterministic by design |
+| Everything in Phase 3, and P4-T01 to P4-T04, P4-T07 to P4-T12 | Nothing | These are deterministic by design |
 
 Before storing a key: set `OPENOKR_ENCRYPTION_KEY` in `apps/web/.env`. Without
 it a fresh root key is generated on every process start, so anything sealed
