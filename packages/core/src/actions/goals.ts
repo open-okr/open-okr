@@ -29,7 +29,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -59,6 +59,7 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
+import { recomputeAlignmentFor } from "./alignment.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const richText = z
@@ -173,6 +174,48 @@ async function recompute(
 ): Promise<void> {
   const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
   await recomputeForGoal(tx, workspaceId, goalId, rhythm.thresholds);
+}
+
+/**
+ * Recomputes the alignment score for every scope this goal sits in (P3-T09).
+ *
+ * Deliberately separate from `recompute` above, and called from fewer places.
+ * METHOD.md §5.2 measures structure: who hangs off whom, who has key results at
+ * all, who is linked sideways. A score that moved when a value moved would be
+ * measuring something else, so publishing a check-in and recording a value do
+ * not call this and must not start.
+ *
+ * The design document drives this from the outbox. There is still no relay host,
+ * so it runs in the writing transaction, which is the same call P3-T05 made and
+ * the stronger guarantee besides.
+ */
+async function realign(
+  tx: OperationTx,
+  workspaceId: string,
+  goalId: string,
+  alsoCycleId?: string | null,
+): Promise<void> {
+  const [goal] = await tx
+    .select({ cycleId: goals.cycleId, spaceId: goals.spaceId })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, workspaceId),
+        eq(goals.id, goalId),
+      ),
+    )
+    .limit(1);
+  if (!goal) {
+    return;
+  }
+  const touched = [goal];
+  if (alsoCycleId && alsoCycleId !== goal.cycleId) {
+    // Moving a goal between cycles changes two pictures, not one: the cycle it
+    // left has one goal fewer to hang together.
+    touched.push({ cycleId: alsoCycleId, spaceId: goal.spaceId });
+  }
+  await recomputeAlignmentFor(tx, workspaceId, touched);
 }
 
 /** The level the acting member holds on one goal, or not-found. */
@@ -876,6 +919,7 @@ export const createGoal = defineWriteAction({
         new Date(),
       );
       await recompute(tx, workspaceId, created.id);
+      await realign(tx, workspaceId, created.id);
 
       return {
         result: { id: created.id, title: created.title },
@@ -1027,6 +1071,11 @@ export const updateGoal = defineWriteAction({
         );
       }
       await recompute(tx, workspaceId, updated.id);
+      // An update can move the parent, the level or the owning space, and all
+      // three are what the score reads. It can also move only a title, and
+      // recomputing then costs one query set and keeps this honest without a
+      // list of fields to forget to extend.
+      await realign(tx, workspaceId, updated.id);
 
       return {
         result: { id: updated.id },
@@ -1100,6 +1149,10 @@ export const closeGoal = defineWriteAction({
       // report an archive as neglected.
       await clearDue(tx, workspaceId, input.id);
       await recompute(tx, workspaceId, input.id);
+      // A closed goal still counts (decision D-11), so the score does not climb
+      // as a cycle ends. It is recomputed anyway because closing can change what
+      // the surface shows beside it.
+      await realign(tx, workspaceId, input.id);
 
       return {
         result: { id: input.id, successStatus: input.successStatus },
@@ -1159,6 +1212,7 @@ export const reopenGoal = defineWriteAction({
         new Date(),
       );
       await recompute(tx, workspaceId, input.id);
+      await realign(tx, workspaceId, input.id);
 
       return {
         result: { id: input.id },
@@ -1297,6 +1351,21 @@ export const moveGoalToCycle = defineWriteAction({
         );
       }
 
+      // The cycle it is leaving, read before the update. `returning` gives the
+      // new values, and the cycle it left has one goal fewer to hang together,
+      // so its own score has to be recomputed too (P3-T09).
+      const [before] = await tx
+        .select({ cycleId: goals.cycleId })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+
       const [moved] = await tx
         .update(goals)
         .set({ cycleId: input.cycleId, timeframe: null, updatedAt: new Date() })
@@ -1313,6 +1382,7 @@ export const moveGoalToCycle = defineWriteAction({
       }
 
       await recompute(tx, workspaceId, moved.id);
+      await realign(tx, workspaceId, moved.id, before?.cycleId ?? null);
 
       return {
         result: { id: moved.id, cycleId: input.cycleId },
@@ -1388,6 +1458,24 @@ export const createKeyResult = defineWriteAction({
       });
 
       await recompute(tx, workspaceId, input.goalId);
+
+      // Only when the count crosses zero (design §7). KR-1 fires at none and at
+      // nothing else, so the second key result changes no penalty and the third
+      // changes no penalty, and recomputing the whole scope for them would be
+      // work with no possible effect.
+      const [{ count } = { count: 0 }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, input.goalId),
+          ),
+        );
+      if (count === 1) {
+        await realign(tx, workspaceId, input.goalId);
+      }
 
       return {
         result: { id: created.id },

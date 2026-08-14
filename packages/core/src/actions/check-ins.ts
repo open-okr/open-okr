@@ -18,7 +18,6 @@ import {
   checkInSnapshots,
   checkIns,
   checkInVotes,
-  goals,
   keyResults,
   withContext,
   workspaceMembers,
@@ -481,37 +480,30 @@ export const acknowledgeCheckIn = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      const [goal] = await tx
-        .select({ reviewerId: goals.reviewerId })
-        .from(goals)
-        .where(
-          activeOnly(
-            goals,
-            eq(goals.workspaceId, workspaceId),
-            eq(goals.id, goalId),
-          ),
-        )
+      const [checkIn] = await tx
+        .select({
+          state: checkIns.state,
+          acknowledgedAt: checkIns.acknowledgedAt,
+          reviewerMemberId: checkIns.reviewerMemberId,
+        })
+        .from(checkIns)
+        .where(activeOnly(checkIns, eq(checkIns.id, input.id)))
         .limit(1);
-      if (!goal) {
-        throw new OperationError("not_found", "No such goal.");
-      }
-      if (goal.reviewerId !== memberId) {
-        // §6.5, and an administrator is refused like anybody else. Closing
-        // somebody else's loop is not an administrative convenience.
+
+      // §6.5, and an administrator is refused like anybody else. Closing
+      // somebody else's loop is not an administrative convenience.
+      //
+      // The reviewer **of record** on the check-in, not `goals.reviewer_id`
+      // (P3-T08). Those two agree while an obligation is open, because
+      // reassignment moves both, and they part company the moment the loop is
+      // closed: the acknowledged row keeps the member who actually closed it,
+      // which is what makes the trail readable a year later.
+      if (checkIn && checkIn.reviewerMemberId !== memberId) {
         throw new OperationError(
           "forbidden",
           "Only this goal's reviewer can acknowledge its check-ins. Reassign the reviewer first if that needs to change.",
         );
       }
-
-      const [checkIn] = await tx
-        .select({
-          state: checkIns.state,
-          acknowledgedAt: checkIns.acknowledgedAt,
-        })
-        .from(checkIns)
-        .where(activeOnly(checkIns, eq(checkIns.id, input.id)))
-        .limit(1);
       if (checkIn?.state !== "published") {
         throw new OperationError(
           "forbidden",

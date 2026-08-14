@@ -233,12 +233,32 @@ At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the
 `key_result_id` to key_results, `value numeric`, `at`, `author_member_id` to workspace_members, `check_in_id?` to check_ins, `source` (`manual` / `check_in` / `kpi` / `import` / `agent`).
 
 ### check_ins
-`subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot jsonb`, `session_id?` to sessions, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.
+`subject_type` (`goal`), `subject_id`, `author_member_id` to workspace_members, `state` (`draft` / `published`), `published_at?`, `status` (`on_track` / `caution` / `off_track`), `confidence numeric?`, `narrative` (rich), `snapshot_id?` to check_in_snapshots, `session_id?` to sessions, `reviewer_member_id?` to workspace_members, `acknowledged_by_id?` to workspace_members, `acknowledged_at?`, `ai_drafted bool`.
 
-The snapshot is immutable and holds, per key result at publish time: identifier, value, previous value, progress percentage, confidence and previous confidence.
+`reviewer_member_id` is the reviewer as of publication, and it is what the review inbox reads. A reassignment moves it only while the check-in is unacknowledged, so a closed loop keeps the member who closed it (P3-T08).
+
+### check_in_snapshots
+`check_in_id` to check_ins, `entries jsonb`, `at`.
+
+The snapshot is immutable, which is why it is a table rather than a column: an edit inside the window writes a new row and keeps the old one, so the difference a reviewer already read cannot change under them. `check_ins.snapshot_id` points at the newest. Each entry holds, per key result at publish time: identifier, value, previous value, progress percentage, confidence and previous confidence.
 
 ### check_in_votes
 `check_in_id?` to check_ins, `key_result_id` to key_results, `session_id?` to sessions, `member_id` to workspace_members, `confidence numeric`, `revealed_at?`.
+
+### goal_dependencies
+`from_goal_id` to goals, `to_goal_id` to goals, `note?`, `created_by_id` to workspace_members.
+
+Horizontal links between goals in different teams (METHOD.md §5.1). Two-way by meaning, stored once in canonical id order, with a unique index on the pair and a check constraint refusing a self-link.
+
+### key_result_dependencies
+`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `note?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `created_by_id` to workspace_members.
+
+The §5.4 register. A provider is named either as a space in this workspace or as free text, and a check constraint requires one of the two. Only a space provider can be confirmed, and only by that space; only a space provider clears a silo finding, because only it names something the engine can find. Unconfirmed and unowned blocks publish gate 4.
+
+### alignment_findings
+`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
+
+`subject_goal_id` is nullable, decision D-16: the anchor finding has no subject because no goal caused it, and attaching it to an arbitrary goal would send a facilitator to fix something that is not broken. Identity for the deterministic engine is `(scope, scope_id, cycle_id, rule_key, subject_goal_id, target_goal_id)`, held by a unique index that coalesces the nullable columns so two nulls do not read as distinct. The engine only ever touches `source = 'engine'` rows, so a structural recompute cannot delete the Coach's semantic findings.
 
 ### goal_retrospectives
 `goal_id` to goals, `body` (rich), `author_member_id` to workspace_members, `ai_drafted bool`.

@@ -60,6 +60,59 @@ describe("responsive shell classes (§3)", () => {
   });
 });
 
+/**
+ * The Review badge (UIUX-PLAN.md §3, S-02 "drives the sidebar badge", P3-T08).
+ *
+ * The count is drawn twice for two different readers: a chip beside the label
+ * from `xl`, and a dot on the icon below it, where the label and the chip are
+ * both hidden. Whichever is visible, the accessible name carries the number, so
+ * the one reader who cannot see either gets the count rather than "Review".
+ */
+describe("the sidebar badge", () => {
+  const withBadge = (badge?: number) =>
+    render(
+      <Sidebar
+        groups={[
+          {
+            id: "g",
+            items: [
+              {
+                id: "review",
+                label: "Review",
+                href: "/review",
+                icon: <span />,
+                ...(badge === undefined ? {} : { badge }),
+              },
+            ],
+          },
+        ]}
+        workspaceSwitcher={<div>Workspace</div>}
+      />,
+    );
+
+  test("puts the count in the link's accessible name at every width", () => {
+    withBadge(3);
+    expect(screen.getByRole("link", { name: /3 waiting on you/ })).toBeTruthy();
+  });
+
+  test("keeps a dot on the icon where the chip is hidden", () => {
+    const { container } = withBadge(3);
+    const dot = container.querySelector("span.rounded-full.bg-bad");
+    // Present below xl, gone from xl, which is exactly where the chip appears.
+    expect(dot?.className).toContain("xl:hidden");
+    const chip = screen.getByText("3", {
+      selector: "span[class*='xl:inline']",
+    });
+    expect(chip.className).toContain("hidden");
+  });
+
+  test("draws nothing at all when there is no badge", () => {
+    const { container } = withBadge();
+    expect(container.querySelector("span.rounded-full.bg-bad")).toBeNull();
+    expect(screen.queryByText(/waiting on you/)).toBeNull();
+  });
+});
+
 describe("AppShell composition", () => {
   test("renders every slot", () => {
     render(

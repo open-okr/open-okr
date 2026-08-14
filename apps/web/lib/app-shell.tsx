@@ -12,12 +12,15 @@ import {
   TopbarSearch,
 } from "@openokr/ui";
 import {
+  BarChart3,
   CheckCircle2,
+  ClipboardCheck,
   Home,
   Inbox,
   RefreshCw,
   Settings,
   Shield,
+  Target,
 } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -27,6 +30,7 @@ import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
+import { loadReviewBadge } from "./review-badge.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { requireWorkspace } from "./workspace.ts";
 
@@ -49,7 +53,10 @@ import { requireWorkspace } from "./workspace.ts";
 
 const ICONS: Readonly<Record<string, ReactNode>> = {
   overview: <Home className="size-full" />,
+  review: <ClipboardCheck className="size-full" />,
   cycle: <RefreshCw className="size-full" />,
+  goals: <Target className="size-full" />,
+  kpis: <BarChart3 className="size-full" />,
   "check-in": <CheckCircle2 className="size-full" />,
   "account-security": <Shield className="size-full" />,
 };
@@ -112,6 +119,11 @@ export async function AppShellLayout({
     session.user.id,
     level,
   );
+  const reviewBadge = await loadReviewBadge(
+    workspace.workspaceId,
+    session.user.id,
+    level,
+  );
 
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
@@ -128,6 +140,9 @@ export async function AppShellLayout({
         href: item.href,
         icon: iconFor(item.id),
         active: item.id === active,
+        ...(item.id === "review" && reviewBadge !== null
+          ? { badge: reviewBadge }
+          : {}),
       })),
     },
   ];

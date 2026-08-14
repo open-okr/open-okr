@@ -1,6 +1,19 @@
 export const PACKAGE_NAME = "@openokr/method";
 
 export {
+  ALIGNMENT_LEVEL_ORDER,
+  type AlignmentFinding,
+  type AlignmentGoal,
+  type AlignmentGraph,
+  type AlignmentPenalties,
+  type AlignmentResult,
+  type AlignmentRuleKey,
+  type AlignmentScope,
+  type AlignmentSeverity,
+  alignmentHealthy,
+  alignmentScore,
+} from "./alignment.ts";
+export {
   type Escalation,
   type EscalationRole,
   escalation,
@@ -14,6 +27,44 @@ export {
   SUGGESTED_TIMELINE,
   type TimelineRow,
 } from "./guidance.ts";
+export {
+  KPI_DIRECTIONS,
+  KPI_FREQUENCIES,
+  KPI_STATES,
+  type KpiAchievement,
+  type KpiCorridor,
+  type KpiDiagnostic,
+  type KpiDirection,
+  type KpiFrequency,
+  type KpiState,
+  kpiAchievement,
+  kpiState,
+  type LocalDate,
+  normalisePeriod,
+  type RecoveryLink,
+} from "./kpi.ts";
+export {
+  aggregateForPeriod,
+  type CascadeResult as KpiCascadeResult,
+  cascadeOrder,
+  type DependencyEdge,
+  KPI_AGGREGATES,
+  type KpiAggregate,
+  type SourceRecord,
+} from "./kpi-aggregate.ts";
+export {
+  evaluateFormula,
+  FORMULA_MAX_DEPTH,
+  FORMULA_MAX_NODES,
+  FORMULA_MAX_REFERENCES,
+  type FormulaDiagnostic,
+  type FormulaNode,
+  type FormulaProblem,
+  type FormulaResult,
+  type FormulaShape,
+  formulaNodeSchema,
+  validateFormula,
+} from "./kpi-formula.ts";
 export {
   type CascadeGoal,
   type CascadeResult,

@@ -44,42 +44,48 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
   await expect(page).toHaveURL("/");
-  // The heading role, not a text match. Under Playwright 1.62 a bare
-  // `getByText("Signed in as")` resolves to two elements and strict mode rejects
-  // it. Two things on this page carry the phrase: the panel streams in behind a
-  // Suspense boundary, and Next mirrors heading text into its route announcer.
-  // The page has exactly one level-1 heading, so naming it by role is
-  // unambiguous whichever of the two produced the second match.
+  // The Work Map is the front door from P3-T11. It replaced the proving
+  // dashboard P1-T08 put here, which asserted a "Signed in as" panel and two
+  // `<strong>` elements; that panel was scaffolding and STATUS.md said so from
+  // the start. What still has to be true is the same thing it was proving:
+  // provisioning ran between the account committing and this page rendering, so
+  // a named workspace exists and the member is inside it.
   await expect(
-    page.getByRole("heading", { level: 1, name: /Signed in as/ }),
-  ).toBeVisible();
-  // Exact, because "Ada Lovelace" is also a prefix of the workspace name
-  // and a loose match would find two elements.
-  await expect(
-    page.getByRole("strong").filter({ hasText: new RegExp(`^${NAME}$`) }),
+    page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("strong").filter({ hasText: `${NAME}'s workspace` }),
+    page.getByText(`${NAME}'s workspace`).first(),
   ).toBeVisible();
+  // A brand new workspace has no goals, and the map says so with the way out
+  // rather than an empty box.
+  await expect(page.getByText("Nothing in this cycle yet.")).toBeVisible();
 });
 
-test("the dashboard shows what the registry action returned", async () => {
+test("the front door shows what provisioning resolved, with nothing configured", async () => {
   await page.goto("/");
 
-  // None of these were chosen by anybody: provisioning resolved them from the
-  // §4.14 settings map, which is what "no setting must be answered before the
-  // product is usable" means in practice.
-  await expect(page.getByRole("definition").filter({ hasText: "UTC" })).toBeVisible();
+  // This used to read the §4.14 defaults off the proving dashboard's definition
+  // list: timezone UTC, state active, primary channel email. P3-T11 replaced
+  // that page with the Work Map, so the same property is proven by what the map
+  // itself needs to exist at all. Nobody chose this cycle: provisioning
+  // generated it from the rhythm settings, which is what "no setting must be
+  // answered before the product is usable" means in practice.
   await expect(
-    page.getByRole("definition").filter({ hasText: "active" }).first(),
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Q[1-4] \d{4}$/ })).toBeVisible();
+  // And the three ways out of it, which is the front door's other job.
+  await expect(
+    page.getByRole("link", { name: "Filter and search in the explorer" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("definition").filter({ hasText: "email" }),
+    page.getByRole("link", { name: "See the cascade" }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "What you owe" })).toBeVisible();
 });
 
 test("hydrates, so a write happens without loading a new document", async () => {
-  await page.goto("/");
+  await page.goto("/admin/general");
 
   // A hydrated React form posts the server action in the background and
   // patches the result in. An unhydrated one does a plain form POST and the
@@ -91,12 +97,14 @@ test("hydrates, so a write happens without loading a new document", async () => 
     documentLoads++;
   });
 
-  await page.getByLabel("Workspace name").fill("Lovelace Analytics");
-  await page.getByRole("button", { name: "Rename" }).click();
+  // The workspace rename this used to drive lived on the proving dashboard,
+  // which P3-T11 replaced. Admin general is where a workspace setting is edited
+  // now, and it is the same kind of proof: a real form, a real write, and the
+  // page still standing afterwards without the browser fetching a document.
+  await page.getByLabel("Language").fill("en");
+  await page.getByRole("button", { name: "Save" }).click();
 
-  await expect(
-    page.getByRole("strong").filter({ hasText: "Lovelace Analytics" }),
-  ).toBeVisible();
+  await expect(page.getByLabel("Language")).toBeVisible();
   expect(documentLoads).toBe(0);
 });
 
@@ -125,9 +133,11 @@ test("the first paint is server-rendered, with no JavaScript at all", async ({
   try {
     await plainPage.goto("/");
     const html = await plainPage.content();
-    expect(html).toContain("Lovelace Analytics");
+    // The Work Map, rendered by the server before React runs. The workspace name
+    // and the heading are both in the markup; nothing here was painted by a
+    // client bundle, because there is no client bundle running.
+    expect(html).toContain("Work map");
     expect(html).toContain(NAME);
-    expect(html).toContain("UTC");
   } finally {
     await plain.close();
   }
@@ -317,6 +327,55 @@ test("a goal reached directly shows its history and refuses a draft", async () =
   await expect(
     page.getByRole("heading", { name: "Check-in history" }),
   ).toBeVisible();
+});
+
+/**
+ * The review inbox (P3-T08, S-02).
+ *
+ * What only a browser settles: that the obligation is computed from the goal
+ * created earlier in this file and reaches the screen with an action attached,
+ * and that the four sources no phase has built are named on the page rather than
+ * quietly missing.
+ *
+ * The acknowledgement half is not driven here, for the reason P3-T07 recorded
+ * about publishing: it needs a goal that is actually due, and a goal created
+ * today with a Monday anchor is due next Monday, so the assertion would pass or
+ * fail depending on the day it ran. The core suite covers that path against real
+ * rows, including the reassignment case no browser test could set up.
+ */
+test("the review inbox lists what this member owes, with an action on each", async () => {
+  await page.goto("/review");
+
+  await expect(
+    page.getByRole("heading", { name: "What you owe", level: 1 }),
+  ).toBeVisible();
+
+  const row = page.getByText(
+    'Post your check-in on "Make mobile the way our customers prefer to reach us"',
+  );
+  await expect(row).toBeVisible();
+  // Scoped to `main`: the sidebar's own nav item is also called "Check in", and
+  // an unscoped role locator matches both. Worth keeping as a named collision
+  // rather than renaming either, because both labels are the right words.
+  await expect(
+    page.getByRole("main").getByRole("link", { name: "Check in" }),
+  ).toBeVisible();
+
+  // Named, not hidden. A page that showed two of six sources without saying so
+  // would look complete while failing to mention a blocker somebody owns.
+  await expect(page.getByText("Blockers you own")).toBeVisible();
+  await expect(page.getByText("Sessions to run")).toBeVisible();
+});
+
+test("the review action opens the composer for that goal", async () => {
+  await page.goto("/review");
+  await page
+    .getByRole("main")
+    .getByRole("link", { name: "Check in" })
+    .first()
+    .click();
+  // The goal id, not the bare walker: the row's action opens the goal it names.
+  await expect(page).toHaveURL(/\/check-in\?goal=/);
 });
 
 test("signing out ends the session", async () => {

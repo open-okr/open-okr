@@ -28,6 +28,7 @@ import {
   cycleRevalidations,
   cycles,
   goals,
+  keyResultDependencies,
   keyResults,
   newId,
   type WorkspaceTx,
@@ -289,6 +290,29 @@ async function loadGoalSnapshots<
       ),
     );
 
+  // The §5.4 register, which is what makes publish gate 4 evaluable at all
+  // (P3-T09). An empty array is a real answer: this key result has no
+  // dependencies, so there is nothing unconfirmed to block on. `undefined` is
+  // what the evaluator reads as "nobody has checked", and it must not appear
+  // here again now that the table exists.
+  const dependencies = await tx
+    .select({
+      keyResultId: keyResultDependencies.keyResultId,
+      confirmed: keyResultDependencies.confirmed,
+      riskOwnerId: keyResultDependencies.riskOwnerId,
+    })
+    .from(keyResultDependencies)
+    .where(
+      activeOnly(
+        keyResultDependencies,
+        eq(keyResultDependencies.workspaceId, workspaceId),
+        inArray(
+          keyResultDependencies.keyResultId,
+          children.map((child) => child.id),
+        ),
+      ),
+    );
+
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -303,6 +327,12 @@ async function loadGoalSnapshots<
         id: child.id,
         title: child.title,
         capacity: child.capacity,
+        dependencies: dependencies
+          .filter((dependency) => dependency.keyResultId === child.id)
+          .map((dependency) => ({
+            confirmed: dependency.confirmed,
+            riskOwnerId: dependency.riskOwnerId,
+          })),
       })),
   }));
 }

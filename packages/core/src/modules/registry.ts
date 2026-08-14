@@ -50,6 +50,21 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "review",
+    navigation: [
+      {
+        id: "review",
+        label: "Review",
+        href: "/review",
+        section: "sidebar",
+        // Every member reaches it, and every member sees a different page: the
+        // inbox only ever lists what the reader themselves owes, so there is
+        // nothing here to withhold from anybody (P3-T08).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "cycle",
     navigation: [
       {
@@ -60,6 +75,36 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // Every member can watch the cycle being planned. The writes on the
         // screen each ask for edit access of their own, so a reader sees the
         // workflow without being handed a control they cannot use (P3-T03).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "goals",
+    navigation: [
+      {
+        id: "goals",
+        label: "Goals",
+        href: "/goals",
+        section: "sidebar",
+        // Every member can read the set. An OKR set nobody can read is not one,
+        // which is the same reason a goal's context binds `workspace_standard`
+        // at view (P3-T04). The writes on each row ask for their own access.
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "kpis",
+    navigation: [
+      {
+        id: "kpis",
+        label: "KPIs",
+        href: "/kpis",
+        section: "sidebar",
+        // Every member reads the grid. A measure nobody can see is not a
+        // shared measure, which is the same reason a company objective binds
+        // workspace_standard at view (P3-T12).
         minLevel: ACCESS_LEVELS.view,
       },
     ],

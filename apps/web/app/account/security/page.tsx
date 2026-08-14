@@ -33,7 +33,7 @@ export default async function SecurityPage() {
         </Card>
         <Card>
           <CardBody>
-            <Sessions />
+            <Sessions userId={session.user.id} />
           </CardBody>
         </Card>
       </div>

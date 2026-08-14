@@ -86,7 +86,12 @@ test("creating the first account finishes setup", async ({ page }) => {
 
   // Straight into the product, signed in, with a workspace already provisioned.
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("strong").first()).toContainText(ADMIN.name);
+  // The Work Map, since P3-T11 replaced the proving dashboard this used to
+  // assert. The workspace switcher still carries the admin name.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible();
+  await expect(page.getByText(ADMIN.name).first()).toBeVisible();
 });
 
 test("the wizard is shut afterwards, and says why", async ({ page }) => {
@@ -125,5 +130,10 @@ test("the admin can sign in again", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("strong").first()).toContainText(ADMIN.name);
+  // The Work Map, since P3-T11 replaced the proving dashboard this used to
+  // assert. The workspace switcher still carries the admin name.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible();
+  await expect(page.getByText(ADMIN.name).first()).toBeVisible();
 });

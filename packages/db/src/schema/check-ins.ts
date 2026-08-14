@@ -67,6 +67,15 @@ export const checkIns = pgTable("check_ins", {
   snapshotId: uuid("snapshot_id"),
   /** No foreign key: sessions are domain G at P4-T04. */
   sessionId: uuid("session_id"),
+  /**
+   * The reviewer as of publication (P3-T08). Null on a draft, because
+   * publication is what creates the obligation. A reassignment moves it only
+   * while the check-in is unacknowledged, so a closed loop keeps the member who
+   * actually closed it.
+   */
+  reviewerMemberId: uuid("reviewer_member_id").references(
+    () => workspaceMembers.id,
+  ),
   acknowledgedById: uuid("acknowledged_by_id").references(
     () => workspaceMembers.id,
   ),

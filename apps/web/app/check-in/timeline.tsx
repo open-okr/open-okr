@@ -55,11 +55,9 @@ function difference(value: number, previous: number | null): string {
 
 export function Timeline({
   checkIns,
-  reviewerId,
   canEdit,
 }: {
   readonly checkIns: readonly TimelineCheckIn[];
-  readonly reviewerId: string;
   readonly canEdit: boolean;
 }) {
   const published = checkIns.filter((entry) => entry.state === "published");
@@ -229,9 +227,10 @@ export function Timeline({
           way to change that. Reactions and comments arrive with the discussion
           wiring at P3-T16.
         </p>
-        {/* The reviewer id is passed in so this stays honest about who the button
-            is for even before P3-T08 builds the inbox that lists it. */}
-        <span className="sr-only">Reviewer of record: {reviewerId}</span>
+        {/* P3-T07 announced the reviewer's raw id here, as a placeholder until
+            P3-T08 built the inbox that lists the obligation. That inbox exists
+            now, and a bare UUID read aloud to somebody on a screen reader was
+            never useful anyway, so the placeholder is gone rather than reworded. */}
       </CardBody>
     </Card>
   );

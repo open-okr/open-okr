@@ -55,6 +55,17 @@ import {
   removeBudget,
   setBudget,
 } from "./ai-usage.ts";
+import {
+  addGoalDependency,
+  addKeyResultDependency,
+  confirmKeyResultDependency,
+  dismissAlignmentFinding,
+  readAlignment,
+  readAlignmentGraph,
+  removeGoalDependency,
+  removeKeyResultDependency,
+  setDependencyRiskOwner,
+} from "./alignment.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
   acknowledgeCheckIn,
@@ -93,6 +104,7 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { readGoalRelations } from "./goal-relations.ts";
 import {
   closeGoal,
   createGoal,
@@ -117,6 +129,13 @@ import {
   revokeLink,
 } from "./invitations.ts";
 import {
+  createKpi,
+  createKpiCategory,
+  readKpiGrid,
+  recordKpiValue,
+  setKpiFormulaAction,
+} from "./kpis.ts";
+import {
   getNotificationSettings,
   listNotifications,
   markNotificationRead,
@@ -136,6 +155,7 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
+import { reviewInbox } from "./review.ts";
 import {
   readWorkspaceSettings,
   resetWorkspaceSettings,
@@ -285,6 +305,22 @@ export const ACTION_MAP = {
   "goals.vote": castConfidenceVote,
   "goals.revealVotes": revealConfidenceVotes,
   "goals.readVotes": readConfidenceVotes,
+  "goals.addDependency": addGoalDependency,
+  "goals.removeDependency": removeGoalDependency,
+  "goals.addKeyResultDependency": addKeyResultDependency,
+  "goals.confirmDependency": confirmKeyResultDependency,
+  "goals.setDependencyRiskOwner": setDependencyRiskOwner,
+  "goals.removeKeyResultDependency": removeKeyResultDependency,
+  "alignment.read": readAlignment,
+  "alignment.graph": readAlignmentGraph,
+  "goals.relations": readGoalRelations,
+  "kpis.createCategory": createKpiCategory,
+  "kpis.create": createKpi,
+  "kpis.record": recordKpiValue,
+  "kpis.grid": readKpiGrid,
+  "kpis.setFormula": setKpiFormulaAction,
+  "alignment.dismissFinding": dismissAlignmentFinding,
+  "review.inbox": reviewInbox,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;
