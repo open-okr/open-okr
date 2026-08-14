@@ -174,7 +174,7 @@ export async function postComment(body: unknown): Promise<WriteState> {
     // The goalId comes from the page, passed via a hidden field or closure.
     // For now, the body includes the subjectType and subjectId.
     const input = body as {
-      subjectType: string;
+      subjectType: "goal" | "key_result" | "check_in" | "cycle" | "document";
       subjectId: string;
       body: unknown;
     };

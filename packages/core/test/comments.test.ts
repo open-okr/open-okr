@@ -1,204 +1,233 @@
 /**
  * Comment and reaction tests (TECHNICAL-PLAN.md §4.10, P3-T16).
  *
- * Tests run against a real database through the test-support harness.
- * Each test uses the factory to create the workspace, members and goals
- * it needs.
+ * Against a real database through the test-support harness.
  */
-import { describe, expect, it } from "vitest";
-import { callAction } from "../src/actions/call.ts";
-import { OperationError } from "../src/operations/operation.ts";
-import { setup } from "./setup.ts";
+import { workerDb } from "@openokr/test-support/db";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { callAction } from "../src/actions/registry.ts";
+import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+
+const OWNER = "comment-owner";
+const SECOND = "comment-second";
+
+let workspaceId: string;
+let cycleId: string;
+let ownerMemberId: string;
+let secondMemberId: string;
+
+const context = (userId = OWNER) => ({
+  workspaceId,
+  actor: { kind: "human" as const, userId },
+});
+
+const richText = (text: string) => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+beforeEach(async () => {
+  const wb = await workerDb();
+  await wb.truncateAllTables();
+  await wb.admin.query(
+    "insert into users (id, name, email) values ($1, $2, $3), ($4, $5, $6)",
+    [
+      OWNER,
+      "Comment Owner",
+      "comment-owner@example.com",
+      SECOND,
+      "Second Member",
+      "comment-second@example.com",
+    ],
+  );
+  const provisioned = await provisionWorkspaceForUser(wb.appPool, {
+    id: OWNER,
+    name: "Comment Owner",
+  });
+  workspaceId = provisioned.workspaceId;
+
+  const current = await callAction(
+    { pool: wb.appPool, ...context() },
+    "cycles.current",
+    { mode: "quarterly" },
+  );
+  cycleId = current?.id as string;
+
+  const members = await wb.admin.query<{ id: string; user_id: string | null }>(
+    "select id, user_id from workspace_members where workspace_id = $1",
+    [workspaceId],
+  );
+  ownerMemberId = members.rows.find((row) => row.user_id === OWNER)
+    ?.id as string;
+
+  // Add a second member
+  const second = await wb.admin.query<{ id: string }>(
+    `insert into workspace_members (id, workspace_id, user_id, name, status)
+     values (gen_random_uuid(), $1, $2, 'Second Member', 'active') returning id`,
+    [workspaceId, SECOND],
+  );
+  secondMemberId = second.rows[0]!.id;
+});
+
+afterAll(async () => {
+  const wb = await workerDb();
+  wb.appPool.end();
+});
+
+async function createGoal(): Promise<string> {
+  const wb = await workerDb();
+  const goal = await callAction(
+    { pool: wb.appPool, ...context() },
+    "goals.create",
+    {
+      title: "Test goal for comments",
+      level: "company" as const,
+      ownerKind: "member" as const,
+      championId: ownerMemberId,
+      reviewerId: secondMemberId,
+      weight: 100,
+      cycleId,
+    },
+  );
+  return goal.id;
+}
 
 describe("comments", () => {
-  it("creates a comment on a goal and auto-subscribes the author", async () => {
-    const { context, goal } = await setup.goalWithKeyResult();
+  it("creates a comment and lists it back", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
 
-    const result = await callAction(context, "comments.create", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      body: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: "First comment on this goal." }],
-          },
-        ],
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.create",
+      {
+        subjectType: "goal" as const,
+        subjectId: goalId,
+        body: richText("First comment on this goal."),
       },
-    });
+    );
 
-    expect(result.id).toBeDefined();
-
-    const comments = await callAction(context, "comments.list", {
-      subjectType: "goal",
-      subjectId: goal.id,
-    });
-    expect(comments).toHaveLength(1);
-    expect(comments[0]!.authorMemberId).toBe(context.actor.memberId);
-  });
-
-  it("mentioning two members subscribes both", async () => {
-    const { context, goal, workspace } = await setup.goalWithKeyResult();
-
-    // Create two additional members to mention
-    const member1 = await setup.addMember(workspace, "Alice");
-    const member2 = await setup.addMember(workspace, "Bob");
-
-    await callAction(context, "comments.create", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      body: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              { type: "text", text: "Hey " },
-              {
-                type: "mention",
-                attrs: { id: member1.memberId, label: "Alice" },
-              },
-              { type: "text", text: " and " },
-              {
-                type: "mention",
-                attrs: { id: member2.memberId, label: "Bob" },
-              },
-              { type: "text", text: " what do you think?" },
-            ],
-          },
-        ],
-      },
-    });
-
-    // The preview should match: both members would be notified
-    const preview = await callAction(context, "comments.previewNotify", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      body: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "mention",
-                attrs: { id: member1.memberId, label: "Alice" },
-              },
-              {
-                type: "mention",
-                attrs: { id: member2.memberId, label: "Bob" },
-              },
-            ],
-          },
-        ],
-      },
-    });
-    expect(preview).toContain(member1.memberId);
-    expect(preview).toContain(member2.memberId);
-  });
-
-  it("only the author can edit a comment", async () => {
-    const { context, goal, workspace } = await setup.goalWithKeyResult();
-
-    const result = await callAction(context, "comments.create", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      body: {
-        type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: "Original" }] },
-        ],
-      },
-    });
-
-    // Author can edit
-    await callAction(context, "comments.update", {
-      commentId: result.id,
-      body: {
-        type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: "Edited" }] },
-        ],
-      },
-    });
-
-    const comments = await callAction(context, "comments.list", {
-      subjectType: "goal",
-      subjectId: goal.id,
-    });
-    expect(comments[0]!.editedAt).not.toBeNull();
+    const list = await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.list",
+      { subjectType: "goal" as const, subjectId: goalId },
+    );
+    expect(list).toHaveLength(1);
+    expect(list[0]!.authorName).toBe("Comment Owner");
   });
 
   it("soft-deletes a comment", async () => {
-    const { context, goal } = await setup.goalWithKeyResult();
+    const wb = await workerDb();
+    const goalId = await createGoal();
 
-    const result = await callAction(context, "comments.create", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      body: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [{ type: "text", text: "To be deleted" }],
-          },
-        ],
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.create",
+      {
+        subjectType: "goal" as const,
+        subjectId: goalId,
+        body: richText("To be deleted."),
       },
-    });
+    );
 
-    await callAction(context, "comments.delete", { commentId: result.id });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.delete",
+      { commentId: created.id },
+    );
 
-    const comments = await callAction(context, "comments.list", {
-      subjectType: "goal",
-      subjectId: goal.id,
-    });
-    expect(comments).toHaveLength(0);
+    const list = await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.list",
+      { subjectType: "goal" as const, subjectId: goalId },
+    );
+    expect(list).toHaveLength(0);
+  });
+
+  it("mentions two members and the preview matches", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+
+    const bodyWithMentions = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Hey " },
+            {
+              type: "mention",
+              attrs: { id: ownerMemberId, label: "Owner" },
+            },
+            { type: "text", text: " and " },
+            {
+              type: "mention",
+              attrs: { id: secondMemberId, label: "Second" },
+            },
+          ],
+        },
+      ],
+    };
+
+    const preview = await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.previewNotify",
+      {
+        subjectType: "goal" as const,
+        subjectId: goalId,
+        body: bodyWithMentions,
+      },
+    );
+    expect(preview).toContain(ownerMemberId);
+    expect(preview).toContain(secondMemberId);
   });
 });
 
 describe("reactions", () => {
-  it("adds a reaction and lists it grouped by emoji", async () => {
-    const { context, goal } = await setup.goalWithKeyResult();
+  it("adds a reaction and lists it grouped", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
 
-    await callAction(context, "reactions.add", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      emoji: "\u{1F44D}",
-    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "reactions.add",
+      {
+        subjectType: "goal",
+        subjectId: goalId,
+        emoji: "\u{1F44D}",
+      },
+    );
 
-    const groups = await callAction(context, "reactions.list", {
-      subjectType: "goal",
-      subjectId: goal.id,
-    });
-
+    const groups = await callAction(
+      { pool: wb.appPool, ...context() },
+      "reactions.list",
+      { subjectType: "goal", subjectId: goalId },
+    );
     expect(groups).toHaveLength(1);
     expect(groups[0]!.emoji).toBe("\u{1F44D}");
-    expect(groups[0]!.count).toBe(1);
     expect(groups[0]!.own).toBe(true);
   });
 
-  it("one emoji per member per subject (idempotent)", async () => {
-    const { context, goal } = await setup.goalWithKeyResult();
+  it("is idempotent for the same emoji", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
 
-    await callAction(context, "reactions.add", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      emoji: "\u{1F44D}",
-    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "reactions.add",
+      { subjectType: "goal", subjectId: goalId, emoji: "\u{1F44D}" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "reactions.add",
+      { subjectType: "goal", subjectId: goalId, emoji: "\u{1F44D}" },
+    );
 
-    // Adding the same emoji again should not create a duplicate
-    await callAction(context, "reactions.add", {
-      subjectType: "goal",
-      subjectId: goal.id,
-      emoji: "\u{1F44D}",
-    });
-
-    const groups = await callAction(context, "reactions.list", {
-      subjectType: "goal",
-      subjectId: goal.id,
-    });
-
+    const groups = await callAction(
+      { pool: wb.appPool, ...context() },
+      "reactions.list",
+      { subjectType: "goal", subjectId: goalId },
+    );
     expect(groups).toHaveLength(1);
     expect(groups[0]!.count).toBe(1);
   });

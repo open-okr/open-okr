@@ -7,8 +7,9 @@
  * Each comment is deep-linkable via #comment-{id}.
  */
 import { Button, Card, CardBody } from "@openokr/ui";
-import { RichTextEditor } from "@openokr/ui/rich-text/editor";
-import { useTranslations } from "@openokr/ui/i18n/use-translations";
+// Rich text editor and mention extensions will be wired in once the
+// comment thread component uses the full TipTap editor. For now the
+// composer uses a plain textarea that wraps input into editor JSON.
 import {
   useCallback,
   useOptimistic,
