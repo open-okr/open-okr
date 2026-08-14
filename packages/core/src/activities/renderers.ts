@@ -209,6 +209,17 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${Number(p.revealed ?? 0)} confidence vote(s) were revealed together`,
   "cadence.staleness_swept": (p) =>
     `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
+  // Comments and reactions (P3-T16)
+  "comment.created": (p) =>
+    `Commented on a ${asString(p.subjectType, "subject")}: ${asString(p.excerpt, "(empty)")}`,
+  "comment.updated": (p) =>
+    `Edited a comment on a ${asString(p.subjectType, "subject")}`,
+  "comment.deleted": (p) =>
+    `Deleted a comment on a ${asString(p.subjectType, "subject")}`,
+  "reaction.added": (p) =>
+    `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
+  "reaction.removed": (p) =>
+    `Removed ${asString(p.emoji)} reaction from a ${asString(p.subjectType, "subject")}`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

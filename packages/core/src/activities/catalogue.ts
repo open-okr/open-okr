@@ -201,6 +201,27 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     examined: z.number().int(),
     flipped: z.number().int(),
   }),
+  // Comments and reactions (P3-T16). Each is worth a line: a comment is a
+  // conversation someone started, an edit keeps the thread honest, and a
+  // reaction is the lightest form of engagement that still feeds engagement
+  // signals.
+  "comment.created": z.object({
+    subjectType: z.string(),
+    excerpt: z.string(),
+  }),
+  "comment.updated": z.object({
+    subjectType: z.string(),
+    excerpt: z.string(),
+  }),
+  "comment.deleted": z.object({ subjectType: z.string() }),
+  "reaction.added": z.object({
+    emoji: z.string(),
+    subjectType: z.string(),
+  }),
+  "reaction.removed": z.object({
+    emoji: z.string(),
+    subjectType: z.string(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

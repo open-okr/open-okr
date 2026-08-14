@@ -19,6 +19,8 @@
 import {
   accessContexts,
   activeOnly,
+  comments,
+  reactions,
   type WorkspaceTx,
   withWorkspace,
 } from "@openokr/db";
@@ -291,6 +293,53 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   // and its callers resolve the owning goal first so the not-found answer covers
   // "no such key result" and "not yours to see" identically.
   goal: ownContextResolver("goal"),
+  // P3-T16. Comments and reactions inherit their parent subject's context.
+  comment: async (tx, subjectId, workspaceId) => {
+    const [row] = await tx
+      .select({
+        subjectType: comments.subjectType,
+        subjectId: comments.subjectId,
+      })
+      .from(comments)
+      .where(
+        activeOnly(
+          comments,
+          eq(comments.workspaceId, workspaceId),
+          eq(comments.id, subjectId),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return undefined;
+    }
+    const parentResolver = SUBJECT_RESOLVERS[row.subjectType];
+    return parentResolver
+      ? parentResolver(tx, row.subjectId, workspaceId)
+      : undefined;
+  },
+  reaction: async (tx, subjectId, workspaceId) => {
+    const [row] = await tx
+      .select({
+        subjectType: reactions.subjectType,
+        subjectId: reactions.subjectId,
+      })
+      .from(reactions)
+      .where(
+        activeOnly(
+          reactions,
+          eq(reactions.workspaceId, workspaceId),
+          eq(reactions.id, subjectId),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return undefined;
+    }
+    const parentResolver = SUBJECT_RESOLVERS[row.subjectType];
+    return parentResolver
+      ? parentResolver(tx, row.subjectId, workspaceId)
+      : undefined;
+  },
 };
 
 export async function resolveSubjectContext<
