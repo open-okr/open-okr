@@ -68,6 +68,16 @@ import {
 } from "./alignment.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import {
+  addReactionAction,
+  createCommentAction,
+  deleteCommentAction,
+  listCommentsAction,
+  listReactionsAction,
+  previewNotifyAction,
+  removeReactionAction,
+  updateCommentAction,
+} from "./comments.ts";
+import {
   acknowledgeCheckIn,
   castConfidenceVote,
   deleteCheckIn,
@@ -335,6 +345,15 @@ export const ACTION_MAP = {
   "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
+  // Comments and reactions (P3-T16)
+  "comments.list": listCommentsAction,
+  "comments.create": createCommentAction,
+  "comments.update": updateCommentAction,
+  "comments.delete": deleteCommentAction,
+  "comments.previewNotify": previewNotifyAction,
+  "reactions.list": listReactionsAction,
+  "reactions.add": addReactionAction,
+  "reactions.remove": removeReactionAction,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

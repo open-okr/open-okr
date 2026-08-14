@@ -141,6 +141,14 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
+  type Comment,
+  COMMENT_SUBJECT_TYPES,
+  type CommentSubjectType,
+  comments,
+  type Reaction,
+  reactions,
+} from "./schema/comments.ts";
+export {
   CHECK_IN_STATES,
   CHECK_IN_STATUSES,
   type CheckIn,
