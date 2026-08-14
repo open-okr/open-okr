@@ -133,6 +133,7 @@ import {
   createKpiCategory,
   createKpiTree,
   launchKpiRecovery,
+  readKpiDetail,
   readKpiGrid,
   readKpiTree,
   readRecoveryBoard,
@@ -329,6 +330,7 @@ export const ACTION_MAP = {
   "kpis.recoveryDraft": readRecoveryDraft,
   "kpis.recoveryBoard": readRecoveryBoard,
   "kpis.tree": readKpiTree,
+  "kpis.detail": readKpiDetail,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
 } as const;

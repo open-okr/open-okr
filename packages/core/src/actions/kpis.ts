@@ -29,7 +29,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
-import { asc, eq, inArray, isNull } from "drizzle-orm";
+import { asc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -891,6 +891,248 @@ export const readKpiTree = defineReadAction({
                 ? null
                 : Number(row.recoveryProgress),
           })),
+        };
+      },
+    );
+  },
+});
+
+export const readKpiDetail = defineReadAction({
+  name: "kpis.detail",
+  summary:
+    "One KPI with its periods, its place in the tree and its formula. Drives screen S-21.",
+  input: z.object({
+    kpiId: z.uuid(),
+    periods: z.number().int().min(1).max(48).default(24),
+  }),
+  output: z.object({
+    kpi: z.object({
+      id: z.uuid(),
+      shortId: z.string(),
+      title: z.string(),
+      categoryName: z.string().nullable(),
+      ownerName: z.string().nullable(),
+      frequency: z.string(),
+      unit: z.string().nullable(),
+      direction: z.string(),
+      indicatorType: z.string(),
+      tier: z.string(),
+      state: z.string(),
+      achievementPct: z.number().nullable(),
+      effectivePct: z.number().nullable(),
+      healthyPct: z.number(),
+      watchPct: z.number(),
+      targetDefault: z.number().nullable(),
+      isCalculated: z.boolean(),
+      formula: z.unknown(),
+      treeId: z.uuid().nullable(),
+      treeName: z.string().nullable(),
+      recoveryGoalId: z.uuid().nullable(),
+      recoveryStartedPct: z.number().nullable(),
+    }),
+    parent: z
+      .object({ id: z.uuid(), title: z.string(), state: z.string() })
+      .nullable(),
+    children: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        state: z.string(),
+        indicatorType: z.string(),
+        achievementPct: z.number().nullable(),
+      }),
+    ),
+    records: z.array(
+      z.object({
+        periodStart: z.string(),
+        actualValue: z.number().nullable(),
+        targetValue: z.number().nullable(),
+        remark: z.string().nullable(),
+      }),
+    ),
+    /** Every other KPI, so the formula builder can offer its references. */
+    candidates: z.array(
+      z.object({ id: z.uuid(), title: z.string(), frequency: z.string() }),
+    ),
+    linkedKeyResults: z.array(
+      z.object({ id: z.uuid(), title: z.string(), goalId: z.uuid() }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [kpi] = await tx
+          .select({
+            id: kpis.id,
+            shortId: kpis.shortId,
+            title: kpis.title,
+            categoryName: kpiCategories.name,
+            ownerName: workspaceMembers.name,
+            frequency: kpis.frequency,
+            unit: kpis.unit,
+            direction: kpis.direction,
+            indicatorType: kpis.indicatorType,
+            tier: kpis.tier,
+            state: kpis.state,
+            achievementPct: kpis.achievementPct,
+            effectivePct: kpis.effectivePct,
+            healthyPct: kpis.healthyPct,
+            watchPct: kpis.watchPct,
+            targetDefault: kpis.targetDefault,
+            isCalculated: kpis.isCalculated,
+            formula: kpis.formula,
+            treeId: kpis.treeId,
+            treeName: kpiTrees.name,
+            parentKpiId: kpis.parentKpiId,
+            recoveryGoalId: kpis.recoveryGoalId,
+            recoveryStartedPct: kpis.recoveryStartedPct,
+          })
+          .from(kpis)
+          .leftJoin(kpiCategories, eq(kpiCategories.id, kpis.categoryId))
+          .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
+          .leftJoin(kpiTrees, eq(kpiTrees.id, kpis.treeId))
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              eq(kpis.id, input.kpiId),
+            ),
+          )
+          .limit(1);
+        if (!kpi) {
+          throw new OperationError("not_found", "No such KPI.");
+        }
+
+        const [parent] = kpi.parentKpiId
+          ? await tx
+              .select({
+                id: kpis.id,
+                title: kpis.title,
+                state: kpis.state,
+              })
+              .from(kpis)
+              .where(
+                activeOnly(
+                  kpis,
+                  eq(kpis.workspaceId, context.workspaceId),
+                  eq(kpis.id, kpi.parentKpiId),
+                ),
+              )
+              .limit(1)
+          : [];
+
+        const children = await tx
+          .select({
+            id: kpis.id,
+            title: kpis.title,
+            state: kpis.state,
+            indicatorType: kpis.indicatorType,
+            achievementPct: kpis.achievementPct,
+          })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              eq(kpis.parentKpiId, input.kpiId),
+            ),
+          )
+          .orderBy(asc(kpis.position), asc(kpis.title));
+
+        const records = await loadKpiRecords(
+          tx,
+          context.workspaceId,
+          input.kpiId,
+          input.periods,
+        );
+
+        const candidates = await tx
+          .select({
+            id: kpis.id,
+            title: kpis.title,
+            frequency: kpis.frequency,
+          })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, context.workspaceId),
+              ne(kpis.id, input.kpiId),
+            ),
+          )
+          .orderBy(asc(kpis.title));
+
+        const linked = await tx
+          .select({
+            id: keyResults.id,
+            title: keyResults.title,
+            goalId: keyResults.goalId,
+          })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(keyResults.kpiId, input.kpiId),
+            ),
+          );
+
+        return {
+          kpi: {
+            id: kpi.id,
+            shortId: kpi.shortId,
+            title: kpi.title,
+            categoryName: kpi.categoryName,
+            ownerName: kpi.ownerName,
+            frequency: kpi.frequency,
+            unit: kpi.unit,
+            direction: kpi.direction,
+            indicatorType: kpi.indicatorType,
+            tier: kpi.tier,
+            state: kpi.state,
+            achievementPct:
+              kpi.achievementPct === null ? null : Number(kpi.achievementPct),
+            effectivePct:
+              kpi.effectivePct === null ? null : Number(kpi.effectivePct),
+            healthyPct: Number(kpi.healthyPct),
+            watchPct: Number(kpi.watchPct),
+            targetDefault:
+              kpi.targetDefault === null ? null : Number(kpi.targetDefault),
+            isCalculated: kpi.isCalculated,
+            formula: kpi.formula,
+            treeId: kpi.treeId,
+            treeName: kpi.treeName,
+            recoveryGoalId: kpi.recoveryGoalId,
+            recoveryStartedPct:
+              kpi.recoveryStartedPct === null
+                ? null
+                : Number(kpi.recoveryStartedPct),
+          },
+          parent: parent ?? null,
+          children: children.map((child) => ({
+            ...child,
+            achievementPct:
+              child.achievementPct === null
+                ? null
+                : Number(child.achievementPct),
+          })),
+          records: records.map((record) => ({
+            periodStart: record.periodStart,
+            actualValue:
+              record.actualValue === null ? null : Number(record.actualValue),
+            targetValue:
+              record.targetValue === null ? null : Number(record.targetValue),
+            remark: record.remark,
+          })),
+          candidates,
+          linkedKeyResults: linked,
         };
       },
     );
