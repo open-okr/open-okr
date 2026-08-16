@@ -284,8 +284,33 @@ P4-T00's acceptance criterion asks the human to make.
 | The eleven quarterly stages | Exact against METHOD.md §8.1 |
 | The four weekly steps | Exact against METHOD.md §7.2 |
 
-**Still to review:** the agent design's deduplication rules, quiet hours and the
-deterministic-with-AI-off matrix.
+### Both blockers are closed, in the direction the documentation already pointed
 
-**Blocking the gate:** the three triggers, and the `quality.wordLists` decision
-above.
+**The three triggers are tabulated.** Their rows are transcribed from
+AI-NATIVE-PLAN §6.4 rather than invented, so the design now carries all 44 keys
+the plan defines. `quality.conflict` is marked as the one trigger in its table
+that is **not** deterministic: it is a judgement about meaning, so with the
+provider off it does not fire and nothing is claimed.
+
+**`quality.wordLists` is withdrawn.** Of the two options above, dropping it is
+the one that matches the documentation as written: §11 already says a value not
+in the registry is not a setting, and `thresholds.ts` already records the §4
+word lists as excluded because they are data rather than numbers. Widening §11
+would have meant changing METHOD.md, which is the further move, not the closer
+one. Workspace additions go to the §4.14 settings map, where every other
+non-numeric preference already lives. **METHOD.md is untouched.**
+
+### What approval still needs
+
+Every structural check a reader can make has been made, and the two open items
+are closed. What remains is not legwork:
+
+- The line-by-line read of the rule corpus and the trigger catalogue, which
+  P4-T00's acceptance criterion puts on the human by name.
+- The judgement calls a comparison cannot settle: whether each stage's
+  completion condition is the right one, whether each check's coaching prompt
+  says the useful thing, whether the corpus verdicts are the ones a facilitator
+  would give.
+
+**Still unreviewed here:** the agent design's deduplication rules, quiet hours
+and the deterministic-with-AI-off matrix.
