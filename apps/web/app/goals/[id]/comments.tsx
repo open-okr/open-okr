@@ -12,6 +12,13 @@ import { Button } from "@openokr/ui";
 // composer uses a plain textarea that wraps input into editor JSON.
 import { useCallback, useState, useTransition } from "react";
 
+/** Not exported: `CommentData` carries it, and nothing names it on its own. */
+interface ReactionGroupData {
+  readonly emoji: string;
+  readonly count: number;
+  readonly own: boolean;
+}
+
 export interface CommentData {
   readonly id: string;
   readonly authorMemberId: string;
@@ -19,12 +26,7 @@ export interface CommentData {
   readonly body: unknown;
   readonly editedAt: string | null;
   readonly createdAt: string;
-}
-
-export interface ReactionGroupData {
-  readonly emoji: string;
-  readonly count: number;
-  readonly own: boolean;
+  readonly reactions: readonly ReactionGroupData[];
 }
 
 interface CommentThreadProps {
@@ -87,12 +89,12 @@ export function CommentThread({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-fg-secondary">
+      <h3 className="text-sm font-medium text-ink-2">
         Discussion ({comments.length})
       </h3>
 
       {comments.length === 0 && (
-        <p className="text-sm text-fg-tertiary">
+        <p className="text-sm text-ink-3">
           No comments yet. Start the conversation.
         </p>
       )}
@@ -101,12 +103,10 @@ export function CommentThread({
         <div
           key={comment.id}
           id={`comment-${comment.id}`}
-          className="rounded-lg border border-border bg-bg-primary p-3 space-y-2"
+          className="rounded-lg border border-line bg-surface p-3 space-y-2"
         >
-          <div className="flex items-center justify-between text-xs text-fg-tertiary">
-            <span className="font-medium text-fg-primary">
-              {comment.authorName}
-            </span>
+          <div className="flex items-center justify-between text-xs text-ink-3">
+            <span className="font-medium text-ink">{comment.authorName}</span>
             <span>
               {new Date(comment.createdAt).toLocaleDateString(undefined, {
                 month: "short",
@@ -128,15 +128,31 @@ export function CommentThread({
               />
             </div>
           ) : (
-            <div className="prose prose-sm max-w-none text-fg-primary">
+            <div className="prose prose-sm max-w-none text-ink">
               <CommentBody body={comment.body} />
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {comment.reactions.map((group) => (
+              <button
+                key={group.emoji}
+                type="button"
+                // The reader's own reaction is marked, because a count with no
+                // "did I" in it makes somebody click again to find out.
+                className={
+                  group.own
+                    ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
+                    : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
+                }
+                onClick={() => handleReact("comment", comment.id, group.emoji)}
+              >
+                {group.emoji} {group.count}
+              </button>
+            ))}
             <button
               type="button"
-              className="text-xs text-fg-tertiary hover:text-fg-secondary"
+              className="text-xs text-ink-3 hover:text-ink-2"
               onClick={() => handleReact("comment", comment.id, "\u{1F44D}")}
             >
               +1
@@ -146,14 +162,14 @@ export function CommentThread({
                 <>
                   <button
                     type="button"
-                    className="text-xs text-fg-tertiary hover:text-fg-secondary"
+                    className="text-xs text-ink-3 hover:text-ink-2"
                     onClick={() => setEditingId(comment.id)}
                   >
                     Edit
                   </button>
                   <button
                     type="button"
-                    className="text-xs text-fg-tertiary hover:text-destructive"
+                    className="text-xs text-ink-3 hover:text-bad"
                     onClick={() => handleDelete(comment.id)}
                   >
                     Delete
@@ -165,7 +181,7 @@ export function CommentThread({
       ))}
 
       {/* Composer */}
-      <div className="rounded-lg border border-border bg-bg-primary p-3 space-y-2">
+      <div className="rounded-lg border border-line bg-surface p-3 space-y-2">
         <CommentEditor
           onSave={(_body) => {
             startTransition(async () => {
@@ -182,14 +198,14 @@ export function CommentThread({
 
 function CommentBody({ body }: { body: unknown }) {
   if (!body || typeof body !== "object") {
-    return <p className="text-fg-tertiary italic">Empty comment</p>;
+    return <p className="text-ink-3 italic">Empty comment</p>;
   }
   // Render rich text content as paragraphs for now.
   // The full rich-text renderer from packages/core will be used once
   // the sanitising allow-list render is wired to a React component.
   const doc = body as { content?: unknown[] };
   if (!doc.content || !Array.isArray(doc.content)) {
-    return <p className="text-fg-tertiary italic">Empty comment</p>;
+    return <p className="text-ink-3 italic">Empty comment</p>;
   }
   return (
     <>
@@ -242,7 +258,7 @@ function CommentEditor({
   return (
     <div className="space-y-2">
       <textarea
-        className="w-full min-h-[80px] rounded border border-border bg-bg-primary p-2 text-sm text-fg-primary placeholder:text-fg-tertiary resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+        className="w-full min-h-[80px] rounded border border-line bg-surface p-2 text-sm text-ink placeholder:text-ink-4 resize-y focus:outline-none focus:ring-1 focus:ring-brand"
         placeholder={placeholder ?? "Write something..."}
         defaultValue={initialBody ? extractPlainText(initialBody) : ""}
         onChange={(e) => {
