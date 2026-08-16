@@ -1,80 +1,27 @@
 # The work split: Agung and Obed
 
 Who takes which task, what can run at the same time, and what has to wait.
-Covers the rest of Phase 3 and all of Phase 4. Written 2026-08-14.
+Rewritten 2026-08-14, after Phase 3 landed and the two lanes were merged.
 
 `IMPLEMENTATION-PLAN.md` is the authority. This file only reads its dependency
 lines and turns them into two lanes. If the two ever disagree, the plan wins and
 this file gets fixed.
 
-## Phase 3: the last four tasks
+## Where things stand
 
-| Task | Size | Owner | Depends on | Can start |
-|---|---|---|---|---|
-| P3-T14 KPI trees, corridors, recovery OKRs | L | **Agung** | P3-T13, P3-T05 | Now |
-| P3-T15 Scorecard, cycle archive and feed-forward | M | **Agung** | P3-T05, P3-T12 | Now |
-| P3-T16 Comments, reactions and discussion wiring | M | **Obed** | P3-T01, P2-T07 | Now |
-| P3-T17 Demo workspace builder and seed | M | **Obed** | P3-T15 | After Agung's P3-T15 |
+**Phase 3 is complete.** All eighteen tasks have landed on `agung`. Ten rows are
+`done`, seven are `in_review`, one is `in_progress`. Only a human sets `done`, so
+those eight are waiting on a read rather than on work.
 
-Three of the four can start today. Only P3-T17 waits, and it waits on the other
-lane.
+Two Phase 4 tasks are already under way, both Obed's, both started in parallel
+with the end of Phase 3:
 
-### Two things about P3-T17 worth settling before it starts
-
-**Its declared dependency understates what it needs.** The plan lists P3-T15
-only, but its own deliverables name "KPI trees with one unhealthy KPI and an
-active recovery OKR", which is P3-T14's work. In practice P3-T17 needs both of
-Agung's tasks finished, not one.
-
-**It also inherits a Phase 1 follow-up.** The first-run wizard is specified to
-offer demo data and does not. That offer lands with the seed, per the note on
-the P3-T17 row in `STATUS.md`.
-
-### Migration numbers, agreed up front
-
-The last migration in the tree is 0027. Both lanes add one, and two people
-picking a number independently will collide.
-
-| Task | Migration | Holds |
-|---|---|---|
-| P3-T14 | 0028 | KPI trees, recovery columns |
-| P3-T16 | 0029 | Comments and reactions |
-
-Whoever lands second checks the number is still free before writing the file.
-
-### The leftovers on the `in_review` rows
-
-Four Phase 3 rows are `in_review` with named work still outstanding. They follow
-the subject, not the row number.
-
-| Leftover | Sits on row | Owner | Why |
-|---|---|---|---|
-| The formula builder screen | P3-T13 | Agung | P3-T14's own card already lists it under the KPI detail |
-| Row sparklines, category subtotals, per-frequency columns, filters, `kpi_shares` | P3-T12 | Agung | Same KPI surfaces P3-T14 rebuilds |
-| Sparkline overlapping its row, the sparse-data forecast question | P3-T10 | Obed | Goal-page layout, next to the comment wiring |
-| Work Map virtualisation, scope tabs, KPI tiles | P3-T11 | Obed | Same tree P3-T16 hangs comments off. KPI tiles wait for P3-T14 |
-
-### One open question for the human
-
-The forecast is faithful arithmetic and poor advice on sparse data: three values
-inside two days, projected six weeks out, reads 672 for a key result whose
-target is 60. Whether METHOD.md §3.6 should require a minimum span before a
-forecast is shown at all is a practice decision, not a developer's.
-
-## Phase 4: read this first
-
-Phase 4 cannot start yet. Two things gate it.
-
-| Gate | State on 2026-08-14 |
+| Task | State |
 |---|---|
-| Phase 3 complete | The four tasks above |
-| P4-T00 design gate approved | Not written. It needs an explicit "design approved" from the human, with the rule corpus and trigger catalogue reviewed line by line |
+| P4-T00 design gate | All three design documents drafted. Eight items were blocked on P3-T14 to P3-T17 and are now unblocked |
+| P4-T13 embeddings | Schema, chunker and service in. Needs integration tests and the outbox worker |
 
-One task is exempt. **P4-T13 depends on P2-T15 only**, which shipped in Phase 2,
-so it can start today without touching anything Phase 3 still owes. That makes
-it the natural landing place for whoever finishes their Phase 3 lane first.
-
-## The Phase 4 dependency map
+## The dependency map
 
 | Task | Size | Depends on | Unblocks |
 |---|---|---|---|
@@ -91,102 +38,132 @@ it the natural landing place for whoever finishes their Phase 3 lane first.
 | P4-T10 Quarterly review: shell, scoring, narratives | L | T09 | T11 |
 | P4-T11 Quarterly review: retro, diagnostic, reset | L | T10 | T12 |
 | P4-T12 Minutes, exports and review feed-forward | M | T11, P3-T15 | end of branch |
-| P4-T13 Embeddings and retrieval | L | **P2-T15 only** | T14 |
+| P4-T13 Embeddings and retrieval | L | P2-T15 | T14 |
 | P4-T14 Copilot | L | T13, P1-T07 | T15 |
 | P4-T15 Coaching and rhythm assists | M | T14, T06 | end of phase |
 
 Two lanes are genuinely independent. The retrieval lane (T13, then T14) shares
 nothing with the coaching lane (T01 through T12). They meet once, at T15.
 
-## The Phase 4 split
+## The split
 
-**Agung takes the method core and the sessions. Obed takes retrieval, the coach
-surfaces and the agents.**
+**Agung takes the method core and the sessions. Obed takes the design gate he
+has already drafted, retrieval, and the coach surfaces.**
 
-The reasoning: the session chain is six tasks that cannot be split, so it belongs
-to one person from the start. The retrieval lane needs the least knowledge of
-existing Phase 3 code. Obed then keeps everything that builds on the AI plumbing
-he wrote.
+This differs from the first version of this document in one place: P4-T00 was
+Agung's and Obed drafted it. Reality wins over the plan on a task already done.
 
-| Stage | Agung | Obed | Runs at the same time? |
+| Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
-| 0 | P3-T14, then P3-T15 | P3-T16, then P3-T17 once P3-T15 lands | Yes, except P3-T17 |
-| 1 | P4-T00 design gate, then wait for approval | **P4-T13 embeddings and retrieval** | Yes |
-| 2 | P4-T01 method package | P4-T14 copilot | Yes |
-| 3 | P4-T04 nudge engine | P4-T02 Draft Coach, then P4-T03 publish gates | Yes |
+| 0 | Review the drafts, fill the eight items P3-T14 to P3-T17 have now unblocked | Same, as their author | Together, then the human approves |
+| 1 | P4-T01 method package | Finish P4-T13: integration tests, the outbox worker | Yes |
+| 2 | P4-T04 nudge engine | P4-T14 copilot | Yes |
+| 3 | P4-T02 waits on T01, so Obed takes it; Agung starts T07 | P4-T02 Draft Coach, then P4-T03 publish gates | Yes |
 | 4 | P4-T07, T08, T09, T10, T11, T12 in that order | P4-T05 Champion, then P4-T06 Coach, then P4-T15 assists | Yes |
 
-Across both phases: eleven tasks for Agung, nine for Obed, and five of Obed's
-are size L, so the load is closer than the count suggests.
-
-If Obed finishes P3-T16 before Agung finishes P3-T15, he starts P4-T13 rather
-than waiting. It is the one Phase 4 task with no Phase 3 dependency at all.
+Eight tasks each. Five of Obed's are size L against four of Agung's, but the
+session chain is six tasks that cannot be split, so the wall-clock is closer
+than the count suggests.
 
 ### Handoffs
 
-Three moments where one lane waits on the other.
+Two moments where one lane waits on the other, both from Agung to Obed.
 
-| Handoff | From | To | What has to be true |
-|---|---|---|---|
-| P3-T15 to P3-T17 | Agung | Obed | The archive writes performance snapshots and the feed-forward opens the next cycle. In practice P3-T14 also has to be in, because the demo seeds a KPI tree with a live recovery OKR |
-| P4-T01 to P4-T02 | Agung | Obed | The method package exports the twenty-six-check catalogue and the threshold registry, and its conformance suite passes |
-| P4-T04 to P4-T05 | Agung | Obed | The nudge table, the rule registry and the escalation ladders are in, with the trigger catalogue resolving rule keys |
-
-Everything else inside a lane is that lane's own business.
-
-## File ownership, so two people do not fight over one file
-
-| Area | Owner | Note |
-|---|---|---|
-| `packages/method` KPI rules | Agung | P3-T14 |
-| `packages/method` everything else | Agung during P4-T01, shared after | Nobody else edits it while T01 is open. After that, any change is a message to the other lane, because both read it |
-| KPI screens S-18, S-19, S-20, S-21 | Agung | P3-T14 |
-| Cycle archive, scorecard, feed-forward | Agung | P3-T15 |
-| Comment and reaction tables and every surface that renders them | Obed | P3-T16 |
-| The demo builder and `pnpm db:seed` | Obed | P3-T17. It reads everything and owns nothing, so it lands last |
-| `packages/agents` | Obed | P4-T05, P4-T06 |
-| `packages/adapters` ai and embedding drivers | Obed | P4-T13 |
-| Session tables and screens S-22 to S-25 | Agung | P4-T07 to T12 |
-| Nudge tables, review-inbox surfaces, admin S-36 nudge card | Agung | P4-T04 |
-| Goal page coach strip, drafting surface S-09, alignment studio review tab | Obed | P4-T02 and P4-T06 both write here, and both are his |
-| Copilot panel S-39 | Obed | P4-T14 |
-
-Two shared files carry a real collision risk: `packages/method`, and the goal
-page, where P3-T16 hangs comments on a page P3-T14 does not touch but P4-T02
-later rewrites. Everything else lands in one lane or the other.
-
-## Two decisions the human has to make
-
-**1. Branch policy.** Everything currently sits on one branch, `agung`, one
-commit per task, and `main` still ends at Phase 1. Two people cannot both commit
-to one branch without stepping on each other. The options:
-
-| Option | What it costs |
+| Handoff | What has to be true |
 |---|---|
-| One branch per person, both cut from today's `agung` | Each handoff needs a rebase or a merge, and neither person sees the other's work until then |
-| A shared `phase4` integration branch both merge into | One more branch to keep green, and a defined delivery point for each handoff |
-| Two git worktrees over the same clone | No extra branches, but two working directories and two node module trees on one machine |
+| P4-T01 to P4-T02 | The method package exports the twenty-six-check catalogue and the threshold registry, and its conformance suite passes |
+| P4-T04 to P4-T05 | The nudge table, the rule registry and the escalation ladders are in, with the trigger catalogue resolving rule keys |
 
-This one is now urgent rather than theoretical: both lanes start work in Phase 3,
-today.
+## The gate before any of it
 
-**2. Who takes the long chain.** P4-T01 to P4-T12 is eight tasks deep and mostly
-size L. It sets the floor for how long Phase 4 takes no matter how many people
-work on it. The split above gives it to Agung. Swap the lanes if Obed has more
-time.
+P4-T00 needs an explicit "design approved" from the human, with the rule corpus
+and the trigger catalogue reviewed line by line. Fifty-eight items; eight of them
+were blocked on Phase 3 and are now answerable. Nothing in stage 1 starts before
+that approval.
+
+## File ownership
+
+| Area | Owner |
+|---|---|
+| `packages/method` | Agung during P4-T01. Shared after, and any change is a message to the other lane |
+| Nudge tables, review-inbox surfaces, admin S-36 nudge card | Agung |
+| Session tables and screens S-22 to S-25 | Agung |
+| `packages/agents` | Obed |
+| `packages/adapters` ai and embedding drivers | Obed |
+| Goal page coach strip, drafting surface S-09, alignment studio review tab | Obed |
+| Copilot panel S-39 | Obed |
+
+The one shared file with real collision risk is `packages/method`. Everything
+else lands in one lane or the other.
+
+## Rules the merge taught us, which both lanes now follow
+
+The first merge of the two lanes brought in six defects. Every one of them
+passed `pnpm typecheck` and `pnpm lint`, because neither of those can see any of
+this. These are not suggestions.
+
+**Run the gates that actually catch things.** Before a task is called done:
+
+| Command | What only it catches |
+|---|---|
+| `pnpm db:lint` | A table shipped without `force row level security`, a policy with no `with check`, a query with no soft-delete scope |
+| `pnpm check:boundaries` | A write outside the Operation pipeline, a vendor SDK outside `packages/adapters` |
+| `pnpm dead-code` | A server action written and never wired to a component |
+| The real-database suite | A write that refuses at run time. `TEST_DB_HOST=localhost TEST_DB_PORT=5432 TEST_DB_SUPERUSER=postgres TEST_DB_PASSWORD=postgres`, and `--no-file-parallelism` on this machine |
+
+**`enable row level security` is not the tenant floor.** Without `force`, the
+table owner bypasses the policy, and the owner is the role migrations run as.
+Every policy needs `with check` as well as `using`, or it constrains reads and
+leaves writes free to carry another workspace's id. Use the missing_ok form,
+`nullif(current_setting('app.workspace_id', true), '')::uuid`, so an unscoped
+request returns nothing instead of raising.
+
+**A read never has `context.actor.memberId`.** Only `runOperation` resolves an
+actor, against rows loaded inside the writing transaction. A read action has to
+resolve the member itself from the user id.
+
+**`set_config(..., true)` is transaction-local.** Outside a transaction it is
+discarded the instant the statement that set it commits. Use `withWorkspace`.
+
+**Migration numbers.** The tree is at 0032; the next is **0033**. 0029 is a
+permanent gap: it was P3-T16's original number, renumbered when the lanes
+collided, and closing the gap now would mean rewriting history for cosmetics.
+Agree the number before writing the file when both lanes have one in flight.
+
+**0031 and 0032 were edited in place** to close the tenant holes, with the
+human's approval. The migration runner hashes content, so anyone who applied
+either before 2026-08-14 has to recreate their development database.
+
+## Open decisions, for the human
+
+1. **Does "Phase 3 complete" mean every row `done`?** P4-T00's dependency line
+   says complete; eight rows sit at `in_review` awaiting a read.
+2. **The write-access floor.** The registry invariant read "every write needs at
+   least `edit`". That would force `comments.create` up to `edit` and hand every
+   commenter the right to rewrite the objective. The floor is now `edit`
+   everywhere except the `comments` and `reactions` domains, plus a new
+   assertion that no write anywhere is reachable at `view`. Recorded on the
+   P3-T16 row and reversible.
+3. **METHOD.md §3.6, the forecast on sparse data.** Three values inside two days,
+   projected six weeks out, reads 672 for a key result whose target is 60.
+   Whether the section should require a minimum span before a forecast is shown
+   is a practice decision, not a developer's.
+4. **The branch policy.** Both lanes are on `agung` today, which worked only
+   because the merge was a fast-forward. Two people writing at once need either
+   a branch each or a shared integration branch.
 
 ## AI credentials: what needs them and when
 
-Every deterministic path has to work with the AI provider switched off, and
-continuous integration proves it. Credentials are for verifying the AI half, not
-for building the product.
+Every deterministic path has to work with the provider switched off, and
+continuous integration proves it. Credentials verify the AI half; they do not
+build the product.
 
-| Task | What it needs | When |
-|---|---|---|
-| P4-T13 | An embedding provider, or a local embedding model | First. This is the earliest task that cannot be finished without one |
-| P4-T14 | A chat provider, for streaming answers | After T13 |
-| P4-T05, P4-T06, P4-T15 | A chat provider, to verify drafting and rewriting | Stage 4 |
-| Everything in Phase 3, and P4-T01 to P4-T04, P4-T07 to P4-T12 | Nothing | These are deterministic by design |
+| Task | What it needs |
+|---|---|
+| P4-T13 | An embedding provider, or a local embedding model. The earliest task that cannot finish without one |
+| P4-T14 | A chat provider, for streaming answers |
+| P4-T05, P4-T06, P4-T15 | A chat provider, to verify drafting and rewriting |
+| Everything else | Nothing. Deterministic by design |
 
 Before storing a key: set `OPENOKR_ENCRYPTION_KEY` in `apps/web/.env`. Without
 it a fresh root key is generated on every process start, so anything sealed
@@ -194,12 +171,12 @@ locally stops opening after a restart.
 
 ## The working rules stay the same
 
-Both lanes still follow the task loop in `EXECUTION-GUIDE.md` and `CLAUDE.md`.
-Nothing here changes it.
+Both lanes follow the task loop in `EXECUTION-GUIDE.md` and `CLAUDE.md`.
 
 - A human names the task. Nobody starts the next one on their own.
 - Restate the task and confirm the Definition of Ready before writing code.
 - Tests first, failing for the right reason.
-- Update the `STATUS.md` row. Only a human sets `done`.
+- Update the `STATUS.md` row, including what is **not** done. Only a human sets
+  `done`.
 - One commit per task, titled `<TASK-ID>: <title>`, signed off with `-s`.
 - Nobody merges their own work.
