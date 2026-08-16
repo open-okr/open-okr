@@ -10,7 +10,9 @@ import {
   COMMENT_SUBJECT_TYPES,
   comments,
   reactions,
+  type WorkspaceTx,
   withWorkspace,
+  workspaceMembers,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -36,6 +38,45 @@ function requireMemberId(memberId: string | null | undefined): string {
     throw new OperationError("forbidden", "A system actor cannot do this.");
   }
   return memberId;
+}
+
+/**
+ * The acting member, for a **read**.
+ *
+ * A write gets its member from `runOperation`, which resolves the actor against
+ * rows loaded inside the writing transaction. A read never goes through that,
+ * so its context carries the user id and nothing else: reading
+ * `context.actor.memberId` there is always undefined, and every read here
+ * refused with "a system actor cannot do this" until this existed.
+ */
+async function readingMember<TSchema extends Record<string, unknown>>(
+  tx: WorkspaceTx<TSchema>,
+  workspaceId: string,
+  actor: { readonly memberId?: string | null; readonly userId?: string | null },
+): Promise<string> {
+  if (actor.memberId) {
+    return actor.memberId;
+  }
+  if (!actor.userId) {
+    throw new OperationError("forbidden", "A system actor cannot do this.");
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, actor.userId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    // The same answer an outsider gets, so membership is not disclosed.
+    throw new OperationError("not_found", "No such workspace.");
+  }
+  return member.id;
 }
 
 const subjectTypeSchema = z.enum(COMMENT_SUBJECT_TYPES);
@@ -67,7 +108,7 @@ export const listCommentsAction = defineReadAction({
     return withWorkspace(db, ctx.workspaceId, async (tx) => {
       await getAccessScoped(tx, {
         workspaceId: ctx.workspaceId,
-        memberId: requireMemberId(ctx.actor.memberId),
+        memberId: await readingMember(tx, ctx.workspaceId, ctx.actor),
         resourceType: input.subjectType,
         resourceId: input.subjectId,
       });
@@ -105,7 +146,7 @@ export const listReactionsAction = defineReadAction({
         ctx.workspaceId,
         input.subjectType,
         input.subjectId,
-        requireMemberId(ctx.actor.memberId),
+        await readingMember(tx, ctx.workspaceId, ctx.actor),
       );
     });
   },
@@ -299,7 +340,10 @@ export const addReactionAction = defineWriteAction({
     emoji: z.string().min(1).max(32),
   }),
   output: z.object({ id: z.string().uuid() }),
-  access: ACCESS_LEVELS.view,
+  // `comment`, not `view`. Reacting is a write, and a write reachable at view
+  // is the silent escalation the registry's own invariant exists to stop:
+  // anyone who could merely read a goal could attach something to it.
+  access: ACCESS_LEVELS.comment,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const result = await addReaction(tx, {
@@ -336,7 +380,9 @@ export const removeReactionAction = defineWriteAction({
   summary: "Remove your own reaction",
   input: z.object({ reactionId: z.string().uuid() }),
   output: z.object({}),
-  access: ACCESS_LEVELS.view,
+  // `comment` for the same reason as adding one. The action refuses anybody
+  // but the reaction's own author besides.
+  access: ACCESS_LEVELS.comment,
   safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {

@@ -13,6 +13,9 @@
  * runs through the same layer as normal reads: the caller reloads each hit
  * through the access-aware getter.
  */
+import { embeddings, newId, withWorkspace } from "@openokr/db";
+import { and, eq, gte } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type ChunkOptions, chunkText, contentHash } from "./chunker.ts";
 
@@ -91,30 +94,31 @@ export class EmbeddingService {
       return;
     }
 
-    const client = await this.#pool.connect();
-    try {
-      await client.query("select set_config('app.workspace_id', $1, true)", [
-        input.workspaceId,
-      ]);
-
+    // `withWorkspace` rather than a checked-out client and `set_config`.
+    // `set_config(..., true)` is transaction-local, and these statements ran
+    // outside any transaction, so the setting was discarded the moment the
+    // statement that set it committed. Every query after it therefore ran with
+    // no workspace at all, which only went unnoticed while the table's
+    // row-level security was not forced.
+    await withWorkspace(drizzle(this.#pool), input.workspaceId, async (tx) => {
       for (const chunk of chunks) {
         const hash = contentHash(chunk.content);
 
         // Check if this chunk already exists with the same hash
-        const existing = await client.query(
-          `select id, content_hash from embeddings
-           where workspace_id = $1
-             and entity_type = $2
-             and entity_id = $3
-             and chunk_index = $4`,
-          [input.workspaceId, input.entityType, input.entityId, chunk.index],
-        );
+        const [existingRow] = await tx
+          .select({ id: embeddings.id, contentHash: embeddings.contentHash })
+          .from(embeddings)
+          .where(
+            and(
+              eq(embeddings.workspaceId, input.workspaceId),
+              eq(embeddings.entityType, input.entityType),
+              eq(embeddings.entityId, input.entityId),
+              eq(embeddings.chunkIndex, chunk.index),
+            ),
+          )
+          .limit(1);
 
-        const existingRow = existing.rows[0] as
-          | { id: string; content_hash: string }
-          | undefined;
-
-        if (existingRow?.content_hash === hash) {
+        if (existingRow?.contentHash === hash) {
           // Content unchanged, skip
           continue;
         }
@@ -135,56 +139,53 @@ export class EmbeddingService {
         }
 
         if (existingRow) {
-          await client.query(
-            `update embeddings
-             set content = $1,
-                 content_hash = $2,
-                 embedding = $3,
-                 model = $4,
-                 dimensions = $5,
-                 updated_at = now()
-             where id = $6`,
-            [
-              chunk.content,
-              hash,
-              embeddingValue,
+          // openokr:allow-mutation: an embedding is derived, not a domain
+          // change. It carries no audit, activity or outbox row for the same
+          // reason a recompute does not: nobody decided it, and a feed entry
+          // per chunk would drown the one the author's own edit produced.
+          await tx
+            .update(embeddings)
+            .set({
+              content: chunk.content,
+              contentHash: hash,
+              embedding: embeddingValue,
               model,
               dimensions,
-              existingRow.id,
-            ],
-          );
+              updatedAt: new Date(),
+            })
+            .where(eq(embeddings.id, existingRow.id));
         } else {
-          await client.query(
-            `insert into embeddings
-             (id, workspace_id, entity_type, entity_id, chunk_index, content, content_hash, embedding, model, dimensions)
-             values (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [
-              input.workspaceId,
-              input.entityType,
-              input.entityId,
-              chunk.index,
-              chunk.content,
-              hash,
-              embeddingValue,
-              model,
-              dimensions,
-            ],
-          );
+          // openokr:allow-mutation: derived, as above.
+          await tx.insert(embeddings).values({
+            id: newId(),
+            workspaceId: input.workspaceId,
+            entityType: input.entityType,
+            entityId: input.entityId,
+            chunkIndex: chunk.index,
+            content: chunk.content,
+            contentHash: hash,
+            embedding: embeddingValue,
+            model,
+            dimensions,
+          });
         }
       }
 
-      // Remove stale chunks (entity was re-chunked with fewer chunks)
-      await client.query(
-        `delete from embeddings
-         where workspace_id = $1
-           and entity_type = $2
-           and entity_id = $3
-           and chunk_index >= $4`,
-        [input.workspaceId, input.entityType, input.entityId, chunks.length],
-      );
-    } finally {
-      client.release();
-    }
+      // Remove stale chunks (entity was re-chunked with fewer chunks). A hard
+      // delete, per the marker on the table: a soft-deleted chunk would still
+      // sit in the vector index and still come back from a search.
+      // openokr:allow-mutation: derived, as above.
+      await tx
+        .delete(embeddings)
+        .where(
+          and(
+            eq(embeddings.workspaceId, input.workspaceId),
+            eq(embeddings.entityType, input.entityType),
+            eq(embeddings.entityId, input.entityId),
+            gte(embeddings.chunkIndex, chunks.length),
+          ),
+        );
+    });
   }
 
   /**
@@ -195,13 +196,20 @@ export class EmbeddingService {
     entityType: string,
     entityId: string,
   ): Promise<void> {
-    await this.#pool.query(
-      `delete from embeddings
-       where workspace_id = $1
-         and entity_type = $2
-         and entity_id = $3`,
-      [workspaceId, entityType, entityId],
-    );
+    // Through `withWorkspace` as well: this ran on the pool with no workspace
+    // set at all, so with the floor forced it would now delete nothing.
+    await withWorkspace(drizzle(this.#pool), workspaceId, async (tx) => {
+      // openokr:allow-mutation: derived data, cleaned up after its source.
+      await tx
+        .delete(embeddings)
+        .where(
+          and(
+            eq(embeddings.workspaceId, workspaceId),
+            eq(embeddings.entityType, entityType),
+            eq(embeddings.entityId, entityId),
+          ),
+        );
+    });
   }
 
   /**
