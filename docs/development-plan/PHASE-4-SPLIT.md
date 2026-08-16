@@ -13,8 +13,15 @@ this file gets fixed.
 `done`, seven are `in_review`, one is `in_progress`. Only a human sets `done`, so
 those eight are waiting on a read rather than on work.
 
-Two Phase 4 tasks are already under way, both Obed's, both started in parallel
-with the end of Phase 3:
+**Phase 4 has been touched by one person only.** An audit of the history on
+2026-08-14 found exactly two Phase 4 commits, both Obed's: `63eceaa` and
+`edda874`. Agung has written no Phase 4 code; both of his commits naming the
+phase are this document. Fourteen of the sixteen tasks have nothing at all:
+`packages/method/src` still holds only Phase 3 files, with no quality catalogue
+and no trigger catalogue, and `packages/agents/src` still holds only P2-T17's
+runtime, with no Champion and no Coach.
+
+The two that are under way, both started in parallel with the end of Phase 3:
 
 | Task | State |
 |---|---|
@@ -53,9 +60,13 @@ has already drafted, retrieval, and the coach surfaces.**
 This differs from the first version of this document in one place: P4-T00 was
 Agung's and Obed drafted it. Reality wins over the plan on a task already done.
 
+**Stage 0 is a gate, not parallel work.** P4-T01 depends on T00, and everything
+else depends on T01 except T13. Until the gate is approved there is exactly one
+Phase 4 task anybody may touch, and it is Obed's.
+
 | Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
-| 0 | Review the drafts, fill the eight items P3-T14 to P3-T17 have now unblocked | Same, as their author | Together, then the human approves |
+| 0 | Review the 58 items line by line, and close the Phase 3 tails: the three unwired comment actions that keep `pnpm dead-code` red, and the seven `in_review` rows waiting on a read | Fill the eight items P3-T14 to P3-T17 have now unblocked, as the author of all three documents. Then P4-T13, the only task that does not wait on the gate | Yes, and neither is Phase 4 code |
 | 1 | P4-T01 method package | Finish P4-T13: integration tests, the outbox worker | Yes |
 | 2 | P4-T04 nudge engine | P4-T14 copilot | Yes |
 | 3 | P4-T02 waits on T01, so Obed takes it; Agung starts T07 | P4-T02 Draft Coach, then P4-T03 publish gates | Yes |
@@ -64,6 +75,13 @@ Agung's and Obed drafted it. Reality wins over the plan on a task already done.
 Eight tasks each. Five of Obed's are size L against four of Agung's, but the
 session chain is six tasks that cannot be split, so the wall-clock is closer
 than the count suggests.
+
+**P4-T01 is Agung's because it is the single bottleneck.** T02 and T04 both wait
+on it, and through those two the whole rest of the phase waits. Agung built
+`packages/method` through Phase 3, so the twenty-six-check catalogue lands in a
+package its author already knows. Obed meanwhile holds T13 and T14, which do not
+touch that package at all, so for the first two stages neither lane waits on the
+other.
 
 ### Handoffs
 
