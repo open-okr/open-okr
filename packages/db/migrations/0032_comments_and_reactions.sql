@@ -41,9 +41,18 @@ create index comments_author_idx
 
 -- RLS: tenant floor
 alter table comments enable row level security;
+-- Without FORCE the table owner bypasses the policy, and the owner is the role
+-- migrations run as. `enable` alone is not the tenant floor.
+alter table comments force row level security;
 
+-- `with check` as well as `using`: without it the policy constrains reads and
+-- leaves writes open, so a request scoped to one workspace could insert a row
+-- carrying another's id. `nullif(..., true)` is the missing_ok form; the bare
+-- `current_setting` raises when the setting is absent instead of returning no
+-- rows, which turns a scoping mistake into a 500.
 create policy comments_tenant on comments
-  using (workspace_id = current_setting('app.workspace_id')::uuid);
+  using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
+  with check (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);
 
 -- ── Reactions ───────────────────────────────────────────────────────────
 
@@ -70,6 +79,8 @@ create index reactions_subject_idx
 
 -- RLS: tenant floor
 alter table reactions enable row level security;
+alter table reactions force row level security;
 
 create policy reactions_tenant on reactions
-  using (workspace_id = current_setting('app.workspace_id')::uuid);
+  using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
+  with check (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);

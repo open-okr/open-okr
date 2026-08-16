@@ -20,6 +20,11 @@ exception
 end
 $$;
 
+-- openokr:hard-delete: an embedding is derived, never authored. A soft-deleted
+-- chunk would still sit in the vector index and still come back from a nearest
+-- neighbour search unless every query remembered to filter it, so a stale row
+-- here is worse than a missing one. When the source changes the chunk is
+-- replaced; when the source goes, the cascade takes it.
 create table embeddings (
   id uuid primary key,
   workspace_id uuid not null references workspaces (id) on delete cascade,
@@ -57,6 +62,15 @@ create index embeddings_content_hash_idx
 
 -- RLS: tenant floor
 alter table embeddings enable row level security;
+-- Without FORCE the table owner bypasses the policy, and the owner is the role
+-- migrations run as. `enable` alone is not the tenant floor. A retrieval index
+-- that leaked across workspaces would be the worst table in the product to get
+-- this wrong on: it holds the text of everything.
+alter table embeddings force row level security;
 
+-- `with check` as well as `using`, so a write cannot carry another workspace's
+-- id, and the missing_ok form of `current_setting` so an unscoped request
+-- returns nothing rather than raising.
 create policy embeddings_tenant on embeddings
-  using (workspace_id = current_setting('app.workspace_id')::uuid);
+  using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
+  with check (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);

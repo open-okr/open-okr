@@ -83,6 +83,10 @@ async function createGoal(): Promise<string> {
       title: "Test goal for comments",
       level: "company" as const,
       ownerKind: "member" as const,
+      // `goals_owner_matches_kind` refuses a member-owned goal with no member
+      // on it, which is what this fixture was doing: the suite could never
+      // have passed against a real database.
+      memberId: ownerMemberId,
       championId: ownerMemberId,
       reviewerId: secondMemberId,
       weight: 100,
