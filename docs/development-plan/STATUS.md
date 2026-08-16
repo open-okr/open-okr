@@ -283,7 +283,6 @@ gate state.
 | P4-T10 | Quarterly review: session shell, scoring, narratives | todo |  |  |  |
 | P4-T11 | Quarterly review: retro, diagnostic, reset | todo |  |  |  |
 | P4-T12 | Minutes, exports and review feed-forward | todo |  |  |  |
-| P4-T13 | Embeddings and retrieval | todo |  |  |  |
 | P4-T14 | Copilot | todo |  |  |  |
 | P4-T15 | Coaching and rhythm assists | todo |  |  |  |
 
