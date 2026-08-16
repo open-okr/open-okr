@@ -260,8 +260,32 @@ METHOD decision rather than a developer's, and the two options are:
 
 **Nothing should be built on `quality.wordLists` until the human picks one.**
 
-### Still to review
+### Both session structures match the canon
 
-`p4-t00-agent-design.md`'s deduplication rules, quiet hours and the
-deterministic-with-AI-off matrix, and `p4-t00-session-design.md` against
-METHOD.md §7 and §8.
+`p4-t00-session-design.md` carries METHOD.md §8.1's eleven quarterly stages with
+the same numbers, names, acts and minute budgets: open, score, narratives,
+recognition, team retro, management retro, root cause, process health, keep or
+modify or abandon, learnings, decisions. And §7.2's weekly ritual is the same
+four steps in the same order, as an explicit state machine: confidence round,
+diagnose what is low, commitments, digest.
+
+Structure is the half a review can settle by reading. Whether each stage's
+completion condition is the right one is a judgement, and it is the judgement
+P4-T00's acceptance criterion asks the human to make.
+
+### Where the review stands
+
+| Reviewed | Result |
+|---|---|
+| The twenty-six quality checks | Exact against METHOD.md §4.1 to §4.4 |
+| The trigger catalogue | 44 in the plan, 42 tabulated, three named above and now fillable |
+| The three escalation ladders | Match `escalation.ts` and AI-NATIVE-PLAN §6.3 |
+| Every §11 key cited by name | All present in `thresholds.ts` |
+| The eleven quarterly stages | Exact against METHOD.md §8.1 |
+| The four weekly steps | Exact against METHOD.md §7.2 |
+
+**Still to review:** the agent design's deduplication rules, quiet hours and the
+deterministic-with-AI-off matrix.
+
+**Blocking the gate:** the three triggers, and the `quality.wordLists` decision
+above.
