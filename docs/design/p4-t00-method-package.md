@@ -108,7 +108,8 @@ These feed phase completion and publish gates, not the strength score.
 ### 1.3 Word lists
 
 Exported as named arrays of lowercase strings. The canon terms are immutable.
-A workspace may add terms via SS11 `quality.wordLists`; the canon terms remain.
+A workspace may add terms through a §4.14 setting; the canon terms remain. Not a
+§11 parameter: see the registry note below.
 
 | List name | Used by | Words |
 |---|---|---|
@@ -392,7 +393,20 @@ P4-T01 adds:
 
 | New key | Group | Default | Reason |
 |---|---|---|---|
-| `quality.wordLists` | quality | `{}` (empty overrides) | Workspace-specific additions to the SS4 word lists |
+| None | | | See below |
+
+**No new §11 parameter.** This table proposed `quality.wordLists`, and it was
+withdrawn on review because §11 already answers it the other way.
+`packages/method/src/thresholds.ts` records the rule in its own header: the §4
+word lists are "data but not numeric", excluded from the registry deliberately
+at P3-T02, alongside §2.4's planning timelines and the formula evaluator's
+safety bounds. §11's own sentence is that a value not in the registry is not a
+setting; admitting a non-numeric map would change what the registry is, and that
+is a METHOD decision rather than a design one.
+
+Workspace additions to the word lists therefore belong in the TECHNICAL-PLAN
+§4.14 settings map, with a default that a fresh workspace resolves without
+configuration, which is where every other non-numeric preference already lives.
 
 No other SS11 parameters are needed: every band, corridor, cap and boundary the
 quality engine fires on is already registered.

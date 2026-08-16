@@ -159,6 +159,8 @@ the build.
 | `digest.daily` | Member's local morning | Opted-in members | No | Yes |
 | `kpi.watch` | KPI enters watch corridor | KPI owner | No | Yes |
 | `kpi.unhealthy` | KPI enters unhealthy corridor | KPI owner + sponsor | No | Yes |
+| `kpi.recovery_proposed` | Unhealthy for two consecutive periods (§11 `kpi.recoveryProposalDelayPeriods`) | KPI owner, carrying a drafted recovery OKR | No, the draft is `draftRecovery` in `packages/method` | Yes |
+| `kpi.recovered` | Real achievement re-enters the healthy corridor | KPI owner, proposing to close the recovery OKR | No | Yes |
 | `cycle.planning_opens` | 6w (annual) or 3w (quarterly) before start | Sponsor + facilitator | No | Yes |
 | `cycle.phase_blocked` | Phase conditions unmet as window closes | Facilitator | No | Yes |
 | `cycle.deadline` | 14, 7, 1 days before publication deadline | Sponsor + facilitator | No | Yes |
@@ -181,6 +183,7 @@ the build.
 | `quality.orphan_goal` | Goal below company has no parent | Champion | No | Yes |
 | `quality.level_skip` | Alignment skips a level | Champion | No | Yes |
 | `quality.silo` | Dept subtree has no horizontal dep | Department lead | No | Yes |
+| `quality.conflict` | Two goals double-count or oppose each other, from the nightly semantic sweep | Both champions, with the reason | No | **No.** The only trigger in this table that needs the provider: it is a judgement about meaning, so with AI off it does not fire and nothing is claimed |
 | `quality.dependency_unowned` | Dep unconfirmed, no risk owner | Champion | No | Yes |
 | `quality.no_cuts` | Capacity checked, nothing cut | Facilitator | No | Yes |
 | `quality.divergence` | Health disagrees with data | Champion + reviewer | No | Yes |
