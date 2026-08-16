@@ -4,6 +4,7 @@ import {
   cyclePriorScores,
   cycles,
   goals,
+  includeDeleted,
   keyResults,
   newId,
   performanceSnapshots,
@@ -15,7 +16,7 @@ import {
   type ScoreBand,
   scoreBand,
 } from "@openokr/method";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 
 /**
@@ -205,11 +206,16 @@ export async function archiveCycleInTx(
     // through a column list. Safe here in a way it was not for the KPI grid at
     // P3-T12: archiving is one facilitator closing one cycle, not two people
     // typing into the same cell, and the index still refuses a real duplicate.
+    // `includeDeleted` on purpose, not `activeOnly`. The unique index does not
+    // exclude soft-deleted rows either, so a deleted snapshot still occupies
+    // the owner's slot: skipping it here would find nothing, insert, and hit
+    // the index. Finding it and reviving it is the only path that works.
     const [existing] = await tx
       .select({ id: performanceSnapshots.id })
       .from(performanceSnapshots)
       .where(
-        and(
+        includeDeleted(
+          performanceSnapshots,
           eq(performanceSnapshots.workspaceId, workspaceId),
           eq(performanceSnapshots.cycleId, cycleId),
           eq(performanceSnapshots.ownerKind, scope.ownerKind),
@@ -228,7 +234,13 @@ export async function archiveCycleInTx(
       await tx
         .update(performanceSnapshots)
         .set({ ...figures, updatedAt: now, deletedAt: null })
-        .where(eq(performanceSnapshots.id, existing.id));
+        .where(
+          // Same reason: this is the revival, so it has to reach a deleted row.
+          includeDeleted(
+            performanceSnapshots,
+            eq(performanceSnapshots.id, existing.id),
+          ),
+        );
     } else {
       // openokr:allow-mutation: same transaction.
       await tx.insert(performanceSnapshots).values({

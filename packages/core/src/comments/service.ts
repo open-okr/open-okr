@@ -16,11 +16,12 @@ import {
   activeOnly,
   type CommentSubjectType,
   comments,
+  includeDeleted,
   reactions,
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   ensureSubscriptionList,
   reconcileMentions,
@@ -103,7 +104,7 @@ export interface UpdateCommentInput {
 export async function updateComment<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: UpdateCommentInput): Promise<void> {
-  // openokr:allow-mutation
+  // openokr:allow-mutation: the calling Operation's own transaction.
   await tx
     .update(comments)
     .set({
@@ -126,7 +127,13 @@ export async function updateComment<
       subjectId: comments.subjectId,
     })
     .from(comments)
-    .where(eq(comments.id, input.commentId))
+    .where(
+      activeOnly(
+        comments,
+        eq(comments.workspaceId, input.workspaceId),
+        eq(comments.id, input.commentId),
+      ),
+    )
     .limit(1);
 
   if (comment) {
@@ -250,12 +257,16 @@ export interface AddReactionInput {
 export async function addReaction<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, input: AddReactionInput): Promise<{ id: string }> {
-  // Check if a soft-deleted reaction exists for the same combo
+  // `includeDeleted` on purpose, not `activeOnly`. The unique index covers
+  // soft-deleted rows too, so a removed reaction still occupies its slot:
+  // skipping it here would find nothing, insert, and hit the index. Finding it
+  // and reviving it is the only path that works.
   const [existing] = await tx
     .select({ id: reactions.id, deletedAt: reactions.deletedAt })
     .from(reactions)
     .where(
-      and(
+      includeDeleted(
+        reactions,
         eq(reactions.workspaceId, input.workspaceId),
         eq(reactions.subjectType, input.subjectType),
         eq(reactions.subjectId, input.subjectId),
@@ -268,16 +279,17 @@ export async function addReaction<
   if (existing) {
     if (existing.deletedAt) {
       // Restore the soft-deleted reaction
-      // openokr:allow-mutation
+      // openokr:allow-mutation: the calling Operation's own transaction.
       await tx
         .update(reactions)
         .set({ deletedAt: null })
-        .where(eq(reactions.id, existing.id));
+        // Same reason: this is the revival, so it has to reach a deleted row.
+        .where(includeDeleted(reactions, eq(reactions.id, existing.id)));
     }
     return { id: existing.id };
   }
 
-  // openokr:allow-mutation
+  // openokr:allow-mutation: the calling Operation's own transaction.
   const [row] = await tx
     .insert(reactions)
     .values({
