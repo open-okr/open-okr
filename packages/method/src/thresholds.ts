@@ -395,8 +395,8 @@ export const THRESHOLDS = {
     group: "quality",
     label: "Strategic issue bounds",
     section: "§2.3",
-    why: "Five to ten, ranked by impact. Fewer than five is not a diagnosis; more than ten is not ranked.",
-    default: { low: 5, high: 10 },
+    why: "Three to ten, ranked by impact. Fewer than three is not a diagnosis; more than ten is not ranked. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. A workspace that wants five back raises this.",
+    default: { low: 3, high: 10 },
     schema: bounds(0, 100),
   }),
   "quality.priorityBounds": param({

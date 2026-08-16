@@ -246,8 +246,12 @@ describe("phase 2, diagnose", () => {
 
   it("requires the §11 minimum number of ranked issues", () => {
     const result = phase(base({ issues: [{ impact: 5 }, { impact: 4 }] }), 2);
+    // The floor is read from the registry, not written here: hardcoding it
+    // made this test fail when the canon moved from 5 to 3 on 2026-08-17, which
+    // is the test asserting the number rather than the behaviour.
+    const floor = canonThresholds()["quality.strategicIssueBounds"].low;
     expect(result?.missing.join(" ")).toMatch(
-      /2 strategic issue\(s\).*at least 5/,
+      new RegExp(`2 strategic issue\\(s\\).*at least ${floor}`),
     );
   });
 });

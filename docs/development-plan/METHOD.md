@@ -76,7 +76,7 @@ A phase is complete when all of its conditions hold. The product computes this. 
 |---|---|
 | 0 | Mission and mid-term strategy written, 2 to 5 annual strategies set, at least one annual OKR with key results |
 | 1 | Sponsor and facilitator named, all 7 input-pack items gathered, pack distributed at least 3 working days before session one |
-| 2 | Prior cycle scored (or first cycle declared), baseline health recorded, at least 5 strategic issues ranked |
+| 2 | Prior cycle scored (or first cycle declared), baseline health recorded, at least 3 strategic issues ranked |
 | 3 | Annual: 3 to 5 priorities each with a 12-month success statement, not-doing list written, leadership agreement on the frame recorded. Quarterly: frame revalidated (holds or documented change) and focus areas chosen |
 | 4 | Every objective and key result passes the §4 quality checks |
 | 5 | All six publish gates green and the set published |
@@ -329,7 +329,7 @@ Word lists:
 |---|---|
 | CY-1 | Input pack complete and distributed at least 3 working days before session one |
 | CY-2 | Prior cycle scored, or first cycle explicitly declared |
-| CY-3 | 5 to 10 strategic issues listed and ranked by impact |
+| CY-3 | 3 to 10 strategic issues listed and ranked by impact |
 | CY-4 | 3 to 5 priorities, each with a stated 12-month success |
 | CY-5 | The not-doing list is written |
 | CY-6 | Capacity checked, nothing left at "exceeds", and the cuts are recorded |
@@ -757,7 +757,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Objective length bounds | 4 to 18 words |
 | Company objective cap | 5 |
 | Objectives per unit cap | 3 |
-| Strategic issue bounds | 5 to 10, ranked |
+| Strategic issue bounds | 3 to 10, ranked |
 | Priority bounds | 3 to 5, each with a 12-month success statement |
 | Annual strategy bounds | 2 to 5 |
 | Carry-forward issue impact | 4 |

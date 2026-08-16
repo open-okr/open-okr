@@ -138,7 +138,7 @@ describe("the canon defaults are the ones METHOD.md §11 prints", () => {
     expect(canon["quality.objectiveLengthWords"]).toEqual({ low: 4, high: 18 });
     expect(canon["quality.companyObjectiveCap"]).toBe(5);
     expect(canon["quality.objectivesPerUnitCap"]).toBe(3);
-    expect(canon["quality.strategicIssueBounds"]).toEqual({ low: 5, high: 10 });
+    expect(canon["quality.strategicIssueBounds"]).toEqual({ low: 3, high: 10 });
     expect(canon["quality.priorityBounds"]).toEqual({ low: 3, high: 5 });
     expect(canon["quality.annualStrategyBounds"]).toEqual({ low: 2, high: 5 });
     expect(canon["quality.carryForwardIssueImpact"]).toBe(4);
