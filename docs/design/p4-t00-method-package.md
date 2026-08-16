@@ -513,7 +513,7 @@ unconfirmed dependency, no sessions booked.
 |---|---|---|
 | CY-1 | fail | Input pack incomplete (4 of 7) |
 | CY-2 | fail | No prior cycle score and not declared as first cycle |
-| CY-3 | fail | 3 issues, below minimum 5 |
+| CY-3 | pass | 3 issues, at the minimum of 3 (the floor moved from 5 on 2026-08-17) |
 | CY-4 | pass | 4 priorities, within 3-5 |
 | CY-5 | fail | Not-doing list empty |
 | CY-6 | fail | Capacity not checked |
