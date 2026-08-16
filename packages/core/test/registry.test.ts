@@ -49,15 +49,38 @@ describe("the registry", () => {
     }
   });
 
-  it("requires at least edit for anything that writes", () => {
-    // A write action that only asked for view would be a silent escalation.
+  it("requires at least edit for anything that writes, except commenting", () => {
+    // A write action that only asked for view would be a silent escalation,
+    // and that is what this guards: every write needs more than view.
+    //
+    // The floor is `edit` everywhere except the `comments` domain. TECHNICAL-
+    // PLAN §4.1 defines four levels, and `comment` (40) sits between view and
+    // edit for exactly one purpose: someone who may discuss a goal without
+    // being able to change it. Forcing a comment write up to `edit` would make
+    // that level unreachable for the thing it is named after, and would hand
+    // every commenter the right to rewrite the objective. The narrower grant
+    // is the safer one here, which is the opposite of the usual direction.
+    //
+    // P3-T07 hit this rule from the other side and widened `acknowledge` to
+    // `edit`, recording the cost. That was right: acknowledging a check-in is
+    // a state change on the goal. Writing a comment is not.
     for (const action of ACTIONS) {
-      if (action.safety !== "read") {
-        expect(
-          action.access,
-          `${action.name} writes but only needs view`,
-        ).toBeGreaterThanOrEqual(ACCESS_LEVELS.edit);
+      if (action.safety === "read") {
+        continue;
       }
+      const discussion =
+        action.name.startsWith("comments.") ||
+        action.name.startsWith("reactions.");
+      const floor = discussion ? ACCESS_LEVELS.comment : ACCESS_LEVELS.edit;
+      expect(
+        action.access,
+        `${action.name} writes but only needs view`,
+      ).toBeGreaterThanOrEqual(floor);
+      // No write is ever reachable at view, whatever its domain.
+      expect(
+        action.access,
+        `${action.name} writes at view level`,
+      ).toBeGreaterThan(ACCESS_LEVELS.view);
     }
   });
 

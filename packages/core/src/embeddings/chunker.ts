@@ -73,12 +73,17 @@ export function chunkText(text: string, options?: ChunkOptions): Chunk[] {
       content: trimmed.slice(start, end).trim(),
     });
 
-    // Advance past the chunk, minus the overlap
-    start = end - overlap;
-    if (start <= (chunks.length > 0 ? end - maxSize : 0)) {
-      // Prevent infinite loop on pathological input
-      start = end;
-    }
+    // Advance past the chunk, minus the overlap. The next start has to be
+    // strictly greater than this one, and the guard has to say so directly.
+    //
+    // The previous guard compared against `end - maxSize`, which reduces to
+    // "only when overlap is at least maxSize" and misses the case that
+    // actually happens: a paragraph or sentence boundary found close to
+    // `start` pulls `end` back, `end - overlap` lands at or behind `start`,
+    // and the loop stops advancing while the array keeps growing until the
+    // process dies. That is what was killing this suite's worker.
+    const next = end - overlap;
+    start = next > start ? next : end;
   }
 
   return chunks;
