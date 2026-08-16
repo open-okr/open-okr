@@ -229,8 +229,39 @@ an oversight. All three are answerable now.
 quality triggers", which is 42, the number the design tabulates rather than the
 number the plan defines. The gate is not complete at 42. It is complete at 44.
 
+### The three escalation ladders agree with the shipped code
+
+`p4-t00-agent-design.md` §4 tabulates the check-in ladder at steps 0 to 5 with
+the same targets and the same §11 parameters as
+`packages/method/src/escalation.ts`, which P3-T06 shipped and which reads its
+numbers from the registry rather than holding them. The acknowledgement ladder
+(1 day, 3 days) and the blocker ladder (20, 24, 48 hours) match AI-NATIVE-PLAN
+§6.3. Every one of the six §11 keys the document cites by name exists in
+`thresholds.ts`, which is the check the "Migration 0028" mistake on the P4-T13
+row shows is worth making.
+
+### One proposed §11 parameter contradicts what §11 is
+
+`p4-t00-method-package.md` proposes `quality.wordLists` as a §11 parameter with
+a default of `{}`, for workspace-specific additions to the §4 word lists.
+`thresholds.ts` says the opposite in its own header, and says why: the §4 word
+lists are "data but not numeric", and P3-T02 excluded them from the registry
+deliberately, alongside §2.4's planning timelines and the formula evaluator's
+safety bounds.
+
+The registry's rule, from §11 itself, is that a value not in it is not a
+setting. Admitting a non-numeric map changes what the registry is. That is a
+METHOD decision rather than a developer's, and the two options are:
+
+| Option | Consequence |
+|---|---|
+| Drop it from the §11 table | Workspace word-list additions need another home, most naturally a §4.14 setting |
+| Widen §11 to admit non-numeric data | METHOD.md §11 changes, and so does the sentence `thresholds.ts` is built on |
+
+**Nothing should be built on `quality.wordLists` until the human picks one.**
+
 ### Still to review
 
-`p4-t00-agent-design.md` beyond its trigger tables (escalation ladders,
-deduplication, quiet hours, the deterministic-with-AI-off matrix) and
-`p4-t00-session-design.md` against METHOD.md §7 and §8.
+`p4-t00-agent-design.md`'s deduplication rules, quiet hours and the
+deterministic-with-AI-off matrix, and `p4-t00-session-design.md` against
+METHOD.md §7 and §8.
