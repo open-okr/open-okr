@@ -197,3 +197,40 @@ that is a process decision.
 | As P3-T17 merges | Fill in demo workspace acceptance criteria (1 item) |
 | After all 58 items filled | Submit P4-T00 for line-by-line review and approval |
 | If gate rule is relaxed | Start P4-T13 (embeddings) immediately |
+
+## Review of the three design documents, 2026-08-17
+
+Read by the other lane against the sources, before the human's own pass. This
+is the legwork, not the approval: P4-T00's acceptance criterion puts the
+line-by-line read on the human, and nothing here substitutes for it.
+
+### The quality-check catalogue is complete and exact
+
+`p4-t00-method-package.md` carries all twenty-six keys METHOD.md §4.1 to §4.4
+define: OBJ-1 to OBJ-5, KR-1 to KR-7, AL-1 to AL-6, CY-1 to CY-8. None missing,
+none invented. This is the part of the gate most likely to drift from the canon
+and it has not.
+
+### Three triggers are in the plan and in no design table
+
+AI-NATIVE-PLAN §6.4 defines **44** trigger keys. The agent design tabulates 42.
+The three absent from every trigger table are:
+
+| Trigger | Was blocked by | Now |
+|---|---|---|
+| `kpi.recovery_proposed` | P3-T14 | Done, so fillable |
+| `kpi.recovered` | P3-T14 | Done, so fillable |
+| `quality.conflict` | P3-T16, the Coach's findings as comments | Done, so fillable |
+
+Each was recorded above as blocked while Phase 3 was still running, so none is
+an oversight. All three are answerable now.
+
+**The counts in the STATUS row are wrong, though.** It reads "26 rhythm + 16
+quality triggers", which is 42, the number the design tabulates rather than the
+number the plan defines. The gate is not complete at 42. It is complete at 44.
+
+### Still to review
+
+`p4-t00-agent-design.md` beyond its trigger tables (escalation ladders,
+deduplication, quiet hours, the deterministic-with-AI-off matrix) and
+`p4-t00-session-design.md` against METHOD.md §7 and §8.
