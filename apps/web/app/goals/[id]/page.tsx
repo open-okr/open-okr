@@ -200,7 +200,11 @@ export default async function GoalPage({
                       key={keyResult.id}
                       className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0"
                     >
-                      <span className="flex min-w-0 flex-col">
+                      {/* `gap-1` rather than nothing: the three children stack
+                          tight without it, and the sparkline's own box then sits
+                          hard against the line of metadata above it, which reads
+                          as the chart overlapping the row. */}
+                      <span className="flex min-w-0 flex-col gap-1">
                         <span className="text-sm text-ink">
                           {keyResult.title}
                         </span>
