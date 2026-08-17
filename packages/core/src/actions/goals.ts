@@ -347,6 +347,13 @@ export const listGoals = defineReadAction({
     /** Closed goals are excluded unless asked for: a set is what is live in it. */
     includeClosed: z.boolean().default(false),
     level: z.enum(GOAL_LEVELS).optional(),
+    /**
+     * One space's goals. Not an access control: the getter below still decides
+     * what the reader may see, and a space they cannot read returns nothing
+     * rather than refusing. This is the scope tab the Work Map and the explorer
+     * both need (S-01, S-13).
+     */
+    spaceId: z.uuid().optional(),
   }),
   output: z.object({ goals: z.array(goalOutput) }),
   access: ACCESS_LEVELS.view,
@@ -369,6 +376,9 @@ export const listGoals = defineReadAction({
         }
         if (input.level) {
           filters.push(eq(goals.level, input.level));
+        }
+        if (input.spaceId) {
+          filters.push(eq(goals.spaceId, input.spaceId));
         }
         if (!input.includeClosed) {
           filters.push(isNull(goals.closedAt));
