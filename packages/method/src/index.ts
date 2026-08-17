@@ -82,6 +82,17 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  type ConditionRow,
+  evaluateObjective,
+  OBJECTIVE_CHECKS,
+  type ObjectiveInput,
+  QUALITY_WORD_LISTS,
+  type QualityCheck,
+  type QualityStatus,
+  type QualityVerdict,
+  strengthScore,
+} from "./quality.ts";
+export {
   type CascadeGoal,
   type CascadeResult,
   type ConfidenceBand,
