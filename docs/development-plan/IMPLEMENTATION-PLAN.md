@@ -12,10 +12,10 @@ Authority: this is the execution authority. It implements TECHNICAL-PLAN.md, AI-
 | 4 | The coaching layer | P4-T00 to P4-T15 |
 | 5 | Reach: channels, agents, work | P5-T00 to P5-T13 |
 | 6 | Data: import, export, portability | P6-T01 to P6-T07 |
-| 7 | Hardening | P7-T01 to P7-T08 |
+| 7 | Hardening | P7-T01 to P7-T09 |
 | 8 | Cloud, enterprise and launch | P8-T01 to P8-T14 |
 
-**104 tasks.** Sizing: S is half a day or less, M is about a day, L is two to three days. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
+**105 tasks.** Sizing: S is half a day or less, M is about a day, L is two to three days. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
 
 ## How to read a task
 
@@ -698,6 +698,13 @@ Depends on: P7-T03
 Deliverables: personal data export and erasure as anonymisation tested end to end; retention settings for message logs, nudge records and agent run logs; a review that no personal data reaches logs, prompts or telemetry.
 Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export is produced, and no personal data of theirs remains in message logs, prompts or telemetry.
 
+### P7-T09: Release engineering and the upgrade contract [L]
+Depends on: P7-T03
+Goal: a release is produced by a pipeline, and an instance any supported distance behind reaches it without losing data, per PLAN.md §5.1.
+Deliverables: changesets wired into the repository, producing the version, changelog and release notes on tag, and failing the build for a release with no changeset; a software bill of materials produced per release and attached to it; image signing moved from P1-T10's tag step into the same pipeline, so one job owns the whole artifact set; the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure; the PLAN.md §5.1 expand-then-contract rule added to the migration linter, so a migration that drops or renames a column names the earlier release that added its replacement.
+Test plan: the upgrade matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring the dump with the previous image returns the instance to its prior state; the linter rejects a same-release drop and accepts a two-release one; a release with no changeset fails the build.
+Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it to the current release, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
+
 ---
 
 # Phase 8: Cloud, enterprise and launch
@@ -771,13 +778,13 @@ Acceptance: a visitor can explore a realistic workspace, see a coach nudge and a
 ### P8-T14: Launch [S]
 Depends on: P8-T13
 Deliverables: the release, changelog, announcement, contributor onboarding with good first issues and the agreement bot live.
-Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud.
+Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud, and an instance on the previous release upgrades to it through the lifecycle helper with its data intact.
 
 ---
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T08 (8). Phase 8: P8-T01 to T14 (14). **104 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **105 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

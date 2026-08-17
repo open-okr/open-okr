@@ -22,7 +22,7 @@ All in `docs/development-plan/` unless noted:
 4. `TECHNICAL-PLAN.md`: the target design: identity and access, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance, the one-contract API.
 5. `AI-NATIVE-PLAN.md`: the AI and agent domain: providers, keys, governance, channels, the two agents with their trigger and escalation catalogue, the copilot, retrieval, the external agent surface.
 6. `UIUX-PLAN.md`: the interface: design system, navigation, interaction patterns, screens S-01 to S-40, quality gates.
-7. `IMPLEMENTATION-PLAN.md`: the work: eight phases, 104 tasks, the Definition of Ready. Execution authority.
+7. `IMPLEMENTATION-PLAN.md`: the work: eight phases, 105 tasks, the Definition of Ready. Execution authority.
 8. `EXECUTION-GUIDE.md`: the process between you and the human.
 9. `reference/`: source-system knowledge bases for the importers. Read-only facts.
 10. This file, at the repository root: how **you** work.
@@ -82,7 +82,7 @@ Detailed designs live in `docs/design/`, written by you at each design gate. Kee
 - Reads and writes are defined **once** in the `packages/core` action contract registry with schemas and a required access level. The internal client, REST, OpenAPI, the command line, the agent tool catalogue and the chat commands are projections. Continuous integration compares the generated artifacts against the committed ones.
 - Validate all external input at the boundary. Verify every inbound channel payload's signature before anything else.
 - Authentication goes through Better Auth only. Session tokens hashed at rest. Never hand-roll sessions, tokens or password handling.
-- Migrations are forward-only and ship with the feature. Data backfills go through the separate data-change runner, never mixed into schema changes.
+- Migrations are forward-only and ship with the feature. Data backfills go through the separate data-change runner, never mixed into schema changes. Removing or renaming anything spans two releases: the first adds the replacement and writes both, the second removes the old (PLAN.md §5.1). A migration that drops what the previous release still reads breaks every rolling upgrade.
 - Soft delete is the repository-wide default scope. Use the explicit opt-in when you need deleted rows.
 - Never commit code under the "Claude" name. No co-author trailers, no generated-with lines, no Claude or Anthropic attribution in commits or change descriptions. Use the current account's name and email only.
 - Provider keys and channel credentials are envelope-encrypted, never logged, decrypted server-side only.

@@ -4,7 +4,7 @@ The single source of truth for execution progress against IMPLEMENTATION-PLAN.md
 
 Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skipping requires a note and human sign-off. The rules are in EXECUTION-GUIDE.md §5.
 
-**104 tasks.**
+**105 tasks.**
 
 ## Phase 1: Foundation
 
@@ -329,6 +329,7 @@ gate state.
 | P7-T06 | Observability | todo |  |  |  |
 | P7-T07 | Method conformance audit | todo |  |  |  |
 | P7-T08 | Privacy: export, erasure and retention | todo |  |  |  |
+| P7-T09 | Release engineering and the upgrade contract | todo |  |  | Added 2026-08-13 with PLAN.md §5.1 (upgrade policy), closing the gap that no task owned changesets, the software bill of materials, the upgrade matrix or the pre-upgrade backup. Known defect it will fix: the helper's rollback line at deploy/docker/openokr prints "run the previous tag", which is wrong once a forward-only migration has applied |
 
 ## Phase 8: Cloud, enterprise and launch
 
