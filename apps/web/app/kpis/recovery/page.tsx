@@ -4,6 +4,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { LaunchRecovery } from "./launch.tsx";
 
@@ -48,8 +49,9 @@ export default async function RecoveryBoardPage() {
   return (
     <AppShellLayout>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3.5">
+        <SectionTabs items={KPI_TABS} active="/kpis/recovery" />
         <Card>
-          <CardHeader className="justify-between">
+          <CardHeader>
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">Recovery board</h1>
               <p className="text-xs text-ink-3">
@@ -60,12 +62,6 @@ export default async function RecoveryBoardPage() {
                     } below the corridor or under recovery.`}
               </p>
             </div>
-            <Link
-              href="/kpis/trees"
-              className="text-xs font-semibold text-brand-text hover:underline"
-            >
-              Open the trees
-            </Link>
           </CardHeader>
         </Card>
 
