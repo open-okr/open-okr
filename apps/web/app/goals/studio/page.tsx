@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { GOAL_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { Studio } from "./studio.tsx";
 
@@ -60,17 +61,15 @@ export default async function StudioPage({
   return (
     <AppShellLayout>
       <div className="flex flex-col gap-3.5">
+        <SectionTabs items={GOAL_TABS} active="/goals/studio" />
         <Card>
-          <CardHeader className="justify-between">
+          <CardHeader>
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">Alignment studio</h1>
               <p className="text-xs text-ink-3">
                 The cascade, with dashed lines for horizontal dependencies.
               </p>
             </div>
-            <a href="/goals" className="text-xs text-brand-text underline">
-              Back to the list
-            </a>
           </CardHeader>
         </Card>
 

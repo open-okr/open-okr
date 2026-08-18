@@ -4,6 +4,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { LaunchRecovery } from "../recovery/launch.tsx";
@@ -116,8 +117,9 @@ export default async function KpiTreesPage({
   return (
     <AppShellLayout>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3.5">
+        <SectionTabs items={KPI_TABS} active="/kpis/trees" />
         <Card>
-          <CardHeader className="justify-between">
+          <CardHeader>
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">KPI trees</h1>
               <p className="text-xs text-ink-3">
@@ -125,12 +127,6 @@ export default async function KpiTreesPage({
                 unhealthy branch and then its leading drivers.
               </p>
             </div>
-            <Link
-              href="/kpis/recovery"
-              className="text-xs font-semibold text-brand-text hover:underline"
-            >
-              Recovery board
-            </Link>
           </CardHeader>
           {tree.trees.length > 0 ? (
             <CardBody className="flex flex-wrap gap-1.5">
