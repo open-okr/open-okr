@@ -39,7 +39,16 @@ beforeEach(async () => {
   const wb = await workerDb();
   scratchDb = `${wb.databaseName}_data_change`;
   await wb.admin.query(`drop database if exists ${scratchDb} with (force)`);
-  await wb.admin.query(`create database ${scratchDb}`);
+  // Explicit UTF8, the same as the test template. A bare `create database`
+  // inherits the cluster's encoding, which on a Windows install is WIN1252,
+  // and a migration carrying any character WIN1252 cannot represent then
+  // fails here and nowhere else. CI's Postgres initialises as UTF8, so the
+  // difference shows up only on a developer's machine, where it reads as a
+  // bug in whatever migration happens to be newest.
+  await wb.admin.query(
+    `create database ${scratchDb} ` +
+      `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+  );
   client = await connectScratch();
 });
 
