@@ -56,6 +56,10 @@ import {
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  recomputeGoalQualityInTx,
+  recomputeUnitQualityInTx,
+} from "../quality/service.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
@@ -930,6 +934,9 @@ export const createGoal = defineWriteAction({
       );
       await recompute(tx, workspaceId, created.id);
       await realign(tx, workspaceId, created.id);
+      // The whole unit, not just this goal: OBJ-5 is a property of the set, so
+      // a fourth objective changes the verdict on the three already there.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: created.id });
 
       return {
         result: { id: created.id, title: created.title },
@@ -1081,6 +1088,10 @@ export const updateGoal = defineWriteAction({
         );
       }
       await recompute(tx, workspaceId, updated.id);
+      // An update can retitle, recycle, or move the level or owning space, and
+      // every one of those changes a verdict. The unit rather than the goal,
+      // because a level move changes the count on both units it touches.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: updated.id });
       // An update can move the parent, the level or the owning space, and all
       // three are what the score reads. It can also move only a title, and
       // recomputing then costs one query set and keeps this honest without a
@@ -1159,6 +1170,9 @@ export const closeGoal = defineWriteAction({
       // report an archive as neglected.
       await clearDue(tx, workspaceId, input.id);
       await recompute(tx, workspaceId, input.id);
+      // OBJ-5 counts the open objectives in a unit, so closing one changes the
+      // verdict on every sibling that is still open.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
       // A closed goal still counts (decision D-11), so the score does not climb
       // as a cycle ends. It is recomputed anyway because closing can change what
       // the surface shows beside it.
@@ -1223,6 +1237,8 @@ export const reopenGoal = defineWriteAction({
       );
       await recompute(tx, workspaceId, input.id);
       await realign(tx, workspaceId, input.id);
+      // Rejoining the open set is the closing rule in reverse.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
 
       return {
         result: { id: input.id },
@@ -1297,6 +1313,9 @@ export const reassignGoalRole = defineWriteAction({
         fromMemberId,
         toMemberId: input.memberId,
       });
+
+      // OBJ-4 names the champion and the reviewer, so a rebind changes it.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: input.id });
 
       return {
         result: { id: input.id, role },
@@ -1393,6 +1412,9 @@ export const moveGoalToCycle = defineWriteAction({
 
       await recompute(tx, workspaceId, moved.id);
       await realign(tx, workspaceId, moved.id, before?.cycleId ?? null);
+      // OBJ-3 reads whether the goal is in a cycle at all, so a move can flip
+      // it. The unit is untouched by a cycle move, so only this goal.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: moved.id });
 
       return {
         result: { id: moved.id, cycleId: input.cycleId },
@@ -1468,6 +1490,8 @@ export const createKeyResult = defineWriteAction({
       });
 
       await recompute(tx, workspaceId, input.goalId);
+      // The KR checks judge the set, so adding one rescores all of them.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: input.goalId });
 
       // Only when the count crosses zero (design §7). KR-1 fires at none and at
       // nothing else, so the second key result changes no penalty and the third
@@ -1602,6 +1626,11 @@ export const updateKeyResult = defineWriteAction({
         );
 
       await recompute(tx, workspaceId, owner.goalId);
+      // Editing a key result changes its own verdicts and the set's.
+      await recomputeGoalQualityInTx(tx, {
+        workspaceId,
+        goalId: owner.goalId,
+      });
 
       return {
         result: { id: input.id },
