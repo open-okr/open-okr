@@ -70,6 +70,10 @@ export const QUALITY_WORD_LISTS = {
     "engaged",
     "thriving",
     "world-class",
+    // Added 2026-08-18 by human decision. §4.6 offers "Make mobile the way our
+    // customers prefer to reach us" as its strong example, and without the verb
+    // form OBJ-1 warned "Cannot tell" on the canon's own exemplar.
+    "prefer",
     "preferred",
     "go-to",
     "healthiest",

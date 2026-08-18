@@ -115,7 +115,7 @@ A workspace may add terms through a §4.14 setting; the canon terms remain. Not 
 |---|---|---|
 | `outputVerbs` | OBJ-1 | launch, build, ship, implement, create, deliver, release, complete, develop, deploy, write, publish, migrate, install, conduct, hold, organise, organize, set up, roll out, rollout, hire, redesign, finish, produce, run |
 | `movementVerbs` | OBJ-1 | increase, grow, improve, reduce, boost, raise, cut, double, triple, maximise, maximize, minimise, minimize, decrease, accelerate, expand, drive |
-| `stateWords` | OBJ-1 | become, be the, delight, delighted, loved, trusted, leading, best, strongest, profitable, sustainable, engaged, thriving, world-class, preferred, go-to, healthiest, excellence, dominant, known for, famous for, proud |
+| `stateWords` | OBJ-1 | become, be the, delight, delighted, loved, trusted, leading, best, strongest, profitable, sustainable, engaged, thriving, world-class, prefer, preferred, go-to, healthiest, excellence, dominant, known for, famous for, proud |
 | `whyMarkers` | OBJ-1 | to, so that, in order to, because |
 | `activityNouns` | KR-5 | call, meeting, interview, demo, email, workshop, session, training, webinar, post, visit, proposal, campaign, feature, report, presentation, event, ticket, article, sprint, task, activity, outreach, touchpoint (and plurals) |
 | `impactWords` | KR-5 | revenue, pipeline, conversion, retention, churn, nps, csat, satisfaction, margin, profit, growth, adoption, activation, engagement, win rate, quality, insight, market share, loyalty, renewal, upsell, arr, mrr, ltv, cac, accuracy, uptime, productivity, time-to-value, referrals, deal size |

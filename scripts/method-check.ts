@@ -31,6 +31,7 @@ import {
   isTriggerKey,
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
+  QUALITY_WORD_LISTS,
   THRESHOLDS,
 } from "../packages/method/src/index.ts";
 
@@ -42,6 +43,8 @@ const aiPlan = read("docs", "development-plan", "AI-NATIVE-PLAN.md");
 const methodDesign = read("docs", "design", "p4-t00-method-package.md");
 const agentDesign = read("docs", "design", "p4-t00-agent-design.md");
 const qualityTests = read("packages", "method", "test", "quality.test.ts");
+
+const NEWLINE = String.fromCharCode(10);
 
 const problems: string[] = [];
 const fail = (what: string, detail: string) =>
@@ -171,7 +174,62 @@ for (const [label, key] of registered) {
   }
 }
 
-// --- 3. Corpus coverage -----------------------------------------------------
+// --- 3. Word lists ----------------------------------------------------------
+
+// The lists §4 fires on, compared term by term against §4.1's and §4.2's own
+// tables. This check was added after "prefer" was missing from the state words
+// and METHOD.md §4.6's own strong example warned against its own rule for it.
+// A word list is data the practice depends on, so a term added to one and not
+// the other is drift like any other.
+const LIST_ROWS: readonly (readonly [string, keyof typeof QUALITY_WORD_LISTS])[] =
+  [
+    ["| Output verbs |", "outputVerbs"],
+    ["| Movement verbs |", "movementVerbs"],
+    ["| State words |", "stateWords"],
+    ["| Why markers |", "whyMarkers"],
+    ["| Activity nouns |", "activityNouns"],
+    ["| Impact words |", "impactWords"],
+  ];
+
+for (const [rowLabel, listName] of LIST_ROWS) {
+  const line = method
+    .split(NEWLINE)
+    .find((candidate) => candidate.startsWith(rowLabel));
+  if (!line) {
+    fail("word lists", `METHOD.md has no "${rowLabel.trim()}" row`);
+    continue;
+  }
+  const documentedTerms = (line.split("|")[2] ?? "")
+    .replace(/\(and plurals\)/i, "")
+    .split(",")
+    .map((term) => term.trim().toLowerCase())
+    .filter((term) => term !== "");
+  const defined = new Set<string>(QUALITY_WORD_LISTS[listName]);
+  for (const term of documentedTerms) {
+    // The activity nouns row ends "(and plurals)", so a plural the package
+    // carries is expected to be absent from the document rather than missing
+    // from the package. The document's own singulars all have to be present.
+    if (!defined.has(term)) {
+      fail(
+        "word lists",
+        `METHOD.md lists "${term}" under ${rowLabel.trim()} and the package's ${listName} does not carry it`,
+      );
+    }
+  }
+  for (const term of defined) {
+    const plural = term.endsWith("s") && documentedTerms.includes(term.slice(0, -1));
+    const irregular =
+      term === "activities" && documentedTerms.includes("activity");
+    if (!documentedTerms.includes(term) && !plural && !irregular) {
+      fail(
+        "word lists",
+        `the package's ${listName} carries "${term}" and METHOD.md does not list it`,
+      );
+    }
+  }
+}
+
+// --- 4. Corpus coverage -----------------------------------------------------
 
 const corpusEntries = [
   ...section(methodDesign, "## 15. The OKR corpus", "## 16.").matchAll(
@@ -208,7 +266,12 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
+const terms = Object.values(QUALITY_WORD_LISTS).reduce(
+  (sum, list) => sum + list.length,
+  0,
+);
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
-    `${documented.size} thresholds and ${corpusEntries.length} corpus entries agree with the documents.`,
+    `${documented.size} thresholds, ${terms} word-list terms and ` +
+    `${corpusEntries.length} corpus entries agree with the documents.`,
 );
