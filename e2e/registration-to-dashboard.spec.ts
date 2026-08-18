@@ -223,8 +223,12 @@ test("drafting a goal with key results persists at zero percent and pending", as
     .fill("Carries the annual mobile thrust");
   await page.getByRole("button", { name: "Add objective" }).click();
 
+  // Level 2, because the quality panel in the rail groups its issues under an
+  // h3 carrying the same title. Two headings with one name is the panel doing
+  // its job, not an ambiguity worth removing.
   await expect(
     page.getByRole("heading", {
+      level: 2,
       name: "Make mobile the way our customers prefer to reach us",
     }),
   ).toBeVisible();
@@ -302,6 +306,42 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
     page.getByRole("heading", { name: "OBJ-1 · Outcome, not output" }),
   ).toBeVisible();
   await expect(page.getByText("How it judges, in order")).toBeVisible();
+});
+
+/**
+ * The quality panel (P4-T02c).
+ *
+ * The acceptance criterion: every open issue across the set, grouped by its
+ * objective, each linking at the field that fixes it. The link is the half worth
+ * driving in a browser: an issue list that lands somebody at the top of a page
+ * has moved the work of finding the row from the panel to the reader.
+ */
+test("the quality panel groups every issue and links at the field", async () => {
+  await page.goto("/cycle?phase=4");
+
+  const panel = page.getByRole("region").filter({ hasText: "Quality panel" });
+  await expect(
+    page.getByRole("heading", { name: "Quality panel" }),
+  ).toBeVisible();
+  await expect(page.getByText(/issues? across .* objectives?/)).toBeVisible();
+
+  // Grouped under the objective they belong to.
+  await expect(
+    panel.getByRole("heading", {
+      name: "Make mobile the way our customers prefer to reach us",
+    }),
+  ).toBeVisible();
+
+  // KR-3 fires on both key results: neither carries a date or an owner.
+  const issue = panel.getByRole("link", { name: /KR-3/ }).first();
+  await expect(issue).toBeVisible();
+  const href = await issue.getAttribute("href");
+  expect(href).toMatch(/#kr-/);
+
+  await issue.click();
+  // The anchor resolves to a real row rather than to the top of the page.
+  const anchored = (href ?? "").split("#")[1] ?? "";
+  await expect(page.locator(`[id="${anchored}"]`)).toBeVisible();
 });
 
 test("closing a goal requires a retrospective and keeps it on reopen", async () => {

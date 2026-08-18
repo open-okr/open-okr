@@ -19,6 +19,7 @@ import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
+import { QualityPanel } from "./quality-panel.tsx";
 
 /**
  * The cycle workspace (UIUX-PLAN.md §4 S-04, S-06 to S-08, P3-T03).
@@ -261,7 +262,38 @@ export default async function CyclePage({
           ) : null}
         </div>
 
-        <div className="w-full flex-none xl:w-80">
+        <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
+          {viewing === 4 ? (
+            <QualityPanel
+              set={draft.goals.map((goal) => ({
+                objective: {
+                  id: goal.id,
+                  title: goal.title,
+                  hasCycle: true,
+                  hasTimeframe: false,
+                  championId: goal.champion.id,
+                  reviewerId: goal.reviewer.id,
+                  objectivesInUnit: draft.goals.filter(
+                    (other) => other.level === goal.level,
+                  ).length,
+                  level: goal.level,
+                },
+                keyResults: goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  baseline: keyResult.baselineValue,
+                  target: keyResult.targetValue,
+                  dueOn: keyResult.dueOn,
+                  ownerId: keyResult.ownerId,
+                  indicatorType: keyResult.indicatorType,
+                  direction: keyResult.direction,
+                  confidence: keyResult.confidence,
+                })),
+              }))}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
+            />
+          ) : null}
           <GuidanceRail phase={viewing} mode={workflow.mode} />
         </div>
       </div>

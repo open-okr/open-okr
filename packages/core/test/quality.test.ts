@@ -288,3 +288,90 @@ describe("what the evaluation costs", () => {
     expect((await storedGoal(created.id))?.quality_score).not.toBeNull();
   });
 });
+
+/**
+ * What the quality panel counts (P4-T02c).
+ *
+ * The panel re-evaluates in the browser rather than reading the stored flags,
+ * so the number it shows has to be the number the server stored. These assert
+ * the two agree, which is the only thing that makes re-evaluating safe.
+ */
+describe("the panel and the stored flags", () => {
+  it("count the same issues for the same set", async () => {
+    const created = (await createGoal({
+      title: "Launch the new mobile app",
+    })) as { id: string };
+    await addKeyResult(created.id);
+    await addKeyResult(created.id, {
+      title: "Improve customer satisfaction",
+      indicatorType: "leading",
+    });
+
+    const stored = await storedGoal(created.id);
+    const { applyStrictness, evaluateKeyResults, evaluateObjective } =
+      await import("@openokr/method");
+    const { canonThresholds } = await import("@openokr/method");
+    const thresholds = canonThresholds();
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      title: string;
+      baseline_value: string;
+      target_value: string;
+      due_on: string | null;
+      owner_id: string | null;
+      indicator_type: "leading" | "lagging";
+      direction: "increase" | "reduce" | "maintain" | "move";
+      confidence: string | null;
+    }>(
+      `select title, baseline_value, target_value, due_on, owner_id,
+              indicator_type, direction, confidence
+       from key_results where goal_id = $1 and deleted_at is null
+       order by position`,
+      [created.id],
+    );
+
+    const objective = applyStrictness(
+      evaluateObjective(
+        {
+          title: "Launch the new mobile app",
+          hasCycle: true,
+          hasTimeframe: false,
+          championId: ownerMemberId,
+          reviewerId: secondMemberId,
+          objectivesInUnit: 1,
+          level: "company",
+        },
+        thresholds,
+      ),
+      "warn",
+    );
+    const keyResults = applyStrictness(
+      evaluateKeyResults(
+        {
+          keyResults: rows.map((row) => ({
+            text: row.title,
+            baseline: Number(row.baseline_value),
+            target: Number(row.target_value),
+            dueOn: row.due_on,
+            ownerId: row.owner_id,
+            indicatorType: row.indicator_type,
+            direction: row.direction,
+            confidence: row.confidence === null ? null : Number(row.confidence),
+          })),
+        },
+        thresholds,
+      ),
+      "warn",
+    );
+
+    const inBrowser = [...objective, ...keyResults]
+      .filter((verdict) => verdict.status !== "pass")
+      .map((verdict) => verdict.id)
+      .sort();
+
+    // Same package, same thresholds, same answer. If these ever diverge, one of
+    // the two is reading something the other cannot see.
+    expect(inBrowser).toEqual([...(stored?.quality_flags ?? [])].sort());
+  });
+});
