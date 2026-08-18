@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ALIGNMENT_CHECKS,
   applyStrictness,
+  CYCLE_CHECKS,
   evaluateAlignment,
+  evaluateCycle,
   evaluateKeyResults,
   evaluateObjective,
   KEY_RESULT_CHECKS,
@@ -524,5 +526,163 @@ describe("AL-5, which lives in the dependency register", () => {
       everyDependencyResolved: false,
     });
     expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("fail");
+  });
+});
+
+/**
+ * §4.4, driven by corpus entry 6: "cycle readiness".
+ *
+ * Input pack with 4 items of 7, no prior cycle score, 3 strategic issues,
+ * 4 priorities, not-doing list empty, capacity unchecked, one unconfirmed
+ * dependency, no sessions booked. The human approved a verdict per check at
+ * the gate, so those are the verdicts.
+ */
+describe("corpus entry 6: cycle readiness", () => {
+  const result = evaluateCycle(
+    {
+      gates: [
+        { gateKey: 4, passed: false },
+        { gateKey: 5, passed: false },
+      ],
+      packComplete: false,
+      packLeadWorkingDays: null,
+      priorCycleScored: false,
+      firstCycle: false,
+      issueCount: 3,
+      issuesRanked: true,
+      priorityCount: 4,
+      prioritiesWithSuccess: 4,
+      notDoingWritten: false,
+      sessionsBookedForWholeCycle: false,
+    },
+    thresholds,
+  );
+  const at = (id: string) => result.find((entry) => entry.id === id)?.status;
+
+  it("fails CY-1 on an incomplete pack", () => {
+    expect(at("CY-1")).toBe("fail");
+  });
+
+  it("fails CY-2: no prior score and not declared the first cycle", () => {
+    expect(at("CY-2")).toBe("fail");
+  });
+
+  it("passes CY-3 at three issues, which is the floor since 2026-08-17", () => {
+    expect(at("CY-3")).toBe("pass");
+  });
+
+  it("passes CY-4 at four priorities, each with a success statement", () => {
+    expect(at("CY-4")).toBe("pass");
+  });
+
+  it("fails CY-5, CY-6, CY-7 and CY-8", () => {
+    expect(at("CY-5")).toBe("fail");
+    expect(at("CY-6")).toBe("fail");
+    expect(at("CY-7")).toBe("fail");
+    expect(at("CY-8")).toBe("fail");
+  });
+
+  it("counts none of them towards the strength score", () => {
+    expect(result).toHaveLength(8);
+    expect(result.every((entry) => !entry.feedsStrengthScore)).toBe(true);
+    expect(strengthScore(result)).toBeNull();
+  });
+
+  it("carries a prompt on every condition of every cycle check", () => {
+    expect(CYCLE_CHECKS).toHaveLength(8);
+    for (const check of CYCLE_CHECKS) {
+      for (const row of check.conditions) {
+        expect(row.prompt.length).toBeGreaterThan(20);
+      }
+    }
+  });
+});
+
+describe("the cycle checks read the §11 registry, not their own numbers", () => {
+  const ready = {
+    gates: [
+      { gateKey: 4, passed: true },
+      { gateKey: 5, passed: true },
+    ],
+    packComplete: true,
+    packLeadWorkingDays: 5,
+    priorCycleScored: true,
+    firstCycle: false,
+    issueCount: 4,
+    issuesRanked: true,
+    priorityCount: 4,
+    prioritiesWithSuccess: 4,
+    notDoingWritten: true,
+    sessionsBookedForWholeCycle: true,
+  };
+
+  it("passes everything when the cycle is ready", () => {
+    const result = evaluateCycle(ready, thresholds);
+    expect(result.every((entry) => entry.status === "pass")).toBe(true);
+  });
+
+  it("fails CY-3 one below the registry's own floor", () => {
+    const floor = thresholds["quality.strategicIssueBounds"].low;
+    const result = evaluateCycle(
+      { ...ready, issueCount: floor - 1 },
+      thresholds,
+    );
+    expect(result.find((entry) => entry.id === "CY-3")?.status).toBe("fail");
+  });
+
+  it("warns CY-3 when the issues are listed but nobody ranked them", () => {
+    const result = evaluateCycle({ ...ready, issuesRanked: false }, thresholds);
+    expect(result.find((entry) => entry.id === "CY-3")?.status).toBe("warn");
+  });
+
+  it("fails CY-1 one working day short of the registry's lead", () => {
+    const lead = thresholds["quality.inputPackLeadWorkingDays"];
+    const result = evaluateCycle(
+      { ...ready, packLeadWorkingDays: lead - 1 },
+      thresholds,
+    );
+    expect(result.find((entry) => entry.id === "CY-1")?.status).toBe("fail");
+  });
+
+  it("fails CY-4 on a priority with no twelve-month success statement", () => {
+    const result = evaluateCycle(
+      { ...ready, prioritiesWithSuccess: 3 },
+      thresholds,
+    );
+    expect(result.find((entry) => entry.id === "CY-4")?.status).toBe("fail");
+  });
+
+  it("leaves CY-8 as todo while nothing books sessions yet", () => {
+    const { sessionsBookedForWholeCycle: _drop, ...withoutSessions } = ready;
+    const result = evaluateCycle(withoutSessions, thresholds);
+    expect(result.find((entry) => entry.id === "CY-8")?.status).toBe("todo");
+  });
+});
+
+describe("the twenty-six checks", () => {
+  it("are all present, and every id is unique", () => {
+    const all = [
+      ...OBJECTIVE_CHECKS,
+      ...KEY_RESULT_CHECKS,
+      ...ALIGNMENT_CHECKS,
+      ...CYCLE_CHECKS,
+    ];
+    expect(all).toHaveLength(26);
+    expect(new Set(all.map((entry) => entry.id)).size).toBe(26);
+  });
+
+  it("count the objective, key result and alignment checks towards the score, and not the cycle ones", () => {
+    // METHOD.md §4: the cycle checks feed phase completion and the publish
+    // gates instead, which is a question about the cycle rather than the OKR.
+    for (const check of [
+      ...OBJECTIVE_CHECKS,
+      ...KEY_RESULT_CHECKS,
+      ...ALIGNMENT_CHECKS,
+    ]) {
+      expect(check.feedsStrengthScore).toBe(true);
+    }
+    for (const check of CYCLE_CHECKS) {
+      expect(check.feedsStrengthScore).toBe(false);
+    }
   });
 });

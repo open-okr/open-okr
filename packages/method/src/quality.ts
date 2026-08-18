@@ -629,9 +629,12 @@ const verdictOf = (check: QualityCheck, condition: string): QualityVerdict => {
 };
 
 const check = (id: string): QualityCheck => {
-  const found = [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].find(
-    (entry) => entry.id === id,
-  );
+  const found = [
+    ...OBJECTIVE_CHECKS,
+    ...KEY_RESULT_CHECKS,
+    ...ALIGNMENT_CHECKS,
+    ...CYCLE_CHECKS,
+  ].find((entry) => entry.id === id);
   if (!found) {
     throw new Error(`No such check: ${id}`);
   }
@@ -1201,4 +1204,295 @@ export function evaluateAlignment(
       feedsStrengthScore: entry.feedsStrengthScore,
     };
   });
+}
+
+/**
+ * §4.4's eight cycle checks.
+ *
+ * These do not feed the strength score. §4 counts objective, key result and
+ * alignment checks; the cycle checks feed phase completion and the publish
+ * gates, which is a different question. Not "is this OKR any good" but "is this
+ * cycle ready to run".
+ *
+ * Two of them are already decided by `publishGates`, and `evaluateCycle`
+ * delegates rather than deciding again: CY-6 is gate 5 and CY-7 is gate 4. The
+ * other six read the same §11 parameters the phase predicates read, so the two
+ * cannot disagree about a number, and a test asserts they agree about the
+ * answer as well.
+ */
+export const CYCLE_CHECKS: readonly QualityCheck[] = [
+  {
+    id: "CY-1",
+    group: "cycle",
+    title: "Input pack complete",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Items missing, or distributed too late",
+        status: "fail",
+        prompt:
+          "The input pack is not ready. Complete it and get it to people the working days ahead that §2.6 asks for, or session one becomes the meeting where everybody reads.",
+      },
+      {
+        condition: "Complete and distributed in time",
+        status: "pass",
+        prompt:
+          "The pack is complete and reached people early enough to have been read.",
+      },
+    ],
+  },
+  {
+    id: "CY-2",
+    group: "cycle",
+    title: "Prior cycle scored",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Neither scored nor declared a first cycle",
+        status: "fail",
+        prompt:
+          "Score the previous cycle before planning the next, or say in as many words that this is the first. Planning without closing the last one throws away the only evidence you have.",
+      },
+      {
+        condition: "Scored, or declared the first cycle",
+        status: "pass",
+        prompt:
+          "The previous cycle is closed, so this one starts from evidence rather than from memory.",
+      },
+    ],
+  },
+  {
+    id: "CY-3",
+    group: "cycle",
+    title: "Strategic issues",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Outside the bounds",
+        status: "fail",
+        prompt:
+          "Too few issues is not a diagnosis, and too many is not a ranking. List them inside the bounds and rank them by impact.",
+      },
+      {
+        condition: "Listed but not ranked",
+        status: "warn",
+        prompt:
+          "The issues are listed but not ranked by impact. Ranking is what turns a list into a decision about what to leave out.",
+      },
+      {
+        condition: "Listed and ranked",
+        status: "pass",
+        prompt:
+          "Ranked by impact, so the priorities have somewhere to come from.",
+      },
+    ],
+  },
+  {
+    id: "CY-4",
+    group: "cycle",
+    title: "Priorities set",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Outside the bounds",
+        status: "fail",
+        prompt:
+          "The priority count is outside what a cycle can carry. Cut to the number that fits, because the ones you drop here are the ones you would have dropped in month two anyway.",
+      },
+      {
+        condition: "A priority with no twelve-month success statement",
+        status: "fail",
+        prompt:
+          "Every priority needs a stated twelve-month success. Without it, nobody can tell later whether it worked.",
+      },
+      {
+        condition: "In range, each with a success statement",
+        status: "pass",
+        prompt: "Each priority says what success looks like in twelve months.",
+      },
+    ],
+  },
+  {
+    id: "CY-5",
+    group: "cycle",
+    title: "Not-doing list",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Not written",
+        status: "fail",
+        prompt:
+          "The not-doing list is empty. A plan that drops nothing is a wish list, and naming what you will not do is what makes the rest fit.",
+      },
+      {
+        condition: "Written",
+        status: "pass",
+        prompt:
+          "The not-doing list is written, so the focus is a choice rather than an intention.",
+      },
+    ],
+  },
+  {
+    id: "CY-6",
+    group: "cycle",
+    title: "Capacity checked",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Unchecked, or something still exceeds",
+        status: "fail",
+        prompt:
+          "Capacity is not settled. Check it and record the cuts, because a key result still marked as exceeding capacity has already told you how the cycle ends.",
+      },
+      {
+        condition: "Checked and nothing exceeds",
+        status: "pass",
+        prompt: "Capacity is checked and nothing is left exceeding it.",
+      },
+    ],
+  },
+  {
+    id: "CY-7",
+    group: "cycle",
+    title: "Dependencies confirmed",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "A dependency neither confirmed nor risk-owned",
+        status: "fail",
+        prompt:
+          "A dependency is neither confirmed by the team providing it nor logged as a risk with a named owner. One or the other, before this cycle starts.",
+      },
+      {
+        condition: "Every dependency confirmed or risk-owned",
+        status: "pass",
+        prompt: "Every dependency is confirmed or owned as a risk.",
+      },
+    ],
+  },
+  {
+    id: "CY-8",
+    group: "cycle",
+    title: "Sessions booked",
+    feedsStrengthScore: false,
+    conditions: [
+      {
+        condition: "Not booked for the whole cycle",
+        status: "fail",
+        prompt:
+          "Book every check-in and review now, for the whole cycle. A cadence booked week by week is the one that quietly stops.",
+      },
+      {
+        condition: "Booked for the whole cycle",
+        status: "pass",
+        prompt:
+          "The whole cadence is in the calendar rather than in somebody's intention.",
+      },
+    ],
+  },
+];
+
+export interface CycleCheckInput {
+  /** Straight from `publishGates`. CY-6 is gate 5 and CY-7 is gate 4. */
+  readonly gates: readonly {
+    readonly gateKey: number;
+    readonly passed: boolean;
+  }[];
+  readonly packComplete: boolean;
+  /** Null when the pack has not been distributed, or no session is booked. */
+  readonly packLeadWorkingDays: number | null;
+  readonly priorCycleScored: boolean;
+  readonly firstCycle: boolean;
+  readonly issueCount: number;
+  readonly issuesRanked: boolean;
+  readonly priorityCount: number;
+  readonly prioritiesWithSuccess: number;
+  readonly notDoingWritten: boolean;
+  /** Undefined until P4-T04 ships sessions. `todo` rather than a guess. */
+  readonly sessionsBookedForWholeCycle?: boolean;
+}
+
+/**
+ * §4.4 as verdicts.
+ *
+ * Everything numeric comes from the §11 registry, so a workspace that widens
+ * its issue bounds widens this check with it rather than being told one thing
+ * by the cycle rail and another by the coach.
+ */
+export function evaluateCycle(
+  input: CycleCheckInput,
+  thresholds: ResolvedThresholds,
+): readonly QualityVerdict[] {
+  const lead = thresholds["quality.inputPackLeadWorkingDays"];
+  const issues = thresholds["quality.strategicIssueBounds"];
+  const priorities = thresholds["quality.priorityBounds"];
+  const gate = (key: number) =>
+    input.gates.find((entry) => entry.gateKey === key);
+
+  const cy1 =
+    input.packComplete &&
+    input.packLeadWorkingDays !== null &&
+    input.packLeadWorkingDays >= lead
+      ? "Complete and distributed in time"
+      : "Items missing, or distributed too late";
+
+  const cy2 =
+    input.priorCycleScored || input.firstCycle
+      ? "Scored, or declared the first cycle"
+      : "Neither scored nor declared a first cycle";
+
+  const cy3 =
+    input.issueCount < issues.low || input.issueCount > issues.high
+      ? "Outside the bounds"
+      : input.issuesRanked
+        ? "Listed and ranked"
+        : "Listed but not ranked";
+
+  const cy4 =
+    input.priorityCount < priorities.low ||
+    input.priorityCount > priorities.high
+      ? "Outside the bounds"
+      : input.prioritiesWithSuccess < input.priorityCount
+        ? "A priority with no twelve-month success statement"
+        : "In range, each with a success statement";
+
+  const cy5 = input.notDoingWritten ? "Written" : "Not written";
+
+  const cy6 = gate(5)?.passed
+    ? "Checked and nothing exceeds"
+    : "Unchecked, or something still exceeds";
+
+  const cy7 = gate(4)?.passed
+    ? "Every dependency confirmed or risk-owned"
+    : "A dependency neither confirmed nor risk-owned";
+
+  const verdicts: QualityVerdict[] = [
+    verdictOf(check("CY-1"), cy1),
+    verdictOf(check("CY-2"), cy2),
+    verdictOf(check("CY-3"), cy3),
+    verdictOf(check("CY-4"), cy4),
+    verdictOf(check("CY-5"), cy5),
+    verdictOf(check("CY-6"), cy6),
+    verdictOf(check("CY-7"), cy7),
+  ];
+
+  const cy8 = check("CY-8");
+  verdicts.push(
+    input.sessionsBookedForWholeCycle === undefined
+      ? {
+          id: cy8.id,
+          status: "todo",
+          prompt:
+            "Nothing books sessions yet, so whether the cadence is in the calendar cannot be read. P4-T04 brings it.",
+          feedsStrengthScore: false,
+        }
+      : verdictOf(
+          cy8,
+          input.sessionsBookedForWholeCycle
+            ? "Booked for the whole cycle"
+            : "Not booked for the whole cycle",
+        ),
+  );
+
+  return verdicts;
 }
