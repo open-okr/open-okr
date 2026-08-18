@@ -43,6 +43,10 @@ You execute exactly one task from `IMPLEMENTATION-PLAN.md` at a time, only when 
 5. Update `STATUS.md` to `in_review`. Branch `task/<task-id>-<slug>`. One change titled `<TASK-ID>: <title>` with the Definition of Done filled in.
 6. Stop. Never start the next task on your own. Never merge your own work.
 
+**One task is one working session and one commit.** That is the size a task is cut to, not a target to squeeze into. If you get partway through and realise it will not fit, stop before writing more code, say so, and propose the split as lettered parts (`P4-T02a`, `P4-T02b`). The human decides. Splitting a task across four commits without saying so is what this rule exists to prevent: it reads as progress and hides that nothing is finishable.
+
+A task that has to be split is a task that was cut wrong. Fix `IMPLEMENTATION-PLAN.md` in the same change, so the next person meets the corrected size rather than the original guess.
+
 Blocked? Set the task to `blocked` in `STATUS.md`, write down exactly why, and ask. Do not improvise around a blocker.
 
 Phases have design gates at P3-T00, P4-T00, P5-T00 and P8-T01. Do not begin a phase's implementation tasks until the human approves that gate's output with an explicit "design approved".
