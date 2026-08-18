@@ -1496,3 +1496,64 @@ export function evaluateCycle(
 
   return verdicts;
 }
+
+/**
+ * METHOD.md §4.6's weak and strong pairs.
+ *
+ * The coach shows these beside the check that fired, which is why each pair
+ * names its checks rather than sitting in a list of general advice. A prompt
+ * tells somebody what is wrong; the pair shows them what right looks like on
+ * the same sentence, and that is a different kind of help.
+ *
+ * The second pair fires two checks, so `firesChecks` is a list. Nothing here
+ * is paraphrased: weak, strong and why are METHOD.md's own words.
+ */
+export interface QualityExample {
+  readonly weak: string;
+  readonly strong: string;
+  readonly why: string;
+  /** The checks the weak version trips, by id. */
+  readonly firesChecks: readonly string[];
+}
+
+export const QUALITY_EXAMPLES: readonly QualityExample[] = [
+  {
+    weak: "Objective: Launch the new mobile app by end of Q3",
+    strong: "Objective: Make mobile the way our customers prefer to reach us",
+    why: "Launch is an output. You can launch and still fail. The strong version names the change in customer behaviour, and the launch becomes a means",
+    firesChecks: ["OBJ-1"],
+  },
+  {
+    weak: "KR: Improve customer satisfaction",
+    strong:
+      "KR: Increase NPS from 32 to 50 (lagging). KR: Cut first-response time from 9h to 2h (leading)",
+    why: "No baseline, no target, no way to score it. The strong pair sets from and to, and combines lagging proof with a leading signal you can steer weekly",
+    firesChecks: ["KR-2", "KR-4"],
+  },
+  {
+    weak: "KR: Hold 12 customer interviews",
+    strong: "KR: Raise activation rate of new sign-ups from 41% to 60%",
+    why: "Interviews are activity. Ask what the interviews are for, and measure that outcome",
+    firesChecks: ["KR-5"],
+  },
+  {
+    weak: "KR: Increase sales calls from 40 to 120 per week",
+    strong:
+      "KR: Grow qualified pipeline from $1.2M to $3.0M (lagging). KR: Lift call-to-meeting conversion from 8% to 15% (leading)",
+    why: "Measurable, but still an output. If 120 calls create no pipeline, the key result was achieved and the quarter was wasted",
+    firesChecks: ["KR-5"],
+  },
+];
+
+/**
+ * The pairs to show beside one check's verdict.
+ *
+ * Empty for most checks, and that is correct rather than a gap: §4.6 carries
+ * four pairs, not twenty-six. A rule card with no example shows its prompt and
+ * says nothing more.
+ */
+export function examplesFor(checkId: string): readonly QualityExample[] {
+  return QUALITY_EXAMPLES.filter((entry) =>
+    entry.firesChecks.includes(checkId),
+  );
+}

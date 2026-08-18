@@ -92,14 +92,17 @@ export {
   evaluateCycle,
   evaluateKeyResults,
   evaluateObjective,
+  examplesFor,
   KEY_RESULT_CHECKS,
   type KeyResultInput,
   type KeyResultSetInput,
   type KeyResultVerdict,
   OBJECTIVE_CHECKS,
   type ObjectiveInput,
+  QUALITY_EXAMPLES,
   QUALITY_WORD_LISTS,
   type QualityCheck,
+  type QualityExample,
   type QualityStatus,
   type QualityVerdict,
   strengthScore,
@@ -172,6 +175,14 @@ export {
   type ValidationResult,
   validateOverrides,
 } from "./thresholds.ts";
+export {
+  deterministicTriggers,
+  isTriggerKey,
+  TRIGGER_CATALOGUE,
+  type Trigger,
+  type TriggerOwner,
+  trigger,
+} from "./triggers.ts";
 export {
   type CycleWorkflowInput,
   canPublish,
