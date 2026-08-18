@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { PHASE_TITLES, phaseWorkAllowed } from "@openokr/method";
+import {
+  canonThresholds,
+  KEY_RESULT_CHECKS,
+  OBJECTIVE_CHECKS,
+  PHASE_TITLES,
+  phaseWorkAllowed,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
@@ -104,8 +111,25 @@ export default async function CyclePage({
           members: (await callAction(context, "people.directory", {})).map(
             (member) => ({ id: member.id, name: member.name }),
           ),
+          // The coach runs in the browser and cannot read the settings row, so
+          // the resolved thresholds travel with the page. Sending them rather
+          // than letting the client fall back to the canon is what keeps a
+          // workspace that has tuned its bounds judged by its own numbers.
+          // `rhythm.read` types this as an unknown record because the registry
+          // is open-ended at the contract boundary. It is `ResolvedThresholds`
+          // by construction: the same `resolveThresholds` builds both.
+          thresholds: (await callAction(context, "rhythm.read", {}))
+            .thresholds as unknown as ResolvedThresholds,
+          checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
+            (check) => ({ id: check.id, title: check.title }),
+          ),
         }
-      : { goals: [], members: [] };
+      : {
+          goals: [],
+          members: [],
+          thresholds: canonThresholds(),
+          checkTitles: [],
+        };
 
   return (
     <AppShellLayout>
@@ -217,6 +241,8 @@ export default async function CyclePage({
               goals={draft.goals}
               members={draft.members}
               canEdit={canEdit}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
             />
           ) : null}
 

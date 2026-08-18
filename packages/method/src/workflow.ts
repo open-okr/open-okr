@@ -486,7 +486,12 @@ function phaseFour(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["The §4 quality checks arrive at P4-T01"],
+      // The catalogue and the stored verdicts both exist since P4-T01 and
+      // P4-T02a. What is missing is the reading that turns a set of stored
+      // flags into one answer for the phase, and that is publish gate 2,
+      // which P4-T03 builds. Naming the task that will supply it beats
+      // naming the one that already did.
+      blocked: ["Reading the §4 verdicts across the set arrives at P4-T03"],
       conditions: { met: 0, total: 0 },
     };
   }

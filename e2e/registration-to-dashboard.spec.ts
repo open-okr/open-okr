@@ -253,6 +253,57 @@ test("drafting a goal with key results persists at zero percent and pending", as
   );
 });
 
+/**
+ * The Draft Coach (P4-T02b).
+ *
+ * The acceptance criterion end to end: an objective beginning with an output
+ * verb fails its rule inline, with the coaching prompt and the §4.6 example, and
+ * the strength score drops. Driven through the browser rather than the unit
+ * suite because the thing worth proving is that the browser evaluates at all:
+ * the same package, the workspace's own thresholds, and no round trip.
+ */
+test("the coach fails a rule as you type, and the score moves with it", async () => {
+  await page.goto("/cycle?phase=4");
+
+  const title = page
+    .getByRole("textbox", { name: /Objective, checked as you type/ })
+    .first();
+  await expect(title).toBeVisible();
+
+  const meter = page.getByText(/OKR strength ·/).first();
+  const before = (await meter.textContent()) ?? "";
+
+  await title.fill("Launch the new mobile app");
+
+  // OBJ-1 fires on the output verb, with no save and no request.
+  const chip = page
+    .getByRole("button", { name: "OBJ-1 · Outcome, not output" })
+    .first();
+  await expect(chip).toBeVisible();
+  expect((await meter.textContent()) ?? "").not.toBe(before);
+
+  // The card carries the prompt, what was seen, and §4.6's pair.
+  await chip.click();
+  await expect(
+    page.getByText(/Your objective starts with a deliverable, not a destination/),
+  ).toBeVisible();
+  await expect(page.getByText(/What was seen\./)).toBeVisible();
+  // The weak half of §4.6's pair, not the strong half: the strong half is the
+  // sentence the drafting test above used as its objective, so asserting it
+  // here would match the goal's own heading as well as the card.
+  await expect(
+    page.getByText(/Launch the new mobile app by end of Q3/),
+  ).toBeVisible();
+
+  // Every verdict links to the rule itself.
+  await page.getByRole("link", { name: "See the rule in METHOD" }).first().click();
+  await expect(page).toHaveURL("/method/OBJ-1");
+  await expect(
+    page.getByRole("heading", { name: "OBJ-1 · Outcome, not output" }),
+  ).toBeVisible();
+  await expect(page.getByText("How it judges, in order")).toBeVisible();
+});
+
 test("closing a goal requires a retrospective and keeps it on reopen", async () => {
   await page.goto("/cycle?phase=4");
   await page.getByRole("link", { name: "Open" }).first().click();

@@ -43,6 +43,14 @@ export interface QualityVerdict {
   readonly id: string;
   readonly status: QualityStatus;
   readonly prompt: string;
+  /**
+   * Which condition row matched, in the catalogue's own words.
+   *
+   * The prompt says what to do about it; this says what was seen. A rule card
+   * that shows only the prompt makes a writer guess which part of their
+   * sentence caused it, and the two are different sentences on purpose.
+   */
+  readonly condition: string;
   readonly feedsStrengthScore: boolean;
 }
 
@@ -463,6 +471,7 @@ const verdictOf = (check: QualityCheck, condition: string): QualityVerdict => {
     id: check.id,
     status: row.status,
     prompt: row.prompt,
+    condition: row.condition,
     feedsStrengthScore: check.feedsStrengthScore,
   };
 };
@@ -626,6 +635,7 @@ const rollUp = (
       id,
       status: "todo",
       prompt: found.conditions[0]?.prompt ?? "",
+      condition: "Nothing to judge yet",
       feedsStrengthScore: found.feedsStrengthScore,
       keyResults: [],
     };
@@ -639,6 +649,7 @@ const rollUp = (
     id,
     status: worst.row.status,
     prompt: worst.row.prompt,
+    condition: worst.row.condition,
     feedsStrengthScore: found.feedsStrengthScore,
     keyResults:
       worst.row.status === "pass"
@@ -1022,6 +1033,7 @@ export function evaluateAlignment(
           status: "todo" as const,
           prompt:
             "Nobody has answered whether the cross-team dependencies are confirmed or risk-owned yet.",
+          condition: "Nobody has answered yet",
           feedsStrengthScore: entry.feedsStrengthScore,
         };
       }
@@ -1042,6 +1054,7 @@ export function evaluateAlignment(
       id: entry.id,
       status: passing?.status ?? "pass",
       prompt: passing?.prompt ?? "",
+      condition: passing?.condition ?? "",
       feedsStrengthScore: entry.feedsStrengthScore,
     };
   });
@@ -1325,6 +1338,7 @@ export function evaluateCycle(
           status: "todo",
           prompt:
             "Nothing books sessions yet, so whether the cadence is in the calendar cannot be read. P4-T04 brings it.",
+          condition: "Nothing books sessions yet",
           feedsStrengthScore: false,
         }
       : verdictOf(
