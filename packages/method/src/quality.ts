@@ -1,4 +1,5 @@
-import type { ResolvedThresholds } from "./thresholds.ts";
+import { type DraftVerdict, draftVerdict } from "./scoring.ts";
+import type { CoachStrictness, ResolvedThresholds } from "./thresholds.ts";
 
 /**
  * METHOD.md §4's quality catalogue, as data and pure functions (P4-T01).
@@ -125,6 +126,94 @@ export const QUALITY_WORD_LISTS = {
     "proud",
   ],
   whyMarkers: ["to", "so that", "in order to", "because"],
+  /**
+   * §4.2's list, which ends "(and plurals)". The plurals are written out
+   * rather than derived, because the matcher is whole-word and an -s rule
+   * would have to know that "activity" pluralises to "activities". A list
+   * somebody can read and correct beats a rule somebody has to debug.
+   */
+  activityNouns: [
+    "call",
+    "calls",
+    "meeting",
+    "meetings",
+    "interview",
+    "interviews",
+    "demo",
+    "demos",
+    "email",
+    "emails",
+    "workshop",
+    "workshops",
+    "session",
+    "sessions",
+    "training",
+    "trainings",
+    "webinar",
+    "webinars",
+    "post",
+    "posts",
+    "visit",
+    "visits",
+    "proposal",
+    "proposals",
+    "campaign",
+    "campaigns",
+    "feature",
+    "features",
+    "report",
+    "reports",
+    "presentation",
+    "presentations",
+    "event",
+    "events",
+    "ticket",
+    "tickets",
+    "article",
+    "articles",
+    "sprint",
+    "sprints",
+    "task",
+    "tasks",
+    "activity",
+    "activities",
+    "outreach",
+    "touchpoint",
+    "touchpoints",
+  ],
+  impactWords: [
+    "revenue",
+    "pipeline",
+    "conversion",
+    "retention",
+    "churn",
+    "nps",
+    "csat",
+    "satisfaction",
+    "margin",
+    "profit",
+    "growth",
+    "adoption",
+    "activation",
+    "engagement",
+    "win rate",
+    "quality",
+    "insight",
+    "market share",
+    "loyalty",
+    "renewal",
+    "upsell",
+    "arr",
+    "mrr",
+    "ltv",
+    "cac",
+    "accuracy",
+    "uptime",
+    "productivity",
+    "time-to-value",
+    "referrals",
+    "deal size",
+  ],
 } as const;
 
 export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
@@ -276,6 +365,221 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
   },
 ];
 
+/**
+ * §4.2's seven checks.
+ *
+ * Where METHOD.md quotes a coaching prompt, it is here verbatim. Where it
+ * words the rule in prose and gives no prompt (KR-3, KR-7, and the pass rows
+ * of KR-1, KR-2 and KR-4), the prompt is composed from METHOD's own sentence
+ * for that rule and nothing else. That is the same treatment OBJ-3, OBJ-4 and
+ * OBJ-5 already had. A row cannot carry no prompt: the data shape refuses it,
+ * because a verdict without a way forward is the one thing §4 never does.
+ */
+export const KEY_RESULT_CHECKS: readonly QualityCheck[] = [
+  {
+    id: "KR-1",
+    group: "key_result",
+    title: "Count",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "None at all",
+        status: "fail",
+        prompt:
+          "An objective with no key results is an intention. How will you know, at the end of the cycle, whether it happened?",
+      },
+      {
+        condition: "Above the upper bound",
+        status: "fail",
+        prompt: "Which two would you drop if you had to? Drop them.",
+      },
+      {
+        condition: "Exactly one",
+        status: "warn",
+        prompt: "Can a single measure prove this from every angle?",
+      },
+      {
+        condition: "Within the bounds",
+        status: "pass",
+        prompt:
+          "A count that proves the objective from more than one angle without becoming a to-do list.",
+      },
+    ],
+  },
+  {
+    id: "KR-2",
+    group: "key_result",
+    title: "Measurable",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "No numbers",
+        status: "fail",
+        prompt: "What is the baseline today, and where must it land?",
+      },
+      {
+        condition: "A single number",
+        status: "warn",
+        prompt:
+          "A target but no baseline. Without the from, you cannot prove movement.",
+      },
+      {
+        condition: "From X to Y, or two numbers",
+        status: "pass",
+        prompt:
+          "This carries both ends, so the movement between them is the thing being measured.",
+      },
+    ],
+  },
+  {
+    id: "KR-3",
+    group: "key_result",
+    title: "Complete",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "Baseline, target, date or owner missing",
+        status: "fail",
+        prompt:
+          "Something is missing: a baseline, a target, a date or an owner. If the baseline is unknown, establishing it can be the first key result.",
+      },
+      {
+        condition: "All four present",
+        status: "pass",
+        prompt:
+          "Baseline, target, date and owner are all here, so this can be checked in on rather than argued about.",
+      },
+    ],
+  },
+  {
+    id: "KR-4",
+    group: "key_result",
+    title: "Leading and lagging mix",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "Untagged",
+        status: "fail",
+        prompt:
+          "This one is neither leading nor lagging. Tag it, or the set cannot say whether it will find out in time.",
+      },
+      {
+        condition: "All lagging",
+        status: "warn",
+        prompt:
+          "You will only find out at the end of the cycle whether it worked.",
+      },
+      {
+        condition: "All leading",
+        status: "warn",
+        prompt: "Which key result proves the actual outcome landed?",
+      },
+      {
+        condition: "At least one of each",
+        status: "pass",
+        prompt:
+          "One of each, so you get an early signal and a final answer rather than only one of them.",
+      },
+    ],
+  },
+  {
+    id: "KR-5",
+    group: "key_result",
+    title: "Impact, not effort",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "Activity noun, no impact word, no purpose",
+        status: "fail",
+        prompt:
+          "This measures pure activity volume. That is an output however measurable it is. Ask why: more calls, to what end? Name that impact and make it the key result.",
+      },
+      {
+        condition: "Output verb with fewer than two numbers",
+        status: "warn",
+        prompt:
+          "Reads like a milestone. What measurably changes because of it? Measure that instead.",
+      },
+      {
+        condition: "Activity plus a why, but the target sits on the activity",
+        status: "warn",
+        prompt:
+          "Good instinct, but flip it. Measure the impact itself and keep the activity as a clearly tagged leading indicator at most.",
+      },
+      {
+        condition: "Otherwise",
+        status: "pass",
+        prompt: "These measure impact, not activity.",
+      },
+    ],
+  },
+  {
+    id: "KR-6",
+    group: "key_result",
+    title: "Ambitious but honest",
+    feedsStrengthScore: true,
+    // §3.2's own second column, one row per draft verdict. The status is not in
+    // METHOD: only the sweet spot reads as an answer rather than a question, so
+    // it is the pass and the other four are warns. None fails, because §3.2
+    // never refuses a set on its confidence and the publish gates are separate.
+    conditions: [
+      {
+        condition: "Nobody has set a confidence yet",
+        status: "todo",
+        prompt:
+          "No confidence set yet. Ask the owners how likely they think each one is, and judge the set rather than any single key result.",
+      },
+      {
+        condition: "Sandbagging",
+        status: "warn",
+        prompt:
+          "If you are near certain, this is business as usual, not an OKR. Raise the targets.",
+      },
+      {
+        condition: "Comfortable",
+        status: "warn",
+        prompt: "Stretch until it feels like a 6 or 7 out of 10.",
+      },
+      {
+        condition: "The sweet spot",
+        status: "pass",
+        prompt: "A real stretch you still believe in.",
+      },
+      {
+        condition: "Ambitious",
+        status: "warn",
+        prompt: "Check that the team genuinely believes it is possible.",
+      },
+      {
+        condition: "Moonshot",
+        status: "warn",
+        prompt:
+          "A moonshot bordering on fantasy. Make sure there is a credible path.",
+      },
+    ],
+  },
+  {
+    id: "KR-7",
+    group: "key_result",
+    title: "Direction set",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "No direction",
+        status: "fail",
+        prompt:
+          "Set the direction: increase, reduce, maintain or move. Without it, nothing can say whether a number arriving is good news.",
+      },
+      {
+        condition: "Direction set",
+        status: "pass",
+        prompt:
+          "The direction is set, so progress can be read from the number itself.",
+      },
+    ],
+  },
+];
+
 export interface ObjectiveInput {
   readonly title: string;
   readonly hasCycle: boolean;
@@ -325,7 +629,9 @@ const verdictOf = (check: QualityCheck, condition: string): QualityVerdict => {
 };
 
 const check = (id: string): QualityCheck => {
-  const found = OBJECTIVE_CHECKS.find((entry) => entry.id === id);
+  const found = [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].find(
+    (entry) => entry.id === id,
+  );
   if (!found) {
     throw new Error(`No such check: ${id}`);
   }
@@ -372,13 +678,17 @@ export function evaluateObjective(
             ? verdictOf(obj1, "Contains an output verb anywhere")
             : verdictOf(obj1, "Cannot tell");
 
-  // OBJ-2
+  // OBJ-2. The bounds are the §11 registry's, not this function's: METHOD.md
+  // §4.1 words them as four and eighteen and the registry carries those as
+  // `quality.objectiveLengthWords`, so a workspace that tunes them tunes the
+  // check rather than being ignored by it.
   const obj2 = check("OBJ-2");
+  const length = thresholds["quality.objectiveLengthWords"];
   const obj2Verdict = hasDigits
     ? verdictOf(obj2, "Contains digits")
-    : wordCount < 4
+    : wordCount < length.low
       ? verdictOf(obj2, "Fewer than 4 words")
-      : wordCount > 18
+      : wordCount > length.high
         ? verdictOf(obj2, "More than 18 words")
         : verdictOf(obj2, "4 to 18 words, no digits");
 
@@ -409,6 +719,265 @@ export function evaluateObjective(
         : verdictOf(obj5, "Within the cap");
 
   return [obj1Verdict, obj2Verdict, obj3Verdict, obj4Verdict, obj5Verdict];
+}
+
+export interface KeyResultInput {
+  readonly text: string;
+  readonly baseline: number | null;
+  readonly target: number | null;
+  readonly dueOn: string | null;
+  readonly ownerId: string | null;
+  readonly indicatorType: "leading" | "lagging" | null;
+  readonly direction: "increase" | "reduce" | "maintain" | "move" | null;
+  /** Null until somebody has answered. KR-6 stays `todo` while it is. */
+  readonly confidence: number | null;
+}
+
+export interface KeyResultSetInput {
+  readonly keyResults: readonly KeyResultInput[];
+}
+
+export interface KeyResultVerdict extends QualityVerdict {
+  /**
+   * Which key results tripped this, by their index in the input. Empty on a
+   * set-level check and on anything that passed. §4.2's four per-key-result
+   * checks are useless to a writer without it: "one of these has no baseline"
+   * is not coaching until it says which one.
+   */
+  readonly keyResults: readonly number[];
+}
+
+/** How many separate numbers the text carries, for KR-2 and KR-5. */
+const numbersIn = (text: string): number =>
+  (text.match(/\d+(?:[.,]\d+)?/g) ?? []).length;
+
+const WORST: Record<QualityStatus, number> = {
+  pass: 0,
+  todo: 1,
+  warn: 2,
+  fail: 3,
+};
+
+/**
+ * Roll a per-key-result check up to one verdict for the set.
+ *
+ * The worst status wins and carries its own prompt, which is why the offenders
+ * are listed separately: the writer needs the prompt for the problem and the
+ * index of the key result that has it.
+ */
+const rollUp = (
+  id: string,
+  perKeyResult: readonly { condition: string; index: number }[],
+): KeyResultVerdict => {
+  const found = check(id);
+  const rows = perKeyResult.map((entry) => ({
+    ...entry,
+    row: rowOf(found, entry.condition),
+  }));
+  const first = rows[0];
+  if (!first) {
+    // No key results at all: only KR-1 has anything to say, and it says it.
+    // Everything else is waiting on input, which is what `todo` is for.
+    return {
+      id,
+      status: "todo",
+      prompt: found.conditions[0]?.prompt ?? "",
+      feedsStrengthScore: found.feedsStrengthScore,
+      keyResults: [],
+    };
+  }
+  const worst = rows.reduce(
+    (carry, entry) =>
+      WORST[entry.row.status] > WORST[carry.row.status] ? entry : carry,
+    first,
+  );
+  return {
+    id,
+    status: worst.row.status,
+    prompt: worst.row.prompt,
+    feedsStrengthScore: found.feedsStrengthScore,
+    keyResults:
+      worst.row.status === "pass"
+        ? []
+        : rows
+            .filter((entry) => entry.row.status !== "pass")
+            .map((entry) => entry.index),
+  };
+};
+
+/**
+ * §4.2's seven key result checks over one objective's set.
+ *
+ * KR-1, KR-4 and KR-6 judge the set. KR-2, KR-3, KR-5 and KR-7 judge each key
+ * result and roll up to the worst, naming the offenders. That split is
+ * METHOD's own: KR-4 asks whether the *set* holds one of each, and KR-2 asks
+ * whether *this text* reads from X to Y.
+ */
+export function evaluateKeyResults(
+  input: KeyResultSetInput,
+  thresholds: ResolvedThresholds,
+): readonly KeyResultVerdict[] {
+  const set = input.keyResults;
+  const indexes = set.map((_, index) => index);
+  const lists = QUALITY_WORD_LISTS;
+
+  // KR-1
+  const kr1 = check("KR-1");
+  const bounds = thresholds["quality.keyResultsPerObjective"];
+  const kr1Row =
+    set.length === 0
+      ? "None at all"
+      : set.length > bounds.high
+        ? "Above the upper bound"
+        : set.length < bounds.low
+          ? "Exactly one"
+          : "Within the bounds";
+  const kr1Verdict: KeyResultVerdict = {
+    ...verdictOf(kr1, kr1Row),
+    keyResults: [],
+  };
+
+  // KR-2. "From X to Y" is two numbers with the words between them, so both
+  // arms of METHOD's pass condition reduce to the same count.
+  const kr2 = rollUp(
+    "KR-2",
+    indexes.map((index) => {
+      const count = numbersIn(set[index]?.text ?? "");
+      return {
+        index,
+        condition:
+          count === 0
+            ? "No numbers"
+            : count === 1
+              ? "A single number"
+              : "From X to Y, or two numbers",
+      };
+    }),
+  );
+
+  // KR-3
+  const kr3 = rollUp(
+    "KR-3",
+    indexes.map((index) => {
+      const entry = set[index] as KeyResultInput;
+      const complete =
+        entry.baseline !== null &&
+        entry.target !== null &&
+        entry.dueOn !== null &&
+        entry.ownerId !== null;
+      return {
+        index,
+        condition: complete
+          ? "All four present"
+          : "Baseline, target, date or owner missing",
+      };
+    }),
+  );
+
+  // KR-4. The untagged case is per key result and the mix is not, so this one
+  // is built by hand rather than through `rollUp`.
+  const kr4Check = check("KR-4");
+  const untagged = indexes.filter((index) => !set[index]?.indicatorType);
+  const leading = set.filter((entry) => entry.indicatorType === "leading");
+  const lagging = set.filter((entry) => entry.indicatorType === "lagging");
+  const kr4Row =
+    set.length === 0 || untagged.length > 0
+      ? "Untagged"
+      : leading.length > 0 && lagging.length > 0
+        ? "At least one of each"
+        : lagging.length > 0
+          ? "All lagging"
+          : "All leading";
+  const kr4: KeyResultVerdict = {
+    ...verdictOf(kr4Check, kr4Row),
+    keyResults: kr4Row === "Untagged" ? untagged : [],
+  };
+
+  // KR-5
+  const kr5 = rollUp(
+    "KR-5",
+    indexes.map((index) => {
+      const text = set[index]?.text ?? "";
+      const activity = contains(text, lists.activityNouns);
+      const impact = contains(text, lists.impactWords);
+      const why = contains(text, lists.whyMarkers);
+      const output = contains(text, lists.outputVerbs);
+      const count = numbersIn(text);
+      return {
+        index,
+        condition:
+          activity && !impact && !why
+            ? "Activity noun, no impact word, no purpose"
+            : output && count < 2
+              ? "Output verb with fewer than two numbers"
+              : activity && why
+                ? "Activity plus a why, but the target sits on the activity"
+                : "Otherwise",
+      };
+    }),
+  );
+
+  // KR-6. The set average, never one key result: §3.2 says so in as many words.
+  const kr6Check = check("KR-6");
+  const answered = set.filter((entry) => entry.confidence !== null);
+  const kr6Row =
+    answered.length === 0
+      ? "Nobody has set a confidence yet"
+      : DRAFT_VERDICT_CONDITIONS[
+          draftVerdict(
+            answered.reduce((sum, entry) => sum + (entry.confidence ?? 0), 0) /
+              answered.length,
+            thresholds,
+          )
+        ];
+  const kr6: KeyResultVerdict = {
+    ...verdictOf(kr6Check, kr6Row),
+    keyResults: [],
+  };
+
+  // KR-7
+  const kr7 = rollUp(
+    "KR-7",
+    indexes.map((index) => ({
+      index,
+      condition: set[index]?.direction ? "Direction set" : "No direction",
+    })),
+  );
+
+  return [kr1Verdict, kr2, kr3, kr4, kr5, kr6, kr7];
+}
+
+/** §3.2's five draft verdicts, named as KR-6's condition rows. */
+const DRAFT_VERDICT_CONDITIONS: Record<DraftVerdict, string> = {
+  sandbagging: "Sandbagging",
+  comfortable: "Comfortable",
+  sweet_spot: "The sweet spot",
+  ambitious: "Ambitious",
+  moonshot: "Moonshot",
+};
+
+/**
+ * METHOD.md §4: "In strict mode every warn becomes a fail."
+ *
+ * That one sentence is the whole rule, and the prompt is unchanged by it: the
+ * problem the writer has is the same problem whether it blocks or not, so the
+ * coaching stays and only the consequence moves.
+ *
+ * `advisory` is in the §11 enum and METHOD.md never says what it does. It is
+ * the identity here rather than a guessed demotion, and that gap is recorded
+ * on the P4-T01 row as a question for a human. Inventing a rule would put
+ * practice in the code instead of in the document.
+ */
+export function applyStrictness<T extends QualityVerdict>(
+  verdicts: readonly T[],
+  strictness: CoachStrictness,
+): readonly T[] {
+  if (strictness !== "strict") {
+    return verdicts;
+  }
+  return verdicts.map((entry) =>
+    entry.status === "warn" ? { ...entry, status: "fail" as const } : entry,
+  );
 }
 
 /**

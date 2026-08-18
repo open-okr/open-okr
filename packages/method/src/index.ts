@@ -82,8 +82,14 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  applyStrictness,
   type ConditionRow,
+  evaluateKeyResults,
   evaluateObjective,
+  KEY_RESULT_CHECKS,
+  type KeyResultInput,
+  type KeyResultSetInput,
+  type KeyResultVerdict,
   OBJECTIVE_CHECKS,
   type ObjectiveInput,
   QUALITY_WORD_LISTS,
