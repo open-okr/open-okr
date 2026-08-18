@@ -18,6 +18,7 @@ import {
   recordValue,
   reopenGoal,
 } from "./actions.ts";
+import { GoalComments } from "./goal-comments.tsx";
 import { Rail } from "./rail.tsx";
 import { Sparkline } from "./sparkline.tsx";
 
@@ -91,6 +92,35 @@ export default async function GoalPage({
   // cycle end and falls back to the key result's own due date, so this reads the
   // same way: a chart projecting to a different horizon than the stored forecast
   // would be two answers to one question.
+  // The discussion (P3-T16). Read here rather than inside the client component
+  // so the thread server-renders with the page, the way every other read on
+  // this page does.
+  const comments = await callAction(context, "comments.list", {
+    subjectType: "goal",
+    subjectId: id,
+  });
+  // One read per comment. A thread is small, and the alternative is a batched
+  // read nobody has needed yet; if a goal ever carries hundreds of comments,
+  // that is the moment to add one rather than now.
+  const reactions = new Map<
+    string,
+    { emoji: string; count: number; own: boolean }[]
+  >();
+  for (const comment of comments) {
+    const groups = await callAction(context, "reactions.list", {
+      subjectType: "comment",
+      subjectId: comment.id,
+    });
+    reactions.set(
+      comment.id,
+      groups.map((group) => ({
+        emoji: group.emoji,
+        count: group.count,
+        own: group.own,
+      })),
+    );
+  }
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -170,7 +200,11 @@ export default async function GoalPage({
                       key={keyResult.id}
                       className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0"
                     >
-                      <span className="flex min-w-0 flex-col">
+                      {/* `gap-1` rather than nothing: the three children stack
+                          tight without it, and the sparkline's own box then sits
+                          hard against the line of metadata above it, which reads
+                          as the chart overlapping the row. */}
+                      <span className="flex min-w-0 flex-col gap-1">
                         <span className="text-sm text-ink">
                           {keyResult.title}
                         </span>
@@ -476,6 +510,23 @@ export default async function GoalPage({
               </CardBody>
             </Card>
           ) : null}
+
+          <Card>
+            <CardBody>
+              <GoalComments
+                goalId={id}
+                comments={comments.map((comment) => ({
+                  ...comment,
+                  createdAt: comment.createdAt.toISOString(),
+                  editedAt: comment.editedAt
+                    ? comment.editedAt.toISOString()
+                    : null,
+                  reactions: reactions.get(comment.id) ?? [],
+                }))}
+                currentMemberId={workspace.memberId}
+              />
+            </CardBody>
+          </Card>
         </div>
 
         <aside className="w-full flex-none lg:w-80">

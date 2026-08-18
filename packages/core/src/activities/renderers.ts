@@ -198,12 +198,34 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
   "kpi.formula_set": (p) =>
     `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
+  "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,
+  "cycle.snapshotted": (p) =>
+    `A cycle's performance was recorded in ${Number(p.snapshots ?? 0)} snapshot(s)${
+      p.verdict ? `, reading ${String(p.verdict)}` : " and no verdict"
+    }`,
+  "cycle.fed_forward": (p) =>
+    `The next cycle inherited ${Number(p.priorScores ?? 0)} prior score(s) and ${Number(p.issues ?? 0)} carried issue(s)`,
+  "kpi.updated": (p) =>
+    `A KPI was edited (${(p.fields as string[] | undefined)?.join(", ") ?? "no fields"})`,
+  "kpi.recovery_launched": (p) =>
+    `A recovery objective with ${Number(p.keyResults ?? 0)} key result(s) was launched`,
   "check_in.vote_cast": (p) =>
     p.changed ? "A confidence vote was changed" : "A confidence vote was cast",
   "check_in.votes_revealed": (p) =>
     `${Number(p.revealed ?? 0)} confidence vote(s) were revealed together`,
   "cadence.staleness_swept": (p) =>
     `${Number(p.flipped ?? 0)} goal(s) went past their grace window and now read outdated`,
+  // Comments and reactions (P3-T16)
+  "comment.created": (p) =>
+    `Commented on a ${asString(p.subjectType, "subject")}: ${asString(p.excerpt, "(empty)")}`,
+  "comment.updated": (p) =>
+    `Edited a comment on a ${asString(p.subjectType, "subject")}`,
+  "comment.deleted": (p) =>
+    `Deleted a comment on a ${asString(p.subjectType, "subject")}`,
+  "reaction.added": (p) =>
+    `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
+  "reaction.removed": (p) =>
+    `Removed ${asString(p.emoji)} reaction from a ${asString(p.subjectType, "subject")}`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

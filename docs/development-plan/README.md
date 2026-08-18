@@ -22,7 +22,8 @@ Read in this order the first time.
 | 6 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, forty screen specifications, accessibility and quality gates | The user interface |
 | 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 105 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
 | 8 | [EXECUTION-GUIDE.md](EXECUTION-GUIDE.md) | The protocol between the human engineer and the agent | Process |
-| 9 | [reference/](reference/) | Source-system knowledge bases, the ground truth for the importers | Facts about the sources |
+| 9 | [CI-GATES.md](CI-GATES.md) | Every gate that refuses the work, the command that runs it locally, and what each catches | Process |
+| 10 | [reference/](reference/) | Source-system knowledge bases, the ground truth for the importers | Facts about the sources |
 
 The agent's own working rules live in [CLAUDE.md](../../CLAUDE.md) at the repository root, where they are loaded automatically.
 

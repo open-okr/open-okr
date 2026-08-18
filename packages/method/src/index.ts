@@ -66,6 +66,33 @@ export {
   validateFormula,
 } from "./kpi-formula.ts";
 export {
+  draftRecovery,
+  type EffectiveHealth,
+  type EffectiveHealthInput,
+  kpiEffectiveHealth,
+  RECOVERY_PLACEHOLDER_TITLE,
+  type RecoveryCloseInput,
+  type RecoveryDiagnostic,
+  type RecoveryDraft,
+  type RecoveryKeyResultDraft,
+  type RecoveryTreeInput,
+  type RecoveryTreeNode,
+  type RecoveryTreeRoot,
+  shouldProposeRecovery,
+  shouldProposeRecoveryClose,
+} from "./kpi-recovery.ts";
+export {
+  type ConditionRow,
+  evaluateObjective,
+  OBJECTIVE_CHECKS,
+  type ObjectiveInput,
+  QUALITY_WORD_LISTS,
+  type QualityCheck,
+  type QualityStatus,
+  type QualityVerdict,
+  strengthScore,
+} from "./quality.ts";
+export {
   type CascadeGoal,
   type CascadeResult,
   type ConfidenceBand,

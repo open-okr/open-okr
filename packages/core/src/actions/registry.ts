@@ -79,6 +79,16 @@ import {
   startCheckIn,
 } from "./check-ins.ts";
 import {
+  addReactionAction,
+  createCommentAction,
+  deleteCommentAction,
+  listCommentsAction,
+  listReactionsAction,
+  previewNotifyAction,
+  removeReactionAction,
+  updateCommentAction,
+} from "./comments.ts";
+import {
   addIssue,
   addPriority,
   calibrateCycle,
@@ -95,11 +105,14 @@ import {
   archiveCycle,
   createCycle,
   ensureCurrentCycle,
+  feedForwardCycle,
   listCycles,
   readAnnualFrame,
   readCurrentCycle,
   readRhythmSettings,
+  readScorecard,
   setAnnualFrame,
+  snapshotCycle,
   updateCycle,
   updateRhythmSettings,
 } from "./cycles.ts";
@@ -131,9 +144,16 @@ import {
 import {
   createKpi,
   createKpiCategory,
+  createKpiTree,
+  launchKpiRecovery,
+  readKpiDetail,
   readKpiGrid,
+  readKpiTree,
+  readRecoveryBoard,
+  readRecoveryDraft,
   recordKpiValue,
   setKpiFormulaAction,
+  updateKpi,
 } from "./kpis.ts";
 import {
   getNotificationSettings,
@@ -267,6 +287,9 @@ export const ACTION_MAP = {
   "cycles.create": createCycle,
   "cycles.update": updateCycle,
   "cycles.archive": archiveCycle,
+  "cycles.snapshot": snapshotCycle,
+  "cycles.feedForward": feedForwardCycle,
+  "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
   "frame.read": readAnnualFrame,
@@ -319,8 +342,24 @@ export const ACTION_MAP = {
   "kpis.record": recordKpiValue,
   "kpis.grid": readKpiGrid,
   "kpis.setFormula": setKpiFormulaAction,
+  "kpis.createTree": createKpiTree,
+  "kpis.launchRecovery": launchKpiRecovery,
+  "kpis.recoveryDraft": readRecoveryDraft,
+  "kpis.recoveryBoard": readRecoveryBoard,
+  "kpis.tree": readKpiTree,
+  "kpis.detail": readKpiDetail,
+  "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
   "review.inbox": reviewInbox,
+  // Comments and reactions (P3-T16)
+  "comments.list": listCommentsAction,
+  "comments.create": createCommentAction,
+  "comments.update": updateCommentAction,
+  "comments.delete": deleteCommentAction,
+  "comments.previewNotify": previewNotifyAction,
+  "reactions.list": listReactionsAction,
+  "reactions.add": addReactionAction,
+  "reactions.remove": removeReactionAction,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

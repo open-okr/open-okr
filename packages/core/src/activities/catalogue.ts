@@ -185,6 +185,26 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     created: z.boolean(),
   }),
   "kpi.formula_set": z.object({ references: z.number().int() }),
+  // The recovery loop (P3-T14). Launching one is a commitment by the team, so
+  // it belongs in the feed beside the objectives it creates.
+  "kpi.tree_created": z.object({ name: z.string() }),
+  "kpi.updated": z.object({ fields: z.array(z.string()) }),
+  // Closing a cycle out (P3-T15). Both are worth a line in the feed: one
+  // records what happened, the other decides what the next cycle inherits.
+  // `cycle.archived` above is P3-T02's soft delete. This is §8.9's archive,
+  // which records what the cycle achieved, so it is named for what it writes.
+  "cycle.snapshotted": z.object({
+    snapshots: z.number().int(),
+    verdict: z.string().nullable(),
+  }),
+  "cycle.fed_forward": z.object({
+    priorScores: z.number().int(),
+    issues: z.number().int(),
+  }),
+  "kpi.recovery_launched": z.object({
+    goalId: z.string(),
+    keyResults: z.number().int(),
+  }),
   "check_in.vote_cast": z.object({ changed: z.boolean() }),
   "check_in.votes_revealed": z.object({ revealed: z.number().int() }),
   // The staleness sweep (P3-T06). A health flip nobody triggered still has to be
@@ -192,6 +212,27 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cadence.staleness_swept": z.object({
     examined: z.number().int(),
     flipped: z.number().int(),
+  }),
+  // Comments and reactions (P3-T16). Each is worth a line: a comment is a
+  // conversation someone started, an edit keeps the thread honest, and a
+  // reaction is the lightest form of engagement that still feeds engagement
+  // signals.
+  "comment.created": z.object({
+    subjectType: z.string(),
+    excerpt: z.string(),
+  }),
+  "comment.updated": z.object({
+    subjectType: z.string(),
+    excerpt: z.string(),
+  }),
+  "comment.deleted": z.object({ subjectType: z.string() }),
+  "reaction.added": z.object({
+    emoji: z.string(),
+    subjectType: z.string(),
+  }),
+  "reaction.removed": z.object({
+    emoji: z.string(),
+    subjectType: z.string(),
   }),
 } as const satisfies Record<string, z.ZodType>;
 

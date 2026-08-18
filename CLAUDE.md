@@ -24,8 +24,9 @@ All in `docs/development-plan/` unless noted:
 6. `UIUX-PLAN.md`: the interface: design system, navigation, interaction patterns, screens S-01 to S-40, quality gates.
 7. `IMPLEMENTATION-PLAN.md`: the work: eight phases, 105 tasks, the Definition of Ready. Execution authority.
 8. `EXECUTION-GUIDE.md`: the process between you and the human.
-9. `reference/`: source-system knowledge bases for the importers. Read-only facts.
-10. This file, at the repository root: how **you** work.
+9. `CI-GATES.md`: every gate that will refuse the work, the command that runs it locally, and what each one catches that reading the diff does not. Read it before your first push, not after your first red build.
+10. `reference/`: source-system knowledge bases for the importers. Read-only facts.
+11. This file, at the repository root: how **you** work.
 
 If two documents disagree, the one higher in this list wins, with one exception: never resolve a REQUIREMENTS versus PLAN conflict yourself. Stop and ask.
 
@@ -140,7 +141,7 @@ Keep this list current once scaffolded.
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate
-- `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate
+- `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate. Sign-off runs in CI on pull requests only, so a branch can look green for days and fail the moment one opens. `docs/development-plan/CI-GATES.md` lists every gate and the order to run them in
 - `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline)
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. Cron or by hand until a scheduler host exists

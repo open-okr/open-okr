@@ -3,6 +3,7 @@ import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
+import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { addCategory, addKpi } from "./actions.ts";
@@ -48,6 +49,7 @@ export default async function KpisPage() {
   return (
     <AppShellLayout>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
+        <SectionTabs items={KPI_TABS} active="/kpis" />
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

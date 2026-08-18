@@ -154,6 +154,14 @@ export {
   type SnapshotEntry,
 } from "./schema/check-ins.ts";
 export {
+  COMMENT_SUBJECT_TYPES,
+  type Comment,
+  type CommentSubjectType,
+  comments,
+  type Reaction,
+  reactions,
+} from "./schema/comments.ts";
+export {
   type CycleBaselineHealth,
   type CycleCalibration,
   type CycleCapacityNote,
@@ -196,6 +204,12 @@ export {
   type RhythmSettingsRow,
   rhythmSettings,
 } from "./schema/cycles.ts";
+export {
+  EMBEDDABLE_ENTITY_TYPES,
+  type EmbeddableEntityType,
+  type Embedding,
+  embeddings,
+} from "./schema/embeddings.ts";
 export {
   CAPACITY_VERDICTS,
   type CapacityVerdict,
@@ -252,11 +266,13 @@ export {
   type KpiShareRow,
   type KpiStateValue,
   type KpiTier,
+  type KpiTreeRow,
   kpiCategories,
   kpiDependencies,
   kpiRecords,
   kpiShares,
   kpis,
+  kpiTrees,
 } from "./schema/kpis.ts";
 export {
   NOTIFICATION_REASONS,
@@ -276,6 +292,18 @@ export {
   subscriptions,
 } from "./schema/notifications.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  type PerformanceSnapshotRow,
+  PORTFOLIO_VERDICTS,
+  type PortfolioVerdictValue,
+  performanceSnapshots,
+  type ScorecardSettingsRow,
+  type ScoreEntryRow,
+  SNAPSHOT_OWNER_KINDS,
+  type SnapshotOwnerKind,
+  scorecardSettings,
+  scoreEntries,
+} from "./schema/scorecard.ts";
 export {
   SPACE_ROLES,
   type Space,

@@ -286,7 +286,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `name`, `description?`, `root_kpi_id?` to kpis.
 
 ### kpis *(short_id, importable)*
-`tree_id?` to kpi_trees, `category_id?` to kpi_categories, `parent_kpi_id?` to kpis, `title`, `description` (rich), `owner_kind`, `space_id?`, `member_id?`, `frequency` (`daily` / `weekly` / `monthly` / `quarterly` / `yearly`), `unit`, `direction` (`higher_better` / `lower_better`), `indicator_type` (`leading` / `lagging`), `tier` (`input` / `output` / `outcome` / `impact`), `target_default numeric?`, `aggregate` (`sum` / `avg` / `max` / `min` / `count`), `is_calculated bool`, `formula jsonb?`, `healthy_pct`, `watch_pct`, `state` (`healthy` / `watch` / `unhealthy` / `recovering` / `no_data`), `achievement_pct numeric?`, `effective_pct numeric?`, `recovery_goal_id?` to goals, `recovery_started_pct numeric?`, `starts_on?`, `ends_on?`, `position`.
+`tree_id?` to kpi_trees, `category_id?` to kpi_categories, `parent_kpi_id?` to kpis, `title`, `description` (rich), `owner_kind`, `space_id?`, `member_id?`, `frequency` (`daily` / `weekly` / `monthly` / `quarterly` / `yearly`), `unit`, `direction` (`higher_better` / `lower_better`), `indicator_type` (`leading` / `lagging`), `tier` (`input` / `output` / `outcome` / `impact`), `target_default numeric?`, `aggregate` (`sum` / `avg` / `max` / `min` / `count`), `is_calculated bool`, `formula jsonb?`, `healthy_pct`, `watch_pct`, `state` (`healthy` / `watch` / `unhealthy` / `recovering` / `no_data`), `achievement_pct numeric?`, `effective_pct numeric?`, `recovery_goal_id?` to goals, `recovery_started_pct numeric?`, `recovery_close_proposed_at?`, `starts_on?`, `ends_on?`, `position`. The closure stamp is what makes METHOD.md §6.5's "propose exactly once" true; it is cleared when a recovery is launched or closed (P3-T14).
 
 ### kpi_records
 `kpi_id` to kpis, `period_start date`, `target_value numeric?`, `actual_value numeric?`, `remark?`, `author_member_id` to workspace_members. Unique on `(workspace_id, kpi_id, period_start)`.
@@ -298,10 +298,10 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `kpi_id` to kpis, `member_id` to workspace_members, `access` (`read` / `update`).
 
 ### performance_snapshots
-`owner_kind`, `space_id?`, `member_id?`, `cycle_id` to cycles, `result_value numeric`, health-bucket counts, `verdict`.
+`cycle_id` to cycles, `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `result_value numeric(3,2)?`, the four §3.3 band counts as integers (`fully_achieved_count`, `strong_count`, `partial_count`, `little_count`), `verdict` (`too_safe` / `healthy` / `partial` / `outran_capacity`)?. Unique on the cycle, the owner kind and the coalesced owner columns, so archiving twice updates rather than doubling the trend. The owner has to agree with its kind, as a check constraint. Derived: written by the archive and never imported (P3-T15).
 
 ### scorecard_settings and score_entries
-Points configuration and entries. Off by default, with no rows unless enabled.
+Points configuration and entries. `scorecard_settings` is one row per workspace with `enabled bool default false` and a `points jsonb`; `score_entries` carries `member_id`, `cycle_id?`, `points`, `reason`. Off by default, with no rows unless enabled (P3-T15).
 
 ## 10. The rhythm (domain G)
 

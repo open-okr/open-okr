@@ -51,10 +51,17 @@ export function Sparkline({
     );
   }
 
-  const points = history.map((point) => ({
-    at: new Date(point.at).getTime(),
-    value: point.value,
-  }));
+  const points = history
+    .map((point) => ({
+      at: new Date(point.at).getTime(),
+      value: point.value,
+    }))
+    // Oldest first. `goals.keyResultHistory` answers newest first, which is
+    // right for a table and backwards for a chart: plotted in that order the
+    // line runs right to left, so a key result that climbed from 41 to 60
+    // draws as a falling line. The read is not changed, because the table
+    // wants what it returns; the chart sorts for itself.
+    .sort((a, b) => a.at - b.at);
   const forecast =
     horizonAt === null
       ? null

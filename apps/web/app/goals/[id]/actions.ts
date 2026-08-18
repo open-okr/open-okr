@@ -160,3 +160,109 @@ export async function recordValue(
     await callAction(context, "goals.recordValue", { id: keyResultId, value });
   });
 }
+
+// ── Comments (P3-T16) ─────────────────────────────────────────────────
+
+export async function postComment(body: unknown): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  try {
+    // The goalId comes from the page, passed via a hidden field or closure.
+    // For now, the body includes the subjectType and subjectId.
+    const input = body as {
+      subjectType: "goal" | "key_result" | "check_in" | "cycle" | "document";
+      subjectId: string;
+      body: unknown;
+    };
+    await callAction(context, "comments.create", input);
+    revalidatePath("/goals/[id]", "page");
+    return NO_ERROR;
+  } catch (error) {
+    return {
+      error:
+        error instanceof OperationError
+          ? error.message
+          : "Failed to post comment.",
+    };
+  }
+}
+
+export async function editComment(
+  commentId: string,
+  body: unknown,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  try {
+    await callAction(context, "comments.update", { commentId, body });
+    revalidatePath("/goals/[id]", "page");
+    return NO_ERROR;
+  } catch (error) {
+    return {
+      error:
+        error instanceof OperationError
+          ? error.message
+          : "Failed to edit comment.",
+    };
+  }
+}
+
+export async function deleteCommentAction(
+  commentId: string,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  try {
+    await callAction(context, "comments.delete", { commentId });
+    revalidatePath("/goals/[id]", "page");
+    return NO_ERROR;
+  } catch (error) {
+    return {
+      error:
+        error instanceof OperationError
+          ? error.message
+          : "Failed to delete comment.",
+    };
+  }
+}
+
+export async function toggleReaction(
+  subjectType: string,
+  subjectId: string,
+  emoji: string,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  try {
+    await callAction(context, "reactions.add", {
+      subjectType,
+      subjectId,
+      emoji,
+    });
+    revalidatePath("/goals/[id]", "page");
+    return NO_ERROR;
+  } catch (error) {
+    return {
+      error:
+        error instanceof OperationError
+          ? error.message
+          : "Failed to add reaction.",
+    };
+  }
+}
