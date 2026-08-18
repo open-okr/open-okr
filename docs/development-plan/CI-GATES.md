@@ -110,17 +110,76 @@ The unit and integration suites are the only gate that catches a write that
 **refuses at run time**. Typecheck and lint cannot see an action that throws the
 moment somebody calls it.
 
+`pnpm test` is the shorter route and runs Turbo's per-package tasks, so it
+caches and only re-runs what changed. The command below is the whole repository
+as one suite, which is what CI shards and what you want before a pull request.
+
 On this machine the harness needs pointing at the native Postgres, and the
 worker count kept down:
 
 ```
 TEST_DB_HOST=localhost TEST_DB_PORT=5432 TEST_DB_SUPERUSER=postgres TEST_DB_PASSWORD=postgres
-node node_modules/vitest/vitest.mjs run --no-file-parallelism
+node node_modules/vitest/vitest.mjs run --config vitest.ci.config.ts --retry=2 --no-file-parallelism
 ```
 
 `--no-file-parallelism` is not optional here. The default worker count opens
 more connections than this machine's `max_connections` allows, and the failures
 that produces look like real bugs in unrelated code.
+
+**`--config vitest.ci.config.ts` is not optional either**, and leaving it off is
+worse than forgetting the database, because the run finishes and reports
+failures rather than refusing. That config sets `projects: ["packages/*",
+"apps/*"]`, which is what makes each package use its own `include`, `exclude`
+and environment. Without it, one default configuration is applied to every file
+in the repository, and two things go wrong at once: React tests needing a DOM
+run in a node environment, and `packages/test-support/fixtures/flaky/` is swept
+in. That directory exists to fail on the first attempt and pass on the retry,
+which is how the flakiness reporter is tested, so `--retry=2` belongs with it.
+
+This cost a run here: 46 failures across 16 files, every one of them the
+invocation rather than the code. The same commit was green on CI at the same
+moment. If a local run fails in files your change never touched, check the
+command before you start reading the diff.
+
+#### What still cannot run without Docker
+
+`packages/db/test/pooling-spike.test.ts` needs PgBouncer, which arrives with
+`pnpm db:up`. Without Docker it fails four tests with `ECONNREFUSED` on port
+56432. That is the machine, not the change. Everything else in the repository
+runs against a native Postgres.
+
+#### The encoding trap
+
+The Windows Postgres installer initialises a cluster as **WIN1252**, while the
+Linux Postgres CI runs is **UTF8**. A `create database` with no encoding clause
+inherits whichever the cluster has, so the same SQL succeeds on CI and fails on
+a developer's machine with:
+
+```
+character with byte sequence 0xe2 0x94 0x80 in encoding "UTF8"
+has no equivalent in encoding "WIN1252"
+```
+
+Two rules follow.
+
+**Creating a database in a test:** name the encoding, and copy `template0`
+rather than `template1`, which carries the cluster's own encoding and will
+refuse the copy.
+
+```sql
+create database x encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0
+```
+
+**Writing a migration:** every character in the file has to survive the target
+database's encoding, and you do not control what that is on somebody else's
+install. `§` and `—` exist in WIN1252 and are safe. Box drawing (`─`, `│`, `└`)
+does not, and a decorative rule made of it stops the migration dead. Migration
+0032 carries 123 of them; it applies on CI and refuses on a WIN1252 cluster.
+
+Editing that file is not the fix by itself. `_migrations` records a checksum
+per file, and changing one raises **"Applied migration X was edited after it
+ran"** on every database that already applied it. Which way to go is a human
+decision, open on the P3-T16 `STATUS.md` row.
 
 ## Sign-off
 

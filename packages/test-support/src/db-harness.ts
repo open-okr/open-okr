@@ -145,12 +145,24 @@ export default async function setupTemplateDatabase(): Promise<void> {
       );
 
       // The fixed-name database the PgBouncer leak-demonstration test uses.
-      const exists = await client.query(
-        "select 1 from pg_database where datname = $1",
+      // Same explicit UTF8 as the template above, and for the same reason: a
+      // bare `create database` inherits the cluster's own encoding, so on a
+      // Windows install this one came out WIN1252 while the template was UTF8.
+      // The encoding is part of the existence check rather than assumed, so a
+      // database left behind by an older run is rebuilt instead of reused.
+      const existing = await client.query<{ encoding: string }>(
+        "select pg_encoding_to_char(encoding) as encoding " +
+          "from pg_database where datname = $1",
         [testDbEnv.spikeLeakDatabase],
       );
-      if (exists.rowCount === 0) {
-        await client.query(`create database ${testDbEnv.spikeLeakDatabase}`);
+      if (existing.rows[0]?.encoding !== "UTF8") {
+        await client.query(
+          `drop database if exists ${testDbEnv.spikeLeakDatabase} with (force)`,
+        );
+        await client.query(
+          `create database ${testDbEnv.spikeLeakDatabase} ` +
+            `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+        );
       }
     } finally {
       await client.query("select pg_advisory_unlock($1)", [TEMPLATE_LOCK_KEY]);
