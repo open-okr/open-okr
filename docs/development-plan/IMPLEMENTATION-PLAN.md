@@ -455,7 +455,7 @@ Acceptance: Given an objective beginning with an output verb, when the champion 
 Depends on: P4-T02b
 Goal: every open issue in one place, grouped by objective.
 Deliverables: the quality panel listing every open issue across a set grouped by objective, each linking to the field that fixes it; the per-workspace strictness control in workspace admin behind `manage_coaching`; the empty, loading and permission-denied states.
-Test plan: the panel's issue count matches the sum of the stored flags; raising strictness moves every warn to a fail in the panel without a reload.
+Test plan: the panel's issue count matches the sum of the stored flags; the browser's verdicts and the stored flags are the same set; raising strictness moves every warn to a fail. **Corrected on 2026-08-18:** this line said "in the panel without a reload". Strictness lives on the server and reaches the panel as a prop, so an admin changing it is seen on the next navigation. A live client-side strictness would be a second copy of a setting the server enforces, which is the divergence P4-T02a exists to prevent.
 Acceptance: Given a set with three warnings across two objectives, when the panel opens, then all three are listed under their objective with a link to each field.
 
 ### P4-T03: Publish gates [M]
