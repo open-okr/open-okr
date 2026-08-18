@@ -998,3 +998,207 @@ export function strengthScore(
   const warns = counted.filter((entry) => entry.status === "warn").length;
   return Math.round(((passes + 0.5 * warns) / counted.length) * 100);
 }
+
+/**
+ * §4.3's six alignment checks.
+ *
+ * These are a **directory, not a second implementation.** Four of them are
+ * already decided by the alignment engine in `alignment.ts`, which emits a
+ * finding keyed AL-1, AL-3, AL-4 or AL-6 and prices it against the §11 penalty
+ * table. Re-deciding them here is exactly the drift one catalogue exists to
+ * prevent, so `evaluateAlignment` reads that engine's findings rather than the
+ * graph.
+ *
+ * The two that are not in the engine say so in their own rows. AL-2 is a
+ * database check constraint, so a goal with two parents cannot be stored and
+ * there is nothing left to warn about at drafting time. AL-5 is the dependency
+ * register, which the publish gates already hold; CY-7 is the same rule read
+ * from the cycle's side.
+ */
+export const ALIGNMENT_CHECKS: readonly QualityCheck[] = [
+  {
+    id: "AL-1",
+    group: "alignment",
+    title: "Supports a bigger priority",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "No parent and no stated contribution",
+        status: "fail",
+        prompt:
+          "What bigger priority does this support? If nothing comes to mind, that is the biggest red flag on this page.",
+      },
+      {
+        condition: "Stated contribution under three words",
+        status: "warn",
+        prompt:
+          "Growth is not a priority, it is a word. Which growth goal, whose?",
+      },
+      {
+        condition: "Parent or a stated contribution",
+        status: "pass",
+        prompt:
+          "This says what it supports, so somebody above it can see why it exists.",
+      },
+    ],
+  },
+  {
+    id: "AL-2",
+    group: "alignment",
+    title: "One parent only",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "Enforced in the schema",
+        status: "pass",
+        prompt:
+          "A goal aligns under one parent goal, or one parent key result, or neither. Never both, and the database refuses to store anything else.",
+      },
+    ],
+  },
+  {
+    id: "AL-3",
+    group: "alignment",
+    title: "No level skip",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "Skips a level",
+        status: "warn",
+        prompt:
+          "This skips a level. A team goal aligns to a department goal, not straight to a company one, or the department in between cannot see what it owns.",
+      },
+      {
+        condition: "Aligned one level up",
+        status: "pass",
+        prompt: "Aligned one level up, so nothing in between is bypassed.",
+      },
+    ],
+  },
+  {
+    id: "AL-4",
+    group: "alignment",
+    title: "Company anchor",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "No company-level objective",
+        status: "fail",
+        prompt:
+          "Nothing anchors this tree. At least one company-level objective has to sit at the top, or every alignment below it points at nothing.",
+      },
+      {
+        condition: "Anchored",
+        status: "pass",
+        prompt: "A company-level objective anchors the tree.",
+      },
+    ],
+  },
+  {
+    id: "AL-5",
+    group: "alignment",
+    title: "Dependencies declared",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition:
+          "A cross-team dependency is neither confirmed nor risk-owned",
+        status: "fail",
+        prompt:
+          "A cross-team dependency is neither confirmed by the providing team nor logged as a risk with a named owner. Get one or the other before this is published.",
+      },
+      {
+        condition: "Every dependency confirmed or risk-owned",
+        status: "pass",
+        prompt:
+          "Every cross-team dependency is either confirmed or owned as a risk.",
+      },
+    ],
+  },
+  {
+    id: "AL-6",
+    group: "alignment",
+    title: "Not siloed",
+    feedsStrengthScore: true,
+    conditions: [
+      {
+        condition: "A department subtree with no horizontal dependency",
+        status: "warn",
+        prompt:
+          "This department depends on nobody and nobody depends on it. Possible silo. Is that really true, or has the dependency simply never been written down?",
+      },
+      {
+        condition: "Horizontal dependencies present",
+        status: "pass",
+        prompt: "This department is connected sideways, not only upwards.",
+      },
+    ],
+  },
+];
+
+export interface AlignmentCheckInput {
+  /** Straight from `alignmentScore`. The engine decides; this reports. */
+  readonly findings: readonly { readonly ruleKey: string }[];
+  /**
+   * AL-5's answer, which lives in the dependency register rather than in the
+   * alignment graph. Null while nobody has been asked, which is a `todo`
+   * rather than a pass: an unanswered check never counts as answered.
+   */
+  readonly everyDependencyResolved: boolean | null;
+}
+
+/** The condition each engine finding maps to, by rule key. */
+const ALIGNMENT_FINDING_CONDITIONS: Record<string, string> = {
+  "AL-1": "No parent and no stated contribution",
+  "AL-3": "Skips a level",
+  "AL-4": "No company-level objective",
+  "AL-6": "A department subtree with no horizontal dependency",
+};
+
+/**
+ * §4.3 as verdicts, read from what the alignment engine already found.
+ *
+ * A rule with no finding against it passed: the engine walks the whole graph
+ * and prices everything it objects to, so silence is an answer rather than an
+ * absence. AL-2 is always a pass because the schema refuses the alternative,
+ * and AL-5 comes from the register the caller passes in.
+ */
+export function evaluateAlignment(
+  input: AlignmentCheckInput,
+): readonly QualityVerdict[] {
+  const raised = new Set(input.findings.map((finding) => finding.ruleKey));
+  return ALIGNMENT_CHECKS.map((entry) => {
+    if (entry.id === "AL-2") {
+      return verdictOf(entry, "Enforced in the schema");
+    }
+    if (entry.id === "AL-5") {
+      if (input.everyDependencyResolved === null) {
+        return {
+          id: entry.id,
+          status: "todo" as const,
+          prompt:
+            "Nobody has answered whether the cross-team dependencies are confirmed or risk-owned yet.",
+          feedsStrengthScore: entry.feedsStrengthScore,
+        };
+      }
+      return verdictOf(
+        entry,
+        input.everyDependencyResolved
+          ? "Every dependency confirmed or risk-owned"
+          : "A cross-team dependency is neither confirmed nor risk-owned",
+      );
+    }
+    const failing = ALIGNMENT_FINDING_CONDITIONS[entry.id];
+    if (failing && raised.has(entry.id)) {
+      return verdictOf(entry, failing);
+    }
+    // The passing row is the last one in every alignment check.
+    const passing = entry.conditions[entry.conditions.length - 1];
+    return {
+      id: entry.id,
+      status: passing?.status ?? "pass",
+      prompt: passing?.prompt ?? "",
+      feedsStrengthScore: entry.feedsStrengthScore,
+    };
+  });
+}

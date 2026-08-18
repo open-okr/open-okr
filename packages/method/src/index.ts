@@ -82,8 +82,11 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  ALIGNMENT_CHECKS,
+  type AlignmentCheckInput,
   applyStrictness,
   type ConditionRow,
+  evaluateAlignment,
   evaluateKeyResults,
   evaluateObjective,
   KEY_RESULT_CHECKS,

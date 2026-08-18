@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALIGNMENT_CHECKS,
   applyStrictness,
+  evaluateAlignment,
   evaluateKeyResults,
   evaluateObjective,
   KEY_RESULT_CHECKS,
@@ -458,5 +460,69 @@ describe("the objective length bounds come from the §11 registry", () => {
     expect(
       verdict("OBJ-2", evaluateObjective({ ...base, title: long }, thresholds)),
     ).toBe("warn");
+  });
+});
+
+/**
+ * §4.3, read from the alignment engine rather than decided a second time.
+ *
+ * Corpus entry 5 is the setup: two department objectives, no company anchor,
+ * one team goal skipping to company, one department with no horizontal
+ * dependency. The engine produces those findings; this asserts the catalogue
+ * turns them into verdicts a writer can act on.
+ */
+describe("corpus entry 5: alignment gaps", () => {
+  const result = evaluateAlignment({
+    findings: [{ ruleKey: "AL-4" }, { ruleKey: "AL-3" }, { ruleKey: "AL-6" }],
+    everyDependencyResolved: true,
+  });
+  const at = (id: string) => result.find((entry) => entry.id === id);
+
+  it("passes AL-1, because the engine raised nothing against it", () => {
+    expect(at("AL-1")?.status).toBe("pass");
+  });
+
+  it("passes AL-2, which the schema settles rather than the coach", () => {
+    expect(at("AL-2")?.status).toBe("pass");
+  });
+
+  it("warns AL-3 on the skip and fails AL-4 on the missing anchor", () => {
+    expect(at("AL-3")?.status).toBe("warn");
+    expect(at("AL-4")?.status).toBe("fail");
+  });
+
+  it("warns AL-6 on the silo", () => {
+    expect(at("AL-6")?.status).toBe("warn");
+  });
+
+  it("carries a prompt on every one of the six", () => {
+    expect(ALIGNMENT_CHECKS).toHaveLength(6);
+    expect(result).toHaveLength(6);
+    for (const entry of result) {
+      expect(entry.prompt.length).toBeGreaterThan(20);
+    }
+    for (const check of ALIGNMENT_CHECKS) {
+      for (const row of check.conditions) {
+        expect(row.prompt.length).toBeGreaterThan(20);
+      }
+    }
+  });
+});
+
+describe("AL-5, which lives in the dependency register", () => {
+  it("is todo while nobody has answered, not a pass", () => {
+    const result = evaluateAlignment({
+      findings: [],
+      everyDependencyResolved: null,
+    });
+    expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("todo");
+  });
+
+  it("fails when a cross-team dependency is neither confirmed nor risk-owned", () => {
+    const result = evaluateAlignment({
+      findings: [],
+      everyDependencyResolved: false,
+    });
+    expect(result.find((entry) => entry.id === "AL-5")?.status).toBe("fail");
   });
 });
