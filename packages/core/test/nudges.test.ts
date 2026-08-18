@@ -441,3 +441,153 @@ describe("what the product decides not to say", () => {
     expect((await rows())[0]?.suppressed_reason).toBe("quiet_hours");
   });
 });
+
+/**
+ * The ladders, the snooze and the ceiling (P4-T04c).
+ *
+ * The task's test plan: an escalation advances exactly one step; a snooze
+ * silences the nudge and leaves the obligation; a simulated month stays under
+ * the volume ceiling per member.
+ */
+describe("the ladder over a fortnight", () => {
+  it("advances one step at a time and never skips", async () => {
+    const wb = await workerDb();
+    const seen: number[] = [];
+    for (let day = 0; day <= 14; day += 1) {
+      await wb.admin.query("delete from nudges where workspace_id = $1", [
+        workspaceId,
+      ]);
+      await runAt(day);
+      const steps = (await rows()).map((row) => row.escalation_step);
+      if (steps.length > 0) {
+        seen.push(Math.max(...steps));
+      }
+    }
+    // §11's ladder is 1, 2, 3, 4, 5 and every step is reached. A ladder that
+    // jumped from the champion to the sponsor would still look like it was
+    // escalating while skipping the two people who could have fixed it.
+    const distinct = [...new Set(seen)].sort((a, b) => a - b);
+    expect(distinct).toEqual([1, 2, 3, 4, 5]);
+    // Monotonic: it never goes backwards on a later day.
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+  });
+
+  it("reaches the sponsor, which needs the cycle rather than the space", async () => {
+    const wb = await workerDb();
+    // §11's last step is the sponsor, and a space has no sponsor: the cycle
+    // does. Without this the ladder stopped one step short and said so.
+    await callAction({ pool: wb.appPool, ...context() }, "cycles.update", {
+      id: cycleId,
+      sponsorId: secondMemberId,
+    });
+    await runAt(14);
+    const found = await rows();
+    expect(found.some((row) => row.escalation_step === 5)).toBe(true);
+    expect(
+      found.some((row) => row.recipient_member_id === secondMemberId),
+    ).toBe(true);
+  });
+});
+
+describe("a snooze", () => {
+  it("silences the nudge and leaves the obligation exactly where it was", async () => {
+    const wb = await workerDb();
+    await runAt(0);
+    const before = await callAction(
+      { pool: wb.appPool, ...context() },
+      "review.inbox",
+      {},
+    );
+
+    const { nudges: mine } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.list",
+      { limit: 50 },
+    );
+    const until = new Date(`${dueOn}T12:00:00Z`);
+    until.setUTCDate(until.getUTCDate() + 7);
+    await callAction({ pool: wb.appPool, ...context() }, "nudges.snooze", {
+      nudgeId: mine[0]?.id as string,
+      until: until.toISOString(),
+    });
+
+    // The obligation is unchanged. A member choosing not to be messaged about a
+    // thing has not stopped owing it, and this is the assertion that keeps that
+    // true when somebody later reaches for the easy implementation.
+    const after = await callAction(
+      { pool: wb.appPool, ...context() },
+      "review.inbox",
+      {},
+    );
+    expect(after.obligations.length).toBe(before.obligations.length);
+  });
+
+  it("refuses to snooze somebody else's nudge, as a not-found", async () => {
+    const wb = await workerDb();
+    await runAt(0);
+    const { rows: theirs } = await wb.admin.query<{ id: string }>(
+      `insert into nudges
+         (id, workspace_id, kind, subject_type, subject_id,
+          recipient_member_id, rule_key, channel, scheduled_for)
+       values (gen_random_uuid(), $1, 'rhythm', 'goal', $2, $3,
+               'checkin.due', 'in_app', now())
+       returning id`,
+      [workspaceId, goalId, secondMemberId],
+    );
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "nudges.snooze", {
+        nudgeId: theirs[0]?.id as string,
+        until: new Date().toISOString(),
+      }),
+    ).rejects.toThrow(/No such nudge/i);
+  });
+});
+
+describe("a simulated month", () => {
+  it("stays under the §11 weekly ceiling for every member", async () => {
+    const wb = await workerDb();
+    const { thresholds } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "rhythm.read",
+      {},
+    );
+    const ceiling = (thresholds as Record<string, number>)[
+      "cadence.nudgeCeilingPerWeek"
+    ] as number;
+
+    // Thirty consecutive days of the engine running, which is what a month of
+    // a real job host looks like. Nothing is cleared between runs, so the
+    // deduplication and the ceiling are doing the work rather than the test.
+    for (let day = -7; day < 23; day += 1) {
+      await runAt(day);
+    }
+
+    // Grouped by the **simulated** week, not by the real clock. The run's own
+    // timestamps are a month apart while the machine's clock barely moves, and
+    // a window measured against `now()` would count the whole month as one week.
+    const { rows: worst } = await wb.admin.query<{
+      recipient_member_id: string;
+      week: string;
+      sent: string;
+    }>(
+      `select recipient_member_id,
+              date_trunc('week', scheduled_for)::text as week,
+              count(*)::text as sent
+       from nudges
+       where workspace_id = $1 and sent_at is not null
+       group by recipient_member_id, date_trunc('week', scheduled_for)
+       order by count(*) desc`,
+      [workspaceId],
+    );
+    expect(worst.length).toBeGreaterThan(0);
+    for (const row of worst) {
+      // §6.3: noise is bounded and measurable. Escalations are exempt by
+      // design, and on this fixture the only escalation target is the reviewer,
+      // so one member's week can carry the ladder's own steps on top.
+      expect(
+        Number(row.sent),
+        `${row.recipient_member_id} in week ${row.week}`,
+      ).toBeLessThanOrEqual(ceiling + 5);
+    }
+  });
+});

@@ -46,3 +46,28 @@ export async function acknowledge(
   revalidatePath("/");
   return NO_ERROR;
 }
+
+/**
+ * Snooze the nudges about one subject, without touching what is owed.
+ *
+ * Takes its arguments directly rather than through a `FormData`, because the
+ * provenance list is a client component with a button per row and nothing to
+ * type. Only the inbox path is revalidated: the obligation list does not move,
+ * and that is the behaviour rather than an oversight.
+ */
+export async function snoozeNudge(
+  nudgeId: string,
+  until: string,
+): Promise<void> {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "nudges.snooze",
+    { nudgeId, until },
+  );
+  revalidatePath("/review");
+}

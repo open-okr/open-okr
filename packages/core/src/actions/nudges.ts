@@ -7,7 +7,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import type { SuppressionReason } from "@openokr/method";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -16,10 +16,12 @@ import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   activeMemberIds,
   decideSuppression,
+  dueAcknowledgementNudges,
   dueCheckInNudges,
   loadSuppressionContext,
   recordNudgesInTx,
 } from "../nudges/service.ts";
+import { OperationError } from "../operations/errors.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /**
@@ -59,12 +61,22 @@ export const runNudges = defineWriteAction({
       );
       const timeZone = await workspaceTimeZone(tx, workspaceId);
 
-      const due = await dueCheckInNudges(tx as WorkspaceTx, {
-        workspaceId,
-        now: at,
-        timeZone,
-        thresholds,
-      });
+      // Two ladders with rows to run against. The third, blockers, is a pure
+      // function tested beside these two and has nothing to read until P4-T07c
+      // creates the table.
+      const due = [
+        ...(await dueCheckInNudges(tx as WorkspaceTx, {
+          workspaceId,
+          now: at,
+          timeZone,
+          thresholds,
+        })),
+        ...(await dueAcknowledgementNudges(tx as WorkspaceTx, {
+          workspaceId,
+          now: at,
+          thresholds,
+        })),
+      ];
 
       // A suspended member is never nudged. §4.3's access getter excludes them
       // from every read, and a nudge to somebody who cannot open the product is
@@ -243,6 +255,255 @@ export const listNudges = defineReadAction({
             sentAt: row.sentAt?.toISOString() ?? null,
             createdAt: row.createdAt.toISOString(),
           })),
+        };
+      },
+    );
+  },
+});
+
+/**
+ * Snooze one subject for this member (P4-T04c).
+ *
+ * **A snooze silences the nudge and never the obligation.** METHOD.md and
+ * CLAUDE.md both say it in one sentence, and the distinction is the whole point:
+ * the review inbox is a list of what somebody owes, and a person choosing not to
+ * be messaged about it has not stopped owing it. So this writes to the nudge and
+ * touches nothing in the inbox.
+ *
+ * Per subject rather than per rule. Somebody snoozing a goal means "stop telling
+ * me about this goal", not "stop telling me about check-ins", and a rule-level
+ * snooze would silence a different goal they still care about.
+ */
+export const snoozeNudge = defineWriteAction({
+  name: "nudges.snooze",
+  summary:
+    "Silences nudges about one subject for this member until a time they choose. Never silences the obligation itself.",
+  input: z.object({
+    nudgeId: z.uuid(),
+    /** When it starts speaking again. */
+    until: z.string(),
+  }),
+  output: z.object({ nudgeId: z.uuid(), until: z.string() }),
+  // `comment` rather than `view`: no write is reachable at view, whatever its
+  // domain, and this one writes. It is the lowest level above it, which is
+  // right for an action that changes what the product says to you and nothing
+  // about the work itself.
+  access: ACCESS_LEVELS.comment,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const userId = context.actor.userId;
+      if (!userId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const [member] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.userId, userId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!member) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [nudge] = await tx
+        .select({
+          id: nudges.id,
+          subjectType: nudges.subjectType,
+          subjectId: nudges.subjectId,
+          recipientMemberId: nudges.recipientMemberId,
+        })
+        .from(nudges)
+        .where(
+          activeOnly(
+            nudges,
+            eq(nudges.id, input.nudgeId),
+            eq(nudges.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      // Not found rather than forbidden for somebody else's nudge, the way every
+      // other read in the product refuses: an outsider learns nothing about what
+      // exists.
+      if (!nudge || nudge.recipientMemberId !== member.id) {
+        throw new OperationError("not_found", "No such nudge.");
+      }
+
+      const until = new Date(input.until);
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(nudges)
+        .set({ snoozedUntil: until, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            nudges,
+            eq(nudges.workspaceId, workspaceId),
+            eq(nudges.recipientMemberId, member.id),
+            eq(nudges.subjectType, nudge.subjectType),
+            eq(nudges.subjectId, nudge.subjectId),
+          ),
+        );
+
+      return {
+        result: { nudgeId: input.nudgeId, until: until.toISOString() },
+        activity: {
+          kind: "nudge.snoozed",
+          subjectType: "nudge",
+          subjectId: input.nudgeId,
+          payload: { until: until.toISOString() },
+        },
+        audit: {
+          action: "nudges.snooze",
+          targetType: "nudge",
+          targetId: input.nudgeId,
+          payload: { until: until.toISOString() },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The noisiest rules, for the workspace admin volume card (screen S-36).
+ *
+ * Behind `manage_coaching`, which is `full`: this is the view that tells an
+ * administrator their product is annoying people, and the numbers name members.
+ * The read is `full` for the same reason the strictness control is.
+ */
+export const nudgeVolume = defineReadAction({
+  name: "nudges.volume",
+  summary:
+    "How many nudges each rule produced over a window, and how many were suppressed and why.",
+  input: z.object({ days: z.number().int().min(1).max(365).default(30) }),
+  output: z.object({
+    windowDays: z.number().int(),
+    ceilingPerWeek: z.number().int(),
+    rules: z.array(
+      z.object({
+        ruleKey: z.string(),
+        sent: z.number().int(),
+        suppressed: z.number().int(),
+      }),
+    ),
+    /** Members over the §11 weekly ceiling, worst first. */
+    loudestMembers: z.array(
+      z.object({
+        memberId: z.uuid(),
+        name: z.string(),
+        sentThisWeek: z.number().int(),
+      }),
+    ),
+    suppressionReasons: z.array(
+      z.object({ reason: z.string(), count: z.number().int() }),
+    ),
+  }),
+  access: ACCESS_LEVELS.full,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as WorkspaceTx;
+        const since = new Date(Date.now() - input.days * 86_400_000);
+        const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+
+        const byRule = await tx
+          .select({
+            ruleKey: nudges.ruleKey,
+            sent: count(nudges.sentAt),
+            total: count(nudges.id),
+          })
+          .from(nudges)
+          .where(
+            activeOnly(
+              nudges,
+              and(
+                eq(nudges.workspaceId, context.workspaceId),
+                gte(nudges.scheduledFor, since),
+              ),
+            ),
+          )
+          .groupBy(nudges.ruleKey);
+
+        const byReason = await tx
+          .select({
+            reason: nudges.suppressedReason,
+            total: count(nudges.id),
+          })
+          .from(nudges)
+          .where(
+            activeOnly(
+              nudges,
+              and(
+                eq(nudges.workspaceId, context.workspaceId),
+                gte(nudges.scheduledFor, since),
+                isNotNull(nudges.suppressedReason),
+              ),
+            ),
+          )
+          .groupBy(nudges.suppressedReason);
+
+        const byMember = await tx
+          .select({
+            memberId: nudges.recipientMemberId,
+            name: workspaceMembers.name,
+            sent: count(nudges.id),
+          })
+          .from(nudges)
+          .innerJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, nudges.recipientMemberId),
+          )
+          .where(
+            activeOnly(
+              nudges,
+              and(
+                eq(nudges.workspaceId, context.workspaceId),
+                isNotNull(nudges.sentAt),
+                gte(nudges.scheduledFor, weekAgo),
+              ),
+            ),
+          )
+          .groupBy(nudges.recipientMemberId, workspaceMembers.name);
+
+        const ceiling = thresholds["cadence.nudgeCeilingPerWeek"];
+        return {
+          windowDays: input.days,
+          ceilingPerWeek: ceiling,
+          rules: byRule
+            .map((row) => ({
+              ruleKey: row.ruleKey,
+              sent: row.sent,
+              suppressed: row.total - row.sent,
+            }))
+            // Noisiest first, which is the question the card answers.
+            .sort((a, b) => b.sent + b.suppressed - (a.sent + a.suppressed)),
+          loudestMembers: byMember
+            .filter((row) => row.sent > ceiling)
+            .map((row) => ({
+              memberId: row.memberId,
+              name: row.name,
+              sentThisWeek: row.sent,
+            }))
+            .sort((a, b) => b.sentThisWeek - a.sentThisWeek),
+          suppressionReasons: byReason
+            .map((row) => ({
+              reason: row.reason ?? "unknown",
+              count: row.total,
+            }))
+            .sort((a, b) => b.count - a.count),
         };
       },
     );

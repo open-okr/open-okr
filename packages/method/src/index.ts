@@ -14,6 +14,8 @@ export {
   alignmentScore,
 } from "./alignment.ts";
 export {
+  acknowledgementEscalation,
+  blockerEscalation,
   type Escalation,
   type EscalationRole,
   escalation,

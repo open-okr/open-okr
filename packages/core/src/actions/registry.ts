@@ -163,7 +163,7 @@ import {
   toggleSubscription,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
-import { listNudges, runNudges } from "./nudges.ts";
+import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
   convertToGuest,
@@ -360,6 +360,8 @@ export const ACTION_MAP = {
   "comments.previewNotify": previewNotifyAction,
   "nudges.run": runNudges,
   "nudges.list": listNudges,
+  "nudges.snooze": snoozeNudge,
+  "nudges.volume": nudgeVolume,
   "reactions.list": listReactionsAction,
   "reactions.add": addReactionAction,
   "reactions.remove": removeReactionAction,

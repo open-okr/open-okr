@@ -142,6 +142,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // the product sent would bury everything a person actually did.
   "nudges.run": (p) =>
     `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
+  "nudge.snoozed": (p) => `snoozed a nudge until ${asString(p.until, "later")}`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>

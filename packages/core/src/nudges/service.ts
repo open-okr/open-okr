@@ -19,6 +19,8 @@
  */
 import {
   activeOnly,
+  checkIns,
+  cycles,
   goals,
   type NudgeKind,
   type NudgeSubjectType,
@@ -30,6 +32,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  acknowledgementEscalation,
   type EscalationRole,
   escalation,
   isTriggerKey,
@@ -92,6 +95,7 @@ async function memberForRole(
     readonly championId: string | null;
     readonly reviewerId: string | null;
     readonly spaceId: string | null;
+    readonly cycleId: string | null;
   },
   role: EscalationRole,
 ): Promise<string | null> {
@@ -119,11 +123,18 @@ async function memberForRole(
     // second place.
     return resolveCoordinator(holders) ?? null;
   }
-  // §11's ladder ends at the sponsor, and a space has no sponsor column: the
-  // cycle does. Resolved by the caller that knows which cycle a goal is in,
-  // which is P4-T04c's escalation work. Until then the ladder stops at the
-  // coordinator rather than escalating to somebody arbitrary.
-  return null;
+  // §11's ladder ends at the sponsor, and a space has no sponsor: the cycle
+  // does. A goal outside a cycle has none, and the ladder stops there rather
+  // than escalating to somebody who was never given the job.
+  if (!goal.cycleId) {
+    return null;
+  }
+  const [cycle] = await tx
+    .select({ sponsorId: cycles.sponsorId })
+    .from(cycles)
+    .where(activeOnly(cycles, eq(cycles.id, goal.cycleId)))
+    .limit(1);
+  return cycle?.sponsorId ?? null;
 }
 
 /**
@@ -153,6 +164,7 @@ export async function dueCheckInNudges(
       championId: goals.championId,
       reviewerId: goals.reviewerId,
       spaceId: goals.spaceId,
+      cycleId: goals.cycleId,
     })
     .from(goals)
     .where(
@@ -210,9 +222,18 @@ export async function dueCheckInNudges(
         // because the review inbox is an obligation rather than a message.
         channel: "in_app",
         escalationStep: step.step,
-        // Widened past the champion, so somebody other than the owner of the
-        // work is being told. That is what makes it worth a quiet hour.
-        urgent: step.targets.some((target) => target !== "champion"),
+        // Urgency is a property of **this recipient**, not of the step.
+        //
+        // A champion at step 5 is still the champion being reminded about their
+        // own goal, and their daily reminder does not earn a quiet hour or a
+        // pass through the weekly ceiling. The reviewer, coordinator and sponsor
+        // are the escalation: somebody other than the owner of the work is
+        // being told, and that is the part §6.3 says gets through.
+        //
+        // Deriving it from the step instead let a month of daily reminders sail
+        // past a ceiling written to stop exactly that, which is what the
+        // simulated month found.
+        urgent: role !== "champion",
       });
     }
   }
@@ -495,5 +516,132 @@ export async function decideSuppression(
         input.context.sentThisWeek.get(input.nudge.recipientMemberId) ?? 0,
     },
     input.thresholds,
+  );
+}
+
+/**
+ * Every acknowledgement nudge due in this workspace (P4-T04c).
+ *
+ * §11: the reviewer is asked one day after publication and the coordinator is
+ * brought in at three. A published check-in nobody acknowledged is a loop left
+ * open, and the person who left it open is the reviewer rather than the
+ * champion who wrote it.
+ *
+ * The reviewer **of record** is the one on the check-in row, not whoever holds
+ * the role today. P3-T08 stamped it at publication for exactly this reason: a
+ * reassignment moves the obligation only while it is still open, and a closed
+ * loop keeps the member who actually closed it.
+ */
+export async function dueAcknowledgementNudges(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly now: Date;
+    readonly thresholds: ResolvedThresholds;
+  },
+): Promise<readonly DueNudge[]> {
+  const rows = await tx
+    .select({
+      id: checkIns.id,
+      // The check-in's subject is always a goal today, and the column pair says
+      // so rather than a foreign key named for it.
+      goalId: checkIns.subjectId,
+      publishedAt: checkIns.publishedAt,
+      reviewerMemberId: checkIns.reviewerMemberId,
+    })
+    .from(checkIns)
+    .where(
+      activeOnly(
+        checkIns,
+        eq(checkIns.workspaceId, input.workspaceId),
+        isNotNull(checkIns.publishedAt),
+        // An acknowledged check-in is a closed loop and owes nobody anything.
+        isNull(checkIns.acknowledgedAt),
+      ),
+    );
+
+  const due: DueNudge[] = [];
+  for (const row of rows) {
+    if (!row.publishedAt || !row.reviewerMemberId) {
+      continue;
+    }
+    const days = Math.floor(
+      (input.now.getTime() - row.publishedAt.getTime()) / 86_400_000,
+    );
+    const step = acknowledgementEscalation(days, input.thresholds);
+    if (step.step === null) {
+      continue;
+    }
+    const ruleKey = step.step >= 2 ? "ack.overdue" : "ack.owed";
+    if (!isTriggerKey(ruleKey)) {
+      throw new OperationError(
+        "forbidden",
+        `\`${ruleKey}\` is not a rule the method package defines.`,
+      );
+    }
+
+    for (const role of step.targets) {
+      const memberId =
+        role === "reviewer"
+          ? row.reviewerMemberId
+          : await memberForRole(
+              tx,
+              await goalRolesFor(tx, input.workspaceId, row.goalId),
+              role,
+            );
+      if (!memberId) {
+        continue;
+      }
+      due.push({
+        ruleKey,
+        kind: trigger(ruleKey)?.owner === "coach" ? "quality" : "rhythm",
+        subjectType: "check_in",
+        subjectId: row.id,
+        recipientMemberId: memberId,
+        channel: "in_app",
+        escalationStep: step.step,
+        // Same rule from the other side: the reviewer owns this obligation, so
+        // their own reminder is not an escalation. The coordinator's is.
+        urgent: role !== "reviewer",
+      });
+    }
+  }
+  return due;
+}
+
+/** The role columns a goal carries, for resolving a ladder target. */
+async function goalRolesFor(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  goalId: string,
+): Promise<{
+  championId: string | null;
+  reviewerId: string | null;
+  spaceId: string | null;
+  cycleId: string | null;
+}> {
+  const [goal] = await tx
+    .select({
+      championId: goals.championId,
+      reviewerId: goals.reviewerId,
+      spaceId: goals.spaceId,
+      cycleId: goals.cycleId,
+    })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.id, goalId),
+        eq(goals.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  return (
+    goal ?? {
+      championId: null,
+      reviewerId: null,
+      spaceId: null,
+      cycleId: null,
+    }
   );
 }

@@ -149,6 +149,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // the nudges are rows of their own, and a feed with one entry per message
   // sent would bury everything a person actually did.
   "nudges.run": z.object({ recorded: z.number().int() }),
+  // A snooze silences the nudge and never the obligation, which is why it
+  // is worth recording: somebody chose to stop being messaged about a
+  // thing they still owe.
+  "nudge.snoozed": z.object({ until: z.string() }),
   // Goals and key results (P3-T04). A goal's title is snapshotted for the same
   // reason a member's name is: "closed Raise activation" has to keep reading that
   // way after the goal is renamed or erased.
