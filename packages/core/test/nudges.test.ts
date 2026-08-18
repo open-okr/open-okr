@@ -309,3 +309,135 @@ describe("the nudge log", () => {
     expect(Number(linked[0]?.count)).toBe(1);
   });
 });
+
+/**
+ * Suppression, against a real database (P4-T04b).
+ *
+ * The pure decision is golden-master tested in `packages/method`. These are the
+ * cases that need rows: that the previous nudge is found, that a suppressed one
+ * is a row rather than an absence, and that it gets no inbox entry.
+ */
+describe("what the product decides not to say", () => {
+  it("writes a row with a reason rather than nothing at all", async () => {
+    const wb = await workerDb();
+    await runAt(0);
+    // The same day, the same subject, the same step: deduplication.
+    const again = await runAt(0);
+    expect(again.recorded).toBe(0);
+    expect(again.suppressed).toBe(1);
+
+    const found = await rows();
+    expect(found).toHaveLength(2);
+    const swallowed = found.filter((row) => row.suppressed_reason !== null);
+    expect(swallowed).toHaveLength(1);
+    expect(swallowed[0]?.suppressed_reason).toBe("dedup");
+    // A suppressed nudge is never also sent, which the migration enforces.
+    expect(swallowed[0]?.sent_at).toBeNull();
+  });
+
+  it("gives a suppressed nudge no inbox row, because nobody saw it", async () => {
+    const wb = await workerDb();
+    await runAt(0);
+    await runAt(0);
+    const { rows: inbox } = await wb.admin.query<{ count: string }>(
+      "select count(*)::text as count from notifications where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(Number(inbox[0]?.count)).toBe(1);
+  });
+
+  it("lets the escalation through the same window, because the step moved", async () => {
+    const wb = await workerDb();
+    const { thresholds } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "rhythm.read",
+      {},
+    );
+    const grace = (thresholds as Record<string, number>)[
+      "cadence.stalenessGraceDays"
+    ] as number;
+
+    await runAt(0);
+    // Past the grace on the same clock day would still be inside the
+    // deduplication window, and the step has increased, so §11 says it speaks.
+    const escalated = await runAt(grace + 1);
+    expect(escalated.recorded).toBeGreaterThan(0);
+  });
+
+  it("stays quiet while workspace quiet mode is on, and says that is why", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update rhythm_settings set quiet_mode = true where workspace_id = $1",
+      [workspaceId],
+    );
+    const result = await runAt(0);
+    expect(result.recorded).toBe(0);
+    expect(result.suppressed).toBe(1);
+    expect((await rows())[0]?.suppressed_reason).toBe("quiet_hours");
+  });
+
+  it("still escalates through workspace quiet mode", async () => {
+    const wb = await workerDb();
+    const { thresholds } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "rhythm.read",
+      {},
+    );
+    const grace = (thresholds as Record<string, number>)[
+      "cadence.stalenessGraceDays"
+    ] as number;
+    await wb.admin.query(
+      "update rhythm_settings set quiet_mode = true where workspace_id = $1",
+      [workspaceId],
+    );
+    // §6.3: quiet mode silences everything except escalations. A goal stale past
+    // its grace is not a message somebody can read in the morning.
+    expect((await runAt(grace + 1)).recorded).toBeGreaterThan(0);
+  });
+
+  it("stays quiet for a switched-off rule, and calls it disabled", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into nudge_rules (id, workspace_id, rule_key, enabled)
+       values (gen_random_uuid(), $1, 'checkin.due', false)`,
+      [workspaceId],
+    );
+    const result = await runAt(0);
+    expect(result.recorded).toBe(0);
+    // Not "held": turned off. The volume dashboard should not read a switched-off
+    // rule as noise the product decided to swallow.
+    expect((await rows())[0]?.suppressed_reason).toBe("disabled");
+  });
+
+  it("needs no rule rows at all to work, which is §4.14's promise", async () => {
+    const wb = await workerDb();
+    const { rows: none } = await wb.admin.query<{ count: string }>(
+      "select count(*)::text as count from nudge_rules where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(Number(none[0]?.count)).toBe(0);
+    // A fresh workspace has no rows and every rule is enabled on the canon
+    // ladder. Seeding forty-four would make the table the catalogue's second
+    // home.
+    expect((await runAt(0)).recorded).toBe(1);
+  });
+
+  it("holds an ordinary nudge inside a member's own quiet hours", async () => {
+    const wb = await workerDb();
+    // The run below lands at 02:00 in this member's timezone.
+    await wb.admin.query(
+      `update workspace_members
+       set timezone = 'UTC', quiet_hours = '{"start":"22:00","end":"07:00"}'::jsonb
+       where id = $1`,
+      [ownerMemberId],
+    );
+    const at = new Date(`${dueOn}T02:00:00Z`);
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.run",
+      { now: at.toISOString() },
+    );
+    expect(result.recorded).toBe(0);
+    expect((await rows())[0]?.suppressed_reason).toBe("quiet_hours");
+  });
+});

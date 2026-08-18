@@ -6,6 +6,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import type { SuppressionReason } from "@openokr/method";
 import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -14,7 +15,9 @@ import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import {
   activeMemberIds,
+  decideSuppression,
   dueCheckInNudges,
+  loadSuppressionContext,
   recordNudgesInTx,
 } from "../nudges/service.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -43,6 +46,8 @@ export const runNudges = defineWriteAction({
   }),
   output: z.object({
     recorded: z.number().int(),
+    /** Written with a reason and never sent. Noise the product chose to hold. */
+    suppressed: z.number().int(),
     ruleKeys: z.array(z.string()),
   }),
   access: ACCESS_LEVELS.full,
@@ -69,19 +74,50 @@ export const runNudges = defineWriteAction({
         active.has(entry.recipientMemberId),
       );
 
+      // Suppression decided before anything is written, so a swallowed nudge is
+      // a row with a reason rather than an absence. Four of the five reasons are
+      // decisions the product made, and it has to be able to name them.
+      const context = await loadSuppressionContext(tx as WorkspaceTx, {
+        workspaceId,
+        now: at,
+        workspaceTimeZone: timeZone,
+      });
+      const decided: {
+        nudge: (typeof deliverable)[number];
+        suppressedReason: SuppressionReason | null;
+      }[] = [];
+      for (const nudge of deliverable) {
+        decided.push({
+          nudge,
+          suppressedReason: await decideSuppression(tx as WorkspaceTx, {
+            workspaceId,
+            nudge,
+            now: at,
+            context,
+            thresholds,
+          }),
+        });
+      }
+
       const ids = await recordNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
-        due: deliverable,
+        due: decided,
         at,
       });
 
-      // The in-app inbox, one row per nudge, linked by the `nudge_id` the
-      // notifications table has carried since 0013 with nothing to point at.
-      for (const [index, nudgeId] of ids.entries()) {
-        const entry = deliverable[index];
+      // The in-app inbox, one row per nudge that was actually sent, linked by
+      // the `nudge_id` the notifications table has carried since 0013 with
+      // nothing to point at. A suppressed nudge gets no inbox row: the point of
+      // suppressing it was that nobody sees it.
+      for (const [index, written] of ids.entries()) {
+        if (!written.sent) {
+          continue;
+        }
+        const entry = decided[index]?.nudge;
         if (!entry) {
           continue;
         }
+        const nudgeId = written.id;
         // openokr:allow-mutation: the calling Operation's own transaction.
         await tx.insert(notifications).values({
           workspaceId,
@@ -97,22 +133,30 @@ export const runNudges = defineWriteAction({
         });
       }
 
+      const sent = ids.filter((written) => written.sent).length;
       return {
         result: {
-          recorded: ids.length,
-          ruleKeys: [...new Set(deliverable.map((entry) => entry.ruleKey))],
+          recorded: sent,
+          suppressed: ids.length - sent,
+          ruleKeys: [
+            ...new Set(
+              decided
+                .filter((entry) => entry.suppressedReason === null)
+                .map((entry) => entry.nudge.ruleKey),
+            ),
+          ],
         },
         activity: {
           kind: "nudges.run",
           subjectType: "workspace",
           subjectId: workspaceId,
-          payload: { recorded: ids.length },
+          payload: { recorded: sent },
         },
         audit: {
           action: "nudges.run",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { recorded: ids.length },
+          payload: { recorded: sent },
         },
       };
     },

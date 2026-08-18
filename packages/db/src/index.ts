@@ -291,6 +291,7 @@ export {
   subscriptionLists,
   subscriptions,
 } from "./schema/notifications.ts";
+export { type NudgeRule, nudgeRules } from "./schema/nudge-rules.ts";
 export {
   NUDGE_KINDS,
   NUDGE_SUBJECT_TYPES,
