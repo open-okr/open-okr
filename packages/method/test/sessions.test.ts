@@ -8,11 +8,12 @@ import {
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  reviewStages,
   rhythmDiagnostic,
   rhythmScore,
   WEEKLY_STEPS,
 } from "../src/sessions.ts";
-import { canonThresholds } from "../src/thresholds.ts";
+import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 /**
  * The rituals as data (P4-T01f).
@@ -37,11 +38,24 @@ describe("§8.1's eleven stages", () => {
   });
 
   it("sum to the sixty minutes §7.1 gives the quarterly review", () => {
-    const total = REVIEW_STAGES.reduce((sum, entry) => sum + entry.minutes, 0);
+    // The minutes come from §11's `sessions.quarterlyStageMinutes`, not from
+    // this list. The list carries the order, which §11 says is canon.
+    const total = reviewStages(thresholds).reduce(
+      (sum, entry) => sum + entry.minutes,
+      0,
+    );
     expect(total).toBe(60);
     expect(RITUALS.find((r) => r.kind === "quarterly")?.length).toBe(
       "60 minutes",
     );
+  });
+
+  it("takes its durations from the registry, so a tuned workspace is timed by its own numbers", () => {
+    const tuned = resolveThresholds({
+      "sessions.quarterlyStageMinutes": [10, 12, 9, 3, 7, 3, 5, 3, 5, 4, 4],
+    });
+    expect(reviewStages(tuned)[0]?.minutes).toBe(10);
+    expect(reviewStages(thresholds)[0]?.minutes).toBe(5);
   });
 
   it("group into the four acts, in the document's order", () => {

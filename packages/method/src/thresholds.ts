@@ -35,6 +35,7 @@
  * parameter is how a reader finds the sentence it came from.
  */
 import { z } from "zod";
+import { QUALITY_WORD_LISTS } from "./word-lists.ts";
 
 /** Which §11 table a parameter comes from. Drives the admin card grouping. */
 export type ThresholdGroup =
@@ -350,6 +351,22 @@ export const THRESHOLDS = {
     why: "Warn: a warning is worth another look, not a refusal. The six publish gates are always hard, whatever this says.",
     default: "warn" as CoachStrictness,
     schema: z.enum(COACH_STRICTNESS),
+  }),
+  "quality.wordLists": param({
+    group: "quality",
+    label: "Quality word lists",
+    section: "§4.1, §4.2",
+    why: "The §4 lists. A workspace adds its own vocabulary; the canon terms remain, so a local addition can never disable a canon rule.",
+    default: QUALITY_WORD_LISTS as unknown as Record<string, readonly string[]>,
+    schema: z.record(z.string(), z.array(z.string())),
+  }),
+  "sessions.quarterlyStageMinutes": param({
+    group: "sessions",
+    label: "Quarterly stage minutes",
+    section: "§8.1",
+    why: "The §8.1 durations, eleven of them in stage order. Pacing rather than a rule: §8.1 says going over is normal and visible, and the facilitator lands it.",
+    default: [5, 12, 9, 3, 7, 3, 5, 3, 5, 4, 4] as readonly number[],
+    schema: z.array(z.number().int().min(1).max(120)).length(11),
   }),
   "quality.strengthScoreBands": param({
     group: "quality",
@@ -673,6 +690,24 @@ export function resolveThresholds(
   const { overrides: valid } = validateOverrides(overrides);
   for (const [key, value] of Object.entries(valid)) {
     resolved[key] = value;
+  }
+  // One parameter adds rather than replaces. METHOD.md §11 words the word
+  // lists as "a workspace may add terms; the canon terms remain", so a
+  // workspace that lists three verbs of its own gets those three on top of the
+  // canon rather than a catalogue of three. Replacing would let a workspace
+  // switch off a canon rule by overriding it with an empty list, which is a
+  // change to the practice and not a setting.
+  if (valid["quality.wordLists"] !== undefined) {
+    const canon = THRESHOLDS["quality.wordLists"].default;
+    const added = valid["quality.wordLists"] as Record<
+      string,
+      readonly string[]
+    >;
+    const merged: Record<string, readonly string[]> = { ...canon };
+    for (const [list, terms] of Object.entries(added)) {
+      merged[list] = [...new Set([...(canon[list] ?? []), ...terms])];
+    }
+    resolved["quality.wordLists"] = merged;
   }
   return resolved as ResolvedThresholds;
 }

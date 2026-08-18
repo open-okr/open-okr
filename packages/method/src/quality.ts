@@ -47,174 +47,13 @@ export interface QualityVerdict {
 }
 
 /**
- * §4.1's four word lists.
- *
- * Not §11 parameters: the registry holds numbers the practice fires on, and a
- * word list is data. A workspace adds terms through a §4.14 setting; the canon
- * terms remain.
+ * §4's word lists live in `word-lists.ts`, because METHOD.md §11 carries them
+ * as a parameter and the registry needs them as a default. Re-exported here so
+ * a caller reading the catalogue finds them where it expects.
  */
-export const QUALITY_WORD_LISTS = {
-  outputVerbs: [
-    "launch",
-    "build",
-    "ship",
-    "implement",
-    "create",
-    "deliver",
-    "release",
-    "complete",
-    "develop",
-    "deploy",
-    "write",
-    "publish",
-    "migrate",
-    "install",
-    "conduct",
-    "hold",
-    "organise",
-    "organize",
-    "set up",
-    "roll out",
-    "rollout",
-    "hire",
-    "redesign",
-    "finish",
-    "produce",
-    "run",
-  ],
-  movementVerbs: [
-    "increase",
-    "grow",
-    "improve",
-    "reduce",
-    "boost",
-    "raise",
-    "cut",
-    "double",
-    "triple",
-    "maximise",
-    "maximize",
-    "minimise",
-    "minimize",
-    "decrease",
-    "accelerate",
-    "expand",
-    "drive",
-  ],
-  stateWords: [
-    "become",
-    "be the",
-    "delight",
-    "delighted",
-    "loved",
-    "trusted",
-    "leading",
-    "best",
-    "strongest",
-    "profitable",
-    "sustainable",
-    "engaged",
-    "thriving",
-    "world-class",
-    "preferred",
-    "go-to",
-    "healthiest",
-    "excellence",
-    "dominant",
-    "known for",
-    "famous for",
-    "proud",
-  ],
-  whyMarkers: ["to", "so that", "in order to", "because"],
-  /**
-   * §4.2's list, which ends "(and plurals)". The plurals are written out
-   * rather than derived, because the matcher is whole-word and an -s rule
-   * would have to know that "activity" pluralises to "activities". A list
-   * somebody can read and correct beats a rule somebody has to debug.
-   */
-  activityNouns: [
-    "call",
-    "calls",
-    "meeting",
-    "meetings",
-    "interview",
-    "interviews",
-    "demo",
-    "demos",
-    "email",
-    "emails",
-    "workshop",
-    "workshops",
-    "session",
-    "sessions",
-    "training",
-    "trainings",
-    "webinar",
-    "webinars",
-    "post",
-    "posts",
-    "visit",
-    "visits",
-    "proposal",
-    "proposals",
-    "campaign",
-    "campaigns",
-    "feature",
-    "features",
-    "report",
-    "reports",
-    "presentation",
-    "presentations",
-    "event",
-    "events",
-    "ticket",
-    "tickets",
-    "article",
-    "articles",
-    "sprint",
-    "sprints",
-    "task",
-    "tasks",
-    "activity",
-    "activities",
-    "outreach",
-    "touchpoint",
-    "touchpoints",
-  ],
-  impactWords: [
-    "revenue",
-    "pipeline",
-    "conversion",
-    "retention",
-    "churn",
-    "nps",
-    "csat",
-    "satisfaction",
-    "margin",
-    "profit",
-    "growth",
-    "adoption",
-    "activation",
-    "engagement",
-    "win rate",
-    "quality",
-    "insight",
-    "market share",
-    "loyalty",
-    "renewal",
-    "upsell",
-    "arr",
-    "mrr",
-    "ltv",
-    "cac",
-    "accuracy",
-    "uptime",
-    "productivity",
-    "time-to-value",
-    "referrals",
-    "deal size",
-  ],
-} as const;
+export { QUALITY_WORD_LISTS } from "./word-lists.ts";
+
+import { wordListsFrom } from "./word-lists.ts";
 
 export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
   {
@@ -661,7 +500,9 @@ export function evaluateObjective(
   // Without this, every objective that names its own quarter would be warned
   // for the one thing OBJ-3 asks it to do.
   const hasDigits = /\d/.test(title.replace(/\bQ[1-4]\b/gi, ""));
-  const lists = QUALITY_WORD_LISTS;
+  // From the registry rather than the module, so a workspace's added terms
+  // reach the check that uses them. §11 carries these as a parameter.
+  const lists = wordListsFrom(thresholds["quality.wordLists"]);
 
   // OBJ-1
   const obj1 = check("OBJ-1");
@@ -822,7 +663,7 @@ export function evaluateKeyResults(
 ): readonly KeyResultVerdict[] {
   const set = input.keyResults;
   const indexes = set.map((_, index) => index);
-  const lists = QUALITY_WORD_LISTS;
+  const lists = wordListsFrom(thresholds["quality.wordLists"]);
 
   // KR-1
   const kr1 = check("KR-1");

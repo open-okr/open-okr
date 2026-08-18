@@ -8,10 +8,16 @@ import type { ResolvedThresholds } from "./thresholds.ts";
  * copy of the eleven stages is a screen that can disagree with the method about
  * how long a review takes.
  *
- * Durations are the document's own minutes. They are not §11 parameters: §11
- * holds the numbers the practice *fires* on, and a stage length is pacing
- * guidance a facilitator overruns on purpose. §8.1 says so: "Going over is
- * normal and visible. The facilitator lands it and moves."
+ * **Structure is canon, minutes are a parameter.** §11 opens by saying the
+ * session agendas and their stage order cannot be changed, and then lists
+ * "Quarterly stage minutes" as a parameter in the same registry. So the stage
+ * list here carries titles, acts and purposes, and `reviewStages` attaches the
+ * durations from `sessions.quarterlyStageMinutes`.
+ *
+ * That split was wrong here for one commit: the durations were written as
+ * literals with a comment arguing they did not belong in §11. `pnpm
+ * method:check` found it by comparing the registry against §11's own table,
+ * which is the whole reason the suite exists.
  */
 
 export type RitualKind = "weekly" | "monthly" | "quarterly";
@@ -97,17 +103,20 @@ export interface ReviewStage {
   readonly stage: number;
   readonly title: string;
   readonly act: ReviewAct;
-  readonly minutes: number;
   readonly purpose: string;
 }
 
-/** §8.1's eleven stages, in order, with the document's own minutes. */
+/** A stage with the duration the registry gives it. */
+export interface TimedReviewStage extends ReviewStage {
+  readonly minutes: number;
+}
+
+/** §8.1's eleven stages, in order. The order is canon; the minutes are not. */
 export const REVIEW_STAGES: readonly ReviewStage[] = [
   {
     stage: 1,
     title: "Open and check-in",
     act: "open",
-    minutes: 5,
     purpose:
       "Before the numbers, the people. A pulse and one word for the cycle",
   },
@@ -115,7 +124,6 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     stage: 2,
     title: "Score the key results",
     act: "review",
-    minutes: 12,
     purpose:
       "Grade every key result against the key result as written, then reveal the objective score together",
   },
@@ -123,7 +131,6 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     stage: 3,
     title: "Objective narratives",
     act: "review",
-    minutes: 9,
     purpose:
       "Owner by owner, the story behind the score, and what the number does not show",
   },
@@ -131,7 +138,6 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     stage: 4,
     title: "Recognition and wins",
     act: "review",
-    minutes: 3,
     purpose:
       "Name the effort that deserved to be seen. Specific beats generous",
   },
@@ -139,21 +145,18 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     stage: 5,
     title: "Team retro",
     act: "retro",
-    minutes: 7,
     purpose: "What worked, what did not. Silent writing, then dot voting",
   },
   {
     stage: 6,
     title: "Management retro",
     act: "retro",
-    minutes: 3,
     purpose: "The four questions leadership owes the team",
   },
   {
     stage: 7,
     title: "Root cause and diagnostic",
     act: "retro",
-    minutes: 5,
     purpose:
       "Every key result under 0.7 gets one honest cause. Then read the diagnostic",
   },
@@ -161,31 +164,42 @@ export const REVIEW_STAGES: readonly ReviewStage[] = [
     stage: 8,
     title: "OKR process health",
     act: "retro",
-    minutes: 3,
     purpose: "Score the practice, not the results. Anonymous",
   },
   {
     stage: 9,
     title: "Keep, modify or abandon",
     act: "reset",
-    minutes: 5,
     purpose: "Close every objective deliberately",
   },
   {
     stage: 10,
     title: "Learnings and next drafts",
     act: "reset",
-    minutes: 4,
     purpose: "Turn what happened into what you now know",
   },
   {
     stage: 11,
     title: "Decisions and actions",
     act: "reset",
-    minutes: 4,
     purpose: "Every action has a name and a date, or it is a wish",
   },
 ];
+
+/**
+ * The eleven stages with their durations, which is what a rail renders and a
+ * timer paces. A workspace that has tuned the parameter gets its own numbers
+ * here rather than being shown the canon ones and timed by something else.
+ */
+export function reviewStages(
+  thresholds: ResolvedThresholds,
+): readonly TimedReviewStage[] {
+  const minutes = thresholds["sessions.quarterlyStageMinutes"];
+  return REVIEW_STAGES.map((stage, index) => ({
+    ...stage,
+    minutes: minutes[index] as number,
+  }));
+}
 
 /**
  * §8.5's five statements, anonymous, scored 1 to 5.

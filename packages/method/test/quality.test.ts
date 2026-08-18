@@ -13,7 +13,7 @@ import {
   QUALITY_WORD_LISTS,
   strengthScore,
 } from "../src/quality.ts";
-import { canonThresholds } from "../src/thresholds.ts";
+import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 /**
  * The objective half of METHOD.md §4's quality catalogue (P4-T01).
@@ -684,5 +684,60 @@ describe("the twenty-six checks", () => {
     for (const check of CYCLE_CHECKS) {
       expect(check.feedsStrengthScore).toBe(false);
     }
+  });
+});
+
+describe("corpus entry 7: a perfect set at strict mode", () => {
+  const strong = evaluateObjective(
+    {
+      title: "Become the preferred platform for mid-market teams",
+      hasCycle: true,
+      hasTimeframe: false,
+      championId: "m1",
+      reviewerId: "m2",
+      objectivesInUnit: 1,
+      level: "company",
+    },
+    thresholds,
+  );
+
+  it("scores 100 with every check passing", () => {
+    expect(strengthScore(strong)).toBe(100);
+  });
+
+  it("scores the same at strict, because there are no warns to promote", () => {
+    // The corpus says so in as many words: "No change from warn mode because
+    // there are no warns to promote." Strictness only moves a set that had
+    // something to say.
+    expect(strengthScore(applyStrictness(strong, "strict"))).toBe(100);
+    expect(applyStrictness(strong, "strict")).toEqual(strong);
+  });
+});
+
+describe("a workspace that adds its own vocabulary", () => {
+  it("gets its terms on top of the canon, never instead of them", () => {
+    // §11: "A workspace may add terms; the canon terms remain." Replacing would
+    // let a workspace switch off a canon rule by overriding it with a short
+    // list, which is a change to the practice rather than a setting.
+    const tuned = resolveThresholds({
+      "quality.wordLists": { outputVerdicts: [], outputVerbs: ["onboard"] },
+    });
+    const lists = tuned["quality.wordLists"];
+    expect(lists.outputVerbs).toContain("onboard");
+    expect(lists.outputVerbs).toContain("launch");
+
+    const result = evaluateObjective(
+      {
+        title: "Onboard the enterprise segment",
+        hasCycle: true,
+        hasTimeframe: false,
+        championId: "m1",
+        reviewerId: "m2",
+        objectivesInUnit: 1,
+        level: "team",
+      },
+      tuned,
+    );
+    expect(verdict("OBJ-1", result)).toBe("fail");
   });
 });

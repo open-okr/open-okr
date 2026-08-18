@@ -348,20 +348,28 @@ the rule they cite.
 | 9 | Goal with no parent | AL-1 | `AL-1` |
 | 10 | Level skip in the cascade | AL-3 | `AL-3` |
 | 11 | Department with no horizontal dependencies | AL-6 | `AL-6` |
-| 12 | Two goals double-counting a metric | Semantic (Coach) | `COACH-CONFLICT` |
+| 12 | Two goals double-counting a metric | Semantic (Coach) | `quality.conflict` |
 | 13 | Dependency unconfirmed and unowned | AL-5 | `AL-5` |
 | 14 | Capacity check with nothing cut | CY-6 | `CY-6` |
-| 15 | Check-in overdue past grace | Cadence engine | `RHYTHM-CHECKIN-OVERDUE` |
-| 16 | Blocker past 24h clock | Cadence engine | `RHYTHM-BLOCKER-AGED` |
-| 17 | Reported health disagrees with data | Scoring engine | `COACH-DIVERGENCE` |
-| 18 | Trend forecast misses target | Scoring engine | `COACH-TREND-OFF-TRACK` |
-| 19 | KPI drops out of corridor | KPI engine | `RHYTHM-KPI-UNHEALTHY` |
-| 20 | Scores near 1.0 at close | Scoring engine | `COACH-SANDBAGGING-CLOSE` |
+| 15 | Check-in overdue past grace | Cadence engine | `checkin.overdue` |
+| 16 | Blocker past 24h clock | Cadence engine | `blocker.overdue` |
+| 17 | Reported health disagrees with data | Scoring engine | `quality.divergence` |
+| 18 | Trend forecast misses target | Scoring engine | `quality.trending_off` |
+| 19 | KPI drops out of corridor | KPI engine | `kpi.unhealthy` |
+| 20 | Scores near 1.0 at close | Scoring engine | `quality.sandbagging_close` |
 
 Items 12, 15-20 are triggers from AI-NATIVE-PLAN.md SS6.4 rather than SS4
 quality checks. They fire at runtime, not at drafting time. Their rule keys
 must resolve inside the package (CLAUDE.md hard rule: "A message citing a
 rule the package does not define fails the build").
+
+**Corrected on 2026-08-18.** This table originally gave those seven its own key
+names, `COACH-CONFLICT` and `RHYTHM-CHECKIN-OVERDUE` among them, for rules that
+already had keys in AI-NATIVE-PLAN.md SS6.4. Two names for one rule is the exact
+drift the package exists to prevent, and the plan outranks a design document, so
+the SS6.4 keys stand and these are them. `pnpm method:check` now refuses any key
+in this table that the trigger catalogue or the quality catalogue does not
+define, so the mistake cannot come back.
 
 ## 12. Publish gates (SS4.5)
 

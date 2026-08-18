@@ -20,6 +20,7 @@
     "db:migrate": "pnpm --filter @openokr/db migrate",
     "db:change": "pnpm --filter @openokr/db change",
     "db:seed": "pnpm --filter @openokr/core seed",
+    "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
     "check:boundaries": "node --experimental-strip-types --no-warnings scripts/check-boundaries.ts",
