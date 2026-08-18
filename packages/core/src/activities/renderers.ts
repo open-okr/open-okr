@@ -138,6 +138,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was published`,
+  // One line per run, not per nudge. A feed with an entry for every message
+  // the product sent would bury everything a person actually did.
+  "nudges.run": (p) =>
+    `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>
