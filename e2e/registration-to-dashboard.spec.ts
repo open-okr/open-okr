@@ -406,6 +406,17 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   await cell.fill("60");
   await cell.press("Enter");
 
+  // Wait for the standing figure to come back before leaving the page. Enter
+  // commits through a server action, and navigating while it is still in
+  // flight abandons it: the value never lands, the KPI stays at no data, and
+  // the recovery board is empty for a reason that has nothing to do with the
+  // recovery board. It passed here in under a second and failed on a CI runner
+  // at the full ten-second timeout, which is what a race looks like from the
+  // outside.
+  await expect(
+    page.getByRole("row").filter({ hasText: "Operating margin" }),
+  ).toContainText("60%");
+
   await page.goto("/kpis/recovery");
   await expect(
     page.getByRole("heading", { level: 2, name: "Operating margin" }),
