@@ -139,6 +139,24 @@ export {
   weightedProgress,
 } from "./scoring.ts";
 export {
+  type Diagnosis,
+  type DiagnosisKind,
+  lowestProcessHealthStatement,
+  MANAGEMENT_RETRO_QUESTIONS,
+  PROCESS_HEALTH_STATEMENTS,
+  REVIEW_STAGES,
+  type ReviewAct,
+  type ReviewStage,
+  RHYTHM_STATEMENTS,
+  RITUALS,
+  type Ritual,
+  type RitualKind,
+  rhythmDiagnostic,
+  rhythmScore,
+  WEEKLY_STEPS,
+  type WeeklyStep,
+} from "./sessions.ts";
+export {
   isTermKey,
   type ResolvedTerminology,
   resolveTerminology,
