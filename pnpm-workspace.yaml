@@ -23,7 +23,7 @@ catalog:
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
   drizzle-orm: ^0.45.2
-  pg: ^8.16.3
+  pg: ^8.23.0
   "@types/pg": ^8.20.4
   pg-boss: ^12.27.0
   ws: ^8.21.3
