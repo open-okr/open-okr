@@ -10,6 +10,7 @@ import {
   runDataChanges,
 } from "../src/data-change.ts";
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
+import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /**
@@ -303,5 +304,99 @@ describe("the sample script: backfilling member timezone", () => {
       { name: "Has Timezone", timezone: "UTC" },
       { name: "No Timezone", timezone: "Asia/Kuala_Lumpur" },
     ]);
+  });
+});
+
+describe("0006: seeding the Champion into workspaces that predate it", () => {
+  it("creates the agent, its member and a view binding on every existing space", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+
+    const workspace = await client.query<{ id: string }>(
+      `insert into workspaces (id, name, slug, settings)
+       values (gen_random_uuid(), 'Old', 'old', '{}'::jsonb)
+       returning id`,
+    );
+    const workspaceId = workspace.rows[0]?.id as string;
+
+    const space = await client.query<{ id: string }>(
+      `insert into spaces (id, workspace_id, name)
+       values (gen_random_uuid(), $1, 'Product') returning id`,
+      [workspaceId],
+    );
+    const spaceId = space.rows[0]?.id as string;
+    await client.query(
+      `insert into access_contexts (id, workspace_id, resource_type, resource_id)
+       values (gen_random_uuid(), $1, 'space', $2)`,
+      [workspaceId, spaceId],
+    );
+
+    const first = await runDataChanges(client, {
+      scripts: [seedChampionAgent],
+    });
+    expect(first[0]?.rowsChanged).toBe(1);
+
+    const agent = await client.query<{
+      kind: string;
+      schedule: string;
+      autonomy: string;
+      member_kind: string;
+    }>(
+      `select a.kind, a.schedule, a.autonomy, m.kind as member_kind
+         from agents a join workspace_members m on m.id = a.member_id
+        where a.workspace_id = $1`,
+      [workspaceId],
+    );
+    expect(agent.rows).toEqual([
+      {
+        kind: "champion",
+        schedule: "hourly",
+        autonomy: "propose",
+        member_kind: "agent",
+      },
+    ]);
+
+    // Bound to the space, and to nothing else. The workspace context is the
+    // one grant a rhythm agent must never hold.
+    const bindings = await client.query<{
+      resource_type: string;
+      level: number;
+    }>(
+      `select c.resource_type, b.level
+         from agents a
+         join access_groups g on g.member_id = a.member_id and g.kind = 'member'
+         join access_bindings b on b.group_id = g.id
+         join access_contexts c on c.id = b.context_id
+        where a.workspace_id = $1`,
+      [workspaceId],
+    );
+    expect(bindings.rows).toEqual([{ resource_type: "space", level: 10 }]);
+  });
+
+  it("leaves a workspace that already has a Champion alone", async () => {
+    await runMigrations(client, {
+      dirs: [join(import.meta.dirname, "../migrations")],
+    });
+
+    const workspace = await client.query<{ id: string }>(
+      `insert into workspaces (id, name, slug, settings)
+       values (gen_random_uuid(), 'New', 'new', '{}'::jsonb)
+       returning id`,
+    );
+    const workspaceId = workspace.rows[0]?.id as string;
+
+    await runDataChanges(client, { scripts: [seedChampionAgent] });
+    // A second run over the same rows: the ledger would skip a finished
+    // script, so the script is called directly to prove the predicate itself
+    // is what makes it safe.
+    const again = await seedChampionAgent.runBatch(client, null);
+    expect(again.rowsChanged).toBe(0);
+
+    const count = await client.query<{ n: string }>(
+      "select count(*)::text as n from agents where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(count.rows[0]?.n).toBe("1");
   });
 });
