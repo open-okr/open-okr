@@ -26,7 +26,6 @@ import {
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
-  newId,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -953,17 +952,6 @@ export const createGoal = defineWriteAction({
           targetId: created.id,
           payload: { title: created.title, level: input.level },
         },
-        outbox: [
-          {
-            topic: "embedding.index",
-            payload: {
-              workspaceId,
-              entityType: "goal",
-              entityId: created.id,
-            },
-            idempotencyKey: `embedding.index:goal:${created.id}:${newId()}`,
-          },
-        ],
       };
     },
   }),
@@ -1126,17 +1114,6 @@ export const updateGoal = defineWriteAction({
             keys: Object.keys(patch).filter((key) => key !== "updatedAt"),
           },
         },
-        outbox: [
-          {
-            topic: "embedding.index",
-            payload: {
-              workspaceId,
-              entityType: "goal",
-              entityId: updated.id,
-            },
-            idempotencyKey: `embedding.index:goal:${updated.id}:${newId()}`,
-          },
-        ],
       };
     },
   }),
@@ -1548,17 +1525,6 @@ export const createKeyResult = defineWriteAction({
           targetId: created.id,
           payload: { goalId: input.goalId, title: input.title },
         },
-        outbox: [
-          {
-            topic: "embedding.index",
-            payload: {
-              workspaceId,
-              entityType: "key_result",
-              entityId: created.id,
-            },
-            idempotencyKey: `embedding.index:key_result:${created.id}:${newId()}`,
-          },
-        ],
       };
     },
   }),
@@ -1682,17 +1648,6 @@ export const updateKeyResult = defineWriteAction({
             keys: Object.keys(patch).filter((key) => key !== "updatedAt"),
           },
         },
-        outbox: [
-          {
-            topic: "embedding.index",
-            payload: {
-              workspaceId,
-              entityType: "key_result",
-              entityId: input.id,
-            },
-            idempotencyKey: `embedding.index:key_result:${input.id}:${newId()}`,
-          },
-        ],
       };
     },
   }),
