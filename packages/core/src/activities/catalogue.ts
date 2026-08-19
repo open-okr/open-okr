@@ -247,6 +247,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     emoji: z.string(),
     subjectType: z.string(),
   }),
+  // Sessions (P4-T07a)
+  "session.created": z.object({ kind: z.string(), title: z.string() }),
+  "session.opened": z.object({ kind: z.string() }),
+  "session.stageAdvanced": z.object({
+    from: z.string().nullable(),
+    to: z.string().nullable(),
+  }),
+  "session.skipped": z.object({ kind: z.string() }),
+  "session.closed": z.object({ kind: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

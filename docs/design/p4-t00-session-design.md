@@ -27,20 +27,32 @@ Reference, not authority: UIUX-PLAN.md SS10.
 
 Shared schema across all three session kinds.
 
+**Schema note (P4-T07a):** This table was corrected on 2026-08-19 to match
+TECHNICAL-PLAN §4, which outranks this document per CLAUDE.md's authority
+order. The original design carried `current_stage integer`, `status: open`,
+`closed_at` and `scheduled_at`; the shipped table uses `stage_key text`,
+`state: running`, `ended_at` and `scheduled_for` alongside additional columns
+TECHNICAL-PLAN specifies. The database table is named `okr_sessions` because
+the auth schema already owns `sessions`.
+
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid | |
-| `workspace_id` | uuid | RLS |
-| `space_id` | uuid | The space this session belongs to |
-| `cycle_id` | uuid | |
-| `kind` | `'weekly'`, `'monthly'`, `'quarterly'` | |
-| `scheduled_at` | timestamp | When it was supposed to start |
-| `started_at` | timestamp, nullable | Null until the facilitator opens |
-| `closed_at` | timestamp, nullable | |
+| `workspace_id` | uuid | RLS (`okr_sessions` table, force row level security) |
+| `space_id` | uuid, nullable | The space this session belongs to |
+| `cycle_id` | uuid, nullable | |
+| `kind` | `'planning'`, `'weekly'`, `'monthly'`, `'quarterly'` | |
+| `title` | text | |
+| `scheduled_for` | timestamptz | When it was supposed to start |
+| `started_at` | timestamptz, nullable | Null until the facilitator opens |
+| `ended_at` | timestamptz, nullable | |
 | `facilitator_id` | uuid | The coordinator (weekly) or facilitator (quarterly) |
-| `current_stage` | integer | Index into the session's stage list |
-| `stage_started_at` | timestamp | When the current stage began |
-| `status` | `'scheduled'`, `'open'`, `'closed'`, `'skipped'` | |
+| `stage_key` | text, nullable | Current stage key (e.g. `confidence`, `diagnose`); null until opened |
+| `stage_started_at` | timestamptz, nullable | When the current stage began |
+| `elapsed` | jsonb | Elapsed seconds per stage, keyed by stage_key |
+| `notes` | jsonb | Per-stage facilitator notes, keyed by stage_key |
+| `state` | `'scheduled'`, `'running'`, `'closed'`, `'skipped'` | |
+| `digest_id` | uuid, nullable | FK to digest once P4-T08 adds that table |
 
 ## 2. The weekly session (SS7.2)
 

@@ -38,6 +38,10 @@ export type {
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {
+  PostgresRealtime,
+  type PostgresRealtimeOptions,
+} from "./drivers/realtime/postgres.ts";
+export {
   RealtimeSocketServer,
   type RealtimeSocketServerOptions,
   type SocketPrincipal,

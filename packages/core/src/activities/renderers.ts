@@ -231,6 +231,14 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
   "reaction.removed": (p) =>
     `Removed ${asString(p.emoji)} reaction from a ${asString(p.subjectType, "subject")}`,
+  // Sessions (P4-T07a)
+  "session.created": (p) =>
+    `Created a ${asString(p.kind)} session: ${asString(p.title)}`,
+  "session.opened": (p) => `Opened the ${asString(p.kind)} session`,
+  "session.stageAdvanced": (p) =>
+    `Advanced to the ${asString(p.to, "next")} stage`,
+  "session.skipped": (p) => `Skipped the ${asString(p.kind)} session`,
+  "session.closed": (p) => `Closed the ${asString(p.kind)} session`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

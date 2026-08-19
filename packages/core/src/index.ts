@@ -335,6 +335,10 @@ export {
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
 export {
+  type SessionStageChangedEvent,
+  sessionChannel,
+} from "./sessions/live.ts";
+export {
   brandingSchema,
   DEFAULT_QUIET_HOURS,
   findSetting,

@@ -316,6 +316,14 @@ export {
   scoreEntries,
 } from "./schema/scorecard.ts";
 export {
+  SESSION_KINDS,
+  SESSION_STATES,
+  type Session,
+  type SessionKind,
+  type SessionState,
+  sessions as okrSessions,
+} from "./schema/sessions.ts";
+export {
   SPACE_ROLES,
   type Space,
   type SpaceMember,

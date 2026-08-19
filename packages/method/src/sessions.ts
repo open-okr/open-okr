@@ -22,6 +22,21 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type RitualKind = "weekly" | "monthly" | "quarterly";
 
+/**
+ * Stage keys for weekly sessions, in §7.2's order.
+ *
+ * These are what the database stores in `sessions.stage_key`. The order is
+ * canon and matches WEEKLY_STEPS step-for-step: index 0 is step 1
+ * (confidence), index 3 is step 4 (digest).
+ */
+export const WEEKLY_STAGE_KEYS = [
+  "confidence",
+  "diagnose",
+  "commitments",
+  "digest",
+] as const;
+export type WeeklyStageKey = (typeof WEEKLY_STAGE_KEYS)[number];
+
 export interface Ritual {
   readonly kind: RitualKind;
   /** §7.1's own wording, because a range is not a number. */

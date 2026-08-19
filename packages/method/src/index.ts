@@ -157,7 +157,9 @@ export {
   rhythmDiagnostic,
   rhythmScore,
   type TimedReviewStage,
+  WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
+  type WeeklyStageKey,
   type WeeklyStep,
 } from "./sessions.ts";
 export {
