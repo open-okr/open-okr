@@ -59,6 +59,18 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // A brand new workspace has no goals, and the map says so with the way out
   // rather than an empty box.
   await expect(page.getByText("Nothing in this cycle yet.")).toBeVisible();
+
+  // The context strip and the statistics, which the front door gained when it
+  // was drawn to its mockup. A workspace with nothing in it reads "not yet"
+  // rather than zero, because zero is an answer and this is the absence of one.
+  await expect(page.getByText(/Phase 1/)).toBeVisible();
+  await expect(page.getByText("no measures yet")).toBeVisible();
+  await expect(page.getByText("not scored yet")).toBeVisible();
+  // The scope tabs: the company, then the default space provisioning made.
+  await expect(page.getByRole("navigation", { name: "Scope" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Company", exact: true }),
+  ).toBeVisible();
 });
 
 test("the front door shows what provisioning resolved, with nothing configured", async () => {
