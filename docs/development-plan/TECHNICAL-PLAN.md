@@ -403,6 +403,7 @@ Keep current in every schema change.
 | No legacy source | `access_contexts`, `access_groups`, `access_group_memberships`, `access_bindings` | No source table maps to these directly; they are written by the Operation pipeline as each imported aggregate is created, the same way a row created in the product gets them. Row 383's `kpi_shares` view scope becomes bindings on the imported KPI's own context, not a replay of a source access table |
 | No legacy source | `invite_links` | Joining is an OpenOKR concept with no FlowyTeam or spreadsheet analogue. An imported person is a `workspace_members` row with `user_id` null until they register and claim it, the same path row 392 describes; nothing invites them to do so |
 | `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
+| No legacy source | `okr_sessions` | Sessions are held rituals, not historical data. The imported workspace's session history is not replayed; if needed it belongs in the import report |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.
 
