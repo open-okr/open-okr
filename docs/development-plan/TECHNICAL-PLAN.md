@@ -269,6 +269,7 @@ The only exceptions are the instance connections that describe the deployment it
 | AI | Off unless a deployment key is present. With a key, the provider's seeded tier map applies and every AI-NATIVE-PLAN.md §2 capability is on |
 | Agent autonomy | Propose. Both built-in agents enabled wherever AI is available, and active in their deterministic form when it is not |
 | AI budgets | No workspace cap on self-host; the tenant's plan cap in the cloud |
+| Agent run cost cap | 2.00 US dollars per run (`agentRunCostCapUsd`, in `workspaces.settings`). It bounds AI spend only: the deterministic path costs nothing, so a run with the provider off never approaches it. Zero is valid and means the agent may not spend, which halts the run as cancelled with the reason in its log rather than failing it |
 | Spaces | One space named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named |
 | Member primary channel | Email, beside the always-on in-app inbox, until a chat identity is linked |
 | Member quiet hours | 19:00 to 08:00 in the member's own timezone |

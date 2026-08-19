@@ -13,14 +13,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
-import {
-  activeMemberIds,
-  decideSuppression,
-  dueAcknowledgementNudges,
-  dueCheckInNudges,
-  loadSuppressionContext,
-  recordNudgesInTx,
-} from "../nudges/service.ts";
+import { runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/errors.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -56,119 +49,25 @@ export const runNudges = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const at = input.now ? new Date(input.now) : new Date();
-      const { thresholds } = resolveRhythm(
-        await readRhythmRow(tx, workspaceId),
-      );
-      const timeZone = await workspaceTimeZone(tx, workspaceId);
-
-      // Two ladders with rows to run against. The third, blockers, is a pure
-      // function tested beside these two and has nothing to read until P4-T07c
-      // creates the table.
-      const due = [
-        ...(await dueCheckInNudges(tx as WorkspaceTx, {
-          workspaceId,
-          now: at,
-          timeZone,
-          thresholds,
-        })),
-        ...(await dueAcknowledgementNudges(tx as WorkspaceTx, {
-          workspaceId,
-          now: at,
-          thresholds,
-        })),
-      ];
-
-      // A suspended member is never nudged. §4.3's access getter excludes them
-      // from every read, and a nudge to somebody who cannot open the product is
-      // an email to a former colleague.
-      const active = await activeMemberIds(tx as WorkspaceTx, workspaceId);
-      const deliverable = due.filter((entry) =>
-        active.has(entry.recipientMemberId),
-      );
-
-      // Suppression decided before anything is written, so a swallowed nudge is
-      // a row with a reason rather than an absence. Four of the five reasons are
-      // decisions the product made, and it has to be able to name them.
-      const context = await loadSuppressionContext(tx as WorkspaceTx, {
+      // One implementation, shared with the Champion's hourly run (P4-T05a).
+      const result = await runDueNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
-        now: at,
-        workspaceTimeZone: timeZone,
-      });
-      const decided: {
-        nudge: (typeof deliverable)[number];
-        suppressedReason: SuppressionReason | null;
-      }[] = [];
-      for (const nudge of deliverable) {
-        decided.push({
-          nudge,
-          suppressedReason: await decideSuppression(tx as WorkspaceTx, {
-            workspaceId,
-            nudge,
-            now: at,
-            context,
-            thresholds,
-          }),
-        });
-      }
-
-      const ids = await recordNudgesInTx(tx as WorkspaceTx, {
-        workspaceId,
-        due: decided,
         at,
       });
 
-      // The in-app inbox, one row per nudge that was actually sent, linked by
-      // the `nudge_id` the notifications table has carried since 0013 with
-      // nothing to point at. A suppressed nudge gets no inbox row: the point of
-      // suppressing it was that nobody sees it.
-      for (const [index, written] of ids.entries()) {
-        if (!written.sent) {
-          continue;
-        }
-        const entry = decided[index]?.nudge;
-        if (!entry) {
-          continue;
-        }
-        const nudgeId = written.id;
-        // openokr:allow-mutation: the calling Operation's own transaction.
-        await tx.insert(notifications).values({
-          workspaceId,
-          recipientMemberId: entry.recipientMemberId,
-          nudgeId,
-          // `check_in` is the reason every nudge this task produces carries,
-          // because every one of them is about a check-in. When P4-T04c adds
-          // blockers and KPI corridors the reason list grows with them rather
-          // than being widened speculatively now.
-          reason: "check_in",
-          channel: entry.channel,
-          sentAt: at,
-        });
-      }
-
-      const sent = ids.filter((written) => written.sent).length;
       return {
-        result: {
-          recorded: sent,
-          suppressed: ids.length - sent,
-          ruleKeys: [
-            ...new Set(
-              decided
-                .filter((entry) => entry.suppressedReason === null)
-                .map((entry) => entry.nudge.ruleKey),
-            ),
-          ],
-        },
+        result,
         activity: {
           kind: "nudges.run",
           subjectType: "workspace",
           subjectId: workspaceId,
-          payload: { recorded: sent },
+          payload: { recorded: result.recorded },
         },
         audit: {
           action: "nudges.run",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { recorded: sent },
+          payload: { recorded: result.recorded },
         },
       };
     },

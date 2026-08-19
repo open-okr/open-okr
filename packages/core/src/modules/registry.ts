@@ -200,6 +200,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // nudged the most, which is not a fact everybody in a workspace needs.
         minLevel: ACCESS_LEVELS.full,
       },
+      {
+        id: "admin-agents",
+        label: "Agents and runs",
+        href: "/admin/agents",
+        section: "admin",
+        // An agent's persona, its scope and what it did last hour. Reading a
+        // run log is reading what the product said to people, which is the
+        // same fact the nudge card guards.
+        minLevel: ACCESS_LEVELS.full,
+      },
     ],
   },
 ];

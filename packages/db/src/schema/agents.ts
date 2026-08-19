@@ -18,7 +18,19 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
  * 0018 for why `agent_runs` and `proposed_changes` carry no `deleted_at`.
  */
 export const AGENT_KINDS = ["coach", "champion", "custom"] as const;
-export const AGENT_SCHEDULES = ["manual", "continuous", "nightly"] as const;
+/**
+ * When an agent runs.
+ *
+ * `hourly` arrived at P4-T05a with the Champion's nudge queue. The daily and
+ * weekly cadences AI-NATIVE-PLAN.md §6.2 also names land with P4-T05b, which
+ * is the task that has something to run on them.
+ */
+export const AGENT_SCHEDULES = [
+  "manual",
+  "continuous",
+  "nightly",
+  "hourly",
+] as const;
 export const AGENT_AUTONOMIES = [
   "sandbox",
   "propose",

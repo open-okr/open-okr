@@ -115,6 +115,19 @@ export const trustedEmailDomainsSchema = z.array(
 
 const storageQuotaBytesSchema = z.number().int().positive();
 
+/** Dollars, not cents, and zero is allowed: it means "may not spend". */
+const agentRunCostCapSchema = z.number().nonnegative();
+
+/**
+ * The cap a workspace inherits, in US dollars per agent run (P4-T05a).
+ *
+ * Exported because the run itself needs it for workspaces provisioned before
+ * the setting existed, whose settings map has no key to read. One constant, so
+ * the default a fresh workspace stores and the default an old one falls back to
+ * cannot drift apart.
+ */
+export const DEFAULT_AGENT_RUN_COST_CAP_USD = 2;
+
 const primaryChannelSchema = z.enum([
   "app",
   "email",
@@ -187,6 +200,19 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     why: "19:00 to 08:00 in the member's own timezone, so the product cannot wake somebody up on its first day.",
     resolve: () => DEFAULT_QUIET_HOURS,
     schema: quietHoursSchema,
+  },
+  {
+    key: "agentRunCostCapUsd",
+    scope: "workspace",
+    why:
+      "2.00 US dollars per agent run. The deterministic path costs nothing, " +
+      "so this only ever bounds AI spend, and one run drafting a handful of " +
+      "check-ins does not approach it. TECHNICAL-PLAN names no figure; " +
+      "P4-T05a picked this one. Zero is a valid value and means the agent " +
+      "may not spend at all, which halts its run rather than failing it. No " +
+      "S-36 card names it yet, so it has none here.",
+    resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
+    schema: agentRunCostCapSchema,
   },
   {
     key: "demoEnabled",

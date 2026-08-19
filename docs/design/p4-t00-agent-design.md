@@ -124,6 +124,15 @@ Same least-privilege model as the Coach. Bindings on:
 - Goals within those spaces (check-in and blocker reads)
 - KPI trees within those spaces (corridor reads)
 
+**As implemented at P4-T05a:** one binding per space, at `view`, added by
+`createSpaceInTx` as each space is created. Goals and KPI trees are reached
+through the space's own access context rather than bound one by one, which is
+how every other principal reaches them; a per-goal binding would be a second
+access model beside the one `can()` already resolves. `view` rather than `edit`
+because everything the agent changes goes through a proposal, and a proposal
+needs no write grant. There is no binding on the workspace context, and a test
+reads `access_bindings` back to assert the absence.
+
 ### 2.4 Write policy
 
 Default: `propose` for recovery OKRs, check-in drafts, and any data write.

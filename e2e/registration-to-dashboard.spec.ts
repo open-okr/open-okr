@@ -108,6 +108,23 @@ test("hydrates, so a write happens without loading a new document", async () => 
   expect(documentLoads).toBe(0);
 });
 
+test("the seeded Champion is in admin, with its schedule and an empty log", async () => {
+  // P4-T05a. The agent is created at provisioning, so a workspace that has
+  // answered no questions still has one, and this is the page that says what
+  // it is and what it has done.
+  await page.goto("/admin/agents");
+
+  await expect(
+    page.getByRole("heading", { name: "Agents and runs" }),
+  ).toBeVisible();
+  await expect(page.getByText("OKR Champion")).toBeVisible();
+  await expect(page.getByText("On the hour")).toBeVisible();
+  await expect(page.getByText("propose")).toBeVisible();
+  // Nothing schedules a run on this instance, and the page says so rather
+  // than showing an empty list that reads like a bug.
+  await expect(page.getByText(/No run yet/)).toBeVisible();
+});
+
 test("registration is closed once the instance has been claimed", async () => {
   await page.goto("/sign-up");
   await expect(page.getByText(/invitation-only/i)).toBeVisible();

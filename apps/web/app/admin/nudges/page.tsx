@@ -167,7 +167,7 @@ export default async function NudgeVolumePage() {
                   className="flex items-center justify-between gap-2 text-sm"
                 >
                   <span className="text-ink">{member.name}</span>
-                  <span className="tabular-nums text-bad-text">
+                  <span className="tabular-nums text-bad">
                     {member.sentThisWeek} this week
                   </span>
                 </li>

@@ -41,6 +41,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindChampionToSpaceInTx } from "../agents/champion.ts";
 import { OperationError } from "../operations/operation.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -104,6 +105,16 @@ export async function createSpaceInTx<
     workspaceId: input.workspaceId,
     resourceType: "space",
     resourceId: spaceId,
+  });
+
+  // The Champion's sight of this space (P4-T05a). Least privilege is a shape,
+  // not a promise: the agent holds no workspace-wide grant, so a space it was
+  // never bound to is a space it cannot read. That makes this line the only
+  // thing standing between the rhythm agent and a silent workspace, which is
+  // why it lives beside the space's own bindings rather than in the agent.
+  await bindChampionToSpaceInTx(tx, {
+    workspaceId: input.workspaceId,
+    contextId,
   });
 
   // Discovery. Without this every space would be invisible to anyone not

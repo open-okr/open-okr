@@ -13,6 +13,11 @@ export {
   readRunState,
 } from "./run-executor.ts";
 export {
+  CHAMPION_HOURLY_CRON,
+  CHAMPION_HOURLY_JOB,
+  registerAgentSchedules,
+} from "./schedule.ts";
+export {
   type ExtractStructuredInput,
   extractStructured,
   StructuredExtractionError,
