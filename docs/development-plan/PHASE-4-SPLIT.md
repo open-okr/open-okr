@@ -2,7 +2,7 @@
 
 Who takes which task, what can run at the same time, and what has to wait.
 Rewritten 2026-08-19, after thirteen Phase 4 tasks landed and the tasks were cut
-into lettered parts.
+into lettered parts. Updated 2026-08-19 to reflect P4-T05a and P4-T07a landing.
 
 `IMPLEMENTATION-PLAN.md` is the authority. This file only reads its dependency
 lines and turns them into two lanes. If the two ever disagree, the plan wins and
@@ -21,49 +21,46 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 12 | P4-T01b to P4-T04c |
+| in_review | 15 | P4-T01b to P4-T05a, and P4-T07a |
 | in_progress | 1 | P4-T13a |
-| todo | 23 | P4-T05a to P4-T15, and P4-T13b |
+| todo | 20 | P4-T05b to P4-T06c, P4-T07b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
-**The twelve `in_review` rows are all in pull request #40 and have not merged.**
-Every check is green and it is waiting on a review. Nothing in Phase 4 is on
-`main` except P4-T00 and P4-T01a, so anybody branching from `main` today gets a
-tree with no quality catalogue, no publish gates and no nudge engine.
+**The twelve rows from P4-T01b to P4-T04c are all in pull request #40 and have not merged.**
+P4-T05a and P4-T07a landed on `obed` and are waiting on a read. Nothing in
+Phase 4 is on `main` except P4-T00 and P4-T01a, so anybody branching from
+`main` today gets a tree with no quality catalogue, no publish gates and no
+nudge engine.
 
-What those twelve rows delivered, in one line each: the twenty-six quality
+What those fifteen rows delivered, in one line each: the twenty-six quality
 checks and their conformance suite (`pnpm method:check`), quality evaluation on
 the write path with the Draft Coach and the quality panel, the six publish
-gates, and the nudge engine with deduplication, quiet hours, suppression
-reasons, three escalation ladders and a volume dashboard.
+gates, the nudge engine with deduplication, quiet hours, suppression reasons,
+three escalation ladders and a volume dashboard, the Champion agent and its
+hourly run, and the session record with live stage sync.
 
 ## The four chains
 
 | Chain | Tasks | Serial? | State |
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
-| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a under way |
-| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | Head unblocked, nothing started |
-| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a under way |
+| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a in_review; P4-T05b next |
+| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a in_review; P4-T07b next |
+| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
-B2 is the critical path. Thirteen rows that cannot be split, and its head
-(P4-T07a) depends only on P4-T04c and P3-T07, both of which exist. Whoever
-starts it decides when Phase 4 ends.
+B2 is the critical path. Thirteen rows that cannot be split. P4-T07a landed
+and the chain is now moving. Whoever finishes it decides when Phase 4 ends.
 
 ## The split
 
-**Agung takes the agents. Obed takes the sessions, after finishing the
-embedding table he is holding.**
+**Agung takes the agents. Obed takes the sessions.**
 
-This inverts the previous version of this document, which gave Obed the Champion
-and the Coach and gave Agung the sessions. Reality moved: Agung wrote the whole
-of Chain A and Chain B's nudge engine, and Chain B1 continues directly out of
-the code he just wrote.
+P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
 
 | Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
-| now | P4-T05a Champion agent and its hourly run | Finish P4-T13a, then P4-T13b | Yes. No shared file |
-| next | P4-T05b, P4-T05c | P4-T07a, P4-T07b, P4-T07c | Yes, with the blocker overlap below |
+| now | P4-T05b daily sweep and cycle countdown | P4-T07b confidence round | Yes, with the blocker overlap below |
+| next | P4-T05c | P4-T07c blockers, the board and aging | Yes |
 | then | P4-T06a, P4-T06b, P4-T06c | P4-T08, P4-T09 | Yes |
 | after | P4-T14a, P4-T14b copilot | P4-T10a to P4-T12 | Yes |
 | last | P4-T15 assists, which needs both lanes finished | | No |
@@ -101,12 +98,12 @@ and this table is what was agreed.
 | P4-T04b | Deduplication, quiet hours and suppression | Agung | in_review |
 | P4-T04c | Escalation ladders, provenance, volume dashboard | Agung | in_review |
 | P4-T05a | The Champion agent and its nudge run | Agung | in_review |
-| P4-T05b | The daily sweep and the cycle countdown | Agung | todo, scope undecided |
+| P4-T05b | The daily sweep and the cycle countdown | Agung | todo, ready |
 | P4-T05c | Champion proposals for check-ins and recovery | Agung | todo, ready |
 | P4-T06a | The Coach agent and write-triggered evaluation | Agung | todo, ready |
 | P4-T06b | The nightly semantic sweep and the finding table | Agung | todo |
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
-| P4-T07a | The session record and live stage sync | Obed | todo, ready |
+| P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | todo |
 | P4-T07c | Blockers, the board and aging | Obed | todo |
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | todo |
@@ -118,7 +115,7 @@ and this table is what was agreed.
 | P4-T11b | Root cause and the process-health survey | Obed | todo |
 | P4-T11c | The diagnostic, the reset and next-cycle drafts | Obed | todo |
 | P4-T12 | Minutes, exports and review feed-forward | Obed | todo |
-| P4-T13a | The embedding table and the outbox worker | Obed | in_progress |
+| P4-T13a | The embedding table and the outbox worker | Obed | in_progress (blocked behind B2) |
 | P4-T13b | Access-filtered retrieval | Obed | todo |
 | P4-T14a | Copilot threads and grounded answers | Agung | todo |
 | P4-T14b | Copilot proposals and background runs | Agung | todo |
