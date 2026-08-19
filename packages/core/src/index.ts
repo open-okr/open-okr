@@ -182,17 +182,6 @@ export {
   validateUpload,
 } from "./blobs/validation.ts";
 export {
-  type EmbedContentInput,
-  EmbeddingService,
-  type EmbedFunction,
-  type RetrievalHit,
-  type RetrievalInput,
-} from "./embeddings/service.ts";
-export {
-  createEmbeddingDispatch,
-  type EmbeddingOutboxRecord,
-} from "./embeddings/worker.ts";
-export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,
