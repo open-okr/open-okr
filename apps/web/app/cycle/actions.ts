@@ -154,5 +154,14 @@ export async function publishCycle(
   formData: FormData,
 ): Promise<WriteState> {
   const cycleId = String(formData.get("cycleId") ?? "");
-  return run((context) => callAction(context, "workflow.publish", { cycleId }));
+  // The override arrives only from the form that asks for a reason. Absent
+  // means a plain publish, and the action refuses a red gate on its own; this
+  // never decides whether the gates are met.
+  const reason = String(formData.get("override.reason") ?? "").trim();
+  return run((context) =>
+    callAction(context, "workflow.publish", {
+      cycleId,
+      ...(reason === "" ? {} : { override: { reason } }),
+    }),
+  );
 }

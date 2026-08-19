@@ -71,7 +71,17 @@ describe("the registry", () => {
       const discussion =
         action.name.startsWith("comments.") ||
         action.name.startsWith("reactions.");
-      const floor = discussion ? ACCESS_LEVELS.comment : ACCESS_LEVELS.edit;
+      // `nudges.snooze` is the second exception, and for a related reason
+      // (P4-T04c). It writes to the member's own nudge rows and to nothing
+      // else: it changes what the product says to them, never what the work
+      // says. A member at `view` still receives nudges, so putting the floor at
+      // `edit` would leave the people with the least power the only ones who
+      // cannot make the product stop talking to them. The action refuses
+      // somebody else's nudge as a not-found, which is what keeps the narrow
+      // grant safe.
+      const ownMessages = action.name === "nudges.snooze";
+      const floor =
+        discussion || ownMessages ? ACCESS_LEVELS.comment : ACCESS_LEVELS.edit;
       expect(
         action.access,
         `${action.name} writes but only needs view`,

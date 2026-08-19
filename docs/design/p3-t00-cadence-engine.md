@@ -219,6 +219,47 @@ member is the caller's job.
 | a longer grace delays the reviewer | 4 | 5 | 2 | champion |
 | a longer grace, then the reviewer | 6 | 5 | 3 | champion,reviewer |
 
+## 7b. The other two ladders (P4-T04c)
+
+§11 carries three ladders and P3-T06 built one. These are the other two, added
+when the nudge engine needed them.
+
+**Acknowledgement.** §11: "reviewer nudged one day after publication, escalated
+at three". The champion is never on this ladder. They did their part, and
+chasing them for somebody else's acknowledgement is how a product teaches people
+its messages are not about them.
+
+<!-- golden: cadence.acknowledgement -->
+
+| case | days_since_publication | expected_step | expected_targets |
+|---|---|---|---|
+| the day it was published | 0 | | |
+| a day later, the reviewer is asked | 1 | 1 | reviewer |
+| still only the reviewer | 2 | 1 | reviewer |
+| three days, the coordinator is brought in | 3 | 2 | reviewer,coordinator |
+| a week later, no further | 7 | 2 | reviewer,coordinator |
+
+**Blocker.** §11: "owner warned at twenty hours, coordinator at twenty-four,
+sponsor at forty-eight. The warning arrives before the deadline, not after it."
+Hours rather than days, because a blocker's clock is twenty-four hours and a
+ladder measured in days could not fire twice inside it.
+
+Nothing calls this yet: blockers are rows from P4-T07c. It is here so the ladder
+is tested beside the other two rather than written in a hurry beside the screen
+that first needs it.
+
+<!-- golden: cadence.blocker -->
+
+| case | hours_since_opened | expected_step | expected_targets |
+|---|---|---|---|
+| just opened | 0 | | |
+| nineteen hours, still quiet | 19 | | |
+| the twenty-hour warning, before the deadline | 20 | 1 | champion |
+| the clock runs out | 24 | 2 | champion,coordinator |
+| a day and a half | 36 | 2 | champion,coordinator |
+| two days, the sponsor hears | 48 | 3 | champion,coordinator,sponsor |
+| a week | 168 | 3 | champion,coordinator,sponsor |
+
 ## 8. What resets the cadence
 
 | Event | Effect on `next_check_in_at` |

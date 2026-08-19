@@ -1,6 +1,58 @@
-import { Bar, Card, CardBody, Chip } from "@openokr/ui";
+import {
+  canonThresholds,
+  confidenceBand,
+  type ResolvedThresholds,
+} from "@openokr/method";
+import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
+
+/**
+ * What a row is, in two letters (S-01's uniform node contract).
+ *
+ * The mockup writes OBJ and KR. Initiatives and KPI rows join the same column
+ * when their tasks land, and the chip is the only place that has to know.
+ */
+function RowKindChip({ kind }: { readonly kind: "goal" | "key_result" }) {
+  return (
+    <Chip tone={kind === "goal" ? "brand" : "neutral"}>
+      {kind === "goal" ? "OBJ" : "KR"}
+    </Chip>
+  );
+}
+
+/**
+ * Confidence as its band and its number (METHOD.md §3.2).
+ *
+ * The band comes from `packages/method` rather than from a comparison written
+ * here, because the boundaries are canon and a second copy of them is how a
+ * screen ends up disagreeing with the engine that escalates.
+ */
+function ConfidenceChip({
+  confidence,
+  thresholds,
+}: {
+  readonly confidence: number | null;
+  readonly thresholds: ResolvedThresholds;
+}) {
+  if (confidence === null) {
+    return <span className="text-xs text-ink-4">—</span>;
+  }
+  const verdict = confidenceBand(confidence, thresholds);
+  const tone =
+    verdict.band === "high" ? "ok" : verdict.band === "medium" ? "warn" : "bad";
+  const label =
+    verdict.band === "high"
+      ? "High"
+      : verdict.band === "medium"
+        ? "Med"
+        : "Low";
+  return (
+    <Chip tone={tone}>
+      {label} {confidence.toFixed(1)}
+    </Chip>
+  );
+}
 
 /**
  * The Work Map's tree and its side panel (UIUX-PLAN.md §4 S-01, P3-T11).
@@ -49,11 +101,13 @@ export function WorkMap({
   /** Deep links every node, so a row is a URL somebody can send. */
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
+  const thresholds = canonThresholds();
+
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
       <div className="min-w-0 flex-1">
         <Card>
-          <CardBody className="p-1.5">
+          <CardBody className="p-0">
             {nodes.length === 0 ? (
               <div className="flex flex-col gap-1.5 p-3">
                 <p className="text-sm text-ink-2">Nothing in this cycle yet.</p>
@@ -67,61 +121,112 @@ export function WorkMap({
                 </p>
               </div>
             ) : (
-              <ul className="flex flex-col">
-                {nodes.map((node) => (
-                  <li key={node.id}>
-                    <a
-                      href={hrefFor(node.id)}
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-line border-b">
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                    >
+                      Goal / key result
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                    >
+                      Health
+                    </th>
+                    <th
+                      scope="col"
+                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase md:table-cell"
+                    >
+                      Confidence
+                    </th>
+                    <th
+                      scope="col"
+                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase sm:table-cell"
+                    >
+                      Progress
+                    </th>
+                    <th
+                      scope="col"
+                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase lg:table-cell"
+                    >
+                      Next step
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                    >
+                      Champion
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nodes.map((node) => (
+                    <tr
+                      key={node.id}
                       aria-current={
                         selected?.id === node.id ? "true" : undefined
                       }
-                      style={{ paddingLeft: `${8 + node.depth * 18}px` }}
                       className={
                         selected?.id === node.id
-                          ? "flex items-center gap-2.5 rounded-md bg-brand-weak py-1.5 pr-2.5"
-                          : "flex items-center gap-2.5 rounded-md py-1.5 pr-2.5 hover:bg-raised"
+                          ? "border-line border-b bg-brand-weak last:border-b-0"
+                          : "border-line border-b last:border-b-0 hover:bg-raised"
                       }
                     >
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="flex items-center gap-1.5">
-                          {node.kind === "key_result" ? (
-                            <span
-                              aria-hidden="true"
-                              className="text-xs text-ink-4"
-                            >
-                              ↳
-                            </span>
-                          ) : null}
-                          <span className="truncate text-sm text-ink">
+                      <th scope="row" className="max-w-0 px-3 py-2 font-normal">
+                        <a
+                          href={hrefFor(node.id)}
+                          className="flex items-center gap-2"
+                          style={{ paddingLeft: `${node.depth * 18}px` }}
+                        >
+                          <RowKindChip kind={node.kind} />
+                          <span
+                            className={
+                              node.kind === "goal"
+                                ? "truncate text-sm font-semibold text-ink"
+                                : "truncate text-sm text-ink-2"
+                            }
+                          >
                             {node.title}
                           </span>
-                        </span>
-                        <span className="truncate text-xs text-ink-3">
-                          {node.owner} · {node.nextStep}
-                          {node.timeframe ? ` · ${node.timeframe}` : ""}
-                        </span>
-                      </span>
-                      <span className="flex flex-none items-center gap-2.5">
-                        <Bar
-                          value={node.progressPct}
-                          className="hidden h-1.5 w-24 sm:block"
-                        />
-                        <span className="w-9 text-right text-xs font-semibold text-ink-3">
-                          {Math.round(node.progressPct)}%
-                        </span>
-                        {node.confidence !== null ? (
-                          <span className="hidden w-8 text-right text-xs text-ink-4 md:block">
-                            {node.confidence.toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className="hidden w-8 md:block" />
-                        )}
+                        </a>
+                      </th>
+                      <td className="px-2 py-2">
                         <HealthChip health={node.health} />
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
+                      </td>
+                      <td className="hidden px-2 py-2 md:table-cell">
+                        <ConfidenceChip
+                          confidence={node.confidence}
+                          thresholds={thresholds}
+                        />
+                      </td>
+                      <td className="hidden px-2 py-2 sm:table-cell">
+                        <span className="flex items-center gap-2">
+                          <Bar
+                            value={node.progressPct}
+                            className="h-1.5 w-20 lg:w-28"
+                          />
+                          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
+                            {Math.round(node.progressPct)}%
+                          </span>
+                        </span>
+                      </td>
+                      <td className="hidden max-w-[16rem] px-2 py-2 lg:table-cell">
+                        <span className="block truncate text-xs text-ink-3">
+                          {node.nextStep}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="flex justify-end">
+                          <Avatar name={node.owner} size="sm" />
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </CardBody>
         </Card>

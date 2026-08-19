@@ -84,6 +84,12 @@ jobs:
         # the outbox.
         run: pnpm check:boundaries
 
+      - name: Method conformance
+        # METHOD.md and packages/method have to agree: every rule key the
+        # documents cite resolves, every SS11 parameter exists in the registry
+        # and nowhere else, and every approved corpus entry is exercised.
+        run: pnpm method:check
+
   test:
     name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope

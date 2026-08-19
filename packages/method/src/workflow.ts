@@ -21,6 +21,7 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
+import { applyStrictness, evaluateKeyResults } from "./quality.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
@@ -80,6 +81,22 @@ export interface KeyResultSnapshot {
     readonly confirmed: boolean;
     readonly riskOwnerId: string | null;
   }[];
+  /**
+   * What §4.2's checks need to judge this key result, for publish gate 2.
+   *
+   * Undefined means nothing has evaluated it, which keeps gate 2 unevaluable
+   * rather than green on an empty answer. The same distinction `dependencies`
+   * draws, for the same reason.
+   */
+  readonly quality?: {
+    readonly baseline: number;
+    readonly target: number;
+    readonly dueOn: string | null;
+    readonly ownerId: string | null;
+    readonly indicatorType: "leading" | "lagging";
+    readonly direction: "increase" | "reduce" | "maintain" | "move";
+    readonly confidence: number | null;
+  };
 }
 
 /** One goal, as the gates need to see it. */
@@ -486,7 +503,12 @@ function phaseFour(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["The §4 quality checks arrive at P4-T01"],
+      // The catalogue and the stored verdicts both exist since P4-T01 and
+      // P4-T02a. What is missing is the reading that turns a set of stored
+      // flags into one answer for the phase, and that is publish gate 2,
+      // which P4-T03 builds. Naming the task that will supply it beats
+      // naming the one that already did.
+      blocked: ["Reading the §4 verdicts across the set arrives at P4-T03"],
       conditions: { met: 0, total: 0 },
     };
   }
@@ -610,7 +632,10 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
  * red gate does. That is the correct direction to be wrong in: a gate that
  * cannot check anything must not pass.
  */
-export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
+export function publishGates(
+  input: CycleWorkflowInput,
+  thresholds?: ResolvedThresholds,
+): readonly GateResult[] {
   const goals = input.goals;
   const goalsBlocked = "goals and key results arrive at P3-T04";
 
@@ -657,9 +682,16 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
   }
 
   // 2. Every key result passes the §4.2 checks.
-  if (input.qualityChecksPass === undefined) {
-    results.push(unevaluable(2, "the §4 quality engine arrives at P4-T01"));
-  } else {
+  //
+  // **A fail blocks and a warn does not**, which is §4's own wording: warn is
+  // "worth another look", fail is "fix before publishing". A workspace that
+  // wants warnings to block sets strictness to strict, and then they are fails
+  // and this gate sees them as such. That is what the setting is for.
+  //
+  // `qualityChecksPass` stays supported for a caller that has already decided,
+  // and it wins when given. Otherwise the gate evaluates the set itself, so it
+  // cannot disagree with the coach that judged the same key results.
+  if (input.qualityChecksPass !== undefined) {
     results.push(
       gate(
         2,
@@ -669,6 +701,53 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
           : ["Some key results do not pass the §4.2 checks"],
       ),
     );
+  } else if (!goals || !thresholds) {
+    results.push(
+      unevaluable(
+        2,
+        goals ? "no thresholds were resolved for this workspace" : goalsBlocked,
+      ),
+    );
+  } else {
+    const unjudged = goals.filter((goal) =>
+      goal.keyResults.some((keyResult) => keyResult.quality === undefined),
+    );
+    if (unjudged.length > 0) {
+      results.push(
+        unevaluable(2, "some key results carry nothing for §4.2 to judge"),
+      );
+    } else {
+      const failures: string[] = [];
+      for (const goal of goals) {
+        const verdicts = applyStrictness(
+          evaluateKeyResults(
+            {
+              keyResults: goal.keyResults.map((keyResult) => ({
+                text: keyResult.title,
+                ...(keyResult.quality as NonNullable<
+                  KeyResultSnapshot["quality"]
+                >),
+              })),
+            },
+            thresholds,
+          ),
+          thresholds["quality.coachStrictness"],
+        );
+        for (const verdict of verdicts.filter(
+          (entry) => entry.status === "fail",
+        )) {
+          const offenders = verdict.keyResults
+            .map((index) => goal.keyResults[index]?.title)
+            .filter((title): title is string => title !== undefined);
+          failures.push(
+            offenders.length > 0
+              ? `${verdict.id} on ${offenders.map((title) => `"${title}"`).join(", ")} in "${goal.title}"`
+              : `${verdict.id} on the set under "${goal.title}"`,
+          );
+        }
+      }
+      results.push(gate(2, failures.length === 0, failures));
+    }
   }
 
   // 3. Alignment is mapped: each objective states what it contributes to.

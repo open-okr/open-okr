@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   // has to follow symlinks into ../../packages to collect the workspace
   // packages this app imports.
   outputFileTracingRoot: join(import.meta.dirname, "../.."),
+  // @swc/helpers 0.5.23 added a `module-sync` export condition pointing at its
+  // `esm/` files. Node 22 honours it, so the standalone server resolves the ESM
+  // helpers at runtime while tracing only collected the CJS ones, and the image
+  // dies on its first request with "Cannot find module". Tracing cannot see
+  // through the condition, so the files are named here. Drop this once tracing
+  // resolves `module-sync` itself.
+  outputFileTracingIncludes: {
+    "/*": [
+      "../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*",
+    ],
+  },
   transpilePackages: [
     "@openokr/adapters",
     "@openokr/agents",

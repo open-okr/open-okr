@@ -19,11 +19,11 @@ catalog:
   # broke typecheck repo-wide; adopting 7.x is its own task, not a bot merge.
   typescript: 5.9.3
   vitest: 4.1.10
-  "@types/node": 26.1.2
+  "@types/node": 26.2.0
   # 0.45.2 is the first release past GHSA-gpj5-g38j-94v9 (SQL injection via
   # improperly escaped identifiers).
   drizzle-orm: ^0.45.2
-  pg: ^8.16.3
+  pg: ^8.23.0
   "@types/pg": ^8.20.4
   pg-boss: ^12.27.0
   ws: ^8.21.3
@@ -45,7 +45,7 @@ catalog:
   # so one client covers four of the six real drivers.
   "@anthropic-ai/sdk": ^0.116.0
   openai: ^7.4.0
-  "@google/genai": ^2.16.0
+  "@google/genai": ^2.17.1
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -82,7 +82,7 @@ catalog:
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
   "@tiptap/core": 3.29.2
-  "@tiptap/pm": 3.29.2
+  "@tiptap/pm": 3.30.1
   "@tiptap/react": 3.29.2
   "@tiptap/starter-kit": 3.29.2
   "@tiptap/extension-table": 3.29.2

@@ -123,6 +123,18 @@ Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` a
 
 All tiers run the same tagged release. Signed images are published on every release. A lifecycle helper ships with the self-hosted tarball for upgrade, status, logs and key rotation, with a documented rollback.
 
+### 5.1 Upgrade policy
+
+Every instance upgrades itself. There is no auto-update and no version check that leaves the instance. An administrator chooses when, and the product never chooses for them.
+
+- **Versioning is semantic.** A major release carries a change an administrator must act on, and the release notes name the action. A minor release carries features and migrations that need nothing from them. A patch carries fixes.
+- **Supported range.** Any release upgrades directly to any later release in the same major, with no stops. Crossing a major means stopping at the last release of the current major first. Downgrading is not supported once migrations have applied. The direct jump within a major is what lets old migrations retire at a major boundary; without it, every migration ever written stays runnable forever.
+- **Rollback means restore.** Migrations are forward-only, so once one has applied, the previous image may not run against the new schema. Rolling back is: stop, restore the backup taken before the upgrade, start the previous image. The lifecycle helper takes that backup itself and refuses to upgrade without one, with an opt-out for deployments whose external database has its own backups. "Run the previous tag" alone is not a rollback and is never presented as one.
+- **Rolling upgrades constrain migrations.** On Kubernetes, pods of release N and N+1 serve traffic together against the N+1 schema for the length of the rollout. Removing or renaming anything therefore spans two releases: the first adds the replacement and writes both, the second removes the old. No release both stops writing a column and drops it. This binds every migration, not just deployment.
+- **Backfills never block a boot.** Schema migrations run on start. Data changes run separately through the data-change runner, on the administrator's schedule, and `status` reports what is pending. An upgrade is never held open by a long backfill.
+
+How a release is produced is §9: changesets for the version, changelog and release notes, a signed image and a software bill of materials per release, and customers pin versions.
+
 ## 6. Security model
 
 The authority is TECHNICAL-PLAN.md §8. The summary:
@@ -167,7 +179,7 @@ Design rules that keep collaborative editing a later addition rather than a rewr
 - **Contract drift checks.** The generated OpenAPI document, the MCP tool catalogue and the generated command line are re-derived in CI and compared against committed artifacts. The single contract registry cannot silently drift.
 - **Method conformance checks.** `packages/method` carries a golden-master suite for every rule, band, corridor and diagnostic in METHOD.md, and CI fails when the implementation and the document disagree.
 - **AI-off leg.** CI boots with the provider set to off and asserts every P0 flow passes and every AI affordance is hidden or disabled.
-- Releases through changesets: version, changelog, signed image, release notes. Customers pin versions. Nothing is force-upgraded.
+- Releases through changesets: version, changelog, signed image, release notes. Customers pin versions. Nothing is force-upgraded. The contract an upgrading administrator relies on is §5.1.
 - Observability through OpenTelemetry with self-hostable backends. Telemetry is opt-in and documented.
 
 ## 10. Delivery phases
@@ -200,7 +212,7 @@ The loop this repository is built for:
 4. The agent builds feature by feature, one task at a time.
 5. Every task meets the Definition of Done in CLAUDE.md before it merges.
 
-Throughput is planned, not assumed: one human reviewer plus the agent, sustaining **3 to 5 merged tasks per week**, where large tasks count double, with parallel worktrees allowed for independent slices. At 104 tasks that is a realistic **7 to 10 months** to the end of Phase 7. If reality diverges by more than half over a month, re-baseline the plan rather than slipping quietly.
+Throughput is planned, not assumed: one human reviewer plus the agent, sustaining **3 to 5 merged tasks per week**, where large tasks count double, with parallel worktrees allowed for independent slices. At 105 tasks that is a realistic **7 to 10 months** to the end of Phase 7. If reality diverges by more than half over a month, re-baseline the plan rather than slipping quietly.
 
 ## 12. Risk register
 

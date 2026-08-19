@@ -328,3 +328,24 @@ create policy tenant_isolation on notes
     expect(lintMigrationSql("0001_tenant_probes.sql", fixture)).toEqual([]);
   });
 });
+
+describe("characters a WIN1252 database cannot store", () => {
+  it("refuses a decorative rule made of box drawing, naming the character", () => {
+    const problems = lintMigrationSql(
+      "0032_comments.sql",
+      `-- ── Comments ──\n${GOOD}`,
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("U+2500");
+    expect(problems[0]).toContain("x4");
+    expect(problems[0]).toContain("WIN1252");
+  });
+
+  it("allows the section sign and the em dash, which WIN1252 carries", () => {
+    // Every migration in this repository opens with a section reference, and
+    // several use an em dash. Neither is the problem, so neither is refused.
+    expect(
+      lintMigrationSql("0001_goals.sql", `-- § 4.2 — goals\n${GOOD}`),
+    ).toEqual([]);
+  });
+});

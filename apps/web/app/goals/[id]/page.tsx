@@ -198,7 +198,11 @@ export default async function GoalPage({
                   {goal.keyResults.map((keyResult) => (
                     <li
                       key={keyResult.id}
-                      className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0"
+                      // The quality panel links straight at the key result a
+                      // check named, so an issue found in the panel lands on the
+                      // row that fixes it rather than at the top of the page.
+                      id={`kr-${keyResult.id}`}
+                      className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0 target:rounded-md target:bg-brand-weak"
                     >
                       {/* `gap-1` rather than nothing: the three children stack
                           tight without it, and the sparkline's own box then sits

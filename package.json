@@ -20,6 +20,7 @@
     "db:migrate": "pnpm --filter @openokr/db migrate",
     "db:change": "pnpm --filter @openokr/db change",
     "db:seed": "pnpm --filter @openokr/core seed",
+    "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
     "check:boundaries": "node --experimental-strip-types --no-warnings scripts/check-boundaries.ts",
@@ -32,14 +33,14 @@
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
+    "@biomejs/biome": "2.5.8",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.62.1",
     "@types/pg": "catalog:",
-    "knip": "6.32.0",
+    "knip": "6.32.2",
     "pg": "catalog:",
-    "turbo": "2.10.8",
+    "turbo": "2.10.10",
     "vitest": "catalog:"
   }
 }

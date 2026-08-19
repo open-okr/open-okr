@@ -59,6 +59,18 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   // A brand new workspace has no goals, and the map says so with the way out
   // rather than an empty box.
   await expect(page.getByText("Nothing in this cycle yet.")).toBeVisible();
+
+  // The context strip and the statistics, which the front door gained when it
+  // was drawn to its mockup. A workspace with nothing in it reads "not yet"
+  // rather than zero, because zero is an answer and this is the absence of one.
+  await expect(page.getByText(/Phase 1/)).toBeVisible();
+  await expect(page.getByText("no measures yet")).toBeVisible();
+  await expect(page.getByText("not scored yet")).toBeVisible();
+  // The scope tabs: the company, then the default space provisioning made.
+  await expect(page.getByRole("navigation", { name: "Scope" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Company", exact: true }),
+  ).toBeVisible();
 });
 
 test("the front door shows what provisioning resolved, with nothing configured", async () => {
@@ -106,6 +118,23 @@ test("hydrates, so a write happens without loading a new document", async () => 
 
   await expect(page.getByLabel("Language")).toBeVisible();
   expect(documentLoads).toBe(0);
+});
+
+test("the seeded Champion is in admin, with its schedule and an empty log", async () => {
+  // P4-T05a. The agent is created at provisioning, so a workspace that has
+  // answered no questions still has one, and this is the page that says what
+  // it is and what it has done.
+  await page.goto("/admin/agents");
+
+  await expect(
+    page.getByRole("heading", { name: "Agents and runs" }),
+  ).toBeVisible();
+  await expect(page.getByText("OKR Champion")).toBeVisible();
+  await expect(page.getByText("On the hour")).toBeVisible();
+  await expect(page.getByText("propose")).toBeVisible();
+  // Nothing schedules a run on this instance, and the page says so rather
+  // than showing an empty list that reads like a bug.
+  await expect(page.getByText(/No run yet/)).toBeVisible();
 });
 
 test("registration is closed once the instance has been claimed", async () => {
@@ -223,8 +252,12 @@ test("drafting a goal with key results persists at zero percent and pending", as
     .fill("Carries the annual mobile thrust");
   await page.getByRole("button", { name: "Add objective" }).click();
 
+  // Level 2, because the quality panel in the rail groups its issues under an
+  // h3 carrying the same title. Two headings with one name is the panel doing
+  // its job, not an ambiguity worth removing.
   await expect(
     page.getByRole("heading", {
+      level: 2,
       name: "Make mobile the way our customers prefer to reach us",
     }),
   ).toBeVisible();
@@ -251,6 +284,93 @@ test("drafting a goal with key results persists at zero percent and pending", as
     "aria-valuenow",
     "0",
   );
+});
+
+/**
+ * The Draft Coach (P4-T02b).
+ *
+ * The acceptance criterion end to end: an objective beginning with an output
+ * verb fails its rule inline, with the coaching prompt and the §4.6 example, and
+ * the strength score drops. Driven through the browser rather than the unit
+ * suite because the thing worth proving is that the browser evaluates at all:
+ * the same package, the workspace's own thresholds, and no round trip.
+ */
+test("the coach fails a rule as you type, and the score moves with it", async () => {
+  await page.goto("/cycle?phase=4");
+
+  const title = page
+    .getByRole("textbox", { name: /Objective, checked as you type/ })
+    .first();
+  await expect(title).toBeVisible();
+
+  const meter = page.getByText(/OKR strength ·/).first();
+  const before = (await meter.textContent()) ?? "";
+
+  await title.fill("Launch the new mobile app");
+
+  // OBJ-1 fires on the output verb, with no save and no request.
+  const chip = page
+    .getByRole("button", { name: "OBJ-1 · Outcome, not output" })
+    .first();
+  await expect(chip).toBeVisible();
+  expect((await meter.textContent()) ?? "").not.toBe(before);
+
+  // The card carries the prompt, what was seen, and §4.6's pair.
+  await chip.click();
+  await expect(
+    page.getByText(/Your objective starts with a deliverable, not a destination/),
+  ).toBeVisible();
+  await expect(page.getByText(/What was seen\./)).toBeVisible();
+  // The weak half of §4.6's pair, not the strong half: the strong half is the
+  // sentence the drafting test above used as its objective, so asserting it
+  // here would match the goal's own heading as well as the card.
+  await expect(
+    page.getByText(/Launch the new mobile app by end of Q3/),
+  ).toBeVisible();
+
+  // Every verdict links to the rule itself.
+  await page.getByRole("link", { name: "See the rule in METHOD" }).first().click();
+  await expect(page).toHaveURL("/method/OBJ-1");
+  await expect(
+    page.getByRole("heading", { name: "OBJ-1 · Outcome, not output" }),
+  ).toBeVisible();
+  await expect(page.getByText("How it judges, in order")).toBeVisible();
+});
+
+/**
+ * The quality panel (P4-T02c).
+ *
+ * The acceptance criterion: every open issue across the set, grouped by its
+ * objective, each linking at the field that fixes it. The link is the half worth
+ * driving in a browser: an issue list that lands somebody at the top of a page
+ * has moved the work of finding the row from the panel to the reader.
+ */
+test("the quality panel groups every issue and links at the field", async () => {
+  await page.goto("/cycle?phase=4");
+
+  const panel = page.getByRole("region").filter({ hasText: "Quality panel" });
+  await expect(
+    page.getByRole("heading", { name: "Quality panel" }),
+  ).toBeVisible();
+  await expect(page.getByText(/issues? across .* objectives?/)).toBeVisible();
+
+  // Grouped under the objective they belong to.
+  await expect(
+    panel.getByRole("heading", {
+      name: "Make mobile the way our customers prefer to reach us",
+    }),
+  ).toBeVisible();
+
+  // KR-3 fires on both key results: neither carries a date or an owner.
+  const issue = panel.getByRole("link", { name: /KR-3/ }).first();
+  await expect(issue).toBeVisible();
+  const href = await issue.getAttribute("href");
+  expect(href).toMatch(/#kr-/);
+
+  await issue.click();
+  // The anchor resolves to a real row rather than to the top of the page.
+  const anchored = (href ?? "").split("#")[1] ?? "";
+  await expect(page.locator(`[id="${anchored}"]`)).toBeVisible();
 });
 
 test("closing a goal requires a retrospective and keeps it on reopen", async () => {
@@ -405,6 +525,17 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   await expect(cell).toBeVisible();
   await cell.fill("60");
   await cell.press("Enter");
+
+  // Wait for the standing figure to come back before leaving the page. Enter
+  // commits through a server action, and navigating while it is still in
+  // flight abandons it: the value never lands, the KPI stays at no data, and
+  // the recovery board is empty for a reason that has nothing to do with the
+  // recovery board. It passed here in under a second and failed on a CI runner
+  // at the full ten-second timeout, which is what a race looks like from the
+  // outside.
+  await expect(
+    page.getByRole("row").filter({ hasText: "Operating margin" }),
+  ).toContainText("60%");
 
   await page.goto("/kpis/recovery");
   await expect(

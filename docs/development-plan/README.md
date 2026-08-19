@@ -20,7 +20,7 @@ Read in this order the first time.
 | 4 | [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) | Target design: the identity and access model, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance budgets and the one-contract API | Technical design |
 | 5 | [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) | The AI and agent layer: providers and bring-your-own-key, governance, chat channels, the Coach and the Champion with the full trigger and escalation catalogue, the copilot, retrieval, and the external agent surface | The AI domain |
 | 6 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, forty screen specifications, accessibility and quality gates | The user interface |
-| 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 104 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
+| 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 105 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
 | 8 | [EXECUTION-GUIDE.md](EXECUTION-GUIDE.md) | The protocol between the human engineer and the agent | Process |
 | 9 | [CI-GATES.md](CI-GATES.md) | Every gate that refuses the work, the command that runs it locally, and what each catches | Process |
 | 10 | [reference/](reference/) | Source-system knowledge bases, the ground truth for the importers | Facts about the sources |
@@ -50,7 +50,7 @@ AI-NATIVE-PLAN.md    providers, governance, channels, the Coach and the Champion
 UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40)
       |              ...eleven of which are drawn in ../stakeholder/mockups/
       |
-IMPLEMENTATION-PLAN.md   104 ordered tasks in eight phases: P1-* to P8-*
+IMPLEMENTATION-PLAN.md   105 ordered tasks in eight phases: P1-* to P8-*
       |
 EXECUTION-GUIDE.md   human picks a task, agent builds, human reviews, merge
       |

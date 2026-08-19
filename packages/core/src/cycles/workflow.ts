@@ -283,6 +283,15 @@ async function loadGoalSnapshots<
       goalId: keyResults.goalId,
       title: keyResults.title,
       capacity: keyResults.capacity,
+      // Publish gate 2 judges the §4.2 checks over the whole set, so the fields
+      // those checks read travel with the snapshot.
+      baselineValue: keyResults.baselineValue,
+      targetValue: keyResults.targetValue,
+      dueOn: keyResults.dueOn,
+      ownerId: keyResults.ownerId,
+      indicatorType: keyResults.indicatorType,
+      direction: keyResults.direction,
+      confidence: keyResults.confidence,
     })
     .from(keyResults)
     .where(
@@ -339,6 +348,18 @@ async function loadGoalSnapshots<
             confirmed: dependency.confirmed,
             riskOwnerId: dependency.riskOwnerId,
           })),
+        // `numeric` arrives as a string, and a string where §4.2 expects a
+        // number makes every comparison read as a missing value.
+        quality: {
+          baseline: Number(child.baselineValue),
+          target: Number(child.targetValue),
+          dueOn: child.dueOn,
+          ownerId: child.ownerId,
+          indicatorType: child.indicatorType,
+          direction: child.direction,
+          confidence:
+            child.confidence === null ? null : Number(child.confidence),
+        },
       })),
   }));
 }
@@ -453,7 +474,7 @@ export async function evaluateWorkflow<
   thresholds: ResolvedThresholds,
 ): Promise<WorkflowSnapshot> {
   const input = await loadWorkflowInput(tx, workspaceId, cycle);
-  const gates = publishGates(input);
+  const gates = publishGates(input, thresholds);
   return {
     input,
     phases: phaseCompletion(input, thresholds),

@@ -82,7 +82,7 @@ Use this whenever a rule, threshold, band, corridor, taxonomy or agenda has been
 
 ## Notes
 
-- Task identifiers run from `P1-*` (foundation) to `P8-*` (cloud, enterprise and launch). There are 104 tasks. The full index is in IMPLEMENTATION-PLAN.md appendix A, and the deferred backlog is appendix B.
+- Task identifiers run from `P1-*` (foundation) to `P8-*` (cloud, enterprise and launch). There are 105 tasks. The full index is in IMPLEMENTATION-PLAN.md appendix A, and the deferred backlog is appendix B.
 - Each phase gates on the previous one, and per-task dependencies still apply. Parallel worktrees are allowed for independent tasks.
 - If the agent is blocked it sets the task to `blocked` in STATUS.md and asks. Answer, and it resumes.
 - The full protocol is in EXECUTION-GUIDE.md. The agent's rules are in CLAUDE.md.

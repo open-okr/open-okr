@@ -17,6 +17,7 @@ import {
   AGENT_AUTONOMIES,
   AGENT_KINDS,
   AGENT_SCHEDULES,
+  type AgentRunLogEntry,
   type AgentTask,
   AI_PROVIDER_KINDS,
   activeOnly,
@@ -24,18 +25,26 @@ import {
   agents,
   MODEL_TIERS,
   proposedChanges,
+  type WorkspaceTx,
   withWorkspace,
   workspaceMembers,
+  workspaces,
 } from "@openokr/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
+import { championInTx } from "../agents/champion.ts";
+import { runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
+import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
+
+/** What the Champion's hourly run records as its trigger. */
+const CHAMPION_HOURLY_TRIGGER = "schedule.hourly";
 
 const agentOutput = z.object({
   id: z.uuid(),
@@ -679,4 +688,264 @@ export const bulkDismissProposedChanges = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * The Champion's hourly run (P4-T05a).
+ *
+ * AI-NATIVE-PLAN.md §6.2: "Hourly: the nudge queue, what is due now, per
+ * member, per channel." The run is a write action for the same reason
+ * `nudges.run` is: the nudge rows, the inbox rows, the run row and the audit
+ * row commit together or not at all.
+ *
+ * With the provider off this run is the whole product. It fires every trigger,
+ * escalates by the ladder and drafts nothing, which is what "deterministic
+ * first" means when it is a line of code rather than a principle.
+ */
+export const runChampion = defineWriteAction({
+  name: "agents.runChampion",
+  summary:
+    "Runs the Champion's nudge queue once, recording what fired in its run log.",
+  input: z.object({
+    /** Defaults to the moment the request arrives. Overridden by tests. */
+    now: z.string().optional(),
+  }),
+  output: z.object({
+    runId: z.uuid(),
+    status: z.string(),
+    recorded: z.number().int(),
+    suppressed: z.number().int(),
+    ruleKeys: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId }) {
+      const champion = await championInTx(tx as WorkspaceTx, workspaceId);
+      if (!champion) {
+        throw new OperationError(
+          "not_found",
+          "This workspace has no Champion.",
+        );
+      }
+      const [agent] = await tx
+        .select({ id: agents.id, enabled: agents.enabled })
+        .from(agents)
+        .where(activeOnly(agents, eq(agents.id, champion.agentId)))
+        .limit(1);
+      if (!agent?.enabled) {
+        throw new OperationError("not_found", "The Champion is turned off.");
+      }
+      const [workspace] = await tx
+        .select({ settings: workspaces.settings })
+        // openokr:allow-raw-read: the action already requires `full` on the
+        // workspace, and this reads the settings column the getter does not
+        // return.
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      const stored = workspace?.settings?.agentRunCostCapUsd;
+      return {
+        agentId: agent.id,
+        // A workspace provisioned before the setting existed has no key to
+        // read, and falls back to the same constant a fresh one stores.
+        costCapUsd:
+          typeof stored === "number" ? stored : DEFAULT_AGENT_RUN_COST_CAP_USD,
+      };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const at = input.now ? new Date(input.now) : new Date();
+      const log: AgentRunLogEntry[] = [];
+      const stamp = at.toISOString();
+
+      // The cap is checked before the work, not after it. A run that spent
+      // first and reported the cap afterwards would have already spent.
+      // Nothing here costs anything with the provider off, so this only ever
+      // stops a run a workspace has explicitly forbidden by setting zero.
+      if (loaded.costCapUsd <= 0) {
+        log.push({
+          at: stamp,
+          taskIndex: 0,
+          kind: "denied",
+          message: `Halted before starting: the cost cap is ${loaded.costCapUsd} and a run may not spend.`,
+        });
+        // openokr:allow-mutation: the operation's own execute.
+        const [halted] = await tx
+          .insert(agentRuns)
+          .values({
+            workspaceId,
+            agentId: loaded.agentId,
+            trigger: CHAMPION_HOURLY_TRIGGER,
+            // Cancelled, not failed. A limit the workspace chose is not an
+            // error, and paging somebody about their own setting is how a
+            // product teaches people to ignore it.
+            status: "cancelled",
+            tasks: [],
+            log,
+            startedAt: at,
+            finishedAt: at,
+          })
+          .returning({ id: agentRuns.id });
+        const haltedId = (halted as { id: string }).id;
+        return {
+          result: {
+            runId: haltedId,
+            status: "cancelled",
+            recorded: 0,
+            suppressed: 0,
+            ruleKeys: [] as string[],
+          },
+          activity: {
+            // The catalogue already has this kind, from the manual cancel
+            // path. A halt is a cancel with a reason in the log, and inventing
+            // a second kind for it would split one thing across two feeds.
+            kind: "agent.run_cancelled",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: { trigger: CHAMPION_HOURLY_TRIGGER, reason: "cost_cap" },
+          },
+          audit: {
+            action: "agents.runChampion",
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: { status: "cancelled", capUsd: loaded.costCapUsd },
+          },
+        };
+      }
+
+      const run = await runDueNudgesInTx(tx as WorkspaceTx, {
+        workspaceId,
+        at,
+      });
+
+      // One entry per rule, because a log that said "3 nudges" could not
+      // answer why any one of them was sent. That question is the whole
+      // reason the run log exists.
+      for (const [index, ruleKey] of run.ruleKeys.entries()) {
+        log.push({
+          at: stamp,
+          taskIndex: index,
+          kind: "applied",
+          message: `${ruleKey}: delivered`,
+        });
+      }
+      log.push({
+        at: stamp,
+        taskIndex: run.ruleKeys.length,
+        kind: "applied",
+        message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
+      });
+
+      // openokr:allow-mutation: the operation's own execute.
+      const [row] = await tx
+        .insert(agentRuns)
+        .values({
+          workspaceId,
+          agentId: loaded.agentId,
+          trigger: CHAMPION_HOURLY_TRIGGER,
+          status: "completed",
+          tasks: [],
+          log,
+          startedAt: at,
+          finishedAt: at,
+        })
+        .returning({ id: agentRuns.id });
+      const runId = (row as { id: string }).id;
+
+      return {
+        result: {
+          runId,
+          status: "completed",
+          recorded: run.recorded,
+          suppressed: run.suppressed,
+          ruleKeys: [...run.ruleKeys],
+        },
+        activity: {
+          kind: "agent.run_completed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            trigger: CHAMPION_HOURLY_TRIGGER,
+            recorded: run.recorded,
+          },
+        },
+        audit: {
+          action: "agents.runChampion",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { status: "completed", recorded: run.recorded },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The run log, as a list (P4-T05a).
+ *
+ * `agents.readRun` answers "what happened in this run" and needs an id to do
+ * it. Nobody has an id until they have seen a list, which is why an
+ * administrator could not read an agent's history until now.
+ *
+ * Newest first, and capped, because this table grows by one row an hour per
+ * workspace forever. A screen that offered every run since provisioning would
+ * be unreadable within a month.
+ */
+export const listAgentRuns = defineReadAction({
+  name: "agents.listRuns",
+  summary: "Recent agent runs with their logs, newest first.",
+  input: z.object({
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      agentId: z.uuid(),
+      agentName: z.string(),
+      trigger: z.string(),
+      status: z.string(),
+      log: z.array(
+        z.object({
+          at: z.string(),
+          taskIndex: z.number().int(),
+          kind: z.string(),
+          message: z.string(),
+        }),
+      ),
+      cost: z.number(),
+      error: z.string().nullable(),
+      startedAt: z.string().nullable(),
+      finishedAt: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.full,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const rows = await withWorkspace(db, context.workspaceId, (tx) =>
+      tx
+        .select({
+          id: agentRuns.id,
+          agentId: agentRuns.agentId,
+          agentName: agents.name,
+          trigger: agentRuns.trigger,
+          status: agentRuns.status,
+          log: agentRuns.log,
+          cost: agentRuns.cost,
+          error: agentRuns.error,
+          startedAt: agentRuns.startedAt,
+          finishedAt: agentRuns.finishedAt,
+        })
+        .from(agentRuns)
+        .innerJoin(agents, eq(agents.id, agentRuns.agentId))
+        .where(eq(agentRuns.workspaceId, context.workspaceId))
+        .orderBy(desc(agentRuns.createdAt))
+        .limit(input.limit ?? 20),
+    );
+    return rows.map((row) => ({
+      ...row,
+      log: [...row.log],
+      cost: Number(row.cost),
+      startedAt: row.startedAt?.toISOString() ?? null,
+      finishedAt: row.finishedAt?.toISOString() ?? null,
+    }));
+  },
 });

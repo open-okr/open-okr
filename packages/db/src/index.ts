@@ -291,6 +291,17 @@ export {
   subscriptionLists,
   subscriptions,
 } from "./schema/notifications.ts";
+export { type NudgeRule, nudgeRules } from "./schema/nudge-rules.ts";
+export {
+  NUDGE_KINDS,
+  NUDGE_SUBJECT_TYPES,
+  NUDGE_SUPPRESSION_REASONS,
+  type Nudge,
+  type NudgeKind,
+  type NudgeSubjectType,
+  type NudgeSuppressionReason,
+  nudges,
+} from "./schema/nudges.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
   type PerformanceSnapshotRow,

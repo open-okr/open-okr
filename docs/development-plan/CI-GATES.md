@@ -173,13 +173,20 @@ create database x encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0
 **Writing a migration:** every character in the file has to survive the target
 database's encoding, and you do not control what that is on somebody else's
 install. `§` and `—` exist in WIN1252 and are safe. Box drawing (`─`, `│`, `└`)
-does not, and a decorative rule made of it stops the migration dead. Migration
-0032 carries 123 of them; it applies on CI and refuses on a WIN1252 cluster.
+does not, and a decorative rule made of it stops the migration dead.
 
-Editing that file is not the fix by itself. `_migrations` records a checksum
-per file, and changing one raises **"Applied migration X was edited after it
-ran"** on every database that already applied it. Which way to go is a human
-decision, open on the P3-T16 `STATUS.md` row.
+`pnpm db:lint` refuses this now, naming the character and how many times it
+appears. The rule was added after migration 0032 shipped 123 box-drawing
+characters in two decorative comment rules, and nobody found out until a
+developer on Windows could not run the test suite. It is mechanical, so nobody
+has to remember it.
+
+If you ever do need to edit a migration that has already run somewhere,
+`_migrations` records a checksum per file and the change raises **"Applied
+migration X was edited after it ran"** on every database that applied it. There
+is no command that repairs the ledger: drop the database and migrate again. That
+is why editing one is a decision rather than a fix, and why it is on the
+ask-a-human list in `CLAUDE.md`.
 
 ## Sign-off
 

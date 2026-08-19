@@ -14,6 +14,8 @@ export {
   alignmentScore,
 } from "./alignment.ts";
 export {
+  acknowledgementEscalation,
+  blockerEscalation,
   type Escalation,
   type EscalationRole,
   escalation,
@@ -82,12 +84,27 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  ALIGNMENT_CHECKS,
+  type AlignmentCheckInput,
+  applyStrictness,
   type ConditionRow,
+  CYCLE_CHECKS,
+  type CycleCheckInput,
+  evaluateAlignment,
+  evaluateCycle,
+  evaluateKeyResults,
   evaluateObjective,
+  examplesFor,
+  KEY_RESULT_CHECKS,
+  type KeyResultInput,
+  type KeyResultSetInput,
+  type KeyResultVerdict,
   OBJECTIVE_CHECKS,
   type ObjectiveInput,
+  QUALITY_EXAMPLES,
   QUALITY_WORD_LISTS,
   type QualityCheck,
+  type QualityExample,
   type QualityStatus,
   type QualityVerdict,
   strengthScore,
@@ -123,6 +140,32 @@ export {
   type WeightedItem,
   weightedProgress,
 } from "./scoring.ts";
+export {
+  type Diagnosis,
+  type DiagnosisKind,
+  lowestProcessHealthStatement,
+  MANAGEMENT_RETRO_QUESTIONS,
+  PROCESS_HEALTH_STATEMENTS,
+  REVIEW_STAGES,
+  type ReviewAct,
+  type ReviewStage,
+  RHYTHM_STATEMENTS,
+  RITUALS,
+  type Ritual,
+  type RitualKind,
+  reviewStages,
+  rhythmDiagnostic,
+  rhythmScore,
+  type TimedReviewStage,
+  WEEKLY_STEPS,
+  type WeeklyStep,
+} from "./sessions.ts";
+export {
+  insideQuietHours,
+  type SuppressionInput,
+  type SuppressionReason,
+  suppressionFor,
+} from "./suppression.ts";
 export {
   isTermKey,
   type ResolvedTerminology,
@@ -160,6 +203,14 @@ export {
   type ValidationResult,
   validateOverrides,
 } from "./thresholds.ts";
+export {
+  deterministicTriggers,
+  isTriggerKey,
+  TRIGGER_CATALOGUE,
+  type Trigger,
+  type TriggerOwner,
+  trigger,
+} from "./triggers.ts";
 export {
   type CycleWorkflowInput,
   canPublish,
