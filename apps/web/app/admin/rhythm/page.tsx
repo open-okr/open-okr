@@ -1,4 +1,5 @@
-import { callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
 import { RhythmForm } from "./rhythm-form";
@@ -26,6 +27,13 @@ export default async function RhythmSettingsPage() {
     {},
   );
 
+  // `rhythm.update` requires `full`, which is what `manage_coaching` grants.
+  // Read here for the form's state; the server refuses regardless.
+  const level = await resolveAccessLevelFor(
+    workspace.workspaceId,
+    workspace.memberId,
+  );
+
   return (
     <>
       <h1>Rhythm and thresholds</h1>
@@ -34,7 +42,7 @@ export default async function RhythmSettingsPage() {
         Nothing here needs changing: a workspace that leaves this page alone
         practises the method as written.
       </p>
-      <RhythmForm rhythm={rhythm} />
+      <RhythmForm rhythm={rhythm} canManage={level >= ACCESS_LEVELS.full} />
     </>
   );
 }

@@ -375,7 +375,10 @@ describe("phases that cannot answer yet", () => {
   it("phase 4 waits for the quality engine and names the task", () => {
     const result = phase(base(), 4);
     expect(result?.state).toBe("todo");
-    expect(result?.blocked.join(" ")).toMatch(/P4-T01/);
+    // The task named here moved from P4-T01 to P4-T03 once the catalogue and
+    // the stored verdicts existed and only the reading across a set did not.
+    // A blocked note that names a task already done sends the reader nowhere.
+    expect(result?.blocked.join(" ")).toMatch(/P4-T03/);
     // Not a failure: nothing is wrong with the cycle.
     expect(result?.missing).toEqual([]);
   });

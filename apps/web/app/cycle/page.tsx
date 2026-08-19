@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { PHASE_TITLES, phaseWorkAllowed } from "@openokr/method";
+import {
+  canonThresholds,
+  KEY_RESULT_CHECKS,
+  OBJECTIVE_CHECKS,
+  PHASE_TITLES,
+  phaseWorkAllowed,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
@@ -12,6 +19,7 @@ import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
+import { QualityPanel } from "./quality-panel.tsx";
 
 /**
  * The cycle workspace (UIUX-PLAN.md §4 S-04, S-06 to S-08, P3-T03).
@@ -104,8 +112,25 @@ export default async function CyclePage({
           members: (await callAction(context, "people.directory", {})).map(
             (member) => ({ id: member.id, name: member.name }),
           ),
+          // The coach runs in the browser and cannot read the settings row, so
+          // the resolved thresholds travel with the page. Sending them rather
+          // than letting the client fall back to the canon is what keeps a
+          // workspace that has tuned its bounds judged by its own numbers.
+          // `rhythm.read` types this as an unknown record because the registry
+          // is open-ended at the contract boundary. It is `ResolvedThresholds`
+          // by construction: the same `resolveThresholds` builds both.
+          thresholds: (await callAction(context, "rhythm.read", {}))
+            .thresholds as unknown as ResolvedThresholds,
+          checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
+            (check) => ({ id: check.id, title: check.title }),
+          ),
         }
-      : { goals: [], members: [] };
+      : {
+          goals: [],
+          members: [],
+          thresholds: canonThresholds(),
+          checkTitles: [],
+        };
 
   return (
     <AppShellLayout>
@@ -217,6 +242,8 @@ export default async function CyclePage({
               goals={draft.goals}
               members={draft.members}
               canEdit={canEdit}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
             />
           ) : null}
 
@@ -235,7 +262,38 @@ export default async function CyclePage({
           ) : null}
         </div>
 
-        <div className="w-full flex-none xl:w-80">
+        <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
+          {viewing === 4 ? (
+            <QualityPanel
+              set={draft.goals.map((goal) => ({
+                objective: {
+                  id: goal.id,
+                  title: goal.title,
+                  hasCycle: true,
+                  hasTimeframe: false,
+                  championId: goal.champion.id,
+                  reviewerId: goal.reviewer.id,
+                  objectivesInUnit: draft.goals.filter(
+                    (other) => other.level === goal.level,
+                  ).length,
+                  level: goal.level,
+                },
+                keyResults: goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  baseline: keyResult.baselineValue,
+                  target: keyResult.targetValue,
+                  dueOn: keyResult.dueOn,
+                  ownerId: keyResult.ownerId,
+                  indicatorType: keyResult.indicatorType,
+                  direction: keyResult.direction,
+                  confidence: keyResult.confidence,
+                })),
+              }))}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
+            />
+          ) : null}
           <GuidanceRail phase={viewing} mode={workflow.mode} />
         </div>
       </div>

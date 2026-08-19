@@ -1,16 +1,17 @@
+import type { ResolvedThresholds } from "@openokr/method";
 import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { ActionForm } from "./action-form.tsx";
+import { DraftCoach } from "./draft-coach.tsx";
 import { addKeyResult, createGoal, recordValue } from "./goal-actions.ts";
 
 /**
  * Phase 4's drafting surface (UIUX-PLAN.md §4 S-09, P3-T04).
  *
- * The objective and its key results, editable where they are read. The quality
- * coaching that makes S-09 "the most coached screen in the product" is P4-T02:
- * the twenty-six checks and the live verdicts need the engine at P4-T01, and a
- * screen that invented its own advice would be inventing method. What is real
- * here is the object: a goal with a champion, a reviewer and key results that
- * carry a baseline, a target and a direction.
+ * The objective and its key results, editable where they are read, with the
+ * Draft Coach beside each objective since P4-T02b: the §4 checks evaluated live
+ * as somebody types, from the same package the server stores its answer with.
+ * Nothing here invents advice; every prompt is METHOD.md's own sentence and
+ * every chip links to the rule.
  *
  * Progress is real since P3-T05: the bar is the weighted average of the key
  * results, recomputed in the same transaction as the write that moved it.
@@ -36,6 +37,9 @@ export interface DraftGoal {
     readonly currentValue: number;
     readonly weight: number;
     readonly kpiId: string | null;
+    readonly dueOn: string | null;
+    readonly ownerId: string | null;
+    readonly confidence: number | null;
   }[];
 }
 
@@ -56,11 +60,19 @@ export function Drafting({
   goals,
   members,
   canEdit,
+  thresholds,
+  checkTitles,
 }: {
   readonly cycleId: string;
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
   readonly canEdit: boolean;
+  /** Resolved per workspace, so the browser judges by the same numbers. */
+  readonly thresholds: ResolvedThresholds;
+  readonly checkTitles: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
 }) {
   return (
     <div className="flex flex-col gap-4.5">
@@ -98,6 +110,45 @@ export function Drafting({
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
+            <DraftCoach
+              objective={{
+                id: goal.id,
+                title: goal.title,
+                hasCycle: true,
+                hasTimeframe: false,
+                championId: goal.champion.id,
+                reviewerId: goal.reviewer.id,
+                // Every objective on this screen belongs to the cycle being
+                // drafted, and they share a level per row, so the count the
+                // per-unit cap reads is the number on screen at this level.
+                objectivesInUnit: goals.filter(
+                  (other) => other.level === goal.level,
+                ).length,
+                level: goal.level as
+                  | "company"
+                  | "department"
+                  | "team"
+                  | "individual",
+              }}
+              keyResults={goal.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                baseline: keyResult.baselineValue,
+                target: keyResult.targetValue,
+                dueOn: keyResult.dueOn,
+                ownerId: keyResult.ownerId,
+                indicatorType: keyResult.indicatorType as "leading" | "lagging",
+                direction: keyResult.direction as
+                  | "increase"
+                  | "reduce"
+                  | "maintain"
+                  | "move",
+                confidence: keyResult.confidence,
+              }))}
+              thresholds={thresholds}
+              checkTitles={checkTitles}
+            />
+
             <div className="flex items-center gap-2.5">
               <Bar value={goal.progressPct} className="h-1.5 flex-1" />
               <span className="text-xs font-semibold text-ink-3">

@@ -12,6 +12,7 @@ import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge } from "./actions.ts";
+import { NudgeProvenance } from "./nudge-provenance.tsx";
 
 /**
  * Review, "what I owe" (UIUX-PLAN.md §4 S-02, P3-T08).
@@ -25,11 +26,15 @@ import { acknowledge } from "./actions.ts";
  * S-03's, the notification inbox, and keeping them apart is why this page has no
  * unread state and no mark-as-read.
  *
- * Two parts of the mockup are deliberately absent, both because they need a
- * phase that has not landed. "Why you got nudged" needs a nudge to be about, and
- * nudges are P4-T05. "Your week" needs the blocker clock and the session streak,
- * which are P3-T09 and P4-T04. Drawing either with invented numbers would make
- * the screen look finished while telling somebody something untrue.
+ * **"Why you got nudged" is here since P4-T04c**, with the rule that caused each
+ * message and a snooze that stops the messages without clearing what is owed.
+ * The list of obligations does not move when somebody snoozes, and the control
+ * says so: choosing not to be messaged about a thing is not the same as no
+ * longer owing it.
+ *
+ * "Your week" is still absent. It needs the blocker clock and the session
+ * streak, which are P4-T07c and P4-T08, and drawing it with invented numbers
+ * would make the screen look finished while telling somebody something untrue.
  */
 
 const GROUPS = [
@@ -53,6 +58,19 @@ export default async function ReviewPage() {
     },
     "review.inbox",
     {},
+  );
+
+  // The nudges this member has had, sent and held alike. A held one is on the
+  // list too: the point of recording a suppression is that the silence can be
+  // accounted for.
+  const { nudges } = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "nudges.list",
+    { limit: 20 },
   );
 
   return (
@@ -133,6 +151,21 @@ export default async function ReviewPage() {
                 </li>
               ))}
             </ul>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-bold text-ink">Why you got nudged</h2>
+              <p className="text-xs text-ink-3">
+                Every message the product sent you, and every one it decided to
+                hold, with the rule behind it.
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <NudgeProvenance nudges={nudges} />
           </CardBody>
         </Card>
       </div>

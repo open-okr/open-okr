@@ -66,8 +66,12 @@ describe("the first registration provisions a workspace", () => {
     expect(workspaces.rows[0].name).toContain("Ada Lovelace");
     expect(workspaces.rows[0].slug).toMatch(/^[a-z0-9-]+$/);
 
+    // Scoped to the human. The workspace also holds the seeded Champion
+    // (P4-T05a), which is a member like anyone else and would otherwise make
+    // this assertion about how many agents ship rather than about the person
+    // who registered.
     const members = await wb.admin.query(
-      "select name, kind, status, primary_channel, quiet_hours from workspace_members",
+      "select name, kind, status, primary_channel, quiet_hours from workspace_members where kind = 'human'",
     );
     expect(members.rows).toHaveLength(1);
     expect(members.rows[0].name).toBe("Ada Lovelace");
@@ -106,10 +110,16 @@ describe("the first registration provisions a workspace", () => {
     const wb = await workerDb();
     await register("ada@example.com", "Ada Lovelace");
 
+    // Two members, not one: the registering person and the Champion agent,
+    // seeded in the same transaction (P4-T05a). The property under test is
+    // still atomicity, so both halves are counted rather than the total being
+    // loosened to "at least one".
     const counts = await wb.admin.query(
-      "select (select count(*) from workspaces)::int as w, (select count(*) from workspace_members)::int as m",
+      `select (select count(*) from workspaces)::int as w,
+              (select count(*) from workspace_members where kind = 'human')::int as humans,
+              (select count(*) from workspace_members where kind = 'agent')::int as agents`,
     );
-    expect(counts.rows[0]).toEqual({ w: 1, m: 1 });
+    expect(counts.rows[0]).toEqual({ w: 1, humans: 1, agents: 1 });
   });
 });
 
@@ -250,8 +260,13 @@ describe("one user, several workspaces", () => {
         const rows = await client.query<{ workspace_id: string }>(
           "select workspace_id from workspace_members",
         );
-        expect(rows.rows).toHaveLength(1);
-        expect(rows.rows[0]?.workspace_id).toBe(membership.workspaceId);
+        // The member and the workspace's own Champion (P4-T05a). What this
+        // test is about is that neither workspace can see the other's rows,
+        // so every row is checked rather than the count being the assertion.
+        expect(rows.rows).toHaveLength(2);
+        for (const row of rows.rows) {
+          expect(row.workspace_id).toBe(membership.workspaceId);
+        }
         await client.query("commit");
       } finally {
         client.release();

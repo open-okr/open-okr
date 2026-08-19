@@ -139,7 +139,20 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.baseline_health_set": z.object({}),
   "cycle.capacity_recorded": z.object({}),
   "cycle.calibrated": z.object({}),
-  "cycle.published": z.object({ name: z.string() }),
+  "cycle.published": z.object({
+    name: z.string(),
+    // Which gates were unmet when somebody published anyway (P4-T03).
+    // Empty on a normal publication, which is most of them.
+    overrodeGates: z.array(z.number().int()).optional(),
+  }),
+  // The nudge run (P4-T04a). One activity per run rather than per nudge:
+  // the nudges are rows of their own, and a feed with one entry per message
+  // sent would bury everything a person actually did.
+  "nudges.run": z.object({ recorded: z.number().int() }),
+  // A snooze silences the nudge and never the obligation, which is why it
+  // is worth recording: somebody chose to stop being messaged about a
+  // thing they still owe.
+  "nudge.snoozed": z.object({ until: z.string() }),
   // Goals and key results (P3-T04). A goal's title is snapshotted for the same
   // reason a member's name is: "closed Raise activation" has to keep reading that
   // way after the goal is renamed or erased.

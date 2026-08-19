@@ -72,3 +72,66 @@ export function escalation(
   }
   return { step: 1, targets: ["champion"] };
 }
+
+/**
+ * The acknowledgement ladder (METHOD.md §11, P4-T04c).
+ *
+ * §11's wording: "reviewer nudged one day after publication, escalated at
+ * three". A check-in nobody acknowledged is a loop left open, and the person
+ * who left it open is the reviewer rather than the champion who wrote it.
+ *
+ * The champion is never on this ladder. They did their part; chasing them for
+ * somebody else's acknowledgement is how a product teaches people that its
+ * messages are not about them.
+ */
+export function acknowledgementEscalation(
+  daysSincePublication: number,
+  thresholds: ResolvedThresholds,
+): Escalation {
+  const ladder = thresholds["cadence.acknowledgementLadderDays"];
+
+  if (daysSincePublication >= ladder.escalate) {
+    // Widened past the reviewer, so §6.3 treats it as urgent.
+    return { step: 2, targets: ["reviewer", "coordinator"] };
+  }
+  if (daysSincePublication >= ladder.nudge) {
+    return { step: 1, targets: ["reviewer"] };
+  }
+  return NOTHING;
+}
+
+/**
+ * The blocker ladder (METHOD.md §11, §7.3).
+ *
+ * §11's wording: "owner warned at twenty hours, coordinator at twenty-four,
+ * sponsor at forty-eight. The warning arrives before the deadline, not after
+ * it." Twenty hours is the warning, and twenty-four is the clock in §3.2 that
+ * the blocker was given to find its next action.
+ *
+ * Hours rather than days, because a blocker's clock is twenty-four hours and a
+ * ladder measured in days could not fire twice inside it.
+ *
+ * **Nothing calls this yet.** Blockers are rows from P4-T07c, and this is here
+ * so the ladder is golden-master tested beside the other two rather than
+ * written in a hurry alongside the screen that first needs it.
+ */
+export function blockerEscalation(
+  hoursSinceOpened: number,
+  thresholds: ResolvedThresholds,
+): Escalation {
+  const ladder = thresholds["cadence.blockerLadderHours"];
+
+  if (hoursSinceOpened >= ladder.sponsor) {
+    return { step: 3, targets: ["champion", "coordinator", "sponsor"] };
+  }
+  if (hoursSinceOpened >= ladder.coordinator) {
+    return { step: 2, targets: ["champion", "coordinator"] };
+  }
+  if (hoursSinceOpened >= ladder.owner) {
+    // The warning, before the deadline rather than after it. The owner of a
+    // blocker is its named owner, which the caller resolves; the role here is
+    // the champion's position on the ladder.
+    return { step: 1, targets: ["champion"] };
+  }
+  return NOTHING;
+}

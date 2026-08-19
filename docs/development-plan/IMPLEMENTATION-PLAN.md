@@ -9,13 +9,13 @@ Authority: this is the execution authority. It implements TECHNICAL-PLAN.md, AI-
 | 1 | Foundation | P1-T01 to P1-T10 |
 | 2 | Platform and agent spine | P2-T01 to P2-T17 |
 | 3 | The OKR core | P3-T00 to P3-T17 |
-| 4 | The coaching layer | P4-T00 to P4-T15 |
+| 4 | The coaching layer | P4-T00 to P4-T15, several split into lettered parts |
 | 5 | Reach: channels, agents, work | P5-T00 to P5-T13 |
 | 6 | Data: import, export, portability | P6-T01 to P6-T07 |
-| 7 | Hardening | P7-T01 to P7-T08 |
+| 7 | Hardening | P7-T01 to P7-T09 |
 | 8 | Cloud, enterprise and launch | P8-T01 to P8-T14 |
 
-**104 tasks.** Sizing: S is half a day or less, M is about a day, L is two to three days. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
+**105 tasks**, some split into lettered parts. **Sizing: one task is one working session and one commit.** S is a short session, M is a full one. There is no L: a task that will not fit one session is split into lettered parts before anybody starts it, and the letters are the tasks. A bare id in a `Depends on:` line means every lettered part of it, so `P4-T02` reads as `P4-T02a` through `P4-T02c`. Phase 4 is cut this way; the earlier phases carry their original sizes because they are done. Guidance, not promises. With the PLAN.md §11 throughput assumption of three to five merged tasks a week where large tasks count double, Phases 1 to 7 are a realistic seven to ten months. If actuals diverge by more than half over a month, re-baseline rather than slipping quietly.
 
 ## How to read a task
 
@@ -381,69 +381,180 @@ Acceptance: Given a fresh workspace, when the demo builds, then the Work Map, re
 # Phase 4: The coaching layer
 
 The active product. Starts with a design gate.
-
 ### P4-T00: Coaching design gate [DESIGN GATE] [M]
 Depends on: Phase 3 complete
 Goal: the design documents for the canon package, the agents and the sessions.
 Deliverables: design documents covering the method package (every rule with its exact condition, status, prompt, reason and example, plus the corpus of real objectives and key results with expected verdicts); the agents (trigger catalogue, escalation ladders, deduplication, quiet hours, the deterministic behaviour with AI off, and the prompt design per phase); and the sessions (both rituals stage by stage with their state machines, live synchronisation and completion conditions).
 Acceptance: the human approves with an explicit statement, and the rule corpus and the trigger catalogue receive a line-by-line review.
 
-### P4-T01: The method package [L]
+### P4-T01a: The quality catalogue: objective checks [M]
 Depends on: P4-T00
-Goal: METHOD.md as executable data and pure functions (TECHNICAL-PLAN.md §6.1).
-Deliverables: `packages/method` with no database or network access, holding the twenty-six-check quality catalogue with word lists, conditions, statuses, prompts, reasons and example pairs; the score, confidence and portfolio bands; the progress signal; the KPI corridors; the blocker and root-cause taxonomies; the publish gates; phase completion conditions; session stage definitions with durations; the process-health statements and management-retro questions; the rhythm diagnostic; the facilitator guidance; the METHOD.md §11 threshold registry with its keys, types, valid ranges, defaults and override schema; and the nudge trigger catalogue from AI-NATIVE-PLAN.md §6.4 as data, so every proactive message's rule key resolves inside the package. Plus the pure evaluators over each, and the strength-score calculation with strictness as a parameter.
-Test plan: a golden-master suite over every rule, band, corridor, gate and diagnostic; the corpus from the design gate produces its expected verdicts exactly; a conformance test comparing the package's rule keys and thresholds against METHOD.md fails on drift.
-Acceptance: Given the corpus of real OKR drafts, when the package evaluates them, then every verdict matches the reviewed expectation, and changing a threshold in the document without changing the package fails the build.
+Goal: METHOD.md §4.1 as data and one pure evaluator (TECHNICAL-PLAN.md §6.1).
+Deliverables: `packages/method/src/quality.ts` with the §4.1 word lists, OBJ-1 to OBJ-5 as condition tables carrying their coaching prompt verbatim, the pure `evaluateObjective`, and the §4 strength score with `todo` counting in the denominator.
+Test plan: corpus entries 1 to 3 from the design document produce their approved verdicts exactly; every condition row carries a prompt.
+Acceptance: Given "Launch the new mobile app by end of Q3", when the package evaluates it, then OBJ-1 fails with its prompt and the rest pass.
 
-### P4-T02: The quality engine and Draft Coach surfaces [L]
-Depends on: P4-T01, P3-T04
-Goal: quality at the point of writing (REQUIREMENTS.md §3.2, screen S-09).
+### P4-T01b: Key result checks and strictness [M]
+Depends on: P4-T01a
+Goal: METHOD.md §4.2 and §4's strictness rule.
+Deliverables: the §4.2 activity-noun and impact word lists; KR-1 to KR-7 with prompts; `evaluateKeyResults` splitting set-level checks from per-key-result ones and naming which key results tripped a rolled-up verdict; KR-6 delegating to §3.2's draft verdict on the set average; `applyStrictness` promoting every warn to a fail.
+Test plan: corpus entry 4 produces its approved verdicts; strict mode moves the strength score and leaves every prompt unchanged.
+Acceptance: Given three activity-shaped key results, when the package evaluates them, then KR-5 fails naming all three, and strict mode turns KR-4's warn into a fail.
+
+### P4-T01c: Alignment checks [S]
+Depends on: P4-T01b, P3-T09
+Goal: METHOD.md §4.3 as verdicts, read from the alignment engine rather than decided twice.
+Deliverables: AL-1 to AL-6 with prompts; `evaluateAlignment` mapping the alignment engine's findings to verdicts; AL-2 recorded as settled by the schema; AL-5 reading `todo` until the dependency register answers.
+Test plan: corpus entry 5's findings produce their approved verdicts; an unanswered AL-5 is `todo` and never a pass.
+Acceptance: Given a graph with no company anchor, when the catalogue reads the engine's findings, then AL-4 fails with its prompt and every rule with no finding passes.
+
+### P4-T01d: Cycle checks [S]
+Depends on: P4-T01c, P3-T02
+Goal: METHOD.md §4.4, completing the twenty-six.
+Deliverables: CY-1 to CY-8 with prompts, none of them feeding the strength score; `evaluateCycle` delegating CY-6 to publish gate 5 and CY-7 to gate 4, and reading every number from the §11 registry.
+Test plan: corpus entry 6 produces its approved verdicts; all twenty-six checks are present with unique ids; only the cycle checks are excluded from the score.
+Acceptance: Given a cycle with an incomplete input pack, when the catalogue evaluates it, then CY-1 fails and the strength score is unaffected.
+
+### P4-T01e: Example pairs and the nudge trigger catalogue [M]
+Depends on: P4-T01d
+Goal: the last of the catalogue, and every rule key a proactive message can cite (METHOD.md §4.6, AI-NATIVE-PLAN.md §6.4).
+Deliverables: the §4.6 weak and strong example pairs attached to the check each weak version trips, with the reason; the AI-NATIVE-PLAN.md §6.4 trigger catalogue as data with its rule keys, subjects, escalation positions and default channels, so every proactive message resolves inside the package.
+Test plan: every example pair names a check the catalogue defines; every trigger's rule key resolves; a trigger with an unknown rule key fails the test.
+Acceptance: Given a failing OBJ-1, when the rule card is asked for its example, then it returns the weak and strong pair from §4.6 with the reason.
+
+### P4-T01f: Session stages, process health and the rhythm diagnostic [M]
+Depends on: P4-T01e
+Goal: the ritual data METHOD.md §7 and §8 define.
+Deliverables: the weekly and quarterly session stage definitions with their durations; the §8.5 process-health statements; the §8.7 management-retro questions; the §8.6 rhythm diagnostic as a pure function over the cycle score and the rhythm score, returning its verdict and narrative; the §9 facilitator guidance.
+Test plan: the diagnostic verdict matches §8.6 across all three cases; the stage durations sum to each session's stated length.
+Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic runs, then it reads as a strategy or quality problem with the specific figures.
+
+### P4-T01g: The conformance suite, `pnpm method:check` [M]
+Depends on: P4-T01f
+Goal: a build that fails when METHOD.md and the package disagree.
+Deliverables: `pnpm method:check` doing three things: every rule key referenced in METHOD.md §10 and §6.4 resolves to a package entry; the §11 defaults in `thresholds.ts` match the values in METHOD.md §11; the design document's corpus entries produce exactly their expected verdicts. Wired into CI.
+Test plan: changing a threshold in the document without changing the package fails; adding a rule key to the document without adding it to the package fails.
+Acceptance: Given a threshold edited in METHOD.md §11 and not in the package, when the suite runs, then it fails naming the key and both values.
+
+### P4-T02a: Server-side quality evaluation and stored flags [M]
+Depends on: P4-T01d, P3-T04
+Goal: every goal and key result write carries its verdicts (REQUIREMENTS.md §3.2).
+Deliverables: evaluation from `packages/method` on every goal and key result write inside the same Operation; the strength score and the flags stored on the goal; per-workspace strictness read from the §11 registry and applied server-side.
+Test plan: the flags stored on the goal match the last evaluation exactly; strict mode changes the stored score for the same input; evaluation adds no extra transaction.
+Acceptance: Given an objective edited to start with an output verb, when it is saved, then the stored flags carry OBJ-1's failure and the strength score drops.
+
+### P4-T02b: The rule verdict component and the strength meter [M]
+Depends on: P4-T02a
+Goal: quality at the point of writing (screen S-09).
 Reference mockup: [03-draft-coach](../stakeholder/mockups/png/03-draft-coach.png), [03b-rule-card](../stakeholder/mockups/png/03b-rule-card.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: server-side evaluation on every goal and key result write, storing the strength score and flags; client-side evaluation as the user types, from the same package; the rule verdict component showing a status dot, a short label and on demand the coaching prompt, the reason and the example pair; the strength meter in the composer header; the quality panel listing every open issue across a set grouped by objective; a link from every verdict to the rule itself; per-workspace strictness.
-Test plan: evaluation completes inside the sixteen-millisecond budget on the client for a five-key-result objective; server and client verdicts are identical for the same input; strict mode promotes every warning to a failure; the flags stored on the goal match the last evaluation.
-Acceptance: Given an objective beginning with an output verb, when the champion types it, then the rule fails inline with its coaching prompt and example within one keystroke's latency, and the strength score drops immediately.
+Deliverables: client-side evaluation as the user types, from the same package; the rule verdict component with a status dot, a short label, and on demand the coaching prompt, the reason and the example pair; a link from every verdict to the rule itself; the strength meter in the composer header.
+Test plan: evaluation completes inside the sixteen-millisecond budget for a five-key-result objective, measured over a thousand runs; server and client verdicts are identical for the same input.
+Acceptance: Given an objective beginning with an output verb, when the champion types it, then the rule fails inline with its coaching prompt and example within one keystroke's latency.
+
+### P4-T02c: The quality panel across a set [M]
+Depends on: P4-T02b
+Goal: every open issue in one place, grouped by objective.
+Deliverables: the quality panel listing every open issue across a set grouped by objective, each linking to the field that fixes it; the per-workspace strictness control in workspace admin behind `manage_coaching`; the empty, loading and permission-denied states.
+Test plan: the panel's issue count matches the sum of the stored flags; the browser's verdicts and the stored flags are the same set; raising strictness moves every warn to a fail. **Corrected on 2026-08-18:** this line said "in the panel without a reload". Strictness lives on the server and reaches the panel as a prop, so an admin changing it is seen on the next navigation. A live client-side strictness would be a second copy of a setting the server enforces, which is the divergence P4-T02a exists to prevent.
+Acceptance: Given a set with three warnings across two objectives, when the panel opens, then all three are listed under their objective with a link to each field.
 
 ### P4-T03: Publish gates [M]
-Depends on: P4-T02, P3-T03
+Depends on: P4-T02c, P3-T03
 Goal: the six gates as hard server-side enforcement (METHOD.md §4.5, screen S-10).
 Reference mockup: [04-gates-capacity](../stakeholder/mockups/png/04-gates-capacity.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: gate evaluation from the method package over the cycle's whole set, recomputed on every relevant write; the gate checklist interface where each unmet gate links to what would fix it; the publish action refusing with the specific gate and reason; an override path that requires elevated access, a written reason and an audit event.
 Test plan: each gate flips exactly on its condition; publishing with any gate red is refused server-side even when the interface is bypassed; an override records its reason and actor.
 Acceptance: Given a set with one unconfirmed and unowned dependency, when the facilitator publishes, then it is refused naming gate four and linking to the dependency register.
 
-### P4-T04: The nudge engine, triggers and escalation [L]
-Depends on: P4-T01, P3-T08
-Goal: the machinery that makes the product active (AI-NATIVE-PLAN.md §6.3, §6.4).
-Reference mockup: [10-review-inbox](../stakeholder/mockups/png/10-review-inbox.png), [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the nudge table and rule registry; the engine computing what is due now per member with deduplication of one per subject per member per day unless escalating; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; escalation ladders for check-ins, acknowledgements and blockers; the suppression record with a reason; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules, all administered from workspace admin (screen S-36) behind `manage_coaching`. Delivery goes to the in-app inbox and email in this task; chat channels arrive in Phase 5.
-Test plan: a burst of triggers on one subject produces one nudge; an escalation advances exactly one step and is delivered even inside quiet hours when marked urgent; a snooze silences the nudge but never the review-inbox obligation; a simulated month against the demo workspace stays under the volume ceiling per member.
-Acceptance: Given a champion who misses their check-in, when the engine runs over the following fortnight, then they are nudged on the due day and once daily after, the reviewer is brought in at the grace boundary, the coordinator at seven days and the sponsor at fourteen, each step recorded and visible to the champion.
+### P4-T04a: The nudge table and the due engine [M]
+Depends on: P4-T01e, P3-T08
+Goal: the machinery that decides what is due now (AI-NATIVE-PLAN.md §6.3).
+Deliverables: the nudge table with its row-level security policy; the rule registry reading the P4-T01e trigger catalogue; the engine computing what is due per member; delivery to the in-app inbox and email through the existing ports.
+Test plan: a trigger fires exactly on its condition; every nudge row carries a rule key, a channel and an escalation position.
+Acceptance: Given a check-in due today, when the engine runs, then one nudge row exists for the champion with the rule key that caused it.
 
-### P4-T05: The OKR Champion agent [L]
-Depends on: P4-T04, P2-T17
-Goal: the rhythm agent (AI-NATIVE-PLAN.md §6.2).
-Deliverables: the seeded Champion agent member with its persona, staged instructions, schedule and least-privilege scope; the hourly nudge run, the daily sweep covering staleness, blocker aging, KPI corridors and the morning summary, the weekly session lifecycle, and the per-cycle countdown and review preparation; proposal generation for drafted check-ins and recovery OKRs; the readable run log; deterministic behaviour with AI off where it still nudges, escalates and computes but drafts nothing.
-Test plan: with AI off every trigger still fires and no drafting occurs; with a provider on, an overdue check-in produces a drafted narrative as a proposal that a human applies; a KPI unhealthy for two periods produces a recovery proposal; the run halts on the cost cap.
-Acceptance: Given a workspace with the agent enabled and AI configured, when a check-in is three days overdue, then the champion receives a nudge containing a drafted check-in they can review and publish in one action, and the draft is marked as AI-generated.
+### P4-T04b: Deduplication, quiet hours and suppression [M]
+Depends on: P4-T04a
+Goal: an active product that is not a noisy one.
+Deliverables: deduplication to one per subject per member per day unless the escalation step increases; quiet hours in the member's timezone; workspace quiet mode; per-rule enable and channel override; the suppression record carrying its reason.
+Test plan: a burst of triggers on one subject produces one nudge; an urgent escalation is delivered inside quiet hours; a suppressed nudge records why.
+Acceptance: Given five triggers on one goal in one day, when the engine runs, then one nudge is delivered and four suppression rows name the reason.
 
-### P4-T06: The OKR Coach agent [L]
-Depends on: P4-T05
-Goal: the quality agent (AI-NATIVE-PLAN.md §6.1).
+### P4-T04c: Escalation ladders, provenance and the volume dashboard [M]
+Depends on: P4-T04b
+Goal: escalation that a champion can see happening to them.
+Reference mockup: [10-review-inbox](../stakeholder/mockups/png/10-review-inbox.png). Reference, not authority: UIUX-PLAN.md §10.
+Deliverables: the escalation ladders for check-ins, acknowledgements and blockers; the nudge provenance component offering snooze, a channel change and a link to the rule; the volume dashboard with the noisiest rules in workspace admin (screen S-36) behind `manage_coaching`; a snooze that never hides a review-inbox obligation.
+Test plan: an escalation advances exactly one step; a snooze silences the nudge and leaves the obligation; a simulated month over the demo workspace stays under the volume ceiling per member.
+Acceptance: Given a champion who misses their check-in, when the engine runs over a fortnight, then the reviewer is brought in at the grace boundary, the coordinator at seven days and the sponsor at fourteen, each step visible to the champion.
+
+### P4-T05a: The Champion agent and its nudge run [M]
+Depends on: P4-T04c, P2-T17
+Goal: the rhythm agent, seeded and running (AI-NATIVE-PLAN.md §6.2).
+Deliverables: the seeded Champion agent member with its persona, staged instructions, schedule and least-privilege scope on named spaces only; the hourly nudge run; the readable run log; the cost cap halting a run.
+Test plan: the agent holds no workspace-wide grant; with AI off the run still fires every trigger and drafts nothing; the run halts on the cost cap.
+Acceptance: Given the agent enabled with AI off, when the hourly run executes, then every due nudge is delivered and the run log shows what fired.
+
+### P4-T05b: The daily sweep and the cycle countdown [M]
+Depends on: P4-T05a
+Goal: the rhythm the agent guards day to day.
+Deliverables: the daily sweep covering staleness, blocker aging, KPI corridors and the morning summary; the weekly session lifecycle; the per-cycle countdown and review preparation.
+Test plan: a goal past its staleness grace produces exactly one sweep nudge; a blocker aging past its clock escalates; the countdown fires on its own schedule and not on the sweep's.
+Acceptance: Given a goal three days past its staleness grace, when the daily sweep runs, then its champion is nudged once with the rule key that fired.
+
+### P4-T05c: Champion proposals for check-ins and recovery [M]
+Depends on: P4-T05b
+Goal: drafting that stays a proposal (AI-NATIVE-PLAN.md §6.2).
+Deliverables: proposal generation for drafted check-ins and recovery OKRs into the review queue, marked as AI-generated, applied by a human in one action.
+Test plan: with AI off no drafting occurs and every trigger still fires; a KPI unhealthy for two periods produces a recovery proposal; nothing commits without a human applying it.
+Acceptance: Given a check-in three days overdue and a provider configured, when the agent runs, then the champion receives a nudge containing a drafted check-in they can review and publish in one action.
+
+### P4-T06a: The Coach agent and write-triggered evaluation [M]
+Depends on: P4-T05c
+Goal: the quality agent at the moment of writing (AI-NATIVE-PLAN.md §6.1).
+Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the AI-NATIVE-PLAN.md §6.4 quality triggers; every message citing its rule key.
+Test plan: a message citing a rule key the method package does not define fails the build; with AI off the quality triggers still fire.
+Acceptance: Given a goal saved with a failing rule, when the Coach runs, then a nudge cites that rule key and links to the rule.
+
+### P4-T06b: The nightly semantic sweep and the finding table [M]
+Depends on: P4-T06a
+Goal: the findings only a reading of the whole workspace produces.
+Deliverables: the nightly sweep producing relink, dependency, conflict and gap findings into the shared finding table with severity and reason; a one-click apply where the fix is mechanical; divergence detection between reported health and the data.
+Test plan: a dismissed finding stays dismissed everywhere; applying a relink re-parents the goal through the normal Operation with audit; with AI off the structural findings still fire and the semantic ones do not.
+Acceptance: Given two goals in different spaces double-counting one metric, when the nightly sweep runs, then a conflict finding appears for both champions, and dismissing it on one side dismisses it everywhere.
+
+### P4-T06c: The rewrite assist and the coach surfaces [M]
+Depends on: P4-T06b
+Goal: the coach where the writer already is.
 Reference mockup: [05-alignment-studio](../stakeholder/mockups/png/05-alignment-studio.png), [03-draft-coach](../stakeholder/mockups/png/03-draft-coach.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the nightly semantic sweep producing relink, dependency, conflict and gap findings into the shared finding table with severity, reason and a one-click apply where mechanical; divergence detection between reported health and the data; the quality triggers from AI-NATIVE-PLAN.md §6.4; the rewrite assist per failing rule; the coach strip on the goal page and the review tab in the alignment studio; every message citing its rule key.
-Test plan: a message citing a rule key the method package does not define fails the build; a dismissed finding stays dismissed; applying a relink finding re-parents the goal through the normal Operation with audit; with AI off the structural findings and the quality triggers still fire while the semantic ones do not.
-Acceptance: Given two goals in different spaces that double-count the same metric, when the nightly sweep runs, then a conflict finding appears for both champions with a specific reason, and dismissing it on one side dismisses it everywhere.
+Deliverables: the rewrite assist per failing rule, previewing before applying; the coach strip on the goal page; the review tab in the alignment studio; every surface hidden or disabled with the provider off.
+Test plan: the assist commits nothing until applied; with AI off the surfaces explain rather than disappear silently.
+Acceptance: Given a key result failing the measurability rule, when the champion uses the rewrite assist, then a corrected version is proposed naming the rule it now satisfies.
 
-### P4-T07: Weekly session: confidence round, voting, blockers [L]
-Depends on: P4-T04, P3-T07
-Goal: steps one and two of the ritual (METHOD.md §7.2, screen S-22).
+### P4-T07a: The session record and live stage sync [M]
+Depends on: P4-T04c, P3-T07
+Goal: one screen every participant shares (METHOD.md §7.2, screen S-22).
 Reference mockup: [07-weekly-session](../stakeholder/mockups/png/07-weekly-session.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the session record with kind, schedule, facilitator, stage state and elapsed time, synchronised live so every participant sees the same screen; the confidence round with the key result list, the focus panel, the draggable dial with band shortcuts, the synchronised vote reveal with a team average, the what-changed note and the confirm that advances; the blocker step with the five-type picker showing each type's definition, the owner, the next action, the twenty-four hour clock and the escalation notice at the critical threshold; the blocker table, board and aging.
-Test plan: a step cannot be completed while any key result is unscored or any low score lacks a type, an owner and an action; the vote reveal is atomic across clients; a blocker's due time is its opening plus the workspace clock; a confidence at or below the critical threshold escalates immediately.
-Acceptance: Given a session where one key result scores below the threshold, when the coordinator tries to continue, then it is refused until that key result has a blocker type, a named owner and a next action, and the blocker's clock starts on save.
+Deliverables: the session record with kind, schedule, facilitator, stage state and elapsed time, with its row-level security policy; live stage synchronisation through the realtime port; the participant list.
+Test plan: a stage change reaches every connected client inside the budget; a reconnecting client lands on the current stage.
+Acceptance: Given two participants in one session, when the facilitator advances a stage, then both see the new stage without a reload.
+
+### P4-T07b: The confidence round [M]
+Depends on: P4-T07a
+Goal: step one of the ritual (METHOD.md §7.2).
+Deliverables: the key result list with the focus panel; the draggable dial with band shortcuts; the synchronised vote reveal with a team average; the what-changed note; the confirm that advances.
+Test plan: the reveal is atomic across clients; the step cannot complete while any key result is unscored.
+Acceptance: Given one unscored key result, when the coordinator tries to continue, then it is refused naming that key result.
+
+### P4-T07c: Blockers, the board and aging [M]
+Depends on: P4-T07b
+Goal: step two, and what happens to a blocker afterwards (METHOD.md §7.3).
+Deliverables: the blocker step with the five-type picker showing each type's definition, the owner, the next action, the twenty-four hour clock and the escalation notice at the critical threshold; the blocker table, board and aging.
+Test plan: a low score cannot pass without a type, an owner and an action; a blocker's due time is its opening plus the workspace clock; a confidence at or below the critical threshold escalates immediately.
+Acceptance: Given a key result scoring below the threshold, when the coordinator continues, then it is refused until that key result has a blocker type, a named owner and a next action, and the clock starts on save.
 
 ### P4-T08: Weekly session: commitments, digest, streaks [M]
-Depends on: P4-T07
+Depends on: P4-T07c
 Goal: steps three and four (METHOD.md §7.2).
 Deliverables: the commitment table with the previous week closed as delivered or not and the new week set with owner and linked key result; the digest engine assembling the headline with its change on last week, on track, at risk, blockers and commitments; the coordinator note; publishing to the in-app feed and email now and to chat in Phase 5; the streak engine with break-on-skip and the streak ribbon; the twelve-week confidence trend; the space home before the session.
 Test plan: closing a session rolls this week's commitments into next week's list to close; a skipped week breaks the streak and a held one extends it; the digest content matches the session record exactly.
@@ -455,44 +566,86 @@ Goal: the monthly ritual (METHOD.md §7.5, screen S-23).
 Deliverables: the objective trend record; the dependency and risk log view; the decision table where every decision names the key result or goal it affects, with the log surfaced on the goal page and in the cycle workspace.
 Acceptance: Given a monthly review recording a decision against a key result, when the goal page is opened, then the decision appears in its history with its date and author.
 
-### P4-T10: Quarterly review: session shell, scoring, narratives [L]
+### P4-T10a: Quarterly review: the session shell [M]
 Depends on: P4-T09
-Goal: the first act (METHOD.md §8, screen S-24).
+Goal: the rail, the pacing and the room (METHOD.md §8, screen S-24).
 Reference mockup: [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the session shell with the eleven-stage rail grouped by act, the lap bar segmented by duration, the stage timer with pacing cues and an add-a-minute control, private facilitator notes per stage, and live stage synchronisation; the open and check-in stage with the pulse picker and the room-pulse read; the scoring stage with evidence, sliders, reasons, the hidden objective score with an animated reveal that respects reduced motion, and the running cycle score; the narratives stage with the pass-the-mic control; the recognition stage.
-Test plan: stage changes reach every connected client inside the budget; the reveal is deterministic and instant under reduced motion; scores written here land on the key results when the session closes.
-Acceptance: Given a running review at the scoring stage, when the facilitator reveals an objective's score, then every participant sees the same number at the same time, and the cycle score updates.
+Deliverables: the session shell with the eleven-stage rail grouped by act; the lap bar segmented by duration; the stage timer with pacing cues and an add-a-minute control; private facilitator notes per stage; live stage synchronisation; the open and check-in stage with the pulse picker and the room-pulse read.
+Test plan: stage changes reach every connected client inside the budget; facilitator notes are never visible to a participant.
+Acceptance: Given a running review, when the facilitator advances a stage, then every participant's rail moves and the timer restarts.
 
-### P4-T11: Quarterly review: retro, diagnostic, reset [L]
-Depends on: P4-T10
-Goal: the second and third acts (METHOD.md §8).
+### P4-T10b: Quarterly review: scoring and the reveal [M]
+Depends on: P4-T10a
+Goal: the scoring stage (METHOD.md §8.3).
+Deliverables: evidence, sliders and reasons per key result; the hidden objective score with an animated reveal that respects reduced motion; the running cycle score; scores written back to the key results when the session closes.
+Test plan: the reveal is deterministic and instant under reduced motion; scores written here land on the key results on close.
+Acceptance: Given a review at the scoring stage, when the facilitator reveals an objective's score, then every participant sees the same number at the same time and the cycle score updates.
+
+### P4-T10c: Quarterly review: narratives and recognition [S]
+Depends on: P4-T10b
+Goal: the two stages that are about people rather than numbers (METHOD.md §8).
+Deliverables: the narratives stage with the pass-the-mic control; the recognition stage.
+Test plan: the mic passes to exactly one participant at a time and every client agrees who holds it.
+Acceptance: Given a narratives stage, when the facilitator passes the mic, then every participant sees who is speaking.
+
+### P4-T11a: Quarterly review: the retros [M]
+Depends on: P4-T10c
+Goal: the second act's first half (METHOD.md §8.4, §8.7).
 Reference mockup: [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the team retro with prompt chips, two columns, sticky notes and dot voting; the management retro with its four questions; the root-cause stage listing every key result below the threshold with the eight-cause picker and a detail field; the anonymous process-health survey with live averages and response counts; the rhythm diagnostic computed from the cycle score and the rhythm score with its verdict and narrative; keep, modify and abandon per objective with the meaning of the chosen decision and a required why; learnings with promotion from top-voted themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
-Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; process-health responses cannot be attributed to a member but cannot be submitted twice; a keep, modify or abandon decision writes back to the goal on close; the lowest process-health statement becomes an issue in the next cycle.
-Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic renders, then it reads as a strategy or quality problem with the specific figures, and the prescription tells the facilitator to fix the key results before pushing the team.
+Deliverables: the team retro with prompt chips, two columns, sticky notes and dot voting; the management retro with its four §8.7 questions.
+Test plan: a dot vote cannot be spent twice by one member; the two retros are visible to different audiences.
+Acceptance: Given a team retro with three notes, when members vote, then the top-voted note is identifiable and each member's votes are capped.
+
+### P4-T11b: Root cause and the process-health survey [M]
+Depends on: P4-T11a
+Goal: why it went the way it did (METHOD.md §8.4, §8.5).
+Deliverables: the root-cause stage listing every key result below the threshold with the eight-cause picker and a detail field; the anonymous process-health survey with live averages and response counts, using the §8.5 statements.
+Test plan: a process-health response cannot be attributed to a member and cannot be submitted twice; every key result below the threshold appears in the root-cause list.
+Acceptance: Given a survey with four responses, when the averages render, then no response can be traced to a member and the count reads four.
+
+### P4-T11c: The diagnostic, the reset and next-cycle drafts [M]
+Depends on: P4-T11b
+Goal: the third act (METHOD.md §8.6, §8.8, §8.9).
+Deliverables: the rhythm diagnostic rendered from P4-T01f with its verdict and narrative; keep, modify and abandon per objective with the meaning of the chosen decision and a required why; learnings with promotion from top-voted themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
+Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; a keep, modify or abandon decision writes back to the goal on close; the lowest process-health statement becomes an issue in the next cycle.
+Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic renders, then it reads as a strategy or quality problem with the specific figures, and the prescription says to fix the key results before pushing the team.
 
 ### P4-T12: Minutes, exports and review feed-forward [M]
-Depends on: P4-T11, P3-T15
+Depends on: P4-T11c, P3-T15
 Goal: the artifact and the handover (METHOD.md §8.10, screen S-25).
 Deliverables: the minutes document with the executive summary and every stage's record; document and PDF export; the close action writing scores, decisions and learnings back to their objects and running the feed-forward into the next cycle; a link from the closed cycle to its minutes.
 Acceptance: Given a completed review, when the facilitator closes it, then the minutes are generated and exportable, every score and decision is written back, and the next cycle's Phase 2 already holds the scores and carry-forward issues.
 
-### P4-T13: Embeddings and retrieval [L]
+### P4-T13a: The embedding table and the outbox worker [M]
 Depends on: P2-T15
-Goal: grounded answers over workspace data (AI-NATIVE-PLAN.md §9).
-Deliverables: the pgvector extension and embedding table with an appropriate index; the outbox-driven worker chunking and embedding goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts, keyed by content hash; access-filtered hybrid retrieval combining vectors and full text; degradation to full text where vectors are unavailable; local embedding support.
-Test plan: retrieval never returns a chunk the requester cannot read; re-embedding is skipped when content is unchanged; with the extension absent the product still answers using full text.
+Goal: workspace content, embedded and kept current (AI-NATIVE-PLAN.md §9).
+Deliverables: the pgvector extension and the embedding table with an appropriate index and its row-level security policy; the outbox-driven worker chunking and embedding goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts, keyed by content hash; local embedding support.
+Test plan: re-embedding is skipped when the content hash is unchanged; the worker is driven only by outbox rows; the chunker terminates on every input including one shorter than the overlap.
+Acceptance: Given a goal edited twice with the same text, when the worker runs, then it embeds once.
+
+### P4-T13b: Access-filtered retrieval [M]
+Depends on: P4-T13a
+Goal: retrieval that cannot leak (AI-NATIVE-PLAN.md §9).
+Deliverables: hybrid retrieval combining vectors and full text, filtered through the access getter; degradation to full text where vectors are unavailable.
+Test plan: retrieval never returns a chunk the requester cannot read; with the extension absent the product still answers using full text.
 Acceptance: Given a private space's check-in, when a non-member asks a question that would match it, then no chunk from it is retrieved or cited.
 
-### P4-T14: Copilot [L]
-Depends on: P4-T13, P1-T07
-Goal: the interactive assistant (screen S-39).
-Deliverables: threads and messages anchored to the workspace or an entity; the side panel with streaming and a stop control; grounded answers with citations only to what the viewer may see; action proposals rendered as a preview or difference with apply and dismiss, committing through the normal mutation layer; long tool runs executing as background jobs and streaming back over realtime; the states for empty, AI off and capped.
-Test plan: a proposal that the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a background run survives a page reload; with AI off the panel explains and links admins to the console.
+### P4-T14a: Copilot threads and grounded answers [M]
+Depends on: P4-T13b, P1-T07
+Goal: the assistant, reading (screen S-39).
+Deliverables: threads and messages anchored to the workspace or an entity; the side panel with streaming and a stop control; grounded answers with citations only to what the viewer may see; the empty, AI off and capped states.
+Test plan: a citation never points at something the viewer cannot read; the stop control ends the stream and leaves the thread readable.
+Acceptance: Given a member asking about their goals, when the copilot answers, then every citation resolves to something they can open.
+
+### P4-T14b: Copilot proposals and background runs [M]
+Depends on: P4-T14a
+Goal: the assistant, writing, and always as a proposal.
+Deliverables: action proposals rendered as a preview or difference with apply and dismiss, committing through the normal Operation; long tool runs executing as background jobs and streaming back over realtime.
+Test plan: a proposal the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a background run survives a page reload.
 Acceptance: Given a member asking the copilot to create a goal, when they approve the proposal, then the goal is created through the normal Operation with audit, an AI provenance chip and a working undo.
 
 ### P4-T15: Coaching and rhythm assists [M]
-Depends on: P4-T14, P4-T06
+Depends on: P4-T14b, P4-T06c
 Goal: the per-module assists (AI-NATIVE-PLAN.md §2).
 Deliverables: draft a goal and key results from an ambition; rewrite a failing objective or key result to satisfy its rule; suggest metrics, units, baselines, targets and alignment parents; draft the overdue check-in from real activity; draft the weekly digest, the retrospective, the review minutes and the diagnostic narrative; suggest KPIs, thresholds and formulas from plain language; narrate a KPI trend; cluster retro notes into themes; propose next-cycle objectives from carried learnings; natural language to a validated list filter. Every one behind a feature switch, with provenance recorded and a preview before applying.
 Test plan: every assist degrades to its manual path with AI off; every write assist renders a preview and commits nothing until applied; provenance is recorded on the resulting value.
@@ -513,7 +666,7 @@ Deliverables: design documents covering the channel port and per-provider capabi
 Acceptance: the human approves with an explicit statement.
 
 ### P5-T01: Channel port, email driver and routing [L]
-Depends on: P5-T00, P4-T04
+Depends on: P5-T00, P4-T04c
 Goal: the delivery layer (AI-NATIVE-PLAN.md §5).
 Deliverables: the channel port with send, verify, parse and capability reporting; the email driver as the always-available baseline with one-click action links; the connection and identity tables with envelope-encrypted credentials; per-member primary channel and quiet hours; the message log with idempotency; routing so every nudge, digest and escalation reaches the member's chosen channel; the message builder degrading to plain text with a link where a capability is missing.
 Test plan: a nudge routes to the member's primary channel and falls back to email when it fails; an unlinked member falls back to email and in-app; the log records every send with its outcome; idempotency prevents a duplicate send on relay retry.
@@ -598,7 +751,7 @@ Test plan: another member cannot read a draft even through a direct identifier p
 Acceptance: Given a document drafted on a goal and then published, when a space member opens the goal, then they see it with a readable history of changes, and before publication they saw nothing.
 
 ### P5-T13: Search, palette and exports [M]
-Depends on: P5-T12, P4-T13
+Depends on: P5-T12, P4-T13b
 Goal: finding and extracting (screens S-32, S-01).
 Deliverables: the search document table with full-text indexing driven from the outbox across goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions, with semantic results blended when available; access-filtered queries; the search page and the command palette with entity jump, actions and recents; Work Map rows for initiatives and tasks; CSV and XLSX export of any list, run asynchronously for large sets and audited.
 Test plan: a term inside a private space's document returns nothing for a non-member and a highlighted result for a member; an export matches the visible rows and columns exactly.
@@ -689,7 +842,7 @@ Deliverables: traces and metrics for requests, Operations, outbox lag, jobs, nud
 Acceptance: a self-hosted installation sees its own dashboards with zero external calls.
 
 ### P7-T07: Method conformance audit [M]
-Depends on: P4-T01
+Depends on: P4-T01g
 Deliverables: a full pass comparing every rule, threshold, band, corridor, taxonomy, gate, agenda and diagnostic in METHOD.md against `packages/method` and against the behaviour observed in the running product; the coaching-prompt corpus reviewed for tone and accuracy against the tuned false-positive rate; any drift corrected in the document or the code, whichever is wrong.
 Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
 
@@ -697,6 +850,13 @@ Acceptance: the conformance suite is complete, and a human confirms that a sampl
 Depends on: P7-T03
 Deliverables: personal data export and erasure as anonymisation tested end to end; retention settings for message logs, nudge records and agent run logs; a review that no personal data reaches logs, prompts or telemetry.
 Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export is produced, and no personal data of theirs remains in message logs, prompts or telemetry.
+
+### P7-T09: Release engineering and the upgrade contract [L]
+Depends on: P7-T03
+Goal: a release is produced by a pipeline, and an instance any supported distance behind reaches it without losing data, per PLAN.md §5.1.
+Deliverables: changesets wired into the repository, producing the version, changelog and release notes on tag, and failing the build for a release with no changeset; a software bill of materials produced per release and attached to it; image signing moved from P1-T10's tag step into the same pipeline, so one job owns the whole artifact set; the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure; the PLAN.md §5.1 expand-then-contract rule added to the migration linter, so a migration that drops or renames a column names the earlier release that added its replacement.
+Test plan: the upgrade matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring the dump with the previous image returns the instance to its prior state; the linter rejects a same-release drop and accepts a two-release one; a release with no changeset fails the build.
+Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it to the current release, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
 
 ---
 
@@ -771,13 +931,13 @@ Acceptance: a visitor can explore a realistic workspace, see a coach nudge and a
 ### P8-T14: Launch [S]
 Depends on: P8-T13
 Deliverables: the release, changelog, announcement, contributor onboarding with good first issues and the agreement bot live.
-Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud.
+Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud, and an instance on the previous release upgrades to it through the lifecycle helper with its data intact.
 
 ---
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T08 (8). Phase 8: P8-T01 to T14 (14). **104 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **105 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

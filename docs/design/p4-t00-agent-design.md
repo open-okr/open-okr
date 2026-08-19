@@ -124,6 +124,15 @@ Same least-privilege model as the Coach. Bindings on:
 - Goals within those spaces (check-in and blocker reads)
 - KPI trees within those spaces (corridor reads)
 
+**As implemented at P4-T05a:** one binding per space, at `view`, added by
+`createSpaceInTx` as each space is created. Goals and KPI trees are reached
+through the space's own access context rather than bound one by one, which is
+how every other principal reaches them; a per-goal binding would be a second
+access model beside the one `can()` already resolves. `view` rather than `edit`
+because everything the agent changes goes through a proposal, and a proposal
+needs no write grant. There is no binding on the workspace context, and a test
+reads `access_bindings` back to assert the absence.
+
 ### 2.4 Write policy
 
 Default: `propose` for recovery OKRs, check-in drafts, and any data write.
@@ -270,21 +279,34 @@ From SS11 `cadence.nudgeDeduplicationHours` (24h) and the trigger catalogue.
 
 Every proactive message is a recorded row, per CLAUDE.md hard rule.
 
+**Corrected on 2026-08-18.** This table originally listed a shorter row with
+the recipient as `member_id`, no `kind`, no `agent_id`, no `scheduled_for`, no
+`acted_at`, and suppression split across a boolean and a reason.
+TECHNICAL-PLAN.md §4 already specified the table and it outranks a design
+document, so the columns below are its. Whoever reads only this section now
+reads what actually shipped.
+
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid | |
 | `workspace_id` | uuid | RLS |
-| `rule_key` | string | Resolves to trigger catalogue |
+| `kind` | string | `rhythm` or `quality`: which agent's remit, as §6.4's two tables split them. The volume dashboard reads by it, because "the Champion is noisy" is a different finding from "the Coach is" |
 | `subject_type` | string | `goal`, `check_in`, `blocker`, `kpi`, `session`, `cycle` |
 | `subject_id` | uuid | |
-| `member_id` | uuid | The recipient |
+| `recipient_member_id` | uuid | The recipient |
+| `agent_id` | uuid, nullable | Null when the product produced it rather than a seeded agent. The due engine runs before either agent exists, and a fabricated id would misattribute it forever |
+| `rule_key` | string | Resolves to the §6.4 trigger catalogue. Text rather than an enum: the catalogue is data in `packages/method` and the conformance suite keeps the two in step |
 | `channel` | string | `in_app`, `email`, `slack`, `teams`, etc. |
-| `escalation_step` | integer | 0 for non-escalating, 1+ for ladder |
-| `suppressed` | boolean | |
-| `suppression_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling` |
-| `delivered_at` | timestamp, nullable | |
+| `scheduled_for` | timestamp | When it should go out |
+| `sent_at` | timestamp, nullable | When it did. Two columns because quiet hours and batching move delivery without changing the decision, and one timestamp could not tell "held until morning" from "never sent" |
+| `acted_at` | timestamp, nullable | When the recipient did the thing it asked for. This is what makes a nudge measurable rather than merely countable |
+| `escalation_step` | smallint | 0 for non-escalating, 1+ for ladder |
+| `suppressed_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling`. Null when it was sent. Four of the five are decisions the product made rather than accidents, which is why they are recorded |
 | `snoozed_until` | timestamp, nullable | |
 | `created_at` | timestamp | |
+
+A suppressed nudge is never also sent, enforced as a check constraint: both
+halves of the record are meaningless without the other.
 
 ## 8. Prompt design per cycle phase
 

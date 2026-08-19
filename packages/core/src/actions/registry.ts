@@ -19,9 +19,11 @@ import {
   bulkDismissProposedChanges,
   cancelAgentRun,
   createAgent,
+  listAgentRuns,
   listProposedChanges,
   readAgentRun,
   readAgents,
+  runChampion,
   setAgentEnabled,
   startAgentRun,
 } from "./agents.ts";
@@ -163,6 +165,7 @@ import {
   toggleSubscription,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
+import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
   convertToGuest,
@@ -268,6 +271,8 @@ export const ACTION_MAP = {
   "agents.startRun": startAgentRun,
   "agents.readRun": readAgentRun,
   "agents.cancelRun": cancelAgentRun,
+  "agents.runChampion": runChampion,
+  "agents.listRuns": listAgentRuns,
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
@@ -357,6 +362,10 @@ export const ACTION_MAP = {
   "comments.update": updateCommentAction,
   "comments.delete": deleteCommentAction,
   "comments.previewNotify": previewNotifyAction,
+  "nudges.run": runNudges,
+  "nudges.list": listNudges,
+  "nudges.snooze": snoozeNudge,
+  "nudges.volume": nudgeVolume,
   "reactions.list": listReactionsAction,
   "reactions.add": addReactionAction,
   "reactions.remove": removeReactionAction,
