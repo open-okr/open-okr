@@ -19,6 +19,7 @@ import {
   checkIns,
   checkInVotes,
   keyResults,
+  newId,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -296,6 +297,17 @@ export const publishCheckIn = defineWriteAction({
           targetId: input.id,
           payload: { status: input.status },
         },
+        outbox: [
+          {
+            topic: "embedding.index",
+            payload: {
+              workspaceId,
+              entityType: "check_in",
+              entityId: input.id,
+            },
+            idempotencyKey: `embedding.index:check_in:${input.id}:${newId()}`,
+          },
+        ],
       };
     },
   }),
@@ -450,6 +462,17 @@ export const deleteCheckIn = defineWriteAction({
           targetId: input.id,
           payload: { rolledBack: result.rolledBack },
         },
+        outbox: [
+          {
+            topic: "embedding.remove",
+            payload: {
+              workspaceId,
+              entityType: "check_in",
+              entityId: input.id,
+            },
+            idempotencyKey: `embedding.remove:check_in:${input.id}:${newId()}`,
+          },
+        ],
       };
     },
   }),

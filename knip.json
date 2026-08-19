@@ -13,9 +13,6 @@
     "apps/web": {
       "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]
     },
-    "packages/core": {
-      "ignore": ["src/embeddings/service.ts"]
-    },
     "packages/test-support": {
       "entry": ["bin/*.ts", "fixtures/**/vitest.config.ts"]
     },
