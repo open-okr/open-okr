@@ -76,6 +76,64 @@ longest serial run left, so they have to start now or they set the end date.
 The copilot waits behind retrieval anyway, and Agung reaches it naturally once
 the agents are done.
 
+### Who owns which row
+
+Every Phase 4 row, with the person planned to take it. This is the planning
+statement; `STATUS.md`'s own owner column is the live record and is filled when
+a row is actually started. Where the two disagree, STATUS.md is what happened
+and this table is what was agreed.
+
+| Task | Title | PIC | Status |
+|---|---|---|---|
+| P4-T00 | Coaching design gate | Obed | done |
+| P4-T01a | The quality catalogue: objective checks | Agung | done |
+| P4-T01b | Key result checks and strictness | Agung | in_review |
+| P4-T01c | Alignment checks | Agung | in_review |
+| P4-T01d | Cycle checks | Agung | in_review |
+| P4-T01e | Example pairs and the nudge trigger catalogue | Agung | in_review |
+| P4-T01f | Session stages, process health, rhythm diagnostic | Agung | in_review |
+| P4-T01g | The conformance suite, `pnpm method:check` | Agung | in_review |
+| P4-T02a | Server-side quality evaluation and stored flags | Agung | in_review |
+| P4-T02b | The rule verdict component and the strength meter | Agung | in_review |
+| P4-T02c | The quality panel across a set | Agung | in_review |
+| P4-T03 | Publish gates | Agung | in_review |
+| P4-T04a | The nudge table and the due engine | Agung | in_review |
+| P4-T04b | Deduplication, quiet hours and suppression | Agung | in_review |
+| P4-T04c | Escalation ladders, provenance, volume dashboard | Agung | in_review |
+| P4-T05a | The Champion agent and its nudge run | Agung | in_review |
+| P4-T05b | The daily sweep and the cycle countdown | Agung | todo, scope undecided |
+| P4-T05c | Champion proposals for check-ins and recovery | Agung | todo, ready |
+| P4-T06a | The Coach agent and write-triggered evaluation | Agung | todo, ready |
+| P4-T06b | The nightly semantic sweep and the finding table | Agung | todo |
+| P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
+| P4-T07a | The session record and live stage sync | Obed | todo, ready |
+| P4-T07b | The confidence round | Obed | todo |
+| P4-T07c | Blockers, the board and aging | Obed | todo |
+| P4-T08 | Weekly session: commitments, digest, streaks | Obed | todo |
+| P4-T09 | Monthly review and decision log | Obed | todo |
+| P4-T10a | Quarterly review: the session shell | Obed | todo |
+| P4-T10b | Quarterly review: scoring and the reveal | Obed | todo |
+| P4-T10c | Quarterly review: narratives and recognition | Obed | todo |
+| P4-T11a | Quarterly review: the retros | Obed | todo |
+| P4-T11b | Root cause and the process-health survey | Obed | todo |
+| P4-T11c | The diagnostic, the reset and next-cycle drafts | Obed | todo |
+| P4-T12 | Minutes, exports and review feed-forward | Obed | todo |
+| P4-T13a | The embedding table and the outbox worker | Obed | in_progress |
+| P4-T13b | Access-filtered retrieval | Obed | todo |
+| P4-T14a | Copilot threads and grounded answers | Agung | todo |
+| P4-T14b | Copilot proposals and background runs | Agung | todo |
+| P4-T15 | Coaching and rhythm assists | Agung | todo, needs both lanes |
+
+**"ready" means the row's dependencies exist in code today.** P4-T05c and
+P4-T06a need nothing from the sessions lane. P4-T07a needs nothing from the
+agents lane: its dependencies, P4-T04c and P3-T07, are both written. Neither
+lane is technically waiting on the other; what a lane waits on is the agreement
+in this table.
+
+**If a PIC goes quiet, the rows do not move themselves.** Reassigning is a
+decision for the human, recorded here in the same change that starts the work,
+so the other lane does not write the same task twice.
+
 ### Handoffs
 
 | Handoff | What has to be true |
