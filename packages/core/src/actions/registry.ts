@@ -180,6 +180,16 @@ import {
 } from "./people.ts";
 import { reviewInbox } from "./review.ts";
 import {
+  advanceStage,
+  closeSession,
+  createSession,
+  listParticipants,
+  listSessions,
+  openSession,
+  readSession,
+  skipSession,
+} from "./sessions.ts";
+import {
   readWorkspaceSettings,
   resetWorkspaceSettings,
   updateWorkspaceBranding,
@@ -369,6 +379,15 @@ export const ACTION_MAP = {
   "reactions.list": listReactionsAction,
   "reactions.add": addReactionAction,
   "reactions.remove": removeReactionAction,
+  // Sessions (P4-T07a)
+  "sessions.create": createSession,
+  "sessions.open": openSession,
+  "sessions.advanceStage": advanceStage,
+  "sessions.skip": skipSession,
+  "sessions.close": closeSession,
+  "sessions.read": readSession,
+  "sessions.list": listSessions,
+  "sessions.participants": listParticipants,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;
