@@ -266,6 +266,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     keyResultId: z.string(),
     confidence: z.number(),
   }),
+  // Blockers (P4-T07c)
+  "session.blockerCreated": z.object({
+    keyResultId: z.string(),
+    type: z.string(),
+  }),
+  "session.blockerResolved": z.object({ type: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

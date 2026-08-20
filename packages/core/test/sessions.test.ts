@@ -640,3 +640,177 @@ describe("sessions.votes — privacy (P4-T07b)", () => {
     expect(memberVotes).toHaveLength(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P4-T07c: Blockers, the board and aging
+// ---------------------------------------------------------------------------
+
+/** Helper: advance a session through confidence (vote, reveal, confirm for
+ * the KR at the given confidence), then into the diagnose stage. */
+async function advanceToDiagnose(
+  sessionId: string,
+  confidence: number,
+): Promise<void> {
+  const wb = await workerDb();
+  await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+    sessionId,
+    keyResultId,
+    confidence,
+  });
+  await callAction({ pool: wb.appPool, ...context() }, "sessions.revealVotes", {
+    sessionId,
+    keyResultId,
+  });
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.confirmConfidence",
+    {
+      sessionId,
+      keyResultId,
+      confidence,
+      whatChanged: "Test note",
+    },
+  );
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.advanceStage",
+    { id: sessionId },
+  );
+}
+
+describe("sessions.createBlocker (P4-T07c)", () => {
+  it("stores a blocker with due_at = opened + 24h", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "resource",
+        ownerId: facilitatorMemberId,
+        nextAction: "Hire a contractor by Friday",
+      },
+    );
+
+    expect((result as { id: string }).id).toBeTruthy();
+
+    // Verify the blocker status includes the correct due_at (approx 24h out).
+    const status = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.blockerStatus",
+      { sessionId },
+    )) as Array<{ dueAt: string; openedAt: string }>;
+
+    expect(status.length).toBe(1);
+    const blocker = status[0]!;
+    const opened = new Date(blocker.openedAt);
+    const due = new Date(blocker.dueAt);
+    const diffHours = (due.getTime() - opened.getTime()) / (1000 * 60 * 60);
+    expect(diffHours).toBeCloseTo(24, 0);
+  });
+});
+
+describe("sessions.resolveBlocker (P4-T07c)", () => {
+  it("sets resolved_at", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+
+    const created = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "dependency",
+        ownerId: facilitatorMemberId,
+        nextAction: "Follow up with platform team",
+      },
+    );
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.resolveBlocker",
+      { id: (created as { id: string }).id },
+    );
+
+    const status = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.blockerStatus",
+      { sessionId },
+    )) as Array<{ resolvedAt: string | null }>;
+
+    expect(status[0]?.resolvedAt).not.toBeNull();
+  });
+});
+
+describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
+  it("is refused when a low-confidence KR has no blocker (acceptance criterion)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    // Confirm at 0.3 (below low threshold of 0.4) and advance to diagnose.
+    await advanceToDiagnose(sessionId, 0.3);
+
+    // No blocker created. Advancing from diagnose should fail.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+      }),
+    ).rejects.toThrow(/below.*0\.4.*no blocker/i);
+  });
+
+  it("succeeds after a blocker is created for the low-confidence KR", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToDiagnose(sessionId, 0.3);
+
+    // Create the blocker.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "clarity",
+        ownerId: facilitatorMemberId,
+        nextAction: "Define acceptance criteria with the team",
+      },
+    );
+
+    // Now advancing should succeed.
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+
+    expect((result as { id: string }).id).toBe(sessionId);
+  });
+
+  it("does not require a blocker when confidence is above the low threshold", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    // Confirm at 0.5 (above low threshold) and advance to diagnose.
+    await advanceToDiagnose(sessionId, 0.5);
+
+    // No blocker needed. Advancing should succeed.
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+
+    expect((result as { id: string }).id).toBe(sessionId);
+  });
+});

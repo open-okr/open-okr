@@ -245,6 +245,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Revealed ${asString(p.count, "0")} votes on a key result`,
   "session.confidenceConfirmed": (p) =>
     `Confirmed confidence at ${asString(p.confidence)}`,
+  // Blockers (P4-T07c)
+  "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
+  "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

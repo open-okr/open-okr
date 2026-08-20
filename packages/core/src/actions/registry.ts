@@ -185,11 +185,14 @@ import {
   closeSession,
   confirmSessionConfidence,
   createSession,
+  createSessionBlocker,
   listParticipants,
   listSessions,
   openSession,
   readSession,
+  resolveSessionBlocker,
   revealSessionVotes,
+  sessionBlockerStatus,
   sessionConfidenceStatus,
   sessionVotes,
   skipSession,
@@ -399,6 +402,10 @@ export const ACTION_MAP = {
   "sessions.confirmConfidence": confirmSessionConfidence,
   "sessions.votes": sessionVotes,
   "sessions.confidenceStatus": sessionConfidenceStatus,
+  // Blockers (P4-T07c)
+  "sessions.createBlocker": createSessionBlocker,
+  "sessions.resolveBlocker": resolveSessionBlocker,
+  "sessions.blockerStatus": sessionBlockerStatus,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;
