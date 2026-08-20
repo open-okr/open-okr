@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 17 | P4-T01b to P4-T05a, P4-T07a to P4-T07c |
+| in_review | 18 | P4-T01b to P4-T05a, P4-T07a to P4-T08 |
 | in_progress | 1 | P4-T13a |
-| todo | 18 | P4-T05b to P4-T06c, P4-T08 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 17 | P4-T05b to P4-T06c, P4-T09 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 **The twelve rows from P4-T01b to P4-T04c are all in pull request #40 and have not merged.**
 P4-T05a and P4-T07a landed on `obed` and are waiting on a read. Nothing in
@@ -43,8 +43,8 @@ hourly run, and the session record with live stage sync.
 | Chain | Tasks | Serial? | State |
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
-| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a and P4-T05b in_review; P4-T05c cut in two, the -a half under way |
-| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T07c in_review; P4-T08 next |
+| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a, P4-T05b, P4-T05c-a and P4-T06a in_review. P4-T05c-b blocked on a provider key; P4-T06b next |
+| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T08 in_review; P4-T09 next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -59,8 +59,8 @@ P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
 
 | Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
-| now | P4-T05b daily sweep and cycle countdown | P4-T08 commitments, digest, streaks | Yes |
-| next | P4-T05c | P4-T09 monthly review | Yes |
+| now | P4-T05b daily sweep and cycle countdown | P4-T09 monthly review | Yes |
+| next | P4-T05c | P4-T10a quarterly session shell | Yes |
 | then | P4-T06a, P4-T06b, P4-T06c | P4-T08, P4-T09 | Yes |
 | after | P4-T14a, P4-T14b copilot | P4-T10a to P4-T12 | Yes |
 | last | P4-T15 assists, which needs both lanes finished | | No |
@@ -107,7 +107,7 @@ and this table is what was agreed.
 | P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | in_review |
 | P4-T07c | Blockers, the board and aging | Obed | in_review |
-| P4-T08 | Weekly session: commitments, digest, streaks | Obed | todo |
+| P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
 | P4-T09 | Monthly review and decision log | Obed | todo |
 | P4-T10a | Quarterly review: the session shell | Obed | todo |
 | P4-T10b | Quarterly review: scoring and the reveal | Obed | todo |
@@ -140,6 +140,29 @@ so the other lane does not write the same task twice.
 | P4-T04c to P4-T07c | The three escalation ladders exist as pure functions in `packages/method/src/escalation.ts`. The blocker one has no table under it; P4-T07c is the task that creates it |
 | P4-T05b to P4-T07c | **Settled 2026-08-20.** P4-T07c landed `blockers` (migration 0038) hours before P4-T05b needed it, so the daily sweep reads that table and defines nothing. `blockerEscalation` was already the only thing deciding which step fires |
 
+### Three triggers now have their tables and still nothing fires them
+
+Found while merging P4-T08, and recorded here because it is exactly the kind of
+gap that falls between two lanes and belongs to neither by default.
+
+| Trigger | Table exists since | What is missing |
+|---|---|---|
+| `digest.weekly` | P4-T08 (`digests`) | §6.4 addresses it to "Space + leadership" after a session closes. `sessions.close` writes the digest and sends no nudge |
+| `commitment.due` | P4-T08 (`commitments`) | Fires at the end of a commitment week, to the owner. Nothing reads the table for it |
+| `streak.at_risk` | P4-T08 (`streaks`) | Fires when a week would break the streak, to the coordinator. Nothing reads the table for it |
+
+P4-T05b recorded all three as waiting on P4-T08's tables, and P4-T08 built the
+tables without the nudges, each lane correctly staying out of the other's files.
+The nudge engine is the agents lane's (`packages/core/src/nudges`), the three
+tables are the sessions lane's, and the reader that joins them is one small file
+neither task claimed.
+
+**Whoever takes it adds a reader beside `dueSessionNudges` in
+`packages/core/src/nudges/rituals.ts` and fires it from the weekly cadence.** It
+is not a new decision path: the rule stays "add rules to `triggers.ts`, read
+them through `runDueNudgesInTx`, never a second `decideSuppression`". All three
+keys are already in the catalogue, so nothing about the method changes.
+
 ## Where the two lanes collide
 
 | Collision | Between | The rule |
@@ -147,7 +170,7 @@ so the other lane does not write the same task twice.
 | Blockers | Resolved. P4-T07c created the table, P4-T05b reads it, the ladder was already there | Held: the ladder was read, not rewritten, and no second table was defined. P4-T05b also leaves `escalated_at` and `escalated_to_id` alone, because a nudge reader writing them would record an escalation as though somebody had acted on it |
 | The nudge engine | Every rhythm trigger and every session trigger records a nudge through `packages/core/src/nudges/run.ts` | Add rules to `packages/method/src/triggers.ts`. Do not add a second decision path beside `decideSuppression` |
 | `packages/method` | Both lanes add rules | Any change is a message to the other lane. It is the one shared package with real risk |
-| Migration numbers | Both lanes add tables | The tree is at **0040**; the next free number is **0041**. Agree it before writing the file when both lanes have one in flight. 0029 is a permanent gap from an earlier collision, and P4-T05b was renumbered 0037 to 0039 mid-task after Obed took 0037 and 0038 the same day: **check `ls packages/db/migrations` again immediately before you commit**, not only when you start |
+| Migration numbers | Both lanes add tables | The tree is at **0041**; the next free number is **0042**. 0029 is a permanent gap from an earlier collision. **This has now collided twice.** P4-T05b was renumbered 0037 to 0039 after the sessions lane took 0037 and 0038 the same day, and P4-T08 was renumbered 0039 to 0041 during its merge because it was cut from a base that predated 0039 and 0040. Neither author could have seen the other's number, which is why "check before you start" does not work: **the rule is that whoever merges renumbers, and the merge is where the collision is resolved.** Check `ls packages/db/migrations` immediately before you commit as well as when you start |
 
 ## File ownership
 
