@@ -13,8 +13,14 @@ export {
   readRunState,
 } from "./run-executor.ts";
 export {
+  CHAMPION_CYCLE_CRON,
+  CHAMPION_CYCLE_JOB,
+  CHAMPION_DAILY_CRON,
+  CHAMPION_DAILY_JOB,
   CHAMPION_HOURLY_CRON,
   CHAMPION_HOURLY_JOB,
+  CHAMPION_WEEKLY_CRON,
+  CHAMPION_WEEKLY_JOB,
   registerAgentSchedules,
 } from "./schedule.ts";
 export {

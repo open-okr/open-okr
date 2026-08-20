@@ -37,6 +37,11 @@ const SCHEDULE_LABEL: Record<string, string> = {
   continuous: "On every write",
   nightly: "Nightly",
   hourly: "On the hour",
+  // Added with the two schedule values P4-T05b opened up. A schedule with no
+  // label here would have rendered the raw enum, which is the kind of leak a
+  // map like this exists to prevent.
+  daily: "Once a day",
+  weekly: "Once a week",
 };
 
 export default async function AgentsPage() {

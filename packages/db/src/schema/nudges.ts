@@ -27,6 +27,13 @@ export const NUDGE_SUBJECT_TYPES = [
   "kpi",
   "session",
   "cycle",
+  /**
+   * The member themselves, for a nudge that is about a person's day rather
+   * than about a row (P4-T05b's morning summary). It exists so deduplication
+   * is per person per day without a second mechanism, and so nothing has to
+   * store a member id under `goal`.
+   */
+  "member",
 ] as const;
 export type NudgeSubjectType = (typeof NUDGE_SUBJECT_TYPES)[number];
 

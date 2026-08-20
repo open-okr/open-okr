@@ -83,13 +83,18 @@ const RULE_FOR_STEP: Record<number, string> = {
 /**
  * Which member holds a role for a goal.
  *
+ * Exported since P4-T05b, because the blocker ladder resolves the same four
+ * roles against the same goal columns. A second copy of "the coordinator falls
+ * back to the manager, and the sponsor lives on the cycle" is how two ladders
+ * end up escalating to different people from the same row.
+ *
  * The champion and the reviewer are columns. The coordinator and the sponsor are
  * space roles, and where a space has no coordinator the role resolves to the
  * space manager (TECHNICAL-PLAN §4.2). A role nobody holds resolves to nothing
  * rather than to somebody arbitrary: escalating to a person who was never given
  * the job is worse than not escalating.
  */
-async function memberForRole(
+export async function memberForRole(
   tx: WorkspaceTx,
   goal: {
     readonly championId: string | null;
@@ -610,7 +615,7 @@ export async function dueAcknowledgementNudges(
 }
 
 /** The role columns a goal carries, for resolving a ladder target. */
-async function goalRolesFor(
+export async function goalRolesFor(
   tx: WorkspaceTx,
   workspaceId: string,
   goalId: string,

@@ -30,6 +30,8 @@ export const AGENT_SCHEDULES = [
   "continuous",
   "nightly",
   "hourly",
+  "daily",
+  "weekly",
 ] as const;
 export const AGENT_AUTONOMIES = [
   "sandbox",

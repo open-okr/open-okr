@@ -274,6 +274,7 @@ The only exceptions are the instance connections that describe the deployment it
 | Member primary channel | Email, beside the always-on in-app inbox, until a chat identity is linked |
 | Member quiet hours | 19:00 to 08:00 in the member's own timezone |
 | Member notifications | Mentions immediate, everything else batched in a 30-minute window, daily summary on at 08:00 local |
+| Member daily summary | The row above, stored as `notification_settings.daily_summary` and `daily_summary_time` since P2-T06 and read by the Champion's daily run since P4-T05b. On at 08:00 local rather than off: this row is the default and it outranks AI-NATIVE-PLAN.md §6.4's "everyone opted in", which reads as opt-out in practice. The row is created lazily, so a member who has never opened their settings still gets the summary from the table's own defaults |
 | Member language, theme, density | The workspace default language, system theme, comfortable density |
 | Member timezone | The browser timezone at first sign-in, falling back to the workspace timezone |
 

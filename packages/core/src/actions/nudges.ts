@@ -1,18 +1,16 @@
 import {
   activeOnly,
-  notifications,
   nudges,
   type WorkspaceTx,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import type { SuppressionReason } from "@openokr/method";
 import { and, count, desc, eq, gte, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
-import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { readRhythmRow } from "../cycles/service.ts";
 import { runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/errors.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -50,10 +48,15 @@ export const runNudges = defineWriteAction({
     async execute({ tx, workspaceId }) {
       const at = input.now ? new Date(input.now) : new Date();
       // One implementation, shared with the Champion's hourly run (P4-T05a).
-      const result = await runDueNudgesInTx(tx as WorkspaceTx, {
-        workspaceId,
-        at,
-      });
+      // This action stays the hourly queue: it is what P4-T04a built and what
+      // `nudges.run` means to every caller. The other three cadences are the
+      // Champion's, reachable through `agents.runChampion`, because a run that
+      // swept staleness under the name "run the nudges" would write to goals
+      // from an action nobody expected to.
+      const { staleFlipped: _sweep, ...result } = await runDueNudgesInTx(
+        tx as WorkspaceTx,
+        { workspaceId, at, cadence: "hourly" },
+      );
 
       return {
         result,

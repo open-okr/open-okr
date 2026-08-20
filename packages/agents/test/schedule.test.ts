@@ -1,8 +1,14 @@
 import type { JobHandler, JobOptions, JobQueue } from "@openokr/adapters";
 import { describe, expect, it } from "vitest";
 import {
+  CHAMPION_CYCLE_CRON,
+  CHAMPION_CYCLE_JOB,
+  CHAMPION_DAILY_CRON,
+  CHAMPION_DAILY_JOB,
   CHAMPION_HOURLY_CRON,
   CHAMPION_HOURLY_JOB,
+  CHAMPION_WEEKLY_CRON,
+  CHAMPION_WEEKLY_JOB,
   registerAgentSchedules,
 } from "../src/schedule.ts";
 
@@ -40,12 +46,28 @@ class RecordingQueue implements JobQueue {
 }
 
 describe("the agent schedules", () => {
-  it("registers the Champion on the hour", async () => {
+  it("registers all four of §6.2's Champion cadences", async () => {
     const queue = new RecordingQueue();
     await registerAgentSchedules(queue);
     expect(queue.scheduled).toEqual([
       { name: CHAMPION_HOURLY_JOB, cron: CHAMPION_HOURLY_CRON },
+      { name: CHAMPION_DAILY_JOB, cron: CHAMPION_DAILY_CRON },
+      { name: CHAMPION_WEEKLY_JOB, cron: CHAMPION_WEEKLY_CRON },
+      { name: CHAMPION_CYCLE_JOB, cron: CHAMPION_CYCLE_CRON },
     ]);
+  });
+
+  it("gives each cadence its own minute, so four runs never contend", async () => {
+    // Not cosmetic: two schedules on the same minute would open two
+    // transactions against the same workspace, and a run log read by minute
+    // could not say which clock spoke.
+    const minutes = [
+      CHAMPION_HOURLY_CRON,
+      CHAMPION_DAILY_CRON,
+      CHAMPION_WEEKLY_CRON,
+      CHAMPION_CYCLE_CRON,
+    ].map((cron) => cron.split(" ")[0]);
+    expect(new Set(minutes).size).toBe(4);
   });
 
   it("declares a recurrence and enqueues nothing", async () => {
@@ -63,7 +85,7 @@ describe("the agent schedules", () => {
     // Two calls, two `schedule` calls: the port registers or replaces, so the
     // driver holds one. This asserts the product does not try to be clever
     // about it by tracking registration state of its own.
-    expect(queue.scheduled).toHaveLength(2);
-    expect(new Set(queue.scheduled.map((row) => row.name)).size).toBe(1);
+    expect(queue.scheduled).toHaveLength(8);
+    expect(new Set(queue.scheduled.map((row) => row.name)).size).toBe(4);
   });
 });

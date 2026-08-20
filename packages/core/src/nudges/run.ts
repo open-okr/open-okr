@@ -1,33 +1,60 @@
 /**
- * One nudge run, shared by the action and by the Champion (P4-T05a).
+ * One nudge run, shared by the action and by the Champion (P4-T05a, P4-T05b).
  *
  * P4-T04a put this inside the `nudges.run` action, where it was the only
- * caller. The Champion's hourly run is the second, and a second copy of "decide
+ * caller. The Champion's runs are the others, and a second copy of "decide
  * what is due, decide what to suppress, write the rows" is exactly the drift
  * the suppression rules cannot survive: two callers disagreeing about whether a
  * nudge was held would produce a product that is quiet for one path and noisy
  * for the other.
+ *
+ * P4-T05b added the cadence. AI-NATIVE-PLAN.md §6.2 gives the Champion four,
+ * and **only the readers change between them**: the suppression decision, the
+ * active-member filter, the row writing and the inbox insert are one path for
+ * all four, below. A cadence holding its own copy of any of that is how a
+ * morning summary ends up ignoring quiet hours.
  *
  * It takes a transaction and writes on it. Both callers are Operations, so the
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
 import { notifications, type WorkspaceTx } from "@openokr/db";
 import type { SuppressionReason } from "@openokr/method";
+import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
   activeMemberIds,
+  type DueNudge,
   decideSuppression,
   dueAcknowledgementNudges,
   dueCheckInNudges,
   loadSuppressionContext,
   recordNudgesInTx,
 } from "./service.ts";
+import {
+  dueBlockerNudges,
+  dueDailyDigestNudges,
+  dueKpiCorridorNudges,
+} from "./sweep.ts";
+
+/**
+ * Which of §6.2's four Champion cadences this run is.
+ *
+ * `hourly` is the nudge queue and is the default, so every caller written
+ * before P4-T05b keeps the behaviour it had. The other three each read a
+ * different set of rows and none of them overlaps another: a nudge fired twice
+ * by two cadences would be held by the deduplication window, but the run log
+ * would still show a product that could not say which clock speaks when.
+ */
+export type NudgeCadence = "hourly" | "daily" | "weekly" | "cycle";
 
 export interface NudgeRunInput {
   readonly workspaceId: string;
   /** The moment the run is for. Never read from a clock in here. */
   readonly at: Date;
+  /** Defaults to `hourly`, which is what P4-T04a and P4-T05a both meant. */
+  readonly cadence?: NudgeCadence;
 }
 
 export interface NudgeRunResult {
@@ -35,6 +62,15 @@ export interface NudgeRunResult {
   /** Written with a reason and never sent. Noise the product chose to hold. */
   readonly suppressed: number;
   readonly ruleKeys: readonly string[];
+  /**
+   * Goals whose health the daily sweep flipped to `outdated`.
+   *
+   * Zero for every other cadence. Reported rather than counted into `recorded`
+   * because flipping a goal's health is a write to the domain, not a message to
+   * a person, and a run log adding the two together could not say which
+   * happened.
+   */
+  readonly staleFlipped: number;
 }
 
 export async function runDueNudgesInTx(
@@ -42,25 +78,67 @@ export async function runDueNudgesInTx(
   input: NudgeRunInput,
 ): Promise<NudgeRunResult> {
   const { workspaceId, at } = input;
+  const cadence = input.cadence ?? "hourly";
   const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
   const timeZone = await workspaceTimeZone(tx, workspaceId);
 
-  // Two ladders with rows to run against. The third, blockers, is a pure
-  // function tested beside these two and has nothing to read until P4-T07c
-  // creates the table.
-  const due = [
-    ...(await dueCheckInNudges(tx, {
-      workspaceId,
-      now: at,
-      timeZone,
-      thresholds,
-    })),
-    ...(await dueAcknowledgementNudges(tx, {
-      workspaceId,
-      now: at,
-      thresholds,
-    })),
-  ];
+  let staleFlipped = 0;
+  const due: DueNudge[] = [];
+
+  if (cadence === "hourly") {
+    // Two ladders with rows to run against. The third, blockers, is a pure
+    // function tested beside these two and has nothing to read until P4-T07c
+    // creates the table.
+    due.push(
+      ...(await dueCheckInNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+      })),
+      ...(await dueAcknowledgementNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+      })),
+    );
+  }
+
+  if (cadence === "daily") {
+    // The staleness sweep, and it is P3-T06's function rather than a second
+    // one. `pnpm cadence:sweep` calls the same code, so a health flip means the
+    // same thing whether a human typed the command or the agent reached it. It
+    // writes on this transaction, so the flip and this run's audit row commit
+    // together.
+    staleFlipped = (await sweepStaleness(tx, workspaceId, thresholds, at))
+      .flipped;
+    due.push(
+      ...(await dueBlockerNudges(tx, { workspaceId, now: at, thresholds })),
+      ...(await dueKpiCorridorNudges(tx, { workspaceId, thresholds })),
+      ...(await dueDailyDigestNudges(tx, {
+        workspaceId,
+        now: at,
+        workspaceTimeZone: timeZone,
+      })),
+    );
+  }
+
+  if (cadence === "weekly") {
+    due.push(
+      ...(await dueSessionNudges(tx, { workspaceId, now: at, thresholds })),
+    );
+  }
+
+  if (cadence === "cycle") {
+    due.push(
+      ...(await dueCycleNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+      })),
+    );
+  }
 
   // A suspended member is never nudged. §4.3's access getter excludes them from
   // every read, and a nudge to somebody who cannot open the product is an email
@@ -117,6 +195,11 @@ export async function runDueNudgesInTx(
       workspaceId,
       recipientMemberId: entry.recipientMemberId,
       nudgeId: written.id,
+      // The notifications table's reason list predates the four cadences, and
+      // every nudge on any of them is a reminder about something the recipient
+      // owes. One reason across all four keeps the inbox honest about what it
+      // is: a list of obligations, not a taxonomy of clocks. The rule key on
+      // the nudge row is what says which trigger fired.
       reason: "check_in",
       channel: entry.channel,
       sentAt: at,
@@ -127,6 +210,7 @@ export async function runDueNudgesInTx(
   return {
     recorded: sent,
     suppressed: ids.length - sent,
+    staleFlipped,
     ruleKeys: [
       ...new Set(
         decided

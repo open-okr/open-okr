@@ -37,14 +37,26 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
-import { runDueNudgesInTx } from "../nudges/run.ts";
+import { type NudgeCadence, runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
 
-/** What the Champion's hourly run records as its trigger. */
-const CHAMPION_HOURLY_TRIGGER = "schedule.hourly";
+/**
+ * What each of the Champion's four runs records as its trigger (P4-T05b).
+ *
+ * One string per cadence, so `agent_runs` can be read by clock: an
+ * administrator asking "did the countdown fire this week" gets an answer, which
+ * a single `schedule.champion` trigger could not give. The strings match
+ * AI-NATIVE-PLAN.md §6.2's own four rows.
+ */
+const CHAMPION_TRIGGERS = {
+  hourly: "schedule.hourly",
+  daily: "schedule.daily",
+  weekly: "schedule.weekly",
+  cycle: "schedule.cycle",
+} as const satisfies Record<NudgeCadence, string>;
 
 const agentOutput = z.object({
   id: z.uuid(),
@@ -709,6 +721,11 @@ export const runChampion = defineWriteAction({
   input: z.object({
     /** Defaults to the moment the request arrives. Overridden by tests. */
     now: z.string().optional(),
+    /**
+     * Which of §6.2's four cadences to run, defaulting to the hourly nudge
+     * queue so every caller written before P4-T05b keeps its behaviour.
+     */
+    cadence: z.enum(["hourly", "daily", "weekly", "cycle"]).optional(),
   }),
   output: z.object({
     runId: z.uuid(),
@@ -716,6 +733,8 @@ export const runChampion = defineWriteAction({
     recorded: z.number().int(),
     suppressed: z.number().int(),
     ruleKeys: z.array(z.string()),
+    /** Goals the daily sweep flipped to `outdated`. Zero for the other three. */
+    staleFlipped: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -754,6 +773,8 @@ export const runChampion = defineWriteAction({
     },
     async execute({ tx, workspaceId, loaded }) {
       const at = input.now ? new Date(input.now) : new Date();
+      const cadence: NudgeCadence = input.cadence ?? "hourly";
+      const trigger = CHAMPION_TRIGGERS[cadence];
       const log: AgentRunLogEntry[] = [];
       const stamp = at.toISOString();
 
@@ -774,7 +795,7 @@ export const runChampion = defineWriteAction({
           .values({
             workspaceId,
             agentId: loaded.agentId,
-            trigger: CHAMPION_HOURLY_TRIGGER,
+            trigger,
             // Cancelled, not failed. A limit the workspace chose is not an
             // error, and paging somebody about their own setting is how a
             // product teaches people to ignore it.
@@ -793,6 +814,7 @@ export const runChampion = defineWriteAction({
             recorded: 0,
             suppressed: 0,
             ruleKeys: [] as string[],
+            staleFlipped: 0,
           },
           activity: {
             // The catalogue already has this kind, from the manual cancel
@@ -801,13 +823,17 @@ export const runChampion = defineWriteAction({
             kind: "agent.run_cancelled",
             subjectType: "workspace",
             subjectId: workspaceId,
-            payload: { trigger: CHAMPION_HOURLY_TRIGGER, reason: "cost_cap" },
+            payload: { trigger, reason: "cost_cap" },
           },
           audit: {
             action: "agents.runChampion",
             targetType: "workspace",
             targetId: workspaceId,
-            payload: { status: "cancelled", capUsd: loaded.costCapUsd },
+            payload: {
+              status: "cancelled",
+              capUsd: loaded.costCapUsd,
+              trigger,
+            },
           },
         };
       }
@@ -815,6 +841,7 @@ export const runChampion = defineWriteAction({
       const run = await runDueNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
         at,
+        cadence,
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -834,6 +861,17 @@ export const runChampion = defineWriteAction({
         kind: "applied",
         message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
       });
+      if (run.staleFlipped > 0) {
+        // The one thing a run does that is not a message. It earns its own line
+        // for the same reason each rule key does: a count of nudges cannot say
+        // that four goals also went outdated.
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 1,
+          kind: "applied",
+          message: `cadence.staleness: ${run.staleFlipped} goals flipped to outdated.`,
+        });
+      }
 
       // openokr:allow-mutation: the operation's own execute.
       const [row] = await tx
@@ -841,7 +879,7 @@ export const runChampion = defineWriteAction({
         .values({
           workspaceId,
           agentId: loaded.agentId,
-          trigger: CHAMPION_HOURLY_TRIGGER,
+          trigger,
           status: "completed",
           tasks: [],
           log,
@@ -858,13 +896,14 @@ export const runChampion = defineWriteAction({
           recorded: run.recorded,
           suppressed: run.suppressed,
           ruleKeys: [...run.ruleKeys],
+          staleFlipped: run.staleFlipped,
         },
         activity: {
           kind: "agent.run_completed",
           subjectType: "workspace",
           subjectId: workspaceId,
           payload: {
-            trigger: CHAMPION_HOURLY_TRIGGER,
+            trigger,
             recorded: run.recorded,
           },
         },
@@ -872,7 +911,7 @@ export const runChampion = defineWriteAction({
           action: "agents.runChampion",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { status: "completed", recorded: run.recorded },
+          payload: { status: "completed", recorded: run.recorded, trigger },
         },
       };
     },

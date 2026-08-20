@@ -499,8 +499,9 @@ Acceptance: Given the agent enabled with AI off, when the hourly run executes, t
 Depends on: P4-T05a
 Goal: the rhythm the agent guards day to day.
 Deliverables: the daily sweep covering staleness, blocker aging, KPI corridors and the morning summary; the weekly session lifecycle; the per-cycle countdown and review preparation.
-Test plan: a goal past its staleness grace produces exactly one sweep nudge; a blocker aging past its clock escalates; the countdown fires on its own schedule and not on the sweep's.
-Acceptance: Given a goal three days past its staleness grace, when the daily sweep runs, then its champion is nudged once with the rule key that fired.
+Test plan: a goal past its staleness grace is flipped to outdated exactly once; a blocker aging past its clock escalates; the countdown fires on its own schedule and not on the sweep's.
+Acceptance: Given a goal three days past its staleness grace, when the daily sweep runs, then that goal reads outdated, a second run changes nothing, and the hourly queue is what nudges its champion.
+Correction, made at P4-T05b: this card asked for the daily sweep to nudge the champion. AI-NATIVE-PLAN.md §6.2 puts the check-in nudge in the **hourly** queue and gives the daily run the staleness sweep, which flips health rather than sending a message. §6.2 outranks this document, so the criterion above is the one that was built. A daily run that also chased check-ins would mean two cadences reading the same rows and a run log that could not say which clock spoke.
 
 ### P4-T05c: Champion proposals for check-ins and recovery [M]
 Depends on: P4-T05b

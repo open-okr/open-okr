@@ -346,3 +346,69 @@ with a specific reason, and dismissing it on one side dismisses it everywhere.
 
 Given a simulated month against the demo workspace, when the nudge engine runs
 daily, then the total nudge count per member stays under the SS11 volume ceiling.
+
+## 10. What P4-T05b built, and where it departs from §2.1
+
+Written when the daily, weekly and per-cycle runs landed. §2.1's table stands;
+this records what is behind each row today so nobody reads the table as a claim
+about what runs.
+
+| §2.1 row | Built | Not built, and why |
+|---|---|---|
+| Hourly: the nudge queue | P4-T05a, whole | |
+| Daily: morning summary | Yes, at the member's own local hour | |
+| Daily: staleness sweep | Yes, calling P3-T06's `sweepStaleness` on the run's transaction | |
+| Daily: blocker aging | Yes, over P4-T07c's `blockers` table | Nothing stamps `escalated_at`: a nudge reader writing it would record an escalation as though somebody had acted |
+| Daily: KPI corridor checks | Yes, all four §6.4 triggers | |
+| Weekly: open and close the session | The three lifecycle messages | The digest and the streak are P4-T08's, which is the task that builds a digest table and a streak engine |
+| Per cycle: planning countdown | Yes, five rules | `cycle.phase_blocked` needs gate state rather than a date, and belongs to the Coach at P4-T06a |
+| Per cycle: review preparation pack | The `cycle.review_due` message | The pack itself is P4-T11's content. This says it is time; it assembles nothing |
+
+**Three decisions worth carrying forward.**
+
+**The morning summary's preference is `notification_settings`.**
+`daily_summary` and `daily_summary_time` have been there since P2-T06,
+defaulting to on at 08:00 in the member's own timezone, which is what
+TECHNICAL-PLAN §4.14 specifies. §6.4's "opted-in members" therefore reads as
+opt-out. The row is created lazily, so the reader left joins and falls back to
+the table's own defaults.
+
+**`session.missed` is one day wide.** §6.4 says "1 day after missed session" and
+§11 has no parameter for it. The condition is the plain fact that the scheduled
+day passed with the session never opened, and the window closes at forty-eight
+hours. A permanent `missed` state would nudge about a session from March every
+day until somebody deleted the row.
+
+**Urgency is read from the trigger catalogue, never chosen per call site.**
+`urgent` bypasses quiet mode, the member's quiet hours *and* the weekly ceiling,
+so a message that repeats daily and is also urgent is unbounded noise. Only a
+trigger the catalogue marks as escalating earns the bypass, and never on the
+owner's own copy of it. `kpi.unhealthy` and `cycle.closing` both repeat for as
+long as their condition holds and are both non-urgent for that reason.
+
+### 10.1 Acceptance criteria
+
+Given a goal three days past its staleness grace, when the daily run executes,
+then that goal reads `outdated`, a second run changes nothing, and no check-in
+nudge is produced by that run.
+
+Given a blocker opened twenty-five hours ago, when the daily run executes, then
+`blocker.overdue` reaches its named owner and at least one member other than the
+owner, at escalation step 2.
+
+Given a blocker that has been resolved, when the daily run executes at any point
+on its clock, then no blocker nudge is produced.
+
+Given a member whose local time is their configured summary hour, when the daily
+run executes, then they receive one `digest.daily` nudge whose subject is
+themselves; at any other local hour they receive none.
+
+Given a weekly session nobody opened, when the weekly run executes on the
+following day, then its facilitator is told once; two days later, nothing.
+
+Given a publication deadline fourteen days away, when the per-cycle run
+executes, then the sponsor and the facilitator are each told once, and on the
+following day neither is told again.
+
+Given a cycle past its end date with status `active`, when the per-cycle run
+executes, then the close is chased; once the cycle reads `closed`, it is not.
