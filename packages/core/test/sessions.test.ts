@@ -22,6 +22,8 @@ let cycleId: string;
 let spaceId: string;
 let facilitatorMemberId: string;
 let memberMemberId: string;
+let goalId: string;
+let keyResultId: string;
 
 const context = (userId = FACILITATOR) => ({
   workspaceId,
@@ -371,5 +373,270 @@ describe("sessions.participants", () => {
     const list = participants as Array<{ memberId: string }>;
     expect(list.some((p) => p.memberId === facilitatorMemberId)).toBe(true);
     expect(list.some((p) => p.memberId === memberMemberId)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07b: The confidence round
+// ---------------------------------------------------------------------------
+
+/** Helper: create a goal with one KR for confidence round testing. */
+async function createGoalWithKr(): Promise<void> {
+  const wb = await workerDb();
+  const goal = await callAction(
+    { pool: wb.appPool, ...context() },
+    "goals.create",
+    {
+      title: "Grow monthly active users by 20 percent",
+      cycleId,
+      spaceId,
+      level: "company",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      reviewerId: memberMemberId,
+      weight: 1,
+    },
+  );
+  goalId = (goal as { id: string }).id;
+
+  const kr = await callAction(
+    { pool: wb.appPool, ...context() },
+    "goals.addKeyResult",
+    {
+      goalId,
+      title: "Monthly active users from 50k to 60k",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 50000,
+      targetValue: 60000,
+      weight: 1,
+    },
+  );
+  keyResultId = (kr as { id: string }).id;
+}
+
+/** Helper: create a session and open it at stage 1 (confidence). */
+async function openSessionAtConfidence(): Promise<string> {
+  const wb = await workerDb();
+  const session = await createSession();
+  const sessionId = (session as { id: string }).id;
+  await callAction({ pool: wb.appPool, ...context() }, "sessions.open", {
+    id: sessionId,
+  });
+  return sessionId;
+}
+
+describe("sessions.castVote (P4-T07b)", () => {
+  it("stores a vote tied to the session", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    const vote = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.6 },
+    );
+
+    expect((vote as { id: string }).id).toBeTruthy();
+  });
+
+  it("upserts: a second vote on the same KR replaces the first", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.4,
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.7,
+    });
+
+    const votes = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.votes",
+      { sessionId, keyResultId },
+    );
+    const list = votes as Array<{ confidence: number }>;
+    expect(list).toHaveLength(1);
+    expect(Number(list[0]?.confidence)).toBe(0.7);
+  });
+});
+
+describe("sessions.revealVotes (P4-T07b)", () => {
+  it("reveals all votes for a KR atomically", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.5,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.3 },
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+
+    expect((result as { revealed: number }).revealed).toBe(2);
+  });
+});
+
+describe("sessions.confirmConfidence (P4-T07b)", () => {
+  it("stores confirmed confidence and the what-changed note", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    // Vote and reveal first.
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.5,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confirmConfidence",
+      {
+        sessionId,
+        keyResultId,
+        confidence: 0.6,
+        whatChanged: "Pipeline grew by 15 percent this week",
+      },
+    );
+
+    expect((result as { id: string }).id).toBeTruthy();
+  });
+});
+
+describe("sessions.advanceStage — confidence completion gate (P4-T07b)", () => {
+  it("is refused when a KR has no confirmed confidence (acceptance criterion)", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    // No confidence confirmed. Advancing should fail naming the KR.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+      }),
+    ).rejects.toThrow(/Monthly active users/);
+  });
+
+  it("succeeds when all KRs are confirmed", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.5,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confirmConfidence",
+      {
+        sessionId,
+        keyResultId,
+        confidence: 0.6,
+        whatChanged: "Pipeline grew by 15 percent this week",
+      },
+    );
+
+    // Now advancing should succeed.
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+
+    expect((result as { id: string }).id).toBe(sessionId);
+  });
+});
+
+describe("sessions.votes — privacy (P4-T07b)", () => {
+  it("returns own vote only before reveal", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    // Facilitator votes.
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.5,
+    });
+    // Member votes.
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.3 },
+    );
+
+    // Member reads: should see only their own vote.
+    const memberVotes = (await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.votes",
+      { sessionId, keyResultId },
+    )) as Array<{ confidence: number }>;
+
+    expect(memberVotes).toHaveLength(1);
+    expect(Number(memberVotes[0]?.confidence)).toBe(0.3);
+  });
+
+  it("returns all votes after reveal", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.castVote", {
+      sessionId,
+      keyResultId,
+      confidence: 0.5,
+    });
+    await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.castVote",
+      { sessionId, keyResultId, confidence: 0.3 },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.revealVotes",
+      { sessionId, keyResultId },
+    );
+
+    // Member reads: should now see both votes.
+    const memberVotes = (await callAction(
+      { pool: wb.appPool, ...context(MEMBER) },
+      "sessions.votes",
+      { sessionId, keyResultId },
+    )) as Array<{ confidence: number }>;
+
+    expect(memberVotes).toHaveLength(2);
   });
 });

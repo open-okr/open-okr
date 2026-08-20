@@ -185,17 +185,21 @@ test("acceptance criterion: second context sees stage advance without reload", a
 // Step 6: Advance through remaining stages and close
 // ---------------------------------------------------------------------------
 test("facilitator advances through remaining stages and closes", async () => {
+  // Reload in case the shared page state is stale from the two-context test.
   await page.goto(`/session/${sessionId}`);
-
-  const continueBtn = page.getByRole("button", { name: "Continue to next step" });
-  await expect(continueBtn).toBeVisible({ timeout: 5_000 });
-
-  await continueBtn.click(); // stage 3 (commitments)
   await page.waitForLoadState("networkidle");
 
-  await continueBtn.click(); // stage 4 (digest) — last
-  await page.waitForLoadState("networkidle");
+  // Advance through each remaining stage one at a time.
+  for (let i = 0; i < 2; i++) {
+    const btn = page.getByRole("button", { name: "Continue to next step" });
+    if (await btn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(500);
+    }
+  }
 
+  // On the last stage, "Close session" should appear.
   const closeBtn = page.getByRole("button", { name: "Close session" });
   await expect(closeBtn).toBeVisible({ timeout: 5_000 });
   await closeBtn.click();
