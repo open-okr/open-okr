@@ -744,6 +744,8 @@ export const runChampion = defineWriteAction({
     staleFlipped: z.number().int(),
     /** Changes written into the review queue, pending a human (P4-T05c-a). */
     proposed: z.number().int(),
+    /** Always zero here: divergence is the Coach's sweep (P4-T06b-a). */
+    diverged: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -825,6 +827,7 @@ export const runChampion = defineWriteAction({
             ruleKeys: [] as string[],
             staleFlipped: 0,
             proposed: 0,
+            diverged: 0,
           },
           activity: {
             // The catalogue already has this kind, from the manual cancel
@@ -937,6 +940,7 @@ export const runChampion = defineWriteAction({
           ruleKeys: [...run.ruleKeys],
           staleFlipped: run.staleFlipped,
           proposed: run.proposed,
+          diverged: run.diverged,
         },
         activity: {
           kind: "agent.run_completed",
@@ -990,6 +994,8 @@ export const runCoach = defineWriteAction({
     recorded: z.number().int(),
     suppressed: z.number().int(),
     ruleKeys: z.array(z.string()),
+    /** Divergence findings written or refreshed (P4-T06b-a). */
+    diverged: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -1053,6 +1059,16 @@ export const runCoach = defineWriteAction({
         kind: "applied",
         message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
       });
+      if (run.diverged > 0) {
+        // A finding is not a message, so it earns its own line. A count of
+        // nudges cannot say that four goals disagree with their own data.
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 1,
+          kind: "applied",
+          message: `quality.divergence: ${run.diverged} finding(s) written or refreshed.`,
+        });
+      }
 
       // openokr:allow-mutation: the operation's own execute. Not `activeOnly`:
       // `agent_runs` carries no `deleted_at`.
@@ -1068,6 +1084,7 @@ export const runCoach = defineWriteAction({
           recorded: run.recorded,
           suppressed: run.suppressed,
           ruleKeys: [...run.ruleKeys],
+          diverged: run.diverged,
         },
         activity: {
           kind: "agent.run_completed",

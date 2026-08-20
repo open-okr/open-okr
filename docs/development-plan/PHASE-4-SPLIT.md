@@ -102,7 +102,8 @@ and this table is what was agreed.
 | P4-T05c-a | The proposal path, and the recovery proposal | Agung | in_review |
 | P4-T05c-b | AI drafting inside the proposal | Agung | blocked, needs a provider key |
 | P4-T06a | The Coach agent and write-triggered evaluation | Agung | in_review |
-| P4-T06b | The nightly semantic sweep and the finding table | Agung | todo |
+| P4-T06b-a | Divergence findings, and the shared reconciler | Agung | in_review |
+| P4-T06b-b | The nightly semantic sweep | Agung | blocked, needs a provider key |
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
 | P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | in_review |
@@ -170,7 +171,7 @@ keys are already in the catalogue, so nothing about the method changes.
 | Blockers | Resolved. P4-T07c created the table, P4-T05b reads it, the ladder was already there | Held: the ladder was read, not rewritten, and no second table was defined. P4-T05b also leaves `escalated_at` and `escalated_to_id` alone, because a nudge reader writing them would record an escalation as though somebody had acted on it |
 | The nudge engine | Every rhythm trigger and every session trigger records a nudge through `packages/core/src/nudges/run.ts` | Add rules to `packages/method/src/triggers.ts`. Do not add a second decision path beside `decideSuppression` |
 | `packages/method` | Both lanes add rules | Any change is a message to the other lane. It is the one shared package with real risk |
-| Migration numbers | Both lanes add tables | The tree is at **0041**; the next free number is **0042**. 0029 is a permanent gap from an earlier collision. **This has now collided twice.** P4-T05b was renumbered 0037 to 0039 after the sessions lane took 0037 and 0038 the same day, and P4-T08 was renumbered 0039 to 0041 during its merge because it was cut from a base that predated 0039 and 0040. Neither author could have seen the other's number, which is why "check before you start" does not work: **the rule is that whoever merges renumbers, and the merge is where the collision is resolved.** Check `ls packages/db/migrations` immediately before you commit as well as when you start |
+| Migration numbers | Both lanes add tables | The tree is at **0042**; the next free number is **0043**. 0029 is a permanent gap from an earlier collision. **This has now collided twice.** P4-T05b was renumbered 0037 to 0039 after the sessions lane took 0037 and 0038 the same day, and P4-T08 was renumbered 0039 to 0041 during its merge because it was cut from a base that predated 0039 and 0040. Neither author could have seen the other's number, which is why "check before you start" does not work: **the rule is that whoever merges renumbers, and the merge is where the collision is resolved.** Check `ls packages/db/migrations` immediately before you commit as well as when you start |
 
 ## File ownership
 

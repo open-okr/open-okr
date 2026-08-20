@@ -25,6 +25,7 @@ import {
 } from "@openokr/db";
 import type { SuppressionReason } from "@openokr/method";
 import { desc, eq, ne } from "drizzle-orm";
+import { sweepDivergenceInTx } from "../alignment/divergence.ts";
 import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -103,6 +104,15 @@ export interface NudgeRunResult {
   readonly staleFlipped: number;
   /** Changes written into the review queue, pending a human. */
   readonly proposed: number;
+  /**
+   * Divergence findings the quality sweep wrote or refreshed.
+   *
+   * Zero for every other cadence. Reported separately from `recorded` for the
+   * same reason `staleFlipped` is: a finding is a row in the findings table, not
+   * a message, and a reader asking "what did the Coach notice" is asking
+   * something different from "what did it say".
+   */
+  readonly diverged: number;
 }
 
 /**
@@ -141,6 +151,7 @@ export async function runDueNudgesInTx(
   const timeZone = await workspaceTimeZone(tx, workspaceId);
 
   let staleFlipped = 0;
+  let diverged = 0;
   const due: DueNudge[] = [];
 
   if (cadence === "hourly") {
@@ -195,6 +206,15 @@ export async function runDueNudgesInTx(
   }
 
   if (cadence === "quality") {
+    // The sweep runs before the reader, so a divergence raised by this run is
+    // a message from this run rather than from the next one. Both are on this
+    // transaction, so the finding and the nudge about it commit together.
+    const cycleId = (await openCycleId(tx, workspaceId)).cycleId;
+    if (cycleId) {
+      diverged = (
+        await sweepDivergenceInTx(tx, { workspaceId, cycleId, thresholds })
+      ).found;
+    }
     due.push(...(await dueQualityNudges(tx, { workspaceId, thresholds })));
   }
 
@@ -281,6 +301,7 @@ export async function runDueNudgesInTx(
     recorded: sent,
     suppressed: ids.length - sent,
     staleFlipped,
+    diverged,
     // Distinct rows, not linked nudges: two nudges pointing at one already
     // pending proposal proposed nothing new, and counting them twice would
     // report activity the run did not cause.

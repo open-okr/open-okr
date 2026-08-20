@@ -31,6 +31,15 @@ export const ALIGNMENT_FINDING_KINDS = [
   "dependency",
   "conflict",
   "gap",
+  /**
+   * Reported health against the goal's own data (P4-T06b-a).
+   *
+   * Not one of METHOD.md §5.3's four semantic types, which are judgements the
+   * Coach makes by reading content. This one is arithmetic, so it gets its own
+   * kind rather than being filed under `gap`: a reader filtering by kind should
+   * not find a deterministic finding among semantic ones.
+   */
+  "divergence",
 ] as const;
 export type AlignmentFindingKind = (typeof ALIGNMENT_FINDING_KINDS)[number];
 

@@ -154,6 +154,64 @@ export async function dueQualityNudges(
     due.push(...(await dependencyNudges(tx, input.workspaceId, goal)));
   }
   due.push(...(await findingNudges(tx, input.workspaceId, open)));
+  due.push(...(await divergenceNudges(tx, input.workspaceId, open)));
+  return due;
+}
+
+/**
+ * The divergence findings the sweep wrote, as messages (P4-T06b-a).
+ *
+ * Reads the rows rather than re-deriving the condition, which is the whole
+ * reason the sweep writes them: the finding is the record, the nudge is the
+ * message about it, and a nudge that re-decided would be able to disagree with
+ * the row it points at.
+ *
+ * Open findings only. A dismissed one was a facilitator saying "I know, and I
+ * am not acting on it", and nudging about it afterwards is how a dismissal stops
+ * meaning anything.
+ */
+async function divergenceNudges(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  open: readonly {
+    readonly id: string;
+    readonly championId: string | null;
+  }[],
+): Promise<readonly DueNudge[]> {
+  const rows = await tx
+    .select({ subjectGoalId: alignmentFindings.subjectGoalId })
+    .from(alignmentFindings)
+    .where(
+      activeOnly(
+        alignmentFindings,
+        and(
+          eq(alignmentFindings.workspaceId, workspaceId),
+          eq(alignmentFindings.kind, "divergence"),
+          eq(alignmentFindings.state, "open"),
+        ),
+      ),
+    );
+
+  const byId = new Map(open.map((goal) => [goal.id, goal]));
+  const due: DueNudge[] = [];
+  for (const finding of rows) {
+    const goal = finding.subjectGoalId
+      ? byId.get(finding.subjectGoalId)
+      : undefined;
+    // §6.4 addresses it to "Champion + reviewer". The reviewer is reached
+    // through the check-in loop they already own, so this is the champion's
+    // message: they are the one who reported the status the data disagrees with.
+    if (!goal?.championId) {
+      continue;
+    }
+    due.push(
+      qualityNudge({
+        ruleKey: "quality.divergence",
+        goalId: goal.id,
+        recipientMemberId: goal.championId,
+      }),
+    );
+  }
   return due;
 }
 

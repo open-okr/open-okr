@@ -533,15 +533,26 @@ Deliverables: the seeded Coach agent with its persona, instructions, schedule an
 Test plan: a message citing a rule key the method package does not define fails the build; with AI off the quality triggers still fire.
 Acceptance: Given a goal saved with a failing rule, when the Coach runs, then a nudge cites that rule key and links to the rule.
 
-### P4-T06b: The nightly semantic sweep and the finding table [M]
+### P4-T06b-a: Divergence findings, and the shared reconciler [M]
 Depends on: P4-T06a
-Goal: the findings only a reading of the whole workspace produces.
-Deliverables: the nightly sweep producing relink, dependency, conflict and gap findings into the shared finding table with severity and reason; a one-click apply where the fix is mechanical; divergence detection between reported health and the data.
-Test plan: a dismissed finding stays dismissed everywhere; applying a relink re-parents the goal through the normal Operation with audit; with AI off the structural findings still fire and the semantic ones do not.
-Acceptance: Given two goals in different spaces double-counting one metric, when the nightly sweep runs, then a conflict finding appears for both champions, and dismissing it on one side dismisses it everywhere.
+Goal: the finding a reading of one goal's own data produces, with no provider.
+Deliverables: divergence detection between reported health and the goal's own data, as findings in the shared table with severity and one specific sentence; the reconciler extracted so the Coach's findings and the engine's obey one implementation of "a dismissal survives" and "a cleared condition disappears"; the `quality.divergence` nudge.
+Test plan: a dismissed finding stays dismissed on the next sweep and stops nudging; a cleared condition soft-deletes and a returning one gets a fresh open row; a sweep of one kind leaves the other kinds' rows alone; with no provider the semantic kinds are absent rather than guessed.
+Acceptance: Given a goal reported on track whose progress is in the red band, when the Coach runs, then one open divergence finding exists on that goal carrying `quality.divergence` and its champion is nudged once; dismissing it survives the next sweep and silences the nudge.
+
+### P4-T06b-b: The nightly semantic sweep [M]
+Depends on: P4-T06b-a
+Goal: the findings only a reading of the whole workspace produces (METHOD.md §5.3).
+Deliverables: the nightly sweep producing METHOD.md §5.3's relink, dependency, conflict and gap findings through the provider, each with a severity and one specific sentence; a one-click apply where §5.3 says the fix is mechanical, re-parenting through the normal Operation with audit; the run cost cap around every provider call.
+Test plan: applying a relink re-parents the goal through the normal Operation with audit; with the provider off none of the four semantic kinds is written; a dismissed semantic finding stays dismissed.
+Acceptance: Given two goals in different spaces double-counting one metric and a provider configured, when the nightly sweep runs, then a conflict finding appears for both champions, and dismissing it on one side dismisses it everywhere.
+
+**Why P4-T06b was cut in two.** METHOD.md §5.3 is the *semantic* review: all four of its types are judgements the Coach makes by reading content, so all four need a provider, and so does the original acceptance criterion. Divergence is not one of them: it is arithmetic over a stored status and stored numbers, and AI-NATIVE-PLAN.md §6.1's own matrix marks it deterministic. The same provider boundary that split P4-T05c splits this, and it let the deterministic half land while the credential was still outstanding.
+
+**One of §6.1's three divergence cases is deliberately not built.** "A forecast that misses while the champion says caution" is ambiguous as written (a pessimistic forecast beside a cautious champion is agreement, not divergence) and rests on the §3.6 forecast, whose behaviour on sparse data is an open practice decision in PHASE-4-SPLIT.md. It waits for that decision rather than being built on a number that may change.
 
 ### P4-T06c: The rewrite assist and the coach surfaces [M]
-Depends on: P4-T06b
+Depends on: P4-T06b-b
 Goal: the coach where the writer already is.
 Reference mockup: [05-alignment-studio](../stakeholder/mockups/png/05-alignment-studio.png), [03-draft-coach](../stakeholder/mockups/png/03-draft-coach.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the rewrite assist per failing rule, previewing before applying; the coach strip on the goal page; the review tab in the alignment studio; every surface hidden or disabled with the provider off.

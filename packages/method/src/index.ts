@@ -23,6 +23,13 @@ export {
   sessionLifecycleStage,
 } from "./countdown.ts";
 export {
+  averageConfidence,
+  type Divergence,
+  type DivergenceInput,
+  type DivergenceKind,
+  divergences,
+} from "./divergence.ts";
+export {
   acknowledgementEscalation,
   blockerEscalation,
   type Escalation,
