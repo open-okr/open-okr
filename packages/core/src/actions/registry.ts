@@ -24,6 +24,7 @@ import {
   readAgentRun,
   readAgents,
   runChampion,
+  runCoach,
   setAgentEnabled,
   startAgentRun,
 } from "./agents.ts";
@@ -291,6 +292,7 @@ export const ACTION_MAP = {
   "agents.readRun": readAgentRun,
   "agents.cancelRun": cancelAgentRun,
   "agents.runChampion": runChampion,
+  "agents.runCoach": runCoach,
   "agents.listRuns": listAgentRuns,
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,

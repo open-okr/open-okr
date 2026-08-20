@@ -16,6 +16,7 @@ import { backfillDefaultSpace } from "../data-changes/0003_backfill_default_spac
 import { backfillRhythmAndCycle } from "../data-changes/0004_backfill_rhythm_and_cycle.ts";
 import { backfillCheckInReviewer } from "../data-changes/0005_backfill_check_in_reviewer.ts";
 import { seedChampionAgent } from "../data-changes/0006_seed_champion_agent.ts";
+import { seedCoachAgent } from "../data-changes/0007_seed_coach_agent.ts";
 
 const env = loadEnv();
 const url = env.DATABASE_ADMIN_URL ?? env.DATABASE_URL;
@@ -31,6 +32,7 @@ try {
       backfillRhythmAndCycle,
       backfillCheckInReviewer,
       seedChampionAgent,
+      seedCoachAgent,
     ],
   });
   process.stdout.write(

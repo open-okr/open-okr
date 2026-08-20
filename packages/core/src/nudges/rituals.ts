@@ -88,6 +88,27 @@ function localDaysBetween(from: string, to: string): number {
 }
 
 /**
+ * Every role holder in a space, in load order.
+ *
+ * Exported since P4-T06a, because the Coach resolves a different role from the
+ * same rows and §4.2's fallback rules are pure functions over exactly this
+ * list. Load order is `created_at`, which is part of the contract rather than a
+ * convenience: `resolveCoordinator` and `resolveManagers` both answer "the
+ * first one", and the longest-standing holder is a defensible answer where an
+ * arbitrary one is not.
+ */
+export async function spaceRoleHolders(
+  tx: WorkspaceTx,
+  spaceId: string,
+): Promise<{ memberId: string; role: "member" | "coordinator" | "manager" }[]> {
+  return tx
+    .select({ memberId: spaceMembers.memberId, role: spaceMembers.role })
+    .from(spaceMembers)
+    .where(activeOnly(spaceMembers, eq(spaceMembers.spaceId, spaceId)))
+    .orderBy(asc(spaceMembers.createdAt));
+}
+
+/**
  * Who runs this space's session: the coordinator, or the manager covering for
  * one, through §4.2's single rule rather than a second copy of it.
  */
@@ -95,12 +116,7 @@ async function spaceCoordinator(
   tx: WorkspaceTx,
   spaceId: string,
 ): Promise<string | null> {
-  const holders = await tx
-    .select({ memberId: spaceMembers.memberId, role: spaceMembers.role })
-    .from(spaceMembers)
-    .where(activeOnly(spaceMembers, eq(spaceMembers.spaceId, spaceId)))
-    .orderBy(asc(spaceMembers.createdAt));
-  return resolveCoordinator(holders) ?? null;
+  return resolveCoordinator(await spaceRoleHolders(tx, spaceId)) ?? null;
 }
 
 /**

@@ -28,6 +28,7 @@ import { desc, eq, ne } from "drizzle-orm";
 import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { dueQualityNudges } from "./quality.ts";
 import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
   activeMemberIds,
@@ -53,7 +54,22 @@ import {
  * by two cadences would be held by the deduplication window, but the run log
  * would still show a product that could not say which clock speaks when.
  */
-export type NudgeCadence = "hourly" | "daily" | "weekly" | "cycle";
+export type NudgeCadence =
+  | "hourly"
+  | "daily"
+  | "weekly"
+  | "cycle"
+  /**
+   * The Coach's quality pass (P4-T06a).
+   *
+   * Not one of §6.2's four, because §6.2 is the Champion's table. §6.1 gives the
+   * Coach `continuous` and the continuous half already happens: P4-T02a
+   * evaluates every goal inside the transaction that writes it. This is the run
+   * that turns the standing verdicts into messages, and it is separate from the
+   * rhythm cadences because a quality complaint and a missed check-in are
+   * different clocks with different owners.
+   */
+  | "quality";
 
 export interface NudgeRunInput {
   readonly workspaceId: string;
@@ -176,6 +192,10 @@ export async function runDueNudgesInTx(
     due.push(
       ...(await dueSessionNudges(tx, { workspaceId, now: at, thresholds })),
     );
+  }
+
+  if (cadence === "quality") {
+    due.push(...(await dueQualityNudges(tx, { workspaceId, thresholds })));
   }
 
   if (cadence === "cycle") {

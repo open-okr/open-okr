@@ -482,3 +482,81 @@ every nudge carrying none returns null.
 Given a suspended member, when they call `goals.publishDraftedCheckIn`, then it
 is refused with the same message `goals.startCheckIn` refuses them with, and no
 check-in row exists.
+
+## 12. What P4-T06a built: the Coach, and two deviations from §1
+
+The Coach is seeded at provisioning beside the Champion, `kind = 'coach'`,
+schedule `continuous`, autonomy `propose`, bound to spaces at `view` and to
+nothing workspace-wide. Data change `0007_seed_coach_agent` gives every
+workspace made before this the same agent, separately from 0006 because a data
+change that has already run is never edited.
+
+**Deviation from §1.3: the binding is `view`, not "read + quality flags
+write".** The Coach writes nothing. Its autonomy is `propose`, and P4-T02a
+already recomputes the flags inside the transaction of whoever edited the goal,
+so a write grant would be a standing permission with no caller, which is the
+shape a privilege escalation hides in. A workspace opting into `scoped_direct`
+raises it deliberately, in one place. §1.3 above is corrected by this paragraph.
+
+**Deviation from §1.1: `continuous` describes the evaluation, not the
+messages.** The evaluation genuinely is continuous and has been since P4-T02a.
+What P4-T06a adds is `agents.runCoach`, one run that turns the standing verdicts
+into nudges, under its own trigger `schedule.quality`. A message emitted inside
+every goal write would nudge a champion on each keystroke-sized save.
+
+### 12.1 Which of §6.4's quality triggers fire, and which do not
+
+| Trigger | Fires | Source |
+|---|---|---|
+| `quality.all_lagging` | Yes | KR-4, condition "All lagging" |
+| `quality.no_baseline` | Yes | KR-3, condition "Baseline, target, date or owner missing" |
+| `quality.orphan_goal` | Yes | `alignment_findings` AL-1 |
+| `quality.level_skip` | Yes | `alignment_findings` AL-3 |
+| `quality.silo` | Yes, to the space manager | `alignment_findings` AL-6 |
+| `quality.dependency_unowned` | Yes | §5.4 register: unconfirmed and no risk owner |
+| `quality.draft_failing` | No: it is inline as the author types, which P4-T02b built. §6.4's own recipient is "Author, inline" | |
+| `quality.gate_blocked` | No: it is the publish attempt's own refusal, which P4-T03 built | |
+| `quality.no_not_doing`, `quality.no_cuts` | No: both fire at a phase transition, and no phase-transition hook exists | |
+| `quality.too_many_objectives` | No: OBJ-5 is evaluated and stored, but §6.4 addresses it to the facilitator and a cycle-level recipient is P4-T09's | |
+| `quality.sandbagging_draft`, `quality.sandbagging_close` | No: scoring at draft and at close, P4-T10b | |
+| `quality.divergence`, `quality.trending_off` | No: both are the nightly sweep's, P4-T06b | |
+| `quality.process_health_low` | No: needs the process-health survey, P4-T11b | |
+| `quality.conflict` | No: the one trigger in the catalogue that needs a provider, P4-T06b | |
+
+**The mapping is keyed on the condition, not on the check id.** KR-4 trips on
+"All lagging" and on "All leading", and only the first is
+`quality.all_lagging`. Choosing a trigger from a stored flag id would have told
+a champion their key results are all lagging when they are all leading, which is
+why `evaluateGoalInTx` was split out of `recomputeGoalQualityInTx`: the Coach
+needs the verdict, which carries the matched condition, rather than the flag.
+
+**Two finding rule keys map to nothing, deliberately.** `AL-4`, the missing
+company anchor, is a property of the whole tree that no goal caused (decision
+D-16 gave it a null subject), and `KR-1`, the key result count, is already the
+Draft Coach's inline message. §6.4 names no trigger for either, and inventing
+one would be adding a proactive message, which CLAUDE.md puts on the
+ask-a-human list.
+
+### 12.2 Acceptance criteria
+
+Given a goal whose key results are all lagging, when the Coach runs, then its
+champion receives one `quality.all_lagging` nudge of kind `quality` at
+escalation step 0, and the goal's stored flags contain `KR-4`.
+
+Given a goal whose key results are all leading, when the Coach runs, then no
+`quality.all_lagging` nudge exists, though `KR-4` is still flagged.
+
+Given a mixed set, when the Coach runs, then neither fires.
+
+Given a closed goal, when the Coach runs, then it is not coached.
+
+Given a workspace with no goals, when the Coach runs, then it records nothing
+and reports no rule keys.
+
+Given a second run inside the deduplication window, when the Coach runs, then
+nothing is delivered and the held nudges carry their reason.
+
+Given the Coach turned off, when the run is called, then it is refused.
+
+Given any Coach run with no provider configured, then its cost is zero and it
+writes no proposal.

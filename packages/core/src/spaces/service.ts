@@ -42,6 +42,7 @@ import {
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { bindChampionToSpaceInTx } from "../agents/champion.ts";
+import { bindCoachToSpaceInTx } from "../agents/coach.ts";
 import { OperationError } from "../operations/operation.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -113,6 +114,10 @@ export async function createSpaceInTx<
   // thing standing between the rhythm agent and a silent workspace, which is
   // why it lives beside the space's own bindings rather than in the agent.
   await bindChampionToSpaceInTx(tx, {
+    workspaceId: input.workspaceId,
+    contextId,
+  });
+  await bindCoachToSpaceInTx(tx, {
     workspaceId: input.workspaceId,
     contextId,
   });

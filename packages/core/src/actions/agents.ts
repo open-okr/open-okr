@@ -37,6 +37,7 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
+import { coachInTx } from "../agents/coach.ts";
 import { type NudgeCadence, runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
@@ -44,18 +45,24 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
 
 /**
- * What each of the Champion's four runs records as its trigger (P4-T05b).
+ * What each run records as its trigger (P4-T05b, P4-T06a).
  *
  * One string per cadence, so `agent_runs` can be read by clock: an
  * administrator asking "did the countdown fire this week" gets an answer, which
- * a single `schedule.champion` trigger could not give. The strings match
- * AI-NATIVE-PLAN.md §6.2's own four rows.
+ * a single `schedule.champion` trigger could not give. The first four match
+ * AI-NATIVE-PLAN.md §6.2's own rows for the Champion; `quality` is the Coach's,
+ * from §6.1.
+ *
+ * `satisfies` rather than a plain object, so adding a cadence without a trigger
+ * string fails the build here rather than writing an empty trigger into a run
+ * row. It has already earned that once.
  */
-const CHAMPION_TRIGGERS = {
+const RUN_TRIGGERS = {
   hourly: "schedule.hourly",
   daily: "schedule.daily",
   weekly: "schedule.weekly",
   cycle: "schedule.cycle",
+  quality: "schedule.quality",
 } as const satisfies Record<NudgeCadence, string>;
 
 const agentOutput = z.object({
@@ -776,7 +783,7 @@ export const runChampion = defineWriteAction({
     async execute({ tx, workspaceId, loaded }) {
       const at = input.now ? new Date(input.now) : new Date();
       const cadence: NudgeCadence = input.cadence ?? "hourly";
-      const trigger = CHAMPION_TRIGGERS[cadence];
+      const trigger = RUN_TRIGGERS[cadence];
       const log: AgentRunLogEntry[] = [];
       const stamp = at.toISOString();
 
@@ -945,6 +952,141 @@ export const runChampion = defineWriteAction({
           targetType: "workspace",
           targetId: workspaceId,
           payload: { status: "completed", recorded: run.recorded, trigger },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * One Coach run (P4-T06a).
+ *
+ * §6.1's continuous half already happens without this: P4-T02a evaluates every
+ * goal against the §4 catalogue inside the transaction that writes it, and
+ * stores the score and the flags. This is the other half, the one that turns a
+ * standing verdict into a message somebody receives.
+ *
+ * Deliberately its own action rather than a `cadence` on `agents.runChampion`.
+ * They are two agents with two personas, two scopes and two run logs, and an
+ * administrator reading `/admin/agents` has to be able to see which of them
+ * spoke. The **implementation** is shared all the way down: one
+ * `runDueNudgesInTx`, one suppression decision, one row writer.
+ *
+ * With the AI provider off this run is the whole Coach. Every trigger it fires
+ * is deterministic, which is what §6.1's own matrix claims and what this makes
+ * true in code.
+ */
+export const runCoach = defineWriteAction({
+  name: "agents.runCoach",
+  summary:
+    "Runs the Coach's quality pass once, recording what fired in its run log.",
+  input: z.object({
+    /** Defaults to the moment the request arrives. Overridden by tests. */
+    now: z.string().optional(),
+  }),
+  output: z.object({
+    runId: z.uuid(),
+    status: z.string(),
+    recorded: z.number().int(),
+    suppressed: z.number().int(),
+    ruleKeys: z.array(z.string()),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId }) {
+      const coach = await coachInTx(tx as WorkspaceTx, workspaceId);
+      if (!coach) {
+        throw new OperationError("not_found", "This workspace has no Coach.");
+      }
+      const [agent] = await tx
+        .select({ id: agents.id, enabled: agents.enabled })
+        .from(agents)
+        .where(activeOnly(agents, eq(agents.id, coach.agentId)))
+        .limit(1);
+      if (!agent?.enabled) {
+        throw new OperationError("not_found", "The Coach is turned off.");
+      }
+      return { agentId: agent.id };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const at = input.now ? new Date(input.now) : new Date();
+      const stamp = at.toISOString();
+      const log: AgentRunLogEntry[] = [];
+
+      // No cost cap check, and that is not an omission. This run reads stored
+      // verdicts and stored findings and calls no provider, so it cannot spend.
+      // P4-T06b's semantic sweep is the Coach's first paid run and is where the
+      // cap belongs.
+      // openokr:allow-mutation: the operation's own execute.
+      const [started] = await tx
+        .insert(agentRuns)
+        .values({
+          workspaceId,
+          agentId: loaded.agentId,
+          trigger: RUN_TRIGGERS.quality,
+          status: "running",
+          tasks: [],
+          log: [],
+          startedAt: at,
+        })
+        .returning({ id: agentRuns.id });
+      const runId = (started as { id: string }).id;
+
+      const run = await runDueNudgesInTx(tx as WorkspaceTx, {
+        workspaceId,
+        at,
+        cadence: "quality",
+        runId,
+      });
+
+      for (const [index, ruleKey] of run.ruleKeys.entries()) {
+        log.push({
+          at: stamp,
+          taskIndex: index,
+          kind: "applied",
+          message: `${ruleKey}: delivered`,
+        });
+      }
+      log.push({
+        at: stamp,
+        taskIndex: run.ruleKeys.length,
+        kind: "applied",
+        message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
+      });
+
+      // openokr:allow-mutation: the operation's own execute. Not `activeOnly`:
+      // `agent_runs` carries no `deleted_at`.
+      await tx
+        .update(agentRuns)
+        .set({ status: "completed", log, finishedAt: at })
+        .where(eq(agentRuns.id, runId));
+
+      return {
+        result: {
+          runId,
+          status: "completed",
+          recorded: run.recorded,
+          suppressed: run.suppressed,
+          ruleKeys: [...run.ruleKeys],
+        },
+        activity: {
+          kind: "agent.run_completed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            trigger: RUN_TRIGGERS.quality,
+            recorded: run.recorded,
+          },
+        },
+        audit: {
+          action: "agents.runCoach",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {
+            status: "completed",
+            recorded: run.recorded,
+            trigger: RUN_TRIGGERS.quality,
+          },
         },
       };
     },

@@ -526,7 +526,8 @@ boundary is also what let the first half land while the second waited on a
 credential.
 
 ### P4-T06a: The Coach agent and write-triggered evaluation [M]
-Depends on: P4-T05c-b
+Depends on: P4-T05c-a
+Dependency corrected at P4-T06a: this card read P4-T05c, and after that split it read P4-T05c-b. Nothing here touches the check-in drafter or any provider, so the real dependency is the proposal path in P4-T05c-a. The old line was chain order rather than data, and it would have stalled the whole agents lane behind one credential.
 Goal: the quality agent at the moment of writing (AI-NATIVE-PLAN.md §6.1).
 Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the AI-NATIVE-PLAN.md §6.4 quality triggers; every message citing its rule key.
 Test plan: a message citing a rule key the method package does not define fails the build; with AI off the quality triggers still fire.

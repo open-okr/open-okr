@@ -101,7 +101,7 @@ and this table is what was agreed.
 | P4-T05b | The daily sweep and the cycle countdown | Agung | in_review |
 | P4-T05c-a | The proposal path, and the recovery proposal | Agung | in_review |
 | P4-T05c-b | AI drafting inside the proposal | Agung | blocked, needs a provider key |
-| P4-T06a | The Coach agent and write-triggered evaluation | Agung | todo, ready |
+| P4-T06a | The Coach agent and write-triggered evaluation | Agung | in_review |
 | P4-T06b | The nightly semantic sweep and the finding table | Agung | todo |
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
 | P4-T07a | The session record and live stage sync | Obed | in_review |

@@ -28,6 +28,7 @@ import {
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultInput,
+  type KeyResultVerdict,
   type QualityVerdict,
   type ResolvedThresholds,
   strengthScore,
@@ -66,13 +67,34 @@ export interface GoalQuality {
 const flagsOf = (verdicts: readonly QualityVerdict[]): string[] =>
   verdicts.filter((entry) => entry.status !== "pass").map((entry) => entry.id);
 
+export interface GoalVerdicts {
+  /** §4.1's five objective checks, after strictness. */
+  readonly objective: readonly QualityVerdict[];
+  /** §4.2's key result checks, after strictness, with the rows each one hit. */
+  readonly keyResults: readonly KeyResultVerdict[];
+  /** Key result ids, in the order `keyResults[].keyResults` indexes them. */
+  readonly keyResultIds: readonly string[];
+  readonly score: number | null;
+  readonly flags: readonly string[];
+  readonly keyResultFlags: ReadonlyMap<string, readonly string[]>;
+}
+
 /**
- * Evaluate one goal and its key results, and store the answer on both.
+ * Evaluate one goal and return the verdicts, writing nothing (P4-T06a).
  *
- * Returns what it wrote, so a caller that needs to report the score does not
- * read the row back.
+ * `recomputeGoalQualityInTx` is this plus two updates, and it was one function
+ * until the Coach needed the verdicts rather than the stored flags.
+ *
+ * **Why the Coach cannot use the stored flags.** A flag is a check id, and one
+ * check can fail for more than one reason: KR-4 trips on "All lagging" and on
+ * "All leading", which §6.4 treats as different things, and only one of them is
+ * `quality.all_lagging`. A nudge chosen from the flag id alone would tell a
+ * champion every key result is lagging when they are all leading, which is the
+ * wrong message rather than a vague one. The verdict carries the condition that
+ * matched, in the catalogue's own words, so the trigger can be chosen from what
+ * was actually seen.
  */
-export async function recomputeGoalQualityInTx(
+export async function evaluateGoalInTx(
   tx: WorkspaceTx,
   input: {
     readonly workspaceId: string;
@@ -80,7 +102,7 @@ export async function recomputeGoalQualityInTx(
     /** Passed in when the caller already loaded them, saving a query. */
     readonly thresholds?: ResolvedThresholds;
   },
-): Promise<GoalQuality | null> {
+): Promise<GoalVerdicts | null> {
   const thresholds =
     input.thresholds ?? (await loadThresholdsInTx(tx, input.workspaceId));
 
@@ -193,24 +215,54 @@ export async function recomputeGoalQualityInTx(
     }
   }
 
+  return {
+    objective,
+    keyResults: keyResultVerdicts,
+    keyResultIds: rows.map((row) => row.id),
+    score,
+    flags,
+    keyResultFlags: perKeyResult,
+  };
+}
+
+/**
+ * Evaluate one goal and store the answer on it and on its key results.
+ *
+ * Returns what it wrote, so a caller that needs to report the score does not
+ * read the row back.
+ */
+export async function recomputeGoalQualityInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly goalId: string;
+    readonly thresholds?: ResolvedThresholds;
+  },
+): Promise<GoalQuality | null> {
+  const evaluated = await evaluateGoalInTx(tx, input);
+  if (!evaluated) {
+    return null;
+  }
+  const { score, flags, keyResultFlags, keyResultIds } = evaluated;
+
   // openokr:allow-mutation: runs on the transaction the calling Operation
   // opened, so the goal, its score and that Operation's audit row commit
   // together or not at all.
   await tx
     .update(goals)
-    .set({ qualityScore: score, qualityFlags: flags })
+    .set({ qualityScore: score, qualityFlags: [...flags] })
     .where(activeOnly(goals, eq(goals.id, input.goalId)));
 
-  for (const row of rows) {
-    const carried = perKeyResult.get(row.id) ?? [];
+  for (const keyResultId of keyResultIds) {
+    const carried = keyResultFlags.get(keyResultId) ?? [];
     // openokr:allow-mutation: the calling Operation's own transaction.
     await tx
       .update(keyResults)
-      .set({ qualityFlags: carried })
-      .where(activeOnly(keyResults, eq(keyResults.id, row.id)));
+      .set({ qualityFlags: [...carried] })
+      .where(activeOnly(keyResults, eq(keyResults.id, keyResultId)));
   }
 
-  return { score, flags, keyResultFlags: perKeyResult };
+  return { score, flags, keyResultFlags };
 }
 
 /**
