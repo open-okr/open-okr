@@ -2,7 +2,7 @@
 
 Who takes which task, what can run at the same time, and what has to wait.
 Rewritten 2026-08-19, after thirteen Phase 4 tasks landed and the tasks were cut
-into lettered parts. Updated 2026-08-20 to reflect P4-T05a, P4-T07a and P4-T07b landing.
+into lettered parts. Updated 2026-08-20 to reflect P4-T05a and P4-T07a through P4-T07c landing.
 
 `IMPLEMENTATION-PLAN.md` is the authority. This file only reads its dependency
 lines and turns them into two lanes. If the two ever disagree, the plan wins and
@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 16 | P4-T01b to P4-T05a, P4-T07a, P4-T07b |
+| in_review | 17 | P4-T01b to P4-T05a, P4-T07a to P4-T07c |
 | in_progress | 1 | P4-T13a |
-| todo | 19 | P4-T05b to P4-T06c, P4-T07c to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 18 | P4-T05b to P4-T06c, P4-T08 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 **The twelve rows from P4-T01b to P4-T04c are all in pull request #40 and have not merged.**
 P4-T05a and P4-T07a landed on `obed` and are waiting on a read. Nothing in
@@ -44,7 +44,7 @@ hourly run, and the session record with live stage sync.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a in_review; P4-T05b next |
-| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a, P4-T07b in_review; P4-T07c next |
+| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T07c in_review; P4-T08 next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -59,8 +59,8 @@ P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
 
 | Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
-| now | P4-T05b daily sweep and cycle countdown | P4-T07c blockers, the board and aging | Yes, with the blocker overlap below |
-| next | P4-T05c | P4-T08 commitments, digest, streaks | Yes |
+| now | P4-T05b daily sweep and cycle countdown | P4-T08 commitments, digest, streaks | Yes |
+| next | P4-T05c | P4-T09 monthly review | Yes |
 | then | P4-T06a, P4-T06b, P4-T06c | P4-T08, P4-T09 | Yes |
 | after | P4-T14a, P4-T14b copilot | P4-T10a to P4-T12 | Yes |
 | last | P4-T15 assists, which needs both lanes finished | | No |
@@ -105,7 +105,7 @@ and this table is what was agreed.
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
 | P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | in_review |
-| P4-T07c | Blockers, the board and aging | Obed | todo |
+| P4-T07c | Blockers, the board and aging | Obed | in_review |
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | todo |
 | P4-T09 | Monthly review and decision log | Obed | todo |
 | P4-T10a | Quarterly review: the session shell | Obed | todo |
@@ -146,7 +146,7 @@ so the other lane does not write the same task twice.
 | Blockers | P4-T07c creates the table, P4-T05b reads it, the ladder already exists | Read the ladder, never rewrite it. The table is P4-T07c's to define |
 | The nudge engine | Every rhythm trigger and every session trigger records a nudge through `packages/core/src/nudges/run.ts` | Add rules to `packages/method/src/triggers.ts`. Do not add a second decision path beside `decideSuppression` |
 | `packages/method` | Both lanes add rules | Any change is a message to the other lane. It is the one shared package with real risk |
-| Migration numbers | Both lanes add tables | The tree is at **0037**; the next free number is **0038**. Agree it before writing the file when both lanes have one in flight. 0029 is a permanent gap from an earlier collision |
+| Migration numbers | Both lanes add tables | The tree is at **0038**; the next free number is **0039**. Agree it before writing the file when both lanes have one in flight. 0029 is a permanent gap from an earlier collision |
 
 ## File ownership
 

@@ -141,6 +141,14 @@ export {
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
+  BLOCKER_SOURCES,
+  BLOCKER_TYPES,
+  type Blocker,
+  type BlockerSource,
+  type BlockerType,
+  blockers,
+} from "./schema/blockers.ts";
+export {
   CHECK_IN_STATES,
   CHECK_IN_STATUSES,
   type CheckIn,

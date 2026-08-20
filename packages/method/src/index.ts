@@ -141,6 +141,7 @@ export {
   weightedProgress,
 } from "./scoring.ts";
 export {
+  BLOCKER_TYPE_DEFINITIONS,
   type Diagnosis,
   type DiagnosisKind,
   lowestProcessHealthStatement,
