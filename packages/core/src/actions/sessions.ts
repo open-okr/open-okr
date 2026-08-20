@@ -13,15 +13,19 @@
 import {
   accessContexts,
   activeOnly,
+  checkInVotes,
+  goals,
+  keyResults,
   SESSION_KINDS,
   SESSION_STATES,
+  sessionConfidences,
   okrSessions as sessions,
   spaceMembers,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
 import { WEEKLY_STAGE_KEYS } from "@openokr/method";
-import { and, desc, eq } from "drizzle-orm";
+import { and, avg, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -342,6 +346,49 @@ export const advanceStage = defineWriteAction({
           );
         }
         nextStageKey = WEEKLY_STAGE_KEYS[stageIndex + 1] ?? null;
+
+        // Stage completion gate: confidence → diagnose requires every KR
+        // in the space's active cycle to have a confirmed confidence.
+        if (
+          session.stageKey === "confidence" &&
+          nextStageKey === "diagnose" &&
+          session.spaceId
+        ) {
+          const spaceKrs = await tx
+            .select({ id: keyResults.id, title: keyResults.title })
+            .from(keyResults)
+            .innerJoin(goals, eq(keyResults.goalId, goals.id))
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(goals.spaceId, session.spaceId),
+                eq(goals.cycleId, session.cycleId ?? ""),
+              ),
+            );
+
+          const confirmed = await tx
+            .select({ keyResultId: sessionConfidences.keyResultId })
+            .from(sessionConfidences)
+            .where(
+              activeOnly(
+                sessionConfidences,
+                eq(sessionConfidences.workspaceId, workspaceId),
+                eq(sessionConfidences.sessionId, input.id),
+              ),
+            );
+
+          const confirmedIds = new Set(confirmed.map((c) => c.keyResultId));
+          const missing = spaceKrs.filter((kr) => !confirmedIds.has(kr.id));
+
+          if (missing.length > 0) {
+            const names = missing.map((kr) => kr.title).join(", ");
+            throw new OperationError(
+              "not_found",
+              `Cannot advance: ${names} has no confirmed confidence.`,
+            );
+          }
+        }
       }
 
       const now = new Date();
@@ -684,6 +731,502 @@ export const listParticipants = defineReadAction({
           memberId: m.memberId,
           name: m.name,
         }));
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07b: Confidence round actions
+// ---------------------------------------------------------------------------
+
+export const castSessionVote = defineWriteAction({
+  name: "sessions.castVote",
+  summary:
+    "A private confidence vote on one key result within a session. Upserts: a second vote replaces the first.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    confidence: z.number().min(0).max(1),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Verify the KR exists.
+      const [kr] = await tx
+        .select({ id: keyResults.id, goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!kr) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+
+      // Upsert: update existing unrevealed vote, or insert.
+      const [existing] = await tx
+        .select({ id: checkInVotes.id })
+        .from(checkInVotes)
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+            eq(checkInVotes.memberId, memberId),
+            isNull(checkInVotes.revealedAt),
+          ),
+        )
+        .limit(1);
+
+      let voteId: string;
+      if (existing) {
+        await tx
+          .update(checkInVotes)
+          .set({
+            confidence: String(input.confidence),
+            updatedAt: new Date(),
+          })
+          .where(activeOnly(checkInVotes, eq(checkInVotes.id, existing.id)));
+        voteId = existing.id;
+      } else {
+        voteId = crypto.randomUUID();
+        await tx.insert(checkInVotes).values({
+          id: voteId,
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          memberId,
+          confidence: String(input.confidence),
+        });
+      }
+
+      return {
+        result: { id: voteId },
+        activity: {
+          kind: "session.voteCast",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { keyResultId: input.keyResultId },
+        },
+        audit: {
+          action: "sessions.castVote",
+          targetType: "check_in_vote",
+          targetId: voteId,
+          payload: { keyResultId: input.keyResultId },
+        },
+      };
+    },
+  }),
+});
+
+export const revealSessionVotes = defineWriteAction({
+  name: "sessions.revealVotes",
+  summary: "Reveals every vote on a key result in one session, atomically.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+  }),
+  output: z.object({ revealed: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const now = new Date();
+      const revealed = await tx
+        .update(checkInVotes)
+        .set({ revealedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+            isNull(checkInVotes.revealedAt),
+          ),
+        )
+        .returning({ id: checkInVotes.id });
+
+      return {
+        result: { revealed: revealed.length },
+        activity: {
+          kind: "session.votesRevealed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            count: revealed.length,
+          },
+        },
+        audit: {
+          action: "sessions.revealVotes",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: {
+            keyResultId: input.keyResultId,
+            count: revealed.length,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const confirmSessionConfidence = defineWriteAction({
+  name: "sessions.confirmConfidence",
+  summary:
+    "The champion confirms the final confidence and writes the what-changed note.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    confidence: z.number().min(0).max(1),
+    whatChanged: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Compute the team average from revealed votes.
+      const [avgRow] = await tx
+        .select({
+          avg: sql<string>`avg(${checkInVotes.confidence})`,
+        })
+        .from(checkInVotes)
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+          ),
+        );
+      const teamAverage = avgRow?.avg
+        ? String(Number(avgRow.avg).toFixed(2))
+        : null;
+
+      // Upsert the confirmed confidence.
+      const [existing] = await tx
+        .select({ id: sessionConfidences.id })
+        .from(sessionConfidences)
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.workspaceId, workspaceId),
+            eq(sessionConfidences.sessionId, input.sessionId),
+            eq(sessionConfidences.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      let confirmId: string;
+      if (existing) {
+        await tx
+          .update(sessionConfidences)
+          .set({
+            confirmedConfidence: String(input.confidence),
+            teamAverage,
+            whatChanged: input.whatChanged,
+            confirmedById: memberId,
+            updatedAt: new Date(),
+          })
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.id, existing.id),
+            ),
+          );
+        confirmId = existing.id;
+      } else {
+        confirmId = crypto.randomUUID();
+        await tx.insert(sessionConfidences).values({
+          id: confirmId,
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          confirmedConfidence: String(input.confidence),
+          teamAverage,
+          whatChanged: input.whatChanged,
+          confirmedById: memberId,
+        });
+      }
+
+      // Update the KR's confidence on the key_results table.
+      await tx
+        .update(keyResults)
+        .set({
+          confidence: String(input.confidence),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        );
+
+      return {
+        result: { id: confirmId },
+        activity: {
+          kind: "session.confidenceConfirmed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            confidence: input.confidence,
+          },
+        },
+        audit: {
+          action: "sessions.confirmConfidence",
+          targetType: "session_confidence",
+          targetId: confirmId,
+          payload: {
+            keyResultId: input.keyResultId,
+            confidence: input.confidence,
+          },
+        },
+      };
+    },
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07b: Confidence round read actions
+// ---------------------------------------------------------------------------
+
+export const sessionVotes = defineReadAction({
+  name: "sessions.votes",
+  summary:
+    "Votes for one KR in a session. Before reveal: own vote only. After reveal: all.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+  }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      memberId: z.uuid(),
+      confidence: z.number(),
+      revealedAt: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      memberId: string;
+      confidence: number;
+      revealedAt: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+
+        if (!member) {
+          throw new OperationError("not_found", "No such session.");
+        }
+
+        // Check if votes are revealed.
+        const allVotes = await tx
+          .select({
+            id: checkInVotes.id,
+            memberId: checkInVotes.memberId,
+            confidence: checkInVotes.confidence,
+            revealedAt: checkInVotes.revealedAt,
+          })
+          .from(checkInVotes)
+          .where(
+            activeOnly(
+              checkInVotes,
+              eq(checkInVotes.workspaceId, context.workspaceId),
+              eq(checkInVotes.sessionId, input.sessionId),
+              eq(checkInVotes.keyResultId, input.keyResultId),
+            ),
+          );
+
+        // If any vote is revealed, all should be (atomic reveal). Show all.
+        const anyRevealed = allVotes.some((v) => v.revealedAt !== null);
+
+        const visible = anyRevealed
+          ? allVotes
+          : allVotes.filter((v) => v.memberId === member.id);
+
+        return visible.map((v) => ({
+          id: v.id,
+          memberId: v.memberId,
+          confidence: Number(v.confidence),
+          revealedAt: v.revealedAt?.toISOString() ?? null,
+        }));
+      },
+    );
+  },
+});
+
+export const sessionConfidenceStatus = defineReadAction({
+  name: "sessions.confidenceStatus",
+  summary: "Which KRs are confirmed vs unconfirmed in this session.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      keyResultId: z.uuid(),
+      title: z.string(),
+      confirmed: z.boolean(),
+      confirmedConfidence: z.number().nullable(),
+      whatChanged: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      keyResultId: string;
+      title: string;
+      confirmed: boolean;
+      confirmedConfidence: number | null;
+      whatChanged: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // Read the session to get the space and cycle.
+        const [session] = await tx
+          .select({
+            spaceId: sessions.spaceId,
+            cycleId: sessions.cycleId,
+          })
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        if (!session?.spaceId || !session.cycleId) {
+          return [];
+        }
+
+        // All KRs in the space's cycle.
+        const krs = await tx
+          .select({ id: keyResults.id, title: keyResults.title })
+          .from(keyResults)
+          .innerJoin(goals, eq(keyResults.goalId, goals.id))
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(goals.spaceId, session.spaceId),
+              eq(goals.cycleId, session.cycleId),
+            ),
+          );
+
+        // Confirmed ones.
+        const confirmed = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confirmedConfidence: sessionConfidences.confirmedConfidence,
+            whatChanged: sessionConfidences.whatChanged,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              eq(sessionConfidences.sessionId, input.sessionId),
+            ),
+          );
+
+        const confirmedMap = new Map(confirmed.map((c) => [c.keyResultId, c]));
+
+        return krs.map((kr) => {
+          const c = confirmedMap.get(kr.id);
+          return {
+            keyResultId: kr.id,
+            title: kr.title,
+            confirmed: !!c,
+            confirmedConfidence: c ? Number(c.confirmedConfidence) : null,
+            whatChanged: c?.whatChanged ?? null,
+          };
+        });
       },
     );
   },

@@ -56,6 +56,60 @@ export async function skipSessionAction(sessionId: string) {
   revalidatePath(`/session/${sessionId}`);
 }
 
+export async function castVoteAction(
+  sessionId: string,
+  keyResultId: string,
+  confidence: number,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.castVote",
+    { sessionId, keyResultId, confidence },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+export async function revealVotesAction(
+  sessionId: string,
+  keyResultId: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.revealVotes",
+    { sessionId, keyResultId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+export async function confirmConfidenceAction(
+  sessionId: string,
+  keyResultId: string,
+  confidence: number,
+  whatChanged: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.confirmConfidence",
+    { sessionId, keyResultId, confidence, whatChanged },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
 export async function closeSessionAction(sessionId: string) {
   const { session, workspace } = await requireWorkspace();
   await callAction(

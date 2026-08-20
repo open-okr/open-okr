@@ -181,12 +181,17 @@ import {
 import { reviewInbox } from "./review.ts";
 import {
   advanceStage,
+  castSessionVote,
   closeSession,
+  confirmSessionConfidence,
   createSession,
   listParticipants,
   listSessions,
   openSession,
   readSession,
+  revealSessionVotes,
+  sessionConfidenceStatus,
+  sessionVotes,
   skipSession,
 } from "./sessions.ts";
 import {
@@ -388,6 +393,12 @@ export const ACTION_MAP = {
   "sessions.read": readSession,
   "sessions.list": listSessions,
   "sessions.participants": listParticipants,
+  // Confidence round (P4-T07b)
+  "sessions.castVote": castSessionVote,
+  "sessions.revealVotes": revealSessionVotes,
+  "sessions.confirmConfidence": confirmSessionConfidence,
+  "sessions.votes": sessionVotes,
+  "sessions.confidenceStatus": sessionConfidenceStatus,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

@@ -316,6 +316,10 @@ export {
   scoreEntries,
 } from "./schema/scorecard.ts";
 export {
+  type SessionConfidence,
+  sessionConfidences,
+} from "./schema/session-confidences.ts";
+export {
   SESSION_KINDS,
   SESSION_STATES,
   type Session,

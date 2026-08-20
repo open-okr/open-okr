@@ -256,6 +256,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "session.skipped": z.object({ kind: z.string() }),
   "session.closed": z.object({ kind: z.string() }),
+  // Confidence round (P4-T07b)
+  "session.voteCast": z.object({ keyResultId: z.string() }),
+  "session.votesRevealed": z.object({
+    keyResultId: z.string(),
+    count: z.number(),
+  }),
+  "session.confidenceConfirmed": z.object({
+    keyResultId: z.string(),
+    confidence: z.number(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

@@ -239,6 +239,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Advanced to the ${asString(p.to, "next")} stage`,
   "session.skipped": (p) => `Skipped the ${asString(p.kind)} session`,
   "session.closed": (p) => `Closed the ${asString(p.kind)} session`,
+  // Confidence round (P4-T07b)
+  "session.voteCast": () => "Cast a confidence vote",
+  "session.votesRevealed": (p) =>
+    `Revealed ${asString(p.count, "0")} votes on a key result`,
+  "session.confidenceConfirmed": (p) =>
+    `Confirmed confidence at ${asString(p.confidence)}`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

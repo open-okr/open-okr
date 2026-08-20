@@ -35,6 +35,7 @@ import {
   openSessionAction,
   skipSessionAction,
 } from "./actions";
+import { ConfidenceRound } from "./confidence-round";
 import { SessionLive } from "./session-live";
 
 interface SessionPageProps {
@@ -73,6 +74,24 @@ export default async function SessionPage({ params }: SessionPageProps) {
   const participants = (await callAction(context, "sessions.participants", {
     id,
   })) as Array<{ memberId: string; name: string }>;
+
+  // Load confidence status for the confidence round (P4-T07b).
+  let krStatuses: Array<{
+    keyResultId: string;
+    title: string;
+    confirmed: boolean;
+    confirmedConfidence: number | null;
+    whatChanged: string | null;
+  }> = [];
+  if (sessionRow.stageKey === "confidence") {
+    try {
+      krStatuses = (await callAction(context, "sessions.confidenceStatus", {
+        sessionId: id,
+      })) as typeof krStatuses;
+    } catch {
+      // No KRs in this space's cycle, or action not available.
+    }
+  }
 
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
   const isScheduled = sessionRow.state === "scheduled";
@@ -176,6 +195,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
             </ol>
           </CardBody>
         </Card>
+      )}
+
+      {/* P4-T07b: Confidence round panel */}
+      {isRunning && sessionRow.stageKey === "confidence" && (
+        <ConfidenceRound
+          sessionId={id}
+          krStatuses={krStatuses}
+          isFacilitator={isFacilitator}
+        />
       )}
 
       {/* Continue / close controls for the facilitator during a running session */}
