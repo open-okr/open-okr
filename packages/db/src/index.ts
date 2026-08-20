@@ -170,6 +170,10 @@ export {
   reactions,
 } from "./schema/comments.ts";
 export {
+  type Commitment,
+  commitments,
+} from "./schema/commitments.ts";
+export {
   type CycleBaselineHealth,
   type CycleCalibration,
   type CycleCapacityNote,
@@ -212,6 +216,15 @@ export {
   type RhythmSettingsRow,
   rhythmSettings,
 } from "./schema/cycles.ts";
+export {
+  DIGEST_PERIODS,
+  DIGEST_SCOPES,
+  type Digest,
+  type DigestBody,
+  type DigestPeriod,
+  type DigestScope,
+  digests,
+} from "./schema/digests.ts";
 export {
   EMBEDDABLE_ENTITY_TYPES,
   type EmbeddableEntityType,
@@ -344,6 +357,10 @@ export {
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";
+export {
+  type Streak,
+  streaks,
+} from "./schema/streaks.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {
   type QuietHours,
