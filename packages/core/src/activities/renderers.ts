@@ -248,6 +248,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Blockers (P4-T07c)
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
+  // Commitments, digest, streaks (P4-T08)
+  "session.commitmentsSet": (p) =>
+    `Set ${asString(p.count, "0")} commitments for this week`,
+  "session.commitmentsClosed": (p) =>
+    `Closed ${asString(p.count, "0")} commitments from last week`,
+  "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

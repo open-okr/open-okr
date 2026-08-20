@@ -17,6 +17,8 @@ import {
   BLOCKER_TYPES,
   blockers,
   checkInVotes,
+  commitments,
+  digests,
   goals,
   keyResults,
   SESSION_KINDS,
@@ -24,11 +26,12 @@ import {
   sessionConfidences,
   okrSessions as sessions,
   spaceMembers,
+  streaks,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
 import { WEEKLY_STAGE_KEYS } from "@openokr/method";
-import { and, avg, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -475,6 +478,49 @@ export const advanceStage = defineWriteAction({
             }
           }
         }
+
+        // Stage completion gate: commitments → digest requires at least 2
+        // new commitments for this session (§11 sessions.weeklyCommitmentBounds).
+        if (
+          session.stageKey === "commitments" &&
+          nextStageKey === "digest" &&
+          session.spaceId &&
+          session.cycleId
+        ) {
+          // Only enforce commitments when the space has KRs.
+          const [krCount] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(keyResults)
+            .innerJoin(goals, eq(keyResults.goalId, goals.id))
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(goals.spaceId, session.spaceId),
+                eq(goals.cycleId, session.cycleId),
+              ),
+            );
+
+          if ((krCount?.count ?? 0) > 0) {
+            const MIN_COMMITMENTS = 2;
+            const [commitmentCount] = await tx
+              .select({ count: sql<number>`count(*)::int` })
+              .from(commitments)
+              .where(
+                activeOnly(
+                  commitments,
+                  eq(commitments.workspaceId, workspaceId),
+                  eq(commitments.sessionId, input.id),
+                ),
+              );
+            if ((commitmentCount?.count ?? 0) < MIN_COMMITMENTS) {
+              throw new OperationError(
+                "not_found",
+                `Cannot advance: at least ${MIN_COMMITMENTS} commitments are required, but only ${commitmentCount?.count ?? 0} were set.`,
+              );
+            }
+          }
+        }
       }
 
       const now = new Date();
@@ -545,10 +591,33 @@ export const skipSession = defineWriteAction({
         );
       }
 
+      const now = new Date();
       await tx
         .update(sessions)
-        .set({ state: "skipped", updatedAt: new Date() })
+        .set({ state: "skipped", updatedAt: now })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      // Reset streak on skip (§7.4: a skipped week breaks it).
+      if (session.spaceId) {
+        const [existing] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, workspaceId),
+              eq(streaks.spaceId, session.spaceId),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          // openokr:allow-mutation: streak is derived.
+          await tx
+            .update(streaks)
+            .set({ currentWeeks: 0, updatedAt: now })
+            .where(eq(streaks.id, existing.id));
+        }
+      }
 
       return {
         result: { id: input.id },
@@ -596,9 +665,128 @@ export const closeSession = defineWriteAction({
       }
 
       const now = new Date();
+
+      // Generate digest from session data.
+      let digestId: string | null = null;
+      if (session.spaceId) {
+        const confirmations = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confidence: sessionConfidences.confirmedConfidence,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, workspaceId),
+              eq(sessionConfidences.sessionId, input.id),
+            ),
+          );
+
+        const confidences = confirmations.map((c) => Number(c.confidence));
+        const avgConfidence =
+          confidences.length > 0
+            ? confidences.reduce((s, v) => s + v, 0) / confidences.length
+            : 0;
+
+        const HIGH = 0.7;
+        const LOW = 0.4;
+        const onTrack = confidences.filter((c) => c >= HIGH).length;
+        const atRisk = confidences.filter((c) => c < LOW).length;
+
+        const [blockerRow] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(blockers)
+          .where(
+            activeOnly(
+              blockers,
+              eq(blockers.workspaceId, workspaceId),
+              eq(blockers.sessionId, input.id),
+              isNull(blockers.resolvedAt),
+            ),
+          );
+        const blockerCount = blockerRow?.count ?? 0;
+
+        const [commitmentRow] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.sessionId, input.id),
+            ),
+          );
+        const commitmentCount = commitmentRow?.count ?? 0;
+
+        const weekStart = now.toISOString().slice(0, 10);
+        digestId = crypto.randomUUID();
+        await tx.insert(digests).values({
+          id: digestId,
+          workspaceId,
+          scope: "space",
+          scopeId: session.spaceId,
+          period: "weekly",
+          periodStart: weekStart,
+          body: {
+            averageConfidence: Math.round(avgConfidence * 100) / 100,
+            onTrackCount: onTrack,
+            atRiskCount: atRisk,
+            blockerCount,
+            commitmentCount,
+          },
+          generatedAt: now,
+        });
+      }
+
+      // Update streak.
+      if (session.spaceId) {
+        const weekStart = now.toISOString().slice(0, 10);
+        const [existing] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, workspaceId),
+              eq(streaks.spaceId, session.spaceId),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          const newCurrent = existing.currentWeeks + 1;
+          const newLongest = Math.max(existing.longestWeeks, newCurrent);
+          // openokr:allow-mutation: streak is derived, not a domain change.
+          await tx
+            .update(streaks)
+            .set({
+              currentWeeks: newCurrent,
+              longestWeeks: newLongest,
+              lastSessionWeek: weekStart,
+              updatedAt: now,
+            })
+            .where(eq(streaks.id, existing.id));
+        } else {
+          // openokr:allow-mutation: streak is derived.
+          await tx.insert(streaks).values({
+            id: crypto.randomUUID(),
+            workspaceId,
+            spaceId: session.spaceId,
+            currentWeeks: 1,
+            longestWeeks: 1,
+            lastSessionWeek: weekStart,
+          });
+        }
+      }
+
       await tx
         .update(sessions)
-        .set({ state: "closed", endedAt: now, updatedAt: now })
+        .set({
+          state: "closed",
+          endedAt: now,
+          digestId,
+          updatedAt: now,
+        })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
       return {
@@ -1523,6 +1711,291 @@ export const sessionBlockerStatus = defineReadAction({
             overdue: now > b.dueAt && !b.resolvedAt,
           };
         });
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T08: Commitment actions
+// ---------------------------------------------------------------------------
+
+export const setSessionCommitments = defineWriteAction({
+  name: "sessions.setCommitments",
+  summary:
+    "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
+  input: z.object({
+    sessionId: z.uuid(),
+    items: z.array(
+      z.object({
+        text: z.string().trim().min(1).max(500),
+        ownerId: z.uuid(),
+        keyResultId: z.uuid().optional(),
+      }),
+    ),
+  }),
+  output: z.object({ count: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (!session.spaceId) {
+        throw new OperationError("not_found", "Session has no space.");
+      }
+
+      const weekStart = new Date().toISOString().slice(0, 10);
+
+      for (const item of input.items) {
+        await tx.insert(commitments).values({
+          id: crypto.randomUUID(),
+          workspaceId,
+          sessionId: input.sessionId,
+          spaceId: session.spaceId,
+          weekStart,
+          text: item.text,
+          ownerId: item.ownerId,
+          keyResultId: item.keyResultId ?? null,
+        });
+      }
+
+      return {
+        result: { count: input.items.length },
+        activity: {
+          kind: "session.commitmentsSet",
+          subjectType: "space",
+          subjectId: session.spaceId,
+          payload: { count: input.items.length },
+        },
+        audit: {
+          action: "sessions.setCommitments",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { count: input.items.length },
+        },
+      };
+    },
+  }),
+});
+
+export const closeSessionCommitments = defineWriteAction({
+  name: "sessions.closeCommitments",
+  summary:
+    "Closes last week's commitments with a delivered/not-delivered verdict.",
+  input: z.object({
+    items: z.array(
+      z.object({
+        id: z.uuid(),
+        delivered: z.boolean(),
+      }),
+    ),
+  }),
+  output: z.object({ closed: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const now = new Date();
+      for (const item of input.items) {
+        await tx
+          .update(commitments)
+          .set({
+            delivered: item.delivered,
+            closedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.id, item.id),
+            ),
+          );
+      }
+
+      return {
+        result: { closed: input.items.length },
+        activity: {
+          kind: "session.commitmentsClosed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { count: input.items.length },
+        },
+        audit: {
+          action: "sessions.closeCommitments",
+          targetType: "commitment",
+          payload: { count: input.items.length },
+        },
+      };
+    },
+  }),
+});
+
+export const listSessionCommitments = defineReadAction({
+  name: "sessions.listCommitments",
+  summary: "Commitments for a session.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      text: z.string(),
+      ownerId: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      delivered: z.boolean().nullable(),
+      closedAt: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      text: string;
+      ownerId: string;
+      keyResultId: string | null;
+      delivered: boolean | null;
+      closedAt: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const rows = await tx
+          .select()
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, context.workspaceId),
+              eq(commitments.sessionId, input.sessionId),
+            ),
+          );
+
+        return rows.map((r) => ({
+          id: r.id,
+          text: r.text,
+          ownerId: r.ownerId,
+          keyResultId: r.keyResultId ?? null,
+          delivered: r.delivered ?? null,
+          closedAt: r.closedAt?.toISOString() ?? null,
+        }));
+      },
+    );
+  },
+});
+
+export const setCoordinatorNote = defineWriteAction({
+  name: "sessions.setCoordinatorNote",
+  summary: "Adds the coordinator's note to the session digest.",
+  input: z.object({
+    sessionId: z.uuid(),
+    note: z.string().trim().min(1).max(2000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (!session.digestId) {
+        throw new OperationError(
+          "not_found",
+          "No digest exists for this session yet.",
+        );
+      }
+
+      await tx
+        .update(digests)
+        .set({ note: input.note, updatedAt: new Date() })
+        .where(activeOnly(digests, eq(digests.id, session.digestId)));
+
+      return {
+        result: { id: session.digestId },
+        activity: {
+          kind: "session.coordinatorNoteSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {},
+        },
+        audit: {
+          action: "sessions.setCoordinatorNote",
+          targetType: "digest",
+          targetId: session.digestId,
+        },
+      };
+    },
+  }),
+});
+
+export const readStreak = defineReadAction({
+  name: "sessions.readStreak",
+  summary: "The rhythm streak for a space.",
+  input: z.object({ spaceId: z.uuid() }),
+  output: z.object({
+    currentWeeks: z.number().int(),
+    longestWeeks: z.number().int(),
+    lastSessionWeek: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<{
+    currentWeeks: number;
+    longestWeeks: number;
+    lastSessionWeek: string | null;
+  }> {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, context.workspaceId),
+              eq(streaks.spaceId, input.spaceId),
+            ),
+          )
+          .limit(1);
+
+        return {
+          currentWeeks: row?.currentWeeks ?? 0,
+          longestWeeks: row?.longestWeeks ?? 0,
+          lastSessionWeek: row?.lastSessionWeek ?? null,
+        };
       },
     );
   },
