@@ -183,18 +183,23 @@ import {
   advanceStage,
   castSessionVote,
   closeSession,
+  closeSessionCommitments,
   confirmSessionConfidence,
   createSession,
   createSessionBlocker,
   listParticipants,
+  listSessionCommitments,
   listSessions,
   openSession,
   readSession,
+  readStreak,
   resolveSessionBlocker,
   revealSessionVotes,
   sessionBlockerStatus,
   sessionConfidenceStatus,
   sessionVotes,
+  setCoordinatorNote,
+  setSessionCommitments,
   skipSession,
 } from "./sessions.ts";
 import {
@@ -406,6 +411,12 @@ export const ACTION_MAP = {
   "sessions.createBlocker": createSessionBlocker,
   "sessions.resolveBlocker": resolveSessionBlocker,
   "sessions.blockerStatus": sessionBlockerStatus,
+  // Commitments, digest, streaks (P4-T08)
+  "sessions.setCommitments": setSessionCommitments,
+  "sessions.closeCommitments": closeSessionCommitments,
+  "sessions.listCommitments": listSessionCommitments,
+  "sessions.setCoordinatorNote": setCoordinatorNote,
+  "sessions.readStreak": readStreak,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

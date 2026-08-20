@@ -814,3 +814,220 @@ describe("sessions.advanceStage — diagnose completion gate (P4-T07c)", () => {
     expect((result as { id: string }).id).toBe(sessionId);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P4-T08: Commitments, digest, streaks
+// ---------------------------------------------------------------------------
+
+/** Helper: advance a session through confidence and diagnose to commitments. */
+async function advanceToCommitments(
+  sessionId: string,
+  confidence: number,
+): Promise<void> {
+  await advanceToDiagnose(sessionId, confidence);
+
+  if (confidence < 0.4) {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.createBlocker",
+      {
+        sessionId,
+        keyResultId,
+        type: "resource",
+        ownerId: facilitatorMemberId,
+        nextAction: "Hire contractor",
+      },
+    );
+  }
+
+  const wb = await workerDb();
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.advanceStage",
+    { id: sessionId },
+  );
+}
+
+describe("sessions.setCommitments (P4-T08)", () => {
+  it("creates commitments for the session", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.5);
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
+          { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    expect((result as { count: number }).count).toBe(2);
+  });
+});
+
+describe("sessions.advanceStage commitments gate (P4-T08)", () => {
+  it("is refused from commitments to digest with fewer than 2 commitments", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.5);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [{ text: "Just one thing", ownerId: facilitatorMemberId }],
+      },
+    );
+
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+      }),
+    ).rejects.toThrow(/at least 2 commitments/i);
+  });
+
+  it("succeeds with 2 commitments", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.5);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "Ship the onboarding flow", ownerId: facilitatorMemberId },
+          { text: "Review the Q3 pipeline", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    expect((result as { id: string }).id).toBe(sessionId);
+  });
+});
+
+describe("sessions.close digest and streak (P4-T08)", () => {
+  it("generates a digest on session close", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.7);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "Ship it", ownerId: facilitatorMemberId },
+          { text: "Review it", ownerId: memberMemberId },
+        ],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: sessionId,
+    });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.read",
+      { id: sessionId },
+    );
+    expect((read as { digestId: string | null }).digestId).not.toBeNull();
+  });
+
+  it("increments the streak on session close", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.7);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "Ship it", ownerId: facilitatorMemberId },
+          { text: "Review it", ownerId: memberMemberId },
+        ],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: sessionId,
+    });
+
+    const streak = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.readStreak",
+      { spaceId },
+    );
+    expect((streak as { currentWeeks: number }).currentWeeks).toBe(1);
+  });
+
+  it("resets the streak on session skip", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const s1 = await openSessionAtConfidence();
+    await advanceToCommitments(s1, 0.7);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: s1,
+        items: [
+          { text: "A", ownerId: facilitatorMemberId },
+          { text: "B", ownerId: memberMemberId },
+        ],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: s1 },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: s1,
+    });
+
+    const s2 = await createSession();
+    const s2Id = (s2 as { id: string }).id;
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.skip", {
+      id: s2Id,
+    });
+
+    const streak = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.readStreak",
+      { spaceId },
+    );
+    expect((streak as { currentWeeks: number }).currentWeeks).toBe(0);
+  });
+});
