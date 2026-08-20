@@ -43,7 +43,7 @@ hourly run, and the session record with live stage sync.
 | Chain | Tasks | Serial? | State |
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
-| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a and P4-T05b in_review; P4-T05c next |
+| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a and P4-T05b in_review; P4-T05c cut in two, the -a half under way |
 | B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T07c in_review; P4-T08 next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
@@ -99,7 +99,8 @@ and this table is what was agreed.
 | P4-T04c | Escalation ladders, provenance, volume dashboard | Agung | in_review |
 | P4-T05a | The Champion agent and its nudge run | Agung | in_review |
 | P4-T05b | The daily sweep and the cycle countdown | Agung | in_review |
-| P4-T05c | Champion proposals for check-ins and recovery | Agung | todo, ready |
+| P4-T05c-a | The proposal path, and the recovery proposal | Agung | in_review |
+| P4-T05c-b | AI drafting inside the proposal | Agung | blocked, needs a provider key |
 | P4-T06a | The Coach agent and write-triggered evaluation | Agung | todo, ready |
 | P4-T06b | The nightly semantic sweep and the finding table | Agung | todo |
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
@@ -146,7 +147,7 @@ so the other lane does not write the same task twice.
 | Blockers | Resolved. P4-T07c created the table, P4-T05b reads it, the ladder was already there | Held: the ladder was read, not rewritten, and no second table was defined. P4-T05b also leaves `escalated_at` and `escalated_to_id` alone, because a nudge reader writing them would record an escalation as though somebody had acted on it |
 | The nudge engine | Every rhythm trigger and every session trigger records a nudge through `packages/core/src/nudges/run.ts` | Add rules to `packages/method/src/triggers.ts`. Do not add a second decision path beside `decideSuppression` |
 | `packages/method` | Both lanes add rules | Any change is a message to the other lane. It is the one shared package with real risk |
-| Migration numbers | Both lanes add tables | The tree is at **0039**; the next free number is **0040**. Agree it before writing the file when both lanes have one in flight. 0029 is a permanent gap from an earlier collision, and P4-T05b was renumbered 0037 to 0039 mid-task after Obed took 0037 and 0038 the same day: **check `ls packages/db/migrations` again immediately before you commit**, not only when you start |
+| Migration numbers | Both lanes add tables | The tree is at **0040**; the next free number is **0041**. Agree it before writing the file when both lanes have one in flight. 0029 is a permanent gap from an earlier collision, and P4-T05b was renumbered 0037 to 0039 mid-task after Obed took 0037 and 0038 the same day: **check `ls packages/db/migrations` again immediately before you commit**, not only when you start |
 
 ## File ownership
 

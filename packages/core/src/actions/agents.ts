@@ -735,6 +735,8 @@ export const runChampion = defineWriteAction({
     ruleKeys: z.array(z.string()),
     /** Goals the daily sweep flipped to `outdated`. Zero for the other three. */
     staleFlipped: z.number().int(),
+    /** Changes written into the review queue, pending a human (P4-T05c-a). */
+    proposed: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -815,6 +817,7 @@ export const runChampion = defineWriteAction({
             suppressed: 0,
             ruleKeys: [] as string[],
             staleFlipped: 0,
+            proposed: 0,
           },
           activity: {
             // The catalogue already has this kind, from the manual cancel
@@ -838,10 +841,33 @@ export const runChampion = defineWriteAction({
         };
       }
 
+      // The run row is written **before** the work, not after it (P4-T05c-a).
+      //
+      // A proposal's `run_id` is not null, so a run that inserted its own row
+      // last could not attach one: the proposal would have nothing to point at.
+      // It is also the more honest shape. A run that crashes now leaves a
+      // `running` row that says something started and did not finish, where
+      // before it left nothing at all and read as a run that never happened.
+      // openokr:allow-mutation: the operation's own execute.
+      const [started] = await tx
+        .insert(agentRuns)
+        .values({
+          workspaceId,
+          agentId: loaded.agentId,
+          trigger,
+          status: "running",
+          tasks: [],
+          log: [],
+          startedAt: at,
+        })
+        .returning({ id: agentRuns.id });
+      const runId = (started as { id: string }).id;
+
       const run = await runDueNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
         at,
         cadence,
+        runId,
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -873,21 +899,27 @@ export const runChampion = defineWriteAction({
         });
       }
 
-      // openokr:allow-mutation: the operation's own execute.
-      const [row] = await tx
-        .insert(agentRuns)
-        .values({
-          workspaceId,
-          agentId: loaded.agentId,
-          trigger,
-          status: "completed",
-          tasks: [],
-          log,
-          startedAt: at,
-          finishedAt: at,
-        })
-        .returning({ id: agentRuns.id });
-      const runId = (row as { id: string }).id;
+      if (run.proposed > 0) {
+        // A proposal is not a message, so it earns its own line rather than
+        // being counted among the nudges. A reader asking "did the agent want
+        // to change anything" is asking a different question from "did it
+        // speak".
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 2,
+          kind: "applied",
+          message: `${run.proposed} change(s) proposed, pending a human.`,
+        });
+      }
+
+      // openokr:allow-mutation: the operation's own execute. The row was
+      // inserted above so the proposals could reference it; this closes it.
+      await tx
+        .update(agentRuns)
+        .set({ status: "completed", log, finishedAt: at })
+        // Not `activeOnly`: `agent_runs` carries no `deleted_at` at all, by
+        // 0018's own decision that a run is a fact rather than a document.
+        .where(eq(agentRuns.id, runId));
 
       return {
         result: {
@@ -897,6 +929,7 @@ export const runChampion = defineWriteAction({
           suppressed: run.suppressed,
           ruleKeys: [...run.ruleKeys],
           staleFlipped: run.staleFlipped,
+          proposed: run.proposed,
         },
         activity: {
           kind: "agent.run_completed",

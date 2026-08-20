@@ -503,15 +503,30 @@ Test plan: a goal past its staleness grace is flipped to outdated exactly once; 
 Acceptance: Given a goal three days past its staleness grace, when the daily sweep runs, then that goal reads outdated, a second run changes nothing, and the hourly queue is what nudges its champion.
 Correction, made at P4-T05b: this card asked for the daily sweep to nudge the champion. AI-NATIVE-PLAN.md §6.2 puts the check-in nudge in the **hourly** queue and gives the daily run the staleness sweep, which flips health rather than sending a message. §6.2 outranks this document, so the criterion above is the one that was built. A daily run that also chased check-ins would mean two cadences reading the same rows and a run log that could not say which clock spoke.
 
-### P4-T05c: Champion proposals for check-ins and recovery [M]
+### P4-T05c-a: The proposal path, and the recovery proposal [M]
 Depends on: P4-T05b
+Goal: a proposal a human applies in one action, with nothing AI about it yet.
+Deliverables: the shared draft helper extracted so one implementation opens a check-in draft; a publish action that opens the draft and publishes it in one Operation, because an agent holds `view` and cannot open one itself; `proposed_changes.ai_generated` and the `nudges` link to the proposal it carries; the recovery OKR proposal raised from the daily sweep, deterministic, from METHOD.md §6.5's template; the nudge that carries it.
+Test plan: a KPI unhealthy for the §11 delay produces exactly one pending proposal with the AI provider off; nothing commits until a human applies it; applying it launches the recovery through the normal Operation with its audit row; the nudge names the proposal.
+Acceptance: Given a KPI unhealthy for two consecutive periods and no AI provider, when the daily run executes, then its owner is nudged once with a pending recovery proposal attached, the KPI is unchanged, and applying that proposal creates the recovery objective as the applying member.
+
+### P4-T05c-b: AI drafting inside the proposal [M]
+Depends on: P4-T05c-a
 Goal: drafting that stays a proposal (AI-NATIVE-PLAN.md §6.2).
-Deliverables: proposal generation for drafted check-ins and recovery OKRs into the review queue, marked as AI-generated, applied by a human in one action.
-Test plan: with AI off no drafting occurs and every trigger still fires; a KPI unhealthy for two periods produces a recovery proposal; nothing commits without a human applying it.
+Deliverables: the check-in drafter in `packages/agents`, producing status, confidence, narrative and values through structured extraction with the §1.8 repair attempt; the AI-refined recovery objective title, defaulting to the template when absent; the run cost cap applied around every provider call; every drafted proposal marked AI-generated.
+Test plan: with AI off no language is generated and every trigger still fires; with a provider configured a check-in three days overdue produces a drafted proposal; a run that reaches its cost cap halts before spending; model output that fails its schema twice fails cleanly rather than proposing nonsense.
 Acceptance: Given a check-in three days overdue and a provider configured, when the agent runs, then the champion receives a nudge containing a drafted check-in they can review and publish in one action.
 
+**Why P4-T05c was cut in two.** The original card asked for the proposal
+machinery and the AI drafting together. The machinery is a shared draft helper,
+a new publish action, two columns and a deterministic recovery proposal, and it
+is verifiable with no provider at all; the drafting is a `packages/agents`
+module that cannot be verified without a key. Splitting on the provider
+boundary is also what let the first half land while the second waited on a
+credential.
+
 ### P4-T06a: The Coach agent and write-triggered evaluation [M]
-Depends on: P4-T05c
+Depends on: P4-T05c-b
 Goal: the quality agent at the moment of writing (AI-NATIVE-PLAN.md §6.1).
 Deliverables: the seeded Coach agent with its persona, instructions, schedule and scope; write-triggered evaluation feeding the goal's quality flags; the AI-NATIVE-PLAN.md §6.4 quality triggers; every message citing its rule key.
 Test plan: a message citing a rule key the method package does not define fails the build; with AI off the quality triggers still fire.

@@ -31,6 +31,7 @@ import {
   deleteCheckInInTx,
   editWindowOpen,
   publishCheckInInTx,
+  startDraftInTx,
 } from "../check-ins/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -150,69 +151,144 @@ export const startCheckIn = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      // One draft per author per goal: reopening continues where they left off
-      // rather than starting a second one, which the unique index enforces too.
-      const [existing] = await tx
-        .select({ id: checkIns.id })
-        .from(checkIns)
-        .where(
-          activeOnly(
-            checkIns,
-            eq(checkIns.workspaceId, workspaceId),
-            eq(checkIns.subjectId, input.goalId),
-            eq(checkIns.authorMemberId, memberId),
-            eq(checkIns.state, "draft"),
-          ),
-        )
-        .limit(1);
-
-      if (existing) {
-        return {
-          result: { id: existing.id, reopened: true },
-          // A draft emits nothing, so the activity row records the act of opening
-          // the composer rather than anything about the goal. `test.*` is not an
-          // option here: this is a real product event, just a quiet one.
-          activity: {
-            kind: "check_in.draft_opened",
-            subjectType: "goal",
-            subjectId: input.goalId,
-            payload: { reopened: true },
-          },
-          audit: {
-            action: "goals.startCheckIn",
-            targetType: "check_in",
-            targetId: existing.id,
-            payload: { reopened: true },
-          },
-        };
-      }
-
-      const [created] = await tx
-        .insert(checkIns)
-        .values({
-          workspaceId,
-          subjectId: input.goalId,
-          authorMemberId: memberId,
-          state: "draft",
-        })
-        .returning({ id: checkIns.id });
-      if (!created) {
-        throw new Error("The check-in insert returned no row.");
-      }
+      // One draft per author per goal, in `startDraftInTx` since P4-T05c-a
+      // needed the same three lines to publish a proposed check-in.
+      const draft = await startDraftInTx(tx, {
+        workspaceId,
+        goalId: input.goalId,
+        authorMemberId: memberId,
+      });
 
       return {
-        result: { id: created.id, reopened: false },
+        result: { id: draft.checkInId, reopened: draft.reopened },
+        // A draft emits nothing, so the activity row records the act of opening
+        // the composer rather than anything about the goal. `test.*` is not an
+        // option here: this is a real product event, just a quiet one.
         activity: {
           kind: "check_in.draft_opened",
           subjectType: "goal",
           subjectId: input.goalId,
-          payload: { reopened: false },
+          payload: { reopened: draft.reopened },
         },
         audit: {
           action: "goals.startCheckIn",
           targetType: "check_in",
-          targetId: created.id,
-          payload: {},
+          targetId: draft.checkInId,
+          payload: { reopened: draft.reopened },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Publishes a check-in whose draft does not exist yet (P4-T05c-a).
+ *
+ * **Why this exists rather than reusing `goals.publishCheckIn`.** That action
+ * takes a draft id, and the Champion cannot produce one: it holds `view` on its
+ * spaces and nothing more, which is the least-privilege rule P4-T05a asserts
+ * with a test. So a proposed check-in cannot be a draft the agent opened and a
+ * publish the human confirms; it has to be one action, carrying the content,
+ * that opens the draft and publishes it **as the applying member**.
+ *
+ * One action is also what §6.4's acceptance asks for in as many words: a drafted
+ * check-in the champion can "review and publish in one action". A proposal row
+ * holds exactly one action and one payload, so anything needing three calls
+ * could not be proposed at all.
+ *
+ * The publication itself is `publishCheckInInTx`, the same function
+ * `goals.publishCheckIn` calls. Nothing about the snapshot, the value history,
+ * the cadence advance or the reviewer of record is re-implemented here: a second
+ * publish path that forgot the reviewer stamp would leave the review inbox with
+ * an obligation it could not attribute.
+ */
+export const publishDraftedCheckIn = defineWriteAction({
+  name: "goals.publishDraftedCheckIn",
+  summary:
+    "Opens the author's draft check-in on a goal and publishes it in one action, for a proposal a human applies.",
+  input: z.object({
+    goalId: z.uuid(),
+    status: z.enum(CHECK_IN_STATUSES),
+    confidence: z.number().min(0).max(1),
+    narrative: richText,
+    values: z.array(composerValue).default([]),
+  }),
+  output: z.object({
+    id: z.uuid(),
+    goalId: z.uuid(),
+    valuesWritten: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      // The goal's own access, checked before anything is written. A proposal
+      // being applied is an ordinary write by the member who applied it, so it
+      // earns no exemption: an applying member without `edit` is refused here
+      // exactly as they would be in the composer.
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const draft = await startDraftInTx(tx, {
+        workspaceId,
+        goalId: input.goalId,
+        authorMemberId: memberId,
+      });
+
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const now = new Date();
+      const published = await publishCheckInInTx(tx, {
+        workspaceId,
+        checkInId: draft.checkInId,
+        authorMemberId: memberId,
+        status: input.status,
+        confidence: input.confidence,
+        narrative: input.narrative,
+        values: input.values,
+        thresholds: rhythm.thresholds,
+        now,
+      });
+
+      await recomputeForGoal(
+        tx,
+        workspaceId,
+        published.goalId,
+        rhythm.thresholds,
+        now,
+      );
+
+      return {
+        result: {
+          id: draft.checkInId,
+          goalId: published.goalId,
+          valuesWritten: published.valuesWritten,
+        },
+        // The same activity kind a composed check-in emits. A separate kind
+        // would split one thing across two feeds and make the goal's history
+        // depend on which surface posted it.
+        activity: {
+          kind: "check_in.published",
+          subjectType: "goal",
+          subjectId: published.goalId,
+          payload: {
+            status: input.status,
+            valuesWritten: published.valuesWritten,
+          },
+        },
+        audit: {
+          action: "goals.publishDraftedCheckIn",
+          targetType: "check_in",
+          targetId: draft.checkInId,
+          payload: { status: input.status, fromProposal: true },
         },
       };
     },

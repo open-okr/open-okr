@@ -152,6 +152,16 @@ export const proposedChanges = pgTable("proposed_changes", {
   status: text("status", { enum: PROPOSED_CHANGE_STATUSES })
     .notNull()
     .default("pending"),
+  /**
+   * Whether a model wrote this proposal's content (P4-T05c-a).
+   *
+   * `run_id` already says a proposal came from an agent. This answers the
+   * different question a reviewer actually has: who chose the words. METHOD.md
+   * §6.5's recovery draft is a template and works with the provider off, so not
+   * every agent proposal is AI-generated, and describing one as though it were
+   * would overstate what the product did.
+   */
+  aiGenerated: boolean("ai_generated").notNull().default(false),
   decidedByMemberId: uuid("decided_by_member_id").references(
     () => workspaceMembers.id,
   ),

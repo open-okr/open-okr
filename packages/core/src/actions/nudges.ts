@@ -1,6 +1,7 @@
 import {
   activeOnly,
   nudges,
+  proposedChanges,
   type WorkspaceTx,
   withContext,
   workspaceMembers,
@@ -53,10 +54,20 @@ export const runNudges = defineWriteAction({
       // Champion's, reachable through `agents.runChampion`, because a run that
       // swept staleness under the name "run the nudges" would write to goals
       // from an action nobody expected to.
-      const { staleFlipped: _sweep, ...result } = await runDueNudgesInTx(
-        tx as WorkspaceTx,
-        { workspaceId, at, cadence: "hourly" },
-      );
+      // `staleFlipped` and `proposed` are dropped rather than reported: this
+      // action runs the hourly queue, which sweeps nothing and, with no agent
+      // run to hang a proposal off, proposes nothing either.
+      const {
+        staleFlipped: _sweep,
+        proposed: _proposed,
+        ruleKeys,
+        ...counts
+      } = await runDueNudgesInTx(tx as WorkspaceTx, {
+        workspaceId,
+        at,
+        cadence: "hourly",
+      });
+      const result = { ...counts, ruleKeys: [...ruleKeys] };
 
       return {
         result,
@@ -95,6 +106,23 @@ export const listNudges = defineReadAction({
         suppressedReason: z.string().nullable(),
         sentAt: z.string().nullable(),
         createdAt: z.string(),
+        /**
+         * The change this nudge offers, when it offers one (P4-T05c-a).
+         *
+         * Null on almost every nudge: a reminder to do something yourself
+         * carries no draft. Present, it is what makes "review and apply in one
+         * action" possible from the inbox, because the id here is the id
+         * `proposals.bulkApply` takes.
+         */
+        proposal: z
+          .object({
+            id: z.uuid(),
+            action: z.string(),
+            status: z.string(),
+            /** False for a template. True only where a model wrote it. */
+            aiGenerated: z.boolean(),
+          })
+          .nullable(),
       }),
     ),
   }),
@@ -134,11 +162,18 @@ export const listNudges = defineReadAction({
             subjectId: nudges.subjectId,
             channel: nudges.channel,
             escalationStep: nudges.escalationStep,
+            proposalId: nudges.proposalId,
+            proposalAction: proposedChanges.action,
+            proposalStatus: proposedChanges.status,
+            proposalAiGenerated: proposedChanges.aiGenerated,
             suppressedReason: nudges.suppressedReason,
             sentAt: nudges.sentAt,
             createdAt: nudges.createdAt,
           })
           .from(nudges)
+          // Left, because most nudges carry no proposal and an inner join
+          // would silently return only the ones that do.
+          .leftJoin(proposedChanges, eq(proposedChanges.id, nudges.proposalId))
           .where(
             activeOnly(
               nudges,
@@ -152,11 +187,28 @@ export const listNudges = defineReadAction({
           .limit(input.limit);
 
         return {
-          nudges: rows.map((row) => ({
-            ...row,
-            sentAt: row.sentAt?.toISOString() ?? null,
-            createdAt: row.createdAt.toISOString(),
-          })),
+          nudges: rows.map(
+            ({
+              proposalId,
+              proposalAction,
+              proposalStatus,
+              proposalAiGenerated,
+              ...row
+            }) => ({
+              ...row,
+              sentAt: row.sentAt?.toISOString() ?? null,
+              createdAt: row.createdAt.toISOString(),
+              proposal:
+                proposalId && proposalAction && proposalStatus
+                  ? {
+                      id: proposalId,
+                      action: proposalAction,
+                      status: proposalStatus,
+                      aiGenerated: proposalAiGenerated ?? false,
+                    }
+                  : null,
+            }),
+          ),
         };
       },
     );

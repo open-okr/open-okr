@@ -111,6 +111,19 @@ export const nudges = pgTable("nudges", {
     enum: NUDGE_SUPPRESSION_REASONS,
   }),
   snoozedUntil: timestamp("snoozed_until", { withTimezone: true }),
+  /**
+   * The proposal this nudge carries, when it carries one (P4-T05c-a).
+   *
+   * §6.4's acceptance is "a nudge containing a drafted change they can review
+   * and apply in one action". Without the link a nudge and its proposal are two
+   * rows a reader has to guess belong together. Null on most rows: a reminder to
+   * do something yourself carries no draft.
+   *
+   * The foreign key is declared in the migration rather than here, to avoid a
+   * circular import between this file and the agents schema, which already
+   * imports nothing from it.
+   */
+  proposalId: uuid("proposal_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -48,7 +48,12 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
-import { type DueNudge, goalRolesFor, memberForRole } from "./service.ts";
+import {
+  type DueNudge,
+  goalRolesFor,
+  memberForRole,
+  type NudgeProposal,
+} from "./service.ts";
 
 /** The rule key each corridor state earns, or nothing where a state is silent. */
 const RULE_FOR_STATE: Partial<Record<KpiState, string>> = {
@@ -119,6 +124,7 @@ function nudge(input: {
   readonly subjectId: string;
   readonly recipientMemberId: string;
   readonly urgent: boolean;
+  readonly proposal?: NudgeProposal;
 }): DueNudge {
   if (!isTriggerKey(input.ruleKey)) {
     // Loud rather than skipped, the same refusal `service.ts` makes. A rule key
@@ -142,6 +148,7 @@ function nudge(input: {
     // widening that never happens.
     escalationStep: 0,
     urgent: input.urgent,
+    ...(input.proposal ? { proposal: input.proposal } : {}),
   };
 }
 
@@ -166,6 +173,15 @@ export async function dueKpiCorridorNudges(
   input: {
     readonly workspaceId: string;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * The cycle a proposed recovery objective would live in.
+     *
+     * A recovery objective is an objective and an objective belongs to a cycle,
+     * so with no open cycle there is nothing to propose into and the nudge goes
+     * out without a proposal attached. Told rather than nothing: the owner still
+     * learns the KPI has been unhealthy for two periods.
+     */
+    readonly cycleId?: string;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
@@ -234,6 +250,24 @@ export async function dueKpiCorridorNudges(
             subjectId: kpi.id,
             recipientMemberId: owner,
             urgent: urgentFor("kpi.recovery_proposed", true),
+            // The proposal is `kpis.launchRecovery` with the ids, and nothing
+            // else. §6.5's drafter is what that action already calls, so the
+            // objective and its key results are produced when a human applies
+            // it, from the tree as it stands then rather than as it stood when
+            // the proposal was raised. A payload carrying drafted titles would
+            // go stale the moment somebody added a driver.
+            //
+            // Deterministic, and marked as such: this is a template, not a
+            // model. P4-T05c-b is what adds a refined title and sets the flag.
+            ...(input.cycleId
+              ? {
+                  proposal: {
+                    action: "kpis.launchRecovery",
+                    payload: { kpiId: kpi.id, cycleId: input.cycleId },
+                    aiGenerated: false,
+                  } as const,
+                }
+              : {}),
           }),
         );
       }

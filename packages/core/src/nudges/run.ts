@@ -17,8 +17,14 @@
  * It takes a transaction and writes on it. Both callers are Operations, so the
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
-import { notifications, type WorkspaceTx } from "@openokr/db";
+import {
+  activeOnly,
+  cycles,
+  notifications,
+  type WorkspaceTx,
+} from "@openokr/db";
 import type { SuppressionReason } from "@openokr/method";
+import { desc, eq, ne } from "drizzle-orm";
 import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -55,6 +61,14 @@ export interface NudgeRunInput {
   readonly at: Date;
   /** Defaults to `hourly`, which is what P4-T04a and P4-T05a both meant. */
   readonly cadence?: NudgeCadence;
+  /**
+   * The agent run any proposal belongs to (P4-T05c-a).
+   *
+   * Absent for `nudges.run`, the hourly queue an administrator can call by
+   * hand. That path is not an agent run and proposes nothing rather than
+   * inventing a run row to look as though it did.
+   */
+  readonly runId?: string;
 }
 
 export interface NudgeRunResult {
@@ -71,6 +85,34 @@ export interface NudgeRunResult {
    * happened.
    */
   readonly staleFlipped: number;
+  /** Changes written into the review queue, pending a human. */
+  readonly proposed: number;
+}
+
+/**
+ * The cycle a proposed recovery objective would live in.
+ *
+ * The one a `planning`, `active` or `closing` cycle names, newest first. A
+ * closed cycle is not somewhere to put new work, and a workspace between cycles
+ * gets nothing rather than a proposal into a cycle that has ended.
+ */
+async function openCycleId(
+  tx: WorkspaceTx,
+  workspaceId: string,
+): Promise<{ cycleId?: string }> {
+  const [row] = await tx
+    .select({ id: cycles.id })
+    .from(cycles)
+    .where(
+      activeOnly(
+        cycles,
+        eq(cycles.workspaceId, workspaceId),
+        ne(cycles.status, "closed"),
+      ),
+    )
+    .orderBy(desc(cycles.startsOn))
+    .limit(1);
+  return row ? { cycleId: row.id } : {};
 }
 
 export async function runDueNudgesInTx(
@@ -114,7 +156,14 @@ export async function runDueNudgesInTx(
       .flipped;
     due.push(
       ...(await dueBlockerNudges(tx, { workspaceId, now: at, thresholds })),
-      ...(await dueKpiCorridorNudges(tx, { workspaceId, thresholds })),
+      ...(await dueKpiCorridorNudges(tx, {
+        workspaceId,
+        thresholds,
+        // Resolved once for the run rather than per KPI. `undefined` is a real
+        // answer: a workspace with no open cycle has nothing to propose a
+        // recovery objective into.
+        ...(await openCycleId(tx, workspaceId)),
+      })),
       ...(await dueDailyDigestNudges(tx, {
         workspaceId,
         now: at,
@@ -176,6 +225,7 @@ export async function runDueNudgesInTx(
     workspaceId,
     due: decided,
     at,
+    ...(input.runId ? { runId: input.runId } : {}),
   });
 
   // The in-app inbox, one row per nudge that was actually sent, linked by the
@@ -211,6 +261,11 @@ export async function runDueNudgesInTx(
     recorded: sent,
     suppressed: ids.length - sent,
     staleFlipped,
+    // Distinct rows, not linked nudges: two nudges pointing at one already
+    // pending proposal proposed nothing new, and counting them twice would
+    // report activity the run did not cause.
+    proposed: new Set(ids.map((written) => written.proposalId).filter(Boolean))
+      .size,
     ruleKeys: [
       ...new Set(
         decided

@@ -429,7 +429,7 @@ Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-P
 `provider`, `direction` (`out` / `in`), `member_id?` to workspace_members, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status`, `error?`, `at`.
 
 ### nudges
-`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`. `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
+`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.
@@ -451,7 +451,7 @@ Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-P
 | `embeddings` | `subject_type`, `subject_id`, `chunk_index`, `content`, `vector`, `model_id`, `content_hash` |
 | `agents` | `member_id` to workspace_members, `builtin_kind` (`coach` / `champion` / `custom`), `definition`, `planning_instructions`, `execution_instructions`, `provider?`, `tier`, `schedule` (`manual` / `continuous` / `nightly` / `hourly` / `daily` / `weekly`), `autonomy` (`sandbox` / `propose` / `scoped_direct`), `scope jsonb`, `enabled`. The Champion's own row stays `hourly`: the column names the finest cadence an agent runs, and P4-T05b's daily, weekly and per-cycle sweeps are separate runs with their own `agent_runs.trigger` |
 | `agent_runs` | `agent_id` to agents, `trigger`, `status`, `tasks jsonb`, `log text`, `started_at`, `finished_at?`, `error?`, `cost` |
-| `proposed_changes` | `run_id` to agent_runs, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?` |
+| `proposed_changes` | `run_id` to agent_runs, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `ai_generated bool` (P4-T05c-a). On that last column: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated. |
 | `oauth_clients` | Registered and cached client metadata |
 | `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
 | `oauth_codes` | `code_hash`, `challenge`, `resource`, `consumed_at?` |

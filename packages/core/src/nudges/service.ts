@@ -26,6 +26,7 @@ import {
   type NudgeSubjectType,
   nudgeRules,
   nudges,
+  proposedChanges,
   rhythmSettings,
   spaceMembers,
   type WorkspaceTx,
@@ -46,6 +47,22 @@ import { daysPastDue } from "../cadence/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 
+/**
+ * A change the agent would make, offered rather than made (P4-T05c-a).
+ *
+ * `action` and `payload` are exactly what `proposals.bulkApply` will call, so a
+ * proposal is a deferred action call and nothing more. That is what keeps
+ * "propose by default" honest: there is no second write path an agent could
+ * take, only an action a human runs later under their own name.
+ */
+export interface NudgeProposal {
+  /** A key in the action registry. Applying it calls that action verbatim. */
+  readonly action: string;
+  readonly payload: Record<string, unknown>;
+  /** True only where a model wrote the content. §6.5's template is not AI. */
+  readonly aiGenerated: boolean;
+}
+
 export interface DueNudge {
   readonly ruleKey: string;
   readonly kind: NudgeKind;
@@ -61,6 +78,15 @@ export interface DueNudge {
    * champion's own reminders and none of them earns waking somebody up.
    */
   readonly urgent: boolean;
+  /**
+   * The change this nudge offers, when it offers one.
+   *
+   * Absent on almost every nudge: a reminder to do something yourself carries
+   * no draft. Present, it is written as a `proposed_changes` row and the nudge
+   * links to it, so the recipient sees one thing to act on rather than two rows
+   * to correlate.
+   */
+  readonly proposal?: NudgeProposal;
 }
 
 /**
@@ -261,9 +287,29 @@ export async function recordNudgesInTx(
       readonly suppressedReason: SuppressionReason | null;
     }[];
     readonly at: Date;
+    /**
+     * The agent run these proposals belong to (P4-T05c-a).
+     *
+     * `proposed_changes.run_id` is not null, so without a run there is nothing
+     * for a proposal to hang off and any proposal on a due nudge is skipped.
+     * That is the correct behaviour rather than a gap: `nudges.run`, the hourly
+     * queue an administrator can call by hand, is not an agent run and must not
+     * invent one to look like it proposed something.
+     */
+    readonly runId?: string;
   },
-): Promise<readonly { readonly id: string; readonly sent: boolean }[]> {
-  const written: { id: string; sent: boolean }[] = [];
+): Promise<
+  readonly {
+    readonly id: string;
+    readonly sent: boolean;
+    readonly proposalId: string | null;
+  }[]
+> {
+  const written: {
+    id: string;
+    sent: boolean;
+    proposalId: string | null;
+  }[] = [];
   for (const { nudge, suppressedReason } of input.due) {
     if (!isTriggerKey(nudge.ruleKey)) {
       throw new OperationError(
@@ -271,6 +317,25 @@ export async function recordNudgesInTx(
         `\`${nudge.ruleKey}\` is not a rule the method package defines.`,
       );
     }
+
+    // The proposal is written first, so the nudge can carry its id in the same
+    // insert rather than being updated a moment later. Both are on this
+    // transaction, so they commit together or not at all.
+    //
+    // A suppressed nudge still gets its proposal. The suppression decided that
+    // **the message** was noise, not that the change was unwanted, and the
+    // review queue is an obligation rather than a message: P3-T08's rule that
+    // a snooze never hides a review-inbox obligation is the same rule seen
+    // from here.
+    const proposalId =
+      nudge.proposal && input.runId
+        ? await recordProposalInTx(tx, {
+            workspaceId: input.workspaceId,
+            runId: input.runId,
+            nudge,
+            proposal: nudge.proposal,
+          })
+        : null;
     // openokr:allow-mutation: runs on the transaction the calling Operation
     // opened, so the nudge rows and that Operation's audit row commit together.
     const [row] = await tx
@@ -289,13 +354,77 @@ export async function recordNudgesInTx(
         // halves matter: the row is what makes the silence answerable.
         sentAt: suppressedReason === null ? input.at : null,
         suppressedReason,
+        proposalId,
       })
       .returning({ id: nudges.id });
     if (row) {
-      written.push({ id: row.id, sent: suppressedReason === null });
+      written.push({
+        id: row.id,
+        sent: suppressedReason === null,
+        proposalId,
+      });
     }
   }
   return written;
+}
+
+/**
+ * Writes one proposal, unless an identical one is already waiting.
+ *
+ * **One pending proposal per subject per action.** A run happens every hour and
+ * the condition that raised it holds until somebody acts, so an unguarded
+ * insert would grow the review queue by one row an hour for a KPI nobody has
+ * got to yet. The deduplication window does that job for nudges; this is the
+ * same idea for the queue, and it has to be a distinct check because a proposal
+ * has no `scheduled_for` to compare.
+ *
+ * Only `pending` blocks a new one. A proposal somebody dismissed was a decision
+ * about that proposal, and a KPI still unhealthy a week later is entitled to be
+ * offered again rather than silently never mentioned.
+ */
+async function recordProposalInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly runId: string;
+    readonly nudge: DueNudge;
+    readonly proposal: NudgeProposal;
+  },
+): Promise<string | null> {
+  const [existing] = await tx
+    .select({ id: proposedChanges.id })
+    .from(proposedChanges)
+    .where(
+      and(
+        eq(proposedChanges.workspaceId, input.workspaceId),
+        eq(proposedChanges.status, "pending"),
+        eq(proposedChanges.action, input.proposal.action),
+        eq(proposedChanges.subjectType, input.nudge.subjectType),
+        eq(proposedChanges.subjectId, input.nudge.subjectId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    // Linked to the one already waiting rather than skipped, so today's nudge
+    // still points at something the recipient can act on.
+    return existing.id;
+  }
+
+  // openokr:allow-mutation: the calling Operation's own transaction, so the
+  // proposal, the nudge that carries it and the audit row commit together.
+  const [row] = await tx
+    .insert(proposedChanges)
+    .values({
+      workspaceId: input.workspaceId,
+      runId: input.runId,
+      action: input.proposal.action,
+      payload: input.proposal.payload,
+      subjectType: input.nudge.subjectType,
+      subjectId: input.nudge.subjectId,
+      aiGenerated: input.proposal.aiGenerated,
+    })
+    .returning({ id: proposedChanges.id });
+  return row?.id ?? null;
 }
 
 /** Members who are active, so a suspended one is never nudged. */

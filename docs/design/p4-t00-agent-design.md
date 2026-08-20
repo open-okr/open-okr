@@ -412,3 +412,73 @@ following day neither is told again.
 
 Given a cycle past its end date with status `active`, when the per-cycle run
 executes, then the close is chased; once the cycle reads `closed`, it is not.
+
+## 11. What P4-T05c-a built: the proposal path
+
+**A proposal is a deferred action call and nothing more.** `proposed_changes`
+stores an action registry key and its payload, and `proposals.bulkApply` calls
+that action verbatim with the deciding member as the actor. That is what keeps
+"propose by default" honest: there is no second write path an agent could take,
+only an action a human runs later under their own name. §2.3's least-privilege
+model needs no exception for it, because the agent never writes.
+
+| Piece | Where | Why it is shaped that way |
+|---|---|---|
+| `startDraftInTx` | `packages/core/src/check-ins/service.ts` | One draft per author per goal, extracted from `goals.startCheckIn` once a second caller needed it |
+| `goals.publishDraftedCheckIn` | the action registry | `goals.publishCheckIn` takes a draft id and the Champion holds `view`, so it cannot open one. A proposal holds one action, so opening the draft and publishing it has to be a single Operation, run as the applying member |
+| `proposed_changes.ai_generated` | migration 0040 | `run_id` says a proposal came from an agent; this says whether a model wrote its content |
+| `nudges.proposal_id` | migration 0040 | Without it, a nudge and its proposal are two rows a reader correlates by hope |
+| The recovery proposal | `packages/core/src/nudges/sweep.ts` | Raised on `kpi.recovery_proposed`, deterministic, from §6.5's template |
+
+**The recovery proposal's payload carries ids, not drafted text.**
+`kpis.launchRecovery` already calls §6.5's drafter, so the objective and its key
+results are produced when a human applies it, from the KPI tree as it stands
+then. A payload carrying drafted titles would go stale the moment somebody added
+a driver under the KPI.
+
+**One pending proposal per subject per action.** A run happens every hour and
+the condition that raised it holds until somebody acts, so an unguarded insert
+would grow the review queue by one row an hour. Today's nudge links to the
+proposal already waiting rather than skipping, so it still points at something
+the recipient can act on. Only `pending` blocks a new one: a dismissal was a
+decision about that proposal, and a KPI still unhealthy a week later is entitled
+to be offered again.
+
+**A suppressed nudge still gets its proposal.** The suppression decided that the
+*message* was noise, not that the change was unwanted. It is the same rule as
+"a snooze never hides a review-inbox obligation", seen from the other side.
+
+**The run row is written before the work.** A proposal's `run_id` is not null, so
+a run inserting its own row last could not attach one. It is also more honest: a
+run that crashes now leaves a `running` row rather than nothing at all.
+
+`nudges.run`, the hourly queue an administrator can call by hand, passes no run
+id and therefore proposes nothing. It is not an agent run and does not invent one
+to look as though it proposed something.
+
+### 11.1 Acceptance criteria
+
+Given a KPI unhealthy for the §11 delay and no AI provider, when the daily run
+executes, then exactly one pending proposal exists, marked not AI-generated, and
+the KPI's own state and recovery link are unchanged.
+
+Given the same KPI after one unhealthy period only, when the daily run executes,
+then no proposal exists.
+
+Given a pending recovery proposal, when the daily run executes again, then there
+is still exactly one.
+
+Given a pending recovery proposal, when a member applies it, then the recovery
+objective is created, the KPI reads `recovering`, the audit row names
+`kpis.launchRecovery`, and the proposal records that member as its decider.
+
+Given a pending recovery proposal, when a member dismisses it, then the KPI is
+unchanged and the proposal reads `dismissed`.
+
+Given a nudge carrying a proposal, when its recipient reads their nudge list,
+then the proposal's id, action and AI-generated flag are returned with it, and
+every nudge carrying none returns null.
+
+Given a suspended member, when they call `goals.publishDraftedCheckIn`, then it
+is refused with the same message `goals.startCheckIn` refuses them with, and no
+check-in row exists.
