@@ -13,6 +13,9 @@
 import {
   accessContexts,
   activeOnly,
+  BLOCKER_SOURCES,
+  BLOCKER_TYPES,
+  blockers,
   checkInVotes,
   goals,
   keyResults,
@@ -25,7 +28,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { WEEKLY_STAGE_KEYS } from "@openokr/method";
-import { and, avg, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, avg, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -387,6 +390,89 @@ export const advanceStage = defineWriteAction({
               "not_found",
               `Cannot advance: ${names} has no confirmed confidence.`,
             );
+          }
+        }
+
+        // Stage completion gate: diagnose → commitments requires every
+        // low-confidence KR to have a blocker with type, owner and action.
+        if (
+          session.stageKey === "diagnose" &&
+          nextStageKey === "commitments" &&
+          session.spaceId
+        ) {
+          // Load confirmed confidences for this session.
+          const confirmations = await tx
+            .select({
+              keyResultId: sessionConfidences.keyResultId,
+              confidence: sessionConfidences.confirmedConfidence,
+            })
+            .from(sessionConfidences)
+            .where(
+              activeOnly(
+                sessionConfidences,
+                eq(sessionConfidences.workspaceId, workspaceId),
+                eq(sessionConfidences.sessionId, input.id),
+              ),
+            );
+
+          // Find KRs with confidence below the low threshold (0.4 default).
+          // The threshold is a §11 parameter; reading it here would require
+          // resolving thresholds inside the action. For now, use 0.4 as the
+          // hard-coded default — it matches the check constraint the design
+          // specifies. METHOD.md says the threshold, not the action, is the
+          // authority, and P4-T15 wires the resolved value.
+          const LOW_THRESHOLD = 0.4;
+          const lowKrIds = confirmations
+            .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
+            .map((c) => c.keyResultId);
+
+          if (lowKrIds.length > 0) {
+            // Check that each low KR has at least one unresolved blocker.
+            const existingBlockers = await tx
+              .select({ keyResultId: blockers.keyResultId })
+              .from(blockers)
+              .where(
+                activeOnly(
+                  blockers,
+                  eq(blockers.workspaceId, workspaceId),
+                  eq(blockers.sessionId, input.id),
+                  isNull(blockers.resolvedAt),
+                ),
+              );
+
+            const blockedIds = new Set(
+              existingBlockers.map((b) => b.keyResultId),
+            );
+            const unblockedLowKrs = lowKrIds.filter(
+              (id) => !blockedIds.has(id),
+            );
+
+            if (unblockedLowKrs.length > 0) {
+              // Look up names for the error message.
+              const krNames = confirmations
+                .filter((c) => unblockedLowKrs.includes(c.keyResultId))
+                .map((c) => c.keyResultId);
+
+              // Get titles from the key_results table.
+              const krRows = await tx
+                .select({ id: keyResults.id, title: keyResults.title })
+                .from(keyResults)
+                .where(
+                  activeOnly(
+                    keyResults,
+                    eq(keyResults.workspaceId, workspaceId),
+                  ),
+                );
+
+              const titles = unblockedLowKrs
+                .map((id) => krRows.find((kr) => kr.id === id)?.title ?? id)
+                .join(", ");
+
+              throw new OperationError(
+                "not_found",
+                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no blocker.`,
+              );
+            }
           }
         }
       }
@@ -1225,6 +1311,216 @@ export const sessionConfidenceStatus = defineReadAction({
             confirmed: !!c,
             confirmedConfidence: c ? Number(c.confirmedConfidence) : null,
             whatChanged: c?.whatChanged ?? null,
+          };
+        });
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07c: Blocker actions
+// ---------------------------------------------------------------------------
+
+export const createSessionBlocker = defineWriteAction({
+  name: "sessions.createBlocker",
+  summary:
+    "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    type: z.enum(BLOCKER_TYPES),
+    description: z.string().max(500).optional(),
+    ownerId: z.uuid(),
+    nextAction: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const now = new Date();
+      // 24-hour clock from §11 cadence.blockerClockHours (default 24).
+      const BLOCKER_CLOCK_HOURS = 24;
+      const dueAt = new Date(
+        now.getTime() + BLOCKER_CLOCK_HOURS * 60 * 60 * 1000,
+      );
+
+      const id = crypto.randomUUID();
+      await tx.insert(blockers).values({
+        id,
+        workspaceId,
+        keyResultId: input.keyResultId,
+        sessionId: input.sessionId,
+        type: input.type,
+        description: input.description ?? null,
+        ownerId: input.ownerId,
+        nextAction: input.nextAction,
+        openedAt: now,
+        dueAt,
+        source: "session",
+      });
+
+      return {
+        result: { id },
+        activity: {
+          kind: "session.blockerCreated",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            type: input.type,
+          },
+        },
+        audit: {
+          action: "sessions.createBlocker",
+          targetType: "blocker",
+          targetId: id,
+          payload: {
+            keyResultId: input.keyResultId,
+            type: input.type,
+            ownerId: input.ownerId,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const resolveSessionBlocker = defineWriteAction({
+  name: "sessions.resolveBlocker",
+  summary: "Marks a blocker as resolved.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [blocker] = await tx
+        .select()
+        .from(blockers)
+        .where(
+          activeOnly(
+            blockers,
+            eq(blockers.workspaceId, workspaceId),
+            eq(blockers.id, input.id),
+          ),
+        )
+        .limit(1);
+
+      if (!blocker) {
+        throw new OperationError("not_found", "No such blocker.");
+      }
+
+      await tx
+        .update(blockers)
+        .set({ resolvedAt: new Date(), updatedAt: new Date() })
+        .where(activeOnly(blockers, eq(blockers.id, input.id)));
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "session.blockerResolved",
+          subjectType: "space",
+          subjectId: workspaceId,
+          payload: { type: blocker.type },
+        },
+        audit: {
+          action: "sessions.resolveBlocker",
+          targetType: "blocker",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+export const sessionBlockerStatus = defineReadAction({
+  name: "sessions.blockerStatus",
+  summary: "Blockers for a session, with aging information.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      type: z.enum(BLOCKER_TYPES),
+      description: z.string().nullable(),
+      ownerId: z.uuid(),
+      nextAction: z.string(),
+      openedAt: z.string(),
+      dueAt: z.string(),
+      resolvedAt: z.string().nullable(),
+      hoursOpen: z.number(),
+      overdue: z.boolean(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      keyResultId: string | null;
+      type: (typeof BLOCKER_TYPES)[number];
+      description: string | null;
+      ownerId: string;
+      nextAction: string;
+      openedAt: string;
+      dueAt: string;
+      resolvedAt: string | null;
+      hoursOpen: number;
+      overdue: boolean;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const rows = await tx
+          .select()
+          .from(blockers)
+          .where(
+            activeOnly(
+              blockers,
+              eq(blockers.workspaceId, context.workspaceId),
+              eq(blockers.sessionId, input.sessionId),
+            ),
+          );
+
+        const now = new Date();
+        return rows.map((b) => {
+          const hoursOpen =
+            (now.getTime() - b.openedAt.getTime()) / (1000 * 60 * 60);
+          return {
+            id: b.id,
+            keyResultId: b.keyResultId ?? null,
+            type: b.type,
+            description: b.description ?? null,
+            ownerId: b.ownerId,
+            nextAction: b.nextAction,
+            openedAt: b.openedAt.toISOString(),
+            dueAt: b.dueAt.toISOString(),
+            resolvedAt: b.resolvedAt?.toISOString() ?? null,
+            hoursOpen: Math.round(hoursOpen * 10) / 10,
+            overdue: now > b.dueAt && !b.resolvedAt,
           };
         });
       },

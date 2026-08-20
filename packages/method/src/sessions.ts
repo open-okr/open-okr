@@ -20,6 +20,38 @@ import type { ResolvedThresholds } from "./thresholds.ts";
  * which is the whole reason the suite exists.
  */
 
+/**
+ * The five blocker types from METHOD.md §7.3, with the definitions the
+ * session UI shows beside each picker option.
+ */
+export const BLOCKER_TYPE_DEFINITIONS = [
+  {
+    type: "resource" as const,
+    label: "Resource",
+    definition: "No capacity, budget or tools to progress the key result",
+  },
+  {
+    type: "dependency" as const,
+    label: "Dependency",
+    definition: "Progress waits on another team's output or decision",
+  },
+  {
+    type: "clarity" as const,
+    label: "Clarity",
+    definition: "The key result is ambiguous. Nobody agrees what done means",
+  },
+  {
+    type: "priority_conflict" as const,
+    label: "Priority conflict",
+    definition: "Business as usual keeps displacing OKR work",
+  },
+  {
+    type: "external" as const,
+    label: "External",
+    definition: "Market, regulation or partner factors beyond your control",
+  },
+] as const;
+
 export type RitualKind = "weekly" | "monthly" | "quarterly";
 
 /**
