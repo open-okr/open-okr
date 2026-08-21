@@ -25,6 +25,7 @@ import {
 } from "@openokr/db";
 import type { SuppressionReason } from "@openokr/method";
 import { desc, eq, ne } from "drizzle-orm";
+import type { AgentDrafter } from "../agents/drafter.ts";
 import { sweepDivergenceInTx } from "../alignment/divergence.ts";
 import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
@@ -86,6 +87,8 @@ export interface NudgeRunInput {
    * inventing a run row to look as though it did.
    */
   readonly runId?: string;
+  /** Language for the proposals, when the host has a provider (P4-T05c-b). */
+  readonly drafter?: AgentDrafter;
 }
 
 export interface NudgeRunResult {
@@ -164,6 +167,7 @@ export async function runDueNudgesInTx(
         now: at,
         timeZone,
         thresholds,
+        ...(input.drafter ? { drafter: input.drafter } : {}),
       })),
       ...(await dueAcknowledgementNudges(tx, {
         workspaceId,
@@ -186,6 +190,7 @@ export async function runDueNudgesInTx(
       ...(await dueKpiCorridorNudges(tx, {
         workspaceId,
         thresholds,
+        ...(input.drafter ? { drafter: input.drafter } : {}),
         // Resolved once for the run rather than per KPI. `undefined` is a real
         // answer: a workspace with no open cycle has nothing to propose a
         // recovery objective into.

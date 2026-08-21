@@ -878,6 +878,9 @@ export const runChampion = defineWriteAction({
         at,
         cadence,
         runId,
+        // Absent unless the host has a provider, which is the normal case and
+        // is what makes every assertion in the deterministic suites true.
+        ...(_context.drafter ? { drafter: _context.drafter } : {}),
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -924,9 +927,19 @@ export const runChampion = defineWriteAction({
 
       // openokr:allow-mutation: the operation's own execute. The row was
       // inserted above so the proposals could reference it; this closes it.
+      // What the run actually spent, from the drafter itself rather than from
+      // an estimate. Zero with no provider, which is why the cap never stops a
+      // deterministic run.
+      const spent = _context.drafter?.spentUsd() ?? 0;
+
       await tx
         .update(agentRuns)
-        .set({ status: "completed", log, finishedAt: at })
+        .set({
+          status: "completed",
+          log,
+          finishedAt: at,
+          cost: String(spent),
+        })
         // Not `activeOnly`: `agent_runs` carries no `deleted_at` at all, by
         // 0018's own decision that a run is a fact rather than a document.
         .where(eq(agentRuns.id, runId));

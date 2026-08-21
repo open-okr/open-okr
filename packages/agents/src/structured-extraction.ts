@@ -14,6 +14,7 @@ import type {
   AIProvider,
   ChatMessage,
   ExtractRequest,
+  TokenUsage,
 } from "@openokr/adapters";
 import type { z } from "zod";
 
@@ -29,6 +30,14 @@ export interface ExtractStructuredInput<T> {
   readonly jsonSchema: Record<string, unknown>;
   readonly temperature?: number;
   readonly maxTokens?: number;
+  /**
+   * Called once per provider call with what that call used (P4-T05c-b).
+   *
+   * Per call rather than per extraction, because a repair attempt is a second
+   * call and a caller metering spend has to pay for both. A caller that does
+   * not care about cost leaves it out.
+   */
+  onUsage?(usage: TokenUsage | undefined): void;
 }
 
 export class StructuredExtractionError extends Error {
@@ -56,8 +65,10 @@ async function attempt<T>(
   provider: AIProvider,
   request: ExtractRequest,
   schema: z.ZodType<T>,
+  onUsage?: (usage: TokenUsage | undefined) => void,
 ): Promise<{ readonly content: string; readonly result?: T }> {
   const response = await provider.extract(request);
+  onUsage?.(response.usage);
   const parsed = tryParseJson(response.content);
   if (!parsed.ok) {
     return { content: response.content };
@@ -88,7 +99,12 @@ export async function extractStructured<T>(
     maxTokens: input.maxTokens,
   };
 
-  const first = await attempt(input.provider, baseRequest, input.schema);
+  const first = await attempt(
+    input.provider,
+    baseRequest,
+    input.schema,
+    input.onUsage,
+  );
   if (first.result !== undefined) {
     return first.result;
   }
@@ -107,7 +123,12 @@ export async function extractStructured<T>(
     ],
   };
 
-  const repaired = await attempt(input.provider, repairRequest, input.schema);
+  const repaired = await attempt(
+    input.provider,
+    repairRequest,
+    input.schema,
+    input.onUsage,
+  );
   if (repaired.result !== undefined) {
     return repaired.result;
   }

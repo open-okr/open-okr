@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
+import { RunControls } from "./run-controls";
 
 /**
  * The agents and their run log (UIUX-PLAN.md §4 S-36, P4-T05a).
@@ -75,6 +76,15 @@ export default async function AgentsPage() {
   const agents = await callAction(context, "agents.list", {});
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
 
+  // Whether a run could draft anything, asked of the stored configuration
+  // rather than assumed. The control says which of the two products this
+  // workspace is running, because "deterministic only" is a complete product
+  // and not a degraded one.
+  const providers = await callAction(context, "ai.readProviderConfig", {});
+  const drafting = providers.some(
+    (entry) => entry.enabled && entry.hasWorkspaceCredential,
+  );
+
   return (
     <>
       <h1>Agents and runs</h1>
@@ -82,6 +92,8 @@ export default async function AgentsPage() {
         Every agent is a member of this workspace, accountable like anyone else.
         None of them holds a workspace-wide grant.
       </p>
+
+      <RunControls drafting={drafting} />
 
       <Card>
         <CardHeader>

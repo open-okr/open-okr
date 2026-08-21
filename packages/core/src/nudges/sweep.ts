@@ -45,6 +45,7 @@ import {
   trigger,
 } from "@openokr/method";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import type { AgentDrafter } from "../agents/drafter.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
@@ -182,11 +183,14 @@ export async function dueKpiCorridorNudges(
      * learns the KPI has been unhealthy for two periods.
      */
     readonly cycleId?: string;
+    /** Language for the recovery objective's title (P4-T05c-b). */
+    readonly drafter?: AgentDrafter;
   },
 ): Promise<readonly DueNudge[]> {
   const rows = await tx
     .select({
       id: kpis.id,
+      title: kpis.title,
       state: kpis.state,
       direction: kpis.direction,
       achievementPct: kpis.achievementPct,
@@ -243,6 +247,15 @@ export async function dueKpiCorridorNudges(
       // column holds today's state and this question is about a run of them.
       const periods = await periodStatesFor(tx, input.workspaceId, kpi);
       if (shouldProposeRecovery(periods, delay)) {
+        // A better sentence than the template, when a model can write one.
+        // Null is the ordinary answer and not a failure: §6.5's template is
+        // what P3-T14 golden-master tested and what the deterministic path has
+        // always proposed.
+        const refined = await refinedRecoveryTitle(
+          input.drafter,
+          kpi.title,
+          achievement,
+        );
         due.push(
           nudge({
             ruleKey: "kpi.recovery_proposed",
@@ -263,8 +276,15 @@ export async function dueKpiCorridorNudges(
               ? {
                   proposal: {
                     action: "kpis.launchRecovery",
-                    payload: { kpiId: kpi.id, cycleId: input.cycleId },
-                    aiGenerated: false,
+                    payload: {
+                      kpiId: kpi.id,
+                      cycleId: input.cycleId,
+                      ...(refined ? { objectiveTitle: refined } : {}),
+                    },
+                    // True only where a model chose the words. The ids and the
+                    // key results are still §6.5's, produced when a human
+                    // applies it.
+                    aiGenerated: refined !== null,
                   } as const,
                 }
               : {}),
@@ -298,6 +318,32 @@ export async function dueKpiCorridorNudges(
   }
 
   return due;
+}
+
+/**
+ * A model's title for a recovery objective, or nothing.
+ *
+ * Never throws, for the reason the check-in drafter does not: a provider having
+ * a bad minute must not stop the corridor being reported. RECOVERY_PLACEHOLDER
+ * wording stays §6.5's whenever this returns null.
+ */
+async function refinedRecoveryTitle(
+  drafter: AgentDrafter | undefined,
+  kpiTitle: string,
+  achievementPct: number | null,
+): Promise<string | null> {
+  if (!drafter) {
+    return null;
+  }
+  try {
+    return await drafter.refineRecoveryTitle({
+      kpiTitle,
+      templateTitle: `Bring ${kpiTitle} back to target`,
+      achievementPct,
+    });
+  } catch {
+    return null;
+  }
 }
 
 /** Whether a linked recovery goal is open, closed, or absent (METHOD.md §6.4). */

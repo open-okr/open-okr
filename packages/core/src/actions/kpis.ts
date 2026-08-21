@@ -770,6 +770,14 @@ export const launchKpiRecovery = defineWriteAction({
     kpiId: z.uuid(),
     /** The cycle the objective lives in. The caller resolves the current one. */
     cycleId: z.uuid(),
+    /**
+     * A title instead of §6.5's template sentence (P4-T05c-b).
+     *
+     * Carried on a Champion proposal when a model wrote a better one. Bounded
+     * like every other objective title, because a proposal is applied through
+     * this action by a human and gets no exemption from §4.1's length rule.
+     */
+    objectiveTitle: z.string().trim().min(1).max(500).optional(),
   }),
   output: z.object({
     goalId: z.uuid(),
@@ -793,6 +801,9 @@ export const launchKpiRecovery = defineWriteAction({
         cycleId: input.cycleId,
         spaceId: null,
         keyResultCap: Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
+        ...(input.objectiveTitle
+          ? { objectiveTitle: input.objectiveTitle }
+          : {}),
       });
 
       return {

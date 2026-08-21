@@ -12,6 +12,7 @@ import type { Pool } from "pg";
 import type { ZodType } from "zod";
 import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import type { AgentDrafter } from "../agents/drafter.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -32,6 +33,14 @@ export interface ActionCallContext {
   readonly workspaceId: string;
   readonly actor: ActorInput;
   readonly ring?: KeyRing;
+  /**
+   * Language for the agents, when the host has a provider to give (P4-T05c-b).
+   *
+   * Absent is the normal case and means the AI provider is off. Every trigger,
+   * ladder, gate and corridor works without it; it adds wording to a proposal
+   * and never decides that the proposal should exist.
+   */
+  readonly drafter?: AgentDrafter;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

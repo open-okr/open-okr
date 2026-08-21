@@ -84,6 +84,12 @@ export {
   type ActivityRenderer,
   renderActivity,
 } from "./activities/renderers.ts";
+export type {
+  AgentDrafter,
+  CheckInDraftContext,
+  DraftedCheckIn,
+  RecoveryTitleContext,
+} from "./agents/drafter.ts";
 export {
   type BudgetCheckResult,
   checkBudget,

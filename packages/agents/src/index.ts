@@ -7,6 +7,10 @@ export const PACKAGE_NAME = "@openokr/agents";
 export const DEPENDS_ON = [ADAPTERS, CORE, DB, METHOD] as const;
 
 export {
+  createProviderDrafter,
+  type ProviderDrafterOptions,
+} from "./drafter.ts";
+export {
   type ProcessNextTaskInput,
   type ProcessNextTaskResult,
   processNextTask,

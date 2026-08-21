@@ -22,6 +22,7 @@ import {
   checkIns,
   cycles,
   goals,
+  keyResults,
   type NudgeKind,
   type NudgeSubjectType,
   nudgeRules,
@@ -43,6 +44,7 @@ import {
   trigger,
 } from "@openokr/method";
 import { and, asc, count, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
 import { daysPastDue } from "../cadence/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
@@ -184,6 +186,12 @@ export async function dueCheckInNudges(
     readonly now: Date;
     readonly timeZone: string;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * Language for the champion's own reminder, when the host has a provider
+     * (P4-T05c-b). Absent is the normal case: the ladder, the escalation and
+     * the nudge are unchanged, and only the drafted check-in is missing.
+     */
+    readonly drafter?: AgentDrafter;
   },
 ): Promise<readonly DueNudge[]> {
   const grace = input.thresholds["cadence.stalenessGraceDays"];
@@ -191,6 +199,8 @@ export async function dueCheckInNudges(
   const rows = await tx
     .select({
       id: goals.id,
+      title: goals.title,
+      health: goals.health,
       nextCheckInAt: goals.nextCheckInAt,
       championId: goals.championId,
       reviewerId: goals.reviewerId,
@@ -233,6 +243,12 @@ export async function dueCheckInNudges(
       );
     }
 
+    // Drafted once per goal, not once per recipient: the escalation may reach
+    // four people and they are all looking at one check-in. Only the champion's
+    // own nudge carries it, because they are the one who can publish it.
+    const drafted =
+      input.drafter && past > 0 ? await draftFor(tx, input, goal, past) : null;
+
     for (const role of step.targets) {
       const memberId = await memberForRole(tx, goal, role);
       if (!memberId) {
@@ -265,10 +281,79 @@ export async function dueCheckInNudges(
         // past a ceiling written to stop exactly that, which is what the
         // simulated month found.
         urgent: role !== "champion",
+        ...(drafted && role === "champion"
+          ? {
+              proposal: {
+                action: "goals.publishDraftedCheckIn",
+                payload: {
+                  goalId: goal.id,
+                  status: drafted.status,
+                  confidence: drafted.confidence,
+                  narrative: drafted.narrative,
+                  values: [],
+                },
+                // A model wrote these words, and the review queue says so.
+                aiGenerated: true,
+              } as const,
+            }
+          : {}),
       });
     }
   }
   return due;
+}
+
+/**
+ * One drafted check-in for a goal, or nothing.
+ *
+ * **Never throws.** A provider that is off, a budget that is spent or output
+ * the schema refused twice all arrive here as null, and the nudge goes out
+ * without a draft. A run that fell over because a model was having a bad
+ * minute would take the whole rhythm with it, and the rhythm is the part that
+ * has to work.
+ *
+ * `values: []` on the proposal, deliberately. A model may write a narrative and
+ * read a status; it may not invent the numbers. Whoever applies the proposal
+ * fills the values in the composer, which is where the key results and their
+ * units are in front of them.
+ */
+async function draftFor(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly drafter?: AgentDrafter;
+  },
+  goal: {
+    readonly id: string;
+    readonly title: string;
+    readonly health: string;
+  },
+  daysOverdue: number,
+): Promise<DraftedCheckIn | null> {
+  if (!input.drafter) {
+    return null;
+  }
+  const rows = await tx
+    .select({ title: keyResults.title, progressPct: keyResults.progressPct })
+    .from(keyResults)
+    .where(activeOnly(keyResults, eq(keyResults.goalId, goal.id)));
+
+  try {
+    return await input.drafter.draftCheckIn({
+      goalTitle: goal.title,
+      daysOverdue,
+      // `pending` is not a previous status, it is the absence of one, and
+      // telling a model the goal was "pending" invites it to write about a
+      // state nobody reported.
+      previousStatus: goal.health === "pending" ? null : goal.health,
+      keyResults: rows.map((row) => ({
+        title: row.title,
+        progressPct: Number(row.progressPct),
+      })),
+    });
+  } catch {
+    return null;
+  }
 }
 
 /**

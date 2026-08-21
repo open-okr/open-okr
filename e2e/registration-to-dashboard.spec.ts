@@ -156,6 +156,28 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
   await expect(page.getByText(/No run yet/)).toBeVisible();
 });
 
+test("an administrator can run an agent, and the page says whether it can draft", async () => {
+  // P4-T05c-b. Nothing executes the declared crons, so this control is the
+  // only way an agent ever speaks. A screen that listed runs without being
+  // able to cause one would describe a product nobody could use.
+  await page.goto("/admin/agents");
+
+  await expect(
+    page.getByRole("heading", { name: "Run one now" }),
+  ).toBeVisible();
+  // No provider is configured on this instance, and the control says so
+  // instead of offering drafting that cannot happen. "Deterministic only" is a
+  // complete product, which is why it is stated rather than hidden.
+  await expect(page.getByText("Deterministic only")).toBeVisible();
+  await expect(page.getByText("Drafting on")).toBeHidden();
+
+  await page.getByRole("button", { name: "Quality pass" }).click();
+  // The run log stops saying it is empty, which is the whole point of the
+  // button: a run happened because somebody asked for one.
+  await expect(page.getByText(/No run yet/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText("schedule.quality")).toBeVisible();
+});
+
 test("registration is closed once the instance has been claimed", async () => {
   await page.goto("/sign-up");
   await expect(page.getByText(/invitation-only/i)).toBeVisible();
