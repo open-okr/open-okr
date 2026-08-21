@@ -192,6 +192,17 @@ beforeEach(async () => {
     memberId: secondMemberId,
     role: "member",
   });
+  // **Quiet hours off for this workspace, or these tests keep the time of
+  // day.** Every member is provisioned with §4.14's 19:00 to 08:00 window, so
+  // a suite asserting that a nudge was *delivered* silently passes in the
+  // afternoon and fails overnight. Continuous integration found this at 01:39
+  // UTC, having been written against local runs in the early afternoon.
+  // Suppression has its own suite at P4-T04b; here it is noise that decides
+  // the result.
+  await wb.admin.query(
+    "update workspace_members set quiet_hours = null where workspace_id = $1",
+    [workspaceId],
+  );
 });
 
 afterAll(async () => {

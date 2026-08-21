@@ -180,6 +180,17 @@ beforeEach(async () => {
     memberId: secondMemberId,
     role: "member",
   });
+  // **Quiet hours off for this workspace, or these tests keep the time of
+  // day.** Every member is provisioned with §4.14's 19:00 to 08:00 window, so
+  // a suite asserting that a nudge was *delivered* silently passes in the
+  // afternoon and fails overnight. Continuous integration found this at 01:39
+  // UTC, having been written against local runs in the early afternoon.
+  // Suppression has its own suite at P4-T04b; here it is noise that decides
+  // the result.
+  await wb.admin.query(
+    "update workspace_members set quiet_hours = null where workspace_id = $1",
+    [workspaceId],
+  );
 });
 
 afterAll(async () => {
@@ -475,7 +486,13 @@ describe("the daily run: KPI corridors and the morning summary", () => {
   it("tells the owner when a KPI falls out of the healthy corridor", async () => {
     // 60 of 100 is below the 70 watch boundary: unhealthy.
     const kpiId = await kpiAt(60, 100);
-    await runAt("daily", new Date());
+    // **02:00 UTC on purpose: inside §4.14's default quiet window.** This test
+    // read the wall clock and so quietly depended on the hour it ran, passing
+    // every afternoon and failing overnight until continuous integration ran it
+    // at 01:39. Pinning it to an hour that *would* be suppressed makes the
+    // `beforeEach` that clears quiet hours load-bearing rather than incidental:
+    // put the window back and this test fails.
+    await runAt("daily", new Date("2026-08-20T02:00:00Z"));
 
     const unhealthy = (await sentNudges()).filter(
       (row) => row.rule_key === "kpi.unhealthy",
