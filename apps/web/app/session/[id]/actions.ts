@@ -222,3 +222,27 @@ export async function setStageNoteAction(sessionId: string, note: string) {
   );
   revalidatePath(`/session/${sessionId}`);
 }
+
+/**
+ * One participant's pulse and word (METHOD.md §8.2, P4-T10a-b).
+ *
+ * Everybody may give one. Nobody but the facilitator gets the room's read, and
+ * `sessions.roomPulse` is what decides that rather than the screen.
+ */
+export async function givePulseAction(
+  sessionId: string,
+  pulse: number,
+  word: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.givePulse",
+    { sessionId, pulse, word },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}

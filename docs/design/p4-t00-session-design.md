@@ -277,7 +277,33 @@ drains them. See PHASE-4-SPLIT.md.
 | 3.0 to 3.9 | Steady. Watch for polite scoring later |
 | Below 3.0 | The cycle cost something. Name it early |
 
-Boundaries: SS11 `sessions.roomPulseBands` (already in `thresholds.ts`).
+Boundaries: SS11 `sessions.roomPulseBands` (already in `thresholds.ts`), read
+through `roomPulseRead` in `packages/method` (P4-T10a-b).
+
+**Three things P4-T10a-b settled.**
+
+*The read is withheld for a practice reason, not a permission one.* Section 8.2
+shows the average to the facilitator. A room that can see its own average before
+scoring has been handed an anchor, which is the failure section 8.3's hidden
+objective score exists to prevent. `sessions.roomPulse` returns the average, the
+band and the sentence to the facilitator and nulls to everybody else, so the
+screen is not the thing keeping the secret. Everybody always sees their own
+pulse.
+
+*The words come back counted, not listed.* A list in row order can be lined up
+against the member list, and section 8.2 asks for the room's mood rather than who
+felt what. Case-folded and sorted by frequency, so the order is a property of the
+words rather than of the rows.
+
+*An empty room is not a costly one.* `roomPulseRead` returns null when nobody has
+spoken. A sentence about the cycle costing something before anybody has given a
+pulse would be the product inventing a mood.
+
+The three sentences are verified in both directions: the method suite asserts
+every sentence the package produces appears in METHOD.md, and `pnpm method:check`
+asserts every read the document lists is one the package can produce. Editing
+either without the other fails the build, and that was proved by breaking it on
+purpose.
 
 ### 4.3 Stage 2: Score the key results (SS8.3)
 

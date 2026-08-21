@@ -28,6 +28,7 @@ import {
   SESSION_KINDS,
   SESSION_STATES,
   sessionConfidences,
+  sessionParticipants,
   okrSessions as sessions,
   spaceMembers,
   streaks,
@@ -37,6 +38,7 @@ import {
 import {
   progressSignal,
   REVIEW_STAGE_KEYS,
+  roomPulseRead,
   WEEKLY_STAGE_KEYS,
 } from "@openokr/method";
 import { and, avg, count, desc, eq, isNull, lt, sql } from "drizzle-orm";
@@ -2985,4 +2987,268 @@ export const setStageNote = defineWriteAction({
       };
     },
   }),
+});
+
+// ---------------------------------------------------------------------------
+// The room pulse (METHOD.md §8.2, P4-T10a-b)
+// ---------------------------------------------------------------------------
+
+export const givePulse = defineWriteAction({
+  name: "sessions.givePulse",
+  summary:
+    "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+  input: z.object({
+    sessionId: z.uuid(),
+    pulse: z.number().int().min(1).max(5),
+    // §8.2 asks for one word. A sentence here turns the read of the room into a
+    // paragraph nobody scans, so the boundary refuses it by name rather than
+    // truncating silently.
+    word: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .refine((value) => !/\s/.test(value), {
+        message: "One word, not a sentence.",
+      }),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (session.kind !== "quarterly") {
+        throw new OperationError(
+          "not_found",
+          "The room pulse belongs to a quarterly review.",
+        );
+      }
+
+      const [existing] = await tx
+        .select({ id: sessionParticipants.id })
+        .from(sessionParticipants)
+        .where(
+          activeOnly(
+            sessionParticipants,
+            eq(sessionParticipants.workspaceId, workspaceId),
+            eq(sessionParticipants.sessionId, input.sessionId),
+            eq(sessionParticipants.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      // One person, one voice. Changing your mind corrects the row rather than
+      // adding a second pulse that would weight whoever spoke twice.
+      const [row] = existing
+        ? await tx
+            .update(sessionParticipants)
+            .set({
+              pulse: input.pulse,
+              word: input.word,
+              attended: true,
+              updatedAt: new Date(),
+            })
+            .where(
+              activeOnly(
+                sessionParticipants,
+                eq(sessionParticipants.id, existing.id),
+              ),
+            )
+            .returning({ id: sessionParticipants.id })
+        : await tx
+            .insert(sessionParticipants)
+            .values({
+              workspaceId,
+              sessionId: input.sessionId,
+              memberId,
+              pulse: input.pulse,
+              word: input.word,
+            })
+            .returning({ id: sessionParticipants.id });
+
+      if (!row) {
+        throw new OperationError("not_found", "The pulse could not be saved.");
+      }
+
+      return {
+        result: { id: row.id },
+        // **The payload carries neither the pulse nor the word.** An activity
+        // row is read by everybody who can see the space, and §8.2 gives the
+        // room's read to the facilitator: a feed that announced each number
+        // would hand the room its own average one entry at a time.
+        activity: {
+          kind: "session.pulseGiven",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.givePulse",
+          targetType: "session_participant",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The words given, counted and sorted, with nothing that points at a person.
+ *
+ * Sorted by count then alphabetically, so the order is a property of the words
+ * rather than of the rows: row order can be lined up against a member list, and
+ * §8.2 asks for the room's mood rather than who felt what.
+ */
+function countWords(
+  rows: readonly { readonly word: string | null }[],
+): { word: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.word === null) {
+      continue;
+    }
+    const key = row.word.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+}
+
+export const readRoomPulse = defineReadAction({
+  name: "sessions.roomPulse",
+  summary:
+    "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** Null for anybody but the facilitator, and until somebody has spoken. */
+    average: z.number().nullable(),
+    band: z.enum(["energetic", "steady", "costly"]).nullable(),
+    /** METHOD.md §8.2's sentence for the band. */
+    read: z.string().nullable(),
+    /** How many have given a pulse, and how many are in the space. */
+    given: z.number(),
+    expected: z.number(),
+    /** The caller's own pulse and word, always. */
+    mine: z.object({
+      pulse: z.number().nullable(),
+      word: z.string().nullable(),
+    }),
+    /**
+     * The words given, counted, for the facilitator.
+     *
+     * Counted rather than listed, and that is a privacy decision as much as a
+     * display one: a list in row order can be lined up against the member list,
+     * and §8.2 asks for the room's mood rather than who felt what. "tired 2"
+     * says the thing without naming anybody.
+     */
+    words: z.array(z.object({ word: z.string(), count: z.number() })),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            memberId: sessionParticipants.memberId,
+            pulse: sessionParticipants.pulse,
+            word: sessionParticipants.word,
+          })
+          .from(sessionParticipants)
+          .where(
+            activeOnly(
+              sessionParticipants,
+              eq(sessionParticipants.workspaceId, context.workspaceId),
+              eq(sessionParticipants.sessionId, input.sessionId),
+            ),
+          );
+
+        const spoken = rows.filter(
+          (row): row is typeof row & { pulse: number } => row.pulse !== null,
+        );
+        const mineRow = rows.find((row) => row.memberId === memberId);
+
+        // How many the room is waiting for. Every active member of the space,
+        // which is the same list `sessions.participants` reads.
+        const expectedRows = session.spaceId
+          ? await tx
+              .select({ memberId: spaceMembers.memberId })
+              .from(spaceMembers)
+              .innerJoin(
+                workspaceMembers,
+                eq(workspaceMembers.id, spaceMembers.memberId),
+              )
+              .where(
+                activeOnly(
+                  spaceMembers,
+                  eq(spaceMembers.workspaceId, context.workspaceId),
+                  eq(spaceMembers.spaceId, session.spaceId),
+                  eq(workspaceMembers.status, "active"),
+                ),
+              )
+          : [];
+
+        const isFacilitator = session.facilitatorId === memberId;
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        // §8.2's own function, from `packages/method`. The boundaries are §11's
+        // and the sentences are the document's, so nothing about the read is
+        // decided here.
+        const read = isFacilitator
+          ? roomPulseRead(
+              spoken.map((row) => row.pulse),
+              thresholds,
+            )
+          : null;
+
+        return {
+          average: read?.average ?? null,
+          band: read?.band ?? null,
+          read: read?.read ?? null,
+          given: spoken.length,
+          expected: expectedRows.length,
+          mine: {
+            pulse: mineRow?.pulse ?? null,
+            word: mineRow?.word ?? null,
+          },
+          // The words go with the read, for the same reason: a participant who
+          // could see the room's words could read the room's mood.
+          words: isFacilitator ? countWords(rows) : [],
+        };
+      },
+    );
+  },
 });

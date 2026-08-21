@@ -600,6 +600,22 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     timeout: 10_000,
   });
 
+  // Stage one's own content: the pulse, and the read only the facilitator gets
+  // (METHOD.md section 8.2, P4-T10a-b).
+  await expect(page.getByText("Your pulse")).toBeVisible();
+  await page.getByRole("button", { name: "4", exact: true }).click();
+  await page.getByLabel("One word for the cycle").fill("relieved");
+  await page.getByRole("button", { name: "Give my pulse" }).click();
+
+  const room = page.getByRole("region").filter({ hasText: "The room" });
+  await expect(room).toHaveCount(1, { timeout: 10_000 });
+  // The average and section 8.2's own sentence for its band. Four is the top of
+  // the energetic band, inclusive, which is the boundary most likely to be
+  // written the wrong way round.
+  await expect(room).toContainText("4.0 of 5");
+  await expect(room).toContainText("The room has energy");
+  await expect(room).toContainText("relieved");
+
   // The private note, written and read back by the facilitator.
   await page
     .getByLabel("Private note for Open and check-in")

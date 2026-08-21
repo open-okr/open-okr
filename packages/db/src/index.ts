@@ -349,6 +349,10 @@ export {
   sessionConfidences,
 } from "./schema/session-confidences.ts";
 export {
+  type SessionParticipant,
+  sessionParticipants,
+} from "./schema/session-participants.ts";
+export {
   SESSION_KINDS,
   SESSION_STATES,
   type Session,

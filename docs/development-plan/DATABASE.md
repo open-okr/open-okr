@@ -317,6 +317,10 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ### session_participants
 `session_id` to sessions, `member_id` to workspace_members, `attended bool`, `pulse smallint?`, `word?`.
 
+Unique on `(workspace_id, session_id, member_id)` where not deleted: one person, one voice. Giving a pulse again corrects it rather than adding a second voice to the average.
+
+A row is created when somebody takes part, not when the session is made. Seeding the space would claim attendance nobody confirmed, and a room pulse averaged over people who never arrived is not the room's pulse. `pulse` and `word` are null until the person gives them, because a missing pulse and a pulse of one are different facts.
+
 ### blockers
 `key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
 

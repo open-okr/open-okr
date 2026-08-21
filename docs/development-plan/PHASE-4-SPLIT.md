@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 23 | P4-T01b to P4-T06c, P4-T07a to P4-T10a-a |
+| in_review | 24 | P4-T01b to P4-T06c, P4-T07a to P4-T10a-b |
 | in_progress | 1 | P4-T13a |
-| todo | 11 | P4-T10a-b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 10 | P4-T10b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
 waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
@@ -48,7 +48,7 @@ hourly run, and the session record with live stage sync.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, fourteen rows | yes | P4-T07a to P4-T10a-a in_review; P4-T10a-b next |
+| B2: the sessions | P4-T07a to P4-T12, fourteen rows | yes | P4-T07a to P4-T10a-b in_review; P4-T10b next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -141,7 +141,7 @@ and this table is what was agreed.
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
 | P4-T09 | Monthly review and decision log | Agung | in_review |
 | P4-T10a-a | Quarterly review: the eleven-stage shell | Agung | in_review |
-| P4-T10a-b | Quarterly review: the room pulse | Agung | todo |
+| P4-T10a-b | Quarterly review: the room pulse | Agung | in_review |
 | P4-T10b | Quarterly review: scoring and the reveal | Agung | todo |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
 | P4-T11a | Quarterly review: the retros | Agung | todo |

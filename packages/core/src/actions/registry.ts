@@ -194,11 +194,13 @@ import {
   createSessionBlocker,
   decisionsForCycle,
   decisionsForGoal,
+  givePulse,
   listParticipants,
   listSessionCommitments,
   listSessions,
   openSession,
   readMonthlyRecord,
+  readRoomPulse,
   readSession,
   readStreak,
   recordDecision,
@@ -435,6 +437,8 @@ export const ACTION_MAP = {
   "sessions.readStreak": readStreak,
 
   "sessions.addMinute": addStageMinute,
+  "sessions.givePulse": givePulse,
+  "sessions.roomPulse": readRoomPulse,
   "sessions.setStageNote": setStageNote,
 
   "sessions.setTrend": setTrend,

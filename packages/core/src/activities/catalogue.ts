@@ -300,6 +300,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     added: z.number(),
   }),
   "session.stageNoteSet": z.object({ stageKey: z.string() }),
+  // The pulse and the word are deliberately absent: an activity row is read by
+  // everybody who can see the space, and section 8.2 gives the room's read to
+  // the facilitator alone.
+  "session.pulseGiven": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

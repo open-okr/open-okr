@@ -47,6 +47,7 @@ import {
   type MonthlyUntrended,
 } from "./monthly-review";
 import { QuarterlyReview } from "./quarterly-review";
+import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { SessionLive } from "./session-live";
 
 interface SessionPageProps {
@@ -134,6 +135,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
   }
   let monthly: MonthlyRecord | null = null;
   const decisionSubjects: DecisionSubject[] = [];
+
+  // Stage one's content (METHOD.md §8.2, P4-T10a-b). Read for the stage it
+  // belongs to and not for the whole review: the other ten stages have their
+  // own panels and their own tasks.
+  let roomPulse: RoomPulse | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[0]) {
+    roomPulse = (await callAction(context, "sessions.roomPulse", {
+      sessionId: id,
+    })) as RoomPulse;
+  }
   if (isMonthly) {
     monthly = (await callAction(context, "sessions.monthlyRecord", {
       sessionId: id,
@@ -340,6 +351,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
           isFacilitator={isFacilitator}
           isRunning={isRunning}
         />
+      ) : null}
+
+      {/* Stage one: the room pulse (METHOD.md §8.2, P4-T10a-b) */}
+      {roomPulse ? (
+        <RoomPulsePanel sessionId={id} pulse={roomPulse} canGive={isRunning} />
       ) : null}
 
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}

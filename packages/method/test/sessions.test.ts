@@ -13,6 +13,7 @@ import {
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
+  roomPulseRead,
   WEEKLY_STEPS,
 } from "../src/sessions.ts";
 import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
@@ -222,5 +223,57 @@ describe("§8.6's rhythm diagnostic", () => {
       expect(method).toContain(result.diagnosis);
       expect(method).toContain(result.prescription);
     }
+  });
+});
+
+describe("section 8.2's read of the room (P4-T10a-b)", () => {
+  it("reads every band's sentence out of the document", () => {
+    // The same conformance the diagnostic gets: a facilitator acts on these
+    // words, so a paraphrase would be the product giving different advice than
+    // the method does.
+    for (const pulses of [
+      [5, 4],
+      [3, 4],
+      [1, 2],
+    ]) {
+      const result = roomPulseRead(pulses, thresholds);
+      expect(result).not.toBeNull();
+      expect(method).toContain(result?.read);
+    }
+  });
+
+  it("puts the boundaries where the document puts them", () => {
+    // "4.0 and above", "3.0 to 3.9", "below 3.0". Inclusive at the top of each
+    // band, exclusive at the bottom, and the boundary values themselves are
+    // the cases most likely to be written the wrong way round.
+    expect(roomPulseRead([4], thresholds)?.band).toBe("energetic");
+    expect(roomPulseRead([3.9], thresholds)?.band).toBe("steady");
+    expect(roomPulseRead([3], thresholds)?.band).toBe("steady");
+    expect(roomPulseRead([2.99], thresholds)?.band).toBe("costly");
+  });
+
+  it("takes its boundaries from the registry, not from literals", () => {
+    // A workspace that retuned the bands is read by its own numbers. Four is
+    // energetic by default and merely steady once the bar moves to 4.5.
+    const strict = resolveThresholds({
+      "sessions.roomPulseBands": { high: 4.5, low: 3.5 },
+    });
+    expect(roomPulseRead([4], thresholds)?.band).toBe("energetic");
+    expect(roomPulseRead([4], strict)?.band).toBe("steady");
+  });
+
+  it("returns nothing when nobody has spoken", () => {
+    // An empty room is not a costly one. Telling a facilitator the cycle cost
+    // something before anybody has given a pulse would be the product
+    // inventing a mood.
+    expect(roomPulseRead([], thresholds)).toBeNull();
+  });
+
+  it("carries the average it read, unrounded", () => {
+    // The screen decides how to display it. Rounding here would make 3.95 show
+    // as 4.0 beside the sentence for a steady room, which reads as a bug in the
+    // bands rather than a rounding choice.
+    expect(roomPulseRead([4, 3, 4, 5], thresholds)?.average).toBe(4);
+    expect(roomPulseRead([3, 4], thresholds)?.average).toBe(3.5);
   });
 });

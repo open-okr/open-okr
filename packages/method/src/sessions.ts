@@ -288,6 +288,60 @@ export function reviewStages(
  * diagnostic. `RHYTHM_STATEMENTS` names them rather than leaving two indexes
  * written down somewhere else.
  */
+/** Section 8.2's three bands, highest first. */
+export type RoomPulseBand = "energetic" | "steady" | "costly";
+
+export interface RoomPulseRead {
+  readonly band: RoomPulseBand;
+  /** The average the band was read from, unrounded. */
+  readonly average: number;
+  /** METHOD.md 8.2's own sentence for this band, word for word. */
+  readonly read: string;
+}
+
+/**
+ * The three reads from METHOD.md 8.2, keyed by band.
+ *
+ * Verbatim from the document, and the conformance suite compares them against
+ * it: this is a coaching sentence a facilitator acts on, not a label, and a
+ * paraphrase here would be the product quietly giving different advice than the
+ * method does.
+ */
+const ROOM_PULSE_READS: Record<RoomPulseBand, string> = {
+  energetic:
+    "The room has energy. Use it. Be honest about ambition, not just relieved",
+  steady:
+    "Steady, not euphoric. Watch for polite scoring later. Steady rooms round their numbers up",
+  costly:
+    "The cycle cost something. Name it early or it leaks into every score in the next ten minutes",
+};
+
+/**
+ * Section 8.2's read of the room, from the pulses the room gave (P4-T10a-b).
+ *
+ * The boundaries come from `sessions.roomPulseBands` rather than from literals,
+ * so a workspace that retuned them is read by its own numbers. Section 8.2's
+ * table is inclusive at the top of each band and exclusive at the bottom: "4.0
+ * and above", "3.0 to 3.9", "below 3.0".
+ *
+ * Null when nobody has given a pulse. An average of zero is not a costly room,
+ * it is an empty one, and telling a facilitator the cycle cost something before
+ * anybody has spoken would be the product inventing a mood.
+ */
+export function roomPulseRead(
+  pulses: readonly number[],
+  thresholds: ResolvedThresholds,
+): RoomPulseRead | null {
+  if (pulses.length === 0) {
+    return null;
+  }
+  const { high, low } = thresholds["sessions.roomPulseBands"];
+  const average = pulses.reduce((sum, pulse) => sum + pulse, 0) / pulses.length;
+  const band: RoomPulseBand =
+    average >= high ? "energetic" : average >= low ? "steady" : "costly";
+  return { band, average, read: ROOM_PULSE_READS[band] };
+}
+
 export const PROCESS_HEALTH_STATEMENTS: readonly string[] = [
   "Our OKRs stayed visible and were genuinely used to make decisions this cycle.",
   "We held a real check-in cadence, not a status report.",
