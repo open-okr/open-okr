@@ -191,12 +191,16 @@ import {
   confirmSessionConfidence,
   createSession,
   createSessionBlocker,
+  decisionsForCycle,
+  decisionsForGoal,
   listParticipants,
   listSessionCommitments,
   listSessions,
   openSession,
+  readMonthlyRecord,
   readSession,
   readStreak,
+  recordDecision,
   resolveSessionBlocker,
   revealSessionVotes,
   sessionBlockerStatus,
@@ -204,6 +208,8 @@ import {
   sessionVotes,
   setCoordinatorNote,
   setSessionCommitments,
+  setShifts,
+  setTrend,
   skipSession,
 } from "./sessions.ts";
 import {
@@ -425,6 +431,13 @@ export const ACTION_MAP = {
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,
+
+  "sessions.setTrend": setTrend,
+  "sessions.setShifts": setShifts,
+  "sessions.recordDecision": recordDecision,
+  "sessions.monthlyRecord": readMonthlyRecord,
+  "decisions.forGoal": decisionsForGoal,
+  "decisions.forCycle": decisionsForCycle,
 } as const;
 
 export type ActionName = keyof typeof ACTION_MAP;

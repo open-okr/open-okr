@@ -149,7 +149,7 @@ The recovery rule (METHOD.md §6.5) is implemented as an Operation: it creates t
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `sessions` | `kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?`, `cycle_id?`, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id`, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` | One row per held ritual. Stage state is live over the realtime channel so everyone sees the same screen |
+| `sessions` | `kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?`, `cycle_id?`, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id`, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?`, `shifts?` | One row per held ritual. `shifts` is §7.5's resource or priority note, kept out of `notes` because those are the facilitator's private per-stage notes. Stage state is live over the realtime channel so everyone sees the same screen |
 | `session_participants` | `session_id`, `member_id`, `attended bool`, `pulse smallint?`, `word?` | Attendance plus the quarterly room pulse |
 | `blockers` | `key_result_id?`, `goal_id?`, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id`, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?`, `session_id?`, `source` (`session` / `manual` / `channel` / `agent`) | `due_at` is `opened_at` plus the workspace blocker clock, 24 hours by default |
 | `commitments` | `session_id?`, `space_id`, `week_start date`, `text`, `owner_id`, `key_result_id?`, `delivered bool?`, `closed_at?` | Set in one week, closed in the next |
@@ -405,6 +405,7 @@ Keep current in every schema change.
 | No legacy source | `invite_links` | Joining is an OpenOKR concept with no FlowyTeam or spreadsheet analogue. An imported person is a `workspace_members` row with `user_id` null until they register and claim it, the same path row 392 describes; nothing invites them to do so |
 | `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
 | No legacy source | `okr_sessions` | Sessions are held rituals, not historical data. The imported workspace's session history is not replayed; if needed it belongs in the import report |
+| No legacy source | `objective_trends`, `decisions` | Both are recorded inside a monthly review, and the review itself is not imported. FlowyTeam has no decision log, so importing one would mean inventing an author and a date for a decision nobody recorded. Anything the source does carry about past decisions is written to the import report instead |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.
 

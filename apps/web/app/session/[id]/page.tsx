@@ -36,6 +36,14 @@ import {
   skipSessionAction,
 } from "./actions";
 import { ConfidenceRound } from "./confidence-round";
+import {
+  type DecisionSubject,
+  type MonthlyDecision,
+  type MonthlyDependency,
+  MonthlyReview,
+  type MonthlyTrend,
+  type MonthlyUntrended,
+} from "./monthly-review";
 import { SessionLive } from "./session-live";
 
 interface SessionPageProps {
@@ -96,6 +104,53 @@ export default async function SessionPage({ params }: SessionPageProps) {
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
   const isScheduled = sessionRow.state === "scheduled";
   const isRunning = sessionRow.state === "running";
+  const isMonthly = sessionRow.kind === "monthly";
+
+  // The monthly review's whole record in one read (METHOD.md §7.5, P4-T09).
+  // Loaded for a scheduled session as well, so a facilitator can see what the
+  // room will be looking at before they open it.
+  interface MonthlyRecord {
+    shifts: string | null;
+    trends: MonthlyTrend[];
+    untrended: MonthlyUntrended[];
+    dependencies: MonthlyDependency[];
+    decisions: MonthlyDecision[];
+  }
+  let monthly: MonthlyRecord | null = null;
+  const decisionSubjects: DecisionSubject[] = [];
+  if (isMonthly) {
+    monthly = (await callAction(context, "sessions.monthlyRecord", {
+      sessionId: id,
+    })) as MonthlyRecord;
+
+    // §7.5 attaches a decision to a key result first and an objective second,
+    // so both are offered and the key results are listed under the objective
+    // they belong to.
+    const objectives = [
+      ...monthly.trends.map((entry) => ({
+        goalId: entry.goalId,
+        goalTitle: entry.goalTitle,
+      })),
+      ...monthly.untrended,
+    ];
+    for (const objective of objectives) {
+      decisionSubjects.push({
+        kind: "goal",
+        id: objective.goalId,
+        label: objective.goalTitle,
+      });
+      const goal = (await callAction(context, "goals.read", {
+        id: objective.goalId,
+      })) as { keyResults: Array<{ id: string; title: string }> };
+      for (const keyResult of goal.keyResults) {
+        decisionSubjects.push({
+          kind: "keyResult",
+          id: keyResult.id,
+          label: `${objective.goalTitle} · ${keyResult.title}`,
+        });
+      }
+    }
+  }
   const currentStageIndex = sessionRow.stageKey
     ? WEEKLY_STAGE_KEYS.indexOf(
         sessionRow.stageKey as (typeof WEEKLY_STAGE_KEYS)[number],
@@ -209,7 +264,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Continue / close controls for the facilitator during a running session */}
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
-          {!isOnLastStage ? (
+          {!isOnLastStage && !isMonthly ? (
             <form
               action={async () => {
                 "use server";
@@ -235,6 +290,20 @@ export default async function SessionPage({ params }: SessionPageProps) {
         </div>
       )}
 
+      {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}
+      {monthly ? (
+        <MonthlyReview
+          sessionId={id}
+          shifts={monthly.shifts}
+          trends={monthly.trends}
+          untrended={monthly.untrended}
+          dependencies={monthly.dependencies}
+          decisions={monthly.decisions}
+          subjects={decisionSubjects}
+          canEdit={isRunning}
+        />
+      ) : null}
+
       {/* Participant list */}
       {participants.length > 0 && (
         <Card>
@@ -252,7 +321,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       )}
 
       {/* Placeholders for data that arrives with later tasks */}
-      {isRunning && (
+      {isRunning && !isMonthly && (
         <p className="text-xs text-ink-3">
           Confidence trend (P4-T07b), blockers (P4-T07c) and streak (P4-T08)
           appear once their tables exist.

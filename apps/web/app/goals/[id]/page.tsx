@@ -73,6 +73,23 @@ export default async function GoalPage({
     : [];
   const closed = goal.closedAt !== null;
 
+  /**
+   * The decisions taken about this goal (METHOD.md §7.5, P4-T09).
+   *
+   * §7.5 calls the decision log "the artifact that survives the meeting", and
+   * this page is where it survives to: a month after the review, nobody opens
+   * the session again, they open the goal.
+   */
+  const decisions = (await callAction(context, "decisions.forGoal", {
+    goalId: id,
+  })) as Array<{
+    id: string;
+    text: string;
+    at: string;
+    authorName: string;
+    keyResultTitle: string | null;
+  }>;
+
   const relations = await callAction(context, "goals.relations", { id });
 
   // One history per key result. A goal carries a handful, so this is a handful
@@ -428,6 +445,47 @@ export default async function GoalPage({
               </CardBody>
             </Card>
           ) : null}
+
+          {decisions.length === 0 ? null : (
+            // Named, so it is a landmark a screen reader can jump to and a
+            // test can scope to. A card with no accessible name is a div.
+            <Card role="region" aria-labelledby="goal-decisions-heading">
+              <CardHeader>
+                <h2
+                  id="goal-decisions-heading"
+                  className="text-sm font-bold text-ink"
+                >
+                  Decisions
+                </h2>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {decisions.map((decision) => (
+                    <li
+                      key={decision.id}
+                      className="flex flex-col gap-1 rounded-md border border-line p-2.5"
+                    >
+                      <span className="text-sm text-ink">{decision.text}</span>
+                      {/* The criterion names the date and the author, and the
+                          key result when one was named, because a decision
+                          about one number is not a decision about the goal. */}
+                      <span className="text-xs text-ink-3">
+                        {decision.keyResultTitle
+                          ? `${decision.keyResultTitle} · `
+                          : ""}
+                        {new Date(decision.at).toLocaleDateString()} ·{" "}
+                        {decision.authorName}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-4">
+                  Recorded in a monthly review. Kept whether the goal is open or
+                  closed.
+                </p>
+              </CardBody>
+            </Card>
+          )}
 
           {goal.retrospective ? (
             <Card>

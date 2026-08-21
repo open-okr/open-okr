@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 21 | P4-T01b to P4-T06c, P4-T07a to P4-T08 |
+| in_review | 22 | P4-T01b to P4-T06c, P4-T07a to P4-T09 |
 | in_progress | 1 | P4-T13a |
-| todo | 12 | P4-T09 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 11 | P4-T10a to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
 waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
@@ -48,7 +48,7 @@ hourly run, and the session record with live stage sync.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T08 in_review; P4-T09 next |
+| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T09 in_review; P4-T10a next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -139,7 +139,7 @@ and this table is what was agreed.
 | P4-T07b | The confidence round | Obed | in_review |
 | P4-T07c | Blockers, the board and aging | Obed | in_review |
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
-| P4-T09 | Monthly review and decision log | Agung | todo |
+| P4-T09 | Monthly review and decision log | Agung | in_review |
 | P4-T10a | Quarterly review: the session shell | Agung | todo |
 | P4-T10b | Quarterly review: scoring and the reveal | Agung | todo |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
@@ -221,6 +221,32 @@ outbox rows correctly and nothing drains them.
 `packages/core/src/scoring/recompute.ts`, `packages/core/src/kpis/formula.ts`
 and two other files already say so in comments.
 
+### The weekly session reads its dates in UTC
+
+Found on 21 August 2026 while building P4-T09, in code P4-T07b and P4-T08
+already shipped. Three places compute a calendar date with
+`toISOString().slice(0, 10)`:
+
+| Line | Column it feeds |
+|---|---|
+| `packages/core/src/actions/sessions.ts:738` | `digests.period_start` |
+| `packages/core/src/actions/sessions.ts:760` | `streaks.last_session_week` |
+| `packages/core/src/actions/sessions.ts:1774` | `commitments.week_start` |
+
+`toISOString` answers in UTC. A session held at six in the morning in Jakarta
+is recorded on the previous day, and a session held on a Monday morning there
+lands in the previous week. The streak reads a week boundary, so the visible
+symptom is a streak that breaks for a team that met on time.
+
+`localDateIn(instant, timeZone)` in `packages/core/src/cycles/generation.ts` is
+the shared answer, paired with `workspaceTimeZone`. It is what the cycle engine
+uses and what P4-T09 uses for the trend month and the decision date.
+
+Not fixed inside P4-T09: it changes how a streak is counted, which is P4-T08's
+behaviour and not this task's to move. It needs a row, and it wants a test that
+pins a workspace to a non-UTC zone and holds a session near midnight, because
+the bug is invisible in any test that runs in the afternoon.
+
 ### The test harness drops a database another worker is still using
 
 Found on 21 August 2026 while verifying P4-T06c. Two consecutive full runs of
@@ -246,15 +272,22 @@ unusual.
 Caught live in `pg_stat_activity` during a run. One of these drops held for
 **18 seconds** on the development machine, which is how wide the window is.
 
+It shows up in two forms and both are the same bug. `57P01` is the outgoing
+fork being cut off mid-query. `database "openokr_test_core_wN" does not exist`
+is the same fork arriving a moment later, after the drop finished and before
+the replacement recreated it. Neither is an assertion, and neither means
+anything about the code under test.
+
 **The workaround, until this is fixed.** Cap the workers:
 
 ```
 TEST_DB_PORT=5432 pnpm --filter @openokr/core exec vitest run --maxWorkers=4
 ```
 
-Fewer forks means fewer recycles. The same suite that failed 123 tests at the
-default twelve passed **60/60 files and 1185/1185 tests** at four, and finished
-faster: 367 seconds against 457.
+Fewer forks means fewer recycles, and it is a workaround rather than a fix: a
+run at four workers passed whole once and then failed 17 tests on a later run
+with the "does not exist" form. Drop to two when a run comes back red for these
+reasons. The suite is slower and it finishes.
 
 **The fix, when somebody takes it.** Put the process id in the database name so
 no two forks can ever share one, and sweep orphans scoped to

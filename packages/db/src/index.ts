@@ -217,6 +217,14 @@ export {
   rhythmSettings,
 } from "./schema/cycles.ts";
 export {
+  type Decision,
+  decisions,
+  OBJECTIVE_TRENDS,
+  type ObjectiveTrend,
+  type ObjectiveTrendRow,
+  objectiveTrends,
+} from "./schema/decisions.ts";
+export {
   DIGEST_PERIODS,
   DIGEST_SCOPES,
   type Digest,

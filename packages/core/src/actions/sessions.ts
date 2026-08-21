@@ -18,9 +18,13 @@ import {
   blockers,
   checkInVotes,
   commitments,
+  decisions,
   digests,
   goals,
+  keyResultDependencies,
   keyResults,
+  OBJECTIVE_TRENDS,
+  objectiveTrends,
   SESSION_KINDS,
   SESSION_STATES,
   sessionConfidences,
@@ -30,12 +34,15 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { WEEKLY_STAGE_KEYS } from "@openokr/method";
+import { progressSignal, WEEKLY_STAGE_KEYS } from "@openokr/method";
 import { and, avg, count, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { localDateIn } from "../cycles/generation.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -2005,6 +2012,708 @@ export const readStreak = defineReadAction({
           longestWeeks: row?.longestWeeks ?? 0,
           lastSessionWeek: row?.lastSessionWeek ?? null,
         };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The monthly review (METHOD.md §7.5, P4-T09)
+// ---------------------------------------------------------------------------
+
+/**
+ * A monthly review has no stages, so nothing here advances one.
+ *
+ * §7.5 records four things and this module stores two of them. The dependency
+ * and risk log is a read of P3-T09's alignment register, returned by
+ * `sessions.monthlyRecord` rather than copied into a table of its own, because
+ * two copies of one dependency is two answers a facilitator has to reconcile.
+ */
+/**
+ * `2026-03-14` from an instant, as the workspace's own timezone sees it.
+ *
+ * **Not `toISOString().slice(0, 10)`.** That answers in UTC, so a review held
+ * at six in the morning in Jakarta is recorded on the previous day, and on the
+ * first of a month it lands in the wrong month entirely. `localDateIn` is the
+ * shared answer the cycle engine already uses, and it is the only thing that
+ * knows what the offset was on that particular date.
+ */
+function localDate(value: Date | string, timeZone: string): string {
+  const at = typeof value === "string" ? new Date(value) : value;
+  const { year, month, day } = localDateIn(at, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * The first day of the month a review covers, in the workspace's timezone.
+ *
+ * A trend is keyed on the month rather than the meeting (TECHNICAL-PLAN §4.7),
+ * so a rescheduled review still records one opinion for the month it is about.
+ */
+function firstOfMonth(value: Date | string, timeZone: string): string {
+  return `${localDate(value, timeZone).slice(0, 7)}-01`;
+}
+
+async function requireMonthly(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+  requires: number,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    requires,
+  );
+  if (session.kind !== "monthly") {
+    throw new OperationError(
+      "not_found",
+      "Trends and decisions belong to a monthly review.",
+    );
+  }
+  return session;
+}
+
+export const setTrend = defineWriteAction({
+  name: "sessions.setTrend",
+  summary:
+    "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    trend: z.enum(OBJECTIVE_TRENDS),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // The objective is authorised on its own terms as well. Holding the
+      // space does not automatically mean holding a goal parked inside it.
+      const goalAccess = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.view as never,
+      });
+
+      const timeZone = await workspaceTimeZone(tx, workspaceId);
+      const month = firstOfMonth(session.scheduledFor, timeZone);
+      const [existing] = await tx
+        .select({ id: objectiveTrends.id })
+        .from(objectiveTrends)
+        .where(
+          activeOnly(
+            objectiveTrends,
+            eq(objectiveTrends.workspaceId, workspaceId),
+            eq(objectiveTrends.goalId, input.goalId),
+            eq(objectiveTrends.month, month),
+          ),
+        )
+        .limit(1);
+
+      // One opinion per objective per month. Recording again corrects it,
+      // which is what a room does when it talks itself round, and it is why
+      // the row is keyed on the month rather than on the meeting.
+      const [row] = existing
+        ? await tx
+            .update(objectiveTrends)
+            .set({
+              trend: input.trend,
+              authorMemberId: memberId,
+              updatedAt: new Date(),
+            })
+            .where(
+              activeOnly(objectiveTrends, eq(objectiveTrends.id, existing.id)),
+            )
+            .returning({ id: objectiveTrends.id })
+        : await tx
+            .insert(objectiveTrends)
+            .values({
+              workspaceId,
+              goalId: input.goalId,
+              month,
+              trend: input.trend,
+              authorMemberId: memberId,
+            })
+            .returning({ id: objectiveTrends.id });
+
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "The trend could not be recorded.",
+        );
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.trendRecorded",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId: goalAccess.contextId,
+          payload: { trend: input.trend, sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setTrend",
+          targetType: "session_trend",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const setShifts = defineWriteAction({
+  name: "sessions.setShifts",
+  summary:
+    "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    shifts: z.string().trim().max(4000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Empty is a real answer and means the room noted no shift, so the
+      // column goes back to null rather than holding an empty string that
+      // reads on screen as somebody having written nothing.
+      await tx
+        .update(sessions)
+        .set({
+          shifts: input.shifts.length === 0 ? null : input.shifts,
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      return {
+        result: { id: input.sessionId },
+        activity: {
+          kind: "session.shiftsRecorded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setShifts",
+          targetType: "session",
+          targetId: input.sessionId,
+        },
+      };
+    },
+  }),
+});
+
+export const recordDecision = defineWriteAction({
+  name: "sessions.recordDecision",
+  summary:
+    "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+  input: z
+    .object({
+      sessionId: z.uuid(),
+      goalId: z.uuid().optional(),
+      keyResultId: z.uuid().optional(),
+      text: z.string().trim().min(1).max(2000),
+    })
+    // §7.5: "Every decision names the key result it affects." A decision with
+    // no subject is a meeting note, and the log is not a notepad. Refused at
+    // the boundary as well as by the table constraint, so a caller gets a
+    // sentence rather than a database error.
+    .refine(
+      (value) => value.goalId !== undefined || value.keyResultId !== undefined,
+      { message: "A decision names the key result or the goal it affects." },
+    ),
+  output: z.object({
+    id: z.uuid(),
+    /**
+     * The goal the decision landed on, whichever end named it.
+     *
+     * Returned so a caller can revalidate that goal's own path rather than the
+     * `/goals/[id]` route pattern, and so a surface can link straight to it.
+     */
+    goalId: z.uuid(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // The goal the decision lands on, whichever end named it. A key result
+      // is authorised through its objective, which is where access lives, and
+      // storing both ends is what lets the goal page find it with one index.
+      let goalId = input.goalId ?? null;
+      if (input.keyResultId) {
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        goalId = goalId ?? owner.goalId;
+      }
+
+      // The refine on the input already refuses a decision naming neither, so
+      // by here there is always a goal to authorise against.
+      if (!goalId) {
+        throw new OperationError(
+          "not_found",
+          "A decision names the key result or the goal it affects.",
+        );
+      }
+      const { contextId: decisionContextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: goalId,
+        requires: ACCESS_LEVELS.view as never,
+      });
+
+      const [row] = await tx
+        .insert(decisions)
+        .values({
+          workspaceId,
+          // Stamped now rather than derived later: `goals.moveToCycle` would
+          // otherwise rewrite which cycle decided this.
+          cycleId: session.cycleId,
+          sessionId: input.sessionId,
+          goalId,
+          keyResultId: input.keyResultId ?? null,
+          text: input.text,
+          at: localDate(new Date(), await workspaceTimeZone(tx, workspaceId)),
+          authorMemberId: memberId,
+        })
+        .returning({ id: decisions.id });
+
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "The decision could not be recorded.",
+        );
+      }
+
+      return {
+        result: { id: row.id, goalId },
+        activity: {
+          kind: "session.decisionRecorded",
+          subjectType: "goal",
+          subjectId: goalId,
+          contextId: decisionContextId,
+          payload: {
+            sessionId: input.sessionId,
+            keyResultId: input.keyResultId ?? null,
+          },
+        },
+        audit: {
+          action: "sessions.recordDecision",
+          targetType: "decision",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+const decisionOutput = z.object({
+  id: z.uuid(),
+  text: z.string(),
+  at: z.string(),
+  authorMemberId: z.uuid(),
+  authorName: z.string(),
+  goalId: z.uuid().nullable(),
+  goalTitle: z.string().nullable(),
+  keyResultId: z.uuid().nullable(),
+  keyResultTitle: z.string().nullable(),
+  sessionId: z.uuid().nullable(),
+});
+
+type DecisionOutput = z.infer<typeof decisionOutput>;
+
+/** The shared shape of a decision row wherever it is listed. */
+function decisionRow(row: {
+  id: string;
+  text: string;
+  at: string;
+  authorMemberId: string;
+  authorName: string | null;
+  goalId: string | null;
+  goalTitle: string | null;
+  keyResultId: string | null;
+  keyResultTitle: string | null;
+  sessionId: string | null;
+}): DecisionOutput {
+  return {
+    id: row.id,
+    text: row.text,
+    at: row.at,
+    authorMemberId: row.authorMemberId,
+    // Left-joined, so a decision by a member who has since been removed still
+    // reads rather than dropping out of the log §7.5 calls the artifact.
+    authorName: row.authorName ?? "Unknown",
+    goalId: row.goalId,
+    goalTitle: row.goalTitle,
+    keyResultId: row.keyResultId,
+    keyResultTitle: row.keyResultTitle,
+    sessionId: row.sessionId,
+  };
+}
+
+const decisionColumns = {
+  id: decisions.id,
+  text: decisions.text,
+  at: decisions.at,
+  authorMemberId: decisions.authorMemberId,
+  authorName: workspaceMembers.name,
+  goalId: decisions.goalId,
+  goalTitle: goals.title,
+  keyResultId: decisions.keyResultId,
+  keyResultTitle: keyResults.title,
+  sessionId: decisions.sessionId,
+} as const;
+
+export const readMonthlyRecord = defineReadAction({
+  name: "sessions.monthlyRecord",
+  summary:
+    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    shifts: z.string().nullable(),
+    trends: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        trend: z.enum(OBJECTIVE_TRENDS),
+        /**
+         * §3.7's signal from the stored progress, shown beside the trend and
+         * never instead of it. The trend is the room's judgement; this is the
+         * number they judged against.
+         */
+        signal: z.enum(["green", "amber", "red"]).nullable(),
+        progressPct: z.number(),
+      }),
+    ),
+    /** Objectives in the review's scope with no trend recorded yet. */
+    untrended: z.array(z.object({ goalId: z.uuid(), goalTitle: z.string() })),
+    dependencies: z.array(
+      z.object({
+        id: z.uuid(),
+        keyResultId: z.uuid(),
+        keyResultTitle: z.string(),
+        description: z.string(),
+        confirmed: z.boolean(),
+        riskOwnerId: z.uuid().nullable(),
+      }),
+    ),
+    decisions: z.array(decisionOutput),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireMonthly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+
+        // Every open objective in the review's scope, so the screen can list
+        // what still has no trend rather than only what has one. Closed
+        // objectives are left out: a review asks where the work is going, and
+        // a finished objective is not going anywhere.
+        const goalRows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            progressPct: goals.progressPct,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              isNull(goals.closedAt),
+            ),
+          )
+          // Ordered, because an unordered list reshuffles between loads and a
+          // facilitator working down a screen loses their place.
+          .orderBy(goals.position, goals.createdAt);
+
+        const trendRows = await tx
+          .select({
+            goalId: objectiveTrends.goalId,
+            trend: objectiveTrends.trend,
+          })
+          .from(objectiveTrends)
+          .where(
+            activeOnly(
+              objectiveTrends,
+              eq(objectiveTrends.workspaceId, context.workspaceId),
+              // Keyed on the month the review covers, so a rescheduled or
+              // repeated review reads back the same opinion.
+              eq(
+                objectiveTrends.month,
+                firstOfMonth(session.scheduledFor, timeZone),
+              ),
+            ),
+          );
+        const byGoal = new Map(trendRows.map((row) => [row.goalId, row.trend]));
+
+        const trends = goalRows.flatMap((goal) => {
+          const trend = byGoal.get(goal.id);
+          if (!trend) {
+            return [];
+          }
+          const progressPct = Number(goal.progressPct);
+          return [
+            {
+              goalId: goal.id,
+              goalTitle: goal.title,
+              trend,
+              signal: Number.isFinite(progressPct)
+                ? progressSignal(progressPct, thresholds)
+                : null,
+              progressPct,
+            },
+          ];
+        });
+
+        const untrended = goalRows
+          .filter((goal) => !byGoal.has(goal.id))
+          .map((goal) => ({ goalId: goal.id, goalTitle: goal.title }));
+
+        // §7.5's dependency and risk log, read from P3-T09's register rather
+        // than stored a second time here.
+        const dependencyRows = await tx
+          .select({
+            id: keyResultDependencies.id,
+            keyResultId: keyResultDependencies.keyResultId,
+            keyResultTitle: keyResults.title,
+            note: keyResultDependencies.note,
+            providerText: keyResultDependencies.providerText,
+            confirmed: keyResultDependencies.confirmed,
+            riskOwnerId: keyResultDependencies.riskOwnerId,
+          })
+          .from(keyResultDependencies)
+          .innerJoin(
+            keyResults,
+            eq(keyResults.id, keyResultDependencies.keyResultId),
+          )
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResultDependencies,
+              eq(keyResultDependencies.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+            ),
+          );
+
+        const decisionRows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return {
+          shifts: session.shifts,
+          trends,
+          untrended,
+          dependencies: dependencyRows.map((row) => ({
+            id: row.id,
+            keyResultId: row.keyResultId,
+            keyResultTitle: row.keyResultTitle,
+            description: row.note ?? row.providerText ?? "",
+            confirmed: row.confirmed,
+            riskOwnerId: row.riskOwnerId,
+          })),
+          decisions: decisionRows.map(decisionRow),
+        };
+      },
+    );
+  },
+});
+
+export const decisionsForGoal = defineReadAction({
+  name: "decisions.forGoal",
+  summary:
+    "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+  input: z.object({ goalId: z.uuid() }),
+  output: z.array(decisionOutput),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<DecisionOutput[]> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such goal.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        // Not-found on forbidden, through the one access getter, and before
+        // any decision is read. A caller cannot learn that a decision exists
+        // by watching an empty list come back instead of a refusal.
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: input.goalId,
+          requires: ACCESS_LEVELS.view as never,
+        });
+
+        const rows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.goalId, input.goalId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return rows.map(decisionRow);
+      },
+    );
+  },
+});
+
+export const decisionsForCycle = defineReadAction({
+  name: "decisions.forCycle",
+  summary:
+    "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.array(decisionOutput),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<DecisionOutput[]> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such cycle.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // Filtered on the decision's own `cycle_id`, not on the goal's.
+        // `goals.moveToCycle` exists, so joining through the goal would move
+        // every past decision into whichever cycle the goal ends up in, and a
+        // decision taken in Q1 would start reading as a Q2 decision.
+        //
+        // Scoped by row-level security rather than by a getter call per row:
+        // the getter refuses one resource at a time and this list spans a
+        // whole cycle. The left join to `goals` is for the title only.
+        const rows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.cycleId, input.cycleId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return rows.map(decisionRow);
       },
     );
   },

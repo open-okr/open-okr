@@ -182,6 +182,26 @@ The decision table is surfaced on:
 - The goal page (decisions affecting that goal)
 - The cycle workspace (all decisions this cycle)
 
+**Two things this table left implicit, settled at P4-T09 by TECHNICAL-PLAN
+§4.7.** Both were the obvious reading of the rows above and both are wrong.
+
+*A trend belongs to a month, not to a meeting.* `objective_trends` is keyed on
+`(goal_id, month)`. A space that reschedules and ends up holding two reviews in
+one March has one March opinion per objective, and the quarterly review reads
+three months of trend without joining sessions. Keying on the session would
+have produced two March opinions and no way to say which one the room meant.
+
+*A decision carries its own `cycle_id`.* Deriving the cycle by joining through
+the goal looks equivalent and is not: `goals.moveToCycle` is a real action, so
+a goal moved into the next quarter would drag every past decision with it, and
+a decision taken in Q1 would start reading as a Q2 decision. Both are driven by
+tests, because the reason for a column is worth more than the column.
+
+*The trend is never pre-filled.* §3.7's progress signal is shown beside each
+objective as evidence and no button starts selected. §7.5 records the trend as
+a judgement, and a judgement that arrives pre-answered is a judgement most
+rooms stop making.
+
 Given / When / Then:
 - Given a monthly review recording a decision against a key result, when the
   goal page is opened, then the decision appears in its history.

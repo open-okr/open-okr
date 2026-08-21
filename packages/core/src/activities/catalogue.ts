@@ -280,6 +280,18 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "session.commitmentsSet": z.object({ count: z.number() }),
   "session.commitmentsClosed": z.object({ count: z.number() }),
   "session.coordinatorNoteSet": z.object({}),
+  // The monthly review (METHOD.md §7.5, P4-T09). A trend and a decision both
+  // hang off the goal rather than the session, because the goal page is where
+  // somebody comes looking for them a month later.
+  "session.trendRecorded": z.object({
+    trend: z.string(),
+    sessionId: z.string(),
+  }),
+  "session.shiftsRecorded": z.object({ sessionId: z.string() }),
+  "session.decisionRecorded": z.object({
+    sessionId: z.string(),
+    keyResultId: z.string().nullable(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

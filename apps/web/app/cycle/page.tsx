@@ -89,6 +89,27 @@ export default async function CyclePage({
     cycleId: cycle.id,
   });
 
+  /**
+   * The decision log for this cycle (METHOD.md §7.5, P4-T09).
+   *
+   * §7.5 surfaces the log in two places, and this is the second: the goal page
+   * answers "what was decided about this", the cycle workspace answers "what
+   * has this cycle decided". Read on every phase rather than only during the
+   * running one, because a decision taken in month two is still the reason
+   * something looks the way it does at the close.
+   */
+  const cycleDecisions = (await callAction(context, "decisions.forCycle", {
+    cycleId: cycle.id,
+  })) as Array<{
+    id: string;
+    text: string;
+    at: string;
+    authorName: string;
+    goalId: string | null;
+    goalTitle: string | null;
+    keyResultTitle: string | null;
+  }>;
+
   const requested = Number((await searchParams).phase ?? Number.NaN);
   const viewing =
     Number.isInteger(requested) && requested >= 0 && requested <= 7
@@ -294,6 +315,42 @@ export default async function CyclePage({
               checkTitles={draft.checkTitles}
             />
           ) : null}
+          {cycleDecisions.length === 0 ? null : (
+            <Card>
+              <CardHeader>
+                <h2 className="text-sm font-bold text-ink">
+                  Decisions this cycle
+                </h2>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {cycleDecisions.map((decision) => (
+                    <li key={decision.id} className="flex flex-col gap-0.5">
+                      <span className="text-sm text-ink">{decision.text}</span>
+                      <span className="text-xs text-ink-3">
+                        {decision.goalId ? (
+                          <a
+                            className="underline"
+                            href={`/goals/${decision.goalId}`}
+                          >
+                            {decision.keyResultTitle ?? decision.goalTitle}
+                          </a>
+                        ) : (
+                          (decision.keyResultTitle ?? decision.goalTitle)
+                        )}{" "}
+                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
+                        {decision.authorName}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-4">
+                  Recorded in the monthly reviews. Each one names the key result
+                  or the objective it affects.
+                </p>
+              </CardBody>
+            </Card>
+          )}
           <GuidanceRail phase={viewing} mode={workflow.mode} />
         </div>
       </div>

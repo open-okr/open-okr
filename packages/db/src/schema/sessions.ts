@@ -65,6 +65,15 @@ export const sessions = pgTable("okr_sessions", {
     .default({}),
   /** Per-stage facilitator notes, keyed by stage_key. */
   notes: jsonb("notes").$type<Record<string, unknown>>().notNull().default({}),
+  /**
+   * §7.5's resource or priority shifts, one note for a monthly review.
+   *
+   * Its own column rather than a key inside `notes`, which holds the
+   * facilitator's private per-stage notes (P4-T10a). A shared record inside a
+   * private-by-design column is one refactor away from being published by
+   * accident.
+   */
+  shifts: text("shifts"),
   state: text("state", { enum: SESSION_STATES }).notNull().default("scheduled"),
   /** FK to the digest row once P4-T08 adds the digests table. */
   digestId: uuid("digest_id"),

@@ -256,6 +256,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.commitmentsClosed": (p) =>
     `Closed ${asString(p.count, "0")} commitments from last week`,
   "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
+  "session.trendRecorded": (p) =>
+    `Recorded the trend for this objective as ${asString(p.trend, "unknown")}`,
+  "session.shiftsRecorded": () =>
+    "Noted the resource or priority shifts for this review",
+  "session.decisionRecorded": () => "Recorded a decision in the monthly review",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

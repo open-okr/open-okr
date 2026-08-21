@@ -592,6 +592,7 @@ Acceptance: Given a completed session, when it closes, then the digest is genera
 Depends on: P4-T08
 Goal: the monthly ritual (METHOD.md §7.5, screen S-23).
 Deliverables: the objective trend record; the dependency and risk log view; the decision table where every decision names the key result or goal it affects, with the log surfaced on the goal page and in the cycle workspace.
+Test plan: a decision naming neither a key result nor a goal is refused; a trend recorded twice corrects the first rather than storing two; the trend is never pre-filled from the §3.7 signal. (Added at P4-T09: the card shipped without a test plan line, which is a Definition of Ready gap, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: Given a monthly review recording a decision against a key result, when the goal page is opened, then the decision appears in its history with its date and author.
 
 ### P4-T10a: Quarterly review: the session shell [M]
