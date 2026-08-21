@@ -5,21 +5,45 @@
  *   Given two participants in one session, when the facilitator advances a
  *   stage, then both see the new stage without a reload.
  *
- * Runs against the local dev server (localhost:3000). Uses a single shared
- * browser context (like registration-to-dashboard.spec.ts) so auth cookies
- * persist across tests. A second context is opened only for the two-client
- * acceptance criterion test.
+ * Runs in continuous integration against the prepared application instance, and
+ * locally against the dev server through `playwright.dev.config.ts`. Uses a
+ * single shared browser context (like registration-to-dashboard.spec.ts) so
+ * auth cookies persist across tests. A second context is opened only for the
+ * two-client acceptance criterion test.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
+import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 import pg from "pg";
 
-const EMAIL = "session-qa@example.com";
-const PASSWORD = "correct horse battery staple";
-const NAME = "Session Tester";
-const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgres://postgres:postgres@localhost:55432/openokr_dev";
+// **Not an address of this spec's own.** The application instance is claimed by
+// whichever spec runs first, and registration closes behind them, so a private
+// account here can only ever exist on the machine where somebody ran the wizard
+// by hand. That is exactly how this file passed locally and failed on
+// continuous integration from the day it landed.
+const { email: EMAIL, password: PASSWORD, name: NAME } = INSTANCE_ACCOUNT;
+/**
+ * The application instance's own database.
+ *
+ * **`DATABASE_URL` is not set for the test process**, only inside the two
+ * `webServer` environments in `playwright.config.ts`, so the previous fallback
+ * to `openokr_dev` silently pointed this spec at a database the servers under
+ * test never touch. It worked on the machine it was written on, where
+ * `openokr_dev` was the running instance, and could not have worked anywhere
+ * else.
+ *
+ * `connectionOptions` is the same helper `e2e/prepare-database.ts` builds the
+ * database with, so the spec and the preparation cannot drift apart. A
+ * `DATABASE_URL` in the environment still wins, which is what makes
+ * `playwright.dev.config.ts` work against a developer's own instance.
+ */
+const CONNECTION = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : connectionOptions(
+      process.env.E2E_DATABASE ?? "openokr_e2e",
+      testDbEnv.appRole,
+    );
 
 test.describe.configure({ mode: "serial" });
 
@@ -29,7 +53,7 @@ let pool: pg.Pool;
 let sessionId: string;
 
 test.beforeAll(async ({ browser }) => {
-  pool = new pg.Pool({ connectionString: DATABASE_URL });
+  pool = new pg.Pool(CONNECTION);
   context = await browser.newContext();
   page = await context.newPage();
 });

@@ -1,5 +1,6 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 
 /**
  * Registration to dashboard, in a real browser (P1-T08).
@@ -15,9 +16,10 @@ import { expect, test } from "@playwright/test";
  * clean context each time: there is one account, and this is its session.
  */
 
-const EMAIL = "ada@example.com";
-const PASSWORD = "correct horse battery staple";
-const NAME = "Ada Lovelace";
+// This spec is the one that claims the instance, and every later spec signs in
+// as whoever did. The constant says so out loud rather than leaving three
+// files to agree by accident.
+const { email: EMAIL, password: PASSWORD, name: NAME } = INSTANCE_ACCOUNT;
 
 test.describe.configure({ mode: "serial" });
 

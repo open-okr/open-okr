@@ -53,7 +53,7 @@ and the chain is now moving. Whoever finishes it decides when Phase 4 ends.
 
 ## The split
 
-**Agung takes the agents. Obed takes the sessions.**
+**Agung takes the agents. Agung has taken the sessions too, from 21 August 2026.**
 
 P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
 
@@ -72,6 +72,25 @@ because B2 cannot be worked by two people at once.
 longest serial run left, so they have to start now or they set the end date.
 The copilot waits behind retrieval anyway, and Agung reaches it naturally once
 the agents are done.
+
+### Agung takes over the sessions lane, 21 August 2026
+
+Agung has taken over every remaining Phase 4 row of Obed's. The rows already
+`in_review` keep Obed's name below, because that is who wrote them and the table
+is a record rather than a roster. Everything still `todo` is Agung's.
+
+**What this changes in practice.** The file-ownership table below no longer
+splits the tree between two people, so the collision rules it lists stop being
+about coordination and start being about memory: they are the reasons a
+particular shape was chosen, and they still hold. The migration-numbering rule
+in particular is now about not colliding with your own earlier branch state
+rather than with somebody else's.
+
+The first thing the takeover found was `e2e/sessions.spec.ts` failing in
+continuous integration from the day it landed, for two reasons that only a
+second environment could expose: it signed in as an account that exists on its
+author's machine, and it connected to `openokr_dev` because `DATABASE_URL` is
+set for the servers under test and not for the test process. Both are fixed.
 
 ### Who owns which row
 
@@ -109,16 +128,16 @@ and this table is what was agreed.
 | P4-T07b | The confidence round | Obed | in_review |
 | P4-T07c | Blockers, the board and aging | Obed | in_review |
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
-| P4-T09 | Monthly review and decision log | Obed | todo |
-| P4-T10a | Quarterly review: the session shell | Obed | todo |
-| P4-T10b | Quarterly review: scoring and the reveal | Obed | todo |
-| P4-T10c | Quarterly review: narratives and recognition | Obed | todo |
-| P4-T11a | Quarterly review: the retros | Obed | todo |
-| P4-T11b | Root cause and the process-health survey | Obed | todo |
-| P4-T11c | The diagnostic, the reset and next-cycle drafts | Obed | todo |
-| P4-T12 | Minutes, exports and review feed-forward | Obed | todo |
-| P4-T13a | The embedding table and the outbox worker | Obed | in_progress (blocked behind B2) |
-| P4-T13b | Access-filtered retrieval | Obed | todo |
+| P4-T09 | Monthly review and decision log | Agung | todo |
+| P4-T10a | Quarterly review: the session shell | Agung | todo |
+| P4-T10b | Quarterly review: scoring and the reveal | Agung | todo |
+| P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
+| P4-T11a | Quarterly review: the retros | Agung | todo |
+| P4-T11b | Root cause and the process-health survey | Agung | todo |
+| P4-T11c | The diagnostic, the reset and next-cycle drafts | Agung | todo |
+| P4-T12 | Minutes, exports and review feed-forward | Agung | todo |
+| P4-T13a | The embedding table and the outbox worker | Agung | in_progress (blocked behind B2) |
+| P4-T13b | Access-filtered retrieval | Agung | todo |
 | P4-T14a | Copilot threads and grounded answers | Agung | todo |
 | P4-T14b | Copilot proposals and background runs | Agung | todo |
 | P4-T15 | Coaching and rhythm assists | Agung | todo, needs both lanes |
