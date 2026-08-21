@@ -63,8 +63,26 @@ export const sessions = pgTable("okr_sessions", {
     .$type<Record<string, number>>()
     .notNull()
     .default({}),
-  /** Per-stage facilitator notes, keyed by stage_key. */
+  /**
+   * Per-stage facilitator notes, keyed by stage_key.
+   *
+   * **Private to the facilitator.** `sessions.read` returns this only to the
+   * member the session names as facilitator and an empty object to everybody
+   * else (P4-T10a-a). Nothing else may be filed in here for that reason.
+   */
   notes: jsonb("notes").$type<Record<string, unknown>>().notNull().default({}),
+  /**
+   * Whole minutes the facilitator added to a stage, keyed by stage_key
+   * (METHOD.md §8.1, P4-T10a-a).
+   *
+   * Separate from §11's `sessions.quarterlyStageMinutes`, which is the
+   * workspace's standing agenda: one room running long on one day must not
+   * retune every future review.
+   */
+  addedMinutes: jsonb("added_minutes")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
   /**
    * §7.5's resource or priority shifts, one note for a monthly review.
    *

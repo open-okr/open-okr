@@ -261,6 +261,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.shiftsRecorded": () =>
     "Noted the resource or priority shifts for this review",
   "session.decisionRecorded": () => "Recorded a decision in the monthly review",
+  "session.minuteAdded": (p) =>
+    `Gave the ${asString(p.stageKey, "current")} stage another minute`,
+  "session.stageNoteSet": (p) =>
+    `Made a private note on the ${asString(p.stageKey, "current")} stage`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

@@ -188,3 +188,37 @@ export async function recordDecisionAction(
   revalidatePath(`/goals/${goalId}`);
   revalidatePath("/cycle");
 }
+
+/**
+ * The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a).
+ *
+ * Both are the facilitator's, and the actions refuse anybody else rather than
+ * relying on the screen to hide the controls.
+ */
+export async function addMinuteAction(sessionId: string) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.addMinute",
+    { id: sessionId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+export async function setStageNoteAction(sessionId: string, note: string) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.setStageNote",
+    { id: sessionId, note },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}

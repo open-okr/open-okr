@@ -292,6 +292,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     sessionId: z.string(),
     keyResultId: z.string().nullable(),
   }),
+  // The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a). Neither payload
+  // carries the note: an activity row is read by everybody who can see the
+  // space, and the note is the one thing that is private.
+  "session.minuteAdded": z.object({
+    stageKey: z.string(),
+    added: z.number(),
+  }),
+  "session.stageNoteSet": z.object({ stageKey: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

@@ -5,9 +5,11 @@ import {
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   PROCESS_HEALTH_STATEMENTS,
+  REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  reviewStageKey,
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
@@ -56,6 +58,23 @@ describe("§8.1's eleven stages", () => {
     });
     expect(reviewStages(tuned)[0]?.minutes).toBe(10);
     expect(reviewStages(thresholds)[0]?.minutes).toBe(5);
+  });
+
+  it("each carry one stage key, in the same order (P4-T10a-a)", () => {
+    // The keys are what `sessions.stage_key`, `sessions.elapsed` and
+    // `sessions.notes` are keyed by, so the pairing with the stage numbers has
+    // to hold or a stored note stops resolving to the stage it was written in.
+    expect(REVIEW_STAGE_KEYS).toHaveLength(REVIEW_STAGES.length);
+    expect(new Set(REVIEW_STAGE_KEYS).size).toBe(REVIEW_STAGE_KEYS.length);
+    for (const stage of REVIEW_STAGES) {
+      expect(reviewStageKey(stage.stage)).toBe(
+        REVIEW_STAGE_KEYS[stage.stage - 1],
+      );
+    }
+    // Out of range is null rather than undefined-shaped, so a caller has one
+    // thing to check.
+    expect(reviewStageKey(0)).toBeNull();
+    expect(reviewStageKey(12)).toBeNull();
   });
 
   it("group into the four acts, in the document's order", () => {

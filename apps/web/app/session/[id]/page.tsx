@@ -21,6 +21,8 @@
  */
 import { callAction } from "@openokr/core";
 import {
+  REVIEW_STAGE_KEYS,
+  reviewStages,
   WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
   type WeeklyStep,
@@ -44,6 +46,7 @@ import {
   type MonthlyTrend,
   type MonthlyUntrended,
 } from "./monthly-review";
+import { QuarterlyReview } from "./quarterly-review";
 import { SessionLive } from "./session-live";
 
 interface SessionPageProps {
@@ -69,6 +72,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
     stageStartedAt: string | null;
     facilitatorId: string;
     scheduledFor: string;
+    elapsed: Record<string, number>;
+    addedMinutes: Record<string, number>;
+    notes: Record<string, unknown>;
   };
 
   try {
@@ -105,6 +111,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
   const isScheduled = sessionRow.state === "scheduled";
   const isRunning = sessionRow.state === "running";
   const isMonthly = sessionRow.kind === "monthly";
+  const isQuarterly = sessionRow.kind === "quarterly";
+
+  // §8.1's eleven stages with the durations §11 gives this workspace, so a
+  // workspace that tuned its agenda is paced by its own numbers.
+  const reviewAgenda = isQuarterly
+    ? reviewStages(
+        (await callAction(context, "rhythm.read", {}))
+          .thresholds as unknown as Parameters<typeof reviewStages>[0],
+      )
+    : [];
 
   // The monthly review's whole record in one read (METHOD.md §7.5, P4-T09).
   // Loaded for a scheduled session as well, so a facilitator can see what the
@@ -151,12 +167,26 @@ export default async function SessionPage({ params }: SessionPageProps) {
       }
     }
   }
+  /**
+   * The stage list this ritual walks, or empty when it has none (P4-T10a-a).
+   *
+   * The same shape the action uses. This read WEEKLY_STAGE_KEYS outright, so a
+   * quarterly review's stage was never found in it: the index stayed at -1 and
+   * the facilitator was offered "Continue to next step" on stage eleven, where
+   * advancing throws. A monthly review has no stages at all and gets neither
+   * control.
+   */
+  const stageKeys: readonly string[] =
+    sessionRow.kind === "weekly"
+      ? WEEKLY_STAGE_KEYS
+      : isQuarterly
+        ? REVIEW_STAGE_KEYS
+        : [];
   const currentStageIndex = sessionRow.stageKey
-    ? WEEKLY_STAGE_KEYS.indexOf(
-        sessionRow.stageKey as (typeof WEEKLY_STAGE_KEYS)[number],
-      )
+    ? stageKeys.indexOf(sessionRow.stageKey)
     : -1;
-  const isOnLastStage = currentStageIndex === WEEKLY_STAGE_KEYS.length - 1;
+  const isOnLastStage =
+    stageKeys.length > 0 && currentStageIndex === stageKeys.length - 1;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -290,6 +320,28 @@ export default async function SessionPage({ params }: SessionPageProps) {
         </div>
       )}
 
+      {/* The quarterly review's shell (METHOD.md §8.1, S-24, P4-T10a-a) */}
+      {isQuarterly ? (
+        <QuarterlyReview
+          sessionId={id}
+          stages={reviewAgenda}
+          stageKeys={REVIEW_STAGE_KEYS}
+          currentStageKey={sessionRow.stageKey}
+          stageStartedAt={sessionRow.stageStartedAt}
+          elapsed={sessionRow.elapsed}
+          addedMinutes={sessionRow.addedMinutes}
+          // Empty for everybody but the facilitator: `sessions.read` refuses to
+          // hand the notes over, so this is not the screen deciding.
+          note={
+            typeof sessionRow.notes[sessionRow.stageKey ?? ""] === "string"
+              ? (sessionRow.notes[sessionRow.stageKey ?? ""] as string)
+              : ""
+          }
+          isFacilitator={isFacilitator}
+          isRunning={isRunning}
+        />
+      ) : null}
+
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}
       {monthly ? (
         <MonthlyReview
@@ -321,7 +373,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       )}
 
       {/* Placeholders for data that arrives with later tasks */}
-      {isRunning && !isMonthly && (
+      {isRunning && !isMonthly && !isQuarterly && (
         <p className="text-xs text-ink-3">
           Confidence trend (P4-T07b), blockers (P4-T07c) and streak (P4-T08)
           appear once their tables exist.

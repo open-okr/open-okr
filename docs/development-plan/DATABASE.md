@@ -306,9 +306,13 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`.
 
 `shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
+
+`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there.
+
+`added_minutes` is the whole minutes the facilitator added per stage (METHOD.md §8.1), keyed by `stage_key` exactly as `elapsed` is. Separate from §11's `sessions.quarterlyStageMinutes`, which is the workspace's standing agenda: one room running long on one day must not retune every future review.
 
 ### session_participants
 `session_id` to sessions, `member_id` to workspace_members, `attended bool`, `pulse smallint?`, `word?`.

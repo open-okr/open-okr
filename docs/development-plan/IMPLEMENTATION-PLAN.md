@@ -595,16 +595,29 @@ Deliverables: the objective trend record; the dependency and risk log view; the 
 Test plan: a decision naming neither a key result nor a goal is refused; a trend recorded twice corrects the first rather than storing two; the trend is never pre-filled from the §3.7 signal. (Added at P4-T09: the card shipped without a test plan line, which is a Definition of Ready gap, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: Given a monthly review recording a decision against a key result, when the goal page is opened, then the decision appears in its history with its date and author.
 
-### P4-T10a: Quarterly review: the session shell [M]
+### P4-T10a-a: Quarterly review: the eleven-stage shell [M]
 Depends on: P4-T09
-Goal: the rail, the pacing and the room (METHOD.md §8, screen S-24).
+Goal: the rail and the pacing (METHOD.md §8.1, screen S-24).
 Reference mockup: [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the session shell with the eleven-stage rail grouped by act; the lap bar segmented by duration; the stage timer with pacing cues and an add-a-minute control; private facilitator notes per stage; live stage synchronisation; the open and check-in stage with the pulse picker and the room-pulse read.
+Deliverables: quarterly stage keys in `packages/method` beside the weekly ones; the eleven-stage state machine with its per-stage completion gate; the session shell with the rail grouped by act; the lap bar segmented by duration; the stage timer with pacing cues and an add-a-minute control; private facilitator notes per stage; live stage synchronisation.
 Test plan: stage changes reach every connected client inside the budget; facilitator notes are never visible to a participant.
 Acceptance: Given a running review, when the facilitator advances a stage, then every participant's rail moves and the timer restarts.
 
+### P4-T10a-b: Quarterly review: the room pulse [S]
+Depends on: P4-T10a-a
+Goal: stage one's own content (METHOD.md §8.2, screen S-24).
+Deliverables: the `session_participants` table with its row-level security policy; `roomPulseRead` in `packages/method` with the §8.2 bands and reads under the conformance suite; the pulse picker with one word per participant; the average read shown to the facilitator only.
+Test plan: the read comes from `sessions.roomPulseBands` and not from a literal; a participant sees their own pulse and never the room's read.
+Acceptance: Given every participant has given a pulse, when the facilitator opens the read, then the average and the §8.2 sentence for its band are shown.
+
+**Why P4-T10a was split.** It carried the shell, the pacing, a new table, a new
+method function with its conformance, and stage one's whole content in one [M].
+The shell alone satisfies the acceptance criterion and both test-plan lines; the
+room pulse is separable work with its own criterion. Split at P4-T10a on
+21 August 2026, before code was written.
+
 ### P4-T10b: Quarterly review: scoring and the reveal [M]
-Depends on: P4-T10a
+Depends on: P4-T10a-a
 Goal: the scoring stage (METHOD.md §8.3).
 Deliverables: evidence, sliders and reasons per key result; the hidden objective score with an animated reveal that respects reduced motion; the running cycle score; scores written back to the key results when the session closes.
 Test plan: the reveal is deterministic and instant under reduced motion; scores written here land on the key results on close.

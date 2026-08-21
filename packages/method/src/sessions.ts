@@ -145,6 +145,38 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
 
 export type ReviewAct = "open" | "review" | "retro" | "reset";
 
+/**
+ * Stage keys for quarterly reviews, in §8.1's order (P4-T10a-a).
+ *
+ * These are what the database stores in `sessions.stage_key`, and what
+ * `sessions.elapsed` and `sessions.notes` are keyed by. Explicit rather than
+ * derived from the titles: a slug generated from canon text would change the
+ * moment somebody rewords a stage, and every stored `elapsed` key and
+ * facilitator note would stop resolving.
+ *
+ * Index 0 is stage 1, index 10 is stage 11, matching `REVIEW_STAGES`
+ * position for position. A test asserts that pairing rather than trusting it.
+ */
+export const REVIEW_STAGE_KEYS = [
+  "open",
+  "score",
+  "narratives",
+  "recognition",
+  "team_retro",
+  "management_retro",
+  "root_cause",
+  "process_health",
+  "keep_modify_abandon",
+  "learnings",
+  "actions",
+] as const;
+export type ReviewStageKey = (typeof REVIEW_STAGE_KEYS)[number];
+
+/** The stage key for a §8.1 stage number, 1 to 11. */
+export function reviewStageKey(stage: number): ReviewStageKey | null {
+  return REVIEW_STAGE_KEYS[stage - 1] ?? null;
+}
+
 export interface ReviewStage {
   /** 1 to 11, as §8.1 numbers them. */
   readonly stage: number;

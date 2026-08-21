@@ -228,6 +228,28 @@ Each stage has:
 - Private facilitator notes (per stage, not shared with participants)
 - Live synchronisation: stage changes reach every connected client within budget
 
+**Three things P4-T10a-a settled that this list left implicit.**
+
+*The stage keys are their own list, not slugs of the titles.* `REVIEW_STAGE_KEYS`
+in `packages/method` is what `stage_key`, `elapsed`, `notes` and `added_minutes`
+are keyed by. A slug generated from canon text would change the moment somebody
+reworded a stage, and every stored note and every elapsed second would stop
+resolving to the stage it belongs to.
+
+*Added minutes are stored per stage, not folded into the agenda.* §11's
+`sessions.quarterlyStageMinutes` is the workspace's standing agenda; one room
+running long on one day must not retune every future review.
+
+*Private means enforced by the read, not by the screen.* `sessions.read` hands
+the notes map to the facilitator and an empty object to everybody else. It did
+not, from P4-T07a until here: the whole map went to every caller. Nothing wrote
+notes in between, so nothing leaked, and the shape was still wrong. The activity
+payload names the stage and never the note, because an activity row is read by
+everybody who can see the space.
+
+*Live synchronisation is still blocked.* The outbox rows exist now; nothing
+drains them. See PHASE-4-SPLIT.md.
+
 | # | Stage | Act | Minutes | Completion condition |
 |---|---|---|---|---|
 | 1 | Open and check-in | Open | 5 | Every participant has a pulse score and one word |

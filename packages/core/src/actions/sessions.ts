@@ -34,7 +34,11 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { progressSignal, WEEKLY_STAGE_KEYS } from "@openokr/method";
+import {
+  progressSignal,
+  REVIEW_STAGE_KEYS,
+  WEEKLY_STAGE_KEYS,
+} from "@openokr/method";
 import { and, avg, count, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -75,6 +79,26 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
+}
+
+/**
+ * The stage list for a ritual, or null when it holds no stages (P4-T10a-a).
+ *
+ * One lookup rather than a branch per call site. The weekly and quarterly
+ * machines are the same walk over two different lists, and a monthly review
+ * has no stages at all: §7.5's agenda is a record the facilitator fills in, not
+ * a rail they advance. A `switch` here means adding a fifth ritual is one
+ * change rather than a hunt.
+ */
+function stageKeysFor(kind: string): readonly string[] | null {
+  switch (kind) {
+    case "weekly":
+      return WEEKLY_STAGE_KEYS;
+    case "quarterly":
+      return REVIEW_STAGE_KEYS;
+    default:
+      return null;
+  }
 }
 
 async function requireSessionAccess(
@@ -157,7 +181,17 @@ const sessionOutput = z.object({
   stageKey: z.string().nullable(),
   stageStartedAt: z.string().nullable(),
   elapsed: z.record(z.string(), z.number()),
+  /**
+   * The facilitator's private per-stage notes, and empty for everybody else.
+   *
+   * §8.1 calls them private and this is where that is enforced. It was not:
+   * `toOutput` returned the whole map to every caller from P4-T07a until
+   * P4-T10a-a. Nothing wrote notes in between, so nothing leaked, and the
+   * shape was still wrong.
+   */
   notes: z.record(z.string(), z.unknown()),
+  /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
+  addedMinutes: z.record(z.string(), z.number()),
   state: z.enum(SESSION_STATES),
   digestId: z.uuid().nullable(),
   createdAt: z.string(),
@@ -166,7 +200,18 @@ const sessionOutput = z.object({
 
 type SessionOutput = z.infer<typeof sessionOutput>;
 
-function toOutput(row: typeof sessions.$inferSelect): SessionOutput {
+/**
+ * A session as a caller may see it.
+ *
+ * `viewerMemberId` decides one field: the facilitator's notes. Every other
+ * column is the shared record of the ritual and is the same for everybody in
+ * the room.
+ */
+function toOutput(
+  row: typeof sessions.$inferSelect,
+  viewerMemberId: string | null,
+): SessionOutput {
+  const isFacilitator = viewerMemberId === row.facilitatorId;
   return {
     id: row.id,
     workspaceId: row.workspaceId,
@@ -181,7 +226,8 @@ function toOutput(row: typeof sessions.$inferSelect): SessionOutput {
     stageKey: row.stageKey ?? null,
     stageStartedAt: row.stageStartedAt?.toISOString() ?? null,
     elapsed: (row.elapsed ?? {}) as Record<string, number>,
-    notes: (row.notes ?? {}) as Record<string, unknown>,
+    notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
+    addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
     state: row.state,
     digestId: row.digestId ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -287,8 +333,7 @@ export const openSession = defineWriteAction({
         );
       }
 
-      const firstStage =
-        session.kind === "weekly" ? WEEKLY_STAGE_KEYS[0] : null;
+      const firstStage = stageKeysFor(session.kind)?.[0] ?? null;
       const now = new Date();
 
       await tx
@@ -304,6 +349,27 @@ export const openSession = defineWriteAction({
 
       return {
         result: { id: input.id },
+        /**
+         * Opening is a stage change too (P4-T10a-a).
+         *
+         * Somebody sitting on a scheduled session is waiting for exactly this
+         * moment, and without the row they would wait through the whole review
+         * unless they thought to reload. Same topic as the advance, because to
+         * a client there is no difference: the stage moved.
+         */
+        outbox: [
+          {
+            topic: "session.stageChanged",
+            payload: {
+              channel: sessionChannel(workspaceId, input.id),
+              sessionId: input.id,
+              workspaceId,
+              from: null,
+              to: firstStage,
+            },
+            idempotencyKey: `session.stageChanged:${input.id}:opened`,
+          },
+        ],
         activity: {
           kind: "session.opened",
           subjectType: "space",
@@ -346,19 +412,18 @@ export const advanceStage = defineWriteAction({
       }
 
       let nextStageKey: string | null = null;
-      if (session.kind === "weekly") {
+      const stageKeys = stageKeysFor(session.kind);
+      if (stageKeys) {
         const stageIndex = session.stageKey
-          ? WEEKLY_STAGE_KEYS.indexOf(
-              session.stageKey as (typeof WEEKLY_STAGE_KEYS)[number],
-            )
+          ? stageKeys.indexOf(session.stageKey)
           : -1;
-        if (stageIndex === WEEKLY_STAGE_KEYS.length - 1) {
+        if (stageIndex === stageKeys.length - 1) {
           throw new OperationError(
             "not_found",
             "Already on the last stage. Close the session to finish.",
           );
         }
-        nextStageKey = WEEKLY_STAGE_KEYS[stageIndex + 1] ?? null;
+        nextStageKey = stageKeys[stageIndex + 1] ?? null;
 
         // Stage completion gate: confidence → diagnose requires every KR
         // in the space's active cycle to have a confirmed confidence.
@@ -563,6 +628,39 @@ export const advanceStage = defineWriteAction({
 
       return {
         result: { id: input.id, realtimeChannel: channel },
+        /**
+         * The realtime publish, as an outbox row (P4-T10a-a).
+         *
+         * **This was missing, and its absence made the live-sync claim false.**
+         * The action returned the channel name and nothing ever published to
+         * it: `session.stageChanged` was declared in `packages/core/src/
+         * sessions/live.ts`, listened for by the client and forwarded by the
+         * SSE route, and emitted by no code at all. Every connected client
+         * therefore sat on a stale rail until somebody reloaded.
+         *
+         * A row rather than a driver call, because that is the only way a side
+         * effect may leave a write path: the change, the activity, the audit
+         * row and this commit together or not at all. It still does not reach
+         * anybody, because no relay drains the outbox yet. That gap is recorded
+         * in PHASE-4-SPLIT.md and it is now the only thing standing between
+         * this write and a live rail.
+         *
+         * The key carries the stage, so advancing twice enqueues two rows while
+         * a retried write of the same advance cannot.
+         */
+        outbox: [
+          {
+            topic: "session.stageChanged",
+            payload: {
+              channel,
+              sessionId: input.id,
+              workspaceId,
+              from: session.stageKey,
+              to: nextStageKey,
+            },
+            idempotencyKey: `session.stageChanged:${input.id}:${nextStageKey ?? "closed"}`,
+          },
+        ],
         activity: {
           kind: "session.stageAdvanced",
           subjectType: "space",
@@ -897,7 +995,7 @@ export const readSession = defineReadAction({
           }
         }
 
-        return toOutput(row);
+        return toOutput(row, member.id);
       },
     );
   },
@@ -949,7 +1047,7 @@ export const listSessions = defineReadAction({
           )
           .orderBy(desc(sessions.scheduledFor));
 
-        return rows.map(toOutput);
+        return rows.map((row) => toOutput(row, member.id));
       },
     );
   },
@@ -2717,4 +2815,174 @@ export const decisionsForCycle = defineReadAction({
       },
     );
   },
+});
+
+// ---------------------------------------------------------------------------
+// The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The session, refused unless the caller is the facilitator running it.
+ *
+ * Space access is not enough for these two. §8.1 gives the add-a-minute
+ * control and the private notes to the facilitator by name, and the write-access
+ * floor in this repository is `edit` for every active member (P3-T16), so
+ * `ACCESS_LEVELS.edit` alone would hand both to the whole room.
+ */
+async function requireFacilitator(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    ACCESS_LEVELS.edit,
+  );
+  if (session.facilitatorId !== memberId) {
+    throw new OperationError(
+      "forbidden",
+      "Only the session's facilitator can do that.",
+    );
+  }
+  return session;
+}
+
+export const addStageMinute = defineWriteAction({
+  name: "sessions.addMinute",
+  summary:
+    "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), stageKey: z.string(), added: z.number() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireFacilitator(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+      );
+
+      if (session.state !== "running" || !session.stageKey) {
+        throw new OperationError(
+          "not_found",
+          "No stage is running, so there is nothing to extend.",
+        );
+      }
+
+      // One stage's minute, not the agenda's. §11's stage minutes are the
+      // workspace's standing agenda and a room running long on one day must
+      // not retune every future review.
+      const added = (session.addedMinutes ?? {}) as Record<string, number>;
+      const next = (added[session.stageKey] ?? 0) + 1;
+
+      await tx
+        .update(sessions)
+        .set({
+          addedMinutes: { ...added, [session.stageKey]: next },
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id, stageKey: session.stageKey, added: next },
+        activity: {
+          kind: "session.minuteAdded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { stageKey: session.stageKey, added: next },
+        },
+        audit: {
+          action: "sessions.addMinute",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+export const setStageNote = defineWriteAction({
+  name: "sessions.setStageNote",
+  summary:
+    "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+  input: z.object({
+    id: z.uuid(),
+    note: z.string().trim().max(4000),
+  }),
+  output: z.object({ id: z.uuid(), stageKey: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireFacilitator(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+      );
+
+      if (session.state !== "running" || !session.stageKey) {
+        throw new OperationError(
+          "not_found",
+          "No stage is running, so there is nothing to note.",
+        );
+      }
+
+      // One note per stage, keyed the same way `elapsed` is. A single note per
+      // session would make the eleventh stage overwrite the first, and a
+      // facilitator reads these back stage by stage while the review runs.
+      const notes = (session.notes ?? {}) as Record<string, unknown>;
+      const next = { ...notes };
+      if (input.note.length === 0) {
+        // Cleared rather than stored empty, so the screen can tell "nothing
+        // written" from "written and then emptied".
+        delete next[session.stageKey];
+      } else {
+        next[session.stageKey] = input.note;
+      }
+
+      await tx
+        .update(sessions)
+        .set({ notes: next, updatedAt: new Date() })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id, stageKey: session.stageKey },
+        // **The payload names the stage and never the note.** An activity row
+        // is read by everybody who can see the space, and the whole point of
+        // this column is that the note is not.
+        activity: {
+          kind: "session.stageNoteSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { stageKey: session.stageKey },
+        },
+        audit: {
+          action: "sessions.setStageNote",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
 });

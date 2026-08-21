@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 22 | P4-T01b to P4-T06c, P4-T07a to P4-T09 |
+| in_review | 23 | P4-T01b to P4-T06c, P4-T07a to P4-T10a-a |
 | in_progress | 1 | P4-T13a |
-| todo | 11 | P4-T10a to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 11 | P4-T10a-b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
 waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
@@ -48,7 +48,7 @@ hourly run, and the session record with live stage sync.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T09 in_review; P4-T10a next |
+| B2: the sessions | P4-T07a to P4-T12, fourteen rows | yes | P4-T07a to P4-T10a-a in_review; P4-T10a-b next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -140,7 +140,8 @@ and this table is what was agreed.
 | P4-T07c | Blockers, the board and aging | Obed | in_review |
 | P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
 | P4-T09 | Monthly review and decision log | Agung | in_review |
-| P4-T10a | Quarterly review: the session shell | Agung | todo |
+| P4-T10a-a | Quarterly review: the eleven-stage shell | Agung | in_review |
+| P4-T10a-b | Quarterly review: the room pulse | Agung | todo |
 | P4-T10b | Quarterly review: scoring and the reveal | Agung | todo |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
 | P4-T11a | Quarterly review: the retros | Agung | todo |
@@ -220,6 +221,53 @@ keys are already in the catalogue, so nothing about the method changes.
 outbox rows correctly and nothing drains them.
 `packages/core/src/scoring/recompute.ts`, `packages/core/src/kpis/formula.ts`
 and two other files already say so in comments.
+
+### Live stage synchronisation has never worked, and its test could not fail
+
+Found on 21 August 2026 while building P4-T10a-a, in code P4-T07a shipped.
+
+**Nothing published `session.stageChanged`.** The event was declared in
+`packages/core/src/sessions/live.ts`, listened for by
+`apps/web/hooks/use-session-live.ts`, forwarded by the SSE route at
+`/api/session/[id]/live`, and emitted by no code at all.
+`sessions.advanceStage` returned the channel name in its result and enqueued
+nothing. Every connected client sat on a stale rail until somebody reloaded.
+
+**The test that proved it asserted something always true.** It waited for the
+second client to show "Diagnose what is low", which is a weekly step title, and
+the rail renders all four titles at every stage. It held before the advance as
+well as after it. So P4-T07a's acceptance criterion, "when the facilitator
+advances a stage, then both see the new stage without a reload", was never
+demonstrated.
+
+**What P4-T10a-a fixed, and what it could not.** `sessions.open` and
+`sessions.advanceStage` now insert the outbox row they should always have
+written, in the same transaction as the stage change, which is the only way a
+side effect may leave a write path. The write path is complete and correct. No
+event reaches a browser, because nothing drains the outbox, which is the gap
+above.
+
+The test is `test.fixme` rather than deleted or left green, so the claim stays
+visible and unmistakably unproven. The quarterly spec reloads the second client
+and says why: what it proves today is that the stage change reached the server
+and that both clients read the same rail from it.
+
+**Remove the `fixme` when the relay exists.** That is the whole remaining work
+for this criterion.
+
+### Three tests in the session spec passed without proving anything
+
+Worth recording as a class, because all three were found in one afternoon and
+none of them failed until somebody looked:
+
+| The assertion | Why it could not fail |
+|---|---|
+| `getByText("Move two engineers…")` after recording a decision | The sentence was in the textarea it had just been typed into, so the assertion went green on the click rather than on the write. The navigation that followed then raced a write that had not landed, which is the whole of the flake that cost five runs to chase |
+| `getByText("Diagnose what is low")` on the second client | A weekly step title the rail renders at every stage |
+| `for (let i = 0; i < 2; i++)` advancing to the end | Correct only because the test before it advanced once. Marking that test `fixme` left this one a stage short |
+
+A test that cannot fail is worse than one that fails, because a failing test
+tells you something.
 
 ### The weekly session reads its dates in UTC
 

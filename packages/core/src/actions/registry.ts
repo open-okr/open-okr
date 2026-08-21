@@ -184,6 +184,7 @@ import {
 } from "./people.ts";
 import { reviewInbox } from "./review.ts";
 import {
+  addStageMinute,
   advanceStage,
   castSessionVote,
   closeSession,
@@ -209,6 +210,7 @@ import {
   setCoordinatorNote,
   setSessionCommitments,
   setShifts,
+  setStageNote,
   setTrend,
   skipSession,
 } from "./sessions.ts";
@@ -431,6 +433,9 @@ export const ACTION_MAP = {
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,
+
+  "sessions.addMinute": addStageMinute,
+  "sessions.setStageNote": setStageNote,
 
   "sessions.setTrend": setTrend,
   "sessions.setShifts": setShifts,
