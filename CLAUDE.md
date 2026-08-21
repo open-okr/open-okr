@@ -141,7 +141,7 @@ docs/stakeholder    Stakeholder pack, and the reference mockups the UI tasks cit
 Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
-- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs `pnpm db:up`, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs
+- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs a Postgres, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs. **Docker is not required.** `pnpm db:up` is the easy way to get the Postgres, and `TEST_DB_PORT` points the suite at one you already run, exactly as it does for the unit suites: `TEST_DB_PORT=5432 pnpm build && TEST_DB_PORT=5432 pnpm test:e2e`. This line said `pnpm db:up` outright for eight tasks, and four end-to-end defects reached continuous integration behind the belief that the suite could not be run locally
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate
