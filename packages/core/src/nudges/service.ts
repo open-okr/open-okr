@@ -339,18 +339,20 @@ async function draftFor(
     .where(activeOnly(keyResults, eq(keyResults.goalId, goal.id)));
 
   try {
-    return await input.drafter.draftCheckIn({
-      goalTitle: goal.title,
-      daysOverdue,
-      // `pending` is not a previous status, it is the absence of one, and
-      // telling a model the goal was "pending" invites it to write about a
-      // state nobody reported.
-      previousStatus: goal.health === "pending" ? null : goal.health,
-      keyResults: rows.map((row) => ({
-        title: row.title,
-        progressPct: Number(row.progressPct),
-      })),
-    });
+    return (
+      (await input.drafter.draftCheckIn?.({
+        goalTitle: goal.title,
+        daysOverdue,
+        // `pending` is not a previous status, it is the absence of one, and
+        // telling a model the goal was "pending" invites it to write about a
+        // state nobody reported.
+        previousStatus: goal.health === "pending" ? null : goal.health,
+        keyResults: rows.map((row) => ({
+          title: row.title,
+          progressPct: Number(row.progressPct),
+        })),
+      })) ?? null
+    );
   } catch {
     return null;
   }

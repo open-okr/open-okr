@@ -45,7 +45,7 @@ created at provisioning.
 | Gate enforcement | Yes | Yes |
 | Divergence detection (health vs data) | Yes | Yes |
 | Trend-off-track detection | Yes | Yes |
-| Rewrite assist | Yes | Hidden |
+| Rewrite assist | Yes | Explained, not hidden (P4-T06c) |
 | Phase-moment messages (SS10 items 8, 14) | Yes (natural language) | Yes (rule citation only) |
 
 ### 1.3 Scope and access
@@ -66,6 +66,21 @@ Applying commits through the normal Operation pipeline with audit.
 
 `scoped_direct`: opt-in per workspace. Writes quality flags directly.
 Still fully audited. Structural findings are still proposals.
+
+**A human-invoked assist is not an agent proposal (P4-T06c).** The rewrite
+assist is a read the champion asks for, in their own session, and applying it
+writes as them. There is no agent initiative to hold back and no run to bind it
+to, so a `proposed_changes` row would record the champion proposing a change to
+themselves. Propose-by-default governs what an agent writes unasked. The
+protections that matter here are the ones a preview gives: nothing is stored
+until the champion presses the button, and the button carries their identity
+into the audit row.
+
+**Hidden was the wrong word for AI off, and P4-T06c's test plan is why.** The
+matrix above said the assist is hidden with no provider. A control that vanishes
+leaves a writer unable to tell whether the product has one, and unable to tell
+whether the rules still apply. Both surfaces now say the rules are checked
+either way and only the suggested wording needs a provider.
 
 ### 1.5 Findings table
 

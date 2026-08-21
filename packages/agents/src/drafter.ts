@@ -70,6 +70,30 @@ const CHECK_IN_SYSTEM =
   "next. Never invent a number that was not given to you, never congratulate, " +
   "and never apologise on anybody's behalf.";
 
+const REWRITE_SHAPE = z.object({
+  rewritten: z.string().trim().min(1).max(500),
+});
+
+const REWRITE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["rewritten"],
+  properties: { rewritten: { type: "string", maxLength: 500 } },
+} as const;
+
+/**
+ * The assist is told the rule and asked for one sentence.
+ *
+ * It is **not** asked to claim it fixed anything: the caller re-runs §4 over
+ * whatever comes back and reports what actually passes, so a persuasive rewrite
+ * that fixes nothing is caught by the catalogue rather than believed.
+ */
+const REWRITE_SYSTEM =
+  "You rewrite one key result so that it satisfies a named check, changing as " +
+  "little as possible and keeping the author's intent. Return one line. Keep " +
+  "any number, unit or date that is already there unless the check is about " +
+  "that number. Never add a number that was not given to you.";
+
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
   "line, an outcome rather than an activity, no more than twelve words, no " +
@@ -276,6 +300,37 @@ export function createProviderDrafter(
         // words no model chose. Observed on the first live run against
         // OpenRouter, which returned the template verbatim.
         return title.trim() === context.templateTitle.trim() ? null : title;
+      } catch {
+        return null;
+      }
+    },
+
+    async rewriteForRule(context) {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const { rewritten } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: REWRITE_SHAPE,
+          jsonSchema: REWRITE_JSON_SCHEMA,
+          maxTokens: 200,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: REWRITE_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Objective: ${context.goalTitle}` +
+                NEWLINE +
+                `Key result as written: ${context.text}` +
+                NEWLINE +
+                `Failing check ${context.ruleId}: ${context.rulePrompt}`,
+            },
+          ],
+        });
+        return rewritten;
       } catch {
         return null;
       }

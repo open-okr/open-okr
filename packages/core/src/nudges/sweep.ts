@@ -336,11 +336,13 @@ async function refinedRecoveryTitle(
     return null;
   }
   try {
-    return await drafter.refineRecoveryTitle({
-      kpiTitle,
-      templateTitle: `Bring ${kpiTitle} back to target`,
-      achievementPct,
-    });
+    return (
+      (await drafter.refineRecoveryTitle?.({
+        kpiTitle,
+        templateTitle: `Bring ${kpiTitle} back to target`,
+        achievementPct,
+      })) ?? null
+    );
   } catch {
     return null;
   }

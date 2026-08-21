@@ -414,6 +414,46 @@ test("the quality panel groups every issue and links at the field", async () => 
   await expect(page.locator(`[id="${anchored}"]`)).toBeVisible();
 });
 
+/**
+ * The coach strip on the goal page (P4-T06c).
+ *
+ * The half of the task's test plan only a browser settles: with no provider,
+ * the surface explains rather than disappearing. A hidden control and an absent
+ * feature look identical from the outside, and a writer who cannot tell the
+ * difference assumes the rules stopped applying too.
+ *
+ * The goal is the one the drafting test made, whose two key results both fail
+ * KR-3 for carrying no date and no owner. Stored flags, written by P4-T02a in
+ * the transaction that created them, not a fresh evaluation on this page.
+ */
+test("the goal page shows the stored verdicts and explains the missing assist", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+
+  const strip = page
+    .getByRole("region")
+    .filter({ hasText: "What the Coach sees" });
+  await expect(
+    page.getByRole("heading", { name: "What the Coach sees" }),
+  ).toBeVisible();
+
+  // The verdict links to the rule, the same way the draft coach's chips do.
+  const rule = strip.getByRole("link", { name: /KR-3/ }).first();
+  await expect(rule).toBeVisible();
+  await expect(rule).toHaveAttribute("href", "/method/KR-3");
+
+  // No provider on this instance, so no suggestion is offered and the strip
+  // says why. Both halves matter: an absent button with no sentence beside it
+  // is the failure this test exists to catch.
+  await expect(
+    strip.getByRole("button", { name: "Suggest a fix" }),
+  ).toBeHidden();
+  await expect(
+    page.getByText(/checked with or without an AI provider/),
+  ).toBeVisible();
+});
+
 test("closing a goal requires a retrospective and keeps it on reopen", async () => {
   await page.goto("/cycle?phase=4");
   await page.getByRole("link", { name: "Open" }).first().click();

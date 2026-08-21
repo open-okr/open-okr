@@ -74,6 +74,17 @@ export interface SemanticFinding {
   readonly reason: string;
 }
 
+/** What the assist is asked to fix, and what it is judged against afterwards. */
+export interface RewriteContext {
+  /** The sentence as written today. */
+  readonly text: string;
+  /** The check it fails, by its §4 id, with the catalogue's own prompt. */
+  readonly ruleId: string;
+  readonly rulePrompt: string;
+  /** The objective it belongs to, so a rewrite stays about the right thing. */
+  readonly goalTitle: string;
+}
+
 export interface RecoveryTitleContext {
   readonly kpiTitle: string;
   /** The template title §6.5 would produce, which is the fallback. */
@@ -84,12 +95,15 @@ export interface RecoveryTitleContext {
 /**
  * What a host must provide for the agents to write language.
  *
- * Both methods may return null, and both are expected to: a provider that is
- * off, a budget that is spent, or output the schema refused twice all end here.
+ * **Every capability is optional and every one may answer null.** A host may
+ * implement drafting and not review, and a capability that is missing is the
+ * same to a caller as one that declined: the deterministic answer stands. That
+ * shape was learned the hard way, by adding a third method and breaking every
+ * stand-in that implemented the first two.
  */
 export interface AgentDrafter {
   /** A check-in a champion can read, correct and publish. Null to propose none. */
-  draftCheckIn(context: CheckInDraftContext): Promise<DraftedCheckIn | null>;
+  draftCheckIn?(context: CheckInDraftContext): Promise<DraftedCheckIn | null>;
   /**
    * A better sentence for a recovery objective than the §6.5 template.
    *
@@ -97,7 +111,7 @@ export interface AgentDrafter {
    * template is what P3-T14 golden-master tested and what the deterministic
    * path has always used.
    */
-  refineRecoveryTitle(context: RecoveryTitleContext): Promise<string | null>;
+  refineRecoveryTitle?(context: RecoveryTitleContext): Promise<string | null>;
   /**
    * METHOD.md §5.3's semantic review over a set of goals.
    *
@@ -105,9 +119,18 @@ export interface AgentDrafter {
    * is different and means the model read them and found nothing, which is a
    * real answer that clears any finding still open.
    */
-  reviewAlignment(
+  reviewAlignment?(
     goals: readonly ReviewableGoal[],
   ): Promise<readonly SemanticFinding[] | null>;
+  /**
+   * A corrected sentence for one failing check.
+   *
+   * The text only. **Whether it actually satisfies the rule is not the model's
+   * to claim**: the caller re-runs §4's own checks over what comes back and
+   * reports what genuinely passes, so an assist cannot talk its way past a
+   * rule it did not fix.
+   */
+  rewriteForRule?(context: RewriteContext): Promise<string | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

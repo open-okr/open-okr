@@ -26,9 +26,15 @@ import {
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
+  type WorkspaceTx,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import {
+  evaluateKeyResults,
+  KEY_RESULT_CHECKS,
+  type KeyResultInput,
+} from "@openokr/method";
 import { asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -81,6 +87,8 @@ const timeframe = z.object({
 });
 
 const keyResultOutput = z.object({
+  /** Failing check ids for this row (P4-T02a stored them, P4-T06c reads them). */
+  qualityFlags: z.array(z.string()),
   id: z.uuid(),
   goalId: z.uuid(),
   title: z.string(),
@@ -130,6 +138,18 @@ const goalOutput = z.object({
   daysPastDue: z.number().int().nullable(),
   position: z.number().int(),
   keyResults: z.array(keyResultOutput),
+  /**
+   * §4's verdict on this goal, as P4-T02a stored it (P4-T06c).
+   *
+   * Read rather than recomputed: the score on the row is what the write path
+   * committed to and what the quality panel already shows, and a second
+   * evaluation here could disagree with it on the same screen.
+   */
+  quality: z.object({
+    score: z.number().nullable(),
+    /** Failing check ids, objective checks first. */
+    flags: z.array(z.string()),
+  }),
   /** Present once the goal has been closed at least once. Kept on reopen. */
   retrospective: z
     .object({ id: z.uuid(), body: z.unknown(), updatedAt: z.string() })
@@ -256,6 +276,7 @@ function keyResultRow(row: {
   capacity: (typeof CAPACITY_VERDICTS)[number] | null;
   progressPct: string;
   confidence: string | null;
+  qualityFlags: string[];
   score: string | null;
   carryForward: boolean;
   position: number;
@@ -296,6 +317,8 @@ const GOAL_COLUMNS = {
   health: goals.health,
   nextCheckInAt: goals.nextCheckInAt,
   position: goals.position,
+  qualityScore: goals.qualityScore,
+  qualityFlags: goals.qualityFlags,
 } as const;
 
 const KEY_RESULT_COLUMNS = {
@@ -318,6 +341,7 @@ const KEY_RESULT_COLUMNS = {
   score: keyResults.score,
   carryForward: keyResults.carryForward,
   position: keyResults.position,
+  qualityFlags: keyResults.qualityFlags,
 } as const;
 
 /** Names for the two roles, so a card reads as a sentence without a second query. */
@@ -463,6 +487,12 @@ export const listGoals = defineReadAction({
             keyResults: children
               .filter((child) => child.goalId === row.id)
               .map(keyResultRow),
+            // The same stored verdict the read returns, so a list and a card
+            // cannot show a different score for one goal.
+            quality: {
+              score: asNumber(row.qualityScore),
+              flags: [...row.qualityFlags],
+            },
             retrospective: null,
           })),
         };
@@ -564,6 +594,13 @@ export const readGoal = defineReadAction({
             name: names.get(row.reviewerId) ?? "Unknown",
           },
           keyResults: children.map(keyResultRow),
+          // Read, never recomputed here: the score on the row is what the
+          // write path committed to and what the quality panel already shows,
+          // and a second evaluation on this screen could disagree with it.
+          quality: {
+            score: asNumber(row.qualityScore),
+            flags: [...row.qualityFlags],
+          },
           retrospective: retro
             ? {
                 id: retro.id,
@@ -1782,4 +1819,161 @@ export const unlinkKeyResultKpi = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * The rewrite assist (METHOD.md §4, P4-T06c).
+ *
+ * **A read action, so it commits nothing.** The whole point of an assist is
+ * that a writer sees a suggestion and decides; a version that saved would be an
+ * agent writing under somebody else's name, which is the line
+ * propose-and-approve draws.
+ *
+ * **The product checks the rewrite; the model does not get to claim it.** A
+ * model asked to fix KR-2 will say it fixed KR-2 whatever it wrote. So the
+ * suggestion is run back through §4's own evaluation and the response reports
+ * which previously-failing checks now pass, from the catalogue rather than from
+ * the model. An assist that did not fix the rule says so.
+ */
+export const rewriteKeyResult = defineReadAction({
+  name: "goals.rewriteKeyResult",
+  summary:
+    "Suggests a corrected key result for one failing check, and reports which checks the suggestion actually passes.",
+  input: z.object({
+    keyResultId: z.uuid(),
+    /** The §4 check id to fix, for example `KR-2`. */
+    ruleId: z.string().trim().min(1).max(20),
+  }),
+  output: z
+    .object({
+      /** The suggested sentence. */
+      text: z.string(),
+      /** Checks that failed before and pass now, by their §4 ids. */
+      nowPassing: z.array(z.string()),
+      /** True when the named rule is among them. */
+      fixesTheRule: z.boolean(),
+    })
+    .nullable(),
+  access: ACCESS_LEVELS.edit,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    // Absent means the provider is off. Null rather than an error: the surface
+    // explains the state instead of showing a failure.
+    const drafter = context.drafter;
+    if (!userId || !drafter) {
+      return null;
+    }
+
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as WorkspaceTx;
+        const [row] = await tx
+          .select({
+            id: keyResults.id,
+            title: keyResults.title,
+            goalId: keyResults.goalId,
+            baselineValue: keyResults.baselineValue,
+            targetValue: keyResults.targetValue,
+            dueOn: keyResults.dueOn,
+            ownerId: keyResults.ownerId,
+            indicatorType: keyResults.indicatorType,
+            direction: keyResults.direction,
+            confidence: keyResults.confidence,
+          })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!row) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+
+        const [goal] = await tx
+          .select({ title: goals.title })
+          .from(goals)
+          .where(activeOnly(goals, eq(goals.id, row.goalId)))
+          .limit(1);
+
+        const check = KEY_RESULT_CHECKS.find(
+          (entry: { id: string }) => entry.id === input.ruleId,
+        );
+        if (!check) {
+          throw new OperationError(
+            "forbidden",
+            `\`${input.ruleId}\` is not a check the method package defines.`,
+          );
+        }
+
+        const thresholds = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        ).thresholds;
+        const asInput = (text: string): KeyResultInput => ({
+          text,
+          baseline: Number(row.baselineValue),
+          target: Number(row.targetValue),
+          dueOn: row.dueOn,
+          ownerId: row.ownerId,
+          indicatorType: row.indicatorType,
+          direction: row.direction,
+          confidence: row.confidence === null ? null : Number(row.confidence),
+        });
+
+        const failingBefore = new Set(
+          evaluateKeyResults({ keyResults: [asInput(row.title)] }, thresholds)
+            .filter((verdict: { status: string }) => verdict.status !== "pass")
+            .map((verdict: { id: string }) => verdict.id),
+        );
+
+        let suggestion: string | null = null;
+        try {
+          suggestion =
+            (await drafter.rewriteForRule?.({
+              text: row.title,
+              ruleId: check.id,
+              // The catalogue's own words for the failing condition, so the
+              // model is told the rule rather than a paraphrase of it.
+              rulePrompt:
+                check.conditions.find(
+                  (condition: { status: string }) =>
+                    condition.status !== "pass",
+                )?.prompt ?? check.title,
+              goalTitle: goal?.title ?? "",
+            })) ?? null;
+        } catch {
+          // A model having a bad minute is not a reason to show an error where
+          // a suggestion would have been. The surface says nothing was
+          // suggested, which is true.
+          suggestion = null;
+        }
+        if (!suggestion) {
+          return null;
+        }
+
+        // §4 run over the model's own output. This is the part that makes the
+        // response honest rather than optimistic.
+        const nowPassing = [...failingBefore].filter((id) =>
+          evaluateKeyResults(
+            { keyResults: [asInput(suggestion)] },
+            thresholds,
+          ).some(
+            (verdict: { id: string; status: string }) =>
+              verdict.id === id && verdict.status === "pass",
+          ),
+        );
+
+        return {
+          text: suggestion,
+          nowPassing,
+          fixesTheRule: nowPassing.includes(check.id),
+        };
+      },
+    );
+  },
 });

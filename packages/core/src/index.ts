@@ -90,6 +90,7 @@ export type {
   DraftedCheckIn,
   RecoveryTitleContext,
   ReviewableGoal,
+  RewriteContext,
   SemanticFinding,
 } from "./agents/drafter.ts";
 export {

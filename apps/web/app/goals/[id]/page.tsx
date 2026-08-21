@@ -18,6 +18,7 @@ import {
   recordValue,
   reopenGoal,
 } from "./actions.ts";
+import { CoachStrip } from "./coach-strip";
 import { GoalComments } from "./goal-comments.tsx";
 import { Rail } from "./rail.tsx";
 import { Sparkline } from "./sparkline.tsx";
@@ -81,6 +82,14 @@ export default async function GoalPage({
     string,
     readonly { readonly value: number; readonly at: string }[]
   >();
+  // Whether the assist can offer anything, asked of the stored configuration
+  // rather than assumed. With no provider the strip still shows every failing
+  // rule and says the suggestion is what needs one.
+  const providers = await callAction(context, "ai.readProviderConfig", {});
+  const drafting = providers.some(
+    (entry) => entry.enabled && entry.hasWorkspaceCredential,
+  );
+
   for (const keyResult of goal.keyResults) {
     const history = await callAction(context, "goals.keyResultHistory", {
       keyResultId: keyResult.id,
@@ -180,6 +189,19 @@ export default async function GoalPage({
               ) : null}
             </CardBody>
           </Card>
+
+          <CoachStrip
+            goalId={goal.id}
+            score={goal.quality.score}
+            flags={goal.quality.flags}
+            keyResults={goal.keyResults.map((kr) => ({
+              id: kr.id,
+              title: kr.title,
+              qualityFlags: kr.qualityFlags,
+            }))}
+            drafting={drafting}
+            canEdit={canEdit && !closed}
+          />
 
           <Card>
             <CardHeader>

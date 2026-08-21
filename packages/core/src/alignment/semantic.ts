@@ -124,7 +124,9 @@ export async function sweepSemanticInTx(
     });
   }
 
-  const findings = await input.drafter.reviewAlignment(reviewable);
+  // The capability is optional: a host may draft without reviewing, and a
+  // missing capability reads the same as one that declined.
+  const findings = (await input.drafter.reviewAlignment?.(reviewable)) ?? null;
   if (findings === null) {
     // The model could not answer. Distinct from an empty list, and treated the
     // same as having no provider: yesterday's findings stay.

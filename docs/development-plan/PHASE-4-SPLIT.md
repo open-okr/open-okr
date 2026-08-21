@@ -21,9 +21,13 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 18 | P4-T01b to P4-T05a, P4-T07a to P4-T08 |
+| in_review | 21 | P4-T01b to P4-T06c, P4-T07a to P4-T08 |
 | in_progress | 1 | P4-T13a |
-| todo | 17 | P4-T05b to P4-T06c, P4-T09 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 12 | P4-T09 to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+
+The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
+waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
+retrieval lane (P4-T13a, b then P4-T14a, b) between here and P4-T15.
 
 **The twelve rows from P4-T01b to P4-T04c are all in pull request #40 and have not merged.**
 P4-T05a and P4-T07a landed on `obed` and are waiting on a read. Nothing in
@@ -43,7 +47,7 @@ hourly run, and the session record with live stage sync.
 | Chain | Tasks | Serial? | State |
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
-| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | P4-T05a, P4-T05b, P4-T05c-a and P4-T06a in_review. P4-T05c-b blocked on a provider key; P4-T06b next |
+| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
 | B2: the sessions | P4-T07a to P4-T12, thirteen rows | yes | P4-T07a to P4-T08 in_review; P4-T09 next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
@@ -55,7 +59,11 @@ and the chain is now moving. Whoever finishes it decides when Phase 4 ends.
 
 **Agung takes the agents. Agung has taken the sessions too, from 21 August 2026.**
 
-P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
+The two-lane plan below is kept as the record of how the phase was scheduled.
+It stopped describing the present on 21 August, when the takeover made every
+remaining row one person's. What is still true in it is the shape: B2 is the
+longest serial run left and it sets the end date, which is why P4-T09 is the
+next row rather than P4-T13b.
 
 | Stage | Agung | Obed | At the same time? |
 |---|---|---|---|
@@ -68,10 +76,13 @@ P4-T05a and P4-T07a are both in_review. Both lanes are moving in parallel.
 Ten rows for Agung, fourteen for Obed, and the wall clock is Obed's chain
 because B2 cannot be worked by two people at once.
 
-**Why Obed gets the sessions rather than the copilot.** The sessions are the
-longest serial run left, so they have to start now or they set the end date.
-The copilot waits behind retrieval anyway, and Agung reaches it naturally once
-the agents are done.
+**Why Obed got the sessions rather than the copilot.** The sessions are the
+longest serial run left, so they had to start immediately or they set the end
+date. The copilot waits behind retrieval anyway.
+
+**The order after the takeover**, one row at a time: P4-T09, P4-T10a to c,
+P4-T11a to c, P4-T12, then P4-T13a and P4-T13b, then P4-T14a and P4-T14b, and
+P4-T15 last because it needs all of them.
 
 ### Agung takes over the sessions lane, 21 August 2026
 
@@ -123,7 +134,7 @@ and this table is what was agreed.
 | P4-T06a | The Coach agent and write-triggered evaluation | Agung | in_review |
 | P4-T06b-a | Divergence findings, and the shared reconciler | Agung | in_review |
 | P4-T06b-b | The nightly semantic sweep | Agung | in_review |
-| P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
+| P4-T06c | The rewrite assist and the coach surfaces | Agung | in_review |
 | P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | in_review |
 | P4-T07c | Blockers, the board and aging | Obed | in_review |
@@ -199,16 +210,59 @@ keys are already in the catalogue, so nothing about the method changes.
 | `packages/agents`, `packages/core/src/agents` | Agung |
 | `packages/core/src/nudges`, the review inbox, the S-36 nudge and volume cards | Agung |
 | `packages/method` | Shared. Any change is a message to the other lane |
-| Session tables, `packages/core/src/sessions`, screens S-22 to S-25 | Obed |
-| `packages/core/src/embeddings`, the embedding schema and drivers | Obed |
+| Session tables, `packages/core/src/sessions`, screens S-22 to S-25 | Obed until 21 August 2026, Agung after |
+| `packages/core/src/embeddings`, the embedding schema and drivers | Obed until 21 August 2026, Agung after |
 | Copilot panel S-39 | Agung, once the agents are done |
 
-## Known gap that outlasts this phase
+## Known gaps that outlast this phase
 
 **There is no relay host and no worker process.** Every write path inserts its
 outbox rows correctly and nothing drains them.
 `packages/core/src/scoring/recompute.ts`, `packages/core/src/kpis/formula.ts`
 and two other files already say so in comments.
+
+### The test harness drops a database another worker is still using
+
+Found on 21 August 2026 while verifying P4-T06c. Two consecutive full runs of
+`packages/core` failed, 111 tests and then 123, with **no assertion failures at
+all**: every failure was Postgres `57P01`, "terminating connection due to
+administrator command". A different set of files failed each time.
+
+The cause is in `packages/test-support/src/db-harness.ts`. `workerDb()` names
+its database `openokr_test_${project}_w${VITEST_POOL_ID}` and opens with
+
+```sql
+drop database if exists <name> with (force)
+```
+
+`with (force)` calls `pg_terminate_backend` on every connection to that
+database. Vitest reuses pool slot numbers, so when it starts a replacement fork
+for slot N while the outgoing fork is still closing its pools, the new fork
+deletes the database the old one is still reading. The old fork's connections
+die with `57P01` and its file is reported as failed, which is why the failing
+file is always one that had just finished rather than one doing anything
+unusual.
+
+Caught live in `pg_stat_activity` during a run. One of these drops held for
+**18 seconds** on the development machine, which is how wide the window is.
+
+**The workaround, until this is fixed.** Cap the workers:
+
+```
+TEST_DB_PORT=5432 pnpm --filter @openokr/core exec vitest run --maxWorkers=4
+```
+
+Fewer forks means fewer recycles. The same suite that failed 123 tests at the
+default twelve passed **60/60 files and 1185/1185 tests** at four, and finished
+faster: 367 seconds against 457.
+
+**The fix, when somebody takes it.** Put the process id in the database name so
+no two forks can ever share one, and sweep orphans scoped to
+`openokr_test_${project}_%` in the global setup, before any worker starts. It
+was not done inside P4-T06c because it changes the harness every package's
+tests run through, and that needs its own row and its own verification across
+all of them. Do not read a red `packages/core` run as a real failure until this
+is done: check for `57P01` first.
 
 As of P4-T05b there are now **four** declared crons nothing executes: the
 Champion's hourly, daily, weekly and per-cycle runs. All four are reachable
