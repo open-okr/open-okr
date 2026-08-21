@@ -42,7 +42,16 @@ const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
   : connectionOptions(
       process.env.E2E_DATABASE ?? "openokr_e2e",
-      testDbEnv.appRole,
+      // **The superuser, not the application role.** Every business table
+      // carries forced row-level security keyed on `app.workspace_id`, and
+      // these setup queries have to find the workspace *before* they could set
+      // it: the member row is how they learn which workspace this is. As the
+      // application role the policy answers with nothing rather than raising,
+      // so the query returns no rows and the spec reports "Member not found"
+      // for a member that is plainly there. Every unit suite reaches past the
+      // tenant floor the same way, through its `admin` connection, and for the
+      // same reason.
+      testDbEnv.superuser,
     );
 
 test.describe.configure({ mode: "serial" });
