@@ -120,18 +120,35 @@ test("hydrates, so a write happens without loading a new document", async () => 
   expect(documentLoads).toBe(0);
 });
 
-test("the seeded Champion is in admin, with its schedule and an empty log", async () => {
-  // P4-T05a. The agent is created at provisioning, so a workspace that has
-  // answered no questions still has one, and this is the page that says what
-  // it is and what it has done.
+test("both seeded agents are in admin, with their schedules and an empty log", async () => {
+  // P4-T05a seeded the Champion and P4-T06a the Coach. Both are created at
+  // provisioning, so a workspace that has answered no questions still has
+  // both, and this is the page that says what they are and what they have
+  // done.
+  //
+  // **Scoped per row rather than per page.** This test asserted a bare
+  // `getByText("propose")` while one agent existed; the moment a second was
+  // seeded it matched twice and Playwright refused it under strict mode. Both
+  // agents propose and neither is "the" one, so every assertion below names
+  // the row it is about.
   await page.goto("/admin/agents");
 
   await expect(
     page.getByRole("heading", { name: "Agents and runs" }),
   ).toBeVisible();
-  await expect(page.getByText("OKR Champion")).toBeVisible();
-  await expect(page.getByText("On the hour")).toBeVisible();
-  await expect(page.getByText("propose")).toBeVisible();
+
+  const champion = page
+    .getByRole("listitem")
+    .filter({ hasText: "OKR Champion" });
+  await expect(champion).toHaveCount(1);
+  await expect(champion.getByText("On the hour")).toBeVisible();
+  await expect(champion.getByText("propose")).toBeVisible();
+
+  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await expect(coach).toHaveCount(1);
+  await expect(coach.getByText("On every write")).toBeVisible();
+  await expect(coach.getByText("propose")).toBeVisible();
+
   // Nothing schedules a run on this instance, and the page says so rather
   // than showing an empty list that reads like a bug.
   await expect(page.getByText(/No run yet/)).toBeVisible();
