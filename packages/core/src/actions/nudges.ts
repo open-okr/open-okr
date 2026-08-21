@@ -61,6 +61,7 @@ export const runNudges = defineWriteAction({
         staleFlipped: _sweep,
         proposed: _proposed,
         diverged: _diverged,
+        reviewed: _reviewed,
         ruleKeys,
         ...counts
       } = await runDueNudgesInTx(tx as WorkspaceTx, {

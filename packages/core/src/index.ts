@@ -89,6 +89,8 @@ export type {
   CheckInDraftContext,
   DraftedCheckIn,
   RecoveryTitleContext,
+  ReviewableGoal,
+  SemanticFinding,
 } from "./agents/drafter.ts";
 export {
   type BudgetCheckResult,

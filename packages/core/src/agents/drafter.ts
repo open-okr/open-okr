@@ -14,7 +14,8 @@
  * drafter proposes the same changes, worded by the method rather than by a
  * model. CLAUDE.md's "deterministic first" is this interface being optional.
  *
- * Nothing here throws on a model that misbehaves. Each method returns null when
+ * "Drafter" covers everything a model does for the agents, which is writing
+ * language and reading meaning. Nothing here throws on a model that misbehaves. Each method returns null when
  * it cannot produce something the schema accepts, and the caller carries on with
  * the deterministic answer: a proposal a human still reviews is worth more than
  * a run that fell over.
@@ -42,6 +43,37 @@ export interface CheckInDraftContext {
   }[];
 }
 
+/**
+ * One goal, as a model is allowed to see it.
+ *
+ * Given to `reviewAlignment` in a list, and referred to **by index**. A model
+ * is never shown or asked for an identifier: it cannot invent an index that
+ * points at a goal in another workspace, and an index out of range is dropped
+ * rather than resolved. That is the whole reason findings come back positional.
+ */
+export interface ReviewableGoal {
+  readonly title: string;
+  /** Plain text, already extracted from the editor document. */
+  readonly description: string;
+  readonly level: string;
+  /** The space's name, or null for a workspace-level goal. */
+  readonly spaceName: string | null;
+  /** The index of this goal's parent in the same list, when it has one here. */
+  readonly parentIndex: number | null;
+  readonly keyResultTitles: readonly string[];
+}
+
+/** A §5.3 finding, positional so no identifier ever comes from a model. */
+export interface SemanticFinding {
+  readonly kind: "relink" | "dependency" | "conflict" | "gap";
+  readonly subjectIndex: number;
+  /** The second goal, for the kinds that involve one. Null for a gap. */
+  readonly targetIndex: number | null;
+  readonly severity: "high" | "medium" | "low";
+  /** One specific sentence, as §5.3 requires. */
+  readonly reason: string;
+}
+
 export interface RecoveryTitleContext {
   readonly kpiTitle: string;
   /** The template title §6.5 would produce, which is the fallback. */
@@ -66,6 +98,16 @@ export interface AgentDrafter {
    * path has always used.
    */
   refineRecoveryTitle(context: RecoveryTitleContext): Promise<string | null>;
+  /**
+   * METHOD.md §5.3's semantic review over a set of goals.
+   *
+   * Null when there is nothing to say or nothing could be said. An empty array
+   * is different and means the model read them and found nothing, which is a
+   * real answer that clears any finding still open.
+   */
+  reviewAlignment(
+    goals: readonly ReviewableGoal[],
+  ): Promise<readonly SemanticFinding[] | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

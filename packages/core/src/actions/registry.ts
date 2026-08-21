@@ -61,6 +61,7 @@ import {
 import {
   addGoalDependency,
   addKeyResultDependency,
+  applyAlignmentFinding,
   confirmKeyResultDependency,
   dismissAlignmentFinding,
   readAlignment,
@@ -382,6 +383,7 @@ export const ACTION_MAP = {
   "kpis.detail": readKpiDetail,
   "kpis.update": updateKpi,
   "alignment.dismissFinding": dismissAlignmentFinding,
+  "alignment.applyFinding": applyAlignmentFinding,
   "review.inbox": reviewInbox,
   // Comments and reactions (P3-T16)
   "comments.list": listCommentsAction,

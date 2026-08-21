@@ -43,6 +43,7 @@ import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+import { callAction } from "./registry.ts";
 
 async function actingMember(
   tx: OperationTx,
@@ -771,6 +772,7 @@ export const dismissAlignmentFinding = defineWriteAction({
           id: alignmentFindings.id,
           ruleKey: alignmentFindings.ruleKey,
           subjectGoalId: alignmentFindings.subjectGoalId,
+          targetGoalId: alignmentFindings.targetGoalId,
           cycleId: alignmentFindings.cycleId,
         })
         .from(alignmentFindings)
@@ -785,15 +787,12 @@ export const dismissAlignmentFinding = defineWriteAction({
       if (!row) {
         throw new OperationError("not_found", "No such finding.");
       }
-      if (row.subjectGoalId) {
-        await requireGoal(
-          tx,
-          workspaceId,
-          memberId,
-          row.subjectGoalId,
-          ACCESS_LEVELS.edit,
-        );
-      }
+      // **Either end, not just the subject.** §5.3's conflict is one row about
+      // two goals in two spaces, and METHOD.md's own line is that dismissing it
+      // dismisses it everywhere. A check on the subject alone would let one
+      // champion clear it and refuse the other, which is the same disagreement
+      // the finding is about.
+      await requireEitherEnd(tx, workspaceId, memberId, row);
 
       const now = new Date();
       // openokr:allow-mutation: same transaction.
@@ -1295,4 +1294,180 @@ export const readAlignment = defineReadAction({
       },
     );
   },
+});
+
+/**
+ * Whoever can edit either goal a finding names may decide it (P4-T06b-b).
+ *
+ * A finding with no goal at all is the anchor finding (decision D-16), which
+ * belongs to the cycle rather than to anybody's goal; the action's own `full`
+ * requirement is what guards that one.
+ */
+async function requireEitherEnd(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  finding: {
+    readonly subjectGoalId: string | null;
+    readonly targetGoalId: string | null;
+  },
+): Promise<void> {
+  const ends = [finding.subjectGoalId, finding.targetGoalId].filter(
+    (id): id is string => id !== null,
+  );
+  if (ends.length === 0) {
+    return;
+  }
+  let refusal: unknown = null;
+  for (const goalId of ends) {
+    try {
+      await requireGoal(tx, workspaceId, memberId, goalId, ACCESS_LEVELS.edit);
+      return;
+    } catch (error) {
+      refusal = error;
+    }
+  }
+  throw refusal;
+}
+
+/**
+ * Applies a finding whose fix is mechanical (METHOD.md §5.3, P4-T06b-b).
+ *
+ * §5.3 offers a one-click apply "where the fix is mechanical (relink,
+ * dependency)". Only `relink` is mechanical here and it is the only kind this
+ * accepts: re-parenting is one column and the engine recomputes from it. A
+ * `dependency` finding says two goals should be linked, and §5.4's register
+ * needs a provider named and a direction chosen, which is a decision rather
+ * than a click. A `conflict` or a `gap` has no fix at all to apply, only a
+ * conversation to have.
+ *
+ * **The re-parent goes through `goals.update`, not through this transaction.**
+ * A relink changes the tree, and the tree drives the §5.2 score, the level-skip
+ * finding and the silo finding. Writing the column here would skip the
+ * recompute that keeps all three true, so the finding's apply is the ordinary
+ * action run by the ordinary member with the ordinary audit row.
+ */
+export const applyAlignmentFinding = defineWriteAction({
+  name: "alignment.applyFinding",
+  summary:
+    "Applies a relink finding by re-parenting the goal through the normal update path.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), goalId: z.uuid(), parentGoalId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [row] = await tx
+        .select({
+          id: alignmentFindings.id,
+          kind: alignmentFindings.kind,
+          state: alignmentFindings.state,
+          subjectGoalId: alignmentFindings.subjectGoalId,
+          targetGoalId: alignmentFindings.targetGoalId,
+        })
+        .from(alignmentFindings)
+        .where(
+          activeOnly(
+            alignmentFindings,
+            eq(alignmentFindings.workspaceId, workspaceId),
+            eq(alignmentFindings.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError("not_found", "No such finding.");
+      }
+      if (row.kind !== "relink") {
+        throw new OperationError(
+          "forbidden",
+          "Only a relink finding has a mechanical fix. A dependency needs a provider named, and a conflict or a gap needs a conversation rather than a click.",
+        );
+      }
+      if (row.state !== "open") {
+        throw new OperationError(
+          "forbidden",
+          "This finding has already been decided.",
+        );
+      }
+      if (!row.subjectGoalId || !row.targetGoalId) {
+        throw new OperationError(
+          "forbidden",
+          "A relink names the goal to move and the parent to move it under. This one names only one of them.",
+        );
+      }
+
+      // Both ends, because a relink moves a goal *into* somebody else's tree
+      // and that is a change to their tree as much as to this one.
+      await requireGoal(
+        tx,
+        workspaceId,
+        memberId,
+        row.subjectGoalId,
+        ACCESS_LEVELS.edit,
+      );
+      await requireGoal(
+        tx,
+        workspaceId,
+        memberId,
+        row.targetGoalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const now = new Date();
+      // openokr:allow-mutation: the operation's own execute. Only the finding's
+      // own decision fields change here; the re-parent itself is the action
+      // called below, in its own transaction with its own audit row.
+      await tx
+        .update(alignmentFindings)
+        .set({
+          state: "applied",
+          decidedById: memberId,
+          decidedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          activeOnly(alignmentFindings, eq(alignmentFindings.id, input.id)),
+        );
+
+      // Deliberately outside this transaction, the same call `bulkApply` makes
+      // and for the same reason: the re-parent is a real domain write with its
+      // own pipeline, audit row and alignment recompute.
+      await callAction(
+        {
+          pool: context.pool,
+          workspaceId,
+          actor: { kind: context.actor.kind, userId: context.actor.userId },
+        },
+        "goals.update",
+        { id: row.subjectGoalId, parentGoalId: row.targetGoalId },
+      );
+
+      return {
+        result: {
+          id: input.id,
+          goalId: row.subjectGoalId,
+          parentGoalId: row.targetGoalId,
+        },
+        activity: {
+          kind: "alignment.finding_applied" as const,
+          subjectType: "goal" as const,
+          subjectId: row.subjectGoalId,
+          payload: { parentGoalId: row.targetGoalId },
+        },
+        audit: {
+          action: "alignment.applyFinding",
+          targetType: "alignment_finding",
+          targetId: input.id,
+          payload: {
+            goalId: row.subjectGoalId,
+            parentGoalId: row.targetGoalId,
+          },
+        },
+      };
+    },
+  }),
 });

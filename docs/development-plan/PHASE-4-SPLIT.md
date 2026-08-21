@@ -122,7 +122,7 @@ and this table is what was agreed.
 | P4-T05c-b | AI drafting inside the proposal | Agung | in_review |
 | P4-T06a | The Coach agent and write-triggered evaluation | Agung | in_review |
 | P4-T06b-a | Divergence findings, and the shared reconciler | Agung | in_review |
-| P4-T06b-b | The nightly semantic sweep | Agung | todo, the provider key is installed |
+| P4-T06b-b | The nightly semantic sweep | Agung | in_review |
 | P4-T06c | The rewrite assist and the coach surfaces | Agung | todo |
 | P4-T07a | The session record and live stage sync | Obed | in_review |
 | P4-T07b | The confidence round | Obed | in_review |

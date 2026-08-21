@@ -746,6 +746,8 @@ export const runChampion = defineWriteAction({
     proposed: z.number().int(),
     /** Always zero here: divergence is the Coach's sweep (P4-T06b-a). */
     diverged: z.number().int(),
+    /** Always zero here: §5.3's review is the Coach's (P4-T06b-b). */
+    reviewed: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -828,6 +830,7 @@ export const runChampion = defineWriteAction({
             staleFlipped: 0,
             proposed: 0,
             diverged: 0,
+            reviewed: 0,
           },
           activity: {
             // The catalogue already has this kind, from the manual cancel
@@ -954,6 +957,7 @@ export const runChampion = defineWriteAction({
           staleFlipped: run.staleFlipped,
           proposed: run.proposed,
           diverged: run.diverged,
+          reviewed: run.reviewed,
         },
         activity: {
           kind: "agent.run_completed",
@@ -1009,6 +1013,8 @@ export const runCoach = defineWriteAction({
     ruleKeys: z.array(z.string()),
     /** Divergence findings written or refreshed (P4-T06b-a). */
     diverged: z.number().int(),
+    /** §5.3 semantic findings written or refreshed (P4-T06b-b). */
+    reviewed: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -1056,6 +1062,7 @@ export const runCoach = defineWriteAction({
         at,
         cadence: "quality",
         runId,
+        ...(_context.drafter ? { drafter: _context.drafter } : {}),
       });
 
       for (const [index, ruleKey] of run.ruleKeys.entries()) {
@@ -1082,12 +1089,27 @@ export const runCoach = defineWriteAction({
           message: `quality.divergence: ${run.diverged} finding(s) written or refreshed.`,
         });
       }
+      if (run.reviewed > 0) {
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 2,
+          kind: "applied",
+          message: `§5.3 semantic review: ${run.reviewed} finding(s) written or refreshed.`,
+        });
+      }
 
       // openokr:allow-mutation: the operation's own execute. Not `activeOnly`:
       // `agent_runs` carries no `deleted_at`.
       await tx
         .update(agentRuns)
-        .set({ status: "completed", log, finishedAt: at })
+        .set({
+          status: "completed",
+          log,
+          finishedAt: at,
+          // Zero without a provider, which is why the note above about this
+          // run never spending held until §5.3's review arrived.
+          cost: String(_context.drafter?.spentUsd() ?? 0),
+        })
         .where(eq(agentRuns.id, runId));
 
       return {
@@ -1098,6 +1120,7 @@ export const runCoach = defineWriteAction({
           suppressed: run.suppressed,
           ruleKeys: [...run.ruleKeys],
           diverged: run.diverged,
+          reviewed: run.reviewed,
         },
         activity: {
           kind: "agent.run_completed",

@@ -27,6 +27,7 @@ import type { SuppressionReason } from "@openokr/method";
 import { desc, eq, ne } from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import { sweepDivergenceInTx } from "../alignment/divergence.ts";
+import { sweepSemanticInTx } from "../alignment/semantic.ts";
 import { sweepStaleness } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -116,6 +117,13 @@ export interface NudgeRunResult {
    * something different from "what did it say".
    */
   readonly diverged: number;
+  /**
+   * §5.3 semantic findings written or refreshed.
+   *
+   * Zero without a provider, which is not the same as zero with one: the first
+   * means nothing was read, the second means nothing was found.
+   */
+  readonly reviewed: number;
 }
 
 /**
@@ -155,6 +163,7 @@ export async function runDueNudgesInTx(
 
   let staleFlipped = 0;
   let diverged = 0;
+  let reviewed = 0;
   const due: DueNudge[] = [];
 
   if (cadence === "hourly") {
@@ -218,6 +227,16 @@ export async function runDueNudgesInTx(
     if (cycleId) {
       diverged = (
         await sweepDivergenceInTx(tx, { workspaceId, cycleId, thresholds })
+      ).found;
+      // §5.3's semantic review, the one part of the Coach that needs a
+      // provider. With none it writes nothing **and clears nothing**, so a
+      // workspace that turns AI off keeps the findings it already had.
+      reviewed = (
+        await sweepSemanticInTx(tx, {
+          workspaceId,
+          cycleId,
+          ...(input.drafter ? { drafter: input.drafter } : {}),
+        })
       ).found;
     }
     due.push(...(await dueQualityNudges(tx, { workspaceId, thresholds })));
@@ -307,6 +326,7 @@ export async function runDueNudgesInTx(
     suppressed: ids.length - sent,
     staleFlipped,
     diverged,
+    reviewed,
     // Distinct rows, not linked nudges: two nudges pointing at one already
     // pending proposal proposed nothing new, and counting them twice would
     // report activity the run did not cause.

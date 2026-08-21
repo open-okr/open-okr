@@ -193,6 +193,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
     `An alignment finding was dismissed (${String(p.ruleKey ?? "no rule")})`,
+  "alignment.finding_applied": () =>
+    "A relink finding was applied and the goal was re-parented",
   "kpi.category_created": (p) =>
     `A KPI category "${String(p.name ?? "")}" was added`,
   "kpi.created": (p) =>

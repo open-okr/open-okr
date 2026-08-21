@@ -68,6 +68,9 @@ const workingDrafter = () => {
       spent += 0.01;
       return `Restore ${input.kpiTitle} to its corridor`;
     },
+    async reviewAlignment() {
+      return null;
+    },
     spentUsd: () => spent,
   };
   return { drafter, calls };
@@ -281,6 +284,9 @@ describe("with a drafter", () => {
       async refineRecoveryTitle() {
         return null;
       },
+      async reviewAlignment() {
+        return null;
+      },
       spentUsd: () => 0,
     };
 
@@ -299,6 +305,9 @@ describe("with a drafter", () => {
       },
       async refineRecoveryTitle() {
         throw new Error("same");
+      },
+      async reviewAlignment() {
+        return null;
       },
       spentUsd: () => 0.02,
     };
@@ -347,6 +356,9 @@ describe("with a drafter", () => {
         return null;
       },
       async refineRecoveryTitle() {
+        return null;
+      },
+      async reviewAlignment() {
         return null;
       },
       spentUsd: () => 0,

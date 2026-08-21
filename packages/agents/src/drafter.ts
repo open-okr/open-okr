@@ -20,6 +20,8 @@ import type {
   CheckInDraftContext,
   DraftedCheckIn,
   RecoveryTitleContext,
+  ReviewableGoal,
+  SemanticFinding,
 } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
@@ -72,6 +74,80 @@ const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
   "line, an outcome rather than an activity, no more than twelve words, no " +
   "trailing full stop. Name the metric.";
+
+/**
+ * §5.3's four types, positional.
+ *
+ * `subjectIndex` and `targetIndex` are indices into the list the model was
+ * given. It is never shown an identifier, so it cannot name a goal that is not
+ * in front of it, and core drops an index out of range.
+ */
+const REVIEW_SHAPE = z.object({
+  findings: z
+    .array(
+      z.object({
+        kind: z.enum(["relink", "dependency", "conflict", "gap"]),
+        subjectIndex: z.number().int().min(0),
+        targetIndex: z.number().int().min(0).nullable(),
+        severity: z.enum(["high", "medium", "low"]),
+        reason: z.string().trim().min(1).max(400),
+      }),
+    )
+    // Bounded. A model asked for "everything wrong" with thirty goals will
+    // happily produce sixty findings, and a review nobody can read is a review
+    // nobody acts on.
+    .max(20),
+});
+
+const REVIEW_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["findings"],
+  properties: {
+    findings: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["kind", "subjectIndex", "targetIndex", "severity", "reason"],
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["relink", "dependency", "conflict", "gap"],
+          },
+          subjectIndex: { type: "integer", minimum: 0 },
+          targetIndex: { type: ["integer", "null"], minimum: 0 },
+          severity: { type: "string", enum: ["high", "medium", "low"] },
+          reason: { type: "string", maxLength: 400 },
+        },
+      },
+    },
+  },
+} as const;
+
+/**
+ * §5.3's own definitions, given to the model as the definitions rather than
+ * paraphrased. The four types are canon; the judgement is what the model adds.
+ */
+const REVIEW_SYSTEM =
+  "You review a set of objectives for problems that structure alone cannot " +
+  "show, and return findings of exactly four types. " +
+  "relink: this goal's content actually supports a different parent better " +
+  "than its current one, or it is unaligned and this is the right parent. " +
+  "dependency: these two goals share metrics or workstreams but no explicit " +
+  "horizontal link exists. " +
+  "conflict: these two goals pull in opposite directions, or double-count " +
+  "the same metric. " +
+  "gap: something is missing or weak, with no second goal involved. " +
+  "Refer to goals by their index in the list. Use targetIndex only for " +
+  "relink, dependency and conflict; it is null for gap. Give one specific " +
+  "sentence of reasoning that names what you saw, never a general remark. " +
+  "Return an empty list when you find nothing: saying nothing is a real " +
+  "answer and inventing a finding is not.";
+
+/** Named, because a bare escape inside a template literal is invisible in a diff. */
+const NEWLINE = String.fromCharCode(10);
 
 export interface ProviderDrafterOptions {
   readonly provider: AIProvider;
@@ -200,6 +276,56 @@ export function createProviderDrafter(
         // words no model chose. Observed on the first live run against
         // OpenRouter, which returned the template verbatim.
         return title.trim() === context.templateTitle.trim() ? null : title;
+      } catch {
+        return null;
+      }
+    },
+
+    async reviewAlignment(
+      goals: readonly ReviewableGoal[],
+    ): Promise<readonly SemanticFinding[] | null> {
+      if (!affordable()) {
+        return null;
+      }
+      const listing = goals
+        .map((goal, index) => {
+          const parent =
+            goal.parentIndex === null
+              ? "none in this set"
+              : `#${goal.parentIndex}`;
+          const measures =
+            goal.keyResultTitles.length === 0
+              ? "none"
+              : goal.keyResultTitles.join("; ");
+          const where = goal.spaceName ? `, ${goal.spaceName}` : "";
+          const about = goal.description
+            ? NEWLINE + `    about: ${goal.description}`
+            : "";
+          return (
+            `#${index} [${goal.level}${where}] ${goal.title}` +
+            NEWLINE +
+            `    parent: ${parent}` +
+            NEWLINE +
+            `    key results: ${measures}` +
+            about
+          );
+        })
+        .join(NEWLINE);
+
+      try {
+        const { findings } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: REVIEW_SHAPE,
+          jsonSchema: REVIEW_JSON_SCHEMA,
+          maxTokens: 1500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: REVIEW_SYSTEM },
+            { role: "user", content: listing },
+          ],
+        });
+        return findings;
       } catch {
         return null;
       }

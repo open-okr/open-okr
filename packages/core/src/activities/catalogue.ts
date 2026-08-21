@@ -189,6 +189,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_risk_owned": z.object({}),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
+  // The one finding kind with a mechanical fix (§5.3, P4-T06b-b). The re-parent
+  // itself emits `goal.updated` from its own action; this records the decision
+  // that caused it, which is the part a reader cannot infer from the goal.
+  "alignment.finding_applied": z.object({ parentGoalId: z.string() }),
   // KPIs (P3-T12). Recording a value is worth a line: it is the one write that
   // moves a corridor state, and a state change is what a nudge reads later.
   "kpi.category_created": z.object({ name: z.string() }),
