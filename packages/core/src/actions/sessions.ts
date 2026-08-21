@@ -355,10 +355,19 @@ export const advanceStage = defineWriteAction({
 
         // Stage completion gate: confidence → diagnose requires every KR
         // in the space's active cycle to have a confirmed confidence.
+        // **`session.cycleId` is part of the condition, not defaulted inside
+        // the query.** `cycle_id` is nullable by design, and this read once
+        // passed `session.cycleId ?? ""` into a uuid comparison, which
+        // Postgres refuses outright: the whole session screen fell to its
+        // error boundary with "We could not load your workspace" for any
+        // session created outside a cycle. A gate over the key results in a
+        // cycle has nothing to check when there is no cycle, so it does not
+        // run rather than running against a placeholder.
         if (
           session.stageKey === "confidence" &&
           nextStageKey === "diagnose" &&
-          session.spaceId
+          session.spaceId &&
+          session.cycleId
         ) {
           const spaceKrs = await tx
             .select({ id: keyResults.id, title: keyResults.title })
@@ -369,7 +378,7 @@ export const advanceStage = defineWriteAction({
                 keyResults,
                 eq(keyResults.workspaceId, workspaceId),
                 eq(goals.spaceId, session.spaceId),
-                eq(goals.cycleId, session.cycleId ?? ""),
+                eq(goals.cycleId, session.cycleId),
               ),
             );
 
