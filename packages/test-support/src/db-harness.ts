@@ -31,6 +31,90 @@ const MIGRATION_DIRS = [
 /** One lock key for every process that might build the template. */
 const TEMPLATE_LOCK_KEY = 761_803_1;
 
+/**
+ * The Vitest project's prefix, so `packages/core` and `packages/db` do not
+ * share a worker database. Each config sets `OPENOKR_DB_PROJECT` through
+ * `test.env`, which reaches the workers; the global setup does not see it,
+ * which is why `sweepOrphans` does not use this.
+ */
+const projectName = (): string =>
+  (process.env.OPENOKR_DB_PROJECT ?? "default").replace(/\W/g, "_");
+
+/** True when no process with this id is running any more. */
+const processIsGone = (pid: number): boolean => {
+  try {
+    // Signal 0 asks the question without sending anything.
+    process.kill(pid, 0);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+/**
+ * Drop the worker databases left behind by processes that are gone.
+ *
+ * Worker databases carry the owning process id in their name, so a run that is
+ * killed, or that simply ends, leaves one per fork. This runs in the global
+ * setup before any worker starts, so the steady state is one run's worth.
+ *
+ * **The pid in the name is what makes this safe.** An earlier version asked
+ * `pg_stat_activity` whether anything was connected and dropped what was not.
+ * That is a guess twice over: an idle connection left by a killed run makes a
+ * dead database look alive, and a database can gain a connection between the
+ * question and the answer. Asking the operating system whether the owning
+ * process still exists is an exact answer, and a database whose owner is gone
+ * cannot acquire a new one.
+ *
+ * **Not scoped by project, and deliberately.** The first version built the
+ * pattern from `OPENOKR_DB_PROJECT`, which each Vitest config sets through
+ * `test.env`. That reaches the workers and not the global setup, so the prefix
+ * here resolved to `default` and the sweep dropped exactly one database per
+ * run while sixty piled up behind it. Cross-project safety does not need the
+ * prefix anyway: the pid does it, and it does it for every project at once.
+ *
+ * `with (force)` is correct *here* and was the defect elsewhere: the only
+ * connections left on a dead process's database are its own orphans, and a
+ * plain `drop database` waits for them indefinitely. One of those blocked for
+ * over two minutes on the development machine, which is why this cannot be a
+ * bare drop in a setup path.
+ */
+const WORKER_DATABASE = /^openokr_test_.+_w\d+(?:_p(\d+))?$/;
+
+const sweepOrphans = async (client: pg.Client): Promise<void> => {
+  const { rows } = await client.query<{ datname: string }>(
+    // `_` is a single-character wildcard in LIKE, so this over-matches
+    // slightly. That is fine and deliberate: the regex below is the precise
+    // gate, and an escaped pattern here was silently matching nothing at all.
+    "select datname from pg_database where datname like 'openokr%test%'",
+  );
+
+  for (const { datname } of rows) {
+    // Only worker databases. The template and the PgBouncer spike database are
+    // named without a `_w<slot>` segment and are not swept.
+    const match = WORKER_DATABASE.exec(datname);
+    if (!match) {
+      continue;
+    }
+    // A name with no `_p` segment predates this scheme, so nothing running now
+    // owns it either.
+    const owner = match[1];
+    if (owner && !processIsGone(Number(owner))) {
+      continue;
+    }
+    // Bounded, so a database that somehow does hold a live connection costs
+    // the setup a few seconds rather than the whole run.
+    await client.query("set statement_timeout = 10000");
+    await client
+      .query(`drop database if exists ${datname} with (force)`)
+      .catch(() => {
+        // Left for the next run. A setup step must not fail the suite over
+        // housekeeping.
+      });
+    await client.query("set statement_timeout = 0");
+  }
+};
+
 const withSuperuser = async <T>(
   database: string,
   fn: (client: pg.Client) => Promise<T>,
@@ -99,6 +183,7 @@ export default async function setupTemplateDatabase(): Promise<void> {
   await withSuperuser("postgres", async (client) => {
     await client.query("select pg_advisory_lock($1)", [TEMPLATE_LOCK_KEY]);
     try {
+      await sweepOrphans(client);
       await ensureRoles(client, {
         ownerRole: testDbEnv.ownerRole,
         appRole: testDbEnv.appRole,
@@ -200,23 +285,44 @@ export const workerDb = async (): Promise<WorkerDb> => {
     return worker;
   }
 
-  const project = (process.env.OPENOKR_DB_PROJECT ?? "default").replace(
-    /\W/g,
-    "_",
-  );
-  const poolId = process.env.VITEST_POOL_ID ?? String(process.pid);
-  const databaseName = `openokr_test_${project}_w${poolId}`;
+  const project = projectName();
+  // **The process id, not just the Vitest pool slot.**
+  //
+  // Vitest reuses slot numbers. It starts the replacement fork for slot N while
+  // the outgoing one is still closing its pools, so a name built from the slot
+  // alone meant the new fork ran `drop database ... with (force)` on the
+  // database the old fork was still reading. `with (force)` terminates every
+  // connection to it, so the outgoing fork's tests died with Postgres `57P01`,
+  // or with `database ... does not exist` if they arrived a moment later. Two
+  // full `packages/core` runs failed that way, 111 tests and then 123, with no
+  // assertion failures among them, and a different set of files each time.
+  //
+  // The pid makes the name unique to one process, so nothing can drop a
+  // database somebody else is using. The cost is a database per fork rather
+  // than per slot, and `sweepOrphans` below is what stops them accumulating.
+  const poolId = process.env.VITEST_POOL_ID ?? "0";
+  const databaseName = `openokr_test_${project}_w${poolId}_p${process.pid}`;
 
   await withSuperuser("postgres", async (client) => {
     // Serialise cloning: concurrent CREATE DATABASE from one template fails.
     await client.query("select pg_advisory_lock($1)", [TEMPLATE_LOCK_KEY]);
     try {
-      await client.query(
-        `drop database if exists ${databaseName} with (force)`,
+      // **Created only when absent, and never dropped first.** Dropping was
+      // the whole defect. Absent is the normal case, and present means this
+      // same process already built it for an earlier test file: `close()`
+      // clears the cached handle when a file ends, so the next file in the
+      // same fork arrives here again. The name belongs to this process, so an
+      // existing one is ours and safe to reuse; every suite truncates in its
+      // own `beforeEach`, which is what isolates one file from the next.
+      const { rows } = await client.query<{ one: number }>(
+        "select 1 as one from pg_database where datname = $1",
+        [databaseName],
       );
-      await client.query(
-        `create database ${databaseName} template ${testDbEnv.templateDatabase} owner ${testDbEnv.ownerRole}`,
-      );
+      if (rows.length === 0) {
+        await client.query(
+          `create database ${databaseName} template ${testDbEnv.templateDatabase} owner ${testDbEnv.ownerRole}`,
+        );
+      }
     } finally {
       await client.query("select pg_advisory_unlock($1)", [TEMPLATE_LOCK_KEY]);
     }

@@ -247,139 +247,51 @@ behaviour and not this task's to move. It needs a row, and it wants a test that
 pins a workspace to a non-UTC zone and holds a session near midnight, because
 the bug is invisible in any test that runs in the afternoon.
 
-### The test harness drops a database another worker is still using
+### The test harness dropped a database another worker was still using
 
-Found on 21 August 2026 while verifying P4-T06c. Two consecutive full runs of
-`packages/core` failed, 111 tests and then 123, with **no assertion failures at
-all**: every failure was Postgres `57P01`, "terminating connection due to
-administrator command". A different set of files failed each time.
+**Fixed on 21 August 2026.** Kept here because the shape of the fix only makes
+sense with the failure beside it.
 
-The cause is in `packages/test-support/src/db-harness.ts`. `workerDb()` names
-its database `openokr_test_${project}_w${VITEST_POOL_ID}` and opens with
+Two full runs of `packages/core` failed, 111 tests and then 123, with no
+assertion failures at all. `workerDb()` named its database
+`openokr_test_${project}_w${VITEST_POOL_ID}` and opened with `drop database
+... with (force)`, which terminates every connection to it. Vitest reuses pool
+slot numbers, so the replacement fork for slot N deleted the database the
+outgoing fork was still reading. It showed up two ways, both meaningless:
+Postgres `57P01` when the fork was cut off mid-query, and `database
+"openokr_test_core_wN" does not exist` when it arrived a moment later. Caught
+live in `pg_stat_activity`; one of those drops held for 18 seconds.
 
-```sql
-drop database if exists <name> with (force)
-```
+The fix is in `packages/test-support/src/db-harness.ts`:
 
-`with (force)` calls `pg_terminate_backend` on every connection to that
-database. Vitest reuses pool slot numbers, so when it starts a replacement fork
-for slot N while the outgoing fork is still closing its pools, the new fork
-deletes the database the old one is still reading. The old fork's connections
-die with `57P01` and its file is reported as failed, which is why the failing
-file is always one that had just finished rather than one doing anything
-unusual.
-
-Caught live in `pg_stat_activity` during a run. One of these drops held for
-**18 seconds** on the development machine, which is how wide the window is.
-
-It shows up in two forms and both are the same bug. `57P01` is the outgoing
-fork being cut off mid-query. `database "openokr_test_core_wN" does not exist`
-is the same fork arriving a moment later, after the drop finished and before
-the replacement recreated it. Neither is an assertion, and neither means
-anything about the code under test.
-
-**The workaround, until this is fixed.** Cap the workers:
-
-```
-TEST_DB_PORT=5432 pnpm --filter @openokr/core exec vitest run --maxWorkers=4
-```
-
-Fewer forks means fewer recycles, and it is a workaround rather than a fix: a
-run at four workers passed whole once and then failed 17 tests on a later run
-with the "does not exist" form. Drop to two when a run comes back red for these
-reasons. The suite is slower and it finishes.
-
-**The fix, when somebody takes it.** Put the process id in the database name so
-no two forks can ever share one, and sweep orphans scoped to
-`openokr_test_${project}_%` in the global setup, before any worker starts. It
-was not done inside P4-T06c because it changes the harness every package's
-tests run through, and that needs its own row and its own verification across
-all of them. Do not read a red `packages/core` run as a real failure until this
-is done: check for `57P01` first.
-
-As of P4-T05b there are now **four** declared crons nothing executes: the
-Champion's hourly, daily, weekly and per-cycle runs. All four are reachable
-through `agents.runChampion` with a `cadence`, which is what the tests drive and
-what an administrator can call.
-
-What this means for a Phase 4 task: register scheduled work through the jobs
-port, and expect nothing to execute it. Do not build a private scheduler around
-it, and do not report a scheduled feature as running. `pnpm cadence:sweep` is
-the shape the repository uses meanwhile: a command a human or a cron calls.
-
-## Branch policy
-
-Settled: **everything is committed on `agung`.** No `task/<id>-<slug>` branches,
-whatever the loop in CLAUDE.md says. A branch cut from `agung` would stack a
-second pull request on an unmerged one, which is not how this repository is
-reviewed.
-
-## Open decisions, for the human
-
-1. **METHOD.md §3.6, the forecast on sparse data.** Three values inside two
-   days, projected six weeks out, reads 672 for a key result whose target is 60.
-   Whether the section should require a minimum span before a forecast is shown
-   is a practice decision, not a developer's.
-2. **The write-access floor.** The floor is `edit` everywhere except the
-   `comments` and `reactions` domains, plus an assertion that no write anywhere
-   is reachable at `view`. Recorded on the P3-T16 row and reversible.
-3. **A worker host.** Nothing runs scheduled work. Building one touches
-   `deploy/docker` and `deploy/helm` and is nobody's task today.
-
-## Rules the merge taught us, which both lanes follow
-
-The first merge of the two lanes brought in six defects. Every one passed
-`pnpm typecheck` and `pnpm lint`, because neither can see any of this.
-
-| Command | What only it catches |
+| Change | Why |
 |---|---|
-| `pnpm db:lint` | A table shipped without `force row level security`, a policy with no `with check`, a query with no soft-delete scope |
-| `pnpm check:boundaries` | A write outside the Operation pipeline, a vendor SDK outside `packages/adapters` |
-| `pnpm dead-code` | A server action written and never wired to a component |
-| `pnpm check:signoff` | A commit without `-s`. It runs on pull requests only, so a branch looks green for days and fails the moment one opens |
-| The real-database suite | A write that refuses at run time |
+| The database name carries `process.pid` | Nothing can drop a database another process is using |
+| No `drop` on the create path; created only when absent | Dropping was the defect. Present means this same process built it for an earlier file, since `close()` clears the cached handle per file |
+| `sweepOrphans` in the global setup, keyed on the pid in the name | A run leaks one database per fork; the next run's setup clears them before any worker starts |
 
-**`enable row level security` is not the tenant floor.** Without `force`, the
-table owner bypasses the policy, and the owner is the role migrations run as.
-Every policy needs `with check` as well as `using`. Use the missing_ok form,
-`nullif(current_setting('app.workspace_id', true), '')::uuid`, so an unscoped
-request returns nothing instead of raising.
+**Two things went wrong in the fix itself, and both failed silently.** The
+sweep first scoped its pattern with `OPENOKR_DB_PROJECT`, which each Vitest
+config sets through `test.env`: that reaches the workers and not the global
+setup, so the prefix resolved to `default` and exactly one database was swept
+per run while sixty accumulated. Then `escape ''` inside a `String.raw`
+template was written as `escape ''`, and an empty escape character makes `\_`
+match nothing. Both returned zero rows without raising. The database count
+before and against after is the only thing that proved either of them; a green
+suite proved nothing.
 
-**A read never has `context.actor.memberId`.** Only `runOperation` resolves an
-actor, against rows loaded inside the writing transaction. A read action
-resolves the member itself from the user id.
+Result: 62 orphans swept on the next run, two databases left. `packages/core`
+passes 61/61 files and 1201/1201 tests at the default twelve workers in **249
+seconds**, against 518 at the two workers the workaround needed.
 
-**`set_config(..., true)` is transaction-local.** Outside a transaction it is
-discarded the instant the statement that set it commits. Use `withWorkspace`.
+### `pnpm test` at the root ignored `TEST_DB_PORT`
 
-**Running the suite on a machine with no Docker.** The harness defaults to the
-compose ports, 55432 for Postgres and 56432 for PgBouncer. A native Postgres on
-5432 runs everything except the pooling spike:
-
-```
-TEST_DB_PORT=5432 pnpm --filter @openokr/core exec vitest run
-```
-
-**A design document that gains a `<!-- golden: ... -->` anchor** must also be
-registered in the manifest in `packages/test-support/test/golden-table.test.ts`,
-with its columns and a row floor. The guard asserts a document holds exactly the
-matrices the manifest names, so an unregistered matrix turns CI red.
-
-## AI credentials: what needs them and when
-
-Every deterministic path works with the provider off, and continuous integration
-proves it. Credentials verify the AI half; they do not build the product.
-
-| Task | What it needs |
-|---|---|
-| P4-T13a, P4-T13b | An embedding provider, or a local embedding model |
-| P4-T14a, P4-T14b | A chat provider, for streaming answers |
-| P4-T05c, P4-T06a to P4-T06c, P4-T15 | A chat provider, to verify drafting and rewriting |
-| Everything else | Nothing. Deterministic by design |
-
-Before storing a key: set `OPENOKR_ENCRYPTION_KEY` in `apps/web/.env`. Without
-it a fresh root key is generated on every process start, so anything sealed
-locally stops opening after a restart.
+Fixed in the same change. `turbo.json` declared no `passThroughEnv`, so Turbo
+filtered the variable out and the harness looked for the Docker stack on port
+55432. On a machine without Docker the root command failed with
+`ECONNREFUSED 127.0.0.1:55432`, which explains nothing, after running two of
+its ten tasks. `TEST_DB_PORT`, `TEST_DB_HOST` and `DATABASE_URL` now pass
+through to `test` and `build`.
 
 ## The working rules stay the same
 

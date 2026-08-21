@@ -3,13 +3,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**"],
+      "passThroughEnv": ["TEST_DB_PORT", "DATABASE_URL"]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "test": {},
+    "test": {
+      "passThroughEnv": ["TEST_DB_PORT", "DATABASE_URL", "TEST_DB_HOST"]
+    },
     "typecheck": {}
   }
 }
