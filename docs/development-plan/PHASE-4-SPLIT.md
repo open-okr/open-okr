@@ -21,9 +21,9 @@ parts once P4-T02 and P4-T04 each proved too large for one session.
 | Status | Rows | Which |
 |---|---|---|
 | done | 2 | P4-T00, P4-T01a |
-| in_review | 24 | P4-T01b to P4-T06c, P4-T07a to P4-T10a-b |
+| in_review | 25 | P4-T01b to P4-T06c, P4-T07a to P4-T10b-a |
 | in_progress | 1 | P4-T13a |
-| todo | 10 | P4-T10b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 10 | P4-T10b-b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
 waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
@@ -48,7 +48,7 @@ hourly run, and the session record with live stage sync.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, fourteen rows | yes | P4-T07a to P4-T10a-b in_review; P4-T10b next |
+| B2: the sessions | P4-T07a to P4-T12, fifteen rows | yes | P4-T07a to P4-T10b-a in_review; P4-T10b-b next |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -142,7 +142,8 @@ and this table is what was agreed.
 | P4-T09 | Monthly review and decision log | Agung | in_review |
 | P4-T10a-a | Quarterly review: the eleven-stage shell | Agung | in_review |
 | P4-T10a-b | Quarterly review: the room pulse | Agung | in_review |
-| P4-T10b | Quarterly review: scoring and the reveal | Agung | todo |
+| P4-T10b-a | Quarterly review: scoring the key results | Agung | in_review |
+| P4-T10b-b | Quarterly review: the reveal | Agung | todo |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
 | P4-T11a | Quarterly review: the retros | Agung | todo |
 | P4-T11b | Root cause and the process-health survey | Agung | todo |
@@ -254,6 +255,56 @@ and that both clients read the same rail from it.
 
 **Remove the `fixme` when the relay exists.** That is the whole remaining work
 for this criterion.
+
+### P4-T07a's closing test is flaky, and the page is why
+
+Found across 21 to 24 August 2026 while verifying P4-T10a and P4-T10b-a.
+
+`facilitator advances through remaining stages and closes` fails roughly one run
+in five. The cause is the screen, not the test: a running session calls
+`router.refresh()` on every SSE event, so any node can be replaced between being
+found and being clicked. It surfaced four different ways, which is why it read as
+four problems.
+
+| Symptom | Same cause |
+|---|---|
+| `net::ERR_ABORTED` on a navigation | A refresh superseded a navigation still in flight |
+| The advance loop stopped mid-rail | The button was not rendered yet when asked |
+| `count()` returned zero | An instant snapshot taken before the next stage rendered |
+| "element was detached from the DOM" | The node was replaced as the click landed |
+
+`networkidle` helps with none of them, because an open event stream never goes
+idle. Six attempts got it to four runs in five: each click retried against the
+current node, the exit condition split into three states rather than two, and the
+close retried on the outcome rather than on the click.
+
+**The monthly and quarterly tests were moved out to `e2e/reviews.spec.ts`**
+rather than left behind this. `sessions.spec.ts` is `mode: "serial"`, so while
+this test flaked the review tests never ran and P4-T09, P4-T10a and P4-T10b-a had
+no end-to-end evidence at all. The weekly test still runs and still fails
+sometimes; what changed is that it no longer takes three tasks' verification with
+it.
+
+### Two tests asserted the day of the week
+
+Found on 23 August 2026, in code P3-T07 and P3-T08 shipped. Both in
+`registration-to-dashboard.spec.ts`:
+
+| Test | Asserted | True until |
+|---|---|---|
+| `the check-in walker lists only what is actually due` | "Nothing of yours is due." | Friday |
+| `a goal reached directly shows its history and refuses a draft` | "This goal is not due" | Friday |
+
+The goal is created during the run with the Monday anchor, and the two-day window
+opens on the Saturday. Both tests were green from Tuesday to Friday and red from
+Saturday, and they turned red mid-session for no reason but the clock. This is
+the third time this class has cost a run in this phase: the quiet-hours nudge
+tests failed at 01:39 UTC for the same reason.
+
+Both now assert the promise rather than the branch. The walker's own count has to
+match the rows it offers; the composer has to agree with whether the page says the
+goal is due. Either branch is correct behaviour, and asserting one of them was
+what made the calendar a dependency.
 
 ### Three tests in the session spec passed without proving anything
 

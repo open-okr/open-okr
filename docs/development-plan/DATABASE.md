@@ -347,7 +347,7 @@ Every table references `session_id` to sessions.
 
 | Table | Key columns |
 |---|---|
-| `review_scores` | `key_result_id`, `score numeric`, `comment?`, `scored_by_id` |
+| `review_scores` | `key_result_id`, `score numeric` (0 to 1), `reason`, `scored_by_id`, `revealed_at?` |
 | `review_narratives` | `goal_id`, `body` (rich), `author_member_id` |
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
 | `retro_notes` | `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
@@ -360,6 +360,8 @@ Every table references `session_id` to sessions.
 | `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?` |
 | `review_actions` | `what`, `owner_id?`, `due_on?`, `done bool` |
 | `review_diagnostics` | `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`delivered` / `strategy_or_quality` / `rhythm`), `narrative` |
+
+`review_scores` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: regrading corrects the row, because a room that changes its mind has one answer and not two. The score lands on `key_results.score` when the session closes, in the same transaction, and only for what was graded. METHOD.md §8.3 hides the objective score until the room reveals it, and a score on the key result is visible on the goal page immediately; a grade also has to be revisable while the room talks. `revealed_at` sits on the row rather than the objective, so the reveal is one update over an objective's rows and every client reads the same answer from it, the same shape as `check_in_votes.revealed_at`.
 
 `respondent_hash` allows one response per member per statement without identifying who gave it.
 

@@ -266,6 +266,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.stageNoteSet": (p) =>
     `Made a private note on the ${asString(p.stageKey, "current")} stage`,
   "session.pulseGiven": () => "Gave their pulse for the cycle",
+  "session.keyResultScored": () => "Graded a key result in the review",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

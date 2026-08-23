@@ -616,15 +616,39 @@ The shell alone satisfies the acceptance criterion and both test-plan lines; the
 room pulse is separable work with its own criterion. Split at P4-T10a on
 21 August 2026, before code was written.
 
-### P4-T10b: Quarterly review: scoring and the reveal [M]
+### P4-T10b-a: Quarterly review: scoring the key results [M]
 Depends on: P4-T10a-a
-Goal: the scoring stage (METHOD.md §8.3).
-Deliverables: evidence, sliders and reasons per key result; the hidden objective score with an animated reveal that respects reduced motion; the running cycle score; scores written back to the key results when the session closes.
-Test plan: the reveal is deterministic and instant under reduced motion; scores written here land on the key results on close.
+Goal: the grading half of the scoring stage (METHOD.md §8.3).
+Deliverables: the `review_scores` table with its row-level security policy; the objective score and the cycle score in `packages/method` under the conformance suite; the slider, the baseline/target/actual evidence and the one-line reason per key result; scores written back to the key results when the session closes.
+Test plan: a score is refused outside 0.0 to 1.0 and refused without a reason; scores written here land on the key results on close, and not before.
+Acceptance: Given a review at the scoring stage, when every key result of an objective has a score and a reason, then the stage may be completed and the scores are on the key results once the session closes.
+
+### P4-T10b-b: Quarterly review: the reveal [M]
+Depends on: P4-T10b-a
+Goal: the reveal (METHOD.md §8.3).
+Deliverables: the objective score hidden until the room reveals it; the reveal as one write every connected client reads the same answer from; the animated reveal that is instant under reduced motion; the running cycle score with its §3.4 verdict.
+Test plan: the reveal is deterministic and instant under reduced motion; no caller can read an objective's score before it is revealed.
 Acceptance: Given a review at the scoring stage, when the facilitator reveals an objective's score, then every participant sees the same number at the same time and the cycle score updates.
 
+**Why P4-T10b was split.** It carried a new table, two new method functions with
+their conformance, four actions, a write-back on close, and a screen with
+sliders, evidence, a hidden score and an animation, in one [M]. Grading and
+revealing are separable: the grading half has its own criterion and its own
+test-plan line, and the reveal is what the original acceptance criterion is
+about. Split on 21 August 2026, before code was written.
+
+**A practice gap found while sizing it.** METHOD.md defines the score bands
+(§3.3) and the portfolio average (§3.4) but never says how an objective's own
+score is computed from its key results. §3.2 makes a goal's *progress* a
+weighted average through `key_results.weight`. Agung decided on 21 August 2026
+that the objective score follows §3.2 and is weighted, while the cycle score
+stays the plain average §3.4 states. **METHOD.md §8.3 carries that sentence as of
+24 August 2026**, written at Agung's direction and open to his review in the pull
+request: the canon and the package now say the same thing, which is what lets the
+conformance suite hold it.
+
 ### P4-T10c: Quarterly review: narratives and recognition [S]
-Depends on: P4-T10b
+Depends on: P4-T10b-a
 Goal: the two stages that are about people rather than numbers (METHOD.md §8).
 Deliverables: the narratives stage with the pass-the-mic control; the recognition stage.
 Test plan: the mic passes to exactly one participant at a time and every client agrees who holds it.

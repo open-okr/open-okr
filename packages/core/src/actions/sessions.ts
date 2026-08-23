@@ -25,6 +25,7 @@ import {
   keyResults,
   OBJECTIVE_TRENDS,
   objectiveTrends,
+  reviewScores,
   SESSION_KINDS,
   SESSION_STATES,
   sessionConfidences,
@@ -36,6 +37,9 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  cycleScore,
+  objectiveScore,
+  portfolioVerdictOf,
   progressSignal,
   REVIEW_STAGE_KEYS,
   roomPulseRead,
@@ -892,6 +896,54 @@ export const closeSession = defineWriteAction({
             longestWeeks: 1,
             lastSessionWeek: weekStart,
           });
+        }
+      }
+
+      /**
+       * The review's grades become facts about the key results (P4-T10b-a).
+       *
+       * §8.3 grades against the key result as written and hides the objective
+       * score until the room reveals it, so a score written straight onto
+       * `key_results.score` during the stage would be visible on the goal page
+       * immediately and would not be revisable while the room talks. Closing is
+       * the moment it stops moving, which is the moment it becomes a fact.
+       *
+       * Only what was graded is written. An ungraded key result keeps whatever
+       * it had, because writing zero would be the review claiming a result it
+       * never discussed.
+       *
+       * In this transaction with the close, so a session cannot end with half
+       * its scores landed.
+       */
+      if (session.kind === "quarterly") {
+        const graded = await tx
+          .select({
+            keyResultId: reviewScores.keyResultId,
+            score: reviewScores.score,
+          })
+          .from(reviewScores)
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.id),
+            ),
+          );
+
+        for (const grade of graded) {
+          // openokr:allow-mutation: runs on the transaction this Operation
+          // opened, so the score, the close, the audit row and the outbox row
+          // commit together or not at all.
+          await tx
+            .update(keyResults)
+            .set({ score: grade.score, updatedAt: now })
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(keyResults.id, grade.keyResultId),
+              ),
+            );
         }
       }
 
@@ -3247,6 +3299,339 @@ export const readRoomPulse = defineReadAction({
           // The words go with the read, for the same reason: a participant who
           // could see the room's words could read the room's mood.
           words: isFacilitator ? countWords(rows) : [],
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Scoring the key results (METHOD.md §8.3, P4-T10b-a)
+// ---------------------------------------------------------------------------
+
+/** The session, refused unless it is a quarterly review. */
+async function requireQuarterly(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+  requires: number,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    requires,
+  );
+  if (session.kind !== "quarterly") {
+    throw new OperationError(
+      "not_found",
+      "Scoring belongs to a quarterly review.",
+    );
+  }
+  return session;
+}
+
+export const scoreKeyResult = defineWriteAction({
+  name: "sessions.scoreKeyResult",
+  summary:
+    "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    score: z.number().min(0).max(1),
+    // §8.3 asks for a one-line reason. "Facts, not feelings" cannot be
+    // enforced; a score nobody explained can be refused.
+    reason: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // The key result is authorised through its objective, which is where
+      // access lives.
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: owner.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const [existing] = await tx
+        .select({ id: reviewScores.id })
+        .from(reviewScores)
+        .where(
+          activeOnly(
+            reviewScores,
+            eq(reviewScores.workspaceId, workspaceId),
+            eq(reviewScores.sessionId, input.sessionId),
+            eq(reviewScores.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      // Regrading corrects the row. A room that talks itself from 0.6 to 0.4
+      // has one answer, not two, and the second would double its weight in
+      // both the objective score and the cycle score.
+      const [row] = existing
+        ? await tx
+            .update(reviewScores)
+            .set({
+              score: String(input.score),
+              reason: input.reason,
+              scoredById: memberId,
+              updatedAt: new Date(),
+            })
+            .where(activeOnly(reviewScores, eq(reviewScores.id, existing.id)))
+            .returning({ id: reviewScores.id })
+        : await tx
+            .insert(reviewScores)
+            .values({
+              workspaceId,
+              sessionId: input.sessionId,
+              keyResultId: input.keyResultId,
+              score: String(input.score),
+              reason: input.reason,
+              scoredById: memberId,
+            })
+            .returning({ id: reviewScores.id });
+
+      if (!row) {
+        throw new OperationError("not_found", "The score could not be saved.");
+      }
+
+      return {
+        result: { id: row.id },
+        // **The payload carries no score.** An activity row is read by
+        // everybody who can see the space, and §8.3 hides the objective score
+        // until the room reveals it: a feed announcing each grade would reveal
+        // it one entry at a time.
+        activity: {
+          kind: "session.keyResultScored",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          contextId,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.scoreKeyResult",
+          targetType: "review_score",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+const scoringKeyResult = z.object({
+  keyResultId: z.uuid(),
+  title: z.string(),
+  weight: z.number(),
+  /** §8.3's evidence, read from the key result rather than typed into the review. */
+  baseline: z.number().nullable(),
+  target: z.number().nullable(),
+  current: z.number().nullable(),
+  unit: z.string().nullable(),
+  score: z.number().nullable(),
+  reason: z.string().nullable(),
+});
+
+export const readScoringStatus = defineReadAction({
+  name: "sessions.scoringStatus",
+  summary:
+    "Stage two's state: the evidence, the grades so far, each objective's score and the cycle score.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /** §3.2's weighted average over the graded key results. Null until one is. */
+        score: z.number().nullable(),
+        scored: z.number(),
+        total: z.number(),
+        keyResults: z.array(scoringKeyResult),
+      }),
+    ),
+    /** §8.6's plain average over every graded key result in the review. */
+    cycleScore: z.number().nullable(),
+    /** §3.4's verdict on that average. */
+    verdict: z
+      .enum(["too_safe", "healthy", "partial", "outran_capacity"])
+      .nullable(),
+    /** Every key result graded. §8.1's completion condition for stage two. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            goalPosition: goals.position,
+            keyResultId: keyResults.id,
+            title: keyResults.title,
+            weight: keyResults.weight,
+            baseline: keyResults.baselineValue,
+            target: keyResults.targetValue,
+            current: keyResults.currentValue,
+            unit: keyResults.unit,
+            position: keyResults.position,
+          })
+          .from(keyResults)
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              isNull(goals.closedAt),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt, keyResults.position);
+
+        const graded = await tx
+          .select({
+            keyResultId: reviewScores.keyResultId,
+            score: reviewScores.score,
+            reason: reviewScores.reason,
+          })
+          .from(reviewScores)
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, context.workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+            ),
+          );
+        const byKeyResult = new Map(
+          graded.map((row) => [
+            row.keyResultId,
+            { score: Number(row.score), reason: row.reason },
+          ]),
+        );
+
+        // Grouped in the order the rows came back, so the screen reads down the
+        // cascade rather than in whatever order Postgres chose.
+        const objectives: {
+          goalId: string;
+          goalTitle: string;
+          score: number | null;
+          scored: number;
+          total: number;
+          keyResults: z.infer<typeof scoringKeyResult>[];
+        }[] = [];
+        for (const row of rows) {
+          let objective = objectives.find(
+            (entry) => entry.goalId === row.goalId,
+          );
+          if (!objective) {
+            objective = {
+              goalId: row.goalId,
+              goalTitle: row.goalTitle,
+              score: null,
+              scored: 0,
+              total: 0,
+              keyResults: [],
+            };
+            objectives.push(objective);
+          }
+          const grade = byKeyResult.get(row.keyResultId);
+          objective.total += 1;
+          if (grade) {
+            objective.scored += 1;
+          }
+          objective.keyResults.push({
+            keyResultId: row.keyResultId,
+            title: row.title,
+            weight: Number(row.weight),
+            baseline: row.baseline === null ? null : Number(row.baseline),
+            target: row.target === null ? null : Number(row.target),
+            current: row.current === null ? null : Number(row.current),
+            unit: row.unit ?? null,
+            score: grade?.score ?? null,
+            reason: grade?.reason ?? null,
+          });
+        }
+
+        for (const objective of objectives) {
+          // §3.2's weighting, from `packages/method`. Nothing about how a score
+          // is built is decided here.
+          objective.score = objectiveScore(
+            objective.keyResults.map((entry) => ({
+              score: entry.score,
+              weight: entry.weight,
+            })),
+          );
+        }
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        // §8.6's own words: the §3.4 portfolio average over every scored key
+        // result. A plain average over key results, not over objective scores.
+        const average = cycleScore(
+          [...byKeyResult.values()].map((entry) => entry.score),
+        );
+
+        return {
+          objectives,
+          cycleScore: average,
+          verdict:
+            average === null ? null : portfolioVerdictOf(average, thresholds),
+          complete:
+            objectives.length > 0 &&
+            objectives.every((entry) => entry.scored === entry.total),
         };
       },
     );

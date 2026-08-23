@@ -332,6 +332,7 @@ export {
   nudges,
 } from "./schema/nudges.ts";
 export { outbox } from "./schema/outbox.ts";
+export { type ReviewScore, reviewScores } from "./schema/review-scores.ts";
 export {
   type PerformanceSnapshotRow,
   PORTFOLIO_VERDICTS,

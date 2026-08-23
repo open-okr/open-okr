@@ -246,3 +246,28 @@ export async function givePulseAction(
   );
   revalidatePath(`/session/${sessionId}`);
 }
+
+/**
+ * One key result's grade (METHOD.md §8.3, P4-T10b-a).
+ *
+ * The room grades together, so this is not the facilitator's alone. It lands on
+ * `key_results.score` when the review closes and not before.
+ */
+export async function scoreKeyResultAction(
+  sessionId: string,
+  keyResultId: string,
+  score: number,
+  reason: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.scoreKeyResult",
+    { sessionId, keyResultId, score, reason },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}

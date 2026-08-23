@@ -574,6 +574,10 @@ Each participant gives a 1 to 5 pulse and one word. The average is read back:
 
 Score each key result 0.0 to 1.0 against the key result as written, with baseline, target and actual on screen as evidence, plus a one-line reason. The objective score is hidden until the team reveals it together. Facts, not feelings. A row of 1.0s usually means the ambition was too safe, and that gets said out loud now, not next quarter.
 
+An objective's score is the weighted average of its key results' scores, using the same weights §3.2 uses for progress. A team that said one key result matters three times as much should see that in the score, exactly as it sees it in the progress. An unscored key result is left out rather than counted as zero, so a half-graded objective does not read as a failing one.
+
+The cycle score is a different question about a different set, and stays the plain §3.4 average over every scored key result in the cycle (§8.6). Averaging the objective scores instead would weight an objective with two key results the same as one with eight.
+
 ### 8.4 Root causes
 
 Every key result under 0.7 gets exactly one primary cause:

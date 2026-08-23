@@ -201,11 +201,13 @@ import {
   openSession,
   readMonthlyRecord,
   readRoomPulse,
+  readScoringStatus,
   readSession,
   readStreak,
   recordDecision,
   resolveSessionBlocker,
   revealSessionVotes,
+  scoreKeyResult,
   sessionBlockerStatus,
   sessionConfidenceStatus,
   sessionVotes,
@@ -438,6 +440,8 @@ export const ACTION_MAP = {
 
   "sessions.addMinute": addStageMinute,
   "sessions.givePulse": givePulse,
+  "sessions.scoreKeyResult": scoreKeyResult,
+  "sessions.scoringStatus": readScoringStatus,
   "sessions.roomPulse": readRoomPulse,
   "sessions.setStageNote": setStageNote,
 

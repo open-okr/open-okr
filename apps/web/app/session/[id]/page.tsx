@@ -48,6 +48,7 @@ import {
 } from "./monthly-review";
 import { QuarterlyReview } from "./quarterly-review";
 import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
+import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
 
 interface SessionPageProps {
@@ -144,6 +145,14 @@ export default async function SessionPage({ params }: SessionPageProps) {
     roomPulse = (await callAction(context, "sessions.roomPulse", {
       sessionId: id,
     })) as RoomPulse;
+  }
+
+  // Stage two (METHOD.md §8.3, P4-T10b-a).
+  let scoring: ScoringStatus | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[1]) {
+    scoring = (await callAction(context, "sessions.scoringStatus", {
+      sessionId: id,
+    })) as ScoringStatus;
   }
   if (isMonthly) {
     monthly = (await callAction(context, "sessions.monthlyRecord", {
@@ -356,6 +365,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Stage one: the room pulse (METHOD.md §8.2, P4-T10a-b) */}
       {roomPulse ? (
         <RoomPulsePanel sessionId={id} pulse={roomPulse} canGive={isRunning} />
+      ) : null}
+
+      {/* Stage two: grading the key results (METHOD.md §8.3, P4-T10b-a) */}
+      {scoring ? (
+        <Scoring sessionId={id} status={scoring} canScore={isRunning} />
       ) : null}
 
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}

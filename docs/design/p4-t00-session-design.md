@@ -319,6 +319,31 @@ purpose.
 The reveal is one write. All connected clients see the same number at the
 same time (same atomicity contract as the check-in vote reveal from P3-T07).
 
+**What P4-T10b-a settled.**
+
+*An objective's score is weighted; the cycle score is not.* METHOD.md §8.3 now
+says so, written at Agung's direction on 24 August 2026 after the gap was found
+while sizing this task: §3.3 graded a key result and §3.4 averaged a set, and
+nothing stated how an objective's own score was built. The objective follows
+§3.2's weights, the cycle stays §3.4's plain average over key results. Weights 3
+and 1 with scores 0.2 and 0.8 give an objective 0.35 and a cycle 0.5, and a
+single formula for both would be wrong about one of them.
+
+*The grade lives in `review_scores` until the session closes.* Writing straight
+to `key_results.score` would put the number on the goal page before the room
+revealed it, and would stop the room revising it while they talk. The write-back
+is in the same transaction as the close, so a session cannot end with half its
+scores landed, and only what was graded is written: an ungraded key result keeps
+what it had rather than being claimed as a zero.
+
+*A score with no reason is refused.* §8.3's "facts, not feelings" cannot be
+enforced. A score nobody explained can be, at the boundary and on the screen.
+
+*The running objective score is deliberately absent from the grading screen.*
+It would be the reveal happening one grade at a time with nobody deciding it.
+The end-to-end spec asserts that absence, so a later task cannot quietly put the
+number there.
+
 Given / When / Then:
 - Given a running review at the scoring stage, when the facilitator reveals an
   objective's score, then every participant sees the same number at the same

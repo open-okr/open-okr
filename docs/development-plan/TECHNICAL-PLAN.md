@@ -164,7 +164,7 @@ All keyed on a `session` of kind `quarterly`.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `review_scores` | `session_id`, `key_result_id`, `score numeric`, `comment?`, `scored_by_id` | Stage 2. Written back to `key_results.score` on close |
+| `review_scores` | `session_id`, `key_result_id`, `score numeric`, `reason`, `scored_by_id`, `revealed_at?` | Stage 2. Written back to `key_results.score` on close, in the same transaction. `reason` rather than `comment?`, and required: §8.3 asks for one line on why, and a score nobody explained is refusable. `revealed_at` per row, so the reveal is one update over an objective's rows |
 | `review_narratives` | `session_id`, `goal_id`, `body` (rich), `author_member_id` | Stage 3 |
 | `kudos` | `session_id?`, `from_member_id`, `to_member_id`, `text` | Stage 4 |
 | `retro_notes` | `session_id`, `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` | Stage 5. Authorship optional so writing can be anonymous |
@@ -405,6 +405,7 @@ Keep current in every schema change.
 | No legacy source | `invite_links` | Joining is an OpenOKR concept with no FlowyTeam or spreadsheet analogue. An imported person is a `workspace_members` row with `user_id` null until they register and claim it, the same path row 392 describes; nothing invites them to do so |
 | `users` | Employee and user email addresses | Only the global identity row. Credentials never transfer: an imported person is a `workspace_members` row with `user_id` null until they claim it by registering. `sessions`, `accounts`, `verifications`, `passkeys` and `two_factors` have no legacy source and are never imported |
 | No legacy source | `okr_sessions` | Sessions are held rituals, not historical data. The imported workspace's session history is not replayed; if needed it belongs in the import report |
+| No legacy source | `review_scores` | Grades are given during a review, and the review is not imported. FlowyTeam key-result scores are restored onto `key_results.score` directly, which is where these land anyway |
 | No legacy source | `session_participants` | Attendance and the room pulse are recorded during a review, and the review itself is not imported. A pulse invented for a meeting nobody held would be a mood the product made up |
 | No legacy source | `objective_trends`, `decisions` | Both are recorded inside a monthly review, and the review itself is not imported. FlowyTeam has no decision log, so importing one would mean inventing an author and a date for a decision nobody recorded. Anything the source does carry about past decisions is written to the import report instead |
 

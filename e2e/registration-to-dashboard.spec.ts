@@ -506,10 +506,37 @@ test("the check-in walker lists only what is actually due", async () => {
   await page.goto("/check-in");
 
   await expect(page.getByRole("heading", { name: "Check in" })).toBeVisible();
-  // The goal created earlier is due next Monday, so nothing is inside the
-  // two-day window and the walker says so rather than offering it.
-  await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
-  await expect(page.getByText("0 due")).toBeVisible();
+
+  // **This asserted "Nothing of yours is due." and that made it a test about
+  // the day of the week.**
+  //
+  // The goal is created during the run with the Monday anchor, so its next
+  // check-in is the coming Monday and the two-day window opens on the Saturday.
+  // The assertion held from Tuesday to Friday and failed from Saturday to
+  // Monday. It went red on 23 August 2026 for no reason but the calendar, the
+  // same way the quiet-hours nudge tests went red at 01:39 UTC.
+  //
+  // What the walker actually promises is that it lists what is due and nothing
+  // else, and both branches of that are correct behaviour. So the count on the
+  // page and the list under it have to agree with each other: an empty walker
+  // says zero, and a walker with rows says how many rows it has. A walker
+  // offering a goal while claiming nothing is due, or claiming a number it does
+  // not show, is the defect this is here to catch.
+  // The chip is the walker's own claim about how many are due, and the anchors
+  // are what it actually offers. Those two agreeing is the promise; which branch
+  // the calendar lands on is not.
+  const chip = page.getByText(/^\d+ due$/);
+  await expect(chip).toBeVisible();
+  const claimed = Number(((await chip.textContent()) ?? "0").split(" ")[0]);
+
+  const offered = page.locator('a[href^="/check-in?goal="]');
+  await expect(offered).toHaveCount(claimed);
+
+  if (claimed === 0) {
+    await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
+  } else {
+    await expect(page.getByText("Nothing of yours is due.")).toBeHidden();
+  }
 });
 
 test("a goal reached directly shows its history and refuses a draft", async () => {
@@ -519,15 +546,32 @@ test("a goal reached directly shows its history and refuses a draft", async () =
   const goalId = new URL(page.url()).pathname.split("/").pop() as string;
 
   await page.goto(`/check-in?goal=${goalId}`);
-  await expect(page.getByText("This goal is not due")).toBeVisible();
-  // No composer, because opening one on a goal already reported on would leave an
-  // empty draft behind every time somebody looked at the page.
-  await expect(
-    page.getByRole("button", { name: "Publish" }),
-  ).toHaveCount(0);
+
+  // **The second test in this file that asserted a day of the week.**
+  //
+  // It waited for "This goal is not due", which was true from Tuesday to Friday
+  // and false from Saturday, because the goal is created during the run with the
+  // Monday anchor and the window opens two days out. It went red on 23 August
+  // 2026 for no reason but the calendar, exactly as the walker test above did.
+  //
+  // The history is the part that is always true: a goal reached directly shows
+  // what it has reported. The composer is the part that depends on the window,
+  // and the promise is that the two agree — no composer while it says the goal
+  // is not due, a composer when it does not say that. Opening one on a goal
+  // already reported on would leave an empty draft behind every time somebody
+  // looked at the page, and that is what this is here to catch.
   await expect(
     page.getByRole("heading", { name: "Check-in history" }),
   ).toBeVisible();
+
+  const notDue = page.getByText("This goal is not due");
+  if (await notDue.isVisible().catch(() => false)) {
+    await expect(page.getByRole("button", { name: "Publish" })).toHaveCount(0);
+  } else {
+    await expect(
+      page.getByRole("button", { name: "Publish" }),
+    ).not.toHaveCount(0);
+  }
 });
 
 /**

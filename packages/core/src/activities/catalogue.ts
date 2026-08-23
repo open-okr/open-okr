@@ -304,6 +304,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // everybody who can see the space, and section 8.2 gives the room's read to
   // the facilitator alone.
   "session.pulseGiven": z.object({ sessionId: z.string() }),
+  // No score in the payload: section 8.3 hides the objective score until the
+  // room reveals it, and a feed announcing each grade would reveal it one entry
+  // at a time.
+  "session.keyResultScored": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
