@@ -20,7 +20,7 @@
     "@base-ui-components/react": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "next": "16.3.1",
+    "next": "16.3.2",
     "pg": "catalog:",
     "react": "19.2.8",
     "react-dom": "19.2.8"
