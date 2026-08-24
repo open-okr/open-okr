@@ -29,7 +29,7 @@ catalog:
   ws: ^8.21.3
   "@types/ws": ^8.18.1
   better-auth: ^1.6.26
-  "@better-auth/passkey": ^1.6.26
+  "@better-auth/passkey": ^1.7.1
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
