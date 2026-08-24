@@ -32,14 +32,14 @@
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.8",
+    "@biomejs/biome": "2.5.9",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.62.1",
     "@types/pg": "catalog:",
     "knip": "6.32.2",
     "pg": "catalog:",
-    "turbo": "2.10.10",
+    "turbo": "2.10.11",
     "vitest": "catalog:"
   }
 }
