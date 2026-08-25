@@ -1,10 +1,14 @@
 /**
- * Scoring the key results (METHOD.md §8.3, p4-t00-session-design.md §4.3,
- * P4-T10b-a).
+ * Scoring the key results and revealing them (METHOD.md §8.3,
+ * p4-t00-session-design.md §4.3, P4-T10b-a and P4-T10b-b).
  *
- * The task's test plan:
+ * P4-T10b-a's test plan:
  * - a score is refused outside 0.0 to 1.0 and refused without a reason
  * - scores written here land on the key results on close, and not before
+ *
+ * P4-T10b-b's test plan:
+ * - the reveal is deterministic
+ * - no caller can read an objective's score before it is revealed
  *
  * The acceptance criterion: when every key result of an objective has a score
  * and a reason, the stage may be completed, and the scores are on the key
@@ -56,6 +60,7 @@ const scoring = async (userId = FACILITATOR) =>
       goalId: string;
       goalTitle: string;
       score: number | null;
+      revealed: boolean;
       scored: number;
       total: number;
       keyResults: {
@@ -299,6 +304,10 @@ describe("the objective score follows §3.2's weighting", () => {
       reason: "Landed.",
     });
 
+    // Revealed first, because P4-T10b-b withholds the number until the room
+    // reveals it. What is under test here is the weighting, not the hiding.
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+
     const status = await scoring();
     // Weights 3 and 1, so (0.2*3 + 0.8*1) / 4 = 0.35. A plain mean is 0.5, and
     // that difference is the whole reason this is not a mean.
@@ -324,6 +333,8 @@ describe("the objective score follows §3.2's weighting", () => {
       score: 0.8,
       reason: "Landed.",
     });
+
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
 
     const status = await scoring();
     // Two different questions about two different sets: the objective is
@@ -441,5 +452,215 @@ describe("access", () => {
       ),
     ).rejects.toThrow();
     await expect(scoring(MEMBER)).rejects.toThrow();
+  });
+});
+
+describe("the reveal (P4-T10b-b)", () => {
+  /** Grades both key results of the seeded objective at 0.2 and 0.8. */
+  const gradeBoth = async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: heavyKeyResultId,
+      score: 0.2,
+      reason: "Missed badly.",
+    });
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: lightKeyResultId,
+      score: 0.8,
+      reason: "Landed.",
+    });
+  };
+
+  it("withholds the objective score from every caller until it is revealed", async () => {
+    await gradeBoth();
+
+    // The test-plan line, at the action rather than at the screen. P4-T10b-a
+    // kept the number off the grading screen; the read still returned it, so a
+    // second surface or a REST caller saw what the room had not.
+    for (const viewer of [FACILITATOR, MEMBER]) {
+      const status = await scoring(viewer);
+      const objective = status.objectives[0];
+      expect(objective?.revealed).toBe(false);
+      expect(objective?.score).toBeNull();
+      // The grades themselves stay visible: the room graded them together and
+      // §8.3 hides the objective's roll-up, not the key results.
+      expect(objective?.keyResults.every((entry) => entry.score !== null)).toBe(
+        true,
+      );
+    }
+  });
+
+  it("gives every participant the same number once it is revealed", async () => {
+    await gradeBoth();
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+
+    for (const viewer of [FACILITATOR, MEMBER]) {
+      const status = await scoring(viewer);
+      expect(status.objectives[0]?.revealed).toBe(true);
+      expect(status.objectives[0]?.score).toBeCloseTo(0.35, 10);
+    }
+  });
+
+  it("is one write, so a second reveal changes nothing", async () => {
+    await gradeBoth();
+    const first = (await call("sessions.revealObjectiveScore", {
+      sessionId,
+      goalId,
+    })) as { revealed: number };
+    const second = (await call("sessions.revealObjectiveScore", {
+      sessionId,
+      goalId,
+    })) as { revealed: number };
+
+    expect(first.revealed).toBe(2);
+    // Deterministic: the second call finds nothing left to reveal rather than
+    // re-stamping the rows with a later time.
+    expect(second.revealed).toBe(0);
+    expect((await scoring()).objectives[0]?.score).toBeCloseTo(0.35, 10);
+  });
+
+  it("counts only revealed objectives in the cycle score", async () => {
+    // Two objectives, so the pooled average is not simply the first
+    // objective's own score. Counting every grade instead would, on a
+    // single-objective review, publish the hidden number under another label.
+    const second = (await call("goals.create", {
+      title: "Make onboarding something a team finishes in one sitting",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      reviewerId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+    const secondKeyResult = (await call("goals.addKeyResult", {
+      goalId: second.id,
+      title: "Take first-week completion from 40 to 75 per cent",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 40,
+      targetValue: 75,
+      unit: "per cent",
+      weight: 1,
+    })) as { id: string };
+
+    await gradeBoth();
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: secondKeyResult.id,
+      score: 1,
+      reason: "Finished at 78.",
+    });
+
+    // Nothing revealed: nothing to average.
+    expect((await scoring()).cycleScore).toBeNull();
+    expect((await scoring()).verdict).toBeNull();
+
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+    // §8.6's plain average over the revealed key results: (0.2 + 0.8) / 2.
+    expect((await scoring()).cycleScore).toBeCloseTo(0.5, 10);
+
+    await call("sessions.revealObjectiveScore", {
+      sessionId,
+      goalId: second.id,
+    });
+    // (0.2 + 0.8 + 1.0) / 3. Still a plain average over key results, so the
+    // one-key-result objective does not weigh as much as the two-key-result
+    // one.
+    expect((await scoring()).cycleScore).toBeCloseTo(2 / 3, 10);
+  });
+
+  it("keeps a regrade after the reveal visible, because the room may still change its mind", async () => {
+    await gradeBoth();
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: heavyKeyResultId,
+      score: 0.6,
+      reason: "Talked back up: the target moved mid-cycle.",
+    });
+
+    const status = await scoring();
+    expect(status.objectives[0]?.revealed).toBe(true);
+    // (0.6*3 + 0.8*1) / 4 = 0.65. A revealed objective is not frozen: §8.3's
+    // reveal is about who sees the number first, not about closing the debate.
+    expect(status.objectives[0]?.score).toBeCloseTo(0.65, 10);
+  });
+
+  it("refuses a reveal from anybody but the facilitator", async () => {
+    await gradeBoth();
+
+    // §8.3 has the room grading and the facilitator revealing. The
+    // write-access floor is edit for every active member (P3-T16), so edit
+    // alone would let any participant reveal, which is the same reasoning
+    // §8.1's add-a-minute control needed.
+    await expect(
+      call("sessions.revealObjectiveScore", { sessionId, goalId }, MEMBER),
+    ).rejects.toThrow(/facilitator/i);
+    expect((await scoring(MEMBER)).objectives[0]?.score).toBeNull();
+  });
+
+  it("refuses revealing an objective nobody graded", async () => {
+    // There is no number to reveal, and an empty reveal would put the
+    // objective into its revealed state with nothing behind it.
+    await expect(
+      call("sessions.revealObjectiveScore", { sessionId, goalId }),
+    ).rejects.toThrow(/graded/i);
+    expect((await scoring()).objectives[0]?.revealed).toBe(false);
+  });
+
+  it("reveals a half-graded objective, because §8.3 leaves the ungraded out", async () => {
+    await call("sessions.scoreKeyResult", {
+      sessionId,
+      keyResultId: heavyKeyResultId,
+      score: 0.2,
+      reason: "Only this one so far.",
+    });
+    await call("sessions.revealObjectiveScore", { sessionId, goalId });
+
+    const status = await scoring();
+    // §8.3: "An unscored key result is left out rather than counted as zero, so
+    // a half-graded objective does not read as a failing one." Weighted over
+    // the graded rows alone, that is 0.2 rather than 0.15.
+    expect(status.objectives[0]?.score).toBeCloseTo(0.2, 10);
+    expect(status.objectives[0]?.revealed).toBe(true);
+  });
+
+  it("is refused on a session that does not score", async () => {
+    const weekly = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "weekly",
+      title: "Weekly check-in",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: facilitatorMemberId,
+    })) as { id: string };
+
+    await expect(
+      call("sessions.revealObjectiveScore", {
+        sessionId: weekly.id,
+        goalId,
+      }),
+    ).rejects.toThrow(/quarterly/i);
+  });
+
+  it("refuses an objective this review never graded", async () => {
+    // The reveal names a goal, and an ungraded goal id would set revealed_at
+    // on nothing while reporting success.
+    const other = (await call("goals.create", {
+      title: "Something the review does not cover at all",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: facilitatorMemberId,
+      reviewerId: facilitatorMemberId,
+      weight: 1,
+    })) as { id: string };
+
+    await expect(
+      call("sessions.revealObjectiveScore", { sessionId, goalId: other.id }),
+    ).rejects.toThrow(/graded/i);
   });
 });

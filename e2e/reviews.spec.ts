@@ -488,22 +488,44 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await page.getByRole("button", { name: "Save the grade" }).first().click();
   await expect(page.getByText(/asks for one line on why/)).toBeVisible();
 
-  // The slider is moved, so the stored grade is a number somebody chose rather
-  // than the nought it rests at. `fill` is how Playwright sets a range input.
-  await page.getByLabel("Score").first().fill("0.6");
-  await page.getByLabel("One line on why").first().fill("Landed 210 of 300.");
-  await page.getByRole("button", { name: "Save the grade" }).first().click();
+  // **Two locators fixed here, and the pair of them hid a defect for a task.**
+  //
+  // `getByLabel("Score")` matched the facilitator's private note first, because
+  // on this stage that field is labelled "Private note for Score the key
+  // results" and the note panel is rendered above the grading panel. So the
+  // slider was never moved, "0.6" landed in the note, the grade was stored as
+  // nought, and `getByText("0.6")` then found the note and reported success.
+  // Every assertion passed and nothing under test had happened. It surfaced only
+  // when P4-T10b-b revealed the objective score and the honest answer was 0.00.
+  //
+  // Scoped to the row instead: the rows are the only sliders on this stage, and
+  // the chip inside a row is the score the server sent back rather than the
+  // slider's local state, which a `router.refresh()` does not reset.
+  const rows = page.getByRole("listitem").filter({ has: page.getByRole("slider") });
+  const firstRow = rows.first();
+  await firstRow.getByRole("slider").fill("0.6");
+  await firstRow.getByLabel("One line on why").fill("Landed 210 of 300.");
+  await firstRow.getByRole("button", { name: "Save the grade" }).click();
   await expect(ungraded).toHaveCount(before - 1, { timeout: 10_000 });
-  // The grade the room agreed, back from the server.
-  await expect(page.getByText("0.6", { exact: true }).first()).toBeVisible();
+  // The grade the room agreed, back from the server. The row carries "0.6"
+  // twice, as the chip the server rendered and as the slider's own readout, and
+  // the chip comes first in the row.
+  await expect(firstRow.getByText("0.6", { exact: true }).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // **An assertion about something that must not be on the screen.** Section 8.3
   // hides the objective score until the room reveals it together, and a running
   // number here would be the reveal happening one grade at a time with nobody
-  // deciding it. If a later task puts that number here, this is what says so.
-  await expect(
-    page.getByText(/stays hidden until the room reveals it/).first(),
-  ).toBeVisible();
+  // deciding it. If a later task puts that number here without a reveal behind
+  // it, this is what says so.
+  const hidden = page.getByText(/stays hidden until the room reveals it/);
+  await expect(hidden.first()).toBeVisible();
+  const hiddenBefore = await hidden.count();
+
+  // Nothing is out, so there is no average to show either. The cycle score runs
+  // through the reveals rather than through the grades.
+  await expect(page.getByText(/The cycle score appears as objectives/)).toBeVisible();
 
   // The second client's rail moves and its timer restarts on stage two's own
   // twelve minutes rather than continuing stage one's six. Reloaded, for the
@@ -524,6 +546,38 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(secondPage.getByLabel("One line on why").first()).toHaveValue(
     "Landed 210 of 300.",
   );
+
+  // The reveal (METHOD.md section 8.3, P4-T10b-b).
+  //
+  // **Not asserted here: that a participant is refused the reveal.** The second
+  // context reuses this one's storage state, so both clients are the same
+  // signed-in facilitator and there is no participant in this spec to refuse.
+  // Writing that assertion here would have passed for the wrong reason and read
+  // as coverage. It is covered against a real second member by
+  // "refuses a reveal from anybody but the facilitator" in
+  // packages/core/test/review-scoring.test.ts.
+  await page.getByRole("button", { name: "Reveal the score" }).first().click();
+
+  // Weighted over the graded key results alone: one at 0.6. Section 8.3 leaves
+  // an ungraded key result out rather than counting it as a zero, so a
+  // half-graded objective does not read as a failing one.
+  await expect(page.getByText("0.60").first()).toBeVisible({ timeout: 10_000 });
+  await expect(hidden).toHaveCount(hiddenBefore - 1, { timeout: 10_000 });
+
+  // The running cycle score, and section 3.4's verdict on it. 0.6 is the floor
+  // of the healthy band, inclusive, which is the boundary most likely to be
+  // written the wrong way round.
+  await expect(page.getByText("Cycle score so far")).toBeVisible();
+  await expect(page.getByText("healthy").first()).toBeVisible();
+
+  // **The same number for the participant, from the same write.** Reloaded for
+  // the reason every other live assertion in this file is: the push is an outbox
+  // row and no relay drains it yet. What this proves is that both clients read
+  // one answer off the server rather than each computing their own.
+  await secondPage.reload();
+  await expect(secondPage.getByText("0.60").first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   await second.close();
 });

@@ -314,10 +314,20 @@ purpose.
 | Reason | One-line per KR (required) |
 | Objective score | Hidden until the team reveals together |
 | Reveal | Deterministic, instant under reduced motion |
-| Running cycle score | Updates live as KRs are scored |
+| Running cycle score | Updates as objectives are revealed |
 
 The reveal is one write. All connected clients see the same number at the
 same time (same atomicity contract as the check-in vote reveal from P3-T07).
+
+**The running cycle score line was corrected on 26 August 2026.** It read
+"Updates live as KRs are scored", which contradicted the row above it. The
+cycle score is §3.4's plain average over key results and an objective's score
+is §3.2's weighted average over the same rows, so on a review with one
+objective whose key results carry equal weights the two numbers are the same
+figure. A cycle score that moved on every grade therefore published the hidden
+objective score under a different label. Agung decided the cycle score runs
+through the reveals instead, which also makes the acceptance criterion literal:
+revealing is then the thing that moves it.
 
 **What P4-T10b-a settled.**
 
@@ -344,10 +354,61 @@ It would be the reveal happening one grade at a time with nobody deciding it.
 The end-to-end spec asserts that absence, so a later task cannot quietly put the
 number there.
 
+**What P4-T10b-b settled.**
+
+*The withholding is in the action, not on the screen.* P4-T10b-a kept the
+number off the grading screen and `sessions.scoringStatus` went on returning
+it, so a second surface, a REST caller or the agent tool catalogue read what
+the room had not. The read now returns `score: null` and `revealed: false`
+until the room reveals, and the screen has nothing left to keep secret.
+
+*The reveal animates in CSS, deliberately.* The design system's one
+reduced-motion override collapses every CSS animation and transition to nothing
+(`packages/ui/src/styles/tokens.css` §2), so the existing `.animate-pop` class
+is instant for a reader who asked for that and no component has to check. A
+JavaScript count-up would keep counting straight through that override, which
+is the trap worth marking rather than the technique worth using.
+
+*A redundant reveal is answered, not refused.* A second reveal stamps nothing
+and returns a count of nought, the same shape `sessions.revealVotes` uses. A
+facilitator on a stale screen pressing again should not meet an error, and
+there is no error code in this codebase that means already done without also
+claiming the objective does not exist. It enqueues no outbox row either,
+because there is no second reveal to push and the idempotency key would collide
+with the first.
+
+*Revealing a half-graded objective is allowed; revealing an ungraded one is
+not.* §8.3 leaves an unscored key result out rather than counting it as zero,
+so a half-graded objective has a legitimate score to put out. An objective with
+nothing graded has none, and letting it enter its revealed state would show the
+room a blank where the number goes.
+
+*A revealed objective is not frozen.* A grade changed after the reveal moves the
+number that is already out. The reveal decides who sees it first, not when the
+argument ends.
+
+*The push is an outbox row and no relay drains it yet*, the same position
+P4-T10a-a recorded for `session.stageChanged`. The write is one write and every
+client that re-reads gets the same answer; `session.scoresRevealed` is declared,
+enqueued and listened for, and it reaches nobody until a relay host exists. The
+end-to-end spec reloads the second client rather than claiming a live rail.
+
+*An end-to-end defect this task uncovered rather than caused.* P4-T10b-a's spec
+filled `getByLabel("Score")`, which matched the facilitator's private note
+first, because on this stage that field is labelled "Private note for Score the
+key results" and its panel renders above the grading panel. The slider was never
+moved, the grade stored as nought, and the following `getByText("0.6")` found
+the note and reported success. The whole sequence passed while nothing under
+test had happened. It surfaced the moment the reveal showed the honest 0.00.
+Both locators are now scoped to the row.
+
 Given / When / Then:
 - Given a running review at the scoring stage, when the facilitator reveals an
   objective's score, then every participant sees the same number at the same
   time, and the cycle score updates.
+- Given a graded but unrevealed objective, when any caller reads the scoring
+  status, then the objective's score is null and the cycle score excludes its
+  key results.
 
 ### 4.4 Stage 3: Objective narratives (SS8.3)
 

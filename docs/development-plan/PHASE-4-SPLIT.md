@@ -2,7 +2,8 @@
 
 Who takes which task, what can run at the same time, and what has to wait.
 Rewritten 2026-08-19, after thirteen Phase 4 tasks landed and the tasks were cut
-into lettered parts. Updated 2026-08-20 to reflect P4-T05a and P4-T07a through P4-T07c landing.
+into lettered parts. Counts and chain states refreshed 2026-08-26, when Agung
+accepted the twenty-nine rows that were sitting in review.
 
 `IMPLEMENTATION-PLAN.md` is the authority. This file only reads its dependency
 lines and turns them into two lanes. If the two ever disagree, the plan wins and
@@ -15,45 +16,51 @@ closed when the gate was approved on 2026-08-17.
 
 ## Where things stand
 
-Phase 4 is thirty-eight rows, because P4-T01 to P4-T14 were cut into lettered
-parts once P4-T02 and P4-T04 each proved too large for one session.
+Phase 4 is forty-two rows, because P4-T01 to P4-T14 were cut into lettered
+parts once P4-T02 and P4-T04 each proved too large for one session. Counts read
+on 26 August 2026.
 
 | Status | Rows | Which |
 |---|---|---|
-| done | 2 | P4-T00, P4-T01a |
-| in_review | 25 | P4-T01b to P4-T06c, P4-T07a to P4-T10b-a |
+| done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
+| in_review | 1 | P4-T10b-b |
 | in_progress | 1 | P4-T13a |
-| todo | 10 | P4-T10b-b to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 9 | P4-T10c to P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
-The agents lane is finished. Every row from P4-T05a to P4-T06c is written and
-waiting on a read, which leaves the sessions lane (P4-T09 to P4-T12) and the
+The agents lane is finished and read. What is left is the tail of the sessions
+lane (P4-T10c to P4-T12, with P4-T10b-b written and waiting on a read) and the
 retrieval lane (P4-T13a, b then P4-T14a, b) between here and P4-T15.
 
-**The twelve rows from P4-T01b to P4-T04c are all in pull request #40 and have not merged.**
-P4-T05a and P4-T07a landed on `obed` and are waiting on a read. Nothing in
-Phase 4 is on `main` except P4-T00 and P4-T01a, so anybody branching from
-`main` today gets a tree with no quality catalogue, no publish gates and no
-nudge engine.
+**`done` here means the row was read and accepted, not that it reached `main`.**
+Branch `agung` is fifty-nine commits ahead of `origin/main`, and the only Phase 4
+work on `main` is P4-T00 and P4-T01a. Anybody branching from `main` today still
+gets a tree with no quality catalogue, no publish gates and no nudge engine. The
+twelve rows from P4-T01b to P4-T04c went out as pull request #40 and it has not
+merged.
 
-What those fifteen rows delivered, in one line each: the twenty-six quality
-checks and their conformance suite (`pnpm method:check`), quality evaluation on
-the write path with the Draft Coach and the quality panel, the six publish
-gates, the nudge engine with deduplication, quiet hours, suppression reasons,
-three escalation ladders and a volume dashboard, the Champion agent and its
-hourly run, and the session record with live stage sync.
+What the twenty-nine rows accepted since P4-T01a delivered, in one line each:
+the twenty-six quality checks and their conformance suite (`pnpm method:check`),
+quality evaluation on the write path with the Draft Coach and the quality panel,
+the six publish gates, the nudge engine with deduplication, quiet hours,
+suppression reasons, three escalation ladders and a volume dashboard, the
+Champion agent with its four cadences and the proposal path, the Coach agent with
+the divergence reconciler and the nightly semantic sweep, and the session record
+through the weekly session, the monthly review and the first two stages of the
+quarterly review.
 
 ## The four chains
 
 | Chain | Tasks | Serial? | State |
 |---|---|---|---|
-| A: method and quality | P4-T01a to P4-T03 | yes | Written, waiting on the merge |
-| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows in_review. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, fifteen rows | yes | P4-T07a to P4-T10b-a in_review; P4-T10b-b next |
+| A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
+| B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
+| B2: the sessions | P4-T07a to P4-T12, fifteen rows | yes | P4-T07a to P4-T10b-a accepted, P4-T10b-b in review; **P4-T10c next** |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
-B2 is the critical path. Thirteen rows that cannot be split. P4-T07a landed
-and the chain is now moving. Whoever finishes it decides when Phase 4 ends.
+B2 is the critical path. Nine of its fifteen rows are accepted, one is in
+review, five remain, and they cannot be worked in parallel. Whoever finishes it
+decides when Phase 4 ends.
 
 ## The split
 
@@ -86,8 +93,8 @@ P4-T15 last because it needs all of them.
 
 ### Agung takes over the sessions lane, 21 August 2026
 
-Agung has taken over every remaining Phase 4 row of Obed's. The rows already
-`in_review` keep Obed's name below, because that is who wrote them and the table
+Agung has taken over every remaining Phase 4 row of Obed's. The rows Obed had
+already written keep his name below, because that is who wrote them and the table
 is a record rather than a roster. Everything still `todo` is Agung's.
 
 **What this changes in practice.** The file-ownership table below no longer
@@ -114,36 +121,36 @@ and this table is what was agreed.
 |---|---|---|---|
 | P4-T00 | Coaching design gate | Obed | done |
 | P4-T01a | The quality catalogue: objective checks | Agung | done |
-| P4-T01b | Key result checks and strictness | Agung | in_review |
-| P4-T01c | Alignment checks | Agung | in_review |
-| P4-T01d | Cycle checks | Agung | in_review |
-| P4-T01e | Example pairs and the nudge trigger catalogue | Agung | in_review |
-| P4-T01f | Session stages, process health, rhythm diagnostic | Agung | in_review |
-| P4-T01g | The conformance suite, `pnpm method:check` | Agung | in_review |
-| P4-T02a | Server-side quality evaluation and stored flags | Agung | in_review |
-| P4-T02b | The rule verdict component and the strength meter | Agung | in_review |
-| P4-T02c | The quality panel across a set | Agung | in_review |
-| P4-T03 | Publish gates | Agung | in_review |
-| P4-T04a | The nudge table and the due engine | Agung | in_review |
-| P4-T04b | Deduplication, quiet hours and suppression | Agung | in_review |
-| P4-T04c | Escalation ladders, provenance, volume dashboard | Agung | in_review |
-| P4-T05a | The Champion agent and its nudge run | Agung | in_review |
-| P4-T05b | The daily sweep and the cycle countdown | Agung | in_review |
-| P4-T05c-a | The proposal path, and the recovery proposal | Agung | in_review |
-| P4-T05c-b | AI drafting inside the proposal | Agung | in_review |
-| P4-T06a | The Coach agent and write-triggered evaluation | Agung | in_review |
-| P4-T06b-a | Divergence findings, and the shared reconciler | Agung | in_review |
-| P4-T06b-b | The nightly semantic sweep | Agung | in_review |
-| P4-T06c | The rewrite assist and the coach surfaces | Agung | in_review |
-| P4-T07a | The session record and live stage sync | Obed | in_review |
-| P4-T07b | The confidence round | Obed | in_review |
-| P4-T07c | Blockers, the board and aging | Obed | in_review |
-| P4-T08 | Weekly session: commitments, digest, streaks | Obed | in_review |
-| P4-T09 | Monthly review and decision log | Agung | in_review |
-| P4-T10a-a | Quarterly review: the eleven-stage shell | Agung | in_review |
-| P4-T10a-b | Quarterly review: the room pulse | Agung | in_review |
-| P4-T10b-a | Quarterly review: scoring the key results | Agung | in_review |
-| P4-T10b-b | Quarterly review: the reveal | Agung | todo |
+| P4-T01b | Key result checks and strictness | Agung | done |
+| P4-T01c | Alignment checks | Agung | done |
+| P4-T01d | Cycle checks | Agung | done |
+| P4-T01e | Example pairs and the nudge trigger catalogue | Agung | done |
+| P4-T01f | Session stages, process health, rhythm diagnostic | Agung | done |
+| P4-T01g | The conformance suite, `pnpm method:check` | Agung | done |
+| P4-T02a | Server-side quality evaluation and stored flags | Agung | done |
+| P4-T02b | The rule verdict component and the strength meter | Agung | done |
+| P4-T02c | The quality panel across a set | Agung | done |
+| P4-T03 | Publish gates | Agung | done |
+| P4-T04a | The nudge table and the due engine | Agung | done |
+| P4-T04b | Deduplication, quiet hours and suppression | Agung | done |
+| P4-T04c | Escalation ladders, provenance, volume dashboard | Agung | done |
+| P4-T05a | The Champion agent and its nudge run | Agung | done |
+| P4-T05b | The daily sweep and the cycle countdown | Agung | done |
+| P4-T05c-a | The proposal path, and the recovery proposal | Agung | done |
+| P4-T05c-b | AI drafting inside the proposal | Agung | done |
+| P4-T06a | The Coach agent and write-triggered evaluation | Agung | done |
+| P4-T06b-a | Divergence findings, and the shared reconciler | Agung | done |
+| P4-T06b-b | The nightly semantic sweep | Agung | done |
+| P4-T06c | The rewrite assist and the coach surfaces | Agung | done |
+| P4-T07a | The session record and live stage sync | Obed | done |
+| P4-T07b | The confidence round | Obed | done |
+| P4-T07c | Blockers, the board and aging | Obed | done |
+| P4-T08 | Weekly session: commitments, digest, streaks | Obed | done |
+| P4-T09 | Monthly review and decision log | Agung | done |
+| P4-T10a-a | Quarterly review: the eleven-stage shell | Agung | done |
+| P4-T10a-b | Quarterly review: the room pulse | Agung | done |
+| P4-T10b-a | Quarterly review: scoring the key results | Agung | done |
+| P4-T10b-b | Quarterly review: the reveal | Agung | in_review |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | todo |
 | P4-T11a | Quarterly review: the retros | Agung | todo |
 | P4-T11b | Root cause and the process-health survey | Agung | todo |

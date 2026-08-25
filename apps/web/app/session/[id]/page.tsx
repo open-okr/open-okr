@@ -147,7 +147,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as RoomPulse;
   }
 
-  // Stage two (METHOD.md §8.3, P4-T10b-a).
+  // Stage two (METHOD.md §8.3, P4-T10b-a and P4-T10b-b).
   let scoring: ScoringStatus | null = null;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[1]) {
     scoring = (await callAction(context, "sessions.scoringStatus", {
@@ -367,9 +367,14 @@ export default async function SessionPage({ params }: SessionPageProps) {
         <RoomPulsePanel sessionId={id} pulse={roomPulse} canGive={isRunning} />
       ) : null}
 
-      {/* Stage two: grading the key results (METHOD.md §8.3, P4-T10b-a) */}
+      {/* Stage two: grading and revealing (METHOD.md §8.3, P4-T10b-a, P4-T10b-b) */}
       {scoring ? (
-        <Scoring sessionId={id} status={scoring} canScore={isRunning} />
+        <Scoring
+          sessionId={id}
+          status={scoring}
+          canScore={isRunning}
+          canReveal={isRunning && isFacilitator}
+        />
       ) : null}
 
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}

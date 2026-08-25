@@ -1,24 +1,32 @@
 "use client";
 
 /**
- * Stage two: grading the key results (UIUX-PLAN.md S-24, METHOD.md §8.3,
- * P4-T10b-a).
+ * Stage two: grading the key results and revealing the scores (UIUX-PLAN.md
+ * S-24, METHOD.md §8.3, P4-T10b-a and P4-T10b-b).
  *
  * One row per key result, with §8.3's evidence beside the slider: baseline,
  * target and where the number actually landed. Grading happens against the key
  * result as written, so the evidence is read from the key result rather than
  * typed into the review.
  *
- * **The objective score is deliberately not here.** §8.3 hides it until the room
- * reveals it together, and P4-T10b-b is the reveal. What this screen shows is
- * how many of an objective's key results are graded, which is what a facilitator
- * needs to know whether the stage can end. Showing the running number would be
- * the reveal happening by accident, one grade at a time.
+ * **The objective score is not on this screen until the room reveals it**, and
+ * the screen is not what keeps it back: `sessions.scoringStatus` returns null
+ * for an unrevealed objective, so a second surface cannot show what this one
+ * hides. Showing a running number would be the reveal happening by accident,
+ * one grade at a time.
+ *
+ * **The reveal animates in CSS, deliberately.** The design system's one
+ * reduced-motion override collapses every CSS animation and transition to
+ * nothing (`packages/ui/src/styles/tokens.css` §2), so `.animate-pop` is
+ * instant for a reader who asked for that and nothing here has to check. A
+ * JavaScript count-up would keep counting straight through that override, which
+ * is the trap this note exists to mark.
  */
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import { scoreKeyResultAction } from "./actions";
+import { verdictLabel, verdictTone } from "../../../lib/verdict";
+import { revealObjectiveScoreAction, scoreKeyResultAction } from "./actions";
 
 interface ScoringKeyResult {
   readonly keyResultId: string;
@@ -34,8 +42,10 @@ interface ScoringKeyResult {
 
 interface ScoringObjective {
   readonly goalId: string;
-  readonly goalTitle: string;
+  /** Null until the room reveals it (§8.3). */
   readonly score: number | null;
+  readonly goalTitle: string;
+  readonly revealed: boolean;
   readonly scored: number;
   readonly total: number;
   readonly keyResults: readonly ScoringKeyResult[];
@@ -173,14 +183,85 @@ function ScoreRow({
   );
 }
 
+/**
+ * The hidden number, the button that puts it out, and the number once it is out.
+ *
+ * §8.3 has the room grading together and revealing together, which in practice
+ * is the facilitator saying now. `sessions.revealObjectiveScore` is what refuses
+ * anybody else; this only decides whether to draw the control.
+ */
+function Reveal({
+  sessionId,
+  objective,
+  canReveal,
+  onProblem,
+}: {
+  readonly sessionId: string;
+  readonly objective: ScoringObjective;
+  readonly canReveal: boolean;
+  readonly onProblem: (message: string | null) => void;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  const reveal = useCallback(() => {
+    onProblem(null);
+    startTransition(async () => {
+      try {
+        await revealObjectiveScoreAction(sessionId, objective.goalId);
+        router.refresh();
+      } catch (error) {
+        onProblem(
+          error instanceof Error ? error.message : "That did not reveal.",
+        );
+      }
+    });
+  }, [objective.goalId, onProblem, router, sessionId]);
+
+  if (objective.revealed && objective.score !== null) {
+    return (
+      <p className="flex flex-wrap items-baseline gap-2">
+        {/* Keyed on the number so a regrade animates again rather than
+            silently swapping one figure for another. */}
+        <span
+          key={objective.score}
+          className="animate-pop text-2xl font-bold tabular-nums text-ink"
+        >
+          {objective.score.toFixed(2)}
+        </span>
+        <span className="text-xs text-ink-3">
+          this objective's score, weighted by each key result's weight
+        </span>
+      </p>
+    );
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="flex-1 text-xs text-ink-4">
+        {objective.scored === 0
+          ? "Nothing is graded yet, so there is no score to reveal."
+          : "This objective's score stays hidden until the room reveals it together."}
+      </span>
+      {canReveal && objective.scored > 0 ? (
+        <Button type="button" size="sm" disabled={pending} onClick={reveal}>
+          Reveal the score
+        </Button>
+      ) : null}
+    </span>
+  );
+}
+
 export function Scoring({
   sessionId,
   status,
   canScore,
+  canReveal,
 }: {
   readonly sessionId: string;
   readonly status: ScoringStatus;
   readonly canScore: boolean;
+  readonly canReveal: boolean;
 }) {
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -214,6 +295,7 @@ export function Scoring({
               >
                 {objective.scored} of {objective.total} graded
               </Chip>
+              {objective.revealed ? <Chip tone="info">revealed</Chip> : null}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
@@ -228,13 +310,12 @@ export function Scoring({
                 />
               ))}
             </ul>
-            <p className="text-xs text-ink-4">
-              {/* Named rather than shown. §8.3 hides the objective score until
-                  the room reveals it, and a running number here would be the
-                  reveal happening one grade at a time. */}
-              This objective's score stays hidden until the room reveals it
-              together. The reveal arrives with P4-T10b-b.
-            </p>
+            <Reveal
+              sessionId={sessionId}
+              objective={objective}
+              canReveal={canReveal}
+              onProblem={setProblem}
+            />
           </CardBody>
         </Card>
       ))}
@@ -242,12 +323,40 @@ export function Scoring({
       {problem === null ? null : <p className="text-sm text-bad">{problem}</p>}
 
       {status.objectives.length === 0 ? null : (
-        <p className="text-xs text-ink-4">
-          {status.complete
-            ? "Every key result is graded. The stage can end."
-            : "Every key result needs a grade and one line on why before the stage ends."}{" "}
-          Grades land on the key results when the review closes, not before.
-        </p>
+        <>
+          {/* §8.6's running average, over the revealed objectives only. An
+              average that counted grades the room had not put out would be the
+              hidden number under another label, because on a review with one
+              objective and even weights the two figures are the same. */}
+          {status.cycleScore === null ? (
+            <p className="text-xs text-ink-4">
+              The cycle score appears as objectives are revealed. It averages
+              the key results of what the room has put out, so nothing reaches
+              it early.
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-ink-3">
+                Cycle score so far
+              </span>
+              <span
+                key={status.cycleScore}
+                className="animate-pop text-lg font-bold tabular-nums text-ink"
+              >
+                {status.cycleScore.toFixed(2)}
+              </span>
+              <Chip tone={verdictTone(status.verdict)}>
+                {verdictLabel(status.verdict)}
+              </Chip>
+            </p>
+          )}
+          <p className="text-xs text-ink-4">
+            {status.complete
+              ? "Every key result is graded. The stage can end."
+              : "Every key result needs a grade and one line on why before the stage ends."}{" "}
+            Grades land on the key results when the review closes, not before.
+          </p>
+        </>
       )}
     </div>
   );

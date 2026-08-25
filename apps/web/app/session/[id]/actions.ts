@@ -271,3 +271,31 @@ export async function scoreKeyResultAction(
   );
   revalidatePath(`/session/${sessionId}`);
 }
+
+/**
+ * One objective's score, put out to the room (METHOD.md §8.3, P4-T10b-b).
+ *
+ * The facilitator's call, and `sessions.revealObjectiveScore` is what refuses
+ * anybody else rather than the screen. The action returns the realtime channel
+ * for the same reason `sessions.advanceStage` does, and it goes unused here for
+ * the same reason: the push is an outbox row and no relay drains it yet, so this
+ * client re-reads through `revalidatePath` and the others re-read when the rail
+ * is live.
+ */
+export async function revealObjectiveScoreAction(
+  sessionId: string,
+  goalId: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  const result = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.revealObjectiveScore",
+    { sessionId, goalId },
+  );
+  void (result as { realtimeChannel: string }).realtimeChannel;
+  revalidatePath(`/session/${sessionId}`);
+}

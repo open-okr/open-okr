@@ -3,6 +3,7 @@ import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
+import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { handOver, recordPerformance } from "./actions.ts";
@@ -19,20 +20,6 @@ import { handOver, recordPerformance } from "./actions.ts";
  * their own page, because a table that mixed the three would add numbers that
  * answer different questions.
  */
-const verdictTone = (verdict: string | null) =>
-  verdict === "healthy"
-    ? ("ok" as const)
-    : verdict === "too_safe"
-      ? ("info" as const)
-      : verdict === "partial"
-        ? ("warn" as const)
-        : verdict === "outran_capacity"
-          ? ("bad" as const)
-          : ("neutral" as const);
-
-const verdictLabel = (verdict: string | null) =>
-  verdict === null ? "not scored" : verdict.replace(/_/g, " ");
-
 export default async function ScorecardPage() {
   const { session, workspace } = await requireWorkspace();
   const context = {

@@ -24,3 +24,20 @@ export interface SessionStageChangedEvent {
     readonly state: string;
   };
 }
+
+/**
+ * One objective's score has been revealed to the room (METHOD.md §8.3,
+ * P4-T10b-b).
+ *
+ * Identifiers only, like every event on this channel. A client that receives it
+ * re-reads `sessions.scoringStatus` through the normal path, so row-level
+ * security and `can()` stay in the loop and the number itself never travels on
+ * the wire.
+ */
+export interface SessionScoresRevealedEvent {
+  readonly name: "session.scoresRevealed";
+  readonly data: {
+    readonly sessionId: string;
+    readonly goalId: string;
+  };
+}

@@ -308,6 +308,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // room reveals it, and a feed announcing each grade would reveal it one entry
   // at a time.
   "session.keyResultScored": z.object({ sessionId: z.string() }),
+  // No score in the payload: the feed reaches the whole space and the reveal
+  // was to the room in the review (P4-T10b-b).
+  "session.objectiveScoreRevealed": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

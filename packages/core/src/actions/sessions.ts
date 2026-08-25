@@ -3452,6 +3452,168 @@ export const scoreKeyResult = defineWriteAction({
   }),
 });
 
+export const revealObjectiveScore = defineWriteAction({
+  name: "sessions.revealObjectiveScore",
+  summary:
+    "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+  }),
+  output: z.object({
+    revealed: z.number().int(),
+    realtimeChannel: z.string(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // §8.3 has the room grading and the room revealing *together*, which in
+      // practice is the facilitator saying now. The write-access floor here is
+      // `edit` for every active member (P3-T16), so `edit` alone would let any
+      // participant pre-empt the room. Same reasoning as §8.1's add-a-minute
+      // control.
+      if (session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the session's facilitator can reveal a score.",
+        );
+      }
+
+      // The objective, authorised where access lives.
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      // One update over the objective's rows. The room sees one answer because
+      // there is one write, not because the clients agree to pretend.
+      const revealed = await tx
+        .update(reviewScores)
+        .set({ revealedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            reviewScores,
+            eq(reviewScores.workspaceId, workspaceId),
+            eq(reviewScores.sessionId, input.sessionId),
+            isNull(reviewScores.revealedAt),
+            sql`${reviewScores.keyResultId} in (
+              select kr.id from key_results kr
+              where kr.goal_id = ${input.goalId}
+                and kr.workspace_id = ${workspaceId}
+                and kr.deleted_at is null
+            )`,
+          ),
+        )
+        .returning({ id: reviewScores.id });
+
+      if (revealed.length === 0) {
+        // Nothing was stamped, and the two reasons are not the same thing.
+        //
+        // Nothing graded is refused: an objective that entered its revealed
+        // state with no grades behind it would show the room a blank where the
+        // number goes. Already out is not refused, because a facilitator on a
+        // stale screen pressing again should not meet an error, and there is no
+        // error code in this codebase that means "already done" without also
+        // claiming the objective does not exist. Same shape as
+        // `sessions.revealVotes` (P3-T07), which also answers a redundant call
+        // with a count of nought.
+        const [graded] = await tx
+          .select({ id: reviewScores.id })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              eq(keyResults.goalId, input.goalId),
+            ),
+          )
+          .limit(1);
+        if (!graded) {
+          throw new OperationError(
+            "not_found",
+            "Nothing is graded on this objective, so there is no score to reveal.",
+          );
+        }
+      }
+
+      const channel = sessionChannel(workspaceId, input.sessionId);
+
+      return {
+        result: { revealed: revealed.length, realtimeChannel: channel },
+        /**
+         * The push, as an outbox row (the only way a side effect may leave a
+         * write path).
+         *
+         * The key carries the objective, so revealing two objectives enqueues
+         * two rows. **A redundant reveal enqueues nothing**, which is the same
+         * fact stated twice: the key would collide with the row the first reveal
+         * wrote, and there is no second reveal to push. That collision is not
+         * theoretical, it failed the idempotence test before this guard existed.
+         *
+         * **No relay drains the outbox yet**, exactly as P4-T10a-a recorded for
+         * `session.stageChanged`: the write is one write and every client that
+         * re-reads gets the same answer, and the moment a relay host exists the
+         * rail becomes live with no change here.
+         */
+        outbox:
+          revealed.length === 0
+            ? []
+            : [
+                {
+                  topic: "session.scoresRevealed",
+                  payload: {
+                    channel,
+                    sessionId: input.sessionId,
+                    workspaceId,
+                    goalId: input.goalId,
+                  },
+                  idempotencyKey: `session.scoresRevealed:${input.sessionId}:${input.goalId}`,
+                },
+              ],
+        /**
+         * The payload carries no score, unlike the reveal itself.
+         *
+         * An activity row is read by everybody who can see the space, which is
+         * wider than the room in the review. Revealing to the room is not
+         * publishing to the space, and the feed can say the room got there
+         * without carrying the number out of it.
+         */
+        activity: {
+          kind: "session.objectiveScoreRevealed",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.revealObjectiveScore",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, revealed: revealed.length },
+        },
+      };
+    },
+  }),
+});
+
 const scoringKeyResult = z.object({
   keyResultId: z.uuid(),
   title: z.string(),
@@ -3468,21 +3630,41 @@ const scoringKeyResult = z.object({
 export const readScoringStatus = defineReadAction({
   name: "sessions.scoringStatus",
   summary:
-    "Stage two's state: the evidence, the grades so far, each objective's score and the cycle score.",
+    "Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     objectives: z.array(
       z.object({
         goalId: z.uuid(),
         goalTitle: z.string(),
-        /** §3.2's weighted average over the graded key results. Null until one is. */
+        /**
+         * §3.2's weighted average over the graded key results, and **null until
+         * the room reveals it** (§8.3, P4-T10b-b).
+         *
+         * Withheld here rather than on the screen. P4-T10b-a kept the number
+         * off the grading screen and this read still returned it, so a second
+         * surface, a REST caller or the agent tool catalogue saw what the room
+         * had not.
+         */
         score: z.number().nullable(),
+        /** Whether the room has revealed this objective's score. */
+        revealed: z.boolean(),
         scored: z.number(),
         total: z.number(),
         keyResults: z.array(scoringKeyResult),
       }),
     ),
-    /** §8.6's plain average over every graded key result in the review. */
+    /**
+     * §8.6's plain average, over the key results of the **revealed** objectives
+     * only.
+     *
+     * Counting every grade would publish a hidden number under another label:
+     * on a review with one objective whose key results carry equal weights, the
+     * plain average and the weighted average are the same figure. Running
+     * through the reveals also makes the acceptance criterion literal, because
+     * revealing is then the thing that moves it. Agung decided this on
+     * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
+     */
     cycleScore: z.number().nullable(),
     /** §3.4's verdict on that average. */
     verdict: z
@@ -3545,6 +3727,7 @@ export const readScoringStatus = defineReadAction({
             keyResultId: reviewScores.keyResultId,
             score: reviewScores.score,
             reason: reviewScores.reason,
+            revealedAt: reviewScores.revealedAt,
           })
           .from(reviewScores)
           .where(
@@ -3557,7 +3740,11 @@ export const readScoringStatus = defineReadAction({
         const byKeyResult = new Map(
           graded.map((row) => [
             row.keyResultId,
-            { score: Number(row.score), reason: row.reason },
+            {
+              score: Number(row.score),
+              reason: row.reason,
+              revealed: row.revealedAt !== null,
+            },
           ]),
         );
 
@@ -3567,6 +3754,7 @@ export const readScoringStatus = defineReadAction({
           goalId: string;
           goalTitle: string;
           score: number | null;
+          revealed: boolean;
           scored: number;
           total: number;
           keyResults: z.infer<typeof scoringKeyResult>[];
@@ -3580,6 +3768,7 @@ export const readScoringStatus = defineReadAction({
               goalId: row.goalId,
               goalTitle: row.goalTitle,
               score: null,
+              revealed: false,
               scored: 0,
               total: 0,
               keyResults: [],
@@ -3590,6 +3779,12 @@ export const readScoringStatus = defineReadAction({
           objective.total += 1;
           if (grade) {
             objective.scored += 1;
+            // One reveal covers the objective, so one revealed row is the
+            // objective revealed. A key result graded after the reveal joins the
+            // number that is already out rather than hiding it again.
+            if (grade.revealed) {
+              objective.revealed = true;
+            }
           }
           objective.keyResults.push({
             keyResultId: row.keyResultId,
@@ -3607,21 +3802,35 @@ export const readScoringStatus = defineReadAction({
         for (const objective of objectives) {
           // §3.2's weighting, from `packages/method`. Nothing about how a score
           // is built is decided here.
-          objective.score = objectiveScore(
-            objective.keyResults.map((entry) => ({
-              score: entry.score,
-              weight: entry.weight,
-            })),
-          );
+          //
+          // Computed only once the room has revealed it. An unrevealed
+          // objective returns null, which is the test-plan line "no caller can
+          // read an objective's score before it is revealed" held at the read
+          // rather than at the screen.
+          objective.score = objective.revealed
+            ? objectiveScore(
+                objective.keyResults.map((entry) => ({
+                  score: entry.score,
+                  weight: entry.weight,
+                })),
+              )
+            : null;
         }
 
         const { thresholds } = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
-        // §8.6's own words: the §3.4 portfolio average over every scored key
-        // result. A plain average over key results, not over objective scores.
+        // §8.6's own words: the §3.4 portfolio average over scored key results.
+        // A plain average over key results, not over objective scores.
+        //
+        // Over the revealed rows only, for the reason the output schema gives:
+        // a running average that counted unrevealed grades would be the hidden
+        // objective score wearing a different label on any review with one
+        // objective and even weights.
         const average = cycleScore(
-          [...byKeyResult.values()].map((entry) => entry.score),
+          [...byKeyResult.values()]
+            .filter((entry) => entry.revealed)
+            .map((entry) => entry.score),
         );
 
         return {

@@ -344,6 +344,7 @@ export {
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
 export {
+  type SessionScoresRevealedEvent,
   type SessionStageChangedEvent,
   sessionChannel,
 } from "./sessions/live.ts";
