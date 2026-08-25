@@ -41,6 +41,7 @@ function clock(seconds: number): string {
 export function QuarterlyReview({
   sessionId,
   stages,
+  stageHasPanel,
   stageKeys,
   currentStageKey,
   stageStartedAt,
@@ -52,6 +53,14 @@ export function QuarterlyReview({
 }: {
   readonly sessionId: string;
   readonly stages: readonly TimedReviewStage[];
+  /**
+   * Whether the running stage has a panel of its own on this page.
+   *
+   * Decided by `page.tsx`, which is what renders the panels, rather than by a
+   * list of built stages kept here: two places tracking that is one place to
+   * forget when the next stage lands.
+   */
+  readonly stageHasPanel: boolean;
   readonly stageKeys: readonly string[];
   readonly currentStageKey: string | null;
   readonly stageStartedAt: string | null;
@@ -315,23 +324,35 @@ export function QuarterlyReview({
 
           <Card>
             <CardHeader>
+              {/* **Not the stage title when the stage has its own panel.** The
+                  panel already carries that heading, and two identical level-two
+                  headings on one page is a duplicate for a screen reader and an
+                  ambiguous target for anything else looking for the panel. */}
               <h2 className="text-sm font-bold text-ink">
-                {current ? current.title : "The review"}
+                {current
+                  ? stageHasPanel
+                    ? "This stage"
+                    : current.title
+                  : "The review"}
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
               {current ? (
                 <>
                   <p className="text-sm text-ink-2">{current.purpose}</p>
-                  <p className="text-xs text-ink-4">
-                    {/* Named rather than left blank. A stage that renders
-                        nothing reads as a broken screen; a stage that says
-                        which task fills it reads as a product being built. */}
-                    This stage's own panel arrives with its task: scoring and
-                    the reveal at P4-T10b, narratives and recognition at
-                    P4-T10c, the retros and the diagnostic at P4-T11. The rail,
-                    the pacing and the notes work now.
-                  </p>
+                  {stageHasPanel ? null : (
+                    <p className="text-xs text-ink-4">
+                      {/* Named rather than left blank. A stage that renders
+                          nothing reads as a broken screen; a stage that says
+                          which task fills it reads as a product being built.
+                          Stages one to four have their panels now, so this line
+                          is only for the ones that do not. */}
+                      This stage's own panel arrives with its task: the retros
+                      and the diagnostic at P4-T11, the reset at P4-T11c, the
+                      minutes at P4-T12. The rail, the pacing and the notes work
+                      now.
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-ink-3">

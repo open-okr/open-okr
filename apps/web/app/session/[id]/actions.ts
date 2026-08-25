@@ -1,6 +1,6 @@
 "use server";
 
-import { callAction } from "@openokr/core";
+import { callAction, richTextFromPlainText } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -268,6 +268,80 @@ export async function scoreKeyResultAction(
     },
     "sessions.scoreKeyResult",
     { sessionId, keyResultId, score, reason },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * The mic, handed on or put down (METHOD.md §8.1 stage 3, P4-T10c).
+ *
+ * The facilitator's control, and `sessions.passMic` is what refuses anybody
+ * else. Null puts it down, which is also what marks the last owner spoken for.
+ */
+export async function passMicAction(sessionId: string, goalId: string | null) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.passMic",
+    { sessionId, goalId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * What the number does not show, for one objective (METHOD.md §8.1 stage 3,
+ * P4-T10c).
+ *
+ * Collected as plain text and stored as editor JSON through the one shared rich
+ * text module, the same path the check-in composer uses. An empty line clears the
+ * note, which is a real act and does not undo that the objective was spoken for.
+ */
+export async function setNarrativeAction(
+  sessionId: string,
+  goalId: string,
+  text: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.setNarrative",
+    {
+      sessionId,
+      goalId,
+      body: text.trim().length === 0 ? null : richTextFromPlainText(text),
+    },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * Naming somebody's effort (METHOD.md §8.1 stage 4, P4-T10c).
+ *
+ * Anybody in the room, not the facilitator alone: §8.1 asks the room to name
+ * what it saw.
+ */
+export async function giveKudosAction(
+  sessionId: string,
+  toMemberId: string,
+  text: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.giveKudos",
+    { sessionId, toMemberId, text },
   );
   revalidatePath(`/session/${sessionId}`);
 }

@@ -579,5 +579,163 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     timeout: 10_000,
   });
 
+  // ---------------------------------------------------------------------------
+  // Stage three: objective narratives (METHOD.md section 8.1 stage 3, P4-T10c)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  // **By name, not by text.** The stage rail is a region and it lists every
+  // stage by name, so filtering a region on the words "Objective narratives"
+  // matched the rail and asserted against the agenda. The panel carries
+  // `role="region"` with its own heading as the accessible name, which is both
+  // what a screen reader needs and the only unambiguous target here.
+  const narratives = page.getByRole("region", {
+    name: "Objective narratives",
+  });
+  await expect(narratives).toHaveCount(1, { timeout: 10_000 });
+  await expect(narratives).toContainText("0 of 2 spoken for");
+
+  // Nobody holds it before the round starts, so nothing is marked speaking.
+  await expect(narratives.getByText("speaking")).toHaveCount(0);
+
+  const micRows = narratives.getByRole("listitem");
+  await micRows
+    .first()
+    .getByRole("button", { name: "Give them the mic" })
+    .click();
+  await expect(micRows.first().getByText("speaking")).toBeVisible({
+    timeout: 10_000,
+  });
+  // **The property the stage exists for, counted rather than looked up.** Two
+  // holders would pass a "the first one is speaking" check and fail this one.
+  await expect(narratives.getByText("speaking")).toHaveCount(1);
+
+  // **The acceptance criterion.** Reloaded for the reason every other live
+  // assertion in this file is: the push is an outbox row and no relay drains it.
+  // What this proves is that both clients read one answer off the server rather
+  // than each tracking a holder of their own.
+  await secondPage.reload();
+  const secondNarratives = secondPage.getByRole("region", {
+    name: "Objective narratives",
+  });
+  await expect(
+    secondNarratives.getByRole("listitem").first().getByText("speaking"),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(secondNarratives.getByText("speaking")).toHaveCount(1);
+
+  // The mic moves on, and that is what marks the objective it left as spoken
+  // for. Section 4.4's "facilitator marks each as spoken", done by the pass.
+  await micRows.nth(1).getByRole("button", { name: "Give them the mic" }).click();
+  await expect(narratives).toContainText("1 of 2 spoken for", {
+    timeout: 10_000,
+  });
+  await expect(micRows.first().getByText("spoken")).toBeVisible();
+  await expect(narratives.getByText("speaking")).toHaveCount(1);
+
+  // What the number does not show, typed on the objective that already spoke.
+  await micRows
+    .first()
+    .getByRole("button", { name: "Add what the number does not show" })
+    .click();
+  await micRows
+    .first()
+    .getByLabel("What the number does not show")
+    .fill("Activation held. The funnel above it never did.");
+  await micRows.first().getByRole("button", { name: "Save the note" }).click();
+  await expect(
+    narratives.getByText("Activation held. The funnel above it never did."),
+  ).toBeVisible({ timeout: 10_000 });
+
+  // Putting it down is what marks the last owner, because nothing takes the mic
+  // after them.
+  await micRows
+    .nth(1)
+    .getByRole("button", { name: "Put the mic down" })
+    .click();
+  await expect(narratives).toContainText("2 of 2 spoken for", {
+    timeout: 10_000,
+  });
+  await expect(narratives.getByText("speaking")).toHaveCount(0);
+  await expect(narratives).toContainText("Every objective has had its turn");
+
+  // ---------------------------------------------------------------------------
+  // Stage four: recognition and wins (METHOD.md section 8.1 stage 4, P4-T10c)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const recognition = page.getByRole("region", {
+    name: "Recognition and wins",
+  });
+  await expect(recognition).toHaveCount(1, { timeout: 10_000 });
+  await expect(recognition).toContainText("0 named");
+  await expect(recognition).toContainText("Nobody has been named yet");
+
+  // **A second human is inserted for this stage and removed again.** This
+  // workspace has one human member and two seeded agents, and recognition names
+  // somebody else, so without a second person the panel can only show its empty
+  // state. Inserted through the pool rather than through the product because
+  // this is setup, and removed at the end of the test because
+  // registration-to-dashboard.spec.ts counts members and has already been
+  // broken once by a member appearing that it did not expect.
+  const colleagueUserId = crypto.randomUUID();
+  const colleagueMemberId = crypto.randomUUID();
+  const setup = await pool.connect();
+  try {
+    await setup.query("begin");
+    await setup.query(`set local app.workspace_id = '${member.workspace_id}'`);
+    await setup.query(
+      `insert into users (id, name, email) values ($1, 'Priya Raman', $2)`,
+      [colleagueUserId, `priya-${colleagueUserId}@example.com`],
+    );
+    await setup.query(
+      `insert into workspace_members (id, workspace_id, user_id, name, kind, status)
+       values ($1, $2, $3, 'Priya Raman', 'human', 'active')`,
+      [colleagueMemberId, member.workspace_id, colleagueUserId],
+    );
+    await setup.query("commit");
+  } finally {
+    setup.release();
+  }
+
+  await page.reload();
+  const withColleague = page.getByRole("region", {
+    name: "Recognition and wins",
+  });
+  // The agents are members of every workspace and are deliberately not offered:
+  // recognition names a person's effort, not a scheduler's.
+  await expect(withColleague.getByRole("combobox")).toContainText(
+    "Priya Raman",
+  );
+  await expect(withColleague.getByRole("combobox")).not.toContainText(
+    "OKR Coach",
+  );
+
+  await withColleague.getByLabel("Who").selectOption({ label: "Priya Raman" });
+  await withColleague
+    .getByLabel("What they did")
+    .fill("Rewrote the onboarding emails twice in a week and said nothing.");
+  await withColleague.getByRole("button", { name: "Name it" }).click();
+  await expect(withColleague).toContainText("1 named", { timeout: 10_000 });
+  await expect(withColleague).toContainText(
+    "Rewrote the onboarding emails twice in a week and said nothing.",
+  );
+  await expect(withColleague).toContainText("named by");
+
+  const cleanup = await pool.connect();
+  try {
+    await cleanup.query("begin");
+    await cleanup.query(`set local app.workspace_id = '${member.workspace_id}'`);
+    await cleanup.query("delete from kudos where to_member_id = $1", [
+      colleagueMemberId,
+    ]);
+    await cleanup.query("delete from workspace_members where id = $1", [
+      colleagueMemberId,
+    ]);
+    await cleanup.query("delete from users where id = $1", [colleagueUserId]);
+    await cleanup.query("commit");
+  } finally {
+    cleanup.release();
+  }
+
   await second.close();
 });

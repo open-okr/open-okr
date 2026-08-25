@@ -19,7 +19,7 @@
  * listed as "no data yet" placeholders rather than faked. P4-T07a owns the
  * session record and the live sync; the subsequent tasks fill the panels.
  */
-import { callAction } from "@openokr/core";
+import { callAction, excerptRichText } from "@openokr/core";
 import {
   REVIEW_STAGE_KEYS,
   reviewStages,
@@ -46,7 +46,9 @@ import {
   type MonthlyTrend,
   type MonthlyUntrended,
 } from "./monthly-review";
+import { type Narratives, NarrativesPanel } from "./narratives";
 import { QuarterlyReview } from "./quarterly-review";
+import { type Recognition, RecognitionPanel } from "./recognition";
 import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
@@ -154,6 +156,56 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as ScoringStatus;
   }
+  // Stage three: the mic and the narratives (METHOD.md §8.1, P4-T10c).
+  //
+  // The stored body is turned into a plain-text excerpt here, on the server,
+  // through the one shared rich text module. The panel is a client component and
+  // handing it editor JSON would mean a second renderer in the browser for a
+  // stage that shows two lines.
+  let narratives: Narratives | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[2]) {
+    const read = (await callAction(context, "sessions.narratives", {
+      sessionId: id,
+    })) as {
+      micGoalId: string | null;
+      objectives: {
+        goalId: string;
+        goalTitle: string;
+        championName: string | null;
+        hasMic: boolean;
+        spokenAt: string | null;
+        body: unknown;
+        authorName: string | null;
+      }[];
+      spoken: number;
+      total: number;
+      complete: boolean;
+    };
+    narratives = {
+      ...read,
+      objectives: read.objectives.map((objective) => ({
+        goalId: objective.goalId,
+        goalTitle: objective.goalTitle,
+        championName: objective.championName,
+        hasMic: objective.hasMic,
+        spokenAt: objective.spokenAt,
+        excerpt:
+          objective.body === null
+            ? null
+            : excerptRichText(objective.body as never, 2000) || null,
+        authorName: objective.authorName,
+      })),
+    };
+  }
+
+  // Stage four: recognition (METHOD.md §8.1, P4-T10c).
+  let recognition: Recognition | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[3]) {
+    recognition = (await callAction(context, "sessions.recognition", {
+      sessionId: id,
+    })) as Recognition;
+  }
+
   if (isMonthly) {
     monthly = (await callAction(context, "sessions.monthlyRecord", {
       sessionId: id,
@@ -345,6 +397,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
         <QuarterlyReview
           sessionId={id}
           stages={reviewAgenda}
+          // Decided here because this is what renders the panels. A list of
+          // built stages kept inside the rail component would be a second place
+          // to forget when the next stage lands.
+          stageHasPanel={
+            roomPulse !== null ||
+            scoring !== null ||
+            narratives !== null ||
+            recognition !== null
+          }
           stageKeys={REVIEW_STAGE_KEYS}
           currentStageKey={sessionRow.stageKey}
           stageStartedAt={sessionRow.stageStartedAt}
@@ -374,6 +435,25 @@ export default async function SessionPage({ params }: SessionPageProps) {
           status={scoring}
           canScore={isRunning}
           canReveal={isRunning && isFacilitator}
+        />
+      ) : null}
+
+      {/* Stage three: objective narratives (METHOD.md §8.1, P4-T10c) */}
+      {narratives ? (
+        <NarrativesPanel
+          sessionId={id}
+          narratives={narratives}
+          canWrite={isRunning}
+          canPassMic={isRunning && isFacilitator}
+        />
+      ) : null}
+
+      {/* Stage four: recognition and wins (METHOD.md §8.1, P4-T10c) */}
+      {recognition ? (
+        <RecognitionPanel
+          sessionId={id}
+          recognition={recognition}
+          canGive={isRunning}
         />
       ) : null}
 

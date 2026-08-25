@@ -92,6 +92,15 @@ export const sessions = pgTable("okr_sessions", {
    * accident.
    */
   shifts: text("shifts"),
+  /**
+   * Which objective holds the mic in stage three (METHOD.md §8.1, P4-T10c).
+   *
+   * A pointer rather than a row per turn. Exactly one objective holds it at a
+   * time, and a single column is the only shape that cannot represent two
+   * holders. Null before the stage starts and null again once the last owner has
+   * spoken.
+   */
+  micGoalId: uuid("mic_goal_id"),
   state: text("state", { enum: SESSION_STATES }).notNull().default("scheduled"),
   /** FK to the digest row once P4-T08 adds the digests table. */
   digestId: uuid("digest_id"),

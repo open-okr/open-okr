@@ -348,7 +348,7 @@ Every table references `session_id` to sessions.
 | Table | Key columns |
 |---|---|
 | `review_scores` | `key_result_id`, `score numeric` (0 to 1), `reason`, `scored_by_id`, `revealed_at?` |
-| `review_narratives` | `goal_id`, `body` (rich), `author_member_id` |
+| `review_narratives` | `goal_id`, `body?` (rich), `body_version?`, `author_member_id?`, `spoken_at?` |
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
 | `retro_notes` | `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
@@ -362,6 +362,12 @@ Every table references `session_id` to sessions.
 | `review_diagnostics` | `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`delivered` / `strategy_or_quality` / `rhythm`), `narrative` |
 
 `review_scores` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: regrading corrects the row, because a room that changes its mind has one answer and not two. The score lands on `key_results.score` when the session closes, in the same transaction, and only for what was graded. METHOD.md §8.3 hides the objective score until the room reveals it, and a score on the key result is visible on the goal page immediately; a grade also has to be revisable while the room talks. `revealed_at` sits on the row rather than the objective, so the reveal is one update over an objective's rows and every client reads the same answer from it, the same shape as `check_in_votes.revealed_at`.
+
+`review_narratives` is unique on `(workspace_id, session_id, goal_id)` where not deleted: an objective's story is one story, and a second row would make stage three list it twice. `body` is nullable and usually null, because §8.1 gives the stage nine minutes of talking rather than writing: a row appears the moment the mic moves on from an objective, and `spoken_at` is what records that. Two check constraints hold the shape: a body always has its version, and an author only exists with a body, so the facilitator who marked a turn over cannot end up named as the author of a narrative they never wrote.
+
+`kudos` is unique on nothing at all. Two entries naming the same person are two things they did, and collapsing them would turn recognition into a count, which is the opposite of what §8.1 asks for. `from_member_id <> to_member_id` is a check constraint: recognising yourself is not recognition.
+
+**Who holds the mic is `okr_sessions.mic_goal_id`, not a row per turn.** Exactly one objective holds it, which is the property stage three exists to enforce, and a single pointer is the only shape that cannot represent two holders. Null before the round starts and null again once the last owner has spoken, which is also what marks that last owner: the pass is what stamps `spoken_at`, so putting the mic down is a real act rather than tidying up.
 
 `respondent_hash` allows one response per member per statement without identifying who gave it.
 

@@ -23,8 +23,10 @@ import {
   goals,
   keyResultDependencies,
   keyResults,
+  kudos,
   OBJECTIVE_TRENDS,
   objectiveTrends,
+  reviewNarratives,
   reviewScores,
   SESSION_KINDS,
   SESSION_STATES,
@@ -45,8 +47,9 @@ import {
   roomPulseRead,
   WEEKLY_STAGE_KEYS,
 } from "@openokr/method";
-import { and, avg, count, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, isNull, lt, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
@@ -54,6 +57,8 @@ import { localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -3450,6 +3455,646 @@ export const scoreKeyResult = defineWriteAction({
       };
     },
   }),
+});
+
+// ---------------------------------------------------------------------------
+// Stage three: objective narratives, and stage four: recognition (METHOD.md
+// §8.1, p4-t00-session-design.md §4.4 and §4.5, P4-T10c)
+// ---------------------------------------------------------------------------
+
+/** Editor JSON for the current rich text schema, or null. */
+const narrativeBody = z
+  .unknown()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    { message: "not valid editor JSON for the current rich text schema" },
+  );
+
+/**
+ * The review's own objectives: this space, this cycle, still open.
+ *
+ * The same predicate `sessions.scoringStatus` reads, and the reason the mic
+ * cannot be handed to a goal from another space: the stage is about the
+ * objectives the room is reviewing, and a goal outside that set is not one.
+ *
+ * **Returns the conditions, not a finished predicate.** Wrapping `activeOnly`
+ * in here is correct and unprovable: the soft-delete lint reads the call site,
+ * and a `from(goals)` whose scope arrives through a function call is
+ * indistinguishable from one that has no scope. That gate exists to catch
+ * exactly the fail-open shape, so every caller spells `activeOnly(goals, ...)`
+ * out loud and this only holds the three conditions that are easy to forget.
+ */
+function reviewObjectiveConditions(
+  workspaceId: string,
+  session: { spaceId: string | null; cycleId: string | null },
+) {
+  return [
+    eq(goals.workspaceId, workspaceId),
+    session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+    session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+    isNull(goals.closedAt),
+  ] as const;
+}
+
+export const passMic = defineWriteAction({
+  name: "sessions.passMic",
+  summary:
+    "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    /**
+     * Null puts the mic down and ends the round.
+     *
+     * Without it the last objective would never be marked spoken, because the
+     * thing that marks an objective is the mic moving on from it and nothing
+     * takes the mic after the last owner.
+     */
+    goalId: z.uuid().nullable(),
+  }),
+  output: z.object({
+    micGoalId: z.uuid().nullable(),
+    spokenGoalId: z.uuid().nullable(),
+    realtimeChannel: z.string(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // §4.4 gives the pass-the-mic control to the facilitator. The write-access
+      // floor here is `edit` for every active member (P3-T16), so `edit` alone
+      // would let any participant take the mic off whoever is speaking.
+      if (session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the session's facilitator can pass the mic.",
+        );
+      }
+
+      if (input.goalId) {
+        const [inScope] = await tx
+          .select({ id: goals.id })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(workspaceId, session),
+              eq(goals.id, input.goalId),
+            ),
+          )
+          .limit(1);
+        if (!inScope) {
+          throw new OperationError(
+            "not_found",
+            "That objective is not in this review.",
+          );
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: input.goalId,
+          requires: ACCESS_LEVELS.edit as never,
+        });
+      }
+
+      const now = new Date();
+      const leaving = session.micGoalId;
+
+      // The objective the mic leaves is spoken for. A row is created if there is
+      // none, carrying no body and no author: most narratives are told and never
+      // typed, and the facilitator marking the turn over did not write anything.
+      if (leaving && leaving !== input.goalId) {
+        const [existing] = await tx
+          .select({
+            id: reviewNarratives.id,
+            spokenAt: reviewNarratives.spokenAt,
+          })
+          .from(reviewNarratives)
+          .where(
+            activeOnly(
+              reviewNarratives,
+              eq(reviewNarratives.workspaceId, workspaceId),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              eq(reviewNarratives.goalId, leaving),
+            ),
+          )
+          .limit(1);
+
+        if (!existing) {
+          await tx.insert(reviewNarratives).values({
+            workspaceId,
+            sessionId: input.sessionId,
+            goalId: leaving,
+            spokenAt: now,
+          });
+        } else if (existing.spokenAt === null) {
+          // Only when it has not been marked. A room that comes back to an
+          // objective for a question is not the owner telling their story a
+          // second time, and re-stamping would move when they told it.
+          await tx
+            .update(reviewNarratives)
+            .set({ spokenAt: now, updatedAt: now })
+            .where(
+              activeOnly(
+                reviewNarratives,
+                eq(reviewNarratives.id, existing.id),
+              ),
+            );
+        }
+      }
+
+      await tx
+        .update(sessions)
+        .set({ micGoalId: input.goalId, updatedAt: now })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      const channel = sessionChannel(workspaceId, input.sessionId);
+      const spokenGoalId = leaving && leaving !== input.goalId ? leaving : null;
+
+      return {
+        result: {
+          micGoalId: input.goalId,
+          spokenGoalId,
+          realtimeChannel: channel,
+        },
+        /**
+         * The push, as an outbox row. **No relay drains the outbox yet**, the
+         * same position P4-T10a-a recorded for `session.stageChanged` and
+         * P4-T10b-b for the score reveal: one write, every client that re-reads
+         * agrees who is speaking, and the rail goes live the day a relay host
+         * exists.
+         *
+         * The key carries the destination and the clock, because passing the mic
+         * back to an objective it already visited is a real move rather than a
+         * retry of the first one.
+         */
+        outbox: [
+          {
+            topic: "session.micPassed",
+            payload: {
+              channel,
+              sessionId: input.sessionId,
+              workspaceId,
+              goalId: input.goalId,
+            },
+            idempotencyKey: `session.micPassed:${input.sessionId}:${input.goalId ?? "down"}:${now.toISOString()}`,
+          },
+        ],
+        activity: {
+          kind: "session.micPassed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.passMic",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, spokenGoalId },
+        },
+      };
+    },
+  }),
+});
+
+export const setNarrative = defineWriteAction({
+  name: "sessions.setNarrative",
+  summary:
+    "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    body: narrativeBody,
+  }),
+  output: z.object({ goalId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // Not the facilitator's alone. §8.1 stage 3 is owner by owner, and an
+      // objective's champion is often not the person running the review: a
+      // narrative only the facilitator could write would be the facilitator
+      // telling somebody else's story.
+      const [inScope] = await tx
+        .select({ id: goals.id })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            ...reviewObjectiveConditions(workspaceId, session),
+            eq(goals.id, input.goalId),
+          ),
+        )
+        .limit(1);
+      if (!inScope) {
+        throw new OperationError(
+          "not_found",
+          "That objective is not in this review.",
+        );
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const cleared = input.body === null;
+      const [existing] = await tx
+        .select({ id: reviewNarratives.id })
+        .from(reviewNarratives)
+        .where(
+          activeOnly(
+            reviewNarratives,
+            eq(reviewNarratives.workspaceId, workspaceId),
+            eq(reviewNarratives.sessionId, input.sessionId),
+            eq(reviewNarratives.goalId, input.goalId),
+          ),
+        )
+        .limit(1);
+
+      // The author goes with the body. Clearing the note drops both, because an
+      // author on an empty narrative names somebody for something that is no
+      // longer there, and the table's own check constraint refuses it.
+      const values = {
+        body: cleared ? null : input.body,
+        bodyVersion: cleared ? null : RICH_TEXT_SCHEMA_VERSION,
+        authorMemberId: cleared ? null : memberId,
+        updatedAt: now,
+      };
+
+      if (existing) {
+        // Rewrites rather than storing two: an objective's story is one story,
+        // and a second row would make the stage list it twice.
+        await tx
+          .update(reviewNarratives)
+          .set(values)
+          .where(
+            activeOnly(reviewNarratives, eq(reviewNarratives.id, existing.id)),
+          );
+      } else {
+        await tx.insert(reviewNarratives).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          goalId: input.goalId,
+          ...values,
+        });
+      }
+
+      return {
+        result: { goalId: input.goalId },
+        /**
+         * The payload carries no narrative text.
+         *
+         * An activity row reaches everybody who can see the space, and a
+         * narrative written inside a review is for the room in it. The feed can
+         * say the story was written without repeating it.
+         */
+        activity: {
+          kind: "session.narrativeWritten",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setNarrative",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, cleared },
+        },
+      };
+    },
+  }),
+});
+
+export const giveKudos = defineWriteAction({
+  name: "sessions.giveKudos",
+  summary:
+    "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+  input: z.object({
+    sessionId: z.uuid(),
+    toMemberId: z.uuid(),
+    // §8.1: "Specific beats generous." A required line is the only part of that
+    // a product can hold.
+    text: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (input.toMemberId === memberId) {
+        // Recognising yourself is not recognition. §8.1 asks the room to name
+        // the effort it saw, and the room is other people.
+        throw new OperationError(
+          "forbidden",
+          "Recognition names somebody else's effort.",
+        );
+      }
+
+      // Active only. A suspended member is excluded from every access-scoped
+      // read in this repository, so recognising one would name somebody the
+      // room cannot see.
+      const [recipient] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.toMemberId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!recipient) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const [row] = await tx
+        .insert(kudos)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          fromMemberId: memberId,
+          toMemberId: input.toMemberId,
+          text: input.text,
+        })
+        .returning({ id: kudos.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.kudosGiven",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The recipient, not the words. Recognition given in a review is for
+          // the room, and the feed says it happened without quoting it.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.giveKudos",
+          targetType: "kudos",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const readNarratives = defineReadAction({
+  name: "sessions.narratives",
+  summary:
+    "Stage three's state: who holds the mic, who has spoken, and what was written.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** The one objective speaking now, or null before and after the round. */
+    micGoalId: z.uuid().nullable(),
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        championName: z.string().nullable(),
+        hasMic: z.boolean(),
+        spokenAt: z.string().nullable(),
+        /** Editor JSON, and null for the ordinary case of spoken and not typed. */
+        body: z.unknown().nullable(),
+        authorName: z.string().nullable(),
+      }),
+    ),
+    spoken: z.number(),
+    total: z.number(),
+    /** Every objective spoken for. §8.1's completion condition for stage three. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const champions = alias(workspaceMembers, "champions");
+        const authors = alias(workspaceMembers, "authors");
+
+        const rows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            championName: champions.name,
+            spokenAt: reviewNarratives.spokenAt,
+            body: reviewNarratives.body,
+            authorName: authors.name,
+          })
+          .from(goals)
+          .leftJoin(champions, eq(champions.id, goals.championId))
+          .leftJoin(
+            reviewNarratives,
+            and(
+              eq(reviewNarratives.goalId, goals.id),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              isNull(reviewNarratives.deletedAt),
+            ),
+          )
+          .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(context.workspaceId, session),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt);
+
+        const objectives = rows.map((row) => ({
+          goalId: row.goalId,
+          goalTitle: row.goalTitle,
+          championName: row.championName ?? null,
+          hasMic: session.micGoalId === row.goalId,
+          spokenAt: row.spokenAt?.toISOString() ?? null,
+          body: row.body ?? null,
+          authorName: row.authorName ?? null,
+        }));
+        const spoken = objectives.filter(
+          (entry) => entry.spokenAt !== null,
+        ).length;
+
+        return {
+          micGoalId: session.micGoalId ?? null,
+          objectives,
+          spoken,
+          total: objectives.length,
+          complete: objectives.length > 0 && spoken === objectives.length,
+        };
+      },
+    );
+  },
+});
+
+export const readRecognition = defineReadAction({
+  name: "sessions.recognition",
+  summary: "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    entries: z.array(
+      z.object({
+        id: z.uuid(),
+        fromName: z.string(),
+        toName: z.string(),
+        text: z.string(),
+        /** Whether the reader gave this one. */
+        mine: z.boolean(),
+      }),
+    ),
+    /**
+     * Who the reader may name: every active member except themselves.
+     *
+     * Returned with the entries rather than left to the screen, because who can
+     * be recognised is the same decision `sessions.giveKudos` enforces and two
+     * places deciding it is one place to get it wrong. The reader is absent for
+     * the reason the action refuses them: recognising yourself is not
+     * recognition.
+     */
+    recipients: z.array(z.object({ memberId: z.uuid(), name: z.string() })),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const givers = alias(workspaceMembers, "givers");
+        const receivers = alias(workspaceMembers, "receivers");
+
+        const rows = await tx
+          .select({
+            id: kudos.id,
+            fromMemberId: kudos.fromMemberId,
+            fromName: givers.name,
+            toName: receivers.name,
+            text: kudos.text,
+          })
+          .from(kudos)
+          .innerJoin(givers, eq(givers.id, kudos.fromMemberId))
+          .innerJoin(receivers, eq(receivers.id, kudos.toMemberId))
+          .where(
+            activeOnly(
+              kudos,
+              eq(kudos.workspaceId, context.workspaceId),
+              eq(kudos.sessionId, input.sessionId),
+            ),
+          )
+          // Oldest first, so the panel reads as the round happened rather than
+          // reshuffling every time somebody adds one.
+          .orderBy(kudos.createdAt);
+
+        const recipients = await tx
+          .select({
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.status, "active"),
+              eq(workspaceMembers.kind, "human"),
+              ne(workspaceMembers.id, memberId),
+            ),
+          )
+          .orderBy(workspaceMembers.name);
+
+        return {
+          entries: rows.map((row) => ({
+            id: row.id,
+            fromName: row.fromName,
+            toName: row.toName,
+            text: row.text,
+            mine: row.fromMemberId === memberId,
+          })),
+          recipients,
+        };
+      },
+    );
+  },
 });
 
 export const revealObjectiveScore = defineWriteAction({

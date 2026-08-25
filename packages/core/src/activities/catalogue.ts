@@ -311,6 +311,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // No score in the payload: the feed reaches the whole space and the reveal
   // was to the room in the review (P4-T10b-b).
   "session.objectiveScoreRevealed": z.object({ sessionId: z.string() }),
+  // No goal title, no narrative text and no recognition words: all three reach
+  // the whole space and all three were written for the room (P4-T10c).
+  "session.micPassed": z.object({ sessionId: z.string() }),
+  "session.narrativeWritten": z.object({ sessionId: z.string() }),
+  "session.kudosGiven": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

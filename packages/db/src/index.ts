@@ -303,6 +303,7 @@ export {
   kpis,
   kpiTrees,
 } from "./schema/kpis.ts";
+export { type Kudo, kudos } from "./schema/kudos.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,
@@ -332,6 +333,10 @@ export {
   nudges,
 } from "./schema/nudges.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  type ReviewNarrative,
+  reviewNarratives,
+} from "./schema/review-narratives.ts";
 export { type ReviewScore, reviewScores } from "./schema/review-scores.ts";
 export {
   type PerformanceSnapshotRow,

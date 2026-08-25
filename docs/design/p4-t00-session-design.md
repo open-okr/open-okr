@@ -415,10 +415,85 @@ Given / When / Then:
 Pass-the-mic control. Each objective's owner tells the story behind the score.
 Facilitator marks each as spoken.
 
+| Element | Behaviour |
+|---|---|
+| The mic | Exactly one objective holds it. The facilitator hands it on and puts it down |
+| Spoken | Stamped by the pass, not by a second control |
+| Narrative | Optional. What the number does not show, one note per objective |
+| Completion | Every objective spoken for |
+
+**What P4-T10c settled.**
+
+*The mic is a column, not a row per turn.* `okr_sessions.mic_goal_id` is a
+single pointer, so two holders is not a state the data can be in. Every client
+agrees who is speaking because there is one write and they all read it, not
+because they coordinate. The panel draws whoever the read says holds it and
+keeps no holder of its own, because a second copy of that answer is a second
+answer.
+
+*The pass is what marks an objective spoken for.* Section 4.4 asks the
+facilitator to mark each as spoken, and the honest moment for that is the mic
+moving on: in a real room the facilitator says thank you and turns to the next
+owner. A separate tick would be a second thing to forget. Putting the mic down
+with a null is therefore a real act rather than tidying up, because nothing
+takes the mic after the last owner and without it that owner is never marked.
+
+*A mic that comes back does not un-speak an objective.* A room returns to an
+objective for a question. `spoken_at` is stamped once and never re-stamped, so
+the record says when the story was told rather than when it was last discussed.
+
+*The narrative is nullable and usually null.* Section 8.1 gives the stage nine
+minutes of talking, not writing. A row appears when the mic moves on, carrying
+no body and no author. Storing an empty document instead would put "somebody
+wrote nothing" in the same shape as "nobody wrote", and the minutes at P4-T12
+have to tell those apart. Clearing a note drops the body and the author
+together and leaves `spoken_at` where it is: deleting the note is not
+un-telling the story.
+
+*Writing is not the facilitator's alone.* Stage three is owner by owner, and an
+objective's champion is usually not the person running the review. A narrative
+only the facilitator could write would be the facilitator telling somebody
+else's story. Passing the mic is the facilitator's; the note is the room's.
+
+*The narrative is a textarea, not an editor.* Collected as plain text and
+stored as editor JSON through the one shared rich text module, the same path
+the check-in composer uses (P3-T07). A stage with nine minutes of talking in it
+does not need a toolbar.
+
+Given / When / Then:
+- Given a narratives stage, when the facilitator passes the mic, then every
+  participant sees who is speaking, and exactly one objective is speaking.
+- Given an objective that held the mic, when the mic moves on, then that
+  objective reads as spoken for whether or not anybody typed a note.
+
 ### 4.5 Stage 4: Recognition and wins (SS8.3)
 
 Specific recognition entries. "Name the effort that deserved to be seen.
 Specific beats generous" (SS8.1).
+
+**What P4-T10c settled.**
+
+*Nothing aggregates.* Two entries naming the same person are two things they
+did, and `kudos` is unique on nothing so the second cannot overwrite the first.
+A count per person would turn recognition into a leaderboard, which is the
+opposite of specific.
+
+*Anybody in the room may give it.* Section 8.1 asks the room to name what it
+saw, so recognition handed out by the facilitator alone would be a different
+ritual with the same name. The action refuses two things and no more:
+recognising yourself, and an empty line.
+
+*Who may be named comes from the read, not the screen.* `sessions.recognition`
+returns the recipients it would accept, which is every active human member
+except the reader. Two places deciding that is one place to get it wrong, and
+the seeded Coach and Champion are excluded because recognition names a person's
+effort rather than a scheduler's.
+
+Given / When / Then:
+- Given a recognition stage, when a participant names somebody's effort, then
+  the entry appears for the room with both names on it.
+- Given a participant, when they open the recipients, then they are not among
+  them.
 
 ### 4.6 Stage 5: Team retro (SS8.4)
 

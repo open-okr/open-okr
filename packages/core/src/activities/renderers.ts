@@ -269,6 +269,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.keyResultScored": () => "Graded a key result in the review",
   "session.objectiveScoreRevealed": () =>
     "Revealed this objective's score in the review",
+  "session.micPassed": () => "Passed the mic in the review",
+  "session.narrativeWritten": () => "Wrote this objective's review narrative",
+  "session.kudosGiven": () => "Named somebody's effort in the review",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */
