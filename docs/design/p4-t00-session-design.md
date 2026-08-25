@@ -499,15 +499,90 @@ Given / When / Then:
 
 | Element | Behaviour |
 |---|---|
-| Prompt chips | Configurable starting prompts |
+| Prompt chips | Deferred, see below |
 | Two columns | What worked, what did not |
-| Sticky notes | Silent writing phase, then display |
-| Dot voting | Each participant gets a fixed number of dots |
+| Sticky notes | Written into either column, optionally without a name |
+| Dot voting | SS11 `Retro dots per member`, canon default 3 |
+
+**What P4-T11a settled.**
+
+*The dot cap is a SS11 parameter, added at Agung's direction on 26 August 2026.*
+SS11 states it plainly: every numeric value the product enforces is a parameter
+in that registry, and a value not in the registry is not a setting. A cap that
+shapes how a room votes is enforced, so the alternative homes were closed. Three
+because the stage has seven minutes: it forces a room to choose, where more
+turns the vote into a full ranking, which is a different exercise. It lands in
+`rhythm_settings` like every other SS11 parameter, so it is already tunable from
+the rhythm card on S-36 with no new surface.
+
+*Two caps, holding different things.* One dot per member per note, held by a
+unique index. `Retro dots per member` in total across notes, held by the action
+because it counts across rows no index can see. Spending two dots on one note is
+how three dots become one loud opinion, and SS8.1's vote is about spread; a
+second cast therefore withdraws the first rather than erroring, because a
+facilitator's room should not meet a refusal for pressing a toggle twice.
+
+*Removing a note removes the dots spent on it.* A dot spent on something that no
+longer exists is a dot its owner cannot get back, which silently shrinks the cap
+for the rest of the stage.
+
+*Anonymity is per note, not per session.* SS8.1 asks for silent writing, and one
+thing in a retro is usually harder to say than the rest. The board shows
+"anonymous" rather than an empty author line, so a reader can tell a choice from
+an absence. An anonymous note has no author to take it back, which is why the
+facilitator can remove any note and the room can only remove its own.
+
+*`retro_notes.votes` is denormalised and held honest by a test.* TECHNICAL-PLAN
+SS4 specifies the column and the board sorts on it, so it stays, recounted from
+the rows and rewritten inside the same transaction as every vote. A cached total
+is usually the wrong idea, so the test asserts it equals the count behind it
+rather than assuming the maintenance held.
+
+*Prompt chips are deferred, not half-built.* The line above said "configurable
+starting prompts" and no document carries the prompt text: METHOD.md has none,
+and TECHNICAL-PLAN SS4.14 has no home for a list like it. Writing the prompts
+here would be inventing practice, which is a human decision. Agung chose on
+26 August 2026 to ship the two canon columns without chips and record the gap
+rather than fill it with invented text. Reopening it means either adding the
+prompts to METHOD.md as canon or giving them a home in the SS4.14 map.
+
+Given / When / Then:
+- Given a team retro with three notes, when members vote, then the top-voted
+  note is identifiable and each member's votes are capped.
+- Given a member who has spent every dot, when they cast another, then it is
+  refused, and taking one back frees it.
 
 ### 4.7 Stage 6: Management retro (SS8.7)
 
 The four questions from METHOD.md SS8.7 (specified in p4-t00-method-package.md
 SS8). Leadership answers out loud. Facilitator records.
+
+**What P4-T11a settled.**
+
+*Leadership is a space's managers and its coordinator*, decided by Agung on
+26 August 2026. SS8.7 says leadership answers out loud, plural, and those are the
+leadership roles this product has (P3-T01). Facilitator-only would be narrower
+than the canon describes; everybody would make the test-plan line "the two
+retros are visible to different audiences" unmeetable. A review with no space has
+no space roles to read, so it falls back to workspace administration, which is
+the only principal left who can be said to lead it.
+
+*The refusal is not-found, not forbidden.* Telling somebody a management retro
+exists and is closed to them is itself a disclosure about the room. The page
+catches the refusal and renders one line saying the stage is leadership's, which
+discloses nothing the stage rail does not already show everybody.
+
+*The questions are never stored.* SS11 lists the management-retro questions as
+unchangeable structure, so a row carries the question number and the answer. The
+read is driven by the canon list rather than by the rows, so all four are always
+asked and an unanswered one is a visible gap rather than a question that quietly
+disappeared.
+
+Given / When / Then:
+- Given an ordinary member of the room, when they open stage six, then they read
+  that the stage is leadership's and no answer.
+- Given a space manager, when they answer a question, then the answer is
+  recorded against that question with their name on it.
 
 ### 4.8 Stage 7: Root cause and diagnostic (SS8.4, SS8.6)
 

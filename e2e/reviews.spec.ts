@@ -721,6 +721,94 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   );
   await expect(withColleague).toContainText("named by");
 
+  // ---------------------------------------------------------------------------
+  // Stage five: the team retro (METHOD.md section 8.1 stage 5, P4-T11a)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const teamRetro = page.getByRole("region", { name: "Team retro" });
+  await expect(teamRetro).toHaveCount(1, { timeout: 10_000 });
+  // The dot cap comes from the section 11 registry, and the panel reports what
+  // the action will enforce rather than counting its own.
+  await expect(teamRetro).toContainText("3 of 3 dots left");
+  await expect(teamRetro).toContainText("What worked");
+  await expect(teamRetro).toContainText("What did not");
+
+  // Scoped to the column, because both columns carry a note field and a
+  // "without my name" checkbox: unscoped, those are two identical targets and
+  // the checkbox failed on exactly that.
+  const worked = teamRetro.getByRole("group", { name: "What worked" });
+  const didnt = teamRetro.getByRole("group", { name: "What did not" });
+
+  await worked
+    .getByRole("textbox")
+    .fill("The weekly check-in actually happened, every week.");
+  await worked.getByRole("button", { name: "Add it" }).click();
+  await expect(
+    teamRetro.getByText("The weekly check-in actually happened, every week."),
+  ).toBeVisible({ timeout: 10_000 });
+
+  // Anonymity is per note, and the board says "anonymous" rather than leaving
+  // the author line blank, so a reader can tell the choice from an absence.
+  await didnt
+    .getByRole("textbox")
+    .fill("The dependency surfaced in week nine.");
+  await didnt.getByLabel("Without my name").check();
+  await didnt.getByRole("button", { name: "Add it" }).click();
+  await expect(teamRetro.getByText("anonymous")).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await teamRetro.getByRole("button", { name: "Spend a dot" }).first().click();
+  await expect(teamRetro).toContainText("2 of 3 dots left", {
+    timeout: 10_000,
+  });
+  await expect(teamRetro.getByText("1 dot", { exact: true })).toBeVisible();
+
+  // A second cast takes it back rather than stacking. Spending two dots on one
+  // note is how three dots become one loud opinion, and the vote is about
+  // spread.
+  await teamRetro
+    .getByRole("button", { name: "Take my dot back" })
+    .first()
+    .click();
+  await expect(teamRetro).toContainText("3 of 3 dots left", {
+    timeout: 10_000,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Stage six: the management retro (METHOD.md section 8.7, P4-T11a)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const managementRetro = page.getByRole("region", {
+    name: "Management retro",
+  });
+  await expect(managementRetro).toHaveCount(1, { timeout: 10_000 });
+  // **This client reads it because it is the space's coordinator**, which the
+  // founding member is. Being the facilitator is not what grants it; the role
+  // is, and packages/core proves that against a member who has neither.
+  await expect(managementRetro).toContainText("0 of 4 answered");
+  await expect(managementRetro).toContainText("right priorities");
+
+  await managementRetro
+    .getByRole("button", { name: "Answer it" })
+    .first()
+    .click();
+  await managementRetro
+    .getByRole("textbox")
+    .first()
+    .fill("Mostly. Two of the five were the previous quarter's leftovers.");
+  await managementRetro.getByRole("button", { name: "Save the answer" }).click();
+  await expect(managementRetro).toContainText("1 of 4 answered", {
+    timeout: 10_000,
+  });
+  await expect(
+    managementRetro.getByText(
+      "Mostly. Two of the five were the previous quarter's leftovers.",
+    ),
+  ).toBeVisible();
+
   const cleanup = await pool.connect();
   try {
     await cleanup.query("begin");

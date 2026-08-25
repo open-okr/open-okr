@@ -794,6 +794,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Annual revalidation length | 30 to 60 minutes |
 | Weekly commitment bounds | 2 to 3 per week |
 | Quarterly stage minutes | The §8.1 durations |
+| Retro dots per member | 3 |
 | Room pulse read boundaries | 4.0 and 3.0 |
 | Diagnostic cycle-score threshold | 0.7 |
 | Diagnostic rhythm-score threshold | 3.5 |

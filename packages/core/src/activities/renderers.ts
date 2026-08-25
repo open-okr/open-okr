@@ -272,6 +272,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.micPassed": () => "Passed the mic in the review",
   "session.narrativeWritten": () => "Wrote this objective's review narrative",
   "session.kudosGiven": () => "Named somebody's effort in the review",
+  "session.retroNoteAdded": () => "Added a note to the review retro",
+  "session.retroNoteRemoved": () => "Removed a note from the review retro",
+  "session.retroVoteCast": () => "Voted in the review retro",
+  "session.managementAnswerRecorded": () =>
+    "Recorded a management retro answer",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

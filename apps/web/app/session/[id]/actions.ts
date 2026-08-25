@@ -273,6 +273,97 @@ export async function scoreKeyResultAction(
 }
 
 /**
+ * One note into the team retro (METHOD.md §8.1 stage 5, P4-T11a).
+ *
+ * Anonymity is per note. §8.1 asks for silent writing, and one thing in a retro
+ * is usually harder to say than the rest.
+ */
+export async function addRetroNoteAction(
+  sessionId: string,
+  columnKey: "worked" | "didnt",
+  text: string,
+  anonymous: boolean,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.addRetroNote",
+    { sessionId, columnKey, text, anonymous },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * Removing a note, and the dots spent on it (METHOD.md §8.1 stage 5, P4-T11a).
+ *
+ * The author or the facilitator. An anonymous note has no author to take it
+ * back, so somebody has to be able to clear a mistake in a running room.
+ */
+export async function removeRetroNoteAction(sessionId: string, noteId: string) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.removeRetroNote",
+    { sessionId, noteId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * One dot, spent or taken back (METHOD.md §8.1 stage 5, P4-T11a).
+ *
+ * A toggle rather than an increment: a second cast on the same note withdraws
+ * the first, because spending two dots on one note is how three dots become one
+ * loud opinion.
+ */
+export async function castRetroVoteAction(sessionId: string, noteId: string) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.castRetroVote",
+    { sessionId, noteId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * Leadership's answer to one of §8.7's four questions (P4-T11a).
+ *
+ * `sessions.setManagementAnswer` refuses anybody who is not a manager or the
+ * coordinator of the review's space, so this is not the thing keeping the two
+ * retros apart.
+ */
+export async function setManagementAnswerAction(
+  sessionId: string,
+  questionKey: number,
+  body: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.setManagementAnswer",
+    { sessionId, questionKey, body },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
  * The mic, handed on or put down (METHOD.md §8.1 stage 3, P4-T10c).
  *
  * The facilitator's control, and `sessions.passMic` is what refuses anybody

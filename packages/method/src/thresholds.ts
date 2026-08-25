@@ -556,6 +556,14 @@ export const THRESHOLDS = {
     default: { low: 2, high: 3 },
     schema: bounds(0, 20),
   }),
+  "sessions.retroDotsPerMember": param({
+    group: "sessions",
+    label: "Retro dots per member",
+    section: "§8.1",
+    why: "Three dots in a seven-minute stage forces a room to choose. More turns the vote into a full ranking, which is a different exercise and does not fit the time §8.1 gives it.",
+    default: 3,
+    schema: z.number().int().min(1).max(10),
+  }),
   "sessions.roomPulseBands": param({
     group: "sessions",
     label: "Room pulse read boundaries",

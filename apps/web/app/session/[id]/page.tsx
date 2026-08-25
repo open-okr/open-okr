@@ -38,6 +38,7 @@ import {
   skipSessionAction,
 } from "./actions";
 import { ConfidenceRound } from "./confidence-round";
+import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
   type DecisionSubject,
   type MonthlyDecision,
@@ -52,6 +53,7 @@ import { type Recognition, RecognitionPanel } from "./recognition";
 import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
+import { type TeamRetro, TeamRetroPanel } from "./team-retro";
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;
@@ -204,6 +206,34 @@ export default async function SessionPage({ params }: SessionPageProps) {
     recognition = (await callAction(context, "sessions.recognition", {
       sessionId: id,
     })) as Recognition;
+  }
+
+  // Stage five: the team retro (METHOD.md §8.1, P4-T11a).
+  let teamRetro: TeamRetro | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[4]) {
+    teamRetro = (await callAction(context, "sessions.retro", {
+      sessionId: id,
+    })) as TeamRetro;
+  }
+
+  // Stage six: the management retro (METHOD.md §8.7, P4-T11a).
+  //
+  // **The refusal is caught rather than allowed to become an error page.**
+  // `sessions.managementRetro` answers not-found to anybody who is not a manager
+  // or the coordinator of this space, which is the audience rule working. An
+  // ordinary member is not looking at a broken screen, so the page renders a
+  // short line in its place instead: the stage is already named on the rail, and
+  // saying whose it is discloses nothing that rail does not.
+  let managementRetro: ManagementRetro | null = null;
+  let managementWithheld = false;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[5]) {
+    try {
+      managementRetro = (await callAction(context, "sessions.managementRetro", {
+        sessionId: id,
+      })) as ManagementRetro;
+    } catch {
+      managementWithheld = true;
+    }
   }
 
   if (isMonthly) {
@@ -404,7 +434,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
             roomPulse !== null ||
             scoring !== null ||
             narratives !== null ||
-            recognition !== null
+            recognition !== null ||
+            teamRetro !== null ||
+            managementRetro !== null ||
+            managementWithheld
           }
           stageKeys={REVIEW_STAGE_KEYS}
           currentStageKey={sessionRow.stageKey}
@@ -455,6 +488,35 @@ export default async function SessionPage({ params }: SessionPageProps) {
           recognition={recognition}
           canGive={isRunning}
         />
+      ) : null}
+
+      {/* Stage five: the team retro (METHOD.md §8.1, P4-T11a) */}
+      {teamRetro ? (
+        <TeamRetroPanel
+          sessionId={id}
+          retro={teamRetro}
+          canWrite={isRunning}
+          canVote={isRunning}
+        />
+      ) : null}
+
+      {/* Stage six: the management retro (METHOD.md §8.7, P4-T11a) */}
+      {managementRetro ? (
+        <ManagementRetroPanel
+          sessionId={id}
+          retro={managementRetro}
+          canAnswer={isRunning}
+        />
+      ) : null}
+      {managementWithheld ? (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-3">
+              This stage is the four questions leadership answers. It is read by
+              this space's managers and its coordinator.
+            </p>
+          </CardBody>
+        </Card>
       ) : null}
 
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}

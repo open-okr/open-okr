@@ -24,8 +24,12 @@ import {
   keyResultDependencies,
   keyResults,
   kudos,
+  managementAnswers,
   OBJECTIVE_TRENDS,
   objectiveTrends,
+  RETRO_COLUMNS,
+  retroNotes,
+  retroVotes,
   reviewNarratives,
   reviewScores,
   SESSION_KINDS,
@@ -40,6 +44,7 @@ import {
 } from "@openokr/db";
 import {
   cycleScore,
+  MANAGEMENT_RETRO_QUESTIONS,
   objectiveScore,
   portfolioVerdictOf,
   progressSignal,
@@ -4097,6 +4102,700 @@ export const readRecognition = defineReadAction({
   },
 });
 
+// ---------------------------------------------------------------------------
+// Stage five: the team retro, and stage six: the management retro (METHOD.md
+// §8.1, §8.7, p4-t00-session-design.md §4.6 and §4.7, P4-T11a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The session, refused unless the caller leads the space it belongs to.
+ *
+ * §8.7 has leadership answering the four questions out loud, and the leadership
+ * roles this product has are a space's managers and its coordinator (P3-T01).
+ * Agung decided on 26 August 2026 that those two roles are the management
+ * retro's audience. The write-access floor here is \`edit\` for every active
+ * member (P3-T16), so \`edit\` alone would show it to the whole room, which is the
+ * one thing keeping the two retros apart.
+ *
+ * A review with no space has no space roles to read, so it falls back to
+ * workspace administration. That is the only principal left who can be said to
+ * lead it.
+ */
+async function requireSpaceLeadership(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+) {
+  const session = await requireQuarterly(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    ACCESS_LEVELS.edit,
+  );
+
+  if (!session.spaceId) {
+    await getAccessScoped(tx, {
+      workspaceId,
+      memberId,
+      resourceType: "workspace",
+      resourceId: workspaceId,
+      requires: ACCESS_LEVELS.full as never,
+    });
+    return session;
+  }
+
+  const [seat] = await tx
+    .select({ role: spaceMembers.role })
+    .from(spaceMembers)
+    .where(
+      activeOnly(
+        spaceMembers,
+        eq(spaceMembers.workspaceId, workspaceId),
+        eq(spaceMembers.spaceId, session.spaceId),
+        eq(spaceMembers.memberId, memberId),
+      ),
+    )
+    .limit(1);
+
+  if (!seat || (seat.role !== "manager" && seat.role !== "coordinator")) {
+    // Not-found rather than forbidden, which is this repository's rule for a
+    // protected read: telling somebody a management retro exists and is closed
+    // to them is itself a disclosure about the room.
+    throw new OperationError("not_found", "No such session.");
+  }
+  return session;
+}
+
+/** The member's dots left in one review, from the §11 parameter. */
+async function dotsLeftFor(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  memberId: string,
+) {
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  const perMember = thresholds["sessions.retroDotsPerMember"];
+  const [spent] = await tx
+    .select({ count: count() })
+    .from(retroVotes)
+    .innerJoin(retroNotes, eq(retroNotes.id, retroVotes.noteId))
+    .where(
+      activeOnly(
+        retroVotes,
+        eq(retroVotes.workspaceId, workspaceId),
+        eq(retroVotes.memberId, memberId),
+        eq(retroNotes.sessionId, sessionId),
+        isNull(retroNotes.deletedAt),
+      ),
+    );
+  const used = Number(spent?.count ?? 0);
+  return { perMember, spent: used, left: Math.max(0, perMember - used) };
+}
+
+export const addRetroNote = defineWriteAction({
+  name: "sessions.addRetroNote",
+  summary:
+    "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    // §8.1's two columns are canon structure. A third would be a different
+    // retro, so the enum refuses it at the boundary rather than storing it.
+    columnKey: z.enum(RETRO_COLUMNS),
+    text: z.string().trim().min(1).max(500),
+    /**
+     * Per note, not per session.
+     *
+     * §8.1 asks for silent writing, and a name changes what people write. One
+     * thing in a retro is usually harder to say than the rest, so the choice
+     * belongs to the note rather than to the member.
+     */
+    anonymous: z.boolean().default(false),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [row] = await tx
+        .insert(retroNotes)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          columnKey: input.columnKey,
+          text: input.text,
+          authorMemberId: input.anonymous ? null : memberId,
+        })
+        .returning({ id: retroNotes.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.retroNoteAdded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // Neither the text nor the column. A retro note is written for the
+          // room in the retro, and an anonymous one carries an actor on the
+          // activity row already; repeating its words in a space-wide feed
+          // would undo the anonymity the writer chose.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.addRetroNote",
+          targetType: "retro_note",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const removeRetroNote = defineWriteAction({
+  name: "sessions.removeRetroNote",
+  summary: "Removes one retro note, with the dots spent on it.",
+  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [note] = await tx
+        .select({
+          id: retroNotes.id,
+          authorMemberId: retroNotes.authorMemberId,
+        })
+        .from(retroNotes)
+        .where(
+          activeOnly(
+            retroNotes,
+            eq(retroNotes.workspaceId, workspaceId),
+            eq(retroNotes.sessionId, input.sessionId),
+            eq(retroNotes.id, input.noteId),
+          ),
+        )
+        .limit(1);
+      if (!note) {
+        throw new OperationError("not_found", "No such note.");
+      }
+
+      // The author takes their own note back. The facilitator can clear any of
+      // them, because an anonymous note has no author to take it back and
+      // somebody has to be able to fix a mistake in a running room.
+      const isAuthor =
+        note.authorMemberId !== null && note.authorMemberId === memberId;
+      if (!isAuthor && session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the note's author or the facilitator can remove it.",
+        );
+      }
+
+      const now = new Date();
+      // The dots go with it. A dot spent on something that no longer exists is
+      // a dot its owner cannot get back, which silently shrinks the cap for the
+      // rest of the stage.
+      await tx
+        .update(retroVotes)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+          ),
+        );
+      await tx
+        .update(retroNotes)
+        .set({ deletedAt: now, updatedAt: now, votes: 0 })
+        .where(activeOnly(retroNotes, eq(retroNotes.id, input.noteId)));
+
+      return {
+        result: { id: input.noteId },
+        activity: {
+          kind: "session.retroNoteRemoved",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.removeRetroNote",
+          targetType: "retro_note",
+          targetId: input.noteId,
+        },
+      };
+    },
+  }),
+});
+
+export const castRetroVote = defineWriteAction({
+  name: "sessions.castRetroVote",
+  summary:
+    "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  output: z.object({
+    noteId: z.uuid(),
+    votes: z.number().int(),
+    mine: z.boolean(),
+    dotsLeft: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [note] = await tx
+        .select({ id: retroNotes.id })
+        .from(retroNotes)
+        .where(
+          activeOnly(
+            retroNotes,
+            eq(retroNotes.workspaceId, workspaceId),
+            eq(retroNotes.sessionId, input.sessionId),
+            eq(retroNotes.id, input.noteId),
+          ),
+        )
+        .limit(1);
+      if (!note) {
+        throw new OperationError("not_found", "No such note.");
+      }
+
+      const [existing] = await tx
+        .select({ id: retroVotes.id })
+        .from(retroVotes)
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+            eq(retroVotes.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      const now = new Date();
+      if (existing) {
+        // A second cast withdraws rather than stacking. Spending two dots on one
+        // note is how three dots become one loud opinion, and the vote is about
+        // spread. The unique index refuses a second row anyway; this makes the
+        // control a toggle instead of an error.
+        await tx
+          .update(retroVotes)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(activeOnly(retroVotes, eq(retroVotes.id, existing.id)));
+      } else {
+        const { left } = await dotsLeftFor(
+          tx,
+          workspaceId,
+          input.sessionId,
+          memberId,
+        );
+        if (left <= 0) {
+          // The total cap counts across notes, which no unique index can see,
+          // so the action is the only place it can be held.
+          throw new OperationError(
+            "forbidden",
+            "You have spent every dot. Take one back before spending it again.",
+          );
+        }
+        await tx.insert(retroVotes).values({
+          workspaceId,
+          noteId: input.noteId,
+          memberId,
+        });
+      }
+
+      // Recounted from the rows and written in the same transaction, so the
+      // denormalised column cannot drift from what is behind it.
+      const [tally] = await tx
+        .select({ count: count() })
+        .from(retroVotes)
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+          ),
+        );
+      const votes = Number(tally?.count ?? 0);
+      await tx
+        .update(retroNotes)
+        .set({ votes, updatedAt: now })
+        .where(activeOnly(retroNotes, eq(retroNotes.id, input.noteId)));
+
+      const after = await dotsLeftFor(
+        tx,
+        workspaceId,
+        input.sessionId,
+        memberId,
+      );
+
+      return {
+        result: {
+          noteId: input.noteId,
+          votes,
+          mine: !existing,
+          dotsLeft: after.left,
+        },
+        activity: {
+          kind: "session.retroVoteCast",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.castRetroVote",
+          targetType: "retro_note",
+          targetId: input.noteId,
+          payload: { withdrawn: Boolean(existing) },
+        },
+      };
+    },
+  }),
+});
+
+export const readRetro = defineReadAction({
+  name: "sessions.retro",
+  summary:
+    "The team retro board: both columns, their notes and the reader's dots.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    columns: z.array(
+      z.object({
+        columnKey: z.enum(RETRO_COLUMNS),
+        notes: z.array(
+          z.object({
+            id: z.uuid(),
+            text: z.string(),
+            votes: z.number().int(),
+            /** Whether the reader spent a dot on it. */
+            mine: z.boolean(),
+            /** Null for an anonymous note, and null is the answer rather than a hidden name. */
+            authorName: z.string().nullable(),
+          }),
+        ),
+      }),
+    ),
+    dotsPerMember: z.number().int(),
+    dotsSpent: z.number().int(),
+    dotsLeft: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const authors = alias(workspaceMembers, "retro_authors");
+        const rows = await tx
+          .select({
+            id: retroNotes.id,
+            columnKey: retroNotes.columnKey,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+            authorName: authors.name,
+            createdAt: retroNotes.createdAt,
+          })
+          .from(retroNotes)
+          .leftJoin(authors, eq(authors.id, retroNotes.authorMemberId))
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, context.workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          // Most-voted first, then oldest, so the board settles as the room
+          // votes rather than reshuffling on every tie.
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        const mine = new Set(
+          (
+            await tx
+              .select({ noteId: retroVotes.noteId })
+              .from(retroVotes)
+              .innerJoin(retroNotes, eq(retroNotes.id, retroVotes.noteId))
+              .where(
+                activeOnly(
+                  retroVotes,
+                  eq(retroVotes.workspaceId, context.workspaceId),
+                  eq(retroVotes.memberId, memberId),
+                  eq(retroNotes.sessionId, input.sessionId),
+                  isNull(retroNotes.deletedAt),
+                ),
+              )
+          ).map((row) => row.noteId),
+        );
+
+        const dots = await dotsLeftFor(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+          memberId,
+        );
+
+        return {
+          // Both columns always, in §8.1's order, so an empty side reads as
+          // empty rather than as missing.
+          columns: RETRO_COLUMNS.map((columnKey) => ({
+            columnKey,
+            notes: rows
+              .filter((row) => row.columnKey === columnKey)
+              .map((row) => ({
+                id: row.id,
+                text: row.text,
+                votes: row.votes,
+                mine: mine.has(row.id),
+                authorName: row.authorName ?? null,
+              })),
+          })),
+          dotsPerMember: dots.perMember,
+          dotsSpent: dots.spent,
+          dotsLeft: dots.left,
+        };
+      },
+    );
+  },
+});
+
+export const setManagementAnswer = defineWriteAction({
+  name: "sessions.setManagementAnswer",
+  summary:
+    "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+  input: z.object({
+    sessionId: z.uuid(),
+    // 1 to 4, indexing the canon questions. The text lives in
+    // `packages/method` and never in a row: §11 lists the management-retro
+    // questions as unchangeable structure.
+    questionKey: z.number().int().min(1).max(4),
+    body: z.string().trim().min(1).max(2000),
+  }),
+  output: z.object({ questionKey: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSpaceLeadership(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+      );
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: managementAnswers.id })
+        .from(managementAnswers)
+        .where(
+          activeOnly(
+            managementAnswers,
+            eq(managementAnswers.workspaceId, workspaceId),
+            eq(managementAnswers.sessionId, input.sessionId),
+            eq(managementAnswers.questionKey, input.questionKey),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Rewrites rather than storing two. Leadership answers out loud and the
+        // record is one answer; a second row would list the question twice.
+        await tx
+          .update(managementAnswers)
+          .set({ body: input.body, answeredById: memberId, updatedAt: now })
+          .where(
+            activeOnly(
+              managementAnswers,
+              eq(managementAnswers.id, existing.id),
+            ),
+          );
+      } else {
+        await tx.insert(managementAnswers).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          questionKey: input.questionKey,
+          body: input.body,
+          answeredById: memberId,
+        });
+      }
+
+      return {
+        result: { questionKey: input.questionKey },
+        activity: {
+          kind: "session.managementAnswerRecorded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The question number, never the answer. The feed reaches the whole
+          // space and this stage is read by two roles inside it.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setManagementAnswer",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { questionKey: input.questionKey },
+        },
+      };
+    },
+  }),
+});
+
+export const readManagementRetro = defineReadAction({
+  name: "sessions.managementRetro",
+  summary:
+    "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    questions: z.array(
+      z.object({
+        questionKey: z.number().int(),
+        /** The canon text, from `packages/method`. Never stored on the row. */
+        question: z.string(),
+        body: z.string().nullable(),
+        answeredByName: z.string().nullable(),
+      }),
+    ),
+    answered: z.number().int(),
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        // The audience rule, in the action rather than on the screen. A member
+        // outside leadership reads not-found.
+        await requireSpaceLeadership(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+        );
+
+        const answerers = alias(workspaceMembers, "answerers");
+        const rows = await tx
+          .select({
+            questionKey: managementAnswers.questionKey,
+            body: managementAnswers.body,
+            answeredByName: answerers.name,
+          })
+          .from(managementAnswers)
+          .innerJoin(
+            answerers,
+            eq(answerers.id, managementAnswers.answeredById),
+          )
+          .where(
+            activeOnly(
+              managementAnswers,
+              eq(managementAnswers.workspaceId, context.workspaceId),
+              eq(managementAnswers.sessionId, input.sessionId),
+            ),
+          );
+        const byKey = new Map(rows.map((row) => [row.questionKey, row]));
+
+        // Driven by the canon list, not by the rows: all four questions are
+        // always asked, and an unanswered one is a gap the stage can see rather
+        // than a question that quietly disappeared.
+        const questions = MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
+          const answer = byKey.get(index + 1);
+          return {
+            questionKey: index + 1,
+            question,
+            body: answer?.body ?? null,
+            answeredByName: answer?.answeredByName ?? null,
+          };
+        });
+        const answered = questions.filter(
+          (entry) => entry.body !== null,
+        ).length;
+
+        return {
+          questions,
+          answered,
+          complete: answered === questions.length,
+        };
+      },
+    );
+  },
+});
 export const revealObjectiveScore = defineWriteAction({
   name: "sessions.revealObjectiveScore",
   summary:

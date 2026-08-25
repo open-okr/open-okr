@@ -350,9 +350,9 @@ Every table references `session_id` to sessions.
 | `review_scores` | `key_result_id`, `score numeric` (0 to 1), `reason`, `scored_by_id`, `revealed_at?` |
 | `review_narratives` | `goal_id`, `body?` (rich), `body_version?`, `author_member_id?`, `spoken_at?` |
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
-| `retro_notes` | `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
+| `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
-| `management_answers` | `question_key smallint` (1 to 4), `body` |
+| `management_answers` | `question_key smallint` (1 to 4), `body`, `answered_by_id` |
 | `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
 | `review_decisions` | `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why` |
@@ -368,6 +368,12 @@ Every table references `session_id` to sessions.
 `kudos` is unique on nothing at all. Two entries naming the same person are two things they did, and collapsing them would turn recognition into a count, which is the opposite of what §8.1 asks for. `from_member_id <> to_member_id` is a check constraint: recognising yourself is not recognition.
 
 **Who holds the mic is `okr_sessions.mic_goal_id`, not a row per turn.** Exactly one objective holds it, which is the property stage three exists to enforce, and a single pointer is the only shape that cannot represent two holders. Null before the round starts and null again once the last owner has spoken, which is also what marks that last owner: the pass is what stamps `spoken_at`, so putting the mic down is a real act rather than tidying up.
+
+**The dot vote has two caps and they hold different things.** `retro_votes` is unique on `(workspace_id, note_id, member_id)` where not deleted, so one member spends at most one dot on any note: spending two is how three dots become one loud opinion, and §8.1's vote is about spread. The total per member across notes is the §11 `Retro dots per member` parameter, held in the action because it counts across rows no index can see. Removing a note soft-deletes the dots spent on it, or their owners could not get them back and the cap would silently shrink for the rest of the stage.
+
+`retro_notes.votes` is denormalised from `retro_votes`, recounted from the rows and rewritten inside the same transaction as every vote. TECHNICAL-PLAN §4 specifies the column and the board sorts on it; a test asserts it equals the count behind it rather than trusting that it was maintained. `column_key` rather than `column`, because `column` is a reserved word in SQL.
+
+`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read.
 
 `respondent_hash` allows one response per member per statement without identifying who gave it.
 

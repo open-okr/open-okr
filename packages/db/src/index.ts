@@ -334,6 +334,16 @@ export {
 } from "./schema/nudges.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
+  type ManagementAnswer,
+  managementAnswers,
+  RETRO_COLUMNS,
+  type RetroColumn,
+  type RetroNote,
+  type RetroVote,
+  retroNotes,
+  retroVotes,
+} from "./schema/retros.ts";
+export {
   type ReviewNarrative,
   reviewNarratives,
 } from "./schema/review-narratives.ts";

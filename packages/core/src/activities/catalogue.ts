@@ -316,6 +316,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "session.micPassed": z.object({ sessionId: z.string() }),
   "session.narrativeWritten": z.object({ sessionId: z.string() }),
   "session.kudosGiven": z.object({ sessionId: z.string() }),
+  // No note text, no column and no answer: the feed reaches the whole space, an
+  // anonymous retro note would lose its anonymity to it, and the management
+  // retro is read by two roles inside that space (P4-T11a).
+  "session.retroNoteAdded": z.object({ sessionId: z.string() }),
+  "session.retroNoteRemoved": z.object({ sessionId: z.string() }),
+  "session.retroVoteCast": z.object({ sessionId: z.string() }),
+  "session.managementAnswerRecorded": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
