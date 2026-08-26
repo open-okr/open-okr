@@ -26,6 +26,7 @@ import type {
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
+  KpiRequestContext,
   MeasureContext,
   NarratedTrend,
   ParentContext,
@@ -35,7 +36,9 @@ import type {
   RecoveryTitleContext,
   ReviewableGoal,
   SemanticFinding,
+  SuggestedKpi,
   SuggestedParent,
+  SummarisableBlocker,
   TrendContext,
 } from "@openokr/core";
 import { z } from "zod";
@@ -482,6 +485,91 @@ const FILTER_SYSTEM =
   "something else is worse than no filter. Choose a cycle by its number, or " +
   "0 for none. Use the exact level and health words you are given, or an " +
   "empty string for none.";
+
+/**
+ * The blocker summary and the KPI suggestion (AI-NATIVE-PLAN.md §2.2,
+ * P4-T15b-b).
+ *
+ * **Neither prompt is trusted to be careful.** The blocker summary is checked
+ * against the board it was given, and every field of a suggested KPI is checked
+ * against its own enum, corridor bound or, for the formula, §6's own parser.
+ */
+const BLOCKER_SUMMARY_SHAPE = z.object({
+  summary: z.string().trim().max(900),
+});
+
+const BLOCKER_SUMMARY_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary"],
+  properties: { summary: { type: "string", maxLength: 900 } },
+} as const;
+
+const BLOCKER_SUMMARY_SYSTEM =
+  "You summarise what a team is stuck on, from a list already in priority " +
+  "order. Keep that order: the first one is the most urgent because the " +
+  "product says so, not because of how it reads. Two or three sentences. " +
+  "Quote a next action exactly when you name one, and never name one that is " +
+  "not on the list. Say what is aging and who owns it; do not suggest what to " +
+  "do about it, because that is the owner's next action and they wrote it.";
+
+const KPI_SHAPE = z.object({
+  title: z.string().trim().max(500),
+  unit: z.string().trim().max(60).nullable(),
+  frequency: z.string().trim().max(40),
+  direction: z.string().trim().max(40),
+  indicatorType: z.string().trim().max(40),
+  targetDefault: z.number().nullable(),
+  healthyPct: z.number().nullable(),
+  watchPct: z.number().nullable(),
+  formulaOperation: z.string().trim().max(20),
+  formulaReferences: z.array(z.number().int()).max(8),
+  why: z.string().trim().max(500),
+});
+
+const KPI_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "title",
+    "unit",
+    "frequency",
+    "direction",
+    "indicatorType",
+    "targetDefault",
+    "healthyPct",
+    "watchPct",
+    "formulaOperation",
+    "formulaReferences",
+    "why",
+  ],
+  properties: {
+    title: { type: "string", maxLength: 500 },
+    unit: { type: ["string", "null"], maxLength: 60 },
+    frequency: { type: "string" },
+    direction: { type: "string" },
+    indicatorType: { type: "string" },
+    targetDefault: { type: ["number", "null"] },
+    healthyPct: { type: ["number", "null"] },
+    watchPct: { type: ["number", "null"] },
+    formulaOperation: { type: "string" },
+    formulaReferences: {
+      type: "array",
+      maxItems: 8,
+      items: { type: "integer" },
+    },
+    why: { type: "string", maxLength: 500 },
+  },
+} as const;
+
+const KPI_SYSTEM =
+  "You turn a description of something somebody wants to measure into one " +
+  "metric. Give it a title, a unit, how often it is recorded, whether higher " +
+  "or lower is better, and a healthy and a watch percentage of target. Where " +
+  "the metric is one number divided by or added to another, name the two " +
+  "existing metrics by number and the operator: add, sub, mul or div. Leave " +
+  "the operator empty when it is recorded by hand rather than calculated. " +
+  "Never reference a metric by anything but its number.";
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -1106,6 +1194,98 @@ export function createProviderDrafter(
           health: parsed.health === "" ? null : parsed.health,
           mine: parsed.mine,
           includeClosed: parsed.includeClosed,
+        };
+      } catch {
+        return null;
+      }
+    },
+
+    async summariseBlockers(context: {
+      readonly blockers: readonly SummarisableBlocker[];
+    }): Promise<string | null> {
+      if (!affordable() || context.blockers.length === 0) {
+        return null;
+      }
+      try {
+        const { summary } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: BLOCKER_SUMMARY_SHAPE,
+          jsonSchema: BLOCKER_SUMMARY_JSON_SCHEMA,
+          maxTokens: 400,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: BLOCKER_SUMMARY_SYSTEM },
+            {
+              role: "user",
+              content:
+                "Blockers, most urgent first:" +
+                NEWLINE +
+                context.blockers
+                  .map(
+                    (blocker, index) =>
+                      `  ${index + 1}. [${blocker.type}] "${blocker.nextAction}"` +
+                      ` — ${blocker.ownerName ?? "no owner named"},` +
+                      ` ${blocker.ageHours}h, escalated to ${blocker.escalation}` +
+                      (blocker.blocks ? `, blocks ${blocker.blocks}` : ""),
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+        return summary.trim() === "" ? null : summary;
+      } catch {
+        return null;
+      }
+    },
+
+    async suggestKpi(context: KpiRequestContext): Promise<SuggestedKpi | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const suggested = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: KPI_SHAPE,
+          jsonSchema: KPI_JSON_SCHEMA,
+          maxTokens: 500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: KPI_SYSTEM },
+            {
+              role: "user",
+              content:
+                `What they want to measure: ${context.description}` +
+                (context.existing.length === 0
+                  ? NEWLINE + "There are no existing metrics to combine."
+                  : NEWLINE +
+                    "Existing metrics:" +
+                    NEWLINE +
+                    context.existing
+                      .map((title, index) => `  ${index + 1}. ${title}`)
+                      .join(NEWLINE)),
+            },
+          ],
+        });
+        return {
+          title: suggested.title,
+          unit: suggested.unit,
+          frequency: suggested.frequency,
+          direction: suggested.direction,
+          indicatorType: suggested.indicatorType,
+          targetDefault: suggested.targetDefault,
+          healthyPct: suggested.healthyPct,
+          watchPct: suggested.watchPct,
+          formula:
+            suggested.formulaOperation === "" ||
+            suggested.formulaReferences.length === 0
+              ? null
+              : {
+                  operation: suggested.formulaOperation,
+                  references: suggested.formulaReferences,
+                },
+          why: suggested.why,
         };
       } catch {
         return null;

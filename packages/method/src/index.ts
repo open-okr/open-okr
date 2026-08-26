@@ -14,6 +14,14 @@ export {
   alignmentScore,
 } from "./alignment.ts";
 export {
+  type BlockerEscalation,
+  type BlockerLadderHours,
+  escalationFor,
+  type RankableBlocker,
+  type RankedBlocker,
+  rankBlockers,
+} from "./blocker-board.ts";
+export {
   cycleClosingDue,
   cycleStartsDue,
   planningOpensDue,

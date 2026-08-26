@@ -25,8 +25,8 @@ a contract, a citation guarantee and a streaming panel. Counts read on
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 16 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a, P4-T15b-a, P4-T15d |
-| todo | 2 | P4-T15b-b, P4-T15c |
+| in_review | 17 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a, P4-T15b-a, P4-T15b-b, P4-T15d |
+| todo | 1 | P4-T15c |
 | blocked | 1 | P4-T14b-b, on a host that consumes the outbox |
 
 The agents lane is finished and read, and **the sessions lane is finished and**
@@ -169,7 +169,7 @@ and this table is what was agreed.
 | P4-T14b-b | Copilot background runs | Agung | blocked, needs an outbox host |
 | P4-T15a | Planning and drafting assists | Agung | in_review |
 | P4-T15b-a | The digest and the trend | Agung | in_review |
-| P4-T15b-b | The blocker summary and the KPI suggestion | Agung | todo |
+| P4-T15b-b | The blocker summary and the KPI suggestion | Agung | in_review |
 | P4-T15c | Review assists | Agung | todo |
 | P4-T15d | The list filter assist | Agung | in_review |
 

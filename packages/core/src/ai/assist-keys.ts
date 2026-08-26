@@ -33,4 +33,8 @@ export const ASSIST_FEATURE_KEYS = {
 export const RHYTHM_ASSIST_KEYS = {
   narrateDigest: "assists.narrateDigest",
   narrateTrend: "assists.narrateTrend",
+  /** §2.2's blocker summary (P4-T15b-b). */
+  summariseBlockers: "assists.summariseBlockers",
+  /** §2.2's KPI suggestion (P4-T15b-b). */
+  suggestKpi: "assists.suggestKpi",
 } as const;

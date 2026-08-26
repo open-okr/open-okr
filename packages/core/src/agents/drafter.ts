@@ -322,6 +322,53 @@ export type ParsedFilter =
     }
   | { readonly kind: "refused"; readonly reason: string };
 
+/** One blocker as the summary assist is shown it (P4-T15b-b). */
+export interface SummarisableBlocker {
+  /** One of §7.3's five types. */
+  readonly type: string;
+  readonly nextAction: string;
+  readonly ownerName: string | null;
+  readonly ageHours: number;
+  /** What it blocks, or null when it names nothing yet. */
+  readonly blocks: string | null;
+  /** §11's ladder rung it has reached. */
+  readonly escalation: string;
+}
+
+/** What the KPI assist is asked to turn into a metric (P4-T15b-b). */
+export interface KpiRequestContext {
+  /** What somebody typed, in their words. */
+  readonly description: string;
+  /** Existing KPIs it could be built from, numbered. Names only. */
+  readonly existing: readonly string[];
+}
+
+/**
+ * A suggested KPI.
+ *
+ * `formula` is a plain arithmetic sentence over the numbered existing metrics,
+ * for example `1 / 2`, and it is **validated by §6's own parser before it is
+ * offered**. A formula that does not parse is dropped and the rest of the
+ * suggestion stands, because a metric with a bad formula is still a metric
+ * somebody wanted.
+ */
+export interface SuggestedKpi {
+  readonly title: string;
+  readonly unit: string | null;
+  readonly frequency: string;
+  readonly direction: string;
+  readonly indicatorType: string;
+  readonly targetDefault: number | null;
+  readonly healthyPct: number | null;
+  readonly watchPct: number | null;
+  /** Indexes into `existing`, one-based, and the operator between them. */
+  readonly formula: {
+    readonly operation: string;
+    readonly references: readonly number[];
+  } | null;
+  readonly why: string;
+}
+
 /**
  * What a host must provide for the agents to write language.
  *
@@ -444,6 +491,24 @@ export interface AgentDrafter {
    * becomes a refusal rather than a filter.
    */
   parseListFilter?(context: FilterContext): Promise<ParsedFilter | null>;
+  /**
+   * §2.2's blocker summary, over a list the product has already ranked.
+   *
+   * **The order is not the model's to change.** It is given the board in order
+   * and asked for prose about it; the caller returns the board unchanged beside
+   * the words, and refuses a summary that quotes a next action not on it.
+   */
+  summariseBlockers?(context: {
+    readonly blockers: readonly SummarisableBlocker[];
+  }): Promise<string | null>;
+  /**
+   * §2.2's KPI, threshold and formula suggestion from plain language.
+   *
+   * Every field is checked by the caller: the frequency and direction against
+   * their enums, the corridor against §6's own bounds, and the formula against
+   * §6's parser. A formula that does not parse is dropped rather than offered.
+   */
+  suggestKpi?(context: KpiRequestContext): Promise<SuggestedKpi | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

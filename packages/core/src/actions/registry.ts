@@ -71,6 +71,7 @@ import {
   setDependencyRiskOwner,
 } from "./alignment.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
+import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
   acknowledgeCheckIn,
   castConfidenceVote,
@@ -169,6 +170,7 @@ import {
   joinByTrustedDomain,
   revokeLink,
 } from "./invitations.ts";
+import { suggestKpi } from "./kpi-assist.ts";
 import {
   createKpi,
   createKpiCategory,
@@ -496,6 +498,8 @@ export const ACTION_MAP = {
   "sessions.createBlocker": createSessionBlocker,
   "sessions.resolveBlocker": resolveSessionBlocker,
   "sessions.blockerStatus": sessionBlockerStatus,
+  "blockers.board": readBlockerBoard,
+  "blockers.summarise": summariseBlockers,
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,
   "sessions.closeCommitments": closeSessionCommitments,
@@ -505,6 +509,7 @@ export const ACTION_MAP = {
   "sessions.digest": readDigest,
   "sessions.narrateDigest": narrateDigest,
   "kpis.narrateTrend": narrateTrend,
+  "kpis.suggest": suggestKpi,
 
   "sessions.addMinute": addStageMinute,
   "sessions.givePulse": givePulse,

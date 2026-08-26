@@ -97,6 +97,7 @@ export type {
   GroundedChunk,
   GroundedQuestionContext,
   GroundingSource,
+  KpiRequestContext,
   MeasureContext,
   NarratedTrend,
   ParentContext,
@@ -108,7 +109,9 @@ export type {
   ReviewableGoal,
   RewriteContext,
   SemanticFinding,
+  SuggestedKpi,
   SuggestedParent,
+  SummarisableBlocker,
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
