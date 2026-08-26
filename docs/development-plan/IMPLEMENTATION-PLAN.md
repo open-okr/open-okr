@@ -759,10 +759,50 @@ Deliverables: action proposals rendered as a preview or difference with apply an
 Test plan: a proposal the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a background run survives a page reload.
 Acceptance: Given a member asking the copilot to create a goal, when they approve the proposal, then the goal is created through the normal Operation with audit, an AI provenance chip and a working undo.
 
-### P4-T15: Coaching and rhythm assists [M]
+### P4-T15a: Planning and drafting assists [M]
 Depends on: P4-T14b, P4-T06c
-Goal: the per-module assists (AI-NATIVE-PLAN.md §2).
-Deliverables: draft a goal and key results from an ambition; rewrite a failing objective or key result to satisfy its rule; suggest metrics, units, baselines, targets and alignment parents; draft the overdue check-in from real activity; draft the weekly digest, the retrospective, the review minutes and the diagnostic narrative; suggest KPIs, thresholds and formulas from plain language; narrate a KPI trend; cluster retro notes into themes; propose next-cycle objectives from carried learnings; natural language to a validated list filter. Every one behind a feature switch, with provenance recorded and a preview before applying.
+Goal: AI-NATIVE-PLAN.md §2.1's write capabilities on the Phase 3 drafting surfaces.
+Deliverables: draft an objective and its key results from a plain-language ambition; suggest metrics, units, baselines and targets for a key result; suggest the alignment parent by meaning. Each behind a feature switch, with provenance recorded and a preview before applying.
+Test plan: every assist is absent with the provider off and the deterministic path is unchanged; a suggestion is a proposal and never a write; the suggested alignment parent is one the member may read.
+Acceptance: Given the provider off, when a member opens the create form, then no assist is offered and the Draft Coach behaves exactly as it does today.
+
+### P4-T15b: Rhythm assists [M]
+Depends on: P4-T15a
+Goal: AI-NATIVE-PLAN.md §2.2's remaining capabilities.
+Deliverables: draft the weekly digest from the session record; narrate a KPI trend and call out anomalies; summarise blockers and risks across a space ranked by age and impact; suggest KPIs, thresholds and formulas from plain language. Each behind a feature switch, with provenance and a preview.
+Test plan: the deterministic digest template is what appears with the provider off; a narrated trend never states a number the chart does not hold.
+Acceptance: Given a weekly session with a digest, when the assist drafts it, then the draft is a proposal over the deterministic template and the template is still what a provider-off workspace gets.
+
+### P4-T15c: Review assists [M]
+Depends on: P4-T15b, P4-T12-a
+Goal: AI-NATIVE-PLAN.md §2.3's capabilities on the quarterly review.
+Deliverables: cluster retro notes into themes before dot voting; draft the review minutes from the session record; narrate the rhythm diagnostic with specifics from this cycle; draft the goal retrospective from check-in history; propose next-cycle objectives from the learnings marked to carry forward.
+Test plan: the diagnostic's verdict sentence is unchanged with the provider off and the narrative is additive; clustering never merges notes from two reviews; a proposed objective cites the learning it came from.
+Acceptance: Given a closed review, when the diagnostic narrative is drafted, then the §8.6 verdict and prescription are identical to the provider-off answer and the narrative sits beside them.
+
+### P4-T15d: The list filter assist [S]
+Depends on: P4-T15a
+Goal: AI-NATIVE-PLAN.md §2.4's filter capability.
+Deliverables: a sentence turned into a validated list filter on the goals explorer, refused rather than approximated when it does not parse into the filter grammar.
+Test plan: a sentence that cannot be expressed in the filter grammar is refused with the reason, not silently narrowed; the manual filters are unchanged with the provider off.
+Acceptance: Given a member typing "my off-track goals this quarter", when the assist runs, then the explorer's own filter state is set and visible as filters they can edit.
+
+**Why P4-T15 was cut into four.** Its single [M] listed thirteen distinct
+assists across all four groups of AI-NATIVE-PLAN.md §2, each needing a feature
+switch, provenance and a preview. That is a lane, not a session. Cut on
+26 August 2026 along §2's own group boundaries rather than an invented grouping,
+so each row maps onto one section of the capability catalogue.
+
+**Two of the thirteen had already landed, and the list restated them.** "Rewrite
+a failing objective or key result to satisfy its rule" is `goals.rewriteKeyResult`
+from P4-T06c. "Draft the overdue check-in from real activity" is
+`goals.publishDraftedCheckIn` from P4-T05c-b. Both are dropped from the rows
+above rather than left in to be built twice.
+
+**Three more of the thirteen belong to other phases** and are not in these rows:
+decomposing a key result into initiatives and tasks is Phase 5's work,
+grounded question answering with citations is P4-T14a, and mapping spreadsheet
+columns to import fields is P6-T01.
 Test plan: every assist degrades to its manual path with AI off; every write assist renders a preview and commits nothing until applied; provenance is recorded on the resulting value.
 Acceptance: Given a key result failing the measurability rule, when the champion uses the rewrite assist, then a corrected version is proposed with the rule it now satisfies, and applying it clears the verdict.
 
