@@ -17,7 +17,11 @@ import { embeddings, newId, withWorkspace } from "@openokr/db";
 import { and, eq, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
+import type { OperationTx } from "../operations/operation.ts";
 import { type ChunkOptions, chunkText, contentHash } from "./chunker.ts";
+import { governingResource } from "./governing.ts";
 
 export interface EmbedContentInput {
   readonly workspaceId: string;
@@ -29,6 +33,12 @@ export interface EmbedContentInput {
 
 export interface RetrievalInput {
   readonly workspaceId: string;
+  /**
+   * Who is asking. Required, because retrieval without a requester is retrieval
+   * that cannot be filtered, and an unfiltered index is the leak §9 exists to
+   * prevent (P4-T13b).
+   */
+  readonly memberId: string;
   readonly query: string;
   readonly entityTypes?: readonly string[];
   readonly limit?: number;
@@ -48,6 +58,16 @@ export type EmbedFunction = (input: readonly string[]) => Promise<{
 }>;
 
 const DEFAULT_RETRIEVAL_LIMIT = 10;
+
+/**
+ * How many candidates to rank per requested hit before access filtering.
+ *
+ * Four is a guess with a reason: most readers can see most of their workspace, so
+ * the first page of candidates is usually almost all readable, and a factor that
+ * multiplied the work by ten to serve the narrowest reader would slow every
+ * query for the common case.
+ */
+const RETRIEVAL_OVERFETCH = 4;
 
 export class EmbeddingService {
   readonly #pool: Pool;
@@ -219,14 +239,86 @@ export class EmbeddingService {
    * through the access-aware getter, so retrieval never widens what someone
    * can see.
    */
+  /**
+   * Retrieval, filtered by what the requester may read (P4-T13b).
+   *
+   * **Candidates are over-fetched and then filtered, not filtered in SQL.** The
+   * alternative was a `context_id` column on `embeddings`, which would be faster
+   * and would be a second implementation of the access model. Asking
+   * `getAccessScoped` for each candidate means retrieval cannot drift from the
+   * rest of the product: a member who loses access to a space stops seeing its
+   * chunks on the next query, with no reindex.
+   *
+   * **A known limitation, stated rather than hidden.** Up to `limit` readable
+   * hits are returned out of the first `limit * OVERFETCH` candidates, so a
+   * member with narrow access can get fewer than `limit` even when more readable
+   * chunks exist further down the ranking. Widening the factor trades latency for
+   * recall; the honest fix is the `context_id` column, recorded on the P4-T13b
+   * row.
+   */
   async retrieve(input: RetrievalInput): Promise<RetrievalHit[]> {
     const limit = input.limit ?? DEFAULT_RETRIEVAL_LIMIT;
     const useVector = this.#embed && (await this.hasPgvector());
 
-    if (useVector) {
-      return this.#vectorRetrieve(input, limit);
+    const candidates = useVector
+      ? await this.#vectorRetrieve(input, limit * RETRIEVAL_OVERFETCH)
+      : await this.#fullTextRetrieve(input, limit * RETRIEVAL_OVERFETCH);
+
+    return this.#readable(input, candidates, limit);
+  }
+
+  /**
+   * Keeps the candidates this member may read, in ranking order, up to the limit.
+   *
+   * A candidate whose entity has no governing resource is dropped: an entity
+   * deleted since it was embedded has no access to inherit, and returning its
+   * chunk would let the index outlive the thing it describes.
+   */
+  async #readable(
+    input: RetrievalInput,
+    candidates: readonly RetrievalHit[],
+    limit: number,
+  ): Promise<RetrievalHit[]> {
+    if (candidates.length === 0) {
+      return [];
     }
-    return this.#fullTextRetrieve(input, limit);
+    return withWorkspace(
+      drizzle(this.#pool),
+      input.workspaceId,
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const kept: RetrievalHit[] = [];
+        for (const hit of candidates) {
+          if (kept.length >= limit) {
+            break;
+          }
+          const governing = await governingResource(
+            tx,
+            input.workspaceId,
+            hit.entityType,
+            hit.entityId,
+          );
+          if (!governing) {
+            continue;
+          }
+          try {
+            await getAccessScoped(tx, {
+              workspaceId: input.workspaceId,
+              memberId: input.memberId,
+              resourceType: governing.resourceType,
+              resourceId: governing.resourceId,
+              requires: ACCESS_LEVELS.view as never,
+            });
+          } catch {
+            // The getter answers not-found for forbidden, which is the same
+            // answer this loop wants: the chunk is not there for this reader.
+            continue;
+          }
+          kept.push(hit);
+        }
+        return kept;
+      },
+    );
   }
 
   async #vectorRetrieve(
@@ -251,7 +343,8 @@ export class EmbeddingService {
     }
 
     // Hybrid: combine vector cosine similarity with full-text rank
-    const result = await this.#pool.query(
+    const rows = await this.#queryInWorkspace(
+      input.workspaceId,
       `with vector_hits as (
          select entity_type, entity_id, content,
                 1 - (embedding <=> $2::vector) as vector_score
@@ -287,12 +380,43 @@ export class EmbeddingService {
       [...params, input.query],
     );
 
-    return result.rows.map((row) => ({
+    return rows.map((row) => ({
       entityType: row.entity_type as string,
       entityId: row.entity_id as string,
       content: row.content as string,
       score: Number(row.score),
     }));
+  }
+
+  /**
+   * Runs one raw query with the workspace applied for its transaction.
+   *
+   * **Not optional.** Row-level security is forced on `embeddings`, so a query on
+   * a connection with no `app.workspace_id` returns nothing at all rather than
+   * everything. Before P4-T13b these three queries ran straight on the pool,
+   * which is the exact shape `index()`'s own comment records having hit once
+   * already, and retrieval would have returned an empty list for every caller.
+   */
+  async #queryInWorkspace(
+    workspaceId: string,
+    text: string,
+    params: readonly unknown[],
+  ): Promise<Record<string, unknown>[]> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config('app.workspace_id', $1, true)", [
+        workspaceId,
+      ]);
+      const result = await client.query(text, [...params]);
+      await client.query("commit");
+      return result.rows as Record<string, unknown>[];
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async #fullTextRetrieve(
@@ -308,7 +432,8 @@ export class EmbeddingService {
       params.push(input.entityTypes);
     }
 
-    const result = await this.#pool.query(
+    const rows = await this.#queryInWorkspace(
+      input.workspaceId,
       `select entity_type, entity_id, content,
               ts_rank(to_tsvector('english', content),
                       plainto_tsquery('english', $2)) as score
@@ -321,7 +446,7 @@ export class EmbeddingService {
       params,
     );
 
-    return result.rows.map((row) => ({
+    return rows.map((row) => ({
       entityType: row.entity_type as string,
       entityId: row.entity_id as string,
       content: row.content as string,
