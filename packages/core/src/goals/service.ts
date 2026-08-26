@@ -96,6 +96,8 @@ export interface CreateGoalInput {
   readonly parentKeyResultId?: string | null;
   readonly weight?: number;
   readonly contributionStatement?: string | null;
+  /** True when a model wrote the words (P4-T15a). */
+  readonly aiGenerated?: boolean;
   readonly position?: number;
 }
 
@@ -258,6 +260,10 @@ export async function createGoalInTx<
       parentKeyResultId: input.parentKeyResultId ?? null,
       weight: String(clampWeight(input.weight ?? 1)),
       contributionStatement: input.contributionStatement?.trim() || null,
+      // Provenance (P4-T15a). False unless the caller says a model wrote the
+      // words. The column has been here since 0022 and nothing wrote it, which
+      // meant an assisted objective read exactly like a typed one.
+      aiGenerated: input.aiGenerated ?? false,
       position: input.position ?? 0,
     })
     .returning({ id: goals.id, title: goals.title });

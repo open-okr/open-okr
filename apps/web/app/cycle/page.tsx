@@ -12,6 +12,7 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
+import { assistsAvailableAction } from "./assist-actions.ts";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
 import { Drafting } from "./drafting.tsx";
@@ -265,6 +266,8 @@ export default async function CyclePage({
               canEdit={canEdit}
               thresholds={draft.thresholds}
               checkTitles={draft.checkTitles}
+              memberId={workspace.memberId}
+              assistsAvailable={await assistsAvailableAction()}
             />
           ) : null}
 

@@ -136,6 +136,11 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import {
+  draftObjective,
+  suggestMeasure,
+  suggestParent,
+} from "./goal-assists.ts";
 import { readGoalRelations } from "./goal-relations.ts";
 import {
   closeGoal,
@@ -420,6 +425,9 @@ export const ACTION_MAP = {
   "goals.due": listDueGoals,
   "goals.checkIns": listCheckIns,
   "goals.rewriteKeyResult": rewriteKeyResult,
+  "goals.draftObjective": draftObjective,
+  "goals.suggestMeasure": suggestMeasure,
+  "goals.suggestParent": suggestParent,
   "goals.startCheckIn": startCheckIn,
   "goals.publishCheckIn": publishCheckIn,
   "goals.publishDraftedCheckIn": publishDraftedCheckIn,

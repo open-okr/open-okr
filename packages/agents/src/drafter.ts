@@ -17,16 +17,22 @@
 import type { AIProvider } from "@openokr/adapters";
 import type {
   AgentDrafter,
+  AmbitionContext,
   CheckInDraftContext,
   DraftedCheckIn,
+  DraftedKeyResult,
+  DraftedObjective,
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
+  MeasureContext,
+  ParentContext,
   ProposalRequestContext,
   ProposedAction,
   RecoveryTitleContext,
   ReviewableGoal,
   SemanticFinding,
+  SuggestedParent,
 } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
@@ -252,6 +258,116 @@ const optionsFor = (context: ProposalRequestContext): string =>
       );
     })
     .join(NEWLINE + NEWLINE);
+
+/**
+ * The drafting assists' shapes (AI-NATIVE-PLAN.md §2.1, P4-T15a).
+ *
+ * Numbers are required, not optional. A key result without a baseline and a
+ * target fails METHOD.md KR-3, and an assist that produced one would be making
+ * work rather than saving it. Whether the numbers are any good is not asserted
+ * here: core runs §4 over whatever comes back and reports what genuinely passes.
+ */
+const MEASURE_FIELDS = {
+  unit: { type: ["string", "null"], maxLength: 60 },
+  direction: {
+    type: "string",
+    enum: ["increase", "reduce", "maintain", "move"],
+  },
+  indicatorType: { type: "string", enum: ["leading", "lagging"] },
+  baseline: { type: "number" },
+  target: { type: "number" },
+} as const;
+
+const MEASURE_SHAPE = z.object({
+  unit: z.string().trim().max(60).nullable(),
+  direction: z.enum(["increase", "reduce", "maintain", "move"]),
+  indicatorType: z.enum(["leading", "lagging"]),
+  baseline: z.number(),
+  target: z.number(),
+});
+
+const MEASURE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["unit", "direction", "indicatorType", "baseline", "target"],
+  properties: MEASURE_FIELDS,
+} as const;
+
+const OBJECTIVE_SHAPE = z.object({
+  title: z.string().trim().max(500),
+  description: z.string().trim().max(2000),
+  keyResults: z
+    .array(MEASURE_SHAPE.extend({ title: z.string().trim().min(1).max(500) }))
+    // Bounded, because METHOD.md's own guidance is a handful of measures per
+    // objective and a model asked for measures will happily write twelve.
+    .max(6),
+});
+
+const OBJECTIVE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "description", "keyResults"],
+  properties: {
+    title: { type: "string", maxLength: 500 },
+    description: { type: "string", maxLength: 2000 },
+    keyResults: {
+      type: "array",
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "title",
+          "unit",
+          "direction",
+          "indicatorType",
+          "baseline",
+          "target",
+        ],
+        properties: {
+          title: { type: "string", maxLength: 500 },
+          ...MEASURE_FIELDS,
+        },
+      },
+    },
+  },
+} as const;
+
+const PARENT_SHAPE = z.object({
+  /** One-based on the wire, because that is how the list is numbered. */
+  candidate: z.number().int(),
+  reason: z.string().trim().max(400),
+});
+
+const PARENT_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["candidate", "reason"],
+  properties: {
+    candidate: { type: "integer" },
+    reason: { type: "string", maxLength: 400 },
+  },
+} as const;
+
+const OBJECTIVE_SYSTEM =
+  "You turn an ambition somebody typed into one objective and the measures " +
+  "under it. The objective says what changes, not what gets done. Each " +
+  "measure carries a baseline and a target as real numbers, and its sentence " +
+  "carries them too. Never repeat an objective that already exists. Never " +
+  "invent a number you were not given: if you have to choose one, choose a " +
+  "round figure the writer will obviously want to correct.";
+
+const MEASURE_SYSTEM =
+  "You put numbers on a key result somebody is part way through writing: a " +
+  "unit, a direction, a baseline and a target. Keep any number already in " +
+  "the sentence. Where you have to choose, choose a round figure the writer " +
+  "will obviously want to correct rather than a precise one they will trust.";
+
+const PARENT_SYSTEM =
+  "You pick which of the numbered objectives this one should roll up into, " +
+  "by number. Pick the one whose success this objective actually contributes " +
+  "to, not the one with the most words in common. Answer 0 when none of them " +
+  "is a real parent: an objective with no parent is often correct.";
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -627,6 +743,134 @@ export function createProviderDrafter(
           action: reply.action,
           fields: reply.fields,
           why: reply.why,
+        };
+      } catch {
+        return null;
+      }
+    },
+
+    async draftObjective(
+      context: AmbitionContext,
+    ): Promise<DraftedObjective | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const drafted = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: OBJECTIVE_SHAPE,
+          jsonSchema: OBJECTIVE_JSON_SCHEMA,
+          maxTokens: 900,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: OBJECTIVE_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Ambition: ${context.ambition}` +
+                (context.spaceName
+                  ? NEWLINE + `Team: ${context.spaceName}`
+                  : "") +
+                (context.existingTitles.length === 0
+                  ? ""
+                  : NEWLINE +
+                    "Objectives this cycle already has:" +
+                    NEWLINE +
+                    context.existingTitles
+                      .map((title) => `- ${title}`)
+                      .join(NEWLINE)),
+            },
+          ],
+        });
+        return drafted.title.trim() === "" ? null : drafted;
+      } catch {
+        return null;
+      }
+    },
+
+    async suggestMeasure(
+      context: MeasureContext,
+    ): Promise<Omit<DraftedKeyResult, "title"> | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        return await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: MEASURE_SHAPE,
+          jsonSchema: MEASURE_JSON_SCHEMA,
+          maxTokens: 250,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: MEASURE_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Objective: ${context.goalTitle}` +
+                NEWLINE +
+                `Key result so far: ${context.keyResultTitle}` +
+                (context.unit
+                  ? NEWLINE + `Unit already chosen: ${context.unit}`
+                  : ""),
+            },
+          ],
+        });
+      } catch {
+        return null;
+      }
+    },
+
+    /**
+     * The parent, by number.
+     *
+     * Zero means none, and it is offered deliberately: a model given a list and
+     * no way to decline picks something. `candidateIndex` comes back zero-based
+     * because that is what core indexes with, and the wire is one-based because
+     * that is how the list is numbered in the prompt.
+     */
+    async suggestParent(
+      context: ParentContext,
+    ): Promise<SuggestedParent | null> {
+      if (!affordable() || context.candidates.length === 0) {
+        return null;
+      }
+      try {
+        const picked = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: PARENT_SHAPE,
+          jsonSchema: PARENT_JSON_SCHEMA,
+          maxTokens: 250,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: PARENT_SYSTEM },
+            {
+              role: "user",
+              content:
+                `This objective: ${context.childTitle}` +
+                (context.childDescription
+                  ? NEWLINE + `  about: ${context.childDescription}`
+                  : "") +
+                NEWLINE +
+                "Possible parents:" +
+                NEWLINE +
+                context.candidates
+                  .map(
+                    (candidate, index) =>
+                      `${index + 1}. [${candidate.level}] ${candidate.title}`,
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+        if (picked.candidate < 1 || picked.reason.trim() === "") {
+          return null;
+        }
+        return {
+          candidateIndex: picked.candidate - 1,
+          reason: picked.reason,
         };
       } catch {
         return null;

@@ -25,8 +25,8 @@ a contract, a citation guarantee and a streaming panel. Counts read on
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 13 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a |
-| todo | 4 | P4-T15a to P4-T15d |
+| in_review | 14 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a |
+| todo | 3 | P4-T15b to P4-T15d |
 | blocked | 1 | P4-T14b-b, on a host that consumes the outbox |
 
 The agents lane is finished and read, and **the sessions lane is finished and**
@@ -58,7 +58,7 @@ quarterly review.
 | A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
 | B2: the sessions | P4-T07a to P4-T12, seventeen rows | yes | **Complete.** P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T12-b written and waiting on a read |
-| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a to P4-T14b-a written and waiting on a read; P4-T14b-b blocked; **P4-T15a next** |
+| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a to P4-T15a written and waiting on a read; P4-T14b-b blocked; **P4-T15b next** |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
 B2 is the critical path. Nine of its fifteen rows are accepted, three are in
@@ -167,7 +167,7 @@ and this table is what was agreed.
 | P4-T14a-b | The copilot panel | Agung | in_review |
 | P4-T14b-a | Copilot proposals | Agung | in_review |
 | P4-T14b-b | Copilot background runs | Agung | blocked, needs an outbox host |
-| P4-T15a | Planning and drafting assists | Agung | todo, needs both lanes |
+| P4-T15a | Planning and drafting assists | Agung | in_review |
 | P4-T15b | Rhythm assists | Agung | todo |
 | P4-T15c | Review assists | Agung | todo |
 | P4-T15d | The list filter assist | Agung | todo |

@@ -87,12 +87,17 @@ export {
 } from "./activities/renderers.ts";
 export type {
   AgentDrafter,
+  AmbitionContext,
   CheckInDraftContext,
   DraftedCheckIn,
+  DraftedKeyResult,
+  DraftedObjective,
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
   GroundingSource,
+  MeasureContext,
+  ParentContext,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
@@ -100,6 +105,7 @@ export type {
   ReviewableGoal,
   RewriteContext,
   SemanticFinding,
+  SuggestedParent,
 } from "./agents/drafter.ts";
 export {
   type BudgetCheckResult,
@@ -207,6 +213,7 @@ export {
   GROUNDING_LIMIT,
   streamAnswer,
 } from "./copilot/answer.ts";
+export { ASSIST_FEATURE_KEYS } from "./actions/goal-assists.ts";
 export {
   citationLabel,
   type ResolvedCitation,

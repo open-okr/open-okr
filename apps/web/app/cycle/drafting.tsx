@@ -1,6 +1,11 @@
 import type { ResolvedThresholds } from "@openokr/method";
 import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { ActionForm } from "./action-form.tsx";
+import {
+  DraftFromAmbition,
+  SuggestMeasure,
+  SuggestParent,
+} from "./assists.tsx";
 import { DraftCoach } from "./draft-coach.tsx";
 import { addKeyResult, createGoal, recordValue } from "./goal-actions.ts";
 
@@ -62,6 +67,8 @@ export function Drafting({
   canEdit,
   thresholds,
   checkTitles,
+  memberId,
+  assistsAvailable,
 }: {
   readonly cycleId: string;
   readonly goals: readonly DraftGoal[];
@@ -73,9 +80,24 @@ export function Drafting({
     readonly id: string;
     readonly title: string;
   }[];
+  /** The reader, who champions and reviews what they apply from a draft. */
+  readonly memberId: string;
+  /**
+   * Whether a provider can answer at all (P4-T15a).
+   *
+   * False is the normal case and the whole surface below is unchanged by it: the
+   * assists are simply not rendered, rather than rendered disabled. A button
+   * that cannot do anything is worse than no button, which is the same reason
+   * `Topbar` left its own slot empty for two phases.
+   */
+  readonly assistsAvailable: boolean;
 }) {
   return (
     <div className="flex flex-col gap-4.5">
+      {assistsAvailable && canEdit ? (
+        <DraftFromAmbition cycleId={cycleId} memberId={memberId} />
+      ) : null}
+
       {goals.length === 0 ? (
         <Card>
           <CardBody>
@@ -101,6 +123,9 @@ export function Drafting({
               <Chip tone={HEALTH_TONE[goal.health] ?? "neutral"}>
                 {goal.health.replace("_", " ")}
               </Chip>
+              {assistsAvailable && canEdit ? (
+                <SuggestParent goalId={goal.id} />
+              ) : null}
               <a
                 className="text-xs text-brand-text underline"
                 href={`/goals/${goal.id}`}
@@ -321,6 +346,10 @@ export function Drafting({
                   <Button type="submit">Add key result</Button>
                 </div>
               </ActionForm>
+            ) : null}
+
+            {assistsAvailable && canEdit ? (
+              <SuggestMeasure goalId={goal.id} />
             ) : null}
           </CardBody>
         </Card>

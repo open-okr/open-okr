@@ -199,6 +199,74 @@ export interface ProposedAction {
 }
 
 /**
+ * A key result as an assist may draft one (AI-NATIVE-PLAN.md §2.1, P4-T15a).
+ *
+ * Numbers included, because a key result without a baseline and a target fails
+ * METHOD.md KR-3 and an assist that produced one would be making more work
+ * rather than less. Whether they are any good is not the model's claim to make:
+ * the caller runs §4's own checks over what comes back and reports what
+ * genuinely passes, the same way the rewrite assist does.
+ */
+export interface DraftedKeyResult {
+  readonly title: string;
+  readonly unit: string | null;
+  readonly direction: "increase" | "reduce" | "maintain" | "move";
+  readonly indicatorType: "leading" | "lagging";
+  readonly baseline: number;
+  readonly target: number;
+}
+
+/** An objective drafted from an ambition, with the measures under it. */
+export interface DraftedObjective {
+  readonly title: string;
+  /** Plain text. The editor document is assembled by the caller. */
+  readonly description: string;
+  readonly keyResults: readonly DraftedKeyResult[];
+}
+
+/** What the drafting assist is told about the ambition it is turning over. */
+export interface AmbitionContext {
+  /** What somebody typed, in their words. */
+  readonly ambition: string;
+  /** The space it would belong to, for tone. Null at workspace level. */
+  readonly spaceName: string | null;
+  /** Objectives already in this cycle, so a draft does not repeat one. */
+  readonly existingTitles: readonly string[];
+}
+
+/** What the measure assist is asked to put numbers on. */
+export interface MeasureContext {
+  readonly keyResultTitle: string;
+  readonly goalTitle: string;
+  /** The unit already chosen, when there is one. */
+  readonly unit: string | null;
+}
+
+/**
+ * A parent suggested by meaning, positional (P4-T15a).
+ *
+ * `candidateIndex` points into the list the caller supplied, which it built
+ * from goals this member may actually read. So the suggestion is safe by
+ * construction: there is no index that resolves to a goal they cannot see.
+ */
+export interface SuggestedParent {
+  readonly candidateIndex: number;
+  /** One specific sentence about why this parent, for the reader to judge. */
+  readonly reason: string;
+}
+
+/** What the alignment assist is shown: one child and the possible parents. */
+export interface ParentContext {
+  readonly childTitle: string;
+  readonly childDescription: string;
+  /** Numbered from one in the order given. Never an identifier. */
+  readonly candidates: readonly {
+    readonly title: string;
+    readonly level: string;
+  }[];
+}
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -272,6 +340,27 @@ export interface AgentDrafter {
   proposeAction?(
     context: ProposalRequestContext,
   ): Promise<ProposedAction | null>;
+  /**
+   * §2.1's objective draft, from a plain-language ambition.
+   *
+   * Null when there is nothing to draft, which includes an ambition that is
+   * already an objective. The caller judges what comes back against §4 and
+   * shows the reader which checks it passes, so a confident draft that fails
+   * OBJ-1 is presented as failing OBJ-1.
+   */
+  draftObjective?(context: AmbitionContext): Promise<DraftedObjective | null>;
+  /** §2.1's measure suggestion: a unit, a direction, a baseline and a target. */
+  suggestMeasure?(
+    context: MeasureContext,
+  ): Promise<Omit<DraftedKeyResult, "title"> | null>;
+  /**
+   * §2.1's alignment suggestion, positional.
+   *
+   * Null when none of the candidates is a plausible parent, which is a real
+   * answer: an objective with no parent is often correct, and inventing one is
+   * how an alignment tree becomes a decoration.
+   */
+  suggestParent?(context: ParentContext): Promise<SuggestedParent | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

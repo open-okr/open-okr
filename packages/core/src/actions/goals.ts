@@ -863,6 +863,15 @@ export const createGoal = defineWriteAction({
       parentKeyResultId: z.uuid().optional(),
       weight: z.number().default(1),
       contributionStatement: z.string().trim().max(1000).optional(),
+      /**
+       * True when a model wrote the words (P4-T15a).
+       *
+       * The caller's claim, not something inferred: only the surface that ran
+       * the assist knows whether the reader kept the draft or rewrote it. A
+       * reader who replaces every word should not have their objective marked
+       * as written by a model, and one who accepts it verbatim should.
+       */
+      aiGenerated: z.boolean().optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -957,6 +966,7 @@ export const createGoal = defineWriteAction({
         parentKeyResultId: input.parentKeyResultId ?? null,
         weight: input.weight,
         contributionStatement: input.contributionStatement ?? null,
+        aiGenerated: input.aiGenerated ?? false,
       });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
