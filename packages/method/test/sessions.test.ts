@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  CLOSE_DECISION_MEANINGS,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   PROCESS_HEALTH_STATEMENTS,
@@ -112,6 +113,28 @@ describe("§7.2's four steps", () => {
     for (const step of WEEKLY_STEPS) {
       expect(method).toContain(step.title);
     }
+  });
+});
+
+describe("§8.8's close decisions", () => {
+  it("carry the document's three meanings, word for word", () => {
+    // Read back out of METHOD.md rather than restated here. The three words
+    // themselves live in `packages/db` as GOAL_CLOSE_DECISIONS because a goal
+    // stores which one it ended on; what belongs to the method is what each one
+    // means, and a screen writing its own gloss on "modify" is drift.
+    expect(Object.keys(CLOSE_DECISION_MEANINGS)).toEqual([
+      "keep",
+      "modify",
+      "abandon",
+    ]);
+    for (const meaning of Object.values(CLOSE_DECISION_MEANINGS)) {
+      expect(method).toContain(meaning);
+    }
+  });
+
+  it("states the rule the stage exists for", () => {
+    // §8.8's closing line, and the reason no decision is pre-selected anywhere.
+    expect(method).toContain("Nothing carries over by default.");
   });
 });
 

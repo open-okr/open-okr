@@ -353,6 +353,14 @@ export {
   type ReviewNarrative,
   reviewNarratives,
 } from "./schema/review-narratives.ts";
+export {
+  DIAGNOSIS_VERDICTS,
+  type DiagnosisVerdict,
+  type ReviewDecision,
+  type ReviewDiagnostic,
+  reviewDecisions,
+  reviewDiagnostics,
+} from "./schema/review-reset.ts";
 export { type ReviewScore, reviewScores } from "./schema/review-scores.ts";
 export {
   type PerformanceSnapshotRow,

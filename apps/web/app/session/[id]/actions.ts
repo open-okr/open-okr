@@ -273,6 +273,52 @@ export async function scoreKeyResultAction(
 }
 
 /**
+ * Reading §8.6's diagnostic, which is a write (METHOD.md §8.6, P4-T11c-a).
+ *
+ * The verdict is stored with the numbers it was read against, because the
+ * minutes have to show what the room was told and a diagnostic recomputed later
+ * would quietly change its verdict as scores were corrected.
+ */
+export async function recordDiagnosticAction(sessionId: string) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.recordDiagnostic",
+    { sessionId },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * One objective closed deliberately (METHOD.md §8.8, P4-T11c-a).
+ *
+ * The why is required at the boundary, because §8.8 asks for it and a decision
+ * nobody explained is the automatic carry-over the section exists to stop.
+ */
+export async function decideObjectiveAction(
+  sessionId: string,
+  goalId: string,
+  decision: "keep" | "modify" | "abandon",
+  why: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.decideObjective",
+    { sessionId, goalId, decision, why },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
  * One primary cause for a key result that came in under the threshold
  * (METHOD.md §8.4, P4-T11b).
  *

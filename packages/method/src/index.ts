@@ -161,6 +161,7 @@ export {
 } from "./scoring.ts";
 export {
   BLOCKER_TYPE_DEFINITIONS,
+  CLOSE_DECISION_MEANINGS,
   type Diagnosis,
   type DiagnosisKind,
   lowestProcessHealthStatement,

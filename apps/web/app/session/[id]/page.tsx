@@ -39,6 +39,7 @@ import {
   skipSessionAction,
 } from "./actions";
 import { ConfidenceRound } from "./confidence-round";
+import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
 import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
   type DecisionSubject,
@@ -52,6 +53,7 @@ import { type Narratives, NarrativesPanel } from "./narratives";
 import { type ProcessHealth, ProcessHealthPanel } from "./process-health";
 import { QuarterlyReview } from "./quarterly-review";
 import { type Recognition, RecognitionPanel } from "./recognition";
+import { type Reset, ResetPanel } from "./reset";
 import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
@@ -250,6 +252,25 @@ export default async function SessionPage({ params }: SessionPageProps) {
       sessionId: id,
     })) as Omit<RootCauses, "causes">;
     rootCauses = { ...read, causes: ROOT_CAUSES };
+  }
+
+  // Stage seven's second half: the diagnostic (METHOD.md §8.6, P4-T11c-a).
+  //
+  // Read on the same stage as the root causes, because §8.4 and §8.6 are one
+  // stage in §8.1's agenda: name the causes, then read what they add up to.
+  let diagnostic: Diagnostic | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[6]) {
+    diagnostic = (await callAction(context, "sessions.diagnostic", {
+      sessionId: id,
+    })) as Diagnostic;
+  }
+
+  // Stage nine: keep, modify or abandon (METHOD.md §8.8, P4-T11c-a).
+  let reset: Reset | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[8]) {
+    reset = (await callAction(context, "sessions.reset", {
+      sessionId: id,
+    })) as Reset;
   }
 
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
@@ -463,7 +484,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
             managementRetro !== null ||
             managementWithheld ||
             rootCauses !== null ||
-            processHealth !== null
+            processHealth !== null ||
+            diagnostic !== null ||
+            reset !== null
           }
           stageKeys={REVIEW_STAGE_KEYS}
           currentStageKey={sessionRow.stageKey}
@@ -552,6 +575,20 @@ export default async function SessionPage({ params }: SessionPageProps) {
           rootCauses={rootCauses}
           canName={isRunning}
         />
+      ) : null}
+
+      {/* Stage seven's second half: the diagnostic (METHOD.md §8.6, P4-T11c-a) */}
+      {diagnostic ? (
+        <DiagnosticPanel
+          sessionId={id}
+          diagnostic={diagnostic}
+          canRead={isRunning}
+        />
+      ) : null}
+
+      {/* Stage nine: keep, modify or abandon (METHOD.md §8.8, P4-T11c-a) */}
+      {reset ? (
+        <ResetPanel sessionId={id} reset={reset} canDecide={isRunning} />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}

@@ -280,6 +280,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.rootCauseNamed": () => "Named a root cause in the review",
   "session.processHealthSubmitted": () =>
     "Answered the review's process-health survey",
+  "session.diagnosticRead": () => "Read the review's rhythm diagnostic",
+  "session.objectiveDecided": () => "Closed this objective in the review",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

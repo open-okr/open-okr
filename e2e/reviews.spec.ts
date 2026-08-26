@@ -834,6 +834,17 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .getByRole("button", { name: "Blocked by a dependency" })
     .click();
   await expect(rootCause).toContainText("1 of 1 named", { timeout: 10_000 });
+
+  // The diagnostic shares this stage: section 8.4 names the causes and section
+  // 8.6 reads what they add up to. It cannot be read yet, because the survey is
+  // stage eight and section 8.6 needs both numbers.
+  const diagnosticPanel = page.getByRole("region", {
+    name: "The diagnostic",
+  });
+  await expect(diagnosticPanel).toHaveCount(1);
+  await expect(diagnosticPanel).toContainText(
+    "needs a cycle score and a rhythm score",
+  );
   // Exact, because the header chip reads "1 of 1 named" and the row's own chip
   // reads "named": unscoped, that is two matches.
   await expect(rootCause.getByText("named", { exact: true })).toBeVisible();
@@ -889,6 +900,46 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // Section 8.5's closing rule: the lowest becomes next cycle's process OKR.
   // Statement 5 scored 2, the lowest of the five.
   await expect(processHealth).toContainText("Lowest: statement 5");
+
+  // **Not asserted here: reading the diagnostic once both numbers exist.** The
+  // rail advances forward only, so a browser cannot return to stage seven after
+  // the survey without a stage-jump control that does not exist. The three
+  // section 8.6 verdicts, the refusal before both numbers are in, and the stored
+  // numbers surviving a later score correction are covered against a real
+  // database by packages/core/test/review-reset.test.ts.
+
+  // ---------------------------------------------------------------------------
+  // Stage nine: keep, modify or abandon (METHOD.md section 8.8, P4-T11c-a)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const reset = page.getByRole("region", { name: "Keep, modify or abandon" });
+  await expect(reset).toHaveCount(1, { timeout: 10_000 });
+  await expect(reset).toContainText("0 of 2 decided");
+  // Nothing pre-selected: section 8.8's closing line is that nothing carries
+  // over by default, and a screen arriving with keep chosen is that carry-over
+  // wearing a decision's clothes.
+  await expect(reset.getByText("undecided").first()).toBeVisible();
+
+  const firstObjective = reset.getByRole("listitem").first();
+  // A decision with no why is refused on the screen before it reaches the
+  // action, because section 8.8 asks for one line and a decision nobody
+  // explained is the carry-over it exists to stop.
+  await firstObjective.getByRole("button", { name: "modify" }).click();
+  await firstObjective
+    .getByRole("button", { name: "Close it deliberately" })
+    .click();
+  await expect(reset).toContainText("asks for one line on why");
+
+  await firstObjective
+    .getByLabel("One line on why")
+    .fill("The target moved when the market did. The objective still holds.");
+  await firstObjective
+    .getByRole("button", { name: "Close it deliberately" })
+    .click();
+  await expect(reset).toContainText("1 of 2 decided", { timeout: 10_000 });
+  // The meaning comes from METHOD.md section 8.8, not from the screen.
+  await expect(reset).toContainText("Adjust the target or wording");
 
   const cleanup = await pool.connect();
   try {

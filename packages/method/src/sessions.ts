@@ -343,6 +343,24 @@ export function roomPulseRead(
 }
 
 /**
+ * §8.8's three ways to close an objective, and what each one means.
+ *
+ * **A taxonomy, so it lives here.** The three words already exist as
+ * `GOAL_CLOSE_DECISIONS` in `packages/db` because a goal stores which one it
+ * ended on; what was missing is the meaning, and a screen that writes its own
+ * gloss on "modify" is a screen that will disagree with the document. Keyed by
+ * the same three words so the two cannot drift apart.
+ *
+ * §8.8's closing line is the point of the stage: nothing carries over by
+ * default.
+ */
+export const CLOSE_DECISION_MEANINGS: Readonly<Record<string, string>> = {
+  keep: "Still relevant. Carry forward deliberately",
+  modify: "Adjust the target or wording from what we learned",
+  abandon: "Priority shifted. End it cleanly",
+};
+
+/**
  * §8.4's eight causes, one-based, and exactly one of them is primary.
  *
  * **A taxonomy, so it lives here and never in a row.** §11 lists the root-cause

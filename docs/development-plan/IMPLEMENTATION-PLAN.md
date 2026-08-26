@@ -669,12 +669,38 @@ Deliverables: the root-cause stage listing every key result below the threshold 
 Test plan: a process-health response cannot be attributed to a member and cannot be submitted twice; every key result below the threshold appears in the root-cause list.
 Acceptance: Given a survey with four responses, when the averages render, then no response can be traced to a member and the count reads four.
 
-### P4-T11c: The diagnostic, the reset and next-cycle drafts [M]
+### P4-T11c-a: The diagnostic and the reset decisions [M]
 Depends on: P4-T11b
-Goal: the third act (METHOD.md §8.6, §8.8, §8.9).
-Deliverables: the rhythm diagnostic rendered from P4-T01f with its verdict and narrative; keep, modify and abandon per objective with the meaning of the chosen decision and a required why; learnings with promotion from top-voted themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
-Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; a keep, modify or abandon decision writes back to the goal on close; the lowest process-health statement becomes an issue in the next cycle.
+Goal: §8.6's verdict and §8.8's close decisions (METHOD.md §8.6, §8.8).
+Deliverables: the rhythm diagnostic rendered from P4-T01f with its verdict and prescription, stored with the numbers it was read against; keep, modify and abandon per objective with the §8.8 meaning of the chosen decision and a required why.
+Test plan: the diagnostic verdict matches METHOD.md §8.6 across the three cases; one decision per objective with a why that cannot be empty.
 Acceptance: Given a cycle score below the threshold and a rhythm score above it, when the diagnostic renders, then it reads as a strategy or quality problem with the specific figures, and the prescription says to fix the key results before pushing the team.
+
+### P4-T11c-b: Learnings, next-cycle drafts, decisions and actions [M]
+Depends on: P4-T11c-a
+Goal: the rest of the third act (METHOD.md §8.9).
+Deliverables: learnings with promotion from top-voted retro themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
+Test plan: a top-voted retro theme promotes into a learning; the lowest process-health statement becomes an issue in the next cycle; an action with no owner is refused.
+Acceptance: Given a closed review with a carried learning, when the next cycle opens, then that learning is in its input pack and the carried item is a strategic issue at impact 4.
+
+**Why P4-T11c was split.** It carried five tables (`review_diagnostics`,
+`review_decisions`, `learnings`, `next_cycle_drafts`, `review_actions`), four of
+§8.1's eleven stages, roughly ten actions and four panels in one [M]. P4-T11a
+was already at the size limit with three tables and two panels, and this was
+half again as large. Split on 26 August 2026, before code was written, at the
+line §8 itself draws: §8.6 and §8.8 are the verdict and the close, §8.9 is the
+feed-forward into the next cycle.
+
+**One test-plan line moved and one is unmet.** "A keep, modify or abandon
+decision writes back to the goal on close" is not met by P4-T11c-a and the row
+says so: `goals_close_is_complete` (migration 0022) holds that a close carries
+`closed_at`, `success_status` and `close_decision` together or none of them, so
+writing the decision alone is refused by the schema. Closing the objective from
+the review would mean deriving a success status and inventing a retrospective
+body, because `closeGoalInTx` requires both and stage nine collects neither.
+The decision lives in `review_decisions`; whether `goals.close` should read it,
+or the review should close objectives outright, is an open question on the
+P4-T11c-a row.
 
 ### P4-T12: Minutes, exports and review feed-forward [M]
 Depends on: P4-T11c, P3-T15

@@ -330,6 +330,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // answer in the one place everybody reads (P4-T11b).
   "session.rootCauseNamed": z.object({ sessionId: z.string() }),
   "session.processHealthSubmitted": z.object({ sessionId: z.string() }),
+  // The verdict travels because §8.6 makes it a statement about the quarter's
+  // system rather than about anybody in it. The decision travels for the same
+  // reason; the why stays in the room it was given to (P4-T11c-a).
+  "session.diagnosticRead": z.object({
+    sessionId: z.string(),
+    verdict: z.string(),
+  }),
+  "session.objectiveDecided": z.object({
+    sessionId: z.string(),
+    decision: z.string(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

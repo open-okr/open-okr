@@ -176,7 +176,7 @@ All keyed on a `session` of kind `quarterly`.
 | `learnings` | `session_id?`, `cycle_id`, `text`, `carry_forward bool`, `source` (`manual` / `retro_theme` / `coach`) | Stage 10 |
 | `next_cycle_drafts` | `session_id`, `title`, `why`, `promoted_to_goal_id?` | Stage 10 |
 | `review_actions` | `session_id`, `what`, `owner_id?`, `due_on?`, `done bool` | Stage 11 |
-| `review_diagnostics` | `session_id`, `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`delivered` / `strategy_or_quality` / `rhythm`), `narrative` | The METHOD.md §8.6 output, computed not typed |
+| `review_diagnostics` | `session_id`, `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`results_delivered` / `strategy_or_quality` / `rhythm`), `narrative`, `ai_narrative?`, `recorded_by_id` | The METHOD.md §8.6 output, computed not typed. **`results_delivered` rather than the `delivered` this row carried until P4-T11c-a**, because that is what `packages/method`'s `DiagnosisKind` calls it and two names for one verdict is a translation layer with nothing to gain. Stored rather than recomputed on read: §8.6 calls this the most valuable output of the review and the minutes have to show what the room was told, so a verdict that changed as scores were corrected would be a record that rewrites itself. `ai_narrative` is separate from `narrative`, so the deterministic sentence survives with AI off |
 
 ### 4.9 The work (domain I)
 

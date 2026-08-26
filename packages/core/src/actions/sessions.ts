@@ -20,8 +20,10 @@ import {
   blockers,
   checkInVotes,
   commitments,
+  DIAGNOSIS_VERDICTS,
   decisions,
   digests,
+  GOAL_CLOSE_DECISIONS,
   goals,
   keyResultDependencies,
   keyResults,
@@ -33,6 +35,8 @@ import {
   RETRO_COLUMNS,
   retroNotes,
   retroVotes,
+  reviewDecisions,
+  reviewDiagnostics,
   reviewNarratives,
   reviewScores,
   rootCauses,
@@ -47,6 +51,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import {
+  CLOSE_DECISION_MEANINGS,
   cycleScore,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
@@ -56,6 +61,7 @@ import {
   progressSignal,
   REVIEW_STAGE_KEYS,
   ROOT_CAUSES,
+  rhythmDiagnostic,
   rhythmScore,
   roomPulseRead,
   WEEKLY_STAGE_KEYS,
@@ -963,6 +969,25 @@ export const closeSession = defineWriteAction({
               ),
             );
         }
+
+        /**
+         * **§8.8's decisions are not written onto the goals, and the schema is
+         * why (P4-T11c-a).**
+         *
+         * `goals_close_is_complete` (migration 0022) holds that a close carries
+         * `closed_at`, `success_status` and `close_decision` together or none of
+         * them: a close decision without a close is a contradiction, and the
+         * constraint refused the write. It was right to.
+         *
+         * Actually closing the objectives here would mean deriving a success
+         * status and inventing a retrospective body for each one, because
+         * `closeGoalInTx` requires both and stage nine collects neither. So the
+         * decision and its why live in `review_decisions`, and the honest
+         * reading of TECHNICAL-PLAN §4's "written back to the goal on close" is
+         * that `goals.close` reads them when somebody closes the objective for
+         * real. **That integration is not built and is an open question on the
+         * P4-T11c-a row rather than a silent gap.**
+         */
       }
 
       await tx
@@ -5346,6 +5371,521 @@ export const readProcessHealth = defineReadAction({
           submitted:
             mineHash !== null &&
             rows.some((row) => row.respondentHash === mineHash),
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Stage seven's second half: the diagnostic, and stage nine: keep, modify or
+// abandon (METHOD.md §8.6 and §8.8, p4-t00-session-design.md §4.8, P4-T11c-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The two numbers §8.6 reads, or nulls where the room has not produced them.
+ *
+ * The cycle score here is the plain §3.4 average over every key result this
+ * review graded, **not** the reveal-gated running total `sessions.scoringStatus`
+ * shows. The reveal is about who sees an objective's roll-up during stage two
+ * (P4-T10b-b); by stage seven the room has seen everything, and a diagnostic
+ * that ignored unrevealed grades would diagnose a quarter that did not happen.
+ */
+async function diagnosticInputsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const graded = await tx
+    .select({ score: reviewScores.score })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+      ),
+    );
+  const cycle = cycleScore(graded.map((row) => Number(row.score)));
+
+  const responses = await tx
+    .select({
+      statementKey: processHealthResponses.statementKey,
+      score: processHealthResponses.score,
+    })
+    .from(processHealthResponses)
+    .where(
+      activeOnly(
+        processHealthResponses,
+        eq(processHealthResponses.workspaceId, workspaceId),
+        eq(processHealthResponses.sessionId, sessionId),
+      ),
+    );
+  const averages = PROCESS_HEALTH_STATEMENTS.map((_statement, index) => {
+    const forStatement = responses.filter(
+      (row) => row.statementKey === index + 1,
+    );
+    return forStatement.length === 0
+      ? null
+      : forStatement.reduce((sum, row) => sum + row.score, 0) /
+          forStatement.length;
+  });
+
+  return { cycle, rhythm: rhythmScore(averages) };
+}
+
+export const recordDiagnostic = defineWriteAction({
+  name: "sessions.recordDiagnostic",
+  summary:
+    "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    verdict: z.enum(DIAGNOSIS_VERDICTS),
+    cycleScore: z.number(),
+    rhythmScore: z.number(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const { cycle, rhythm } = await diagnosticInputsInTx(
+        tx,
+        workspaceId,
+        input.sessionId,
+      );
+      if (cycle === null || rhythm === null) {
+        // §8.6 combines two numbers and neither is optional. A diagnostic built
+        // on a missing answer is worse than no diagnostic, because it reads as
+        // evidence.
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs both a cycle score and a rhythm score. Grade the key results and run the survey first.",
+        );
+      }
+
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      // The verdict, the diagnosis and the prescription all come from
+      // `packages/method`. Nothing about which of the three cases applies is
+      // decided here.
+      const diagnosis = rhythmDiagnostic(cycle, rhythm, thresholds);
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: reviewDiagnostics.id })
+        .from(reviewDiagnostics)
+        .where(
+          activeOnly(
+            reviewDiagnostics,
+            eq(reviewDiagnostics.workspaceId, workspaceId),
+            eq(reviewDiagnostics.sessionId, input.sessionId),
+          ),
+        )
+        .limit(1);
+
+      const values = {
+        cycleScore: String(cycle),
+        rhythmScore: String(rhythm),
+        verdict: diagnosis.kind,
+        narrative: diagnosis.prescription,
+        recordedById: memberId,
+        updatedAt: now,
+      };
+
+      if (existing) {
+        // Reading it again replaces it. A room that deliberately re-reads after
+        // correcting a score has one answer, not two, and the stored numbers
+        // move with the verdict so the record stays internally consistent.
+        await tx
+          .update(reviewDiagnostics)
+          .set(values)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.id, existing.id),
+            ),
+          );
+      } else {
+        await tx.insert(reviewDiagnostics).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          ...values,
+        });
+      }
+
+      return {
+        result: {
+          verdict: diagnosis.kind,
+          cycleScore: cycle,
+          rhythmScore: rhythm,
+        },
+        activity: {
+          kind: "session.diagnosticRead",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The verdict is the one thing worth carrying: it is about the
+          // quarter's system rather than about anybody in it, and §8.6 calls it
+          // the review's most valuable output.
+          payload: { sessionId: input.sessionId, verdict: diagnosis.kind },
+        },
+        audit: {
+          action: "sessions.recordDiagnostic",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { verdict: diagnosis.kind },
+        },
+      };
+    },
+  }),
+});
+
+export const readDiagnostic = defineReadAction({
+  name: "sessions.diagnostic",
+  summary: "§8.6's verdict for this review, stored or still unreadable.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** The stored numbers when recorded, else what the room has so far. */
+    cycleScore: z.number().nullable(),
+    rhythmScore: z.number().nullable(),
+    verdict: z.enum(DIAGNOSIS_VERDICTS).nullable(),
+    /** §8.6's sentences, from `packages/method`. Never stored as the verdict's meaning. */
+    diagnosis: z.string().nullable(),
+    prescription: z.string().nullable(),
+    recorded: z.boolean(),
+    /** Both numbers exist, so the room can read it. */
+    readable: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const [stored] = await tx
+          .select({
+            cycleScore: reviewDiagnostics.cycleScore,
+            rhythmScore: reviewDiagnostics.rhythmScore,
+            verdict: reviewDiagnostics.verdict,
+          })
+          .from(reviewDiagnostics)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.workspaceId, context.workspaceId),
+              eq(reviewDiagnostics.sessionId, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        if (stored) {
+          // The sentences are recomputed from the stored numbers rather than
+          // stored twice, so a wording correction in METHOD.md reaches old
+          // records while the verdict they were read at does not move.
+          const diagnosis = rhythmDiagnostic(
+            Number(stored.cycleScore),
+            Number(stored.rhythmScore),
+            thresholds,
+          );
+          return {
+            cycleScore: Number(stored.cycleScore),
+            rhythmScore: Number(stored.rhythmScore),
+            verdict: stored.verdict,
+            diagnosis: diagnosis.diagnosis,
+            prescription: diagnosis.prescription,
+            recorded: true,
+            readable: true,
+          };
+        }
+
+        const { cycle, rhythm } = await diagnosticInputsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
+        return {
+          cycleScore: cycle,
+          rhythmScore: rhythm,
+          verdict: null,
+          diagnosis: null,
+          prescription: null,
+          recorded: false,
+          readable: cycle !== null && rhythm !== null,
+        };
+      },
+    );
+  },
+});
+
+export const decideObjective = defineWriteAction({
+  name: "sessions.decideObjective",
+  summary:
+    "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    decision: z.enum(GOAL_CLOSE_DECISIONS),
+    // Required. §8.8 asks for "one decision and a one-line why", and a decision
+    // nobody explained is the default carry-over the section exists to stop.
+    why: z.string().trim().min(1).max(1000),
+  }),
+  output: z.object({ goalId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [inScope] = await tx
+        .select({ id: goals.id })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            ...reviewObjectiveConditions(workspaceId, session),
+            eq(goals.id, input.goalId),
+          ),
+        )
+        .limit(1);
+      if (!inScope) {
+        throw new OperationError(
+          "not_found",
+          "That objective is not in this review.",
+        );
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: reviewDecisions.id })
+        .from(reviewDecisions)
+        .where(
+          activeOnly(
+            reviewDecisions,
+            eq(reviewDecisions.workspaceId, workspaceId),
+            eq(reviewDecisions.sessionId, input.sessionId),
+            eq(reviewDecisions.goalId, input.goalId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // One decision per objective. §8.8 closes each deliberately, which is
+        // one answer rather than a history of opinions.
+        await tx
+          .update(reviewDecisions)
+          .set({
+            decision: input.decision,
+            why: input.why,
+            decidedById: memberId,
+            updatedAt: now,
+          })
+          .where(
+            activeOnly(reviewDecisions, eq(reviewDecisions.id, existing.id)),
+          );
+      } else {
+        await tx.insert(reviewDecisions).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          goalId: input.goalId,
+          decision: input.decision,
+          why: input.why,
+          decidedById: memberId,
+        });
+      }
+
+      return {
+        result: { goalId: input.goalId },
+        activity: {
+          kind: "session.objectiveDecided",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          // The decision travels; the why does not. Whether an objective is
+          // kept or abandoned is the space's business, and the reasoning was
+          // given to the room.
+          payload: { sessionId: input.sessionId, decision: input.decision },
+        },
+        audit: {
+          action: "sessions.decideObjective",
+          targetType: "goal",
+          targetId: input.goalId,
+          payload: { decision: input.decision },
+        },
+      };
+    },
+  }),
+});
+
+export const readReset = defineReadAction({
+  name: "sessions.reset",
+  summary:
+    "Stage nine's state: every objective in the review and how it was closed.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /** §3.2's weighted score over what this review graded, or null. */
+        score: z.number().nullable(),
+        decision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
+        /** §8.8's meaning for the chosen decision, from `packages/method`. */
+        meaning: z.string().nullable(),
+        why: z.string().nullable(),
+      }),
+    ),
+    decided: z.number().int(),
+    total: z.number().int(),
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({ goalId: goals.id, goalTitle: goals.title })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(context.workspaceId, session),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt);
+
+        const decisions = await tx
+          .select({
+            goalId: reviewDecisions.goalId,
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+          })
+          .from(reviewDecisions)
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, context.workspaceId),
+              eq(reviewDecisions.sessionId, input.sessionId),
+            ),
+          );
+        const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
+
+        const graded = await tx
+          .select({
+            goalId: keyResults.goalId,
+            score: reviewScores.score,
+            weight: keyResults.weight,
+          })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, context.workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+            ),
+          );
+
+        const objectives = rows.map((row) => {
+          const decided = byGoal.get(row.goalId);
+          const forGoal = graded.filter((entry) => entry.goalId === row.goalId);
+          return {
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            // §3.2's weighting, from `packages/method`. Shown here as evidence
+            // beside the decision, which is what §8.8 asks a room to decide on.
+            score: objectiveScore(
+              forGoal.map((entry) => ({
+                score: Number(entry.score),
+                weight: Number(entry.weight),
+              })),
+            ),
+            decision: decided?.decision ?? null,
+            meaning:
+              decided === undefined
+                ? null
+                : (CLOSE_DECISION_MEANINGS[decided.decision] ?? null),
+            why: decided?.why ?? null,
+          };
+        });
+        const decidedCount = objectives.filter(
+          (entry) => entry.decision !== null,
+        ).length;
+
+        return {
+          objectives,
+          decided: decidedCount,
+          total: objectives.length,
+          complete: objectives.length > 0 && decidedCount === objectives.length,
         };
       },
     );
