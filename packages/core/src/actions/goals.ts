@@ -17,6 +17,7 @@ import {
   checkIns,
   cycles,
   GOAL_CLOSE_DECISIONS,
+  GOAL_HEALTH,
   GOAL_LEVELS,
   GOAL_OWNER_KINDS,
   GOAL_SUCCESS_STATUSES,
@@ -37,7 +38,16 @@ import {
   KEY_RESULT_CHECKS,
   type KeyResultInput,
 } from "@openokr/method";
-import { asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -384,6 +394,25 @@ export const listGoals = defineReadAction({
      * both need (S-01, S-13).
      */
     spaceId: z.uuid().optional(),
+    /**
+     * §3.2's health band (P4-T15d).
+     *
+     * The explorer had no way to ask for "the off-track ones", which made the
+     * filter assist's own acceptance sentence unexpressible. Deterministic in
+     * its own right: a filter chip, with or without a provider.
+     */
+    health: z.enum(GOAL_HEALTH).optional(),
+    /**
+     * Only the ones this member champions or reviews.
+     *
+     * "Mine" rather than an owner id, because a filter naming a member id would
+     * let a caller ask about somebody else's list by editing a URL, and this
+     * question is always about the person asking.
+     */
+    // Optional rather than defaulted, because a `default` on a read action's
+    // input makes the field required in the inferred handler type, and every
+    // existing caller of `goals.list` would have to pass it.
+    mine: z.boolean().optional(),
   }),
   output: z.object({ goals: z.array(goalOutput) }),
   access: ACCESS_LEVELS.view,
@@ -409,6 +438,19 @@ export const listGoals = defineReadAction({
         }
         if (input.spaceId) {
           filters.push(eq(goals.spaceId, input.spaceId));
+        }
+        if (input.health) {
+          filters.push(eq(goals.health, input.health));
+        }
+        if (input.mine) {
+          // Champion or reviewer: both are ways of being accountable for it, and
+          // a reviewer looking for their own list means the ones they answer for.
+          filters.push(
+            or(
+              eq(goals.championId, memberId),
+              eq(goals.reviewerId, memberId),
+            ) as never,
+          );
         }
         if (!input.includeClosed) {
           filters.push(isNull(goals.closedAt));

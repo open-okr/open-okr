@@ -22,12 +22,14 @@ import type {
   DraftedCheckIn,
   DraftedKeyResult,
   DraftedObjective,
+  FilterContext,
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
   MeasureContext,
   NarratedTrend,
   ParentContext,
+  ParsedFilter,
   ProposalRequestContext,
   ProposedAction,
   RecoveryTitleContext,
@@ -424,6 +426,62 @@ const TREND_SYSTEM =
   "were not shown. An anomaly is a movement that does not fit the pattern, " +
   "not simply the largest one; an empty list is the right answer for a " +
   "series that did what it always does.";
+
+/**
+ * The list filter (AI-NATIVE-PLAN.md §2.4, P4-T15d).
+ *
+ * **`expressible` is a field, so refusing is something the model can say.**
+ * §2.4 asks for a filter "refused rather than approximated", and a model given
+ * only a filter shape will always fill it in: asked whether the sentence fits
+ * the grammar, it answers that question instead of quietly narrowing
+ * "blocked on legal" to "off track".
+ *
+ * The caller re-checks every field against the grammar anyway, so a level or a
+ * band the product does not have becomes a refusal rather than a filter.
+ */
+const FILTER_SHAPE = z.object({
+  expressible: z.boolean(),
+  reason: z.string().trim().max(300),
+  /** One-based into the cycle list. Zero means the sentence named no cycle. */
+  cycle: z.number().int(),
+  level: z.string().trim().max(40),
+  health: z.string().trim().max(40),
+  mine: z.boolean(),
+  includeClosed: z.boolean(),
+});
+
+const FILTER_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "expressible",
+    "reason",
+    "cycle",
+    "level",
+    "health",
+    "mine",
+    "includeClosed",
+  ],
+  properties: {
+    expressible: { type: "boolean" },
+    reason: { type: "string", maxLength: 300 },
+    cycle: { type: "integer" },
+    level: { type: "string" },
+    health: { type: "string" },
+    mine: { type: "boolean" },
+    includeClosed: { type: "boolean" },
+  },
+} as const;
+
+const FILTER_SYSTEM =
+  "You turn a sentence into a filter over a list of objectives. The filter " +
+  "can express four things and nothing else: which cycle, which level, which " +
+  "health band, and whether the objectives belong to the person asking. " +
+  "**If the sentence asks for anything else, say it is not expressible and " +
+  "say which part.** Never approximate: a filter that looks right and means " +
+  "something else is worse than no filter. Choose a cycle by its number, or " +
+  "0 for none. Use the exact level and health words you are given, or an " +
+  "empty string for none.";
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -999,6 +1057,56 @@ export function createProviderDrafter(
           ],
         });
         return narrated.narrative.trim() === "" ? null : narrated;
+      } catch {
+        return null;
+      }
+    },
+
+    async parseListFilter(
+      context: FilterContext,
+    ): Promise<ParsedFilter | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const parsed = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: FILTER_SHAPE,
+          jsonSchema: FILTER_JSON_SCHEMA,
+          maxTokens: 250,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: FILTER_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Sentence: ${context.sentence}` +
+                NEWLINE +
+                "Cycles:" +
+                NEWLINE +
+                context.cycles
+                  .map((name, index) => `  ${index + 1}. ${name}`)
+                  .join(NEWLINE) +
+                NEWLINE +
+                `Levels: ${context.levels.join(", ")}` +
+                NEWLINE +
+                `Health bands: ${context.healthBands.join(", ")}`,
+            },
+          ],
+        });
+
+        if (!parsed.expressible) {
+          return { kind: "refused", reason: parsed.reason };
+        }
+        return {
+          kind: "filter",
+          cycleNumber: parsed.cycle < 1 ? null : parsed.cycle,
+          level: parsed.level === "" ? null : parsed.level,
+          health: parsed.health === "" ? null : parsed.health,
+          mine: parsed.mine,
+          includeClosed: parsed.includeClosed,
+        };
       } catch {
         return null;
       }

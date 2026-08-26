@@ -289,6 +289,40 @@ export interface NarratedTrend {
 }
 
 /**
+ * What the filter assist is shown (P4-T15d).
+ *
+ * The cycles are names, numbered from one, and the levels and health bands are
+ * the product's own enums. Nothing here is an identifier, so a filter the model
+ * produces can only describe goals this member is already allowed to list.
+ */
+export interface FilterContext {
+  readonly sentence: string;
+  readonly cycles: readonly string[];
+  readonly levels: readonly string[];
+  readonly healthBands: readonly string[];
+}
+
+/**
+ * A parsed filter, or a refusal.
+ *
+ * **Refusing is a first-class answer, not a failure.** §2.4 asks for a filter
+ * "refused rather than approximated", so the shape makes refusal expressible:
+ * a model that narrows "blocked on legal" to "off track" has produced something
+ * that reads right and is wrong, and this is what lets it say so instead.
+ */
+export type ParsedFilter =
+  | {
+      readonly kind: "filter";
+      /** One-based into the cycle list, or null when the sentence named none. */
+      readonly cycleNumber: number | null;
+      readonly level: string | null;
+      readonly health: string | null;
+      readonly mine: boolean;
+      readonly includeClosed: boolean;
+    }
+  | { readonly kind: "refused"; readonly reason: string };
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -402,6 +436,14 @@ export interface AgentDrafter {
    * narration is dropped. A trend read next to its own chart has to agree with it.
    */
   narrateTrend?(context: TrendContext): Promise<NarratedTrend | null>;
+  /**
+   * §2.4's sentence-to-filter, or a refusal with the reason (P4-T15d).
+   *
+   * Every field that comes back is checked against the grammar by the caller, so
+   * a level the product does not have or a cycle number past the end of the list
+   * becomes a refusal rather than a filter.
+   */
+  parseListFilter?(context: FilterContext): Promise<ParsedFilter | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

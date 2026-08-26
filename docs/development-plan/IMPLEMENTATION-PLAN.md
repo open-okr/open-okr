@@ -818,7 +818,7 @@ Acceptance: Given a closed review, when the diagnostic narrative is drafted, the
 ### P4-T15d: The list filter assist [S]
 Depends on: P4-T15a
 Goal: AI-NATIVE-PLAN.md §2.4's filter capability.
-Deliverables: a sentence turned into a validated list filter on the goals explorer, refused rather than approximated when it does not parse into the filter grammar.
+Deliverables: the goals explorer's filter grammar extended with §3.2's health band and a whose-are-they filter, both working with no provider; a sentence turned into a validated filter over that grammar, refused with the reason rather than approximated when it does not fit.
 Test plan: a sentence that cannot be expressed in the filter grammar is refused with the reason, not silently narrowed; the manual filters are unchanged with the provider off.
 Acceptance: Given a member typing "my off-track goals this quarter", when the assist runs, then the explorer's own filter state is set and visible as filters they can edit.
 

@@ -136,6 +136,7 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import { parseListFilter } from "./filter-assist.ts";
 import {
   draftObjective,
   suggestMeasure,
@@ -429,6 +430,7 @@ export const ACTION_MAP = {
   "goals.draftObjective": draftObjective,
   "goals.suggestMeasure": suggestMeasure,
   "goals.suggestParent": suggestParent,
+  "goals.parseFilter": parseListFilter,
   "goals.startCheckIn": startCheckIn,
   "goals.publishCheckIn": publishCheckIn,
   "goals.publishDraftedCheckIn": publishDraftedCheckIn,

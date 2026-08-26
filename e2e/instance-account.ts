@@ -80,4 +80,26 @@ export async function signIn(
     );
   });
   await expect(page).toHaveURL("/");
+  // **Settled, not merely arrived.** `waitForURL` resolves while the sign-in
+  // navigation is still finishing, and a `goto` issued in the next line then
+  // supersedes it and fails with `net::ERR_ABORTED`. Two specs hit that on
+  // separate runs before this line existed.
+  await page.waitForLoadState("load");
+}
+
+/**
+ * Navigates, retrying once.
+ *
+ * `net::ERR_ABORTED` means a navigation was superseded rather than a page that
+ * does not work, and it happens on a first `goto` after signing in. The
+ * assertion that follows a `goto` is what proves the page loaded; this only
+ * stops a race deciding whether the spec runs at all.
+ */
+export async function goTo(
+  page: import("@playwright/test").Page,
+  url: string,
+): Promise<void> {
+  await page.goto(url).catch(async () => {
+    await page.goto(url);
+  });
 }

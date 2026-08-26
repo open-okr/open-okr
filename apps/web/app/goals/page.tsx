@@ -5,10 +5,13 @@ import {
   confidenceBand,
 } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import type { ReactNode } from "react";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../lib/workspace";
+import { filterAssistAvailableAction } from "./filter-actions.ts";
+import { FilterAssist } from "./filter-assist.tsx";
 import { HealthChip } from "./health-chip.tsx";
 
 /**
@@ -38,6 +41,15 @@ export default async function GoalsPage({
     level?: string;
     view?: string;
     closed?: string;
+    /**
+     * §3.2's health band, and whose objectives these are (P4-T15d).
+     *
+     * Both are ordinary filters that work with no provider: the filter assist
+     * needed them to exist before it could set them, and the explorer is better
+     * for having them either way.
+     */
+    health?: string;
+    mine?: string;
   }>;
 }) {
   const { session, workspace } = await requireWorkspace();
@@ -47,6 +59,9 @@ export default async function GoalsPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const query = await searchParams;
+  // Whether a provider can turn a sentence into filters. False is the normal
+  // case, and the chips below are unchanged by it (P4-T15d).
+  const filterAssistAvailable = await filterAssistAvailableAction();
 
   const cycles = await callAction(context, "cycles.list", {});
   const current = await callAction(context, "cycles.current", {
@@ -55,6 +70,10 @@ export default async function GoalsPage({
   const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
 
   const level = ALIGNMENT_LEVEL_ORDER.find((entry) => entry === query.level);
+  // Validated against the band list rather than passed through, so a hand-edited
+  // URL cannot ask for a band the product does not have.
+  const health = GOAL_HEALTH_BANDS.find((entry) => entry === query.health);
+  const mine = query.mine === "1";
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
 
@@ -63,6 +82,8 @@ export default async function GoalsPage({
         cycleId,
         includeClosed,
         ...(level ? { level } : {}),
+        ...(health ? { health } : {}),
+        ...(mine ? { mine } : {}),
       })
     : { goals: [] };
 
@@ -75,9 +96,15 @@ export default async function GoalsPage({
 
   const href = (patch: Record<string, string | null>): string => {
     const next = new URLSearchParams();
+    // Every filter the page understands, so a chip that changes one keeps the
+    // rest. The two added in P4-T15d were missing from this list at first, which
+    // meant clicking any chip silently cleared them: caught by an e2e assertion
+    // that the other half of the filter survived.
     const merged = {
       cycle: cycleId,
       level: level ?? null,
+      health: health ?? null,
+      mine: mine ? "1" : null,
       view: tree ? null : "list",
       closed: includeClosed ? "1" : null,
       ...patch,
@@ -132,6 +159,11 @@ export default async function GoalsPage({
               cycles={cycles}
               cycleId={cycleId}
               level={level ?? null}
+              health={health ?? null}
+              mine={mine}
+              filterAssist={
+                filterAssistAvailable ? <FilterAssist /> : undefined
+              }
               tree={tree}
               includeClosed={includeClosed}
               href={href}
@@ -174,67 +206,112 @@ export default async function GoalsPage({
   );
 }
 
+/** §3.2's bands, in the order the explorer offers them. */
+const GOAL_HEALTH_BANDS = [
+  "pending",
+  "on_track",
+  "caution",
+  "off_track",
+  "outdated",
+  "achieved",
+  "missed",
+] as const;
+
 function Filters({
   cycles,
   cycleId,
   level,
+  health,
+  mine,
   tree,
   includeClosed,
   href,
+  filterAssist,
 }: {
   readonly cycles: readonly { id: string; name: string }[];
   readonly cycleId: string | null;
   readonly level: string | null;
+  readonly health: string | null;
+  readonly mine: boolean;
   readonly tree: boolean;
   readonly includeClosed: boolean;
   readonly href: (patch: Record<string, string | null>) => string;
+  /** The sentence-to-filter box, when a provider can answer. */
+  readonly filterAssist?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Group label="Cycle">
-        {cycles.map((cycle) => (
-          <Tab
-            key={cycle.id}
-            href={href({ cycle: cycle.id })}
-            active={cycle.id === cycleId}
-          >
-            {cycle.name}
+    <div className="flex flex-col gap-2">
+      {filterAssist}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Group label="Cycle">
+          {cycles.map((cycle) => (
+            <Tab
+              key={cycle.id}
+              href={href({ cycle: cycle.id })}
+              active={cycle.id === cycleId}
+            >
+              {cycle.name}
+            </Tab>
+          ))}
+        </Group>
+
+        <Group label="Level">
+          <Tab href={href({ level: null })} active={level === null}>
+            All
           </Tab>
-        ))}
-      </Group>
+          {ALIGNMENT_LEVEL_ORDER.map((entry) => (
+            <Tab
+              key={entry}
+              href={href({ level: entry })}
+              active={level === entry}
+            >
+              {entry}
+            </Tab>
+          ))}
+        </Group>
 
-      <Group label="Level">
-        <Tab href={href({ level: null })} active={level === null}>
-          All
-        </Tab>
-        {ALIGNMENT_LEVEL_ORDER.map((entry) => (
-          <Tab
-            key={entry}
-            href={href({ level: entry })}
-            active={level === entry}
-          >
-            {entry}
+        <Group label="Health">
+          <Tab href={href({ health: null })} active={health === null}>
+            Any
           </Tab>
-        ))}
-      </Group>
+          {GOAL_HEALTH_BANDS.map((band) => (
+            <Tab
+              key={band}
+              href={href({ health: band })}
+              active={health === band}
+            >
+              {band.replace("_", " ")}
+            </Tab>
+          ))}
+        </Group>
 
-      <Group label="View">
-        <Tab href={href({ view: null })} active={tree}>
-          Tree
-        </Tab>
-        <Tab href={href({ view: "list" })} active={!tree}>
-          List
-        </Tab>
-      </Group>
+        <Group label="Whose">
+          <Tab href={href({ mine: null })} active={!mine}>
+            Everyone's
+          </Tab>
+          <Tab href={href({ mine: "1" })} active={mine}>
+            Mine
+          </Tab>
+        </Group>
 
-      <Group label="Closed">
-        <Tab href={href({ closed: null })} active={!includeClosed}>
-          Hidden
-        </Tab>
-        <Tab href={href({ closed: "1" })} active={includeClosed}>
-          Shown
-        </Tab>
-      </Group>
+        <Group label="View">
+          <Tab href={href({ view: null })} active={tree}>
+            Tree
+          </Tab>
+          <Tab href={href({ view: "list" })} active={!tree}>
+            List
+          </Tab>
+        </Group>
+
+        <Group label="Closed">
+          <Tab href={href({ closed: null })} active={!includeClosed}>
+            Hidden
+          </Tab>
+          <Tab href={href({ closed: "1" })} active={includeClosed}>
+            Shown
+          </Tab>
+        </Group>
+      </div>
     </div>
   );
 }
@@ -247,12 +324,23 @@ function Group({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    // A named group, because "Any" and "All" appear in more than one of these
+    // and a test that clicks the wrong one passes for the wrong reason. Naming
+    // the region is also what a screen reader wants: the chips mean nothing
+    // without knowing which filter they belong to.
+    // A `fieldset`, not a `div role="group"`: the a11y lint asks for the element
+    // that already has the role, and `getByRole("group")` finds either. The
+    // label is on the element rather than in a `legend`, because the visible
+    // text below is the label and a legend would say it twice.
+    <fieldset
+      aria-label={label}
+      className="flex items-center gap-1.5 border-0 p-0"
+    >
       <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
         {label}
       </span>
       <div className="flex flex-wrap gap-1">{children}</div>
-    </div>
+    </fieldset>
   );
 }
 

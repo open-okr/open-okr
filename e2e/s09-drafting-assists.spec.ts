@@ -23,7 +23,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page } from "@playwright/test";
-import { signIn } from "./instance-account.ts";
+import { goTo, signIn } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -45,13 +45,7 @@ test("sign in and reach the drafting step", async () => {
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible({ timeout: 10_000 });
 
-  // Retried once. A single `goto` here failed one run with
-  // `net::ERR_ABORTED`, which is a navigation superseded rather than a page
-  // that does not work, and the assertion below is what actually proves the
-  // step loaded.
-  await page.goto("/cycle?phase=4").catch(async () => {
-    await page.goto("/cycle?phase=4");
-  });
+  await goTo(page, "/cycle?phase=4");
   // The drafting step's own form is the anchor: it is what the acceptance
   // criterion calls "the create form".
   await expect(

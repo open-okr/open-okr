@@ -25,6 +25,8 @@ export const ASSIST_FEATURE_KEYS = {
   draftObjective: "assists.draftObjective",
   suggestMeasure: "assists.suggestMeasure",
   suggestParent: "assists.suggestParent",
+  /** §2.4's list filter (P4-T15d). */
+  parseFilter: "assists.parseFilter",
 } as const;
 
 /** §2.2's rhythm narrations (P4-T15b-a). */
