@@ -28,3 +28,56 @@ export const INSTANCE_ACCOUNT = {
   password: "correct horse battery staple",
   name: "Ada Lovelace",
 } as const;
+
+/**
+ * Signs in as that person, and refuses to be the one who claims the instance.
+ *
+ * **The claim belongs to exactly one spec, and it is not this function's.**
+ * `registration-to-dashboard.spec.ts` claims it, and its first test *is* the
+ * registration path: a spec that registered before it turns that test red,
+ * because `/sign-up` is shut behind the first account. Learned by doing it:
+ * `copilot.spec.ts` sorted before `registration-` and broke it, which is why
+ * that file is now `s39-copilot.spec.ts`.
+ *
+ * So a spec that runs before the claimer gets a clear failure naming the rule,
+ * rather than quietly claiming and breaking a file somewhere else. Order still
+ * matters and is still alphabetical; what changes is that getting it wrong says
+ * so.
+ *
+ * Not yet used by `reviews.spec.ts` or `sessions.spec.ts`, which still carry
+ * their own sign-in. Both would be better for adopting it, and neither is this
+ * task's to change.
+ */
+export async function signIn(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  const { expect } = await import("@playwright/test");
+  await page.goto("/");
+
+  if (page.url().includes("/setup")) {
+    throw new Error(
+      "This instance has never been set up. The wizard spec runs against its " +
+        "own instance; an application spec must not claim this one.",
+    );
+  }
+  if (!page.url().includes("/sign-in")) {
+    // Already signed in, which is what a second call in the same context sees.
+    return;
+  }
+
+  await page.getByLabel("Email").fill(INSTANCE_ACCOUNT.email);
+  await page.getByLabel("Password").fill(INSTANCE_ACCOUNT.password);
+  await page
+    .getByRole("button", { name: "Sign in", exact: true })
+    .first()
+    .click();
+
+  await page.waitForURL("/", { timeout: 10_000 }).catch(() => {
+    throw new Error(
+      "Nobody has claimed this instance yet, so there is no account to sign " +
+        "in as. An application spec must sort after " +
+        "registration-to-dashboard.spec.ts, which is the one that registers.",
+    );
+  });
+  await expect(page).toHaveURL("/");
+}

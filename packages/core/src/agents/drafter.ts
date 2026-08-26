@@ -139,6 +139,24 @@ export interface GroundedAnswer {
 }
 
 /**
+ * One piece of an answer arriving (P4-T14a-b).
+ *
+ * A discriminated union rather than a stream of plain strings, because a reader
+ * needs the words as they arrive and the product needs the finished answer's
+ * citations and cost, and neither can be recovered from the other. The `done`
+ * chunk carries the assembled `GroundedAnswer`, so the caller records the same
+ * thing it would have recorded had it not streamed at all.
+ *
+ * **A stream that stops carries no `done`.** That is what tells the caller the
+ * reader interrupted it: what arrived is recorded, marked as stopped, with no
+ * citations, because the model never said which sources its unfinished sentence
+ * rested on.
+ */
+export type GroundedChunk =
+  | { readonly kind: "text"; readonly text: string }
+  | { readonly kind: "done"; readonly answer: GroundedAnswer };
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -188,6 +206,19 @@ export interface AgentDrafter {
   answerGrounded?(
     context: GroundedQuestionContext,
   ): Promise<GroundedAnswer | null>;
+  /**
+   * The same answer, arriving as it is written (P4-T14a-b).
+   *
+   * Optional beside `answerGrounded` rather than replacing it: a provider or a
+   * model without streaming still answers, and a caller that cannot stream (a
+   * chat command, an external agent asking once) wants the whole thing anyway.
+   * A host that implements one and not the other is a host with one fewer
+   * surface, not a broken one.
+   */
+  streamGrounded?(
+    context: GroundedQuestionContext,
+    signal?: AbortSignal,
+  ): AsyncIterable<GroundedChunk>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

@@ -90,6 +90,7 @@ export type {
   CheckInDraftContext,
   DraftedCheckIn,
   GroundedAnswer,
+  GroundedChunk,
   GroundedQuestionContext,
   GroundingSource,
   RecoveryTitleContext,
@@ -197,8 +198,11 @@ export {
 export {
   type AnswerQuestionInput,
   type AnswerQuestionResult,
+  type AnswerSource,
   answerQuestion,
+  type CopilotEvent,
   GROUNDING_LIMIT,
+  streamAnswer,
 } from "./copilot/answer.ts";
 export {
   citationLabel,

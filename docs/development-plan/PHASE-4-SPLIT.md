@@ -25,13 +25,13 @@ a contract, a citation guarantee and a streaming panel. Counts read on
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 11 | P4-T10b-b to P4-T12-b, P4-T13a, P4-T13b, P4-T14a-a |
-| todo | 6 | P4-T14a-b, P4-T14b, P4-T15a to P4-T15d |
+| in_review | 12 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14a-b |
+| todo | 5 | P4-T14b, P4-T15a to P4-T15d |
 
 The agents lane is finished and read, and **the sessions lane is finished and**
 **waiting on a read**: the quarterly review runs all eleven stages, produces its
 minutes and hands §8.9's five rows to the next cycle. What is left is the
-retrieval lane (P4-T14a-b then P4-T14b) and P4-T15, which needs both.
+retrieval lane (P4-T14b) and P4-T15, which needs both.
 
 **`done` here means the row was read and accepted, not that it reached `main`.**
 Branch `agung` is fifty-nine commits ahead of `origin/main`, and the only Phase 4
@@ -57,7 +57,7 @@ quarterly review.
 | A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
 | B2: the sessions | P4-T07a to P4-T12, seventeen rows | yes | **Complete.** P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T12-b written and waiting on a read |
-| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a to P4-T14a-a written and waiting on a read; **P4-T14a-b next** |
+| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a to P4-T14a-b written and waiting on a read; **P4-T14b next** |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
 B2 is the critical path. Nine of its fifteen rows are accepted, three are in
@@ -163,7 +163,7 @@ and this table is what was agreed.
 | P4-T13a | The embedding table and the outbox worker | Agung | done |
 | P4-T13b | Access-filtered retrieval | Agung | done |
 | P4-T14a-a | Copilot threads and grounded answers | Agung | in_review |
-| P4-T14a-b | The copilot panel | Agung | todo |
+| P4-T14a-b | The copilot panel | Agung | in_review |
 | P4-T14b | Copilot proposals and background runs | Agung | todo |
 | P4-T15a | Planning and drafting assists | Agung | todo, needs both lanes |
 | P4-T15b | Rhythm assists | Agung | todo |

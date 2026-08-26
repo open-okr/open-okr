@@ -601,10 +601,20 @@ export const readAvailability = defineReadAction({
      * §2.4's own degradation and is worth offering on its own.
      */
     searchAvailable: z.boolean(),
+    /**
+     * True when the answer can arrive word by word (P4-T14a-b).
+     *
+     * A provider that answers but does not stream is a working copilot with a
+     * pause instead of a stream, so the panel needs to know which it has rather
+     * than showing a stop control for something that cannot be stopped.
+     */
+    streaming: z.boolean(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context) {
-    const providerConfigured = Boolean(context.drafter?.answerGrounded);
+    const streaming = Boolean(context.drafter?.streamGrounded);
+    const providerConfigured =
+      Boolean(context.drafter?.answerGrounded) || streaming;
     if (!providerConfigured) {
       return {
         available: false,
@@ -613,6 +623,7 @@ export const readAvailability = defineReadAction({
           "No AI provider is configured, so the copilot can find sources but cannot write an answer.",
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
+        streaming: false,
       };
     }
 
@@ -630,6 +641,7 @@ export const readAvailability = defineReadAction({
       providerConfigured: true,
       reason: availability.available ? null : (availability.reason ?? null),
       searchAvailable: true,
+      streaming,
     };
   },
 });

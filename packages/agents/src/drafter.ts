@@ -19,6 +19,9 @@ import type {
   AgentDrafter,
   CheckInDraftContext,
   DraftedCheckIn,
+  GroundedAnswer,
+  GroundedChunk,
+  GroundedQuestionContext,
   RecoveryTitleContext,
   ReviewableGoal,
   SemanticFinding,
@@ -93,6 +96,95 @@ const REWRITE_SYSTEM =
   "little as possible and keeping the author's intent. Return one line. Keep " +
   "any number, unit or date that is already there unless the check is about " +
   "that number. Never add a number that was not given to you.";
+
+/**
+ * The copilot's voice (AI-NATIVE-PLAN.md §2.4, P4-T14a-b).
+ *
+ * **Numbered passages, and a numbered answer about which it used.** The model is
+ * shown `[1]`, `[2]` and so on, never an identifier, so a source it names can
+ * only be one it was given. Core drops a number out of range.
+ *
+ * The sentinel line is how a *streamed* answer says what it used. A JSON reply
+ * would be cleaner and cannot be streamed to a reader: they would watch a string
+ * being escaped. So the prose streams and the last line is machine-read and
+ * never shown.
+ */
+const COPILOT_SYSTEM =
+  "You answer questions about this workspace's goals, metrics and reviews, " +
+  "using only the numbered passages you are given. Be short and specific. If " +
+  "the passages do not answer the question, say so plainly and say what is " +
+  "missing; never fill a gap with a plausible number, name or date. Refer to a " +
+  "passage in your prose by its number in square brackets. End with one final " +
+  "line, the word SOURCES then a colon then the numbers you used separated by " +
+  "commas, or SOURCES: none. Write nothing after that line.";
+
+/** The line the model ends with, which the reader never sees. */
+const SOURCES_SENTINEL = "SOURCES:";
+
+/** How much prose one answer may run to, in tokens. */
+const COPILOT_MAX_TOKENS = 700;
+
+/** The passages, numbered from one, as the model is shown them. */
+const passagesFor = (context: GroundedQuestionContext): string =>
+  context.sources
+    .map(
+      (source, index) =>
+        `[${index + 1}] ${source.label}` + NEWLINE + source.content,
+    )
+    .join(NEWLINE + NEWLINE);
+
+/** The conversation so far, then the passages, then the question. */
+const copilotMessages = (context: GroundedQuestionContext) => [
+  { role: "system" as const, content: COPILOT_SYSTEM },
+  ...context.history.map((turn) => ({
+    role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
+    content: turn.content,
+  })),
+  {
+    role: "user" as const,
+    content:
+      (context.sources.length === 0
+        ? "There are no passages for this question."
+        : "Passages:" + NEWLINE + passagesFor(context)) +
+      NEWLINE +
+      NEWLINE +
+      `Question: ${context.question}`,
+  },
+];
+
+/**
+ * The numbers on the sentinel line, as zero-based indexes.
+ *
+ * Anything that is not a number is ignored rather than guessed at, and the
+ * caller drops an index out of range, so a model writing
+ * "SOURCES: 1, the second one" cites the first passage and nothing else.
+ */
+function parseSources(line: string): number[] {
+  const at = line.indexOf(SOURCES_SENTINEL);
+  const listed = at < 0 ? line : line.slice(at + SOURCES_SENTINEL.length);
+  return listed
+    .split(",")
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((value) => Number.isInteger(value) && value >= 1)
+    .map((value) => value - 1);
+}
+
+/** The prose without the sentinel line, and the indexes it named. */
+function splitAnswer(raw: string): {
+  text: string;
+  usedSourceIndexes: number[];
+} {
+  const at = raw.lastIndexOf(SOURCES_SENTINEL);
+  if (at < 0) {
+    // A model that forgot the line still answered. No citation is the honest
+    // result: it did not say what it used.
+    return { text: raw.trim(), usedSourceIndexes: [] };
+  }
+  return {
+    text: raw.slice(0, at).trim(),
+    usedSourceIndexes: parseSources(raw.slice(at)),
+  };
+}
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -303,6 +395,120 @@ export function createProviderDrafter(
       } catch {
         return null;
       }
+    },
+
+    async answerGrounded(
+      context: GroundedQuestionContext,
+    ): Promise<GroundedAnswer | null> {
+      if (!affordable()) {
+        return null;
+      }
+      const before = spent;
+      try {
+        const reply = await options.provider.chat({
+          model: options.model,
+          messages: copilotMessages(context),
+          maxTokens: COPILOT_MAX_TOKENS,
+        });
+        charge(reply.usage);
+        const { text, usedSourceIndexes } = splitAnswer(reply.content);
+        if (text === "") {
+          return null;
+        }
+        return {
+          text,
+          usedSourceIndexes,
+          model: options.model,
+          tokensIn: reply.usage.inputTokens,
+          tokensOut: reply.usage.outputTokens,
+          costUsd: spent - before,
+        };
+      } catch {
+        return null;
+      }
+    },
+
+    /**
+     * The same answer, streamed.
+     *
+     * **A streamed turn records no token count, and that is the port's shape
+     * rather than an omission here.** `AIProvider.stream` yields text and no
+     * usage, so there is nothing truthful to put in `tokensIn`, `tokensOut` or
+     * `costUsd`. Estimating them would put a made-up number in a cost report.
+     * The cap is still honoured at the door, so a workspace that has spent its
+     * budget cannot start a stream; what it cannot do is stop one part way
+     * through on cost. Recorded on the P4-T14a-b row.
+     *
+     * The sentinel line is held back rather than filtered afterwards: the
+     * reader must never watch `SOURCES: 1, 3` appear and then vanish. Anything
+     * that could be the beginning of that line stays in the buffer until the
+     * next piece proves it is not.
+     */
+    async *streamGrounded(
+      context: GroundedQuestionContext,
+      signal?: AbortSignal,
+    ): AsyncIterable<GroundedChunk> {
+      if (!affordable()) {
+        return;
+      }
+      let buffer = "";
+      let sentinel = "";
+      // Every word actually sent to the reader, so the `done` chunk carries the
+      // same whole answer a non-streamed call would have returned.
+      let prose = "";
+      const send = (text: string): GroundedChunk => {
+        prose += text;
+        return { kind: "text", text };
+      };
+      try {
+        for await (const piece of options.provider.stream({
+          model: options.model,
+          messages: copilotMessages(context),
+          maxTokens: COPILOT_MAX_TOKENS,
+        })) {
+          if (signal?.aborted) {
+            // Return rather than throw: what arrived is a real partial answer
+            // and the caller records it.
+            return;
+          }
+          if (sentinel !== "") {
+            sentinel += piece;
+            continue;
+          }
+          buffer += piece;
+          const at = buffer.indexOf(SOURCES_SENTINEL);
+          if (at >= 0) {
+            const before = buffer.slice(0, at).trimEnd();
+            if (before !== "") {
+              yield send(before);
+            }
+            sentinel = buffer.slice(at);
+            buffer = "";
+            continue;
+          }
+          // Hold back only what could still turn into the sentinel.
+          const safe = buffer.length - (SOURCES_SENTINEL.length - 1);
+          if (safe > 0) {
+            yield send(buffer.slice(0, safe));
+            buffer = buffer.slice(safe);
+          }
+        }
+      } catch {
+        // Nothing more is coming. What was yielded already stands, and the
+        // caller records it as stopped.
+        return;
+      }
+      if (sentinel === "" && buffer !== "") {
+        yield send(buffer);
+      }
+      yield {
+        kind: "done",
+        answer: {
+          text: prose.trim(),
+          usedSourceIndexes: sentinel === "" ? [] : parseSources(sentinel),
+          model: options.model,
+        },
+      };
     },
 
     async rewriteForRule(context) {

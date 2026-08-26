@@ -26,6 +26,8 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
+import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
+import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
@@ -125,6 +127,11 @@ export async function AppShellLayout({
     level,
   );
 
+  // Read here rather than inside the panel so the first open needs no round
+  // trip, and so a provider-off workspace renders its own state on the server
+  // instead of flashing an input it cannot use.
+  const copilot = await copilotAvailabilityAction();
+
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
     ...sidebarItems,
@@ -177,6 +184,7 @@ export async function AppShellLayout({
           <Topbar
             breadcrumb={workspace.name}
             search={<TopbarSearch />}
+            askAi={<CopilotPanel initialAvailability={copilot} />}
             avatarMenu={
               <AvatarMenu
                 name={workspace.name}
