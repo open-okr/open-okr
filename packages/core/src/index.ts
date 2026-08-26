@@ -59,6 +59,7 @@ export {
   AGGREGATABLE_KINDS,
   InvalidActivityPayloadError,
   isTestScaffoldKind,
+  PRIVATE_ACTIVITY_KINDS,
   UnregisteredActivityKindError,
   validateActivityPayload,
 } from "./activities/catalogue.ts";
@@ -88,6 +89,9 @@ export type {
   AgentDrafter,
   CheckInDraftContext,
   DraftedCheckIn,
+  GroundedAnswer,
+  GroundedQuestionContext,
+  GroundingSource,
   RecoveryTitleContext,
   ReviewableGoal,
   RewriteContext,
@@ -190,6 +194,17 @@ export {
   type ValidationResult,
   validateUpload,
 } from "./blobs/validation.ts";
+export {
+  type AnswerQuestionInput,
+  type AnswerQuestionResult,
+  answerQuestion,
+  GROUNDING_LIMIT,
+} from "./copilot/answer.ts";
+export {
+  citationLabel,
+  type ResolvedCitation,
+  readableCitations,
+} from "./copilot/citations.ts";
 export {
   type ProvisionedMember,
   type ProvisionMemberInput,

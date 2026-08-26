@@ -17,11 +17,9 @@ import { embeddings, newId, withWorkspace } from "@openokr/db";
 import { and, eq, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { type ChunkOptions, chunkText, contentHash } from "./chunker.ts";
-import { governingResource } from "./governing.ts";
+import { mayRead } from "./governing.ts";
 
 export interface EmbedContentInput {
   readonly workspaceId: string;
@@ -68,6 +66,29 @@ const DEFAULT_RETRIEVAL_LIMIT = 10;
  * query for the common case.
  */
 const RETRIEVAL_OVERFETCH = 4;
+
+/**
+ * The question, as a text-search query that ranks rather than filters.
+ *
+ * `plainto_tsquery` joins every term with `&`, so a passage has to contain all
+ * of them. That is right for a search box and wrong for the copilot, whose query
+ * is a sentence somebody typed: "What is happening with mid-market activation?"
+ * matched nothing, because no goal contains the word "happening". The first real
+ * caller of retrieval found this (P4-T14a-a); nothing before it passed a
+ * sentence.
+ *
+ * So the operators are swapped for `|` and the ranking decides. A passage
+ * holding two of the terms outranks one holding a single term, and a question
+ * with one word in common with the corpus returns something instead of nothing.
+ * The cast through text is the standard way to do it: `plainto_tsquery` also
+ * emits `<->` between the parts of a hyphenated compound, and only `&` is
+ * replaced, so "mid-market" stays one phrase.
+ *
+ * A query of nothing but stop words becomes an empty tsquery, which matches
+ * nothing. That is the right answer to a question with no content in it.
+ */
+const ANY_TERM_TSQUERY = (parameter: string) =>
+  `replace(plainto_tsquery('english', ${parameter})::text, '&', '|')::tsquery`;
 
 export class EmbeddingService {
   readonly #pool: Pool;
@@ -292,29 +313,19 @@ export class EmbeddingService {
           if (kept.length >= limit) {
             break;
           }
-          const governing = await governingResource(
-            tx,
-            input.workspaceId,
-            hit.entityType,
-            hit.entityId,
-          );
-          if (!governing) {
-            continue;
+          // `mayRead` rather than the resolve-then-ask pair this loop used to
+          // inline: the copilot has to ask the same question about a stored
+          // citation (P4-T14a-a), and two copies of the check are how a
+          // citation and a retrieval hit would come to disagree.
+          const readable = await mayRead(tx, {
+            workspaceId: input.workspaceId,
+            memberId: input.memberId,
+            entityType: hit.entityType,
+            entityId: hit.entityId,
+          });
+          if (readable) {
+            kept.push(hit);
           }
-          try {
-            await getAccessScoped(tx, {
-              workspaceId: input.workspaceId,
-              memberId: input.memberId,
-              resourceType: governing.resourceType,
-              resourceId: governing.resourceId,
-              requires: ACCESS_LEVELS.view as never,
-            });
-          } catch {
-            // The getter answers not-found for forbidden, which is the same
-            // answer this loop wants: the chunk is not there for this reader.
-            continue;
-          }
-          kept.push(hit);
         }
         return kept;
       },
@@ -358,11 +369,11 @@ export class EmbeddingService {
        text_hits as (
          select entity_type, entity_id, content,
                 ts_rank(to_tsvector('english', content),
-                        plainto_tsquery('english', $${params.length + 1})) as text_score
+                        ${ANY_TERM_TSQUERY(`${params.length + 1}`)}) as text_score
          from embeddings
          where workspace_id = $1
            ${typeFilter}
-           and to_tsvector('english', content) @@ plainto_tsquery('english', $${params.length + 1})
+           and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY(`${params.length + 1}`)}
          limit ${limit * 2}
        )
        select
@@ -436,11 +447,11 @@ export class EmbeddingService {
       input.workspaceId,
       `select entity_type, entity_id, content,
               ts_rank(to_tsvector('english', content),
-                      plainto_tsquery('english', $2)) as score
+                      ${ANY_TERM_TSQUERY("$2")}) as score
        from embeddings
        where workspace_id = $1
          ${typeFilter}
-         and to_tsvector('english', content) @@ plainto_tsquery('english', $2)
+         and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY("$2")}
        order by score desc
        limit ${limit}`,
       params,

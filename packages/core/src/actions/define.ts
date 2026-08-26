@@ -13,6 +13,7 @@ import type { ZodType } from "zod";
 import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { EmbedFunction } from "../embeddings/service.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -41,6 +42,16 @@ export interface ActionCallContext {
    * and never decides that the proposal should exist.
    */
   readonly drafter?: AgentDrafter;
+  /**
+   * How to turn text into a vector, when the host has a provider that can
+   * (P4-T14a-a).
+   *
+   * Separate from `drafter` because they fail separately. Without this,
+   * retrieval takes the full-text path, which is AI-NATIVE-PLAN §2.4's own
+   * degradation and still answers. Without the drafter there is no prose. A
+   * workspace can have one and not the other.
+   */
+  readonly embed?: EmbedFunction;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

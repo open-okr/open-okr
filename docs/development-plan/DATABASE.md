@@ -480,8 +480,8 @@ Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-P
 | `ai_model_policies` | `tier`, `provider`, `model_id`, `sampling jsonb`, `json_mode` |
 | `ai_feature_settings` | `feature_key`, `enabled`, `tier_override?`, `quota jsonb` |
 | `ai_prompts` | `feature_key?`, `agent_id?`, `phase?`, `version`, `system_prompt`, `is_default` |
-| `ai_threads` | `subject_type?`, `subject_id?`, `member_id`, `title?` |
-| `ai_messages` | `thread_id`, `role`, `content`, `tokens`, `cost` |
+| `ai_threads` | `subject_type?`, `subject_id?`, `member_id`, `title?`. Both anchor columns are present or neither: half an anchor is a thread nothing resolves. One member's, because §2.4 answers across what that member may see, so the same question has two answers for two readers (P4-T14a-a) |
+| `ai_messages` | `thread_id`, `role` (`member` / `assistant`), `content`, `citations jsonb`, `model?`, `tokens_in?`, `tokens_out?`, `cost?`, `stopped_at?`. `citations` is the answer's own claim about what it used, stored rather than resolved: whether the reader may *see* a cited thing is a different question, asked again on every read. `stopped_at` is set when a reader ends a stream early (written by P4-T14a-b, the column ships with the table so the stop control is a write and not a migration) |
 | `ai_tool_calls` | `message_id?`, `run_id?`, `tool`, `input jsonb`, `output_excerpt`, `status`, `permission_checked bool`, `duration_ms` |
 | `ai_usage_events` | `member_id?`, `agent_id?`, `feature`, `source`, `provider`, `model_id`, `tokens_in`, `tokens_out`, `cost`, `latency_ms`, `status`, `flagged` |
 | `embeddings` | `subject_type`, `subject_id`, `chunk_index`, `content`, `vector`, `model_id`, `content_hash` |

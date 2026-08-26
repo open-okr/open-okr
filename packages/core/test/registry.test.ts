@@ -80,8 +80,18 @@ describe("the registry", () => {
       // somebody else's nudge as a not-found, which is what keeps the narrow
       // grant safe.
       const ownMessages = action.name === "nudges.snooze";
+      // The copilot is the third, and it is `nudges.snooze`'s reason again
+      // (P4-T14a-a): both writes touch one member's own conversation and
+      // nothing in the workspace. A member who may read a space but not change
+      // it should be able to ask about it, and retrieval decides what they are
+      // answered from by their own access, so the narrow grant leaks nothing.
+      // Both actions refuse a thread that is not the caller's as a not-found,
+      // which is what `nudges.snooze` relies on too.
+      const ownConversation = action.name.startsWith("copilot.");
       const floor =
-        discussion || ownMessages ? ACCESS_LEVELS.comment : ACCESS_LEVELS.edit;
+        discussion || ownMessages || ownConversation
+          ? ACCESS_LEVELS.comment
+          : ACCESS_LEVELS.edit;
       expect(
         action.access,
         `${action.name} writes but only needs view`,

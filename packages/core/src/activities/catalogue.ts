@@ -345,9 +345,36 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     sessionId: z.string(),
     decision: z.string(),
   }),
+  // The copilot writes an activity row because the Operation pipeline requires
+  // one, and neither of these belongs in anybody else's feed. See
+  // PRIVATE_ACTIVITY_KINDS below (P4-T14a-a).
+  "copilot.asked": z.object({ threadId: z.string() }),
+  "copilot.answered": z.object({
+    threadId: z.string(),
+    stopped: z.boolean(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
+
+/**
+ * Kinds the activity feed never shows, whatever the reader's access.
+ *
+ * An activity with no `contextId` is workspace-public by construction, which is
+ * right for a rename and wrong for "Agung asked the copilot something". A
+ * copilot thread is one member's conversation: the audit row records that the
+ * call happened and what it cost, which is what an administrator needs, and the
+ * feed is where the workspace reads about the workspace.
+ *
+ * Filtered by kind in `queryFeed` rather than by omitting the activity row,
+ * because the pipeline requires one and an operation that could skip it would be
+ * an operation that could skip the audit row too. Central, so it cannot be
+ * applied to one surface and forgotten on the next.
+ */
+export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
+  "copilot.asked",
+  "copilot.answered",
+]);
 
 /**
  * The kinds a feed renderer collapses consecutive same-actor rows into one

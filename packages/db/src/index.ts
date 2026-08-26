@@ -91,6 +91,15 @@ export {
   type ModelTier,
 } from "./schema/ai-models.ts";
 export {
+  AI_MESSAGE_ROLES,
+  type AiCitation,
+  type AiMessage,
+  type AiMessageRole,
+  type AiThread,
+  aiMessages,
+  aiThreads,
+} from "./schema/ai-threads.ts";
+export {
   type AIBudget,
   type AIUsageEvent,
   aiBudgets,

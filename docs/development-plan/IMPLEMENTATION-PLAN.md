@@ -745,12 +745,26 @@ Deliverables: hybrid retrieval combining vectors and full text, filtered through
 Test plan: retrieval never returns a chunk the requester cannot read; with the extension absent the product still answers using full text.
 Acceptance: Given a private space's check-in, when a non-member asks a question that would match it, then no chunk from it is retrieved or cited.
 
-### P4-T14a: Copilot threads and grounded answers [M]
-Depends on: P4-T13b, P1-T07
-Goal: the assistant, reading (screen S-39).
-Deliverables: threads and messages anchored to the workspace or an entity; the side panel with streaming and a stop control; grounded answers with citations only to what the viewer may see; the empty, AI off and capped states.
-Test plan: a citation never points at something the viewer cannot read; the stop control ends the stream and leaves the thread readable.
-Acceptance: Given a member asking about their goals, when the copilot answers, then every citation resolves to something they can open.
+### P4-T14a-a: Copilot threads and grounded answers [M]
+Depends on: P4-T13b
+Goal: the assistant, answering (screen S-39), with no interface yet.
+Deliverables: threads and messages anchored to the workspace or an entity; grounded answers over access-filtered retrieval with citations only to what the viewer may see; the AI-off answer, which is the passages and no prose.
+Test plan: a citation never points at something the viewer cannot read, proved both by construction and at read time; a question with the provider off is recorded and answered with what retrieval found.
+Acceptance: Given a member asking about their goals, when the copilot answers, then every citation resolves to something they can open, and a source deleted afterwards stops being shown without the answer changing.
+
+### P4-T14a-b: The copilot panel [M]
+Depends on: P4-T14a-a, P1-T07
+Goal: the assistant, on screen (screen S-39).
+Deliverables: the side panel; the answer streaming token by token; a stop control that ends the stream and leaves the thread readable; the empty, AI off and capped states; the thread list and the entry point the panel opens from.
+Test plan: the stop control ends the stream and leaves the thread readable; the panel offers no box to type in when no provider is configured, and says why.
+Acceptance: Given a member stopping an answer halfway, when they reopen the thread, then what had arrived is there, marked as stopped, and the conversation can continue.
+
+**Why P4-T14a was cut in two.** One [M] carried the schema, the retrieval
+grounding, the citation guarantee, a streaming side panel, a stop control and
+three screen states. The two halves also need different things: the answering
+half is a contract and a guarantee, and the panel half is streaming, which no
+single transactional write can do. Cut on 26 August 2026, and the shape of the
+cut is what made the transaction boundary visible: see `actions/copilot.ts`.
 
 ### P4-T14b: Copilot proposals and background runs [M]
 Depends on: P4-T14a
@@ -801,7 +815,7 @@ above rather than left in to be built twice.
 
 **Three more of the thirteen belong to other phases** and are not in these rows:
 decomposing a key result into initiatives and tasks is Phase 5's work,
-grounded question answering with citations is P4-T14a, and mapping spreadsheet
+grounded question answering with citations is P4-T14a-a, and mapping spreadsheet
 columns to import fields is P6-T01.
 Test plan: every assist degrades to its manual path with AI off; every write assist renders a preview and commits nothing until applied; provenance is recorded on the resulting value.
 Acceptance: Given a key result failing the measurability rule, when the champion uses the rewrite assist, then a corrected version is proposed with the rule it now satisfies, and applying it clears the verdict.

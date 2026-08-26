@@ -35,9 +35,11 @@ import {
   reviewNarratives,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
-export interface GoverningResource {
+interface GoverningResource {
   readonly resourceType: string;
   readonly resourceId: string;
 }
@@ -68,11 +70,15 @@ async function throughSession(
  * The resource whose access decides whether this chunk may be read, or null when
  * the entity is gone.
  *
+ * Private. `mayRead` below is the only caller and the only thing anyone wants:
+ * the resource on its own is an intermediate answer, and exporting it invited a
+ * second copy of the resolve-then-ask pair (P4-T14a-a).
+ *
  * A null answer withholds the chunk. An entity that has been deleted since it was
  * embedded has no access to inherit, and returning the chunk anyway would make
  * the index outlive the thing it describes.
  */
-export async function governingResource(
+async function governingResource(
   tx: OperationTx,
   workspaceId: string,
   entityType: string,
@@ -305,5 +311,51 @@ export async function governingResource(
       // no. Failing closed is the whole reason this function returns a resource
       // rather than a boolean.
       return null;
+  }
+}
+
+/**
+ * Whether this member may read this embedded entity, right now (P4-T14a-a).
+ *
+ * Resolves the governing resource and asks the access getter, which is the one
+ * answer this product has about who can see what. Two callers need it:
+ * retrieval, filtering candidates before they are ranked, and the copilot,
+ * filtering a stored citation at the moment somebody reads the thread. They ask
+ * the same question, so they call the same function; a second copy of this loop
+ * is how a citation and a retrieval hit would come to disagree.
+ *
+ * False for an entity that has been deleted, for one whose type nobody has
+ * mapped, and for a member the getter refuses. The getter answers not-found for
+ * forbidden, and both mean the same thing here: not there for this reader.
+ */
+export async function mayRead(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly entityType: string;
+    readonly entityId: string;
+  },
+): Promise<boolean> {
+  const governing = await governingResource(
+    tx,
+    input.workspaceId,
+    input.entityType,
+    input.entityId,
+  );
+  if (!governing) {
+    return false;
+  }
+  try {
+    await getAccessScoped(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.memberId,
+      resourceType: governing.resourceType,
+      resourceId: governing.resourceId,
+      requires: ACCESS_LEVELS.view as never,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }

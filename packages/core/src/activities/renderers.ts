@@ -286,6 +286,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.nextCycleDrafted": () => "Drafted an objective for the next cycle",
   "session.actionAgreed": () => "Agreed an action in the review",
   "session.actionCompleted": () => "Updated a review action",
+  // Written because the map is exhaustive over the catalogue, and never read:
+  // both kinds are in PRIVATE_ACTIVITY_KINDS, so no feed reaches them. Left as
+  // real sentences rather than empty strings, in case a member's own history
+  // screen ever wants them (P4-T14a-a).
+  "copilot.asked": () => "Asked the copilot a question",
+  "copilot.answered": () => "The copilot answered",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

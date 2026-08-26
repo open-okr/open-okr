@@ -146,6 +146,47 @@ describe("full-text retrieval, which is the degradation the row asks for", () =>
     expect(hits[0]?.content).toContain("mid-market");
   });
 
+  it("ranks a whole sentence rather than requiring every word of it", async () => {
+    // The defect the copilot found (P4-T14a-a). `plainto_tsquery` joins terms
+    // with `&`, so this question matched nothing: no goal contains the word
+    // "happening". A question is a sentence, and every retrieval caller from
+    // here on passes one.
+    const hits = await retrieve(
+      "What is happening with mid-market activation?",
+      ownerMemberId,
+    );
+    expect(hits.map((hit) => hit.entityId)).toEqual([goalId]);
+  });
+
+  it("prefers the passage that matches more of the question", async () => {
+    const other = (await call("goals.create", {
+      title: "Cut onboarding to two days",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+    await indexEntity("goal", other.id);
+
+    // Both passages hold "days" or "market"; only one holds both halves of the
+    // question. Ranking is what any-term matching leans on, so it is asserted.
+    const hits = await retrieve(
+      "mid-market platform onboarding",
+      ownerMemberId,
+    );
+    expect(hits.length).toBeGreaterThan(1);
+    expect(hits[0]?.entityId).toBe(goalId);
+  });
+
+  it("returns nothing for a question made only of stop words", async () => {
+    // An empty tsquery, which matches nothing. The right answer to a question
+    // with no content in it, and the one case any-term matching must not widen.
+    expect(await retrieve("what is it about", ownerMemberId)).toHaveLength(0);
+  });
+
   it("returns nothing for a query that matches nothing", async () => {
     expect(await retrieve("submarine cartography", ownerMemberId)).toHaveLength(
       0,

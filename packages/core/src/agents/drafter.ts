@@ -93,6 +93,52 @@ export interface RecoveryTitleContext {
 }
 
 /**
+ * One retrieved passage, as a model is allowed to see it.
+ *
+ * Given to `answerGrounded` in a list and referred to **by index**, for the same
+ * reason `ReviewableGoal` is: a model is never shown an identifier, so it cannot
+ * invent a citation that points at something in another workspace, and an index
+ * out of range is dropped rather than resolved. That is the structural half of
+ * "a citation never points at something the viewer cannot read". The other half
+ * is read time, where the reader's access is checked again.
+ */
+export interface GroundingSource {
+  /** A short name for the passage, for the model's own prose. Never an id. */
+  readonly label: string;
+  /** The passage itself, already access-filtered by retrieval. */
+  readonly content: string;
+}
+
+/** What the copilot is asked, and what it is allowed to read while answering. */
+export interface GroundedQuestionContext {
+  readonly question: string;
+  /** Earlier turns in this thread, oldest first, so a follow-up makes sense. */
+  readonly history: readonly {
+    readonly role: "member" | "assistant";
+    readonly content: string;
+  }[];
+  /** What retrieval found. An empty list means answer from nothing. */
+  readonly sources: readonly GroundingSource[];
+}
+
+/** A grounded answer, with what it actually used and what it cost. */
+export interface GroundedAnswer {
+  readonly text: string;
+  /**
+   * Which sources the answer used, by index into `sources`.
+   *
+   * The claim is the model's; whether the reader may see what it points at is
+   * not. Out-of-range indexes are dropped by the caller.
+   */
+  readonly usedSourceIndexes: readonly number[];
+  readonly model?: string;
+  readonly tokensIn?: number;
+  readonly tokensOut?: number;
+  /** What the call cost, when the host can price the model it used. */
+  readonly costUsd?: number;
+}
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -131,6 +177,17 @@ export interface AgentDrafter {
    * rule it did not fix.
    */
   rewriteForRule?(context: RewriteContext): Promise<string | null>;
+  /**
+   * AI-NATIVE-PLAN.md §2.4's grounded answer over retrieved passages.
+   *
+   * Null when the model would rather say nothing, which is not a failure: §2.4's
+   * own degradation is full-text search, so a caller that gets null shows the
+   * passages retrieval found and no prose. That is a smaller answer, not a
+   * broken one, and it is what a provider-off workspace gets every time.
+   */
+  answerGrounded?(
+    context: GroundedQuestionContext,
+  ): Promise<GroundedAnswer | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

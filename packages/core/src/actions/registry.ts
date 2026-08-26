@@ -94,6 +94,13 @@ import {
   updateCommentAction,
 } from "./comments.ts";
 import {
+  ask,
+  readAvailability,
+  readThread,
+  readThreads,
+  recordAnswer,
+} from "./copilot.ts";
+import {
   addIssue,
   addPriority,
   calibrateCycle,
@@ -292,6 +299,11 @@ export const ACTION_MAP = {
   "invitations.revokeLink": revokeLink,
   "invitations.acceptLink": acceptLink,
   "invitations.joinByTrustedDomain": joinByTrustedDomain,
+  "copilot.ask": ask,
+  "copilot.recordAnswer": recordAnswer,
+  "copilot.thread": readThread,
+  "copilot.threads": readThreads,
+  "copilot.availability": readAvailability,
   "blobs.prepareUpload": prepareUpload,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
