@@ -41,6 +41,7 @@ import {
 } from "./actions";
 import { ConfidenceRound } from "./confidence-round";
 import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
+import { Digest } from "./digest";
 import { type Forward, ForwardPanel } from "./forward";
 import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
@@ -118,6 +119,18 @@ export default async function SessionPage({ params }: SessionPageProps) {
     } catch {
       // No KRs in this space's cycle, or action not available.
     }
+  }
+
+  // The weekly digest (P4-T15b-a). Deterministic, so it loads with the page and
+  // needs no provider; null before step 4 has produced one.
+  let weeklyDigest: { weekStart: string; lines: string[] } | null = null;
+  let digestAssistAvailable = false;
+  if (sessionRow.kind === "weekly") {
+    weeklyDigest = (await callAction(context, "sessions.digest", {
+      sessionId: id,
+    })) as typeof weeklyDigest;
+    const { drafterFor } = await import("../../../lib/drafter");
+    digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
   }
 
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
@@ -445,6 +458,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
             </ol>
           </CardBody>
         </Card>
+      )}
+
+      {/* P4-T15b-a: the weekly digest, deterministic, with an optional narration */}
+      {sessionRow.kind === "weekly" && (
+        <Digest
+          sessionId={id}
+          digest={weeklyDigest}
+          assistAvailable={digestAssistAvailable}
+        />
       )}
 
       {/* P4-T07b: Confidence round panel */}

@@ -667,3 +667,27 @@ export async function revealObjectiveScoreAction(
   void (result as { realtimeChannel: string }).realtimeChannel;
   revalidatePath(`/session/${sessionId}`);
 }
+
+/**
+ * The narrated weekly digest, or null (P4-T15b-a).
+ *
+ * Null covers a provider that is off, a switch an administrator turned off, a
+ * model that declined, and a model that stated a figure the product did not
+ * compute. The panel treats all four the same, because from a reader's side
+ * they are the same: the digest is the lines.
+ */
+export async function narrateDigestAction(sessionId: string) {
+  const { session, workspace } = await requireWorkspace();
+  const { drafterFor } = await import("../../../lib/drafter");
+  const drafter = await drafterFor(workspace.workspaceId);
+  const base = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  return callAction(
+    drafter ? { ...base, drafter } : base,
+    "sessions.narrateDigest",
+    { sessionId },
+  );
+}

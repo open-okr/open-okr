@@ -97,6 +97,7 @@ export type {
   GroundedQuestionContext,
   GroundingSource,
   MeasureContext,
+  NarratedTrend,
   ParentContext,
   ProposalOption,
   ProposalRequestContext,
@@ -106,7 +107,13 @@ export type {
   RewriteContext,
   SemanticFinding,
   SuggestedParent,
+  TrendContext,
+  TrendPoint,
 } from "./agents/drafter.ts";
+export {
+  ASSIST_FEATURE_KEYS,
+  RHYTHM_ASSIST_KEYS,
+} from "./ai/assist-keys.ts";
 export {
   type BudgetCheckResult,
   checkBudget,
@@ -213,7 +220,6 @@ export {
   GROUNDING_LIMIT,
   streamAnswer,
 } from "./copilot/answer.ts";
-export { ASSIST_FEATURE_KEYS } from "./actions/goal-assists.ts";
 export {
   citationLabel,
   type ResolvedCitation,

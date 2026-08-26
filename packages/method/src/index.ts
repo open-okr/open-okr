@@ -23,6 +23,14 @@ export {
   sessionLifecycleStage,
 } from "./countdown.ts";
 export {
+  BLOCKER_CLOCK_HOURS,
+  type DigestBlocker,
+  type DigestRisk,
+  type WeeklyDigestInput,
+  weeklyDigestLines,
+  weeklyDigestNumbers,
+} from "./digest.ts";
+export {
   averageConfidence,
   type Divergence,
   type DivergenceInput,

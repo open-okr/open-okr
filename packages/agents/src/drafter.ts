@@ -26,6 +26,7 @@ import type {
   GroundedChunk,
   GroundedQuestionContext,
   MeasureContext,
+  NarratedTrend,
   ParentContext,
   ProposalRequestContext,
   ProposedAction,
@@ -33,6 +34,7 @@ import type {
   ReviewableGoal,
   SemanticFinding,
   SuggestedParent,
+  TrendContext,
 } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
@@ -368,6 +370,60 @@ const PARENT_SYSTEM =
   "by number. Pick the one whose success this objective actually contributes " +
   "to, not the one with the most words in common. Answer 0 when none of them " +
   "is a real parent: an objective with no parent is often correct.";
+
+/**
+ * The rhythm narrations (AI-NATIVE-PLAN.md §2.2, P4-T15b-a).
+ *
+ * **Neither prompt asks the model to be accurate; the caller checks.** Core
+ * compares every number in what comes back against the numbers it computed and
+ * drops the narration when one was invented. Telling a model to be careful is
+ * not a guarantee, and this is.
+ */
+const DIGEST_NARRATION_SHAPE = z.object({
+  narrative: z.string().trim().max(1200),
+});
+
+const DIGEST_NARRATION_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["narrative"],
+  properties: { narrative: { type: "string", maxLength: 1200 } },
+} as const;
+
+const TREND_SHAPE = z.object({
+  narrative: z.string().trim().max(1200),
+  anomalies: z.array(z.string().trim().min(1).max(300)).max(5),
+});
+
+const TREND_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["narrative", "anomalies"],
+  properties: {
+    narrative: { type: "string", maxLength: 1200 },
+    anomalies: {
+      type: "array",
+      maxItems: 5,
+      items: { type: "string", maxLength: 300 },
+    },
+  },
+} as const;
+
+const DIGEST_NARRATION_SYSTEM =
+  "You rewrite a weekly digest as two or three sentences somebody will read " +
+  "in a channel. Say the same things the lines say, in the same order, in " +
+  "plainer words. **Use only the numbers that are already in the lines.** " +
+  "Never add a figure, a comparison or a percentage that is not there, and " +
+  "never round one. Do not congratulate and do not apologise.";
+
+const TREND_SYSTEM =
+  "You describe what a metric has done over the periods you are given, and " +
+  "you say which movements were unusual for it. **Use only the values you " +
+  "are given and the differences between them.** Never state a figure that " +
+  "is not in the series, never estimate one, and never describe a period you " +
+  "were not shown. An anomaly is a movement that does not fit the pattern, " +
+  "not simply the largest one; an empty list is the right answer for a " +
+  "series that did what it always does.";
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -872,6 +928,77 @@ export function createProviderDrafter(
           candidateIndex: picked.candidate - 1,
           reason: picked.reason,
         };
+      } catch {
+        return null;
+      }
+    },
+
+    async narrateDigest(context: {
+      readonly lines: readonly string[];
+    }): Promise<string | null> {
+      if (!affordable() || context.lines.length === 0) {
+        return null;
+      }
+      try {
+        const { narrative } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: DIGEST_NARRATION_SHAPE,
+          jsonSchema: DIGEST_NARRATION_JSON_SCHEMA,
+          maxTokens: 400,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: DIGEST_NARRATION_SYSTEM },
+            {
+              role: "user",
+              content: "The digest:" + NEWLINE + context.lines.join(NEWLINE),
+            },
+          ],
+        });
+        return narrative.trim() === "" ? null : narrative;
+      } catch {
+        return null;
+      }
+    },
+
+    async narrateTrend(context: TrendContext): Promise<NarratedTrend | null> {
+      if (!affordable() || context.points.length < 2) {
+        return null;
+      }
+      try {
+        const narrated = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: TREND_SHAPE,
+          jsonSchema: TREND_JSON_SCHEMA,
+          maxTokens: 500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: TREND_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Metric: ${context.title}` +
+                NEWLINE +
+                `Unit: ${context.unit ?? "none given"}` +
+                NEWLINE +
+                `Better when it goes: ${context.direction}` +
+                NEWLINE +
+                "Series, oldest first:" +
+                NEWLINE +
+                context.points
+                  .map(
+                    (point) =>
+                      `  ${point.period}: ${point.value}` +
+                      (point.target === null
+                        ? ""
+                        : ` (target ${point.target})`),
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+        return narrated.narrative.trim() === "" ? null : narrated;
       } catch {
         return null;
       }

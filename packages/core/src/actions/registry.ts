@@ -204,6 +204,7 @@ import {
   updateOwnProfile,
 } from "./people.ts";
 import { reviewInbox } from "./review.ts";
+import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
 import {
   addRetroNote,
   addReviewAction,
@@ -499,6 +500,9 @@ export const ACTION_MAP = {
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,
+  "sessions.digest": readDigest,
+  "sessions.narrateDigest": narrateDigest,
+  "kpis.narrateTrend": narrateTrend,
 
   "sessions.addMinute": addStageMinute,
   "sessions.givePulse": givePulse,

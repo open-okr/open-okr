@@ -19,7 +19,7 @@
  * already checks; these count goals and key results before and after so a future
  * change that starts writing is caught by behaviour rather than by shape.
  */
-import { ASSIST_FEATURE_KEYS, type AgentDrafter } from "@openokr/core";
+import { type AgentDrafter, ASSIST_FEATURE_KEYS } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";

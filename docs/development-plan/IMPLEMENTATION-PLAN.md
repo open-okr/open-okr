@@ -792,15 +792,24 @@ Deliverables: draft an objective and its key results from a plain-language ambit
 Test plan: every assist is absent with the provider off and the deterministic path is unchanged; a suggestion is a proposal and never a write; the suggested alignment parent is one the member may read.
 Acceptance: Given the provider off, when a member opens the create form, then no assist is offered and the Draft Coach behaves exactly as it does today.
 
-### P4-T15b: Rhythm assists [M]
+### P4-T15b-a: The digest and the trend [M]
 Depends on: P4-T15a
-Goal: AI-NATIVE-PLAN.md §2.2's remaining capabilities.
-Deliverables: draft the weekly digest from the session record; narrate a KPI trend and call out anomalies; summarise blockers and risks across a space ranked by age and impact; suggest KPIs, thresholds and formulas from plain language. Each behind a feature switch, with provenance and a preview.
-Test plan: the deterministic digest template is what appears with the provider off; a narrated trend never states a number the chart does not hold.
+Goal: AI-NATIVE-PLAN.md §2.2's two narrations, over deterministic paths that exist.
+Deliverables: METHOD.md §7.2 step 4's weekly digest as a deterministic template in `packages/method` and the read that assembles it; the assist that narrates it; the KPI trend narration with its anomalies. Both behind their own feature switch, both refused when the prose states a number the product did not compute.
+Test plan: the deterministic digest template is what appears with the provider off; a narrated trend never states a number the chart does not hold; a narration that invents a figure is dropped and the template stands.
 Acceptance: Given a weekly session with a digest, when the assist drafts it, then the draft is a proposal over the deterministic template and the template is still what a provider-off workspace gets.
 
+### P4-T15b-b: The blocker summary and the KPI suggestion [M]
+Depends on: P4-T15b-a
+Goal: AI-NATIVE-PLAN.md §2.2's other two capabilities.
+Deliverables: a space-wide read of open blockers and risks ranked by age and impact, which does not exist yet, and the assist that summarises it; KPIs, thresholds and formulas suggested from plain language, with the formula validated by the §6 expression parser before it is offered.
+Test plan: the ranking is the product's and not the model's, so the summary cannot reorder it; a suggested formula that does not parse is refused rather than offered.
+Acceptance: Given a space with four open blockers of different ages, when the assist summarises them, then the order is the deterministic ranking and every blocker in the summary is one of the four.
+
+**Why P4-T15b was cut in two.** Four assists, and two of them had no deterministic path to sit on top of: the weekly digest was stored as five numbers with nothing rendering them, and there was no space-wide blocker read at all. So half this row was building the thing the assist assists with. Cut on 26 August 2026 along that line: the two narrations whose deterministic paths could be finished in one session, then the two that need new reads first.
+
 ### P4-T15c: Review assists [M]
-Depends on: P4-T15b, P4-T12-a
+Depends on: P4-T15b-a, P4-T12-a
 Goal: AI-NATIVE-PLAN.md §2.3's capabilities on the quarterly review.
 Deliverables: cluster retro notes into themes before dot voting; draft the review minutes from the session record; narrate the rhythm diagnostic with specifics from this cycle; draft the goal retrospective from check-in history; propose next-cycle objectives from the learnings marked to carry forward.
 Test plan: the diagnostic's verdict sentence is unchanged with the provider off and the narrative is additive; clustering never merges notes from two reviews; a proposed objective cites the learning it came from.

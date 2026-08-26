@@ -266,6 +266,28 @@ export interface ParentContext {
   }[];
 }
 
+/** One point on a KPI's series, as a model is shown it (P4-T15b-a). */
+export interface TrendPoint {
+  readonly period: string;
+  readonly value: number;
+  readonly target: number | null;
+}
+
+/** What the trend assist is shown. Numbers only, and only these numbers. */
+export interface TrendContext {
+  readonly title: string;
+  readonly unit: string | null;
+  readonly direction: string;
+  readonly points: readonly TrendPoint[];
+}
+
+/** A narrated trend and what it calls unusual. */
+export interface NarratedTrend {
+  readonly narrative: string;
+  /** One sentence each. Empty when nothing stood out, which is a real answer. */
+  readonly anomalies: readonly string[];
+}
+
 /**
  * What a host must provide for the agents to write language.
  *
@@ -361,6 +383,25 @@ export interface AgentDrafter {
    * how an alignment tree becomes a decoration.
    */
   suggestParent?(context: ParentContext): Promise<SuggestedParent | null>;
+  /**
+   * METHOD.md §7.2 step 4's digest, rewritten as prose (P4-T15b-a).
+   *
+   * Given the deterministic lines and nothing else. **The caller checks every
+   * number in what comes back against the numbers it computed** and drops the
+   * narration when one was invented, so this method cannot be the reason a
+   * digest states a figure nobody measured.
+   */
+  narrateDigest?(context: {
+    readonly lines: readonly string[];
+  }): Promise<string | null>;
+  /**
+   * §2.2's KPI trend narration, with the anomalies called out.
+   *
+   * Checked the same way: a number in the prose that is not in the series, not a
+   * target, not a corridor bound and not a change the product computed means the
+   * narration is dropped. A trend read next to its own chart has to agree with it.
+   */
+  narrateTrend?(context: TrendContext): Promise<NarratedTrend | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

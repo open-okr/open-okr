@@ -27,6 +27,7 @@ import {
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { ASSIST_FEATURE_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -47,16 +48,6 @@ import { listGoals, readGoal } from "./goals.ts";
  * silently became `any`. Thirteen test files started failing on implicit `any`
  * before the cause was obvious.
  */
-
-/**
- * One feature key per assist, so an administrator can turn off the one that is
- * not helping without losing the other two.
- */
-export const ASSIST_FEATURE_KEYS = {
-  draftObjective: "assists.draftObjective",
-  suggestMeasure: "assists.suggestMeasure",
-  suggestParent: "assists.suggestParent",
-} as const;
 
 /** How many objectives an assist may look at, or offer as parents. */
 const CANDIDATE_LIMIT = 40;

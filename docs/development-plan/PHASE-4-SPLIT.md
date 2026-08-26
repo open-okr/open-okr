@@ -16,7 +16,7 @@ closed when the gate was approved on 2026-08-17.
 
 ## Where things stand
 
-Phase 4 is forty-nine rows, because P4-T01 to P4-T15 were cut into lettered
+Phase 4 is fifty rows, because P4-T01 to P4-T15 were cut into lettered
 parts once P4-T02 and P4-T04 each proved too large for one session. The latest
 is P4-T14a, cut in two on 26 August 2026 when its single [M] turned out to carry
 a contract, a citation guarantee and a streaming panel. Counts read on
@@ -25,8 +25,8 @@ a contract, a citation guarantee and a streaming panel. Counts read on
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 14 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a |
-| todo | 3 | P4-T15b to P4-T15d |
+| in_review | 15 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a, P4-T15b-a |
+| todo | 3 | P4-T15b-b, P4-T15c, P4-T15d |
 | blocked | 1 | P4-T14b-b, on a host that consumes the outbox |
 
 The agents lane is finished and read, and **the sessions lane is finished and**
@@ -168,7 +168,8 @@ and this table is what was agreed.
 | P4-T14b-a | Copilot proposals | Agung | in_review |
 | P4-T14b-b | Copilot background runs | Agung | blocked, needs an outbox host |
 | P4-T15a | Planning and drafting assists | Agung | in_review |
-| P4-T15b | Rhythm assists | Agung | todo |
+| P4-T15b-a | The digest and the trend | Agung | in_review |
+| P4-T15b-b | The blocker summary and the KPI suggestion | Agung | todo |
 | P4-T15c | Review assists | Agung | todo |
 | P4-T15d | The list filter assist | Agung | todo |
 

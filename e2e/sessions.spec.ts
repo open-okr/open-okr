@@ -158,10 +158,17 @@ test("create a session and navigate to the session screen", async () => {
 test("scheduled state — step rail and controls visible", async () => {
   await page.goto(`/session/${sessionId}`);
 
-  await expect(page.getByText("Confidence round")).toBeVisible();
-  await expect(page.getByText("Diagnose what is low")).toBeVisible();
-  await expect(page.getByText("Commitments")).toBeVisible();
-  await expect(page.getByText("Digest")).toBeVisible();
+  // Scoped to the rail, because these four assertions are about the rail.
+  // Unscoped, "Digest" matched three things the moment the weekly session grew
+  // a digest panel of its own (P4-T15b-a), and `getByText` is a
+  // case-insensitive substring match, so even renaming the panel would not have
+  // helped. A locator that names where it is looking does not break when the
+  // page gains a second mention of a word.
+  const rail = page.locator("ol").first();
+  await expect(rail.getByText("Confidence round")).toBeVisible();
+  await expect(rail.getByText("Diagnose what is low")).toBeVisible();
+  await expect(rail.getByText("Commitments")).toBeVisible();
+  await expect(rail.getByText("Digest")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Start session" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip" })).toBeVisible();
