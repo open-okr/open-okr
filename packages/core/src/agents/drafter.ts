@@ -157,6 +157,48 @@ export type GroundedChunk =
   | { readonly kind: "done"; readonly answer: GroundedAnswer };
 
 /**
+ * One action the copilot is allowed to propose, as the model is shown it.
+ *
+ * `choices` holds numbered lists of **labels only**. No identifier reaches the
+ * model, so a choice it makes can only be one it was shown, and a number out of
+ * range resolves to nothing rather than to somebody else's space. Same rule as
+ * the citation indexes, for the same reason.
+ */
+export interface ProposalOption {
+  readonly action: string;
+  readonly label: string;
+  readonly whatItDoes: string;
+  /** JSON Schema for the fields the model may author. */
+  readonly fields: Record<string, unknown>;
+  /** Numbered from one in the order given. */
+  readonly choices: Readonly<Record<string, readonly string[]>>;
+}
+
+/** What the copilot is asked to turn into a proposal. */
+export interface ProposalRequestContext {
+  /** What the member asked for, in their words. */
+  readonly request: string;
+  readonly options: readonly ProposalOption[];
+  /** What retrieval found, so a proposal can build on what is already there. */
+  readonly sources: readonly GroundingSource[];
+}
+
+/**
+ * A proposal, as the model may express one.
+ *
+ * The action name has to be one of the options it was given, and the fields are
+ * validated against that option's own schema before anything is stored. A model
+ * that names an action outside the list, or writes a field the schema refuses,
+ * produces no proposal rather than a rejected one.
+ */
+export interface ProposedAction {
+  readonly action: string;
+  readonly fields: Record<string, unknown>;
+  /** One sentence for the reviewer: why this, now. */
+  readonly why: string;
+}
+
+/**
  * What a host must provide for the agents to write language.
  *
  * **Every capability is optional and every one may answer null.** A host may
@@ -219,6 +261,17 @@ export interface AgentDrafter {
     context: GroundedQuestionContext,
     signal?: AbortSignal,
   ): AsyncIterable<GroundedChunk>;
+  /**
+   * A proposal from a request, chosen from a curated list (P4-T14b-a).
+   *
+   * Null when the request does not match anything on the list, which is the
+   * common case and not a failure: most questions are questions. A copilot that
+   * proposed something for every sentence would be a copilot nobody trusts with
+   * the apply button.
+   */
+  proposeAction?(
+    context: ProposalRequestContext,
+  ): Promise<ProposedAction | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }

@@ -101,6 +101,13 @@ import {
   recordAnswer,
 } from "./copilot.ts";
 import {
+  applyProposal,
+  dismissProposal,
+  readProposals,
+  recordProposal,
+  undoProposal,
+} from "./copilot-proposals.ts";
+import {
   addIssue,
   addPriority,
   calibrateCycle,
@@ -134,6 +141,7 @@ import {
   closeGoal,
   createGoal,
   createKeyResult,
+  deleteGoal,
   goalReviewDecision,
   listDueGoals,
   listGoals,
@@ -304,6 +312,11 @@ export const ACTION_MAP = {
   "copilot.thread": readThread,
   "copilot.threads": readThreads,
   "copilot.availability": readAvailability,
+  "copilot.recordProposal": recordProposal,
+  "copilot.proposals": readProposals,
+  "copilot.applyProposal": applyProposal,
+  "copilot.dismissProposal": dismissProposal,
+  "copilot.undoProposal": undoProposal,
   "blobs.prepareUpload": prepareUpload,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
@@ -394,6 +407,7 @@ export const ACTION_MAP = {
   "goals.create": createGoal,
   "goals.update": updateGoal,
   "goals.close": closeGoal,
+  "goals.delete": deleteGoal,
   "goals.reviewDecision": goalReviewDecision,
   "goals.reopen": reopenGoal,
   "goals.reassignRole": reassignGoalRole,

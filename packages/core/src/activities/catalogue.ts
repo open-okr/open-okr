@@ -163,6 +163,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     closeDecision: z.enum(["keep", "modify", "abandon"]),
   }),
   "goal.reopened": z.object({}),
+  // The title, because a feed entry about a goal being removed has to read as
+  // a sentence after the goal is gone (P4-T14b-a).
+  "goal.deleted": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
   "goal.moved_to_cycle": z.object({ title: z.string() }),
   "key_result.created": z.object({ title: z.string() }),
@@ -353,6 +356,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     threadId: z.string(),
     stopped: z.boolean(),
   }),
+  // The action name travels; the payload does not. A proposal's content is the
+  // member's own conversation, and the audit row already holds what an
+  // administrator needs (P4-T14b-a).
+  "copilot.proposed": z.object({
+    threadId: z.string(),
+    action: z.string(),
+  }),
+  "copilot.proposalApplied": z.object({ action: z.string() }),
+  "copilot.proposalDismissed": z.object({ action: z.string() }),
+  "copilot.proposalUndone": z.object({ action: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
@@ -374,6 +387,13 @@ export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
 export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "copilot.asked",
   "copilot.answered",
+  // A proposal is a suggestion in one member's conversation. What it *does* when
+  // applied writes its own activity through the applied action's own operation,
+  // and that one belongs in the feed because the change does (P4-T14b-a).
+  "copilot.proposed",
+  "copilot.proposalApplied",
+  "copilot.proposalDismissed",
+  "copilot.proposalUndone",
 ]);
 
 /**

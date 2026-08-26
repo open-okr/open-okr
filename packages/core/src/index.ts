@@ -93,6 +93,9 @@ export type {
   GroundedChunk,
   GroundedQuestionContext,
   GroundingSource,
+  ProposalOption,
+  ProposalRequestContext,
+  ProposedAction,
   RecoveryTitleContext,
   ReviewableGoal,
   RewriteContext,
@@ -209,6 +212,18 @@ export {
   type ResolvedCitation,
   readableCitations,
 } from "./copilot/citations.ts";
+export {
+  type AuthoredProposal,
+  type BuiltProposal,
+  buildProposal,
+  type NumberedChoice,
+  PROPOSABLE_ACTIONS,
+  type ProposalOffer,
+  proposalOffers,
+  proposeFromRequest,
+  type Reversal,
+  reversalFor,
+} from "./copilot/proposals.ts";
 export {
   type ProvisionedMember,
   type ProvisionMemberInput,

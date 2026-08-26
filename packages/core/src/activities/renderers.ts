@@ -151,6 +151,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "goal.closed": (p) =>
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",
+  "goal.deleted": (p) => `Removed the goal "${p.title}"`,
   "goal.role_reassigned": (p) =>
     `The goal's ${asString(p.role, "role")} was reassigned`,
   "goal.moved_to_cycle": (p) =>
@@ -292,6 +293,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // screen ever wants them (P4-T14a-a).
   "copilot.asked": () => "Asked the copilot a question",
   "copilot.answered": () => "The copilot answered",
+  "copilot.proposed": () => "The copilot proposed a change",
+  "copilot.proposalApplied": () => "Applied a copilot proposal",
+  "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
+  "copilot.proposalUndone": () => "Undid a copilot proposal",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

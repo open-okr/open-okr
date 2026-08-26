@@ -23,6 +23,7 @@ import type {
   AgentDrafter,
   GroundedChunk,
   GroundedQuestionContext,
+  ProposalRequestContext,
 } from "@openokr/core";
 import { describe, expect, it } from "vitest";
 import { createProviderDrafter } from "../src/drafter.ts";
@@ -60,6 +61,41 @@ class ScriptedProvider implements AIProvider {
     throw new Error("not used in this test");
   }
   extract(): Promise<ChatResponse> {
+    throw new Error("not used in this test");
+  }
+  capabilities(): ModelCapabilities {
+    throw new Error("not used in this test");
+  }
+  async stop(): Promise<void> {}
+}
+
+/** Answers `extract` with one fixed JSON body. Nothing else is used here. */
+class ExtractingProvider implements AIProvider {
+  readonly requests: ChatRequest[] = [];
+  #body: string;
+
+  constructor(body: string) {
+    this.#body = body;
+  }
+
+  async extract(request: ChatRequest): Promise<ChatResponse> {
+    this.requests.push(request);
+    return {
+      content: this.#body,
+      usage: { inputTokens: 300, outputTokens: 40 },
+    };
+  }
+
+  chat(): Promise<ChatResponse> {
+    throw new Error("not used in this test");
+  }
+  stream(): AsyncIterable<string> {
+    throw new Error("not used in this test");
+  }
+  chatWithTools(): Promise<ChatResponse> {
+    throw new Error("not used in this test");
+  }
+  embed(_request: EmbedRequest): Promise<EmbedResponse> {
     throw new Error("not used in this test");
   }
   capabilities(): ModelCapabilities {
@@ -267,6 +303,111 @@ describe("the whole answer, not streamed", () => {
     expect(done).toBeNull();
     // Refused at the door: the provider was never called, so nothing was spent
     // discovering there was nothing to spend.
+    expect(provider.requests).toEqual([]);
+  });
+});
+
+/**
+ * Proposals (P4-T14b-a).
+ *
+ * The refusals are the point. A model that declines, names an action it was not
+ * offered, or gives no reason produces no proposal, because a proposal a reviewer
+ * cannot judge is worse than none.
+ */
+describe("proposing an action", () => {
+  const OPTIONS: ProposalRequestContext["options"] = [
+    {
+      action: "goals.create",
+      label: "Create an objective",
+      whatItDoes: "Adds a new objective to the current quarterly cycle.",
+      fields: { type: "object", properties: { title: { type: "string" } } },
+      choices: { spaces: ["Product", "Sales"] },
+    },
+  ];
+
+  const request = (
+    reply: unknown,
+  ): { provider: ExtractingProvider; drafter: AgentDrafter } => {
+    const provider = new ExtractingProvider(JSON.stringify(reply));
+    return {
+      provider,
+      drafter: createProviderDrafter({
+        provider,
+        model: "test-model",
+        costCapUsd: 2,
+        costInPerMillion: 1,
+        costOutPerMillion: 2,
+      }),
+    };
+  };
+
+  const ask = (drafter: AgentDrafter) =>
+    drafter.proposeAction?.({
+      request: "Create an objective for mid-market activation",
+      options: OPTIONS,
+      sources: [],
+    }) ?? Promise.resolve(null);
+
+  it("passes through what the model authored", async () => {
+    const { provider, drafter } = request({
+      propose: true,
+      action: "goals.create",
+      fields: { title: "Raise activation", level: "team", spaceNumber: 2 },
+      why: "You asked for one and the cycle has none.",
+    });
+
+    expect(await ask(drafter)).toEqual({
+      action: "goals.create",
+      fields: { title: "Raise activation", level: "team", spaceNumber: 2 },
+      why: "You asked for one and the cycle has none.",
+    });
+    // The choices reach the model as a numbered list of labels, which is the
+    // only form in which it can pick one.
+    const sent = provider.requests[0]?.messages.at(-1)?.content ?? "";
+    expect(sent).toContain("1. Product");
+    expect(sent).toContain("2. Sales");
+  });
+
+  it("proposes nothing when the model declines", async () => {
+    const { drafter } = request({
+      propose: false,
+      action: "",
+      fields: {},
+      why: "",
+    });
+    expect(await ask(drafter)).toBeNull();
+  });
+
+  it("proposes nothing for an action it was not offered", async () => {
+    const { drafter } = request({
+      propose: true,
+      action: "people.erase",
+      fields: { memberId: "someone" },
+      why: "Tidying up.",
+    });
+    expect(await ask(drafter)).toBeNull();
+  });
+
+  it("proposes nothing without a reason", async () => {
+    const { drafter } = request({
+      propose: true,
+      action: "goals.create",
+      fields: { title: "Raise activation" },
+      why: "   ",
+    });
+    expect(await ask(drafter)).toBeNull();
+  });
+
+  it("proposes nothing when the cap is spent", async () => {
+    const provider = new ExtractingProvider("{}");
+    const drafter = createProviderDrafter({
+      provider,
+      model: "test-model",
+      costCapUsd: 0,
+      costInPerMillion: 1,
+      costOutPerMillion: 2,
+    });
+    expect(await ask(drafter)).toBeNull();
     expect(provider.requests).toEqual([]);
   });
 });

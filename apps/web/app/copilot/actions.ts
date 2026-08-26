@@ -3,15 +3,17 @@
 /**
  * What the copilot panel reads (screen S-39, P4-T14a-b).
  *
- * Reads only. The two writes a conversation makes, `copilot.ask` and
- * `copilot.recordAnswer`, both happen inside the streaming route, because the
- * question and the answer belong to the same request the reader can stop.
+ * The conversation's own two writes, `copilot.ask` and `copilot.recordAnswer`,
+ * are not here: they happen inside the streaming route, because the question and
+ * the answer belong to the same request the reader can stop. What is here is
+ * every read the panel makes, plus the proposal decisions, which are ordinary
+ * writes with nothing to stream (P4-T14b-a).
  *
  * Every one of these resolves the caller from the session cookie and goes
  * through `callAction`, so the panel cannot reach a thread that is not the
  * reader's: the actions answer not-found for somebody else's.
  */
-import { callAction } from "@openokr/core";
+import { callAction, proposeFromRequest } from "@openokr/core";
 import { getPool } from "../../lib/auth";
 import { drafterFor } from "../../lib/drafter";
 import { requireWorkspace } from "../../lib/workspace";
@@ -54,4 +56,42 @@ export async function copilotAvailabilityAction() {
     "copilot.availability",
     {},
   );
+}
+
+/**
+ * Asks the copilot to turn a request into a proposal, and records it if it does.
+ *
+ * A server action rather than part of the streaming route, because a proposal is
+ * not prose: there is nothing to stream, and the panel needs the built preview
+ * before it can offer anything. Null is the ordinary answer.
+ */
+export async function proposeFromCopilotAction(
+  threadId: string,
+  request: string,
+) {
+  const base = await context();
+  const drafter = await drafterFor(base.workspaceId);
+  if (!drafter) {
+    return null;
+  }
+  return proposeFromRequest({ ...base, drafter }, { threadId, request });
+}
+
+/** The proposals in one of the reader's own conversations. */
+export async function listCopilotProposalsAction(threadId: string) {
+  return callAction(await context(), "copilot.proposals", { threadId });
+}
+
+/** Applies one, as the reader. The proposed action's own access decides. */
+export async function applyCopilotProposalAction(id: string) {
+  return callAction(await context(), "copilot.applyProposal", { id });
+}
+
+export async function dismissCopilotProposalAction(id: string) {
+  return callAction(await context(), "copilot.dismissProposal", { id });
+}
+
+/** Reverses an applied one, where the action it applied has a reverse. */
+export async function undoCopilotProposalAction(id: string) {
+  return callAction(await context(), "copilot.undoProposal", { id });
 }

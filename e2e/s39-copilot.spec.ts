@@ -97,9 +97,10 @@ test("a question is recorded and answered with what is there to find", async () 
   // server once the request lands.
   await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
   // And the panel explains itself rather than sitting silent: no provider, so
-  // no prose, and it says which.
+  // no prose, and it says which. `first` because the footer says the same thing
+  // about the workspace's state while this says it about this turn.
   await expect(
-    panel.getByText("No AI provider is configured", { exact: false }),
+    panel.getByText("No AI provider is configured", { exact: false }).first(),
   ).toBeVisible({ timeout: 15_000 });
 });
 

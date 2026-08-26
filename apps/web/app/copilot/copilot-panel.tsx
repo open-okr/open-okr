@@ -23,13 +23,26 @@
  * Capped is a budget or a switch, and it says which.
  */
 import { Button, Chip, Kbd, useKeyboardShortcut } from "@openokr/ui";
-import { Loader2, MessageSquare, Send, Square, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  MessageSquare,
+  Send,
+  Square,
+  Undo2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applyCopilotProposalAction,
   copilotAvailabilityAction,
+  dismissCopilotProposalAction,
+  listCopilotProposalsAction,
   listCopilotThreadsAction,
+  proposeFromCopilotAction,
   readCopilotThreadAction,
+  undoCopilotProposalAction,
 } from "./actions";
 
 interface Citation {
@@ -140,6 +153,99 @@ function Turn({ message }: { readonly message: Message }) {
   );
 }
 
+interface Proposal {
+  readonly id: string;
+  readonly action: string;
+  readonly preview: readonly {
+    readonly label: string;
+    readonly value: string;
+  }[];
+  readonly why: string;
+  readonly status: "pending" | "applied" | "dismissed";
+  readonly undone: boolean;
+  readonly reversible: boolean;
+}
+
+/**
+ * One proposal, with what it would do and what may be done about it.
+ *
+ * **The buttons are offered whether or not the reader may use them.** A member
+ * who cannot create an objective sees Apply and gets the permission layer's own
+ * refusal, which is the S-39 requirement and the opposite of hiding it. The one
+ * thing that is not offered is an undo for an action with no reverse, because
+ * that is a fact about the action rather than about the reader.
+ */
+function ProposalCard({
+  proposal,
+  busy,
+  onApply,
+  onDismiss,
+  onUndo,
+}: {
+  readonly proposal: Proposal;
+  readonly busy: boolean;
+  readonly onApply: () => void;
+  readonly onDismiss: () => void;
+  readonly onUndo: () => void;
+}) {
+  return (
+    <section
+      aria-label="Proposed change"
+      className="rounded-lg border border-line bg-surface p-3"
+    >
+      <header className="flex items-center gap-2">
+        <Chip tone="agent">AI</Chip>
+        <span className="text-xs font-semibold text-ink-2">
+          {proposal.action}
+        </span>
+        {proposal.status === "applied" ? (
+          <Chip tone={proposal.undone ? "neutral" : "ok"}>
+            {proposal.undone ? "Undone" : "Applied"}
+          </Chip>
+        ) : null}
+        {proposal.status === "dismissed" ? (
+          <Chip tone="neutral">Dismissed</Chip>
+        ) : null}
+      </header>
+      <p className="mt-2 text-xs text-ink-3">{proposal.why}</p>
+      <dl className="mt-2 flex flex-col gap-1">
+        {proposal.preview.map((row) => (
+          <div key={row.label} className="flex gap-2 text-xs">
+            <dt className="w-20 flex-none text-ink-4">{row.label}</dt>
+            <dd className="min-w-0 text-ink-2">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-3 flex items-center gap-2">
+        {proposal.status === "pending" ? (
+          <>
+            <Button variant="primary" disabled={busy} onClick={onApply}>
+              <Check className="size-4" />
+              Apply
+            </Button>
+            <Button variant="ghost" disabled={busy} onClick={onDismiss}>
+              Dismiss
+            </Button>
+          </>
+        ) : null}
+        {proposal.status === "applied" &&
+        !proposal.undone &&
+        proposal.reversible ? (
+          <Button variant="ghost" disabled={busy} onClick={onUndo}>
+            <Undo2 className="size-4" />
+            Undo
+          </Button>
+        ) : null}
+        {proposal.status === "applied" && !proposal.reversible ? (
+          <p className="text-xs text-ink-4">
+            This one cannot be undone: the action it applied has no reverse.
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function CopilotPanel({
   initialAvailability,
 }: {
@@ -155,6 +261,7 @@ export function CopilotPanel({
   /** The answer as it arrives. Replaced by the recorded message when it lands. */
   const [streaming, setStreaming] = useState<string | null>(null);
   const [sources, setSources] = useState<readonly Source[]>([]);
+  const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const abort = useRef<AbortController | null>(null);
@@ -196,13 +303,46 @@ export function CopilotPanel({
   }, [open]);
 
   const loadThread = useCallback(async (id: string) => {
-    const thread = await readCopilotThreadAction(id);
+    const [thread, listed] = await Promise.all([
+      readCopilotThreadAction(id),
+      listCopilotProposalsAction(id),
+    ]);
     setThreadId(thread.id);
     setMessages(thread.messages);
+    setProposals(listed);
     setStreaming(null);
     setSources([]);
     setNotice(null);
   }, []);
+
+  /**
+   * Applies, dismisses or undoes one, then re-reads.
+   *
+   * The refusal is shown as it arrives. A member who may not create an objective
+   * gets `goals.create`'s own words, not a disabled button and no explanation.
+   */
+  const decide = useCallback(
+    async (
+      id: string,
+      decision: (id: string) => Promise<unknown>,
+    ): Promise<void> => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        await decision(id);
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? error.message : "That could not be done.",
+        );
+      } finally {
+        setBusy(false);
+        if (threadId) {
+          await loadThread(threadId).catch(() => undefined);
+        }
+      }
+    },
+    [loadThread, threadId],
+  );
 
   const stop = useCallback(() => {
     abort.current?.abort();
@@ -303,6 +443,9 @@ export function CopilotPanel({
       setBusy(false);
       setStreaming(null);
       if (landedThreadId) {
+        // A request to change something, offered as a proposal rather than
+        // done. Null is the ordinary answer and means this was a question.
+        await proposeFromCopilotAction(landedThreadId, asked).catch(() => null);
         // The recorded thread, with citations filtered against access now,
         // replaces everything drawn optimistically above.
         await loadThread(landedThreadId).catch(() => undefined);
@@ -388,6 +531,22 @@ export function CopilotPanel({
               {messages.map((message) => (
                 <Turn key={message.id} message={message} />
               ))}
+              {proposals.map((proposal) => (
+                <ProposalCard
+                  key={proposal.id}
+                  proposal={proposal}
+                  busy={busy}
+                  onApply={() =>
+                    void decide(proposal.id, applyCopilotProposalAction)
+                  }
+                  onDismiss={() =>
+                    void decide(proposal.id, dismissCopilotProposalAction)
+                  }
+                  onUndo={() =>
+                    void decide(proposal.id, undoCopilotProposalAction)
+                  }
+                />
+              ))}
               {streaming !== null ? (
                 <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
                   {streaming === "" ? (
@@ -403,7 +562,10 @@ export function CopilotPanel({
             </div>
           )}
 
-          {notice ? (
+          {/* Only when it says something the footer does not. With the provider
+              off the stream's reason and the footer's reason are the same
+              sentence, and printing it twice reads as two problems. */}
+          {notice && notice !== availability.reason ? (
             <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-3">
               {notice}
             </p>

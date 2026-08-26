@@ -1907,6 +1907,115 @@ export const unlinkKeyResultKpi = defineWriteAction({
 });
 
 /**
+ * Removes a goal (P4-T14b-a).
+ *
+ * **Not the same thing as closing one, and the difference matters.**
+ * `goals.close` is the end of a cycle: an outcome, a keep-or-abandon decision
+ * and a retrospective, all of which are a record of work that happened. This is
+ * for a goal that should not exist, which until now the product had no way to
+ * say. The column has always been there; nothing wrote it.
+ *
+ * The reason it exists now is undo. A copilot proposal that creates an
+ * objective needs a reverse, and closing the objective would file a false
+ * report about a quarter. Agung approved adding it on 26 August 2026, because
+ * an action that removes something a person can see is a product decision and
+ * not a mechanism.
+ *
+ * **Soft, and `full`.** Soft because that is this repository's default scope, so
+ * the row stays where every audit and activity row that points at it can still
+ * find it. `full` because removal is not an editing right: a champion may
+ * change their objective and only an administrator may make it not have
+ * existed. `destructive` in the registry, which is what the safety class is for.
+ *
+ * Its key results go with it. A key result whose goal is gone is a measure of
+ * nothing, and leaving them behind would put orphans in every list that reads
+ * key results without their goal.
+ */
+export const deleteGoal = defineWriteAction({
+  name: "goals.delete",
+  summary:
+    "Removes a goal and its key results, which is not the same as closing one.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  safety: "destructive",
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      // Through the getter, so a goal this member cannot see reads as absent
+      // rather than as refused.
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.full,
+      );
+
+      const [goal] = await tx
+        .select({ title: goals.title, level: goals.level })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!goal) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+
+      const now = new Date();
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(keyResults)
+        .set({ deletedAt: now })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, input.id),
+          ),
+        );
+      await tx
+        .update(goals)
+        .set({ deletedAt: now })
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        );
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "goal.deleted",
+          subjectType: "goal",
+          subjectId: input.id,
+          // The title travels because the feed entry has to read as a sentence
+          // after the thing it names is gone, which is exactly this case.
+          payload: { title: goal.title },
+        },
+        audit: {
+          action: "goals.delete",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { title: goal.title, level: goal.level },
+        },
+      };
+    },
+  }),
+});
+
+/**
  * The rewrite assist (METHOD.md §4, P4-T06c).
  *
  * **A read action, so it commits nothing.** The whole point of an assist is

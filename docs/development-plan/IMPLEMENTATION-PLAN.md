@@ -766,15 +766,27 @@ half is a contract and a guarantee, and the panel half is streaming, which no
 single transactional write can do. Cut on 26 August 2026, and the shape of the
 cut is what made the transaction boundary visible: see `actions/copilot.ts`.
 
-### P4-T14b: Copilot proposals and background runs [M]
-Depends on: P4-T14a
+### P4-T14b-a: Copilot proposals [M]
+Depends on: P4-T14a-b
 Goal: the assistant, writing, and always as a proposal.
-Deliverables: action proposals rendered as a preview or difference with apply and dismiss, committing through the normal Operation; long tool runs executing as background jobs and streaming back over realtime.
-Test plan: a proposal the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a background run survives a page reload.
+Deliverables: a curated catalogue of actions the copilot may propose, with the model authoring fields only and never an identifier; proposals rendered as a preview with apply, dismiss and an AI provenance chip; applying through the normal Operation as the member; an undo for every action that has a reverse.
+Test plan: a proposal the user lacks permission to apply is refused by the permission layer, not hidden by the interface; a model naming an action off the catalogue, indexing past a list it was shown, or writing a field the schema refuses produces no proposal at all.
 Acceptance: Given a member asking the copilot to create a goal, when they approve the proposal, then the goal is created through the normal Operation with audit, an AI provenance chip and a working undo.
 
+### P4-T14b-b: Copilot background runs [M]
+Depends on: P4-T14b-a, and on a host that consumes the outbox
+Goal: work the copilot cannot finish inside one request.
+Deliverables: long tool runs executing as background jobs and streaming back over realtime; a run that survives a page reload and reattaches.
+Test plan: a background run survives a page reload; a run whose budget is spent halts and says so.
+Acceptance: Given a member asking for something that takes a minute, when they reload the page, then the run is still going and they rejoin it.
+**Blocked, and the reason is not in this row.** Nothing in the application constructs `OutboxRelay` or a jobs adapter, so a job this row enqueues would never be picked up. See PLAN.md §12's risk entry. Do not start this row before a host exists.
+
+**Why P4-T14b was cut in two.** One [M] held a proposal catalogue, a preview, an apply path, an undo, *and* background job execution over realtime. The two halves also differ in whether they can be built at all: the proposal half is code, and the background half needs a worker host the product does not have. Cut on 26 August 2026, and the second half is marked blocked rather than left to be discovered mid-session.
+
+**`goals.delete` arrived with the first half.** The acceptance criterion asks for a working undo after a proposal creates an objective, and the registry had no reverse for `goals.create`: `goals.close` is the end of a cycle, with an outcome and a retrospective, and using it as an undo would file a false report about a quarter. Agung approved adding a soft delete at `full` on 26 August 2026.
+
 ### P4-T15a: Planning and drafting assists [M]
-Depends on: P4-T14b, P4-T06c
+Depends on: P4-T14b-a, P4-T06c
 Goal: AI-NATIVE-PLAN.md §2.1's write capabilities on the Phase 3 drafting surfaces.
 Deliverables: draft an objective and its key results from a plain-language ambition; suggest metrics, units, baselines and targets for a key result; suggest the alignment parent by meaning. Each behind a feature switch, with provenance recorded and a preview before applying.
 Test plan: every assist is absent with the provider off and the deterministic path is unchanged; a suggestion is a proposal and never a write; the suggested alignment parent is one the member may read.

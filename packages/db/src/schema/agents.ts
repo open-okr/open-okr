@@ -11,6 +11,7 @@ import {
 import { newId } from "../id.ts";
 import { AI_PROVIDER_KINDS } from "./ai.ts";
 import { MODEL_TIERS } from "./ai-models.ts";
+import { aiThreads } from "./ai-threads.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
 /**
@@ -142,9 +143,21 @@ export const proposedChanges = pgTable("proposed_changes", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
-  runId: uuid("run_id")
-    .notNull()
-    .references(() => agentRuns.id, { onDelete: "cascade" }),
+  /**
+   * The agent run that produced it, or null for a copilot proposal
+   * (P4-T14b-a).
+   *
+   * A proposal names its origin, a run or a thread, exactly one, and the table's
+   * own check constraint enforces that. Inventing an agent run for a question
+   * somebody typed would put a run in the run log that nobody scheduled.
+   */
+  runId: uuid("run_id").references(() => agentRuns.id, {
+    onDelete: "cascade",
+  }),
+  /** The copilot conversation it was proposed in, or null for an agent run. */
+  threadId: uuid("thread_id").references(() => aiThreads.id, {
+    onDelete: "cascade",
+  }),
   action: text("action").notNull(),
   payload: jsonb("payload").notNull().default({}),
   subjectType: text("subject_type"),
@@ -166,6 +179,19 @@ export const proposedChanges = pgTable("proposed_changes", {
     () => workspaceMembers.id,
   ),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
+  /**
+   * What applying it returned, as the action's own result.
+   *
+   * Undo needs it. Reversing a creation means naming the thing that was created,
+   * and the applied action's result is the only place that identifier exists.
+   */
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  /**
+   * When the member reversed an applied proposal.
+   *
+   * Not a status. It was applied, and then it was undone, and both are true.
+   */
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

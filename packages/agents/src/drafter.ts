@@ -22,6 +22,8 @@ import type {
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
+  ProposalRequestContext,
+  ProposedAction,
   RecoveryTitleContext,
   ReviewableGoal,
   SemanticFinding,
@@ -185,6 +187,71 @@ function splitAnswer(raw: string): {
     usedSourceIndexes: parseSources(raw.slice(at)),
   };
 }
+
+/**
+ * A proposal, as a model may express one (P4-T14b-a).
+ *
+ * **`propose` is a field rather than a nullable object**, because a model asked
+ * for "an object or null" returns an object with empty strings in it far more
+ * often than it returns null. Asked whether to propose at all, it answers the
+ * question. Declining is the common case: most sentences are questions.
+ *
+ * `fields` is deliberately untyped here. Its shape belongs to the action, and
+ * core validates it against that action's own schema before anything is stored,
+ * so a second copy of the shape in this file would be a second thing to keep in
+ * step.
+ */
+const PROPOSAL_SHAPE = z.object({
+  propose: z.boolean(),
+  action: z.string().trim().max(120),
+  fields: z.record(z.string(), z.unknown()),
+  why: z.string().trim().max(1000),
+});
+
+const PROPOSAL_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["propose", "action", "fields", "why"],
+  properties: {
+    propose: { type: "boolean" },
+    action: { type: "string" },
+    fields: { type: "object" },
+    why: { type: "string", maxLength: 1000 },
+  },
+} as const;
+
+const PROPOSAL_SYSTEM =
+  "You decide whether what somebody asked for is a request to change " +
+  "something in this workspace, and if it is, you fill in one of the actions " +
+  "you are offered. Propose nothing unless the request plainly asks for that " +
+  "exact change: a question is not a request. Choose a list item by its " +
+  "number, never by inventing a name or an identifier. Write only the fields " +
+  "the action asks for. Say in one sentence why this change, now.";
+
+/** The offered actions, their fields and their numbered choices, as text. */
+const optionsFor = (context: ProposalRequestContext): string =>
+  context.options
+    .map((option) => {
+      const choices = Object.entries(option.choices)
+        .map(
+          ([name, list]) =>
+            `  ${name}:` +
+            NEWLINE +
+            list
+              .map((label, index) => `    ${index + 1}. ${label}`)
+              .join(NEWLINE),
+        )
+        .join(NEWLINE);
+      return (
+        `action: ${option.action} (${option.label})` +
+        NEWLINE +
+        `  what it does: ${option.whatItDoes}` +
+        NEWLINE +
+        `  fields: ${JSON.stringify(option.fields)}` +
+        (choices === "" ? "" : NEWLINE + choices)
+      );
+    })
+    .join(NEWLINE + NEWLINE);
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -509,6 +576,61 @@ export function createProviderDrafter(
           model: options.model,
         },
       };
+    },
+
+    async proposeAction(
+      context: ProposalRequestContext,
+    ): Promise<ProposedAction | null> {
+      if (!affordable() || context.options.length === 0) {
+        return null;
+      }
+      try {
+        const reply = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: PROPOSAL_SHAPE,
+          jsonSchema: PROPOSAL_JSON_SCHEMA,
+          maxTokens: 500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: PROPOSAL_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Request: ${context.request}` +
+                NEWLINE +
+                NEWLINE +
+                "Actions you may propose:" +
+                NEWLINE +
+                optionsFor(context),
+            },
+          ],
+        });
+        if (!reply.propose) {
+          return null;
+        }
+        // The action name is checked against the offered list here as well as in
+        // core, so a model naming something it was not offered never becomes a
+        // call at all.
+        const offered = context.options.some(
+          (option) => option.action === reply.action,
+        );
+        if (!offered) {
+          return null;
+        }
+        if (reply.why.trim() === "") {
+          // A proposal with no stated reason is a proposal a reviewer cannot
+          // judge. Refused rather than shown with a blank line.
+          return null;
+        }
+        return {
+          action: reply.action,
+          fields: reply.fields,
+          why: reply.why,
+        };
+      } catch {
+        return null;
+      }
     },
 
     async rewriteForRule(context) {
