@@ -207,6 +207,13 @@ import {
   updateOwnProfile,
 } from "./people.ts";
 import { reviewInbox } from "./review.ts";
+import {
+  clusterRetroNotes,
+  draftMinutes,
+  draftRetrospective,
+  narrateDiagnostic,
+  proposeFromLearnings,
+} from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
 import {
   addRetroNote,
@@ -532,6 +539,11 @@ export const ACTION_MAP = {
   "sessions.processHealth": readProcessHealth,
   "sessions.recordDiagnostic": recordDiagnostic,
   "sessions.diagnostic": readDiagnostic,
+  "sessions.clusterRetro": clusterRetroNotes,
+  "sessions.narrateDiagnostic": narrateDiagnostic,
+  "sessions.draftMinutes": draftMinutes,
+  "sessions.proposeFromLearnings": proposeFromLearnings,
+  "goals.draftRetrospective": draftRetrospective,
   "sessions.decideObjective": decideObjective,
   "sessions.reset": readReset,
   "sessions.captureLearning": captureLearning,

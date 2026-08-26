@@ -29,6 +29,15 @@ export const ASSIST_FEATURE_KEYS = {
   parseFilter: "assists.parseFilter",
 } as const;
 
+/** §2.3's review assists (P4-T15c). */
+export const REVIEW_ASSIST_KEYS = {
+  clusterRetro: "assists.clusterRetro",
+  narrateDiagnostic: "assists.narrateDiagnostic",
+  draftMinutes: "assists.draftMinutes",
+  draftRetrospective: "assists.draftRetrospective",
+  proposeObjectives: "assists.proposeObjectives",
+} as const;
+
 /** §2.2's rhythm narrations (P4-T15b-a). */
 export const RHYTHM_ASSIST_KEYS = {
   narrateDigest: "assists.narrateDigest",

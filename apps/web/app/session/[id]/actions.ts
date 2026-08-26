@@ -691,3 +691,43 @@ export async function narrateDigestAction(sessionId: string) {
     { sessionId },
   );
 }
+
+/**
+ * §8.6's diagnostic with the specifics under it, or without them (P4-T15c).
+ *
+ * The verdict, the diagnosis and the prescription in the answer are
+ * `sessions.diagnostic`'s own, whatever the provider does. Only `narrative`
+ * comes from a model, and it is null with no provider.
+ */
+export async function narrateDiagnosticAction(sessionId: string) {
+  const { session, workspace } = await requireWorkspace();
+  const { drafterFor } = await import("../../../lib/drafter");
+  const drafter = await drafterFor(workspace.workspaceId);
+  const base = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  return callAction(
+    drafter ? { ...base, drafter } : base,
+    "sessions.narrateDiagnostic",
+    { sessionId },
+  );
+}
+
+/** Themes over this review's retro board, or null. Writes nothing. */
+export async function clusterRetroAction(sessionId: string) {
+  const { session, workspace } = await requireWorkspace();
+  const { drafterFor } = await import("../../../lib/drafter");
+  const drafter = await drafterFor(workspace.workspaceId);
+  const base = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  return callAction(
+    drafter ? { ...base, drafter } : base,
+    "sessions.clusterRetro",
+    { sessionId },
+  );
+}

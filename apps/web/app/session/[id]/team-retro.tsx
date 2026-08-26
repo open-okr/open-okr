@@ -26,6 +26,7 @@ import { useCallback, useState, useTransition } from "react";
 import {
   addRetroNoteAction,
   castRetroVoteAction,
+  clusterRetroAction,
   removeRetroNoteAction,
 } from "./actions";
 
@@ -245,13 +246,51 @@ export function TeamRetroPanel({
   retro,
   canWrite,
   canVote,
+  assistAvailable = false,
 }: {
   readonly sessionId: string;
   readonly retro: TeamRetro;
   readonly canWrite: boolean;
   readonly canVote: boolean;
+  /**
+   * Whether a provider can group the notes (P4-T15c).
+   *
+   * False is the normal case and the board is unchanged by it. Themes are a lens
+   * over the board before the dots are spent, and nothing is written: the notes
+   * keep their columns and the vote is still per note.
+   */
+  readonly assistAvailable?: boolean;
 }) {
   const [problem, setProblem] = useState<string | null>(null);
+  const [themes, setThemes] = useState<
+    readonly { title: string; noteIds: readonly string[] }[] | null
+  >(null);
+  const [clustering, setClustering] = useState(false);
+
+  /** The note text behind an id, so a theme can be read without the board. */
+  const textOf = useCallback(
+    (noteId: string): string =>
+      retro.columns
+        .flatMap((column) => column.notes)
+        .find((note) => note.id === noteId)?.text ?? "",
+    [retro.columns],
+  );
+
+  const cluster = useCallback(async () => {
+    setClustering(true);
+    setProblem(null);
+    try {
+      const clustered = await clusterRetroAction(sessionId);
+      setThemes(clustered?.themes ?? null);
+      if (!clustered || clustered.themes.length === 0) {
+        setProblem("No themes came out of that. The board stands on its own.");
+      }
+    } catch {
+      setProblem("The assist could not run. The board is unaffected.");
+    } finally {
+      setClustering(false);
+    }
+  }, [sessionId]);
 
   return (
     <Card role="region" aria-labelledby="team-retro-heading">
@@ -283,6 +322,49 @@ export function TeamRetroPanel({
             />
           ))}
         </div>
+
+        {themes ? (
+          <section
+            aria-label="Retro themes"
+            className="rounded-md border border-line bg-surface p-3"
+          >
+            <span className="mb-2 flex items-center gap-2">
+              <Chip tone="agent">AI</Chip>
+              <span className="text-xs text-ink-4">
+                A lens over the board. The vote is still per note.
+              </span>
+            </span>
+            <ul className="flex flex-col gap-2">
+              {themes.map((theme) => (
+                <li key={theme.title}>
+                  <p className="text-sm font-semibold text-ink">
+                    {theme.title}
+                  </p>
+                  <ul className="mt-0.5 flex flex-col gap-0.5">
+                    {theme.noteIds.map((noteId) => (
+                      <li key={noteId} className="text-xs text-ink-3">
+                        {textOf(noteId)}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {assistAvailable && themes === null ? (
+          <span>
+            <Button
+              type="button"
+              variant="ai"
+              disabled={clustering}
+              onClick={() => void cluster()}
+            >
+              Find the themes
+            </Button>
+          </span>
+        ) : null}
 
         {problem === null ? null : (
           <p className="text-sm text-bad">{problem}</p>

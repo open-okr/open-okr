@@ -133,6 +133,13 @@ export default async function SessionPage({ params }: SessionPageProps) {
     digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
   }
 
+  // Whether a provider can add §8.6's specifics, or find retro themes
+  // (P4-T15c). False is the normal case and every panel below is unchanged by
+  // it: the verdict, the prescription and the board are the method's.
+  const { drafterFor: resolveDrafter } = await import("../../../lib/drafter");
+  const reviewAssistAvailable =
+    (await resolveDrafter(workspace.workspaceId)) !== null;
+
   const isFacilitator = workspace.memberId === sessionRow.facilitatorId;
   const isScheduled = sessionRow.state === "scheduled";
   const isRunning = sessionRow.state === "running";
@@ -587,6 +594,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           retro={teamRetro}
           canWrite={isRunning}
           canVote={isRunning}
+          assistAvailable={reviewAssistAvailable}
         />
       ) : null}
 
@@ -624,6 +632,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           sessionId={id}
           diagnostic={diagnostic}
           canRead={isRunning}
+          assistAvailable={reviewAssistAvailable}
         />
       ) : null}
 

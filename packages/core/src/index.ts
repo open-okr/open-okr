@@ -89,6 +89,8 @@ export type {
   AgentDrafter,
   AmbitionContext,
   CheckInDraftContext,
+  ClusterableNote,
+  DiagnosticContext,
   DraftedCheckIn,
   DraftedKeyResult,
   DraftedObjective,
@@ -100,12 +102,15 @@ export type {
   KpiRequestContext,
   MeasureContext,
   NarratedTrend,
+  NoteThemes,
   ParentContext,
   ParsedFilter,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
+  ProposedObjective,
   RecoveryTitleContext,
+  RetrospectiveCheckIn,
   ReviewableGoal,
   RewriteContext,
   SemanticFinding,
@@ -117,6 +122,7 @@ export type {
 } from "./agents/drafter.ts";
 export {
   ASSIST_FEATURE_KEYS,
+  REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
 } from "./ai/assist-keys.ts";
 export {

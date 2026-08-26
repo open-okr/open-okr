@@ -20,7 +20,7 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import { recordDiagnosticAction } from "./actions";
+import { narrateDiagnosticAction, recordDiagnosticAction } from "./actions";
 
 export interface Diagnostic {
   readonly cycleScore: number | null;
@@ -42,14 +42,41 @@ export function DiagnosticPanel({
   sessionId,
   diagnostic,
   canRead,
+  assistAvailable = false,
 }: {
   readonly sessionId: string;
   readonly diagnostic: Diagnostic;
   readonly canRead: boolean;
+  /**
+   * Whether a provider can add the specifics (P4-T15c).
+   *
+   * False is the normal case and nothing above changes: the verdict, the
+   * diagnosis and the prescription are the method's and are on screen either
+   * way. This only decides whether a paragraph can be asked for.
+   */
+  readonly assistAvailable?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [narrating, setNarrating] = useState(false);
+
+  const narrate = useCallback(async () => {
+    setNarrating(true);
+    setProblem(null);
+    try {
+      const narrated = await narrateDiagnosticAction(sessionId);
+      setNarrative(narrated?.narrative ?? null);
+      if (!narrated?.narrative) {
+        setProblem("No specifics this time. The verdict above stands.");
+      }
+    } catch {
+      setProblem("The assist could not run. The verdict above is unaffected.");
+    } finally {
+      setNarrating(false);
+    }
+  }, [sessionId]);
 
   const read = useCallback(() => {
     setProblem(null);
@@ -110,6 +137,33 @@ export function DiagnosticPanel({
               Computed from your own data. It is the same answer with AI
               switched off.
             </p>
+            {narrative ? (
+              <section
+                aria-label="Diagnostic specifics"
+                className="rounded-md border border-line bg-surface p-3"
+              >
+                <span className="mb-1.5 flex items-center gap-2">
+                  <Chip tone="agent">AI</Chip>
+                  <span className="text-xs text-ink-4">
+                    Specifics, under the verdict
+                  </span>
+                </span>
+                <p className="text-sm text-ink">{narrative}</p>
+              </section>
+            ) : null}
+            {assistAvailable && narrative === null ? (
+              <span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ai"
+                  disabled={narrating}
+                  onClick={() => void narrate()}
+                >
+                  Add the specifics
+                </Button>
+              </span>
+            ) : null}
           </>
         ) : diagnostic.readable ? (
           <>

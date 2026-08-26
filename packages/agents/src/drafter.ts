@@ -19,6 +19,8 @@ import type {
   AgentDrafter,
   AmbitionContext,
   CheckInDraftContext,
+  ClusterableNote,
+  DiagnosticContext,
   DraftedCheckIn,
   DraftedKeyResult,
   DraftedObjective,
@@ -29,11 +31,14 @@ import type {
   KpiRequestContext,
   MeasureContext,
   NarratedTrend,
+  NoteThemes,
   ParentContext,
   ParsedFilter,
   ProposalRequestContext,
   ProposedAction,
+  ProposedObjective,
   RecoveryTitleContext,
+  RetrospectiveCheckIn,
   ReviewableGoal,
   SemanticFinding,
   SuggestedKpi,
@@ -570,6 +575,129 @@ const KPI_SYSTEM =
   "existing metrics by number and the operator: add, sub, mul or div. Leave " +
   "the operator empty when it is recorded by hand rather than calculated. " +
   "Never reference a metric by anything but its number.";
+
+/**
+ * The review assists (AI-NATIVE-PLAN.md §2.3, P4-T15c).
+ *
+ * **The diagnostic prompt is the careful one.** §8.6's verdict and prescription
+ * are the method's, and this is asked for specifics *under* them. It is told
+ * not to restate them and not to disagree with them, and the caller returns the
+ * method's own sentences whatever comes back, so a model that argues with the
+ * verdict changes nothing.
+ */
+const THEMES_SHAPE = z.object({
+  themes: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(120),
+        noteNumbers: z.array(z.number().int()).max(40),
+      }),
+    )
+    // A retro with twelve themes has no themes. Bounded so the answer stays a
+    // lens rather than a re-listing of the board.
+    .max(8),
+});
+
+const THEMES_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["themes"],
+  properties: {
+    themes: {
+      type: "array",
+      maxItems: 8,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "noteNumbers"],
+        properties: {
+          title: { type: "string", maxLength: 120 },
+          noteNumbers: {
+            type: "array",
+            maxItems: 40,
+            items: { type: "integer" },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+const PROSE_SHAPE = z.object({ text: z.string().trim().max(2000) });
+
+const PROSE_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text"],
+  properties: { text: { type: "string", maxLength: 2000 } },
+} as const;
+
+const OBJECTIVES_SHAPE = z.object({
+  objectives: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(500),
+        learningNumber: z.number().int(),
+        why: z.string().trim().max(400),
+      }),
+    )
+    .max(6),
+});
+
+const OBJECTIVES_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["objectives"],
+  properties: {
+    objectives: {
+      type: "array",
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "learningNumber", "why"],
+        properties: {
+          title: { type: "string", maxLength: 500 },
+          learningNumber: { type: "integer" },
+          why: { type: "string", maxLength: 400 },
+        },
+      },
+    },
+  },
+} as const;
+
+const CLUSTER_SYSTEM =
+  "You group a retrospective's notes into a few themes, before the team votes " +
+  "on them. A theme is something two or more notes are both about. Refer to " +
+  "notes only by their numbers. Leave a note out rather than forcing it into a " +
+  "theme it does not belong to: a note on its own is a real answer. Name a " +
+  "theme in the team's own words, not in management language.";
+
+const DIAGNOSTIC_SYSTEM =
+  "You add the specifics under a verdict that has already been decided. The " +
+  "verdict and the prescription are given to you and they are not yours to " +
+  "change, restate or argue with: write two or three sentences about what " +
+  "actually happened this cycle that the verdict is describing. Use only the " +
+  "numbers you are given. Never suggest a different verdict.";
+
+const MINUTES_SYSTEM =
+  "You write up a review from its own record: the sections you are given and " +
+  "nothing else. Short paragraphs in the order the sections come. Do not add " +
+  "a conclusion, do not congratulate anybody, and never mention anything that " +
+  "is not in the sections.";
+
+const RETROSPECTIVE_SYSTEM =
+  "You write the closing retrospective for an objective, from its own weekly " +
+  "check-ins. Say what happened, when it turned, and what somebody would do " +
+  "differently. Use only what the check-ins say and the statuses they carry. " +
+  "It is a draft the owner will correct, so leave the judgements to them.";
+
+const OBJECTIVES_SYSTEM =
+  "You propose objectives for the next cycle, each one answering exactly one " +
+  "of the learnings you are given. Cite the learning by its number; a " +
+  "proposal that answers no learning is not wanted. An objective says what " +
+  "changes, not what gets done. Propose fewer rather than more: a cycle with " +
+  "six new objectives from a retrospective is a cycle nobody will finish.";
 
 const TITLE_SYSTEM =
   "You name a recovery objective for a metric that has been unhealthy. One " +
@@ -1287,6 +1415,187 @@ export function createProviderDrafter(
                 },
           why: suggested.why,
         };
+      } catch {
+        return null;
+      }
+    },
+
+    async clusterNotes(context: {
+      readonly notes: readonly ClusterableNote[];
+    }): Promise<NoteThemes | null> {
+      if (!affordable() || context.notes.length < 3) {
+        return null;
+      }
+      try {
+        return await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: THEMES_SHAPE,
+          jsonSchema: THEMES_JSON_SCHEMA,
+          maxTokens: 600,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: CLUSTER_SYSTEM },
+            {
+              role: "user",
+              content:
+                "Notes:" +
+                NEWLINE +
+                context.notes
+                  .map(
+                    (note, index) =>
+                      `  ${index + 1}. [${note.column}] ${note.text}`,
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+      } catch {
+        return null;
+      }
+    },
+
+    async narrateDiagnostic(
+      context: DiagnosticContext,
+    ): Promise<string | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const { text } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: PROSE_SHAPE,
+          jsonSchema: PROSE_JSON_SCHEMA,
+          maxTokens: 400,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: DIAGNOSTIC_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Verdict: ${context.verdict}` +
+                NEWLINE +
+                `What it means: ${context.diagnosis}` +
+                NEWLINE +
+                `What to do: ${context.prescription}` +
+                NEWLINE +
+                `Cycle score: ${context.cycleScore}` +
+                NEWLINE +
+                `Rhythm score: ${context.rhythmScore}`,
+            },
+          ],
+        });
+        return text.trim() === "" ? null : text;
+      } catch {
+        return null;
+      }
+    },
+
+    async draftMinutes(context: {
+      readonly sections: readonly {
+        readonly label: string;
+        readonly body: string;
+      }[];
+    }): Promise<string | null> {
+      if (!affordable() || context.sections.length === 0) {
+        return null;
+      }
+      try {
+        const { text } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: PROSE_SHAPE,
+          jsonSchema: PROSE_JSON_SCHEMA,
+          maxTokens: 900,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: MINUTES_SYSTEM },
+            {
+              role: "user",
+              content: context.sections
+                .map((section) => `${section.label}:` + NEWLINE + section.body)
+                .join(NEWLINE + NEWLINE),
+            },
+          ],
+        });
+        return text.trim() === "" ? null : text;
+      } catch {
+        return null;
+      }
+    },
+
+    async draftRetrospective(context: {
+      readonly goalTitle: string;
+      readonly checkIns: readonly RetrospectiveCheckIn[];
+    }): Promise<string | null> {
+      if (!affordable() || context.checkIns.length === 0) {
+        return null;
+      }
+      try {
+        const { text } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: PROSE_SHAPE,
+          jsonSchema: PROSE_JSON_SCHEMA,
+          maxTokens: 700,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: RETROSPECTIVE_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Objective: ${context.goalTitle}` +
+                NEWLINE +
+                "Check-ins, oldest first:" +
+                NEWLINE +
+                context.checkIns
+                  .map(
+                    (entry) =>
+                      `  ${entry.period} [${entry.status}` +
+                      (entry.confidence === null
+                        ? ""
+                        : `, confidence ${entry.confidence}`) +
+                      `] ${entry.narrative}`,
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+        return text.trim() === "" ? null : text;
+      } catch {
+        return null;
+      }
+    },
+
+    async proposeObjectives(context: {
+      readonly learnings: readonly string[];
+    }): Promise<readonly ProposedObjective[] | null> {
+      if (!affordable() || context.learnings.length === 0) {
+        return null;
+      }
+      try {
+        const { objectives } = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: OBJECTIVES_SHAPE,
+          jsonSchema: OBJECTIVES_JSON_SCHEMA,
+          maxTokens: 700,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: OBJECTIVES_SYSTEM },
+            {
+              role: "user",
+              content:
+                "Learnings carried forward:" +
+                NEWLINE +
+                context.learnings
+                  .map((text, index) => `  ${index + 1}. ${text}`)
+                  .join(NEWLINE),
+            },
+          ],
+        });
+        return objectives.length === 0 ? null : objectives;
       } catch {
         return null;
       }

@@ -25,14 +25,21 @@ a contract, a citation guarantee and a streaming panel. Counts read on
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 17 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T14b-a, P4-T15a, P4-T15b-a, P4-T15b-b, P4-T15d |
-| todo | 1 | P4-T15c |
+| in_review | 18 | P4-T10b-b to P4-T12-b, P4-T13a to P4-T15d, all but the blocked row |
+| todo | 0 | nothing |
 | blocked | 1 | P4-T14b-b, on a host that consumes the outbox |
 
-The agents lane is finished and read, and **the sessions lane is finished and**
-**waiting on a read**: the quarterly review runs all eleven stages, produces its
-minutes and hands §8.9's five rows to the next cycle. What is left is the
-retrieval lane, whose last buildable row is done, and P4-T15.
+**Every buildable row in Phase 4 is written.** The agents lane is finished and
+read. The sessions lane, the retrieval lane and the assists are written and
+waiting on a read: the quarterly review runs all eleven stages and hands §8.9's
+five rows forward, the copilot answers with access-filtered citations and
+proposes changes a person applies, and all thirteen of AI-NATIVE-PLAN §2's
+assists are behind their own switches with a deterministic path under each one.
+
+One row is blocked and it is not blocked on Phase 4: **P4-T14b-b** needs a host
+that consumes the outbox, which nothing in the product constructs. PLAN.md §12's
+R10 records it, and the same gap is why the copilot's retrieval finds nothing to
+cite in a running instance even with a provider key configured.
 
 **`done` here means the row was read and accepted, not that it reached `main`.**
 Branch `agung` is fifty-nine commits ahead of `origin/main`, and the only Phase 4
@@ -58,7 +65,7 @@ quarterly review.
 | A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
 | B2: the sessions | P4-T07a to P4-T12, seventeen rows | yes | **Complete.** P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T12-b written and waiting on a read |
-| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a to P4-T15a written and waiting on a read; P4-T14b-b blocked; **P4-T15b next** |
+| C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | every row written and waiting on a read; P4-T14b-b blocked on an outbox host |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
 B2 is the critical path. Nine of its fifteen rows are accepted, three are in
@@ -170,7 +177,7 @@ and this table is what was agreed.
 | P4-T15a | Planning and drafting assists | Agung | in_review |
 | P4-T15b-a | The digest and the trend | Agung | in_review |
 | P4-T15b-b | The blocker summary and the KPI suggestion | Agung | in_review |
-| P4-T15c | Review assists | Agung | todo |
+| P4-T15c | Review assists | Agung | in_review |
 | P4-T15d | The list filter assist | Agung | in_review |
 
 **"ready" means the row's dependencies exist in code today.** P4-T05c and

@@ -369,6 +369,52 @@ export interface SuggestedKpi {
   readonly why: string;
 }
 
+/** One retro note as the clustering assist is shown it (P4-T15c). */
+export interface ClusterableNote {
+  readonly text: string;
+  /** §8.1's two columns: what worked, what did not. */
+  readonly column: string;
+}
+
+/**
+ * Themes over a numbered list of notes.
+ *
+ * `noteNumbers` are one-based into the list the model was shown, which is one
+ * review's board and nothing else. A theme cannot reach a note from another
+ * retro, and a number out of range is dropped by the caller.
+ */
+export interface NoteThemes {
+  readonly themes: readonly {
+    readonly title: string;
+    readonly noteNumbers: readonly number[];
+  }[];
+}
+
+/** What the diagnostic narration is told. §8.6's own answer, and the numbers. */
+export interface DiagnosticContext {
+  readonly verdict: string;
+  readonly diagnosis: string;
+  readonly prescription: string;
+  readonly cycleScore: number;
+  readonly rhythmScore: number;
+}
+
+/** One published check-in, as the retrospective assist is shown it. */
+export interface RetrospectiveCheckIn {
+  readonly period: string;
+  readonly status: string;
+  readonly confidence: number | null;
+  readonly narrative: string;
+}
+
+/** An objective proposed from a learning, citing it by number (P4-T15c). */
+export interface ProposedObjective {
+  readonly title: string;
+  /** One-based into the learnings list. A proposal citing none is dropped. */
+  readonly learningNumber: number;
+  readonly why: string;
+}
+
 /**
  * What a host must provide for the agents to write language.
  *
@@ -509,6 +555,47 @@ export interface AgentDrafter {
    * §6's parser. A formula that does not parse is dropped rather than offered.
    */
   suggestKpi?(context: KpiRequestContext): Promise<SuggestedKpi | null>;
+  /**
+   * §2.3's retro clustering, positional over one board (P4-T15c).
+   *
+   * Null when the notes do not group into anything, which is a real answer: a
+   * retro where four people said four unrelated things has four themes of one,
+   * and pretending otherwise is worse than saying nothing.
+   */
+  clusterNotes?(context: {
+    readonly notes: readonly ClusterableNote[];
+  }): Promise<NoteThemes | null>;
+  /**
+   * §2.3's diagnostic narrative, which is **additive and never a replacement**.
+   *
+   * §8.6's verdict and prescription come from `packages/method` and are the same
+   * sentence with or without this. What comes back here is a paragraph that sits
+   * beside them, in `review_diagnostics.ai_narrative`, a column separate from
+   * the room's own `narrative` for exactly this reason.
+   */
+  narrateDiagnostic?(context: DiagnosticContext): Promise<string | null>;
+  /** §2.3's minutes draft, over the record the session already holds. */
+  draftMinutes?(context: {
+    readonly sections: readonly {
+      readonly label: string;
+      readonly body: string;
+    }[];
+  }): Promise<string | null>;
+  /** §2.3's goal retrospective, from the published check-ins. */
+  draftRetrospective?(context: {
+    readonly goalTitle: string;
+    readonly checkIns: readonly RetrospectiveCheckIn[];
+  }): Promise<string | null>;
+  /**
+   * §2.3's next-cycle objectives, each citing the learning it came from.
+   *
+   * A proposal that cites nothing is dropped by the caller: §8.9 hands learnings
+   * forward so the next cycle answers them, and an objective with no learning
+   * behind it is one somebody could have typed unaided.
+   */
+  proposeObjectives?(context: {
+    readonly learnings: readonly string[];
+  }): Promise<readonly ProposedObjective[] | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
 }
