@@ -175,6 +175,7 @@ export {
   RITUALS,
   type Ritual,
   type RitualKind,
+  ROOT_CAUSES,
   type RoomPulseBand,
   type RoomPulseRead,
   reviewStageKey,

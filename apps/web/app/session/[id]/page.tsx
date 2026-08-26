@@ -22,6 +22,7 @@
 import { callAction, excerptRichText } from "@openokr/core";
 import {
   REVIEW_STAGE_KEYS,
+  ROOT_CAUSES,
   reviewStages,
   WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
@@ -48,9 +49,11 @@ import {
   type MonthlyUntrended,
 } from "./monthly-review";
 import { type Narratives, NarrativesPanel } from "./narratives";
+import { type ProcessHealth, ProcessHealthPanel } from "./process-health";
 import { QuarterlyReview } from "./quarterly-review";
 import { type Recognition, RecognitionPanel } from "./recognition";
 import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
+import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
@@ -234,6 +237,27 @@ export default async function SessionPage({ params }: SessionPageProps) {
     } catch {
       managementWithheld = true;
     }
+  }
+
+  // Stage seven: root causes (METHOD.md §8.4, P4-T11b).
+  //
+  // The taxonomy is added to the read here rather than imported by the panel,
+  // because a client component holding its own copy of a canon list is the drift
+  // §11 exists to prevent.
+  let rootCauses: RootCauses | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[6]) {
+    const read = (await callAction(context, "sessions.rootCauses", {
+      sessionId: id,
+    })) as Omit<RootCauses, "causes">;
+    rootCauses = { ...read, causes: ROOT_CAUSES };
+  }
+
+  // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
+  let processHealth: ProcessHealth | null = null;
+  if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[7]) {
+    processHealth = (await callAction(context, "sessions.processHealth", {
+      sessionId: id,
+    })) as ProcessHealth;
   }
 
   if (isMonthly) {
@@ -437,7 +461,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
             recognition !== null ||
             teamRetro !== null ||
             managementRetro !== null ||
-            managementWithheld
+            managementWithheld ||
+            rootCauses !== null ||
+            processHealth !== null
           }
           stageKeys={REVIEW_STAGE_KEYS}
           currentStageKey={sessionRow.stageKey}
@@ -517,6 +543,24 @@ export default async function SessionPage({ params }: SessionPageProps) {
             </p>
           </CardBody>
         </Card>
+      ) : null}
+
+      {/* Stage seven: root causes (METHOD.md §8.4, P4-T11b) */}
+      {rootCauses ? (
+        <RootCausePanel
+          sessionId={id}
+          rootCauses={rootCauses}
+          canName={isRunning}
+        />
+      ) : null}
+
+      {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}
+      {processHealth ? (
+        <ProcessHealthPanel
+          sessionId={id}
+          health={processHealth}
+          canAnswer={isRunning}
+        />
       ) : null}
 
       {/* The monthly review's record (METHOD.md §7.5, S-23, P4-T09) */}

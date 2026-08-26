@@ -323,6 +323,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "session.retroNoteRemoved": z.object({ sessionId: z.string() }),
   "session.retroVoteCast": z.object({ sessionId: z.string() }),
   "session.managementAnswerRecorded": z.object({ sessionId: z.string() }),
+  // No cause number and no scores. §8.4 says look for the system, not the
+  // person, and a space-wide entry naming a cause against a named key result
+  // invites the opposite. The survey's payload matters more still: an activity
+  // row carries its actor, so scores in it would attribute an anonymous
+  // answer in the one place everybody reads (P4-T11b).
+  "session.rootCauseNamed": z.object({ sessionId: z.string() }),
+  "session.processHealthSubmitted": z.object({ sessionId: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;

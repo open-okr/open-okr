@@ -344,6 +344,12 @@ export {
   retroVotes,
 } from "./schema/retros.ts";
 export {
+  type ProcessHealthResponse,
+  processHealthResponses,
+  type RootCause,
+  rootCauses,
+} from "./schema/review-diagnosis.ts";
+export {
   type ReviewNarrative,
   reviewNarratives,
 } from "./schema/review-narratives.ts";

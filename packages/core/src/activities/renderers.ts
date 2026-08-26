@@ -277,6 +277,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "session.retroVoteCast": () => "Voted in the review retro",
   "session.managementAnswerRecorded": () =>
     "Recorded a management retro answer",
+  "session.rootCauseNamed": () => "Named a root cause in the review",
+  "session.processHealthSubmitted": () =>
+    "Answered the review's process-health survey",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

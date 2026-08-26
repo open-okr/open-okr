@@ -601,6 +601,52 @@ Then the rhythm diagnostic renders (p4-t00-method-package.md SS9):
 The diagnostic is deterministic. With AI on, a narrative adds specifics from
 this cycle. With AI off, the verdict sentence is the same.
 
+**What P4-T11b settled.** The diagnostic itself arrives at P4-T11c; this is the
+root-cause half and the survey it reads.
+
+*SS8.4's taxonomy was missing from `packages/method` and is there now.* SS11 lists
+the root-cause taxonomy among the structures a workspace cannot change and
+CLAUDE.md says every taxonomy is implemented in that package, so its absence was
+a gap between the document and the code rather than a decision. Two tests read it
+back out of METHOD.md, word for word and in the document's order, because a set
+comparison would pass on a shuffled list and the picker shows the order.
+
+*The list reads `review_scores`, not `key_results.score`.* Grades do not land on
+the key results until the session closes (P4-T10b-a) and stage seven runs before
+that, so reading the key result would show an empty list in every live review.
+Strictly below the threshold, because SS8.4 says "below 0.7": a key result that
+scored exactly it met it, and asking a room to explain a result it did not miss
+is how a stage loses its credibility.
+
+*Anonymity, stated precisely.* `process_health_responses` carries
+`sha256(salt || member_id)` where a member id would go, and the salt lives on the
+session, written when the first response arrives. A hash of the member id alone
+would be the same string in every review, so somebody holding the table could
+follow one unnamed person across quarters; the per-review salt breaks that. A salt
+rather than an HMAC on the instance root key, because a rotation would leave every
+stored hash unmatchable and silently break the one-response rule mid-review. **It
+is not anonymity against somebody holding both the database and the member list**,
+because a room is small enough to enumerate and no scheme that lets this
+application recount a member's response could be. What the product guarantees, and
+what the tests assert, is that no read returns an attribution and no column
+carries one.
+
+*The activity payloads carry neither the cause nor the scores.* An activity row
+carries its actor, so scores in a payload would attribute an anonymous survey in
+the one place everybody in the space reads. The root-cause payload omits the cause
+number for SS8.4's own reason: look for the system, not the person.
+
+*All five statements are answered together*, refused at the boundary and on the
+screen. SS8.6 reads statements two and five, so a set missing one produces a
+diagnostic with a hole in it, and one built on a missing answer is worse than none
+because it reads as evidence.
+
+Given / When / Then:
+- Given a survey with four responses, when the averages render, then no response
+  can be traced to a member and the count reads four.
+- Given a key result graded exactly at the threshold, when the root-cause list
+  renders, then it is not in it.
+
 Given / When / Then:
 - Given a cycle score below 0.7 and a rhythm score above 3.5, when the
   diagnostic renders, then it reads as a strategy or quality problem with

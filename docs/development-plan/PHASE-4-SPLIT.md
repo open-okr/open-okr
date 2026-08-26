@@ -23,9 +23,9 @@ on 26 August 2026.
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 3 | P4-T10b-b, P4-T10c, P4-T11a |
+| in_review | 4 | P4-T10b-b, P4-T10c, P4-T11a, P4-T11b |
 | in_progress | 1 | P4-T13a |
-| todo | 7 | P4-T11b, P4-T11c, P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 6 | P4-T11c, P4-T12, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
 The agents lane is finished and read. What is left is the tail of the sessions
 lane (P4-T11b to P4-T12, with P4-T10b-b, P4-T10c and P4-T11a written and
@@ -55,7 +55,7 @@ quarterly review.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, fifteen rows | yes | P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T11a in review; **P4-T11b next** |
+| B2: the sessions | P4-T07a to P4-T12, fifteen rows | yes | P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T11b in review; **P4-T11c next** |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -154,7 +154,7 @@ and this table is what was agreed.
 | P4-T10b-b | Quarterly review: the reveal | Agung | in_review |
 | P4-T10c | Quarterly review: narratives and recognition | Agung | in_review |
 | P4-T11a | Quarterly review: the retros | Agung | in_review |
-| P4-T11b | Root cause and the process-health survey | Agung | todo |
+| P4-T11b | Root cause and the process-health survey | Agung | in_review |
 | P4-T11c | The diagnostic, the reset and next-cycle drafts | Agung | todo |
 | P4-T12 | Minutes, exports and review feed-forward | Agung | todo |
 | P4-T13a | The embedding table and the outbox worker | Agung | in_progress (blocked behind B2) |

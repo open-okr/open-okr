@@ -353,7 +353,7 @@ Every table references `session_id` to sessions.
 | `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
 | `management_answers` | `question_key smallint` (1 to 4), `body`, `answered_by_id` |
-| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?` |
+| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?`, `named_by_id` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
 | `review_decisions` | `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why` |
 | `learnings` | `cycle_id`, `text`, `carry_forward bool`, `source` |
@@ -375,7 +375,9 @@ Every table references `session_id` to sessions.
 
 `management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read.
 
-`respondent_hash` allows one response per member per statement without identifying who gave it.
+`root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: §8.4's own word is "primary", and a key result with two causes has had the question dodged rather than answered. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
+
+`respondent_hash` allows one response per member per statement without identifying who gave it. It is `sha256(salt || member_id)` where the salt is `okr_sessions.process_health_salt`, written when the first response of a review arrives. **A per-review salt, and the reason is precise:** a hash of the member id alone would be the same string in every review, so somebody holding the table could follow one unnamed person's answers across quarters without ever learning their name. It is a salt rather than an HMAC on the instance root key because a key rotation would leave every stored hash unmatchable and silently break the one-response rule mid-review. **What it does not buy:** anonymity against somebody holding both this database and the member list, because a room is small enough to enumerate, and no scheme that lets the same application recount a member's response could be. What the product guarantees is narrower and real, and is what the tests assert: no read returns an attribution, and no column carries one.
 
 ## 12. The work (domain I)
 

@@ -342,6 +342,28 @@ export function roomPulseRead(
   return { band, average, read: ROOM_PULSE_READS[band] };
 }
 
+/**
+ * §8.4's eight causes, one-based, and exactly one of them is primary.
+ *
+ * **A taxonomy, so it lives here and never in a row.** §11 lists the root-cause
+ * taxonomy among the structures a workspace cannot change, and a cause stored as
+ * text would let one be edited and would leave old reviews naming a cause the
+ * method no longer has.
+ *
+ * The order is the document's, because the picker shows them in it and a room
+ * reading the list top to bottom is reading §8.4.
+ */
+export const ROOT_CAUSES: readonly string[] = [
+  "Ambition set too high",
+  "Wrong key result. We measured the wrong thing",
+  "Blocked by a dependency",
+  "Capacity or resourcing",
+  "Priority shifted mid-cycle",
+  "External or market change",
+  "Lack of focus. Too many OKRs",
+  "No clear owner or cadence",
+];
+
 export const PROCESS_HEALTH_STATEMENTS: readonly string[] = [
   "Our OKRs stayed visible and were genuinely used to make decisions this cycle.",
   "We held a real check-in cadence, not a status report.",

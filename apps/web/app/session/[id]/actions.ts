@@ -273,6 +273,68 @@ export async function scoreKeyResultAction(
 }
 
 /**
+ * One primary cause for a key result that came in under the threshold
+ * (METHOD.md §8.4, P4-T11b).
+ *
+ * The detail travels with the cause, because a detail with no cause behind it
+ * explains nothing. `sessions.setRootCause` refuses a key result that did not
+ * miss.
+ */
+export async function setRootCauseAction(
+  sessionId: string,
+  keyResultId: string,
+  causeKey: number,
+  detail: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.setRootCause",
+    {
+      sessionId,
+      keyResultId,
+      causeKey,
+      ...(detail.length === 0 ? {} : { detail }),
+    },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * The five process-health statements, answered together and anonymously
+ * (METHOD.md §8.5, P4-T11b).
+ *
+ * All five at once: §8.6's rhythm score reads two of them, so a partial answer
+ * leaves a hole in the diagnostic and the action refuses it.
+ */
+export async function submitProcessHealthAction(
+  sessionId: string,
+  scores: readonly number[],
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.submitProcessHealth",
+    {
+      sessionId,
+      scores: scores.map((score, index) => ({
+        statementKey: index + 1,
+        score,
+      })),
+    },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
  * One note into the team retro (METHOD.md §8.1 stage 5, P4-T11a).
  *
  * Anonymity is per note. §8.1 asks for silent writing, and one thing in a retro

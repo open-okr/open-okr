@@ -101,6 +101,16 @@ export const sessions = pgTable("okr_sessions", {
    * spoken.
    */
   micGoalId: uuid("mic_goal_id"),
+  /**
+   * The salt behind `process_health_responses.respondent_hash` (P4-T11b).
+   *
+   * Written when the first response arrives. A hash of the member id alone
+   * would be the same string in every review, so somebody holding the table
+   * could follow one unnamed person's answers across quarters. A per-review
+   * salt breaks that link, and it survives root-key rotation, which an HMAC on
+   * the instance secret would not.
+   */
+  processHealthSalt: text("process_health_salt"),
   state: text("state", { enum: SESSION_STATES }).notNull().default("scheduled"),
   /** FK to the digest row once P4-T08 adds the digests table. */
   digestId: uuid("digest_id"),

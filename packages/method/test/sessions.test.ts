@@ -9,6 +9,7 @@ import {
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  ROOT_CAUSES,
   reviewStageKey,
   reviewStages,
   rhythmDiagnostic,
@@ -110,6 +111,33 @@ describe("§7.2's four steps", () => {
     expect(WEEKLY_STEPS.map((entry) => entry.step)).toEqual([1, 2, 3, 4]);
     for (const step of WEEKLY_STEPS) {
       expect(method).toContain(step.title);
+    }
+  });
+});
+
+describe("§8.4's root causes", () => {
+  it("are the document's eight, word for word", () => {
+    // Read back out of METHOD.md rather than restated here, so editing either
+    // one without the other fails the build. Same shape as the §8.5 statements
+    // and the §8.7 questions below.
+    expect(ROOT_CAUSES).toHaveLength(8);
+    for (const cause of ROOT_CAUSES) {
+      expect(method).toContain(cause);
+    }
+  });
+
+  it("keeps the document's order, because the picker shows it", () => {
+    // §8.4 numbers them, and a room reading the picker top to bottom should be
+    // reading the document. A set comparison would pass on a shuffled list.
+    const section = method.slice(
+      method.indexOf("### 8.4 Root causes"),
+      method.indexOf("### 8.5 Process health"),
+    );
+    let cursor = -1;
+    for (const cause of ROOT_CAUSES) {
+      const at = section.indexOf(cause);
+      expect(at).toBeGreaterThan(cursor);
+      cursor = at;
     }
   });
 });

@@ -809,6 +809,87 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     ),
   ).toBeVisible();
 
+  // ---------------------------------------------------------------------------
+  // Stage seven: root causes (METHOD.md section 8.4, P4-T11b)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const rootCause = page.getByRole("region", { name: "Root cause" });
+  await expect(rootCause).toHaveCount(1, { timeout: 10_000 });
+
+  // The one key result graded earlier came in at 0.6, which is below the
+  // section 11 threshold of 0.7, so exactly one row is listed and the other
+  // graded-at-nothing key results are not.
+  await expect(rootCause).toContainText("0 of 1 named");
+  await expect(rootCause.getByText("0.6")).toBeVisible();
+  // Eight causes, from the method package rather than from this screen.
+  await expect(
+    rootCause.getByRole("button", { name: "Ambition set too high" }),
+  ).toBeVisible();
+  await expect(
+    rootCause.getByRole("button", { name: "No clear owner or cadence" }),
+  ).toBeVisible();
+
+  await rootCause
+    .getByRole("button", { name: "Blocked by a dependency" })
+    .click();
+  await expect(rootCause).toContainText("1 of 1 named", { timeout: 10_000 });
+  // Exact, because the header chip reads "1 of 1 named" and the row's own chip
+  // reads "named": unscoped, that is two matches.
+  await expect(rootCause.getByText("named", { exact: true })).toBeVisible();
+
+  // ---------------------------------------------------------------------------
+  // Stage eight: the process-health survey (METHOD.md section 8.5, P4-T11b)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const processHealth = page.getByRole("region", {
+    name: "OKR process health",
+  });
+  await expect(processHealth).toHaveCount(1, { timeout: 10_000 });
+  await expect(processHealth).toContainText("0 responses");
+  await expect(processHealth).toContainText("check-in cadence");
+
+  // A partial answer is refused on the screen before it reaches the action,
+  // because section 8.6's rhythm score reads two specific statements and a set
+  // missing one of them produces a diagnostic with a hole in it.
+  await processHealth
+    .getByRole("group", { name: "Score for statement 1" })
+    .getByRole("button", { name: "4" })
+    .click();
+  await processHealth
+    .getByRole("button", { name: "Submit anonymously" })
+    .click();
+  await expect(processHealth).toContainText("All five, together");
+
+  // All five, then submitted. Statements 2 and 5 are the ones the rhythm score
+  // averages: 4 and 2 give 3.0.
+  for (const [statement, score] of [
+    ["2", "4"],
+    ["3", "5"],
+    ["4", "3"],
+    ["5", "2"],
+  ] as const) {
+    await processHealth
+      .getByRole("group", { name: `Score for statement ${statement}` })
+      .getByRole("button", { name: score, exact: true })
+      .click();
+  }
+  await processHealth
+    .getByRole("button", { name: "Submit anonymously" })
+    .click();
+
+  await expect(processHealth).toContainText("1 response", { timeout: 10_000 });
+  await expect(processHealth).toContainText("yours is in");
+  // Scoped to the rhythm line. Statement 4 scored 3, so its own average chip
+  // also reads 3.0 and an unscoped assertion matches both.
+  await expect(
+    processHealth.locator("p").filter({ hasText: "Rhythm score" }),
+  ).toContainText("3.0");
+  // Section 8.5's closing rule: the lowest becomes next cycle's process OKR.
+  // Statement 5 scored 2, the lowest of the five.
+  await expect(processHealth).toContainText("Lowest: statement 5");
+
   const cleanup = await pool.connect();
   try {
     await cleanup.query("begin");

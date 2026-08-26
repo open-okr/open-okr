@@ -10,6 +10,8 @@
  * result so the route handler can notify connected clients. The
  * action itself does not import `packages/adapters` (CLAUDE.md boundary rule).
  */
+
+import { createHash, randomBytes } from "node:crypto";
 import {
   accessContexts,
   activeOnly,
@@ -27,11 +29,13 @@ import {
   managementAnswers,
   OBJECTIVE_TRENDS,
   objectiveTrends,
+  processHealthResponses,
   RETRO_COLUMNS,
   retroNotes,
   retroVotes,
   reviewNarratives,
   reviewScores,
+  rootCauses,
   SESSION_KINDS,
   SESSION_STATES,
   sessionConfidences,
@@ -44,11 +48,15 @@ import {
 } from "@openokr/db";
 import {
   cycleScore,
+  lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   objectiveScore,
+  PROCESS_HEALTH_STATEMENTS,
   portfolioVerdictOf,
   progressSignal,
   REVIEW_STAGE_KEYS,
+  ROOT_CAUSES,
+  rhythmScore,
   roomPulseRead,
   WEEKLY_STAGE_KEYS,
 } from "@openokr/method";
@@ -4796,6 +4804,554 @@ export const readManagementRetro = defineReadAction({
     );
   },
 });
+// ---------------------------------------------------------------------------
+// Stage seven: root causes, and stage eight: process health (METHOD.md §8.4 and
+// §8.5, p4-t00-session-design.md §4.8, P4-T11b)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every key result this review graded below the threshold.
+ *
+ * Read from `review_scores` rather than from `key_results.score`, because the
+ * grades do not land on the key results until the session closes (P4-T10b-a) and
+ * stage seven runs before that. Strictly below: §8.4 says "below 0.7", so a key
+ * result that scored exactly the threshold met it, and asking a room to explain
+ * a result it did not miss is how a stage loses its credibility.
+ */
+async function missedKeyResultsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  threshold: number,
+) {
+  return tx
+    .select({
+      keyResultId: keyResults.id,
+      title: keyResults.title,
+      goalTitle: goals.title,
+      score: reviewScores.score,
+      position: keyResults.position,
+    })
+    .from(reviewScores)
+    .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+        isNull(keyResults.deletedAt),
+        isNull(goals.deletedAt),
+        lt(reviewScores.score, String(threshold)),
+      ),
+    )
+    .orderBy(goals.position, keyResults.position);
+}
+
+export const setRootCause = defineWriteAction({
+  name: "sessions.setRootCause",
+  summary:
+    "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    // 1 to 8, indexing §8.4's taxonomy. The text is canon in
+    // `packages/method`; §11 lists the root-cause taxonomy among the structures
+    // a workspace cannot change.
+    causeKey: z.number().int().min(1).max(8),
+    detail: z.string().trim().max(1000).optional(),
+  }),
+  output: z.object({ keyResultId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const missed = await missedKeyResultsInTx(
+        tx,
+        workspaceId,
+        input.sessionId,
+        thresholds["scoring.rootCauseThreshold"],
+      );
+      const target = missed.find(
+        (entry) => entry.keyResultId === input.keyResultId,
+      );
+      if (!target) {
+        // Either it was never graded here or it did not miss. Naming a cause for
+        // a result the room hit would put an explanation in the minutes for
+        // something that needs none.
+        throw new OperationError(
+          "not_found",
+          "That key result did not come in under the threshold in this review.",
+        );
+      }
+
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: (
+          await tx
+            .select({ goalId: keyResults.goalId })
+            .from(keyResults)
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(keyResults.id, input.keyResultId),
+              ),
+            )
+            .limit(1)
+        )[0]?.goalId as string,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: rootCauses.id })
+        .from(rootCauses)
+        .where(
+          activeOnly(
+            rootCauses,
+            eq(rootCauses.workspaceId, workspaceId),
+            eq(rootCauses.sessionId, input.sessionId),
+            eq(rootCauses.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Replaces rather than adding. §8.4's own word is "primary", and a key
+        // result with two causes has had the question dodged rather than
+        // answered.
+        await tx
+          .update(rootCauses)
+          .set({
+            causeKey: input.causeKey,
+            detail: input.detail ?? null,
+            namedById: memberId,
+            updatedAt: now,
+          })
+          .where(activeOnly(rootCauses, eq(rootCauses.id, existing.id)));
+      } else {
+        await tx.insert(rootCauses).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          causeKey: input.causeKey,
+          detail: input.detail ?? null,
+          namedById: memberId,
+        });
+      }
+
+      return {
+        result: { keyResultId: input.keyResultId },
+        activity: {
+          kind: "session.rootCauseNamed",
+          subjectType: "goal",
+          subjectId: contextId ? input.keyResultId : input.keyResultId,
+          contextId,
+          // The cause number stays out of the feed. §8.4 says look for the
+          // system, not the person, and a space-wide entry reading "capacity or
+          // resourcing" against a named key result invites the opposite.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setRootCause",
+          targetType: "key_result",
+          targetId: input.keyResultId,
+          payload: { causeKey: input.causeKey },
+        },
+      };
+    },
+  }),
+});
+
+export const readRootCauses = defineReadAction({
+  name: "sessions.rootCauses",
+  summary:
+    "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** §11's `scoring.rootCauseThreshold`, so the screen never states its own. */
+    threshold: z.number(),
+    keyResults: z.array(
+      z.object({
+        keyResultId: z.uuid(),
+        title: z.string(),
+        goalTitle: z.string(),
+        score: z.number(),
+        causeKey: z.number().int().nullable(),
+        /** The canon label, from `packages/method`. Never stored on the row. */
+        causeLabel: z.string().nullable(),
+        detail: z.string().nullable(),
+      }),
+    ),
+    named: z.number().int(),
+    /** Every missed key result has a cause. §8.1's condition for the stage. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const threshold = thresholds["scoring.rootCauseThreshold"];
+        const missed = await missedKeyResultsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+          threshold,
+        );
+
+        const named = await tx
+          .select({
+            keyResultId: rootCauses.keyResultId,
+            causeKey: rootCauses.causeKey,
+            detail: rootCauses.detail,
+          })
+          .from(rootCauses)
+          .where(
+            activeOnly(
+              rootCauses,
+              eq(rootCauses.workspaceId, context.workspaceId),
+              eq(rootCauses.sessionId, input.sessionId),
+            ),
+          );
+        const byKeyResult = new Map(named.map((row) => [row.keyResultId, row]));
+
+        const keyResultRows = missed.map((entry) => {
+          const cause = byKeyResult.get(entry.keyResultId);
+          return {
+            keyResultId: entry.keyResultId,
+            title: entry.title,
+            goalTitle: entry.goalTitle,
+            score: Number(entry.score),
+            causeKey: cause?.causeKey ?? null,
+            causeLabel:
+              cause === undefined
+                ? null
+                : (ROOT_CAUSES[cause.causeKey - 1] ?? null),
+            detail: cause?.detail ?? null,
+          };
+        });
+        const withCause = keyResultRows.filter(
+          (entry) => entry.causeKey !== null,
+        ).length;
+
+        return {
+          threshold,
+          keyResults: keyResultRows,
+          named: withCause,
+          complete:
+            keyResultRows.length > 0 && withCause === keyResultRows.length,
+        };
+      },
+    );
+  },
+});
+
+/**
+ * The respondent's hash for one review, and the salt behind it.
+ *
+ * **What this buys, precisely.** A hash of the member id alone would be the same
+ * string in every review, so somebody holding the table could follow one unnamed
+ * person's answers across quarters. The per-review salt breaks that link, and it
+ * survives root-key rotation, which an HMAC keyed on the instance secret would
+ * not: a rotation would leave every stored hash unmatchable and silently break
+ * the one-response rule mid-review.
+ *
+ * **What it does not buy.** It is not anonymity against somebody holding both
+ * this database and the member list, because a room is small enough to
+ * enumerate, and no scheme that lets this same application recount a member's
+ * response could be. What the product guarantees is narrower and real: no read
+ * returns an attribution, and no column carries one.
+ */
+function respondentHash(salt: string, memberId: string) {
+  return createHash("sha256").update(`${salt}:${memberId}`).digest("hex");
+}
+
+export const submitProcessHealth = defineWriteAction({
+  name: "sessions.submitProcessHealth",
+  summary:
+    "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+  input: z.object({
+    sessionId: z.uuid(),
+    /**
+     * All five, together.
+     *
+     * A partial survey would move an average without the respondent having read
+     * the rest, and §8.6 builds the rhythm score out of two specific statements:
+     * a set missing one of them produces a diagnostic with a hole in it.
+     */
+    scores: z
+      .array(
+        z.object({
+          statementKey: z.number().int().min(1).max(5),
+          score: z.number().int().min(1).max(5),
+        }),
+      )
+      .length(5),
+  }),
+  output: z.object({ statements: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const keys = new Set(input.scores.map((entry) => entry.statementKey));
+      if (keys.size !== 5) {
+        throw new OperationError(
+          "not_found",
+          "All five statements are answered together, once each.",
+        );
+      }
+
+      const now = new Date();
+      // **Written here rather than in a helper, on purpose.** The boundary gate
+      // reads the call site, so a `tx.update()` inside a plain function is
+      // indistinguishable from a write outside the Operation pipeline. That gate
+      // exists to catch exactly that shape, so the write is spelled out inside
+      // the operation and only the hashing, which touches nothing, is factored
+      // out.
+      let salt = session.processHealthSalt;
+      if (!salt) {
+        salt = randomBytes(32).toString("hex");
+        await tx
+          .update(sessions)
+          .set({ processHealthSalt: salt, updatedAt: now })
+          .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+      }
+      const hash = respondentHash(salt, memberId);
+      for (const entry of input.scores) {
+        const [existing] = await tx
+          .select({ id: processHealthResponses.id })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+              eq(processHealthResponses.statementKey, entry.statementKey),
+              eq(processHealthResponses.respondentHash, hash),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          // A second submission corrects the first rather than counting again.
+          // A room of one that reads as two responses is a survey nobody can
+          // trust.
+          await tx
+            .update(processHealthResponses)
+            .set({ score: entry.score, updatedAt: now })
+            .where(
+              activeOnly(
+                processHealthResponses,
+                eq(processHealthResponses.id, existing.id),
+              ),
+            );
+        } else {
+          await tx.insert(processHealthResponses).values({
+            workspaceId,
+            sessionId: input.sessionId,
+            statementKey: entry.statementKey,
+            score: entry.score,
+            respondentHash: hash,
+          });
+        }
+      }
+
+      return {
+        result: { statements: input.scores.length },
+        activity: {
+          kind: "session.processHealthSubmitted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // **No scores, and this one matters more than the others.** An
+          // activity row carries its actor, so a payload with the answers in it
+          // would attribute an anonymous survey in the one place everybody can
+          // read.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.submitProcessHealth",
+          targetType: "session",
+          targetId: input.sessionId,
+          // The audit row names the acting principal by design, so it records
+          // that somebody answered and never what they said.
+          payload: { statements: input.scores.length },
+        },
+      };
+    },
+  }),
+});
+
+export const readProcessHealth = defineReadAction({
+  name: "sessions.processHealth",
+  summary:
+    "§8.5's five statements with the room's averages, and the reader's own answers.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    statements: z.array(
+      z.object({
+        statementKey: z.number().int(),
+        /** Canon text from `packages/method`. */
+        statement: z.string(),
+        /** The room's average, null until somebody answers. */
+        average: z.number().nullable(),
+        /** The reader's own score, and null when they have not answered. */
+        mine: z.number().nullable(),
+      }),
+    ),
+    /** Respondents, not answers: five rows from one person is one response. */
+    responses: z.number().int(),
+    /** §8.6's average of statements 2 and 5, from `packages/method`. */
+    rhythmScore: z.number().nullable(),
+    /** §8.5's closing rule: the lowest becomes next cycle's process OKR. */
+    lowest: z
+      .object({ statementKey: z.number().int(), statement: z.string() })
+      .nullable(),
+    submitted: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            statementKey: processHealthResponses.statementKey,
+            score: processHealthResponses.score,
+            respondentHash: processHealthResponses.respondentHash,
+          })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, context.workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+            ),
+          );
+
+        // The reader's own hash, recomputed rather than stored anywhere. With no
+        // salt yet nobody has answered, so there is nothing of theirs to find.
+        const mineHash = session.processHealthSalt
+          ? respondentHash(session.processHealthSalt, memberId)
+          : null;
+
+        const statements = PROCESS_HEALTH_STATEMENTS.map((statement, index) => {
+          const key = index + 1;
+          const forStatement = rows.filter((row) => row.statementKey === key);
+          const average =
+            forStatement.length === 0
+              ? null
+              : forStatement.reduce((sum, row) => sum + row.score, 0) /
+                forStatement.length;
+          const own = forStatement.find(
+            (row) => mineHash !== null && row.respondentHash === mineHash,
+          );
+          return {
+            statementKey: key,
+            statement,
+            average,
+            mine: own?.score ?? null,
+          };
+        });
+
+        // Respondents rather than rows: one person answering five statements is
+        // one response, and the acceptance criterion counts people.
+        const respondents = new Set(rows.map((row) => row.respondentHash));
+        const averages = statements.map((entry) => entry.average);
+        const lowest = lowestProcessHealthStatement(averages);
+
+        return {
+          statements,
+          responses: respondents.size,
+          // Both from `packages/method`. Nothing about which statements make the
+          // rhythm score, or how a tie is broken, is decided here.
+          rhythmScore: rhythmScore(averages),
+          lowest:
+            lowest === null
+              ? null
+              : {
+                  statementKey: lowest.position,
+                  statement: lowest.statement,
+                },
+          submitted:
+            mineHash !== null &&
+            rows.some((row) => row.respondentHash === mineHash),
+        };
+      },
+    );
+  },
+});
+
 export const revealObjectiveScore = defineWriteAction({
   name: "sessions.revealObjectiveScore",
   summary:
