@@ -40,6 +40,7 @@ import {
 } from "./actions";
 import { ConfidenceRound } from "./confidence-round";
 import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
+import { type Forward, ForwardPanel } from "./forward";
 import { type ManagementRetro, ManagementRetroPanel } from "./management-retro";
 import {
   type DecisionSubject,
@@ -273,6 +274,22 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as Reset;
   }
 
+  // Stages ten and eleven: learnings, drafts, decisions and actions
+  // (METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b).
+  //
+  // One read for both, because the two halves are one flow: what we learned,
+  // what the next cycle might carry, and who does what by when.
+  let forward: Forward | null = null;
+  if (
+    isQuarterly &&
+    (sessionRow.stageKey === REVIEW_STAGE_KEYS[9] ||
+      sessionRow.stageKey === REVIEW_STAGE_KEYS[10])
+  ) {
+    forward = (await callAction(context, "sessions.forward", {
+      sessionId: id,
+    })) as Forward;
+  }
+
   // Stage eight: the process-health survey (METHOD.md §8.5, P4-T11b).
   let processHealth: ProcessHealth | null = null;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[7]) {
@@ -486,7 +503,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
             rootCauses !== null ||
             processHealth !== null ||
             diagnostic !== null ||
-            reset !== null
+            reset !== null ||
+            forward !== null
           }
           stageKeys={REVIEW_STAGE_KEYS}
           currentStageKey={sessionRow.stageKey}
@@ -589,6 +607,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Stage nine: keep, modify or abandon (METHOD.md §8.8, P4-T11c-a) */}
       {reset ? (
         <ResetPanel sessionId={id} reset={reset} canDecide={isRunning} />
+      ) : null}
+
+      {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}
+      {forward ? (
+        <ForwardPanel sessionId={id} forward={forward} canEdit={isRunning} />
       ) : null}
 
       {/* Stage eight: process health (METHOD.md §8.5, P4-T11b) */}

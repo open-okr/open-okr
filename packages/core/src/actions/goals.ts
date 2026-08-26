@@ -26,6 +26,8 @@ import {
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
+  okrSessions,
+  reviewDecisions,
   type WorkspaceTx,
   withContext,
   workspaceMembers,
@@ -1154,6 +1156,89 @@ export const updateGoal = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * What the last quarterly review decided about this objective (P4-T11c-b).
+ *
+ * **This is what "written back to the goal on close" means.** §8.8 has the room
+ * deciding keep, modify or abandon with a one-line why, and P4-T11c-a found that
+ * the decision cannot be written onto the goal on its own: `goals_close_is_complete`
+ * holds that `closed_at`, `success_status` and `close_decision` are present
+ * together or not at all, and the review collects no retrospective to close with.
+ *
+ * So the decision stays in `review_decisions` and the close screen reads it here
+ * as its default. Agung settled that on 26 August 2026. Closing an objective
+ * stays a deliberate act with a retrospective behind it; what the review
+ * contributes is the decision the room already reached, so nobody has to
+ * remember it or type it twice.
+ *
+ * The most recent review wins. A goal reviewed twice was discussed twice, and
+ * the later conversation is the one that stands.
+ */
+export const goalReviewDecision = defineReadAction({
+  name: "goals.reviewDecision",
+  summary:
+    "The keep/modify/abandon decision the last quarterly review reached for this goal.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({
+    decision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
+    why: z.string().nullable(),
+    /** When the review that decided it was held, so a stale one reads as stale. */
+    decidedAt: z.string().nullable(),
+    sessionTitle: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(
+          tx,
+          context.workspaceId,
+          context.actor.userId,
+        );
+        // Through the access getter, like every other read of a goal: a
+        // non-member reads not-found rather than a decision.
+        await requireGoalAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.id,
+          ACCESS_LEVELS.view,
+        );
+
+        const [row] = await tx
+          .select({
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+            decidedAt: reviewDecisions.updatedAt,
+            sessionTitle: okrSessions.title,
+          })
+          .from(reviewDecisions)
+          .innerJoin(okrSessions, eq(okrSessions.id, reviewDecisions.sessionId))
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, context.workspaceId),
+              eq(reviewDecisions.goalId, input.id),
+            ),
+          )
+          .orderBy(desc(reviewDecisions.updatedAt))
+          .limit(1);
+
+        return {
+          decision: row?.decision ?? null,
+          why: row?.why ?? null,
+          decidedAt: row?.decidedAt?.toISOString() ?? null,
+          sessionTitle: row?.sessionTitle ?? null,
+        };
+      },
+    );
+  },
 });
 
 export const closeGoal = defineWriteAction({

@@ -282,6 +282,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "Answered the review's process-health survey",
   "session.diagnosticRead": () => "Read the review's rhythm diagnostic",
   "session.objectiveDecided": () => "Closed this objective in the review",
+  "session.learningCaptured": () => "Captured a learning in the review",
+  "session.nextCycleDrafted": () => "Drafted an objective for the next cycle",
+  "session.actionAgreed": () => "Agreed an action in the review",
+  "session.actionCompleted": () => "Updated a review action",
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

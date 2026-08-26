@@ -273,6 +273,101 @@ export async function scoreKeyResultAction(
 }
 
 /**
+ * One learning, optionally carried into the next cycle (METHOD.md §8.9,
+ * P4-T11c-b).
+ *
+ * `retroNoteId` is set when the learning was promoted from a dot-voted theme
+ * rather than typed, which is what lets the minutes show where it came from and
+ * stops the same theme being promoted twice.
+ */
+export async function captureLearningAction(
+  sessionId: string,
+  text: string,
+  carryForward: boolean,
+  retroNoteId?: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.captureLearning",
+    {
+      sessionId,
+      text,
+      carryForward,
+      ...(retroNoteId ? { retroNoteId } : {}),
+    },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/** A candidate objective for the next cycle (METHOD.md §8.9, P4-T11c-b). */
+export async function draftNextCycleAction(
+  sessionId: string,
+  title: string,
+  why: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.draftNextCycle",
+    { sessionId, title, why },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
+ * One action, with an owner and a date (METHOD.md §8.1 stage 11, P4-T11c-b).
+ *
+ * Both required, and §8.1 says why in one line: every action has a name and a
+ * date, or it is a wish.
+ */
+export async function addActionAction(
+  sessionId: string,
+  what: string,
+  ownerId: string,
+  dueOn: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.addAction",
+    { sessionId, what, ownerId, dueOn },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/** Ticking or unticking one action. Reversible, because rooms make mistakes. */
+export async function completeActionAction(
+  sessionId: string,
+  actionId: string,
+  done: boolean,
+) {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.completeAction",
+    { sessionId, actionId, done },
+  );
+  revalidatePath(`/session/${sessionId}`);
+}
+
+/**
  * Reading §8.6's diagnostic, which is a write (METHOD.md §8.6, P4-T11c-a).
  *
  * The verdict is stored with the numbers it was read against, because the

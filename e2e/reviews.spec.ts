@@ -941,6 +941,71 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // The meaning comes from METHOD.md section 8.8, not from the screen.
   await expect(reset).toContainText("Adjust the target or wording");
 
+  // ---------------------------------------------------------------------------
+  // Stage ten: learnings and next-cycle drafts (METHOD.md section 8.9, P4-T11c-b)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const forward = page.getByRole("region", {
+    name: "Learnings and what happens next",
+  });
+  await expect(forward).toHaveCount(1, { timeout: 10_000 });
+  await expect(forward).toContainText("0 carried");
+
+  // The retro theme written in stage five is offered here, most voted first,
+  // because section 8.9 promotes the top dot-voted themes.
+  await expect(forward).toContainText("Promote a retro theme");
+  await forward.getByRole("button", { name: "Promote it" }).first().click();
+  await expect(forward).toContainText("from the retro", { timeout: 10_000 });
+  await expect(forward).toContainText("1 carried");
+
+  // A draft with no why is refused on the screen: without it the next cycle
+  // cannot prioritise the draft against anything.
+  await forward
+    .getByLabel("A candidate objective")
+    .fill("Make the platform something a team can adopt without us");
+  await forward.getByRole("button", { name: "Draft it" }).click();
+  await expect(forward).toContainText("needs a title and a why");
+
+  await forward
+    .getByLabel("Why", { exact: true })
+    .fill("Three of five losses last quarter were onboarding, not features.");
+  await forward.getByRole("button", { name: "Draft it" }).click();
+  await expect(
+    forward.getByText("Make the platform something a team can adopt without us"),
+  ).toBeVisible({ timeout: 10_000 });
+
+  // ---------------------------------------------------------------------------
+  // Stage eleven: decisions and actions (METHOD.md section 8.1 stage 11)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("button", { name: "Continue to next step" }).click();
+  const actions = page.getByRole("region", {
+    name: "Learnings and what happens next",
+  });
+  await expect(actions).toHaveCount(1, { timeout: 10_000 });
+  await expect(actions).toContainText("0 actions");
+
+  // An action with no owner and no date is refused on the screen. Section 8.1:
+  // every action has a name and a date, or it is a wish.
+  await actions
+    .getByLabel("What happens")
+    .fill("Write the dependency contract with the platform space");
+  await actions.getByRole("button", { name: "Agree it" }).click();
+  await expect(actions).toContainText("or it is a wish");
+
+  await actions.getByLabel("Owner").selectOption({ index: 1 });
+  await actions.getByLabel("By", { exact: true }).fill("2026-12-31");
+  await actions.getByRole("button", { name: "Agree it" }).click();
+  await expect(actions).toContainText("1 action", { timeout: 10_000 });
+  await expect(actions).toContainText("2026-12-31");
+
+  // Ticking is reversible, because a room ticking by mistake is normal.
+  await actions.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    actions.getByRole("button", { name: "Reopen it" }),
+  ).toBeVisible({ timeout: 10_000 });
+
   const cleanup = await pool.connect();
   try {
     await cleanup.query("begin");

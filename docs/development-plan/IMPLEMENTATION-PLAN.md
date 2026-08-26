@@ -680,7 +680,7 @@ Acceptance: Given a cycle score below the threshold and a rhythm score above it,
 Depends on: P4-T11c-a
 Goal: the rest of the third act (METHOD.md §8.9).
 Deliverables: learnings with promotion from top-voted retro themes and carry-forward flags; next-cycle drafts; decisions and actions with owner and due date.
-Test plan: a top-voted retro theme promotes into a learning; the lowest process-health statement becomes an issue in the next cycle; an action with no owner is refused.
+Test plan: a top-voted retro theme promotes into a learning; an action with no owner or no date is refused. **The lowest process-health statement becoming an issue in the next cycle moved to P4-T12**, which is titled "Minutes, exports and review feed-forward" and owns §8.9's mapping into `cycle_issues`; this row builds the tables that mapping reads.
 Acceptance: Given a closed review with a carried learning, when the next cycle opens, then that learning is in its input pack and the carried item is a strategic issue at impact 4.
 
 **Why P4-T11c was split.** It carried five tables (`review_diagnostics`,

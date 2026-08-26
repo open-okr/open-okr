@@ -337,6 +337,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     sessionId: z.string(),
     verdict: z.string(),
   }),
+  "session.learningCaptured": z.object({ sessionId: z.string() }),
+  "session.nextCycleDrafted": z.object({ sessionId: z.string() }),
+  "session.actionAgreed": z.object({ sessionId: z.string() }),
+  "session.actionCompleted": z.object({ sessionId: z.string() }),
   "session.objectiveDecided": z.object({
     sessionId: z.string(),
     decision: z.string(),

@@ -350,6 +350,16 @@ export {
   rootCauses,
 } from "./schema/review-diagnosis.ts";
 export {
+  LEARNING_SOURCES,
+  type Learning,
+  type LearningSource,
+  learnings,
+  type NextCycleDraft,
+  nextCycleDrafts,
+  type ReviewAction,
+  reviewActions,
+} from "./schema/review-forward.ts";
+export {
   type ReviewNarrative,
   reviewNarratives,
 } from "./schema/review-narratives.ts";

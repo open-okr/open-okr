@@ -28,13 +28,16 @@ import {
   keyResultDependencies,
   keyResults,
   kudos,
+  learnings,
   managementAnswers,
+  nextCycleDrafts,
   OBJECTIVE_TRENDS,
   objectiveTrends,
   processHealthResponses,
   RETRO_COLUMNS,
   retroNotes,
   retroVotes,
+  reviewActions,
   reviewDecisions,
   reviewDiagnostics,
   reviewNarratives,
@@ -5886,6 +5889,565 @@ export const readReset = defineReadAction({
           decided: decidedCount,
           total: objectives.length,
           complete: objectives.length > 0 && decidedCount === objectives.length,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Stage ten: learnings and next-cycle drafts, and stage eleven: decisions and
+// actions (METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b)
+// ---------------------------------------------------------------------------
+
+export const captureLearning = defineWriteAction({
+  name: "sessions.captureLearning",
+  summary:
+    "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+  input: z.object({
+    sessionId: z.uuid(),
+    text: z.string().trim().min(1).max(1000),
+    /**
+     * §8.9's "mark the ones to carry forward".
+     *
+     * Off by default, because §8.9's own rule is that carried work re-enters the
+     * next cycle as an issue and has to survive prioritisation on its merits. A
+     * default of true would be the free pass that section refuses.
+     */
+    carryForward: z.boolean().default(false),
+    /**
+     * The retro note this came from, when it was promoted rather than typed.
+     *
+     * §8.9 promotes the top dot-voted themes into learnings, and naming the note
+     * is what lets the minutes show where a learning came from and stops the same
+     * theme being promoted twice.
+     */
+    retroNoteId: z.uuid().optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (!session.cycleId) {
+        // A learning belongs to a cycle: §8.9 feeds it into the next one's input
+        // pack, and a learning with no cycle behind it has nowhere to go.
+        throw new OperationError(
+          "not_found",
+          "This review is not attached to a cycle, so a learning has nothing to belong to.",
+        );
+      }
+
+      if (input.retroNoteId) {
+        const [note] = await tx
+          .select({ id: retroNotes.id })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+              eq(retroNotes.id, input.retroNoteId),
+            ),
+          )
+          .limit(1);
+        if (!note) {
+          throw new OperationError(
+            "not_found",
+            "That retro note is not in this review.",
+          );
+        }
+
+        const [already] = await tx
+          .select({ id: learnings.id })
+          .from(learnings)
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, workspaceId),
+              eq(learnings.retroNoteId, input.retroNoteId),
+            ),
+          )
+          .limit(1);
+        if (already) {
+          // Promoting the same note twice would double a theme's weight in the
+          // next cycle, which is the opposite of what dot voting was for.
+          throw new OperationError(
+            "forbidden",
+            "That retro note is already a learning.",
+          );
+        }
+      }
+
+      const [row] = await tx
+        .insert(learnings)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          cycleId: session.cycleId,
+          text: input.text,
+          carryForward: input.carryForward,
+          source: input.retroNoteId ? "retro_theme" : "manual",
+          retroNoteId: input.retroNoteId ?? null,
+          createdById: memberId,
+        })
+        .returning({ id: learnings.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.learningCaptured",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.captureLearning",
+          targetType: "learning",
+          targetId: row.id,
+          payload: { carryForward: input.carryForward },
+        },
+      };
+    },
+  }),
+});
+
+export const draftNextCycle = defineWriteAction({
+  name: "sessions.draftNextCycle",
+  summary:
+    "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+  input: z.object({
+    sessionId: z.uuid(),
+    title: z.string().trim().min(1).max(280),
+    // Required. A draft with no reason behind it is a title somebody liked, and
+    // the next cycle cannot prioritise it against anything.
+    why: z.string().trim().min(1).max(1000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [row] = await tx
+        .insert(nextCycleDrafts)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          title: input.title,
+          why: input.why,
+          createdById: memberId,
+        })
+        .returning({ id: nextCycleDrafts.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.nextCycleDrafted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.draftNextCycle",
+          targetType: "next_cycle_draft",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const addReviewAction = defineWriteAction({
+  name: "sessions.addAction",
+  summary: "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+  input: z.object({
+    sessionId: z.uuid(),
+    what: z.string().trim().min(1).max(500),
+    /**
+     * Both required, and §8.1 says why in one line: "Every action has a name and
+     * a date, or it is a wish." Optional columns would let the product store the
+     * exact thing the stage exists to prevent.
+     */
+    ownerId: z.uuid(),
+    dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Active only. An action owned by a suspended member is an action with
+      // nobody on it, which is the wish §8.1 refuses.
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const [row] = await tx
+        .insert(reviewActions)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          what: input.what,
+          ownerId: input.ownerId,
+          dueOn: input.dueOn,
+          createdById: memberId,
+        })
+        .returning({ id: reviewActions.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.actionAgreed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.addAction",
+          targetType: "review_action",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const completeReviewAction = defineWriteAction({
+  name: "sessions.completeAction",
+  summary: "Marks one review action done, or not done again.",
+  input: z.object({
+    sessionId: z.uuid(),
+    actionId: z.uuid(),
+    done: z.boolean(),
+  }),
+  output: z.object({ id: z.uuid(), done: z.boolean() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [action] = await tx
+        .select({ id: reviewActions.id })
+        .from(reviewActions)
+        .where(
+          activeOnly(
+            reviewActions,
+            eq(reviewActions.workspaceId, workspaceId),
+            eq(reviewActions.sessionId, input.sessionId),
+            eq(reviewActions.id, input.actionId),
+          ),
+        )
+        .limit(1);
+      if (!action) {
+        throw new OperationError("not_found", "No such action.");
+      }
+
+      // Reversible on purpose. An action ticked by mistake in a running room
+      // should be untickable, and "closed honestly" is the weekly session's own
+      // standard (P4-T08).
+      await tx
+        .update(reviewActions)
+        .set({ done: input.done, updatedAt: new Date() })
+        .where(activeOnly(reviewActions, eq(reviewActions.id, input.actionId)));
+
+      return {
+        result: { id: input.actionId, done: input.done },
+        activity: {
+          kind: "session.actionCompleted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.completeAction",
+          targetType: "review_action",
+          targetId: input.actionId,
+          payload: { done: input.done },
+        },
+      };
+    },
+  }),
+});
+
+export const readForward = defineReadAction({
+  name: "sessions.forward",
+  summary:
+    "Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    learnings: z.array(
+      z.object({
+        id: z.uuid(),
+        text: z.string(),
+        carryForward: z.boolean(),
+        source: z.string(),
+        authorName: z.string().nullable(),
+      }),
+    ),
+    /**
+     * The retro notes not yet promoted, most-voted first.
+     *
+     * §8.9 promotes the top dot-voted themes, so the stage needs the board's
+     * verdict in front of it rather than asking the room to remember it. A note
+     * already promoted is absent rather than shown as unavailable, because the
+     * learning it became is in the list above.
+     */
+    promotable: z.array(
+      z.object({
+        noteId: z.uuid(),
+        text: z.string(),
+        votes: z.number().int(),
+      }),
+    ),
+    drafts: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        why: z.string(),
+        promoted: z.boolean(),
+      }),
+    ),
+    actions: z.array(
+      z.object({
+        id: z.uuid(),
+        what: z.string(),
+        ownerName: z.string(),
+        dueOn: z.string(),
+        done: z.boolean(),
+      }),
+    ),
+    /** Everybody who can own an action: active humans in the workspace. */
+    owners: z.array(z.object({ memberId: z.uuid(), name: z.string() })),
+    carried: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const authors = alias(workspaceMembers, "learning_authors");
+        const learningRows = await tx
+          .select({
+            id: learnings.id,
+            text: learnings.text,
+            carryForward: learnings.carryForward,
+            source: learnings.source,
+            retroNoteId: learnings.retroNoteId,
+            authorName: authors.name,
+          })
+          .from(learnings)
+          .leftJoin(authors, eq(authors.id, learnings.createdById))
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, context.workspaceId),
+              eq(learnings.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(learnings.createdAt);
+
+        const promotedNotes = new Set(
+          learningRows
+            .map((row) => row.retroNoteId)
+            .filter((id): id is string => id !== null),
+        );
+        const noteRows = await tx
+          .select({
+            noteId: retroNotes.id,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+          })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, context.workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        const draftRows = await tx
+          .select({
+            id: nextCycleDrafts.id,
+            title: nextCycleDrafts.title,
+            why: nextCycleDrafts.why,
+            promotedToGoalId: nextCycleDrafts.promotedToGoalId,
+          })
+          .from(nextCycleDrafts)
+          .where(
+            activeOnly(
+              nextCycleDrafts,
+              eq(nextCycleDrafts.workspaceId, context.workspaceId),
+              eq(nextCycleDrafts.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(nextCycleDrafts.createdAt);
+
+        const owners = alias(workspaceMembers, "action_owners");
+        const actionRows = await tx
+          .select({
+            id: reviewActions.id,
+            what: reviewActions.what,
+            ownerName: owners.name,
+            dueOn: reviewActions.dueOn,
+            done: reviewActions.done,
+          })
+          .from(reviewActions)
+          .innerJoin(owners, eq(owners.id, reviewActions.ownerId))
+          .where(
+            activeOnly(
+              reviewActions,
+              eq(reviewActions.workspaceId, context.workspaceId),
+              eq(reviewActions.sessionId, input.sessionId),
+            ),
+          )
+          // Soonest first: §8.1 stage 11 is about dates, so the list reads as a
+          // schedule rather than as an order of typing.
+          .orderBy(reviewActions.dueOn, reviewActions.createdAt);
+
+        const candidates = await tx
+          .select({
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.status, "active"),
+              eq(workspaceMembers.kind, "human"),
+            ),
+          )
+          .orderBy(workspaceMembers.name);
+
+        return {
+          learnings: learningRows.map((row) => ({
+            id: row.id,
+            text: row.text,
+            carryForward: row.carryForward,
+            source: row.source,
+            authorName: row.authorName ?? null,
+          })),
+          promotable: noteRows
+            .filter((row) => !promotedNotes.has(row.noteId))
+            .map((row) => ({
+              noteId: row.noteId,
+              text: row.text,
+              votes: row.votes,
+            })),
+          drafts: draftRows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            why: row.why,
+            promoted: row.promotedToGoalId !== null,
+          })),
+          actions: actionRows.map((row) => ({
+            id: row.id,
+            what: row.what,
+            ownerName: row.ownerName,
+            dueOn: row.dueOn,
+            done: row.done,
+          })),
+          owners: candidates,
+          carried: learningRows.filter((row) => row.carryForward).length,
         };
       },
     );
