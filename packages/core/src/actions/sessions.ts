@@ -3793,6 +3793,9 @@ export const setNarrative = defineWriteAction({
         updatedAt: now,
       };
 
+      // The row's id, so the activity can name the narrative rather than the
+      // goal for embedding (P4-T13a).
+      let narrativeId = existing?.id ?? null;
       if (existing) {
         // Rewrites rather than storing two: an objective's story is one story,
         // and a second row would make the stage list it twice.
@@ -3803,12 +3806,16 @@ export const setNarrative = defineWriteAction({
             activeOnly(reviewNarratives, eq(reviewNarratives.id, existing.id)),
           );
       } else {
-        await tx.insert(reviewNarratives).values({
-          workspaceId,
-          sessionId: input.sessionId,
-          goalId: input.goalId,
-          ...values,
-        });
+        const [inserted] = await tx
+          .insert(reviewNarratives)
+          .values({
+            workspaceId,
+            sessionId: input.sessionId,
+            goalId: input.goalId,
+            ...values,
+          })
+          .returning({ id: reviewNarratives.id });
+        narrativeId = inserted?.id ?? null;
       }
 
       return {
@@ -3825,6 +3832,13 @@ export const setNarrative = defineWriteAction({
           subjectType: "goal",
           subjectId: input.goalId,
           contextId,
+          // The activity names the goal; the content is the narrative, and
+          // embedding the goal would embed its title again (P4-T13a). A cleared
+          // note has nothing to embed, and the worker would find nothing anyway.
+          embed:
+            cleared || narrativeId === null
+              ? undefined
+              : { entityType: "review_narrative", entityId: narrativeId },
           payload: { sessionId: input.sessionId },
         },
         audit: {
@@ -3914,6 +3928,7 @@ export const giveKudos = defineWriteAction({
           kind: "session.kudosGiven",
           subjectType: "space",
           subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "kudos", entityId: row.id },
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
@@ -4287,6 +4302,8 @@ export const addRetroNote = defineWriteAction({
           kind: "session.retroNoteAdded",
           subjectType: "space",
           subjectId: session.spaceId ?? workspaceId,
+          // The activity names the space; the content is the note (P4-T13a).
+          embed: { entityType: "retro_note", entityId: row.id },
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
@@ -6014,6 +6031,7 @@ export const captureLearning = defineWriteAction({
           kind: "session.learningCaptured",
           subjectType: "space",
           subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "learning", entityId: row.id },
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
@@ -6078,6 +6096,7 @@ export const draftNextCycle = defineWriteAction({
           kind: "session.nextCycleDrafted",
           subjectType: "space",
           subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "next_cycle_draft", entityId: row.id },
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,

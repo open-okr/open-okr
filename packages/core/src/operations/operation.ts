@@ -30,6 +30,8 @@
  * `full`, so the level check is real machinery over a placeholder answer. It
  * is one function, replaced wholesale, and no handler changes when it is.
  */
+
+import { randomUUID } from "node:crypto";
 import {
   activeOnly,
   activities,
@@ -52,6 +54,7 @@ import { validateActivityPayload } from "../activities/catalogue.ts";
 import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
+import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
 import { OperationError } from "./errors.ts";
 import { isRecoveryAction } from "./freeze.ts";
 
@@ -97,6 +100,29 @@ export interface ActivityInput {
    * about.
    */
   readonly notify?: boolean;
+  /**
+   * Names the content this write changed, so the pipeline enqueues it for
+   * embedding (AI-NATIVE-PLAN.md §9, P4-T13a).
+   *
+   * **Only for writes whose activity points at a container rather than at what
+   * changed.** A goal's activity names the goal, so a goal write needs nothing
+   * here: the pipeline reads `subjectType` and enqueues by itself. A retro
+   * note's activity names the space and a narrative's names the goal, and
+   * embedding the container would be embedding the wrong thing, so those writes
+   * say what actually changed.
+   *
+   * Same shape as `notify` above and for the same reason: the mechanism is
+   * central so it cannot be implemented inconsistently, and the opt-in is per
+   * write because most writes change no embeddable text. Agung chose this on
+   * 26 August 2026.
+   *
+   * Setting it does not mean the text changed. The worker re-reads and hashes,
+   * and an unchanged hash embeds nothing.
+   */
+  readonly embed?: {
+    readonly entityType: string;
+    readonly entityId: string;
+  };
 }
 
 export interface AuditInput {
@@ -402,6 +428,41 @@ export async function runOperation<TResult, TLoaded = undefined>(
       //    transaction commits, so nothing fires for a change that rolls back.
       for (const message of outcome.outbox ?? []) {
         await enqueueOutbox(tx, message);
+      }
+
+      /**
+       * 8. The embedding job, as one more outbox row (P4-T13a).
+       *
+       * Here rather than in each action, because an enqueue that every write has
+       * to remember is an enqueue the ninth content kind will forget. Two ways in:
+       * the activity's own subject is embeddable, or the write named the content
+       * explicitly because its activity points at a container.
+       *
+       * The key carries a timestamp, so it never collides. Coalescing to one
+       * pending row per entity was the first idea and was wrong: a second edit
+       * arriving while the relay holds the first row would collide on the unique
+       * key, and a failed enqueue inside this transaction would roll back a
+       * legitimate domain write. Duplicate rows are the cheaper mistake, because
+       * the worker's hash check makes the second one a no-op.
+       */
+      const embedTarget =
+        outcome.activity.embed ??
+        (isEmbeddableSubject(outcome.activity.subjectType)
+          ? {
+              entityType: outcome.activity.subjectType,
+              entityId: outcome.activity.subjectId,
+            }
+          : null);
+      if (embedTarget) {
+        await enqueueOutbox(tx, {
+          topic: EMBED_TOPIC,
+          payload: {
+            workspaceId: spec.workspaceId,
+            entityType: embedTarget.entityType,
+            entityId: embedTarget.entityId,
+          },
+          idempotencyKey: `${EMBED_TOPIC}:${embedTarget.entityType}:${embedTarget.entityId}:${Date.now()}:${randomUUID()}`,
+        });
       }
 
       return outcome.result;
