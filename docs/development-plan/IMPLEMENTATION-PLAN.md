@@ -714,7 +714,7 @@ Depends on: P4-T12-a, P3-T15
 Goal: the handover (METHOD.md §8.9).
 Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as an issue; carried learnings joining carried key results as issues at impact 4.
 Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes an issue with source `process_health`; the feed-forward is idempotent, so running it twice does not double the issues.
-Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4 and the `waiting` list is empty.
+Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4, the lowest process-health statement is an issue with source `process_health`, the learnings are in §2.6's item two, and the `waiting` list is empty.
 
 **Why P4-T12 was split.** The minutes are a read across twelve tables, a screen
 and two export routes; the feed-forward is a change to `cycles.feedForward`,

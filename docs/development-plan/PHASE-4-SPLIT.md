@@ -23,14 +23,14 @@ on 26 August 2026.
 | Status | Rows | Which |
 |---|---|---|
 | done | 31 | P4-T00, P4-T01a to P4-T06c, P4-T07a to P4-T10b-a |
-| in_review | 7 | P4-T10b-b to P4-T12-a |
+| in_review | 8 | P4-T10b-b to P4-T12-b |
 | in_progress | 1 | P4-T13a |
-| todo | 5 | P4-T12-b, P4-T13b, P4-T14a, P4-T14b, P4-T15 |
+| todo | 4 | P4-T13b, P4-T14a, P4-T14b, P4-T15 |
 
-The agents lane is finished and read. What is left is the tail of the sessions
-lane (P4-T11b to P4-T12, with P4-T10b-b, P4-T10c and P4-T11a written and
-waiting on a read) and the retrieval lane (P4-T13a, b then P4-T14a, b) between
-here and P4-T15.
+The agents lane is finished and read, and **the sessions lane is finished and**
+**waiting on a read**: the quarterly review runs all eleven stages, produces its
+minutes and hands §8.9's five rows to the next cycle. What is left is the
+retrieval lane (P4-T13a, b then P4-T14a, b) and P4-T15, which needs both.
 
 **`done` here means the row was read and accepted, not that it reached `main`.**
 Branch `agung` is fifty-nine commits ahead of `origin/main`, and the only Phase 4
@@ -55,7 +55,7 @@ quarterly review.
 |---|---|---|---|
 | A: method and quality | P4-T01a to P4-T03 | yes | **Complete.** Accepted, still unmerged |
 | B1: the agents | P4-T05a, b, c then P4-T06a, b, c | yes | **Complete.** All eight rows accepted. The provider key that blocked P4-T05c-b is installed, and both drafting paths are verified against the live model |
-| B2: the sessions | P4-T07a to P4-T12, seventeen rows | yes | P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T12-a in review; **P4-T12-b next, and it is the last row in this lane** |
+| B2: the sessions | P4-T07a to P4-T12, seventeen rows | yes | **Complete.** P4-T07a to P4-T10b-a accepted, P4-T10b-b to P4-T12-b written and waiting on a read |
 | C: embeddings and copilot | P4-T13a, b then P4-T14a, b | yes | P4-T13a in_progress |
 | D: the convergence | P4-T15 | needs B1 and C | Not startable |
 
@@ -158,7 +158,7 @@ and this table is what was agreed.
 | P4-T11c-a | The diagnostic and the reset decisions | Agung | in_review |
 | P4-T11c-b | Learnings, next-cycle drafts, decisions and actions | Agung | in_review |
 | P4-T12-a | The minutes and their exports | Agung | in_review |
-| P4-T12-b | Review feed-forward into the next cycle | Agung | todo |
+| P4-T12-b | Review feed-forward into the next cycle | Agung | in_review |
 | P4-T13a | The embedding table and the outbox worker | Agung | in_progress (blocked behind B2) |
 | P4-T13b | Access-filtered retrieval | Agung | todo |
 | P4-T14a | Copilot threads and grounded answers | Agung | todo |

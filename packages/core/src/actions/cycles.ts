@@ -1062,8 +1062,12 @@ export const feedForwardCycle = defineWriteAction({
     priorScores: z.number().int(),
     issues: z.number().int(),
     frameCarried: z.boolean(),
-    /** Rows of the mapping this build cannot fill, each naming its task. */
+    /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
     waiting: z.array(z.string()),
+    /** Whether the lowest process-health statement became an issue. */
+    processHealthIssue: z.boolean(),
+    /** Whether the learnings reached the next cycle's input pack. */
+    packNote: z.boolean(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
