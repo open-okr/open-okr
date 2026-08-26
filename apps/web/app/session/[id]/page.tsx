@@ -29,6 +29,7 @@ import {
   type WeeklyStep,
 } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -607,6 +608,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Stage nine: keep, modify or abandon (METHOD.md §8.8, P4-T11c-a) */}
       {reset ? (
         <ResetPanel sessionId={id} reset={reset} canDecide={isRunning} />
+      ) : null}
+
+      {isQuarterly ? (
+        <p className="text-xs text-ink-4">
+          <Link className="underline" href={`/session/${id}/minutes`}>
+            The minutes
+          </Link>{" "}
+          are generated from whatever the review has recorded so far, and say so
+          while it is still running.
+        </p>
       ) : null}
 
       {/* Stages ten and eleven (METHOD.md §8.9, §8.1 stage 11, P4-T11c-b) */}

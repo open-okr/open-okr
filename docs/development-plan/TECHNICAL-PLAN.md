@@ -14,6 +14,7 @@ Authority: below PLAN.md and METHOD.md, above IMPLEMENTATION-PLAN.md. Where this
 - **Auth.** Better Auth. Email and password, passkeys and one-time passwords from Phase 1. Single sign-on in Phase 8. Session tokens hashed at rest.
 - **UI.** Tailwind with shadcn/ui on Base UI primitives, SmoothUI on Motion for animation, TanStack Query, Table and Virtual. The design system lives in `packages/ui`.
 - **Rich text.** Editor JSON is canonical, stored as `jsonb` with a `version` integer. One shared core module owns parsing, structural validation against an allowed node and mark list, sanitised rendering, excerpting and mention extraction. Markdown is a derived, lossy bridge used for import, export and AI authoring, with round-trip golden tests.
+- **Documents.** `@react-pdf/renderer` (MIT) renders the review minutes to PDF on the server, approved on 26 August 2026 at P4-T12-a. It adds 3.5MB across 15 packages to the traced standalone output, measured rather than estimated. Anything wrapping Chromium was rejected: it would add roughly 300MB to an image P1-T09 worked down from 726MB to 204MB. The Markdown export and the PDF are built from one document function, so the two cannot drift into two records that disagree.
 - **Validation.** Zod at every boundary.
 - **Monorepo.** Turborepo with pnpm.
 

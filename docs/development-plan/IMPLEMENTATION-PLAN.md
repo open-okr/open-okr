@@ -702,11 +702,34 @@ The decision lives in `review_decisions`; whether `goals.close` should read it,
 or the review should close objectives outright, is an open question on the
 P4-T11c-a row.
 
-### P4-T12: Minutes, exports and review feed-forward [M]
-Depends on: P4-T11c, P3-T15
-Goal: the artifact and the handover (METHOD.md §8.10, screen S-25).
-Deliverables: the minutes document with the executive summary and every stage's record; document and PDF export; the close action writing scores, decisions and learnings back to their objects and running the feed-forward into the next cycle; a link from the closed cycle to its minutes.
-Acceptance: Given a completed review, when the facilitator closes it, then the minutes are generated and exportable, every score and decision is written back, and the next cycle's Phase 2 already holds the scores and carry-forward issues.
+### P4-T12-a: The minutes and their exports [M]
+Depends on: P4-T11c-b
+Goal: the artifact (METHOD.md §8.10, screen S-25).
+Deliverables: the minutes document with the executive summary and every stage's record; Markdown and PDF export; a link from the review to its minutes.
+Test plan: the minutes carry every stage that recorded something; the facilitator's private notes are absent; the management retro is absent for a reader outside its audience; both exports answer with the right content type.
+Acceptance: Given a review that recorded every stage, when a member opens the minutes, then the executive summary reads §8.10's seven figures and both exports download.
+
+### P4-T12-b: Review feed-forward into the next cycle [M]
+Depends on: P4-T12-a, P3-T15
+Goal: the handover (METHOD.md §8.9).
+Deliverables: the two §8.9 rows `cycles.feedForward` reports as waiting, filled: learnings and the retrospective into the next cycle's input pack, and the lowest process-health statement as an issue; carried learnings joining carried key results as issues at impact 4.
+Test plan: a carried learning becomes an issue at impact 4; the lowest process-health statement becomes an issue with source `process_health`; the feed-forward is idempotent, so running it twice does not double the issues.
+Acceptance: Given a closed review with a carried learning, when the next cycle is fed forward, then that learning is a strategic issue at impact 4 and the `waiting` list is empty.
+
+**Why P4-T12 was split.** The minutes are a read across twelve tables, a screen
+and two export routes; the feed-forward is a change to `cycles.feedForward`,
+which P3-T15 already built with a `waiting` list naming the two rows it could
+not fill. Two separable pieces with separate acceptance criteria, split on
+26 August 2026 before code was written.
+
+**The feed-forward is pulled, not pushed, and §8.10 is why.** "Hold the review
+before drafting the next cycle's OKRs, never in the same session" means the next
+cycle usually does not exist when the review closes, so a push on close would be
+a no-op in the normal order. `cycles.feedForward` already takes a `fromCycleId`
+and a `toCycleId` and runs when the next cycle is created, which is the only
+shape that works. The original acceptance criterion said "when the facilitator
+closes it... the next cycle's Phase 2 already holds the scores", and that is
+corrected above.
 
 ### P4-T13a: The embedding table and the outbox worker [M]
 Depends on: P2-T15

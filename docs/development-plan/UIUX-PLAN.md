@@ -182,7 +182,7 @@ Format: purpose, layout, primary actions, states.
 - Learnings and drafts: a learning composer, the top-voted retro themes with promote actions, carry-forward toggles, and next-cycle objective drafts with the learning that motivates each.
 - Decisions and actions: a what, owner and due composer, the action list, and the closing block with minutes export.
 
-**S-25 Minutes.** The generated document: an executive summary table, the scorecard by objective, recognition, root causes, retro themes, the management retro, process health, the decisions, learnings, next-cycle drafts, actions and facilitator notes. Exportable and shareable.
+**S-25 Minutes.** The generated document: an executive summary table, the scorecard by objective, recognition, root causes, retro themes, the management retro, process health, the decisions, learnings, next-cycle drafts and actions. Exportable as Markdown and PDF, and shareable. **The facilitator's private per-stage notes are not in it, correcting this line at P4-T12-a:** METHOD.md §8.1 makes them private and the screen that collects them tells the facilitator nobody else can see them, so a shareable document is the one place they must not appear. **The management retro is absent from the payload** for a reader who is not a manager or the space's coordinator, so an export cannot carry §8.7's answers past their audience.
 
 ### Work
 

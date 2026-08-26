@@ -79,6 +79,7 @@ import { localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { sessionChannel } from "../sessions/live.ts";
@@ -6448,6 +6449,467 @@ export const readForward = defineReadAction({
           })),
           owners: candidates,
           carried: learningRows.filter((row) => row.carryForward).length,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The minutes (METHOD.md §8.10, screen S-25, P4-T12-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * §8.10's executive summary and every stage's record, in one read.
+ *
+ * **Two things are deliberately absent, and both are promises the product
+ * already made.**
+ *
+ * The facilitator's private per-stage notes. UIUX-PLAN's S-25 lists "facilitator
+ * notes" among the minutes' contents, and §8.1 makes them private: the screen
+ * that collects them says "Nobody else in the room can see it, and it is not in
+ * the activity feed" (P4-T10a-a). METHOD.md sits above UIUX-PLAN in the authority
+ * order and §8.10's own list does not mention them, so they stay out and the
+ * UIUX-PLAN line is corrected.
+ *
+ * The management retro, unless the reader may see it. §8.7's four answers are read
+ * by a space's managers and its coordinator (P4-T11a), and a shareable document
+ * that carried them to everybody would undo that in one step. `management` is
+ * null for anybody else, which is the same shape `sessions.roomPulse` uses for
+ * the room's read.
+ *
+ * Everything here is read, never recomputed. The cycle score and the verdict come
+ * from `review_diagnostics` as the room was told them, because a document that
+ * recalculated would disagree with the meeting it minutes.
+ */
+export const readMinutes = defineReadAction({
+  name: "sessions.minutes",
+  summary:
+    "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    title: z.string(),
+    heldOn: z.string().nullable(),
+    state: z.string(),
+    /** §8.10's executive summary, in its own words. */
+    summary: z.object({
+      cycleScore: z.number().nullable(),
+      verdict: z.string().nullable(),
+      objectivesReviewed: z.number().int(),
+      keyResultsReviewed: z.number().int(),
+      /** §8.4's threshold, so the count says what it counted. */
+      belowThreshold: z.number().int(),
+      threshold: z.number(),
+      teamPulse: z.number().nullable(),
+      learningsCarried: z.number().int(),
+      actionsAgreed: z.number().int(),
+    }),
+    scores: z.array(
+      z.object({
+        goalTitle: z.string(),
+        keyResultTitle: z.string(),
+        score: z.number(),
+        reason: z.string(),
+      }),
+    ),
+    narratives: z.array(
+      z.object({ goalTitle: z.string(), excerpt: z.string().nullable() }),
+    ),
+    recognition: z.array(
+      z.object({ toName: z.string(), fromName: z.string(), text: z.string() }),
+    ),
+    retro: z.array(
+      z.object({
+        columnKey: z.string(),
+        text: z.string(),
+        votes: z.number().int(),
+      }),
+    ),
+    /** Null unless the reader is a manager or the space's coordinator. */
+    management: z
+      .array(z.object({ question: z.string(), body: z.string() }))
+      .nullable(),
+    rootCauses: z.array(
+      z.object({
+        keyResultTitle: z.string(),
+        cause: z.string(),
+        detail: z.string().nullable(),
+      }),
+    ),
+    processHealth: z.array(
+      z.object({ statement: z.string(), average: z.number() }),
+    ),
+    decisions: z.array(
+      z.object({
+        goalTitle: z.string(),
+        decision: z.string(),
+        why: z.string(),
+      }),
+    ),
+    learnings: z.array(
+      z.object({ text: z.string(), carryForward: z.boolean() }),
+    ),
+    drafts: z.array(z.object({ title: z.string(), why: z.string() })),
+    actions: z.array(
+      z.object({
+        what: z.string(),
+        ownerName: z.string(),
+        dueOn: z.string(),
+        done: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const workspaceId = context.workspaceId;
+        const memberId = await actingMember(tx, workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+        const threshold = thresholds["scoring.rootCauseThreshold"];
+
+        // --- the scored key results, which most of the summary counts ---
+        const scoreRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            keyResultTitle: keyResults.title,
+            score: reviewScores.score,
+            reason: reviewScores.reason,
+            position: goals.position,
+          })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position, keyResults.position);
+
+        const [diagnostic] = await tx
+          .select({
+            cycleScore: reviewDiagnostics.cycleScore,
+            verdict: reviewDiagnostics.verdict,
+          })
+          .from(reviewDiagnostics)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.workspaceId, workspaceId),
+              eq(reviewDiagnostics.sessionId, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        const [pulse] = await tx
+          .select({ average: avg(sessionParticipants.pulse) })
+          .from(sessionParticipants)
+          .where(
+            activeOnly(
+              sessionParticipants,
+              eq(sessionParticipants.workspaceId, workspaceId),
+              eq(sessionParticipants.sessionId, input.sessionId),
+            ),
+          );
+
+        // --- stage three ---
+        const narrativeRows = await tx
+          .select({
+            goalTitle: goals.title,
+            body: reviewNarratives.body,
+            spokenAt: reviewNarratives.spokenAt,
+          })
+          .from(reviewNarratives)
+          .innerJoin(goals, eq(goals.id, reviewNarratives.goalId))
+          .where(
+            activeOnly(
+              reviewNarratives,
+              eq(reviewNarratives.workspaceId, workspaceId),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position);
+
+        // --- stage four ---
+        const givers = alias(workspaceMembers, "minutes_givers");
+        const receivers = alias(workspaceMembers, "minutes_receivers");
+        const kudosRows = await tx
+          .select({
+            toName: receivers.name,
+            fromName: givers.name,
+            text: kudos.text,
+          })
+          .from(kudos)
+          .innerJoin(givers, eq(givers.id, kudos.fromMemberId))
+          .innerJoin(receivers, eq(receivers.id, kudos.toMemberId))
+          .where(
+            activeOnly(
+              kudos,
+              eq(kudos.workspaceId, workspaceId),
+              eq(kudos.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(kudos.createdAt);
+
+        // --- stage five ---
+        const retroRows = await tx
+          .select({
+            columnKey: retroNotes.columnKey,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+          })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        // --- stage six, audience-gated ---
+        let management: { question: string; body: string }[] | null = null;
+        if (session.spaceId) {
+          const [seat] = await tx
+            .select({ role: spaceMembers.role })
+            .from(spaceMembers)
+            .where(
+              activeOnly(
+                spaceMembers,
+                eq(spaceMembers.workspaceId, workspaceId),
+                eq(spaceMembers.spaceId, session.spaceId),
+                eq(spaceMembers.memberId, memberId),
+              ),
+            )
+            .limit(1);
+          if (seat?.role === "manager" || seat?.role === "coordinator") {
+            management = [];
+          }
+        } else {
+          // No space means no space roles to read, the same fallback
+          // `sessions.managementRetro` uses.
+          management = [];
+        }
+        if (management !== null) {
+          const answers = await tx
+            .select({
+              questionKey: managementAnswers.questionKey,
+              body: managementAnswers.body,
+            })
+            .from(managementAnswers)
+            .where(
+              activeOnly(
+                managementAnswers,
+                eq(managementAnswers.workspaceId, workspaceId),
+                eq(managementAnswers.sessionId, input.sessionId),
+              ),
+            )
+            .orderBy(managementAnswers.questionKey);
+          management = answers.map((row) => ({
+            question:
+              MANAGEMENT_RETRO_QUESTIONS[row.questionKey - 1] ??
+              `Question ${row.questionKey}`,
+            body: row.body,
+          }));
+        }
+
+        // --- stage seven ---
+        const causeRows = await tx
+          .select({
+            keyResultTitle: keyResults.title,
+            causeKey: rootCauses.causeKey,
+            detail: rootCauses.detail,
+          })
+          .from(rootCauses)
+          .innerJoin(keyResults, eq(keyResults.id, rootCauses.keyResultId))
+          .where(
+            activeOnly(
+              rootCauses,
+              eq(rootCauses.workspaceId, workspaceId),
+              eq(rootCauses.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+            ),
+          );
+
+        // --- stage eight, pooled and never attributed ---
+        const healthRows = await tx
+          .select({
+            statementKey: processHealthResponses.statementKey,
+            score: processHealthResponses.score,
+          })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+            ),
+          );
+
+        // --- stage nine ---
+        const decisionRows = await tx
+          .select({
+            goalTitle: goals.title,
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+          })
+          .from(reviewDecisions)
+          .innerJoin(goals, eq(goals.id, reviewDecisions.goalId))
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, workspaceId),
+              eq(reviewDecisions.sessionId, input.sessionId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position);
+
+        // --- stages ten and eleven ---
+        const learningRows = await tx
+          .select({
+            text: learnings.text,
+            carryForward: learnings.carryForward,
+          })
+          .from(learnings)
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, workspaceId),
+              eq(learnings.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(learnings.createdAt);
+
+        const draftRows = await tx
+          .select({
+            title: nextCycleDrafts.title,
+            why: nextCycleDrafts.why,
+          })
+          .from(nextCycleDrafts)
+          .where(
+            activeOnly(
+              nextCycleDrafts,
+              eq(nextCycleDrafts.workspaceId, workspaceId),
+              eq(nextCycleDrafts.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(nextCycleDrafts.createdAt);
+
+        const owners = alias(workspaceMembers, "minutes_owners");
+        const actionRows = await tx
+          .select({
+            what: reviewActions.what,
+            ownerName: owners.name,
+            dueOn: reviewActions.dueOn,
+            done: reviewActions.done,
+          })
+          .from(reviewActions)
+          .innerJoin(owners, eq(owners.id, reviewActions.ownerId))
+          .where(
+            activeOnly(
+              reviewActions,
+              eq(reviewActions.workspaceId, workspaceId),
+              eq(reviewActions.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(reviewActions.dueOn);
+
+        const scores = scoreRows.map((row) => ({
+          goalTitle: row.goalTitle,
+          keyResultTitle: row.keyResultTitle,
+          score: Number(row.score),
+          reason: row.reason,
+        }));
+        const pulseAverage =
+          pulse?.average === null || pulse?.average === undefined
+            ? null
+            : Number(pulse.average);
+
+        return {
+          title: session.title,
+          heldOn: session.endedAt?.toISOString() ?? null,
+          state: session.state,
+          summary: {
+            // From the diagnostic as the room was told it, never recomputed: a
+            // document that recalculated would disagree with the meeting it
+            // minutes.
+            cycleScore:
+              diagnostic === undefined ? null : Number(diagnostic.cycleScore),
+            verdict: diagnostic?.verdict ?? null,
+            objectivesReviewed: new Set(scoreRows.map((row) => row.goalId))
+              .size,
+            keyResultsReviewed: scores.length,
+            belowThreshold: scores.filter((row) => row.score < threshold)
+              .length,
+            threshold,
+            teamPulse: pulseAverage,
+            learningsCarried: learningRows.filter((row) => row.carryForward)
+              .length,
+            actionsAgreed: actionRows.length,
+          },
+          scores,
+          narratives: narrativeRows.map((row) => ({
+            goalTitle: row.goalTitle,
+            excerpt:
+              row.body === null
+                ? null
+                : excerptRichText(row.body as never, 4000) || null,
+          })),
+          recognition: kudosRows,
+          retro: retroRows,
+          management,
+          rootCauses: causeRows.map((row) => ({
+            keyResultTitle: row.keyResultTitle,
+            cause: ROOT_CAUSES[row.causeKey - 1] ?? `Cause ${row.causeKey}`,
+            detail: row.detail,
+          })),
+          // Pooled averages, never a respondent. The survey is anonymous and a
+          // document is the last place that should stop being true.
+          processHealth: PROCESS_HEALTH_STATEMENTS.map((statement, index) => {
+            const forStatement = healthRows.filter(
+              (row) => row.statementKey === index + 1,
+            );
+            return {
+              statement,
+              average:
+                forStatement.length === 0
+                  ? 0
+                  : forStatement.reduce((sum, row) => sum + row.score, 0) /
+                    forStatement.length,
+            };
+          }).filter((entry) => entry.average > 0),
+          decisions: decisionRows,
+          learnings: learningRows,
+          drafts: draftRows,
+          actions: actionRows,
         };
       },
     );

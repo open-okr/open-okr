@@ -1006,6 +1006,60 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     actions.getByRole("button", { name: "Reopen it" }),
   ).toBeVisible({ timeout: 10_000 });
 
+  // ---------------------------------------------------------------------------
+  // The minutes and both exports (METHOD.md section 8.10, S-25, P4-T12-a)
+  // ---------------------------------------------------------------------------
+
+  await page.getByRole("link", { name: "The minutes" }).click();
+  await expect(page.getByRole("heading", { name: "Q1 review" })).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const summary = page.getByRole("region", { name: "Executive summary" });
+  await expect(summary).toHaveCount(1);
+  // Section 8.10's own list. The review above graded one key result at 0.6, so
+  // one key result was reviewed and one came in below 0.7.
+  await expect(summary).toContainText("Key results");
+  await expect(summary).toContainText("Team pulse");
+  await expect(summary).toContainText("Actions agreed");
+
+  // Every stage that recorded something is in the document.
+  await expect(page.getByText("Landed 210 of 300.")).toBeVisible();
+  await expect(page.getByText("Activation held. The funnel above it never did.")).toBeVisible();
+  await expect(page.getByText("Blocked by a dependency")).toBeVisible();
+  await expect(page.getByText("Adjust the target or wording")).toHaveCount(0);
+  await expect(
+    page.getByText("The dependency surfaced in week nine."),
+  ).toBeVisible();
+
+  // **The facilitator's private note is not in the minutes.** Section 8.1 makes
+  // it private and the screen that collects it promises nobody else can see it,
+  // so a shareable document is the one place that must not carry it.
+  await expect(page.getByText("Pulse was low")).toHaveCount(0);
+
+  // The review is still running, and the document says so rather than letting
+  // itself be quoted as a record.
+  await expect(page.getByText("still running")).toBeVisible();
+
+  // Both exports answer, and with the right content type. Fetched rather than
+  // clicked, because a download in a browser context is a file on disk and what
+  // matters here is that the route works and is access-scoped.
+  const markdown = await page.request.get(
+    `/session/${reviewId}/minutes/export`,
+  );
+  expect(markdown.status()).toBe(200);
+  expect(markdown.headers()["content-type"]).toContain("text/markdown");
+  const body = await markdown.text();
+  expect(body).toContain("# Q1 review");
+  expect(body).toContain("## Executive summary");
+  expect(body).not.toContain("Pulse was low");
+
+  const pdf = await page.request.get(`/session/${reviewId}/minutes/pdf`);
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toContain("application/pdf");
+  // A real PDF, not an error page with the wrong header on it.
+  expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+
   const cleanup = await pool.connect();
   try {
     await cleanup.query("begin");
