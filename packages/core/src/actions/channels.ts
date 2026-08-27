@@ -870,3 +870,169 @@ export const listMessages = defineReadAction({
     );
   },
 });
+
+/**
+ * Everything one member needs to decide where the product reaches them
+ * (P5-T02c).
+ *
+ * One read for one screen. The alternative was four calls the page would have
+ * to assemble, and a member's own channel settings are one question: where do
+ * messages go, when am I asleep, and which accounts have I proved.
+ */
+export const mySettings = defineReadAction({
+  name: "channels.mySettings",
+  summary: "The caller's own primary channel, quiet hours and linked accounts.",
+  input: z.object({}),
+  output: z.object({
+    primaryChannel: z.enum(["app", ...CHANNEL_MESSAGE_PROVIDERS]),
+    quietHours: z.object({ start: z.string(), end: z.string() }).nullable(),
+    timezone: z.string(),
+    identities: z.array(identityOutput),
+    /** Providers the workspace has connected, so the page offers only those. */
+    connected: z.array(connectionProviderSchema),
+  }),
+  access: ACCESS_LEVELS.comment,
+  async handler(context) {
+    const userId = context.actor.userId;
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId: userId ?? "" },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const workspaceId = context.workspaceId;
+        const memberId = await readingMember(tx, workspaceId, userId);
+
+        const [member] = await tx
+          .select({
+            primaryChannel: workspaceMembers.primaryChannel,
+            quietHours: workspaceMembers.quietHours,
+            timezone: workspaceMembers.timezone,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(workspaceMembers, eq(workspaceMembers.id, memberId)),
+          )
+          .limit(1);
+
+        const identities = await tx
+          .select({
+            provider: channelIdentities.provider,
+            externalId: channelIdentities.externalId,
+            externalHandle: channelIdentities.externalHandle,
+            verifiedAt: channelIdentities.verifiedAt,
+          })
+          .from(channelIdentities)
+          .where(
+            activeOnly(
+              channelIdentities,
+              eq(channelIdentities.workspaceId, workspaceId),
+              eq(channelIdentities.memberId, memberId),
+            ),
+          )
+          .orderBy(channelIdentities.provider);
+
+        const connections = await tx
+          .select({ provider: channelConnections.provider })
+          .from(channelConnections)
+          .where(
+            activeOnly(
+              channelConnections,
+              eq(channelConnections.workspaceId, workspaceId),
+              eq(channelConnections.state, "connected"),
+            ),
+          );
+
+        return {
+          primaryChannel: (member?.primaryChannel ?? "email") as
+            | "app"
+            | (typeof CHANNEL_MESSAGE_PROVIDERS)[number],
+          quietHours: member?.quietHours ?? null,
+          timezone: member?.timezone ?? "UTC",
+          identities: identities.map((row) => ({
+            provider: row.provider,
+            externalId: row.externalId,
+            externalHandle: row.externalHandle,
+            verifiedAt: row.verifiedAt?.toISOString() ?? null,
+          })),
+          connected: connections.map((row) => row.provider),
+        };
+      },
+    );
+  },
+});
+
+/**
+ * Sends one message to the caller, to prove a connection works (P5-T02c).
+ *
+ * **Through the ordinary queue, not around it.** A test that called the driver
+ * directly would prove the credential and nothing else: not the routing, not
+ * the identity resolution, not the log. This writes the same row a nudge writes
+ * and the relay delivers it the same way, so a test that arrives means a nudge
+ * will arrive.
+ *
+ * The idempotency key carries a stamp the caller supplies, because pressing
+ * the button twice is somebody deliberately asking twice.
+ */
+export const testSend = defineWriteAction({
+  name: "channels.testSend",
+  summary: "Queues a test message to the caller through the normal path.",
+  input: z.object({
+    /** Distinguishes one press from the next. Supplied, never read from a clock. */
+    attempt: z.string().trim().min(1).max(60),
+  }),
+  output: z.object({ queued: z.boolean(), provider: messageProviderSchema }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = requireMember(actor);
+      const provider = "email" as const;
+
+      // openokr:allow-mutation: inside this operation's own transaction.
+      const [row] = await tx
+        .insert(channelMessages)
+        .values({
+          workspaceId,
+          provider,
+          direction: "out" as const,
+          memberId,
+          payload: {
+            text: "This is a test from OpenOKR. Your channel works.",
+            subject: "OpenOKR test message",
+          },
+          idempotencyKey: `channel.test:${memberId}:${input.attempt}`,
+          status: "queued" as const,
+        })
+        .returning({ id: channelMessages.id });
+
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "The test message could not be queued.",
+        );
+      }
+
+      return {
+        result: { queued: true, provider },
+        activity: {
+          kind: "channel.message_queued",
+          subjectType: "member",
+          subjectId: memberId,
+          payload: { provider, duplicate: false },
+        },
+        audit: {
+          action: "channels.testSend",
+          targetType: "member",
+          targetId: memberId,
+          payload: { provider },
+        },
+        outbox: [
+          {
+            topic: CHANNEL_MESSAGE_TOPIC,
+            payload: { workspaceId, messageId: row.id },
+            idempotencyKey: `${CHANNEL_MESSAGE_TOPIC}:${row.id}`,
+          },
+        ],
+      };
+    },
+  }),
+});

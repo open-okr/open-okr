@@ -910,6 +910,17 @@ Deliverables: the slash command rendered from P5-T06's router, button action han
 Test plan: a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry; a member without edit access gets the same refusal sentence the browser shows; an unknown command names what is available.
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
+### P5-T02c: The channel settings surface [M]
+Depends on: P5-T02a
+Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
+Goal: an administrator can connect a provider, and a member can link their account, without an engineer.
+
+**Why this is a row rather than part of P5-T02a.** That task shipped the driver, the inbound door, the linking mechanism and the routing wiring, and left the surface out. Two reasons, both recorded there: the self-serve OAuth half cannot be exercised at all without a Slack app, and it would have stood between an administrator and a screen that did not exist either. The mechanism is real and nobody can reach it, which is not shipped. This row is the reaching.
+
+Deliverables: the notifications-and-channels card in workspace admin (UIUX-PLAN.md §6 S-36) listing each provider with its state, when it last verified, and the provider's own last complaint; connect and disconnect, with the credential written once and never read back; a test send that proves the connection without waiting for a nudge; the member's own channel card with a primary-channel choice, quiet hours, and the short-code linking flow; the recent message log with its outcomes; loading, empty, error and permission-denied states on both.
+Test plan: a member without workspace administration sees the permission-denied state and not the card; a connected provider shows its state and never its credential; a test send writes one log row; a member issues a code, and the code is shown once and not stored; disconnecting removes the provider from the list and frees its installation.
+Acceptance: Given a workspace administrator with a Slack bot token, when they connect Slack and a member links their account from their own settings, then a nudge for that member arrives in Slack, and neither screen has ever displayed the token.
+
 ### P5-T03: Microsoft Teams driver [L]
 Depends on: P5-T01b-b
 Goal: the enterprise chat provider.
@@ -1167,7 +1178,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (19: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point, and P5-T02 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **110 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (20: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **111 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

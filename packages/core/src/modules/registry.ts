@@ -174,6 +174,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     name: "account",
     navigation: [
       {
+        id: "account-channels",
+        label: "Where to reach you",
+        href: "/account/channels",
+        section: "sidebar",
+        // Every member. Telling the product where to send its reminders cannot
+        // be a privilege only editors have: a member at view still receives
+        // nudges (P5-T02c).
+        minLevel: ACCESS_LEVELS.view,
+      },
+      {
         id: "account-security",
         label: "Security",
         href: "/account/security",
@@ -206,6 +216,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         section: "admin",
         // §4.14 governs this card with the `manage_coaching` permission. Until
         // named permissions land, workspace admin is the closest honest level.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-channels",
+        label: "Channels",
+        href: "/admin/channels",
+        section: "admin",
+        // A bot token reaches every member of the workspace, so who may
+        // install one is not a question for everybody (P5-T02c).
         minLevel: ACCESS_LEVELS.full,
       },
       {

@@ -209,15 +209,18 @@ test("facilitator opens the session — stage 1 becomes active", async () => {
 test("acceptance criterion: second context sees stage advance without reload", async ({
   browser,
 }) => {
-  const second = await browser.newContext();
+  // **The second context reuses the first one's session rather than signing in
+  // again**, which is a correction rather than a convenience. This test began
+  // failing on its sign-in once the suite grew: P2-T09's authentication rate
+  // limit is per address, and by this point in the run the same account has
+  // signed in several times over. The limit is doing its job; the spec was
+  // spending it on setup. What the acceptance criterion needs is two
+  // independent clients watching one session, and two contexts carrying the
+  // same cookie are exactly that.
+  const second = await browser.newContext({
+    storageState: await context.storageState(),
+  });
   const secondPage = await second.newPage();
-
-  // Sign in to the second context.
-  await secondPage.goto("/sign-in");
-  await secondPage.getByLabel("Email").fill(EMAIL);
-  await secondPage.getByLabel("Password").fill(PASSWORD);
-  await secondPage.getByRole("button", { name: "Sign in", exact: true }).first().click();
-  await secondPage.waitForURL("/", { timeout: 10_000 });
 
   // Both open the session.
   await page.goto(`/session/${sessionId}`);

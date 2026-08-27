@@ -64,7 +64,8 @@ const memberSummary = z.object({
 
 export const updateOwnProfile = defineWriteAction({
   name: "people.updateOwnProfile",
-  summary: "Update the signed-in member's own timezone, avatar or bio.",
+  summary:
+    "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
   input: z.object({
     timezone: z
       .string()
@@ -72,6 +73,30 @@ export const updateOwnProfile = defineWriteAction({
       .optional(),
     avatarBlobId: z.uuid().nullable().optional(),
     bio: bioInputSchema,
+    /**
+     * Where messages go (P5-T02c). `app` is in-app only.
+     *
+     * Here rather than in a channel action of its own, because it is one of a
+     * member's own profile facts and a second action for it would mean two
+     * places that can change where the product reaches somebody.
+     */
+    primaryChannel: z
+      .enum(["app", "email", "slack", "teams", "whatsapp", "telegram"])
+      .optional(),
+    /**
+     * When not to be messaged, in the member's own timezone.
+     *
+     * Null clears it. AI-NATIVE-PLAN §5.4 defers a nudge inside this window to
+     * the next open one rather than dropping it, so setting a window loses
+     * nothing.
+     */
+    quietHours: z
+      .object({
+        start: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
+        end: z.string().regex(/^\d{1,2}:\d{2}$/, "Use HH:MM."),
+      })
+      .nullable()
+      .optional(),
   }),
   output: memberSummary,
   // A write, so at least edit (the registry's own invariant: "a write that
@@ -95,6 +120,12 @@ export const updateOwnProfile = defineWriteAction({
       if (input.bio !== undefined) {
         patch.bio = input.bio;
         patch.bioVersion = sql`coalesce(${workspaceMembers.bioVersion}, 0) + 1`;
+      }
+      if (input.primaryChannel !== undefined) {
+        patch.primaryChannel = input.primaryChannel;
+      }
+      if (input.quietHours !== undefined) {
+        patch.quietHours = input.quietHours;
       }
 
       const [updated] = await tx

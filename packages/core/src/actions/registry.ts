@@ -79,8 +79,10 @@ import {
   listConnections,
   listIdentities,
   listMessages,
+  mySettings,
   send as sendChannelMessage,
   startLink,
+  testSend,
   unlinkIdentity,
 } from "./channels.ts";
 import {
@@ -344,6 +346,8 @@ export const ACTION_MAP = {
   "channels.unlinkIdentity": unlinkIdentity,
   "channels.send": sendChannelMessage,
   "channels.listMessages": listMessages,
+  "channels.mySettings": mySettings,
+  "channels.testSend": testSend,
   "copilot.ask": ask,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,
