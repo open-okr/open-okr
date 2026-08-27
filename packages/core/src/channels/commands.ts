@@ -65,6 +65,21 @@ export interface ChatCommand {
  */
 export const CHAT_COMMANDS: readonly ChatCommand[] = [
   {
+    /**
+     * The one command that is a conversation rather than a line (P5-T06b).
+     *
+     * `toInput` is never called for it: the router hands it to the check-in
+     * flow, which asks §3.2's questions in order and runs the two registry
+     * actions once every answer is in. It is in this table anyway so the help
+     * reply lists it and the catalogue-versus-registry test covers it.
+     */
+    verb: "checkin",
+    action: "goals.startCheckIn",
+    summary: "Check in on a goal you champion, one question at a time.",
+    args: [{ name: "goal", hint: "the goal's identifier", required: true }],
+    toInput: (args) => ({ goalId: args.goal }),
+  },
+  {
     verb: "status",
     action: "goals.read",
     summary: "The health, progress and next check-in of one goal.",

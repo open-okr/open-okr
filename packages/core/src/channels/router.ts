@@ -21,7 +21,14 @@
 import type { Pool } from "pg";
 import { type ActionName, callAction } from "../actions/registry.ts";
 import { OperationError } from "../operations/operation.ts";
+import { DEFAULT_CHAT_CONVERSATION_MINUTES } from "../settings/registry.ts";
 import type { ChannelConnectionKey } from "./capabilities.ts";
+import {
+  beginCheckIn,
+  CHECK_IN_COMMAND,
+  continueCheckIn,
+  type FlowRequest,
+} from "./check-in-flow.ts";
 import {
   type ChatCommand,
   helpText,
@@ -40,6 +47,17 @@ export interface RouterRequest {
   readonly text: string;
   /** How this provider's own commands are written, for the help reply. */
   readonly prefix?: string;
+  /**
+   * How long a half-finished conversation waits, from §4.14's setting
+   * (P5-T06b).
+   *
+   * Passed in rather than read here, for the same reason `now` is: this file
+   * decides what a message means, and a workspace's own settings are the
+   * caller's to resolve.
+   */
+  readonly conversationMinutes?: number;
+  /** The provider's thread, when it has one, so a reply resumes the right one. */
+  readonly threadId?: string;
   /**
    * The moment this arrived.
    *
@@ -83,7 +101,36 @@ export async function routeCommand(
   request: RouterRequest,
 ): Promise<RouterReply> {
   const prefix = request.prefix ?? "/okr";
+  const flow: FlowRequest = {
+    pool: request.pool,
+    workspaceId: request.workspaceId,
+    provider: request.provider,
+    memberId: request.memberId,
+    userId: request.userId,
+    now: request.now,
+    minutes: request.conversationMinutes ?? DEFAULT_CHAT_CONVERSATION_MINUTES,
+    ...(request.threadId ? { threadId: request.threadId } : {}),
+  };
+
   const parsed = parseCommand(request.text);
+
+  // **A message that is a command is a command, even mid-conversation.**
+  // §8.1 says anything which is not an answer ends the conversation, and a
+  // recognised command is exactly that: it ends it and then runs. The first
+  // version tried to answer first, so somebody who typed `checkin` while a
+  // check-in was already half finished had it abandoned *and* nothing started,
+  // which is the worst of both.
+  //
+  // Anything else is read as an answer. "8" and "skip" are not commands, so a
+  // member answering a question is never told there is no "8" command.
+  const looksLikeCommand =
+    parsed.kind === "command" || parsed.kind === "incomplete";
+  if (!looksLikeCommand) {
+    const answered = await continueCheckIn(flow, request.text);
+    if (answered.kind !== "none") {
+      return { kind: "reply", text: answered.text };
+    }
+  }
 
   if (parsed.kind === "help") {
     return { kind: "reply", text: helpText(prefix) };
@@ -108,6 +155,18 @@ export async function routeCommand(
   }
 
   const { command, args } = parsed;
+
+  // The one command that is a conversation. Everything below it is a line.
+  if (command.verb === CHECK_IN_COMMAND) {
+    const begun = await beginCheckIn(flow, args.goal ?? "");
+    return {
+      kind: "reply",
+      // `none` cannot happen for a start, and a fallback here rather than a
+      // cast keeps the union honest if a fourth outcome is ever added.
+      text: begun.kind === "none" ? "I could not start that." : begun.text,
+    };
+  }
+
   try {
     const result = await callAction(
       {

@@ -128,6 +128,9 @@ const agentRunCostCapSchema = z.number().nonnegative();
  */
 export const DEFAULT_AGENT_RUN_COST_CAP_USD = 2;
 
+/** How long a half-finished chat conversation waits to be resumed (P5-T06b). */
+export const DEFAULT_CHAT_CONVERSATION_MINUTES = 30;
+
 const primaryChannelSchema = z.enum([
   "app",
   "email",
@@ -213,6 +216,24 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "S-36 card names it yet, so it has none here.",
     resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
     schema: agentRunCostCapSchema,
+  },
+  {
+    key: "chatConversationMinutes",
+    scope: "workspace",
+    why:
+      "Thirty minutes. Long enough that somebody can answer three questions " +
+      "between meetings, short enough that a half-finished check-in does not " +
+      "wait overnight to be resumed by a message about something else. " +
+      "Design §8.1 named the figure and put it in METHOD.md's §11 registry; " +
+      "it is here instead, because §11 is the OKR practice canon and how long " +
+      "a chat window stays open is an interaction timeout rather than a " +
+      "practice rule. Corrected in the design document at P5-T06b.",
+    resolve: () => DEFAULT_CHAT_CONVERSATION_MINUTES,
+    schema: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60),
   },
   {
     key: "demoEnabled",

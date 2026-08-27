@@ -955,12 +955,22 @@ Deliverables: the command catalogue as data, each command naming exactly one reg
 Test plan: every command in the catalogue names an action the registry defines; a member without the access level gets the browser's own refusal and the attempt is audited with the channel on it; an unknown command names what is available rather than failing silently; the audit row carries the channel for an inbound action and does not for a browser one.
 Acceptance: Given a member without edit access on a goal, when they attempt an action from chat, then it is refused with the same message the browser would show, and the attempt is audited with the channel named.
 
-### P5-T06b: The commands that collect fields [M]
+### P5-T06b: The conversational check-in [M]
 Depends on: P5-T06a
-Goal: a check-in, a blocker and a commitment can be completed from chat.
-Deliverables: the modal path for providers that have one; §8's conversational state machine as a row per conversation, holding the fields collected so far and an expiry, for providers that do not; the three commands and their argument prompts.
-Test plan: a check-in submitted from a modal produces the same record as one from the browser; a conversation resumed after a process restart still holds its collected fields; an expired conversation starts again rather than completing with half its answers.
+Goal: a check-in can be completed from chat, across turns.
+
+**Narrowed from "the three commands" to one, and the reason is in the actions.** `sessions.createBlocker` needs a session, a key result, a type, an owner and a next action; `sessions.setCommitments` needs a session and a list. Both are bound to a *running session*, and nothing in the design says how a chat message finds one: the sender names a key result, not a session, and resolving one from the other is a lookup the design never specifies. A check-in needs a goal and three answers, all of which a member can give from a phone. The other two are P5-T06c.
+
+Deliverables: §8.1's state machine as a `channel_conversations` row, so a process restart does not lose somebody's half-finished check-in; the expiry as a §4.14 setting with a working default; §8.2's question order, status then confidence then narrative then each key result's value; abandoning on anything that is not an answer; resuming on the next message; nothing written until every required field is in, and then one registry action in one transaction.
+Test plan: a conversation resumed after the row is re-read still holds its collected fields; an expired conversation starts again rather than completing with half its answers; a partial conversation leaves no check-in and the goal is still due; the completed check-in is the same record the browser produces.
 Acceptance: Given a champion with a due check-in, when they complete it from chat, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
+
+### P5-T06c: The session-bound chat commands [S]
+Depends on: P5-T06b
+Goal: a blocker and a commitment can be raised from chat.
+Deliverables: resolving the running session for what the sender named, which is the piece the design leaves open; the blocker and commit commands over P5-T06b's state machine; the refusal when no session is running, which says so rather than failing.
+Test plan: a blocker raised from chat is the same row the session screen writes; a member who names a key result with no running session in its space is told that rather than refused silently.
+Acceptance: Given a running weekly session, when a participant raises a blocker from chat, then it appears on the session's own board with the channel on its audit row.
 
 ### P5-T07: Public contract projections: REST, OpenAPI and the command line [L]
 Depends on: P1-T07, Phase 4 complete
@@ -1190,7 +1200,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (21: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **112 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (22: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **113 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

@@ -2,8 +2,8 @@
 
 Part one of the Phase 5 design gate. Authority: AI-NATIVE-PLAN.md §5,
 TECHNICAL-PLAN.md §4.11 and §5, METHOD.md §11. Implemented at P5-T01 (port,
-email, routing), P5-T02 to P5-T05 (the four providers), P5-T06 (the command
-surface).
+email, routing), P5-T02 to P5-T05 (the four providers), P5-T06a and P5-T06b (the command
+surface, cut into the one-line commands and the conversational check-in).
 
 ## 0. What already exists
 
@@ -261,8 +261,8 @@ the fields collected so far, and when it expires.
 | Aspect | Decision |
 |---|---|
 | Where the state lives | A `channel_conversations` row, not memory. The relay is stateless and a process restart must not lose somebody's half-finished check-in |
-| How long it lives | Thirty minutes, in the §11 registry so a workspace can change it |
-| Abandoning | Any message that is not an answer, or the expiry, ends it. Nothing is written |
+| How long it lives | Thirty minutes, and the clock restarts on every answer rather than running for the whole conversation: somebody answering slowly is still answering. **Corrected at P5-T06b:** this said the §11 registry, and §11 is METHOD.md, the OKR practice canon. How long a chat window stays open is an interaction timeout rather than a practice rule, so it is `chatConversationMinutes` in the TECHNICAL-PLAN §4.14 settings map, where a workspace can still change it |
+| Abandoning | Any message that is not an answer, or the expiry, ends it. Nothing is written. **One refinement at P5-T06b:** a message that parses as a *known command* ends the conversation and then runs, rather than ending it and doing nothing. The first build read replies before commands, so somebody who typed `checkin` while one was half finished lost it and started nothing, which is the worst of both |
 | Resuming | The next message on the same thread continues it |
 | What is written | Nothing until every required field is collected. Then one registry action, one transaction |
 

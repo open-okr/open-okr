@@ -229,3 +229,54 @@ export const channelInstallations = pgTable(
 );
 
 export type ChannelInstallation = typeof channelInstallations.$inferSelect;
+
+/**
+ * A chat conversation in progress (design §8.1, P5-T06b).
+ *
+ * Migration 0057 holds its policy and its one unique index. A row rather than
+ * memory, because either process can restart between two messages and a
+ * half-finished check-in must survive a deploy.
+ */
+export const channelConversations = pgTable(
+  "channel_conversations",
+  {
+    id: uuid("id").primaryKey().$defaultFn(newId),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+    provider: text("provider", {
+      enum: CHANNEL_CONNECTION_PROVIDERS,
+    }).notNull(),
+    externalThreadId: text("external_thread_id"),
+    /** The command being run, from the chat command catalogue. */
+    command: text("command").notNull(),
+    /** What it is about: the goal a check-in is for, and so on. */
+    subjectId: uuid("subject_id"),
+    /** The answers so far. Read by the state machine and by nothing else. */
+    collected: jsonb("collected")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    /** Which field is being asked for, so a reply has somewhere to go. */
+    awaiting: text("awaiting").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("channel_conversations_member_idx").on(
+      table.workspaceId,
+      table.memberId,
+      table.provider,
+    ),
+  ],
+);
+
+export type ChannelConversation = typeof channelConversations.$inferSelect;

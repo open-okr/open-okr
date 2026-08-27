@@ -470,6 +470,15 @@ Both directions, because one constraint alone leaves a hole: without the first, 
 
 Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
 
+### channel_conversations *(built at P5-T06b)*
+`member_id`, `provider`, `external_thread_id?`, `command`, `subject_id?`, `collected jsonb`, `awaiting`, `expires_at`. Unique on `(workspace_id, member_id, provider)`. **Hard-deleted** when a conversation finishes or is abandoned: a tombstone would hold the unique index and the same member could never start another.
+
+**A row rather than memory, which is the whole reason the table exists.** A provider without a modal asks one question at a time, and either the web process or the relay can restart between two messages; a half-finished check-in held in a process would be lost by a deploy.
+
+`collected` holds the answers so far and nothing else in the product reads it. The registry action runs once, when every required field is in, in one transaction. A draft check-in somebody did not know they had created is worse than starting again.
+
+`awaiting` names the field a reply belongs to, so the state is one row rather than a position inferred from what is missing. `expires_at` restarts on every answer: thirty minutes is per question, because somebody answering slowly is still answering. The window is `chatConversationMinutes` in the §4.14 settings map, not METHOD.md §11 as the design first said: how long a chat window stays open is an interaction timeout rather than an OKR practice rule.
+
 ### channel_link_codes *(built at P5-T02a)*
 `member_id` to workspace_members, `provider`, `code_hash`, `expires_at`, `consumed_at?`. Partial unique on `(workspace_id, member_id, provider) where consumed_at is null`, plus an index on `(workspace_id, provider, code_hash)` for the inbound lookup.
 
