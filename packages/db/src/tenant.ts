@@ -79,12 +79,51 @@ export async function withUser<
  */
 export const INSTANCE_ADMIN_SETTING = "app.instance_admin";
 
+/**
+ * Names one provider workspace, for the pre-tenant installation lookup
+ * (P5-T02a).
+ *
+ * An inbound webhook has not identified an OpenOKR workspace yet, and finding
+ * out which one it is *is* the question. `channel_installations` admits a row
+ * either through the ordinary tenant setting or through this one matching its
+ * own `external_team_id`, which is the same arrangement `app.user_id` has on
+ * `workspace_members`. A caller can only see the row for a team id they
+ * already hold.
+ */
+const CHANNEL_TEAM_SETTING = "app.channel_team_id";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
   readonly userId?: string;
   /** Opens instance-settings writes. Never set from a request handler. */
   readonly instanceAdmin?: boolean;
+  /**
+   * Names one provider workspace, for the installation lookup only (P5-T02a).
+   *
+   * Reveals exactly the `channel_installations` row whose `external_team_id`
+   * equals it, and nothing else in the database.
+   */
+  readonly channelTeamId?: string;
+}
+
+/**
+ * Opens a transaction that can find which workspace installed one provider
+ * team (P5-T02a).
+ *
+ * Use it for that lookup and nothing else: it is the only read in the product
+ * that runs before a tenant is known, and the one row it can reach is the one
+ * the caller already named.
+ */
+export async function withProviderTeam<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  teamId: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { channelTeamId: teamId }, fn);
 }
 
 /**
@@ -121,7 +160,7 @@ export async function withContext<
   context: TenantContext,
   fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
 ): Promise<T> {
-  const { workspaceId, userId, instanceAdmin } = context;
+  const { workspaceId, userId, instanceAdmin, channelTeamId } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
     throw new Error("Invalid workspace id: expected a UUID.");
@@ -131,9 +170,22 @@ export async function withContext<
   if (userId !== undefined && (userId === "" || userId.length > 255)) {
     throw new Error("Invalid user id: expected a non-empty identifier.");
   }
-  if (workspaceId === undefined && userId === undefined && !instanceAdmin) {
+  if (
+    channelTeamId !== undefined &&
+    (channelTeamId === "" || channelTeamId.length > 255)
+  ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, or instance admin.",
+      "Invalid provider team id: expected a non-empty identifier.",
+    );
+  }
+  if (
+    workspaceId === undefined &&
+    userId === undefined &&
+    channelTeamId === undefined &&
+    !instanceAdmin
+  ) {
+    throw new Error(
+      "A tenant context needs a workspace id, a user id, a provider team id, or instance admin.",
     );
   }
 
@@ -153,6 +205,11 @@ export async function withContext<
     if (instanceAdmin) {
       await tx.execute(
         sql`select set_config(${INSTANCE_ADMIN_SETTING}, 'on', true)`,
+      );
+    }
+    if (channelTeamId !== undefined) {
+      await tx.execute(
+        sql`select set_config(${CHANNEL_TEAM_SETTING}, ${channelTeamId}, true)`,
       );
     }
     return fn(tx);

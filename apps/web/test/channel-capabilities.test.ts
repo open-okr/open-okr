@@ -1,4 +1,4 @@
-import { EmailChannel } from "@openokr/adapters";
+import { EmailChannel, SlackChannel } from "@openokr/adapters";
 import { CHANNEL_CAPABILITIES } from "@openokr/core";
 import { expect, test } from "vitest";
 
@@ -28,6 +28,16 @@ test("the email driver reports what the core matrix says email can do", () => {
   });
 
   expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.email);
+});
+
+test("the Slack driver reports what the core matrix says Slack can do", () => {
+  const driver = new SlackChannel({
+    botToken: "xoxb-unused",
+    signingSecret: "unused",
+    slackUserFor: () => null,
+  });
+
+  expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.slack);
 });
 
 test("every provider the matrix names is one the router can choose", () => {

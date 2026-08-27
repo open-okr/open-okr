@@ -301,6 +301,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "channel.disconnected": (p) => `Disconnected ${p.provider}`,
   "channel.identity_linked": (p) => `Linked their ${p.provider} account`,
   "channel.identity_unlinked": (p) => `Unlinked their ${p.provider} account`,
+  "channel.link_started": (p) => `Asked for a ${p.provider} linking code`,
   // Named by what it is rather than by what it says. The body is not in the
   // payload and this line is read by people who may be entitled to know a
   // message went out without being entitled to read it.

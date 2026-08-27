@@ -99,7 +99,11 @@ describe("the registry", () => {
       // at `full`.
       const ownIdentity =
         action.name === "channels.linkIdentity" ||
-        action.name === "channels.unlinkIdentity";
+        action.name === "channels.unlinkIdentity" ||
+        // Asking for a code to prove their own account (P5-T02a). The member
+        // comes from the session, the code is theirs alone, and it grants
+        // nothing except the ability to be reached.
+        action.name === "channels.startLink";
       const floor =
         discussion || ownMessages || ownConversation || ownIdentity
           ? ACCESS_LEVELS.comment

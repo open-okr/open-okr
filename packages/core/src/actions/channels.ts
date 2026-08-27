@@ -21,6 +21,8 @@ import {
   CHANNEL_MESSAGE_PROVIDERS,
   channelConnections,
   channelIdentities,
+  channelInstallations,
+  channelLinkCodes,
   channelMessages,
   // The dedupe read below is the one query in this file that must see a
   // soft-deleted row: the unique index is not partial on `deleted_at`, so a
@@ -34,6 +36,11 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import {
+  generateLinkCode,
+  hashLinkCode,
+  LINK_CODE_TTL_SECONDS,
+} from "../channels/inbound.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
 import {
@@ -234,6 +241,33 @@ export const connect = defineWriteAction({
         await tx.insert(channelConnections).values(row);
       }
 
+      // The routing row an inbound webhook needs (P5-T02a). Written here
+      // rather than derived from the connection, because an inbound request
+      // has no tenant setting yet and a workspace-scoped policy would answer
+      // it with nothing. `channel_installations` is the one table with a
+      // second key for exactly that lookup.
+      const teamId =
+        typeof config.teamId === "string" && config.teamId.trim() !== ""
+          ? config.teamId.trim()
+          : null;
+      if (teamId) {
+        // openokr:allow-mutation: inside this operation's own transaction.
+        await tx
+          .delete(channelInstallations)
+          .where(
+            and(
+              eq(channelInstallations.workspaceId, workspaceId),
+              eq(channelInstallations.provider, input.provider),
+            ),
+          );
+        // openokr:allow-mutation: same reason as the delete above.
+        await tx.insert(channelInstallations).values({
+          workspaceId,
+          provider: input.provider,
+          externalTeamId: teamId,
+        });
+      }
+
       return {
         result: {
           provider: input.provider,
@@ -296,6 +330,19 @@ export const disconnect = defineWriteAction({
           activeOnly(
             channelConnections,
             eq(channelConnections.id, existing.id),
+          ),
+        );
+
+      // Really removed, not soft-deleted: an installation is a routing fact,
+      // and a tombstone would hold the unique index so the same provider
+      // workspace could never be reconnected.
+      // openokr:allow-mutation: inside this operation's own transaction.
+      await tx
+        .delete(channelInstallations)
+        .where(
+          and(
+            eq(channelInstallations.workspaceId, workspaceId),
+            eq(channelInstallations.provider, input.provider),
           ),
         );
 
@@ -527,6 +574,87 @@ export const unlinkIdentity = defineWriteAction({
           action: "channels.unlinkIdentity",
           targetType: "member",
           targetId: memberId,
+          payload: { provider: input.provider },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * A short code the member sends to the bot to prove their account (§5.5,
+ * P5-T02a).
+ *
+ * **The code is returned once and never stored in the clear.** The row holds
+ * its hash, so this response is the only place it exists. A member who loses it
+ * asks for another, which replaces the first: pressing the button twice means
+ * "the last one, please", not "two live ways to become me".
+ *
+ * The provider's own authorise link is the other half of §5.5 and belongs to
+ * the install flow. This is the half that works for every provider, including
+ * the two that have no OAuth for a person.
+ */
+export const startLink = defineWriteAction({
+  name: "channels.startLink",
+  summary: "Issues a short code for linking the caller's own account.",
+  input: z.object({ provider: connectionProviderSchema }),
+  output: z.object({
+    /** Shown once. Never readable again. */
+    code: z.string(),
+    expiresAt: z.string(),
+    provider: connectionProviderSchema,
+  }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = requireMember(actor);
+      const now = new Date();
+      const code = generateLinkCode();
+      const expiresAt = new Date(now.getTime() + LINK_CODE_TTL_SECONDS * 1000);
+
+      // Any code this member already had for this provider stops working. The
+      // partial unique index would refuse a second live row anyway; consuming
+      // rather than deleting keeps "that code was replaced" answerable.
+      // openokr:allow-mutation: inside this operation's own transaction.
+      await tx
+        .update(channelLinkCodes)
+        .set({ consumedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            channelLinkCodes,
+            eq(channelLinkCodes.workspaceId, workspaceId),
+            eq(channelLinkCodes.memberId, memberId),
+            eq(channelLinkCodes.provider, input.provider),
+            isNull(channelLinkCodes.consumedAt),
+          ),
+        );
+
+      // openokr:allow-mutation: inside this operation's own transaction.
+      await tx.insert(channelLinkCodes).values({
+        workspaceId,
+        memberId,
+        provider: input.provider,
+        codeHash: hashLinkCode(code),
+        expiresAt,
+      });
+
+      return {
+        result: {
+          code,
+          expiresAt: expiresAt.toISOString(),
+          provider: input.provider,
+        },
+        activity: {
+          kind: "channel.link_started",
+          subjectType: "member",
+          subjectId: memberId,
+          payload: { provider: input.provider },
+        },
+        audit: {
+          action: "channels.startLink",
+          targetType: "member",
+          targetId: memberId,
+          // The provider, never the code. An audit row is read by people.
           payload: { provider: input.provider },
         },
       };

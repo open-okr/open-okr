@@ -892,12 +892,22 @@ Deliverables: a session list showing scheduled, running and closed sessions for 
 Test plan: a member sees only sessions in spaces they can read; a running session is distinguishable from a scheduled one in the list; a member with no sessions sees an empty state that says how one is created.
 Acceptance: Given a member with a session scheduled in their space, when they open the product, then they can reach that session in two clicks without knowing its identifier.
 
-### P5-T02: Slack driver [L]
+### P5-T02a: The Slack driver and its inbound door [M]
 Depends on: P5-T01b-b
-Goal: the first chat provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: self-serve installation and workspace connection; identity linking; outbound rich messages with buttons for direct messages and space channels; inbound signature verification with replay protection; slash command and button action handling; a modal-based check-in.
-Test plan: a tampered inbound payload is rejected; an unlinked sender receives nothing at all; a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry.
+Goal: Slack can be connected, a member can prove their account, and messages travel both ways.
+
+**Why P5-T02 was cut in two, and the ordering defect it exposed.** P5-T02's acceptance criterion is a check-in completed in a Slack modal. That needs the command router, and the router is P5-T06's own deliverable ("one router, generated from the action registry", `docs/design/p5-t00-channel-design.md` §7), which this plan schedules *after* P5-T02. So P5-T02 as written could not be finished without building P5-T06 inside it, and a Slack-only router is the wrong shape for four providers. The driver half needs none of it.
+
+Deliverables: the Slack driver against the existing `Channel` port, with Block Kit rendering, direct messages and space channel posts; self-serve installation through OAuth with the bot token stored as an envelope-encrypted connection; identity linking by a short code that is hashed, single-use and expiring; the inbound endpoint with AI-NATIVE-PLAN.md §6's first six steps, signature over the raw bytes before anything is parsed, the replay window, delivery-id deduplication, verified-identity resolution, the suspended-member check and the per-member rate limit; the connection health card.
+Test plan: a tampered signature is refused before parsing and nothing is written; a payload outside the replay window is refused; a repeated delivery id is ignored as a duplicate; an unlinked sender receives nothing at all; a suspended member receives nothing; the driver's `capabilities()` matches the core matrix; buttons render as Block Kit actions.
+Acceptance: Given a workspace with Slack connected and a member who has linked their account, when a nudge is delivered to them, then it arrives as a Slack message with its action buttons, and `channel_messages` holds one row naming Slack.
+
+### P5-T02b: Slack commands, buttons and the modal check-in [M]
+Depends on: P5-T02a, P5-T06
+Goal: a champion can complete a check-in without leaving Slack.
+Deliverables: the slash command rendered from P5-T06's router, button action handling, the modal check-in and its submission, §6's steps seven and eight (the command resolving to a registry action and `can()` on it), and the audit entry naming the channel.
+Test plan: a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry; a member without edit access gets the same refusal sentence the browser shows; an unknown command names what is available.
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
 ### P5-T03: Microsoft Teams driver [L]
@@ -1157,7 +1167,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (18: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **109 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (19: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point, and P5-T02 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **110 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

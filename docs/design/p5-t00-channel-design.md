@@ -183,6 +183,7 @@ Every inbound request, in this order, before anything reads the body as data:
 
 | Step | Check | On failure |
 |---|---|---|
+| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | Silence |
 | 1 | Signature over the raw bytes, per provider | 401, nothing parsed |
 | 2 | Timestamp inside the replay window | 401 |
 | 3 | The delivery id has not been seen | 200, ignored as a duplicate |
@@ -273,6 +274,6 @@ what it most needs, so the narrative and the values are asked last.
 | # | Question | My position |
 |---|---|---|
 | C1 | ~~Does the channel work land before a relay host exists?~~ Answered 27 August 2026 | No. The relay was cut out as P5-T01a and built first, because routing nudges into a queue nobody drains would have stacked a second layer of undelivered work on the first |
-| C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail |
+| C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail. **Built at P5-T02a**, and enforced by the database rather than by a check: two unique indexes, one each way |
 | C3 | Where do WhatsApp templates live? | A per-nudge-kind registry in `packages/method`, because a template is a coaching message and §11 already owns those |
 | C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |

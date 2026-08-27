@@ -470,6 +470,18 @@ Both directions, because one constraint alone leaves a hole: without the first, 
 
 Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
 
+### channel_link_codes *(built at P5-T02a)*
+`member_id` to workspace_members, `provider`, `code_hash`, `expires_at`, `consumed_at?`. Partial unique on `(workspace_id, member_id, provider) where consumed_at is null`, plus an index on `(workspace_id, provider, code_hash)` for the inbound lookup.
+
+Four properties, each a column rather than a convention: hashed, so a table of live codes is not a table of ways to become other people; expiring, at AI-NATIVE-PLAN §5.5's ten minutes; single-use, and `consumed_at` is set rather than the row deleted so "that code was already used" stays distinguishable from "no such code"; and one live code per member per provider, so asking again replaces the last one rather than adding a second.
+
+### channel_installations *(built at P5-T02a)*
+`workspace_id`, `provider`, `external_team_id`. Unique on `(provider, external_team_id)`. **Hard-deleted**, not soft: a tombstone would hold the unique index and the same provider workspace could never be reconnected.
+
+**The one table read before a tenant is known**, and the reason it exists. An inbound webhook has not identified a workspace: finding out which one it is *is* the question. The first version of the inbound endpoint asked `channel_connections` through the ordinary application role with no tenant setting, and forced row-level security answered with nothing every time, so no inbound message could ever have been accepted. A test caught it before it shipped.
+
+The floor is kept rather than lifted. The policy admits a row two ways: `workspace_id = app.workspace_id`, or `external_team_id = app.channel_team_id`. That second key is the same arrangement `app.user_id` has on `workspace_members` for the "which workspaces are mine" lookup, and `withProviderTeam` is the only wrapper that sets it. A caller reaches exactly the row for a team id they already hold; the `with check` clause takes the tenant setting alone, so nothing can be *written* through the second key.
+
 ### nudges *(delivery semantics changed at P5-T01b-b)*
 A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
 

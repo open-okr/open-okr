@@ -20,6 +20,15 @@ export type ChannelProviderKey =
   | "whatsapp"
   | "telegram";
 
+/**
+ * The four that need installing.
+ *
+ * Email is absent because it is the instance’s own mail settings: it needs no
+ * connection, holds no identity, and nothing arrives through it. Anywhere a
+ * provider has to be one a person can *send from*, this is the type.
+ */
+export type ChannelConnectionKey = Exclude<ChannelProviderKey, "email">;
+
 export interface ChannelCapabilityRow {
   readonly outbound: boolean;
   readonly inbound: boolean;

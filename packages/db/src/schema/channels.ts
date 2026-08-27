@@ -150,3 +150,82 @@ export const channelMessages = pgTable(
 );
 
 export type ChannelMessage = typeof channelMessages.$inferSelect;
+
+/**
+ * A short code a member sends to a bot to prove their account (§5.5).
+ *
+ * Migration 0055 holds the policy and the two indexes. Hashed, expiring and
+ * single-use, because a live code is a way to become somebody else.
+ */
+export const channelLinkCodes = pgTable(
+  "channel_link_codes",
+  {
+    id: uuid("id").primaryKey().$defaultFn(newId),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+    provider: text("provider", {
+      enum: CHANNEL_CONNECTION_PROVIDERS,
+    }).notNull(),
+    /** One-way. Never read back, only compared against. */
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Set rather than deleted, so "already used" stays answerable. */
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("channel_link_codes_hash_idx").on(
+      table.workspaceId,
+      table.provider,
+      table.codeHash,
+    ),
+  ],
+);
+
+export type ChannelLinkCode = typeof channelLinkCodes.$inferSelect;
+
+/**
+ * Which OpenOKR workspace a provider workspace maps to (P5-T02a).
+ *
+ * Migration 0056 holds its policy, which admits a row through the ordinary
+ * tenant setting or through `app.channel_team_id`. That second key is what
+ * makes the pre-tenant inbound lookup possible without lifting the floor.
+ */
+export const channelInstallations = pgTable(
+  "channel_installations",
+  {
+    id: uuid("id").primaryKey().$defaultFn(newId),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    provider: text("provider", {
+      enum: CHANNEL_CONNECTION_PROVIDERS,
+    }).notNull(),
+    /** The provider's own workspace identifier. Opaque, and never a person. */
+    externalTeamId: text("external_team_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("channel_installations_team_idx").on(
+      table.provider,
+      table.externalTeamId,
+    ),
+  ],
+);
+
+export type ChannelInstallation = typeof channelInstallations.$inferSelect;

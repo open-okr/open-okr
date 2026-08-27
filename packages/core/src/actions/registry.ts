@@ -80,6 +80,7 @@ import {
   listIdentities,
   listMessages,
   send as sendChannelMessage,
+  startLink,
   unlinkIdentity,
 } from "./channels.ts";
 import {
@@ -339,6 +340,7 @@ export const ACTION_MAP = {
   "channels.disconnect": disconnectChannel,
   "channels.listIdentities": listIdentities,
   "channels.linkIdentity": linkIdentity,
+  "channels.startLink": startLink,
   "channels.unlinkIdentity": unlinkIdentity,
   "channels.send": sendChannelMessage,
   "channels.listMessages": listMessages,

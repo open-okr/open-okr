@@ -234,9 +234,29 @@ export {
 export {
   CHANNEL_CAPABILITIES,
   type ChannelCapabilityRow,
+  type ChannelConnectionKey,
   type ChannelProviderKey,
   capabilitiesFor,
 } from "./channels/capabilities.ts";
+export {
+  memberExternalId,
+  type OpenedConnection,
+  openConnection,
+  parseSlackSecret,
+  type SlackSecret,
+} from "./channels/connections.ts";
+export {
+  generateLinkCode,
+  handleInbound,
+  hashLinkCode,
+  INBOUND_RATE_LIMIT,
+  INBOUND_RATE_WINDOW_SECONDS,
+  type InboundOutcome,
+  type InboundRequestFacts,
+  LINK_CODE_TTL_SECONDS,
+  resolveInbound,
+  workspaceForProviderTeam,
+} from "./channels/inbound.ts";
 export {
   connectedProviders,
   loadRoutingMembers,

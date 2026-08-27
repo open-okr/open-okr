@@ -35,12 +35,20 @@ export type {
   ModelTier,
   TierModelMap,
 } from "./drivers/ai/tier-map.ts";
+export { PostgresCache } from "./drivers/cache/postgres.ts";
 export {
   type AddressLookup,
   EmailChannel,
   type EmailChannelOptions,
   renderEmailBody,
 } from "./drivers/channel/email.ts";
+export {
+  SlackChannel,
+  type SlackChannelOptions,
+  SlackPermanentError,
+  slackDeliveryId,
+  toBlocks,
+} from "./drivers/channel/slack.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {

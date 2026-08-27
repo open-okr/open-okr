@@ -163,9 +163,13 @@ export {
   type ChannelConnection,
   type ChannelConnectionProvider,
   type ChannelIdentity,
+  type ChannelInstallation,
+  type ChannelLinkCode,
   type ChannelMessage,
   channelConnections,
   channelIdentities,
+  channelInstallations,
+  channelLinkCodes,
   channelMessages,
 } from "./schema/channels.ts";
 export {
@@ -462,6 +466,7 @@ export {
   type WorkspaceTx,
   withContext,
   withInstanceAdmin,
+  withProviderTeam,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

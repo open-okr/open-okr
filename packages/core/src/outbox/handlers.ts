@@ -77,6 +77,8 @@ export interface OutboxHandlerDeps {
    * builds the driver and passes this.
    */
   readonly sendChannel?: (message: {
+    /** Which provider the routing chose. The host picks the driver from it. */
+    readonly provider: string;
     readonly memberId: string | null;
     readonly text: string;
     readonly subject?: string;
@@ -288,6 +290,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
 
   const outcome = await deps
     .sendChannel({
+      provider: row.provider,
       memberId: row.memberId,
       text,
       ...(asString(payload.subject)

@@ -28,14 +28,22 @@
  * An operator who does want a dedicated drainer sets `OPENOKR_RELAY=off` on the
  * serving replicas and leaves one instance with it on.
  */
-import { createAIProvider, EmailChannel, OutboxRelay } from "@openokr/adapters";
+import {
+  createAIProvider,
+  EmailChannel,
+  OutboxRelay,
+  SlackChannel,
+} from "@openokr/adapters";
 import { type Env, loadEnv } from "@openokr/config";
 import {
   dispatchOutbox,
   findSeededModel,
   memberEmail,
+  memberExternalId,
   type OutboxDelivery,
   type OutboxHandlerDeps,
+  openConnection,
+  parseSlackSecret,
   resolveAICredential,
   resolveTierRoute,
 } from "@openokr/core";
@@ -132,12 +140,13 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
             await mailerFrom(mail).send(message);
           },
           /**
-           * Email, because email is the only driver built (P5-T01b-a).
+           * The driver for whatever provider the routing chose.
            *
-           * The routing that picks between email, Slack, Teams, WhatsApp and
-           * Telegram is P5-T01b-b. Wiring one driver here rather than a
-           * router keeps the choice visible: nothing in this file decides
-           * anything, and when the router arrives it replaces this one line.
+           * **Nothing here decides anything.** `resolveDelivery` picked the
+           * provider and wrote it on the message row; this only builds the
+           * driver that speaks it. A provider with no driver yet suppresses
+           * with a reason, which is what a workspace that connected Teams
+           * before P5-T03 exists should get.
            */
           async sendChannel(message) {
             if (!workspaceId || !message.memberId) {
@@ -146,20 +155,57 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
                 suppressedReason: "the message names no member to reach",
               };
             }
-            const channel = new EmailChannel({
-              mailer: mailerFrom(mail),
-              addressFor: (recipient) =>
-                memberEmail(getPool(), workspaceId, recipient.memberId),
-            });
-            return channel.send(
-              { memberId: message.memberId },
-              {
-                text: message.text,
-                ...(message.subject ? { subject: message.subject } : {}),
-                ...(message.buttons ? { buttons: message.buttons } : {}),
-                idempotencyKey: message.idempotencyKey,
-              },
-            );
+            const outbound = {
+              text: message.text,
+              ...(message.subject ? { subject: message.subject } : {}),
+              ...(message.buttons ? { buttons: message.buttons } : {}),
+              idempotencyKey: message.idempotencyKey,
+            };
+
+            if (message.provider === "email") {
+              const channel = new EmailChannel({
+                mailer: mailerFrom(mail),
+                addressFor: (recipient) =>
+                  memberEmail(getPool(), workspaceId, recipient.memberId),
+              });
+              return channel.send({ memberId: message.memberId }, outbound);
+            }
+
+            if (message.provider === "slack") {
+              // Decrypted per delivery, not held: a process keeping every
+              // workspace's bot token resident is a process whose heap dump is
+              // a breach (P5-T02a).
+              const connection = await openConnection(getPool(), getKeyRing(), {
+                workspaceId,
+                provider: "slack",
+              });
+              const secret = connection
+                ? parseSlackSecret(connection.secret)
+                : null;
+              if (!secret) {
+                return {
+                  delivered: false,
+                  suppressedReason:
+                    "Slack is not connected, or its stored credentials are not readable",
+                };
+              }
+              const channel = new SlackChannel({
+                botToken: secret.botToken,
+                signingSecret: secret.signingSecret,
+                slackUserFor: (recipient) =>
+                  memberExternalId(getPool(), {
+                    workspaceId,
+                    provider: "slack",
+                    memberId: recipient.memberId,
+                  }),
+              });
+              return channel.send({ memberId: message.memberId }, outbound);
+            }
+
+            return {
+              delivered: false,
+              suppressedReason: `no driver for ${message.provider} yet`,
+            };
           },
         }
       : {}),

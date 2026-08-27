@@ -51,6 +51,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "channel.disconnected": z.object({ provider: z.string() }),
   "channel.identity_linked": z.object({ provider: z.string() }),
   "channel.identity_unlinked": z.object({ provider: z.string() }),
+  // The provider only. The code itself is never in a row anybody reads
+  // (P5-T02a).
+  "channel.link_started": z.object({ provider: z.string() }),
   "channel.message_queued": z.object({
     provider: z.string(),
     /** True when this key had already been queued, so nothing new was sent. */
