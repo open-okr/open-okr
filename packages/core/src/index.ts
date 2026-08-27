@@ -299,6 +299,11 @@ export {
   resolveDelivery,
 } from "./channels/routing.ts";
 export {
+  parseBlockerType,
+  runningSessionFor,
+  type SessionLookup,
+} from "./channels/sessions.ts";
+export {
   type AnswerQuestionInput,
   type AnswerQuestionResult,
   type AnswerSource,

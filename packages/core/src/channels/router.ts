@@ -18,6 +18,8 @@
  * checked in from Slack" is answerable a quarter later cannot depend on forty
  * actions each remembering.
  */
+import { withWorkspace } from "@openokr/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type ActionName, callAction } from "../actions/registry.ts";
 import { OperationError } from "../operations/operation.ts";
@@ -35,6 +37,7 @@ import {
   incompleteText,
   parseCommand,
 } from "./commands.ts";
+import { runningSessionFor } from "./sessions.ts";
 
 export interface RouterRequest {
   readonly pool: Pool;
@@ -156,6 +159,33 @@ export async function routeCommand(
 
   const { command, args } = parsed;
 
+  // The two commands that need the session somebody is in (P5-T06c). Resolved
+  // here rather than in the catalogue, because it is a query and `toInput` is
+  // pure: parsed arguments and a moment, nothing that reads a database.
+  const sessionBound = SESSION_BOUND[command.verb];
+  if (sessionBound) {
+    const lookup = await withWorkspace(
+      drizzle(request.pool),
+      request.workspaceId,
+      (tx) =>
+        runningSessionFor(tx, {
+          workspaceId: request.workspaceId,
+          memberId: request.memberId,
+          ...(sessionBound.keyResultArg
+            ? { keyResultId: args[sessionBound.keyResultArg] ?? "" }
+            : {}),
+        }),
+    );
+    if (lookup.kind !== "found") {
+      // A member the product knows gets a sentence, not silence.
+      return { kind: "reply", text: lookup.reason };
+    }
+    return runAction(request, command, {
+      ...command.toInput(args, request.now),
+      ...sessionBound.extra(lookup.sessionId, request.memberId, args),
+    });
+  }
+
   // The one command that is a conversation. Everything below it is a line.
   if (command.verb === CHECK_IN_COMMAND) {
     const begun = await beginCheckIn(flow, args.goal ?? "");
@@ -167,6 +197,59 @@ export async function routeCommand(
     };
   }
 
+  return runAction(request, command, command.toInput(args, request.now));
+}
+
+/**
+ * How a session-bound command finds its session and shapes its input.
+ *
+ * A table rather than two branches, so a third one is a row: what the sender
+ * names, and what the action needs beyond it. Both put the sender down as the
+ * owner, because a blocker somebody raises is theirs and a commitment somebody
+ * makes is theirs.
+ */
+const SESSION_BOUND: Readonly<
+  Record<
+    string,
+    {
+      readonly keyResultArg?: string;
+      readonly extra: (
+        sessionId: string,
+        memberId: string,
+        args: Readonly<Record<string, string>>,
+      ) => Record<string, unknown>;
+    }
+  >
+> = {
+  blocker: {
+    keyResultArg: "keyResult",
+    extra: (sessionId, memberId) => ({ sessionId, ownerId: memberId }),
+  },
+  commit: {
+    // Nothing named, so the lookup falls back to the one session running in a
+    // space this member is in, and refuses when there is more than one.
+    extra: (sessionId, memberId, args) => ({
+      sessionId,
+      // The action takes a list. One item, because a chat line is one
+      // commitment and `setCommitments` appends rather than replacing.
+      items: [{ text: args.text ?? "", ownerId: memberId }],
+    }),
+  },
+};
+
+/**
+ * Calls one registry action and turns whatever happens into a reply.
+ *
+ * Extracted at the second caller: the session-bound commands build their input
+ * from a query rather than from the catalogue alone, and everything after that
+ * is identical. `can()` still decides, and the refusal is still the sentence the
+ * browser shows.
+ */
+async function runAction(
+  request: RouterRequest,
+  command: ChatCommand,
+  input: Record<string, unknown>,
+): Promise<RouterReply> {
   try {
     const result = await callAction(
       {
@@ -177,7 +260,7 @@ export async function routeCommand(
         channel: request.provider,
       },
       command.action as ActionName,
-      command.toInput(args, request.now) as never,
+      input as never,
     );
     return {
       kind: "done",

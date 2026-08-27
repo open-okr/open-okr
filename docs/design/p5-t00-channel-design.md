@@ -214,10 +214,10 @@ seven commands, each mapping to exactly one registry action:
 | Command | Registry action | Access it needs | Built |
 |---|---|---|---|
 | check in | `goals.startCheckIn` then `goals.publishCheckIn` | edit on the goal | P5-T06b |
-| blocker | `sessions.createBlocker` | edit | P5-T06b |
+| blocker | `sessions.createBlocker` | edit | Built at P5-T06c |
 | status | `goals.read` | view | Built at P5-T06a |
 | ack | `goals.acknowledgeCheckIn` | edit | Built at P5-T06a |
-| commit | `sessions.setCommitments` | edit | P5-T06b |
+| commit | `sessions.setCommitments` | edit | Built at P5-T06c |
 | ask | `copilot.ask` | comment | Built at P5-T06a |
 | snooze | `nudges.snooze` | comment | Built at P5-T06a |
 
@@ -230,9 +230,23 @@ command names exactly one, which is the invariant a test now walks the
 catalogue for. `kpis.detail` and `notifications.list` are commands of their own
 whenever they are wanted.
 
-**The seam the build follows.** Four of these fit on one line and are built.
-The other three collect fields, which is a modal on Slack and Teams and §8's
-state machine on WhatsApp and Telegram, and they are P5-T06b.
+**The seam the build followed, and what it turned out to be.** The split was
+meant to be "one line" against "collects fields", and only `checkin` ended up
+on the second side. `blocker` and `commit` were built as one line each at
+P5-T06c: a blocker's type is one word out of five and its next action is a
+sentence, and somebody raising a blocker is doing it during a session, on a
+phone, while a room waits. Three exchanges to say one thing is worse there than
+one line that needs its words in order. The state machine exists if that turns
+out to be the wrong call.
+
+**§7 said nothing about how a chat message finds a session, and both of those
+commands need one.** The rule is now in `packages/core/src/channels/sessions.ts`
+and it is this: a sender who names a key result gets the running session in that
+key result's goal's space; a sender who names nothing gets the running session
+in the one space they are in that has one. Only a *running* session, because a
+blocker raised into a scheduled one is a blocker nobody is in the room for.
+Two running sessions refuse rather than pick, because putting somebody's blocker
+on the wrong team's board is worse than asking them which.
 
 **One definition, four renderings.** A command is declared once with its
 arguments; each driver renders it as that provider's own idiom, a slash command

@@ -18,9 +18,16 @@
  * typed is matched against a fixed verb list and its arguments are parsed by
  * shape. A message whose body looks like a prompt is a string in a payload.
  *
- * The commands that collect fields, check in and blocker and commit, are
- * P5-T06b: those are a modal on Slack and Teams and a conversation across
- * turns on the two providers without one, which is a different problem.
+ * **`checkin` is the one command that is a conversation.** The router hands it
+ * to the check-in flow, which asks METHOD.md §3.2's questions in order across
+ * turns and opens a modal where the provider has one (P5-T06b, P5-T02b).
+ *
+ * **`blocker` and `commit` are one line each, and that is a decision** made at
+ * P5-T06c. Both could have been conversations: the machine exists. A blocker's
+ * type is one word out of five and its next action is a sentence, and somebody
+ * raising a blocker is doing it *during a session*, on a phone, while a room
+ * waits. Three exchanges to say one thing is worse there than one line that
+ * needs the words in order.
  */
 
 /** What one command needs from the person who typed it. */
@@ -57,12 +64,7 @@ export interface ChatCommand {
   ) => Record<string, unknown>;
 }
 
-/**
- * §5.3's commands that fit on one line.
- *
- * `status`, `ask`, `ack` and `snooze` carry everything they need in the text.
- * The other three are P5-T06b.
- */
+/** §5.3's seven commands. */
 export const CHAT_COMMANDS: readonly ChatCommand[] = [
   {
     /**
@@ -78,6 +80,46 @@ export const CHAT_COMMANDS: readonly ChatCommand[] = [
     summary: "Check in on a goal you champion, one question at a time.",
     args: [{ name: "goal", hint: "the goal's identifier", required: true }],
     toInput: (args) => ({ goalId: args.goal }),
+  },
+  {
+    /**
+     * The session lookup is the router's, not this table's (P5-T06c).
+     *
+     * `toInput` is pure by design: parsed arguments and a moment, nothing that
+     * reads a database. A blocker needs the running session in the named key
+     * result's space, which is a query, so the router resolves it and this
+     * carries only what the sender typed.
+     */
+    verb: "blocker",
+    action: "sessions.createBlocker",
+    summary: "Raise a blocker on a key result, in the session that is running.",
+    args: [
+      {
+        name: "keyResult",
+        hint: "the key result's identifier",
+        required: true,
+      },
+      {
+        name: "type",
+        hint: "one of resource, dependency, clarity, priority_conflict, external",
+        required: true,
+      },
+      { name: "nextAction", hint: "what happens next", required: true },
+    ],
+    toInput: (args) => ({
+      keyResultId: args.keyResult,
+      type: args.type,
+      nextAction: args.nextAction,
+    }),
+  },
+  {
+    verb: "commit",
+    action: "sessions.setCommitments",
+    summary: "Add one commitment to the session that is running.",
+    args: [
+      { name: "text", hint: "what you are committing to", required: true },
+    ],
+    toInput: (args) => ({ text: args.text }),
   },
   {
     verb: "status",
