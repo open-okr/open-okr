@@ -35,6 +35,12 @@ export type {
   ModelTier,
   TierModelMap,
 } from "./drivers/ai/tier-map.ts";
+export {
+  type AddressLookup,
+  EmailChannel,
+  type EmailChannelOptions,
+  renderEmailBody,
+} from "./drivers/channel/email.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {

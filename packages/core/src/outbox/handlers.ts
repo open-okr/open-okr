@@ -6,7 +6,7 @@
  * `packages/adapters` since P1-T07, and no deployment ever constructed one. So
  * no invitation email was sent, no live session event reached a second browser
  * except by a page refresh, and nothing was indexed for retrieval. That is
- * PLAN.md §12's R10, and this table plus `apps/web/bin/relay.ts` is what closes
+ * PLAN.md §12's R10, and this table plus `apps/web/lib/relay.ts` is what closes
  * it.
  *
  * **Dependencies arrive as plain functions, not as ports.** `packages/core` may
@@ -19,7 +19,17 @@
  * the row will deliver it again. The idempotency key is on the row for
  * consumers that need it, and each handler below says how it copes.
  */
+import {
+  activeOnly,
+  channelMessages,
+  users,
+  withWorkspace,
+  workspaceMembers,
+} from "@openokr/db";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import { parseEmbedJob, runEmbedJob } from "../embeddings/worker.ts";
@@ -58,6 +68,24 @@ export interface OutboxHandlerDeps {
     readonly subject: string;
     readonly text: string;
   }) => Promise<void>;
+  /**
+   * Delivers one message over a channel (P5-T01b-a).
+   *
+   * A function rather than the `Channel` port itself, for the same reason as
+   * everything else here: the port lives in `packages/adapters`. The host
+   * builds the driver and passes this.
+   */
+  readonly sendChannel?: (message: {
+    readonly memberId: string | null;
+    readonly text: string;
+    readonly subject?: string;
+    readonly buttons?: readonly { label: string; url: string }[];
+    readonly idempotencyKey: string;
+  }) => Promise<{
+    readonly delivered: boolean;
+    readonly externalMessageId?: string;
+    readonly suppressedReason?: string;
+  }>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /** Where a skipped delivery is reported. */
@@ -162,6 +190,166 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
 };
 
 /**
+ * A member's email address, or null (P5-T01b-a).
+ *
+ * Exported because the relay host needs it to build the email channel, and it
+ * is the one lookup that crosses from a member to the person behind them.
+ * `users` carries no tenant policy of its own, so the join through
+ * `workspace_members` under the workspace's own setting is what scopes it.
+ */
+export async function memberEmail(
+  pool: Pool,
+  workspaceId: string,
+  memberId: string,
+): Promise<string | null> {
+  const db = drizzle(pool);
+  const [row] = await withWorkspace(db, workspaceId, (tx) =>
+    tx
+      .select({ email: users.email })
+      .from(workspaceMembers)
+      .innerJoin(users, eq(users.id, workspaceMembers.userId))
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.id, memberId),
+        ),
+      )
+      .limit(1),
+  );
+  return row?.email ?? null;
+}
+
+/**
+ * Delivers one row from the channel message log (P5-T01b-a).
+ *
+ * **Safe to run twice** by status: the row is marked `sent` in the same
+ * statement that stamps `sent_at`, and a repeat delivery finds it already
+ * marked and stops before calling the driver. The window between the send and
+ * that update is the one place a duplicate is still possible, which is what
+ * `channel_messages.idempotency_key` and the driver's own key are for.
+ */
+const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const messageId = asString(delivery.payload.messageId);
+  if (!workspaceId || !messageId) {
+    throw new PermanentDispatchError(
+      "A channel message row needs a workspace and a message id.",
+    );
+  }
+
+  const db = drizzle(deps.pool);
+  const [row] = await withWorkspace(db, workspaceId, (tx) =>
+    tx
+      .select({
+        memberId: channelMessages.memberId,
+        payload: channelMessages.payload,
+        status: channelMessages.status,
+        idempotencyKey: channelMessages.idempotencyKey,
+      })
+      .from(channelMessages)
+      .where(
+        activeOnly(
+          channelMessages,
+          eq(channelMessages.workspaceId, workspaceId),
+          eq(channelMessages.id, messageId),
+        ),
+      )
+      .limit(1),
+  );
+
+  if (!row) {
+    // The row was deleted between the enqueue and the delivery. Nothing will
+    // bring it back, so this is not something to retry ten times.
+    throw new PermanentDispatchError(
+      "The message this row names no longer exists.",
+    );
+  }
+  if (row.status !== "queued") {
+    deps.onSkipped?.(delivery, `already ${row.status}`);
+    return;
+  }
+  if (!deps.sendChannel) {
+    deps.onSkipped?.(delivery, "no channel driver is configured");
+    return;
+  }
+
+  const payload = (row.payload ?? {}) as {
+    text?: unknown;
+    subject?: unknown;
+    buttons?: unknown;
+  };
+  const text = asString(payload.text);
+  if (!text) {
+    throw new PermanentDispatchError("The message row has no text to send.");
+  }
+
+  const outcome = await deps
+    .sendChannel({
+      memberId: row.memberId,
+      text,
+      ...(asString(payload.subject)
+        ? { subject: payload.subject as string }
+        : {}),
+      ...(Array.isArray(payload.buttons)
+        ? {
+            buttons: payload.buttons as readonly {
+              label: string;
+              url: string;
+            }[],
+          }
+        : {}),
+      idempotencyKey: row.idempotencyKey,
+    })
+    // A driver that throws is a failed send, not a crashed relay. The row
+    // records why and the relay's own backoff decides whether to try again.
+    .catch((error: unknown) => ({
+      delivered: false,
+      failure: error instanceof Error ? error.message : String(error),
+    }));
+
+  const failure = "failure" in outcome ? outcome.failure : undefined;
+  const status = outcome.delivered
+    ? ("sent" as const)
+    : failure
+      ? ("failed" as const)
+      : ("suppressed" as const);
+
+  // openokr:allow-mutation: the delivery side of the outbox, marking the row
+  // the relay has already claimed. Not a domain write: nothing about the
+  // workspace changed, only the record of what this delivery did.
+  await withWorkspace(db, workspaceId, (tx) =>
+    tx
+      .update(channelMessages)
+      .set({
+        status,
+        error:
+          failure ??
+          ("suppressedReason" in outcome
+            ? (outcome.suppressedReason ?? null)
+            : null),
+        sentAt: outcome.delivered ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(activeOnly(channelMessages, eq(channelMessages.id, messageId))),
+  );
+
+  if (status === "failed") {
+    // Rethrown so the relay retries and, at the ceiling, dead-letters. The row
+    // already says what happened, so this is about the queue, not the record.
+    throw new Error(failure);
+  }
+  if (status === "suppressed") {
+    deps.onSkipped?.(
+      delivery,
+      "suppressedReason" in outcome
+        ? (outcome.suppressedReason ?? "the driver sent nothing")
+        : "the driver sent nothing",
+    );
+  }
+};
+
+/**
  * A rename, which nothing needs to deliver anywhere yet.
  *
  * Acknowledged rather than dead-lettered: the row is a record that the rename
@@ -181,6 +369,7 @@ const acknowledge: OutboxHandler = async (delivery, deps) => {
  */
 export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [EMBED_TOPIC]: embedContent,
+  [CHANNEL_MESSAGE_TOPIC]: deliverChannelMessage,
   "invitation.email": sendInvitation,
   "session.stageChanged": publishEvent,
   "session.micPassed": publishEvent,

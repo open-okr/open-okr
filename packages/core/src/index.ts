@@ -32,6 +32,7 @@ export {
   resolveSubjectContext,
   type SubjectContext,
 } from "./access/reads.ts";
+export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
 export {
   type ActionCallContext,
   type ActionDefinition,
@@ -325,6 +326,7 @@ export {
 } from "./operations/operation.ts";
 export {
   dispatchOutbox,
+  memberEmail,
   OUTBOX_HANDLERS,
   type OutboxDelivery,
   type OutboxHandler,

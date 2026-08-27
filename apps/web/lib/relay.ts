@@ -28,11 +28,12 @@
  * An operator who does want a dedicated drainer sets `OPENOKR_RELAY=off` on the
  * serving replicas and leaves one instance with it on.
  */
-import { createAIProvider, OutboxRelay } from "@openokr/adapters";
+import { createAIProvider, EmailChannel, OutboxRelay } from "@openokr/adapters";
 import { type Env, loadEnv } from "@openokr/config";
 import {
   dispatchOutbox,
   findSeededModel,
+  memberEmail,
   type OutboxDelivery,
   type OutboxHandlerDeps,
   resolveAICredential,
@@ -129,6 +130,36 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
       ? {
           async sendMail(message) {
             await mailerFrom(mail).send(message);
+          },
+          /**
+           * Email, because email is the only driver built (P5-T01b-a).
+           *
+           * The routing that picks between email, Slack, Teams, WhatsApp and
+           * Telegram is P5-T01b-b. Wiring one driver here rather than a
+           * router keeps the choice visible: nothing in this file decides
+           * anything, and when the router arrives it replaces this one line.
+           */
+          async sendChannel(message) {
+            if (!workspaceId || !message.memberId) {
+              return {
+                delivered: false,
+                suppressedReason: "the message names no member to reach",
+              };
+            }
+            const channel = new EmailChannel({
+              mailer: mailerFrom(mail),
+              addressFor: (recipient) =>
+                memberEmail(getPool(), workspaceId, recipient.memberId),
+            });
+            return channel.send(
+              { memberId: message.memberId },
+              {
+                text: message.text,
+                ...(message.subject ? { subject: message.subject } : {}),
+                ...(message.buttons ? { buttons: message.buttons } : {}),
+                idempotencyKey: message.idempotencyKey,
+              },
+            );
           },
         }
       : {}),

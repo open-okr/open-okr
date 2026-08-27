@@ -158,6 +158,17 @@ export {
   blockers,
 } from "./schema/blockers.ts";
 export {
+  CHANNEL_CONNECTION_PROVIDERS,
+  CHANNEL_MESSAGE_PROVIDERS,
+  type ChannelConnection,
+  type ChannelConnectionProvider,
+  type ChannelIdentity,
+  type ChannelMessage,
+  channelConnections,
+  channelIdentities,
+  channelMessages,
+} from "./schema/channels.ts";
+export {
   CHECK_IN_STATES,
   CHECK_IN_STATUSES,
   type CheckIn,

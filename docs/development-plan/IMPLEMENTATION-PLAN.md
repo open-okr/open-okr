@@ -865,15 +865,35 @@ Deliverables: a dispatch table in `packages/core` mapping every enqueued topic t
 Test plan: a topic with no handler dead-letters at once while an ordinary failure still retries; a handler whose dependency is absent skips rather than fails, so an instance with no SMTP collects no dead letters; an invitation written by the real action produces the email a member would receive; a build worker does not start a relay; a test proves every `topic:` literal in the action sources has a handler.
 Acceptance: Given a fresh instance with mail configured, when an owner invites an address, then the invitation email is sent without anybody running a command, and PLAN.md §12 R10 is closed.
 
-### P5-T01b: Channel port, email driver and routing [L]
+### P5-T01b-a: Channel connections, the email driver and the message log [M]
 Depends on: P5-T01a, P4-T04c
-Goal: the delivery layer (AI-NATIVE-PLAN.md §5).
-Deliverables: the channel port with send, verify, parse and capability reporting; the email driver as the always-available baseline with one-click action links; the connection and identity tables with envelope-encrypted credentials; per-member primary channel and quiet hours; the message log with idempotency; routing so every nudge, digest and escalation reaches the member's chosen channel; the message builder degrading to plain text with a link where a capability is missing.
-Test plan: a nudge routes to the member's primary channel and falls back to email when it fails; an unlinked member falls back to email and in-app; the log records every send with its outcome; idempotency prevents a duplicate send on relay retry.
+Goal: a workspace can hold a channel connection and a member can hold an identity, and one driver actually sends.
+
+**Why P5-T01b was cut in two.** The row carried a port, a driver, three tables with their policies, envelope-encrypted credentials, per-member primary channel and quiet hours, routing with fallback, a message log and a degrading message builder. That is two sessions of work, and the acceptance criterion belongs entirely to the second half. Split at the seam the design already draws: what a channel *is* (tables, driver, log) before what the product *decides* (routing, quiet hours, degradation).
+
+Deliverables: migration for `channel_connections`, `channel_identities` and `channel_messages` with forced row-level security and both unique constraints on identities; envelope-encrypted credentials in the shape `ai_credentials` already uses; the email driver against the existing `Channel` port, with one-click action links standing in for buttons; the message log with `(workspace_id, idempotency_key)` unique, which is what makes a relay retry safe; registry actions to read and manage a connection and to link and unlink an identity; a channel outbox topic delivered by P5-T01a's dispatch table.
+Test plan: the same message delivered twice writes one row and sends once; a connection's credentials never appear in a read action's output; an identity is unique both ways, so a second member cannot claim an external id and a member cannot hold two identities on one provider; the email driver renders buttons as links; every table refuses a cross-workspace read.
+Acceptance: Given a workspace with mail configured, when a message is sent to a member through the channel port twice with the same idempotency key, then the member receives it once and `channel_messages` holds exactly one row.
+
+### P5-T01b-b: Routing, quiet hours and the message builder [M]
+Depends on: P5-T01b-a
+Goal: every nudge, digest and escalation reaches the member's chosen channel.
+Deliverables: `resolveDelivery` with AI-NATIVE-PLAN.md §5.4's five-step order; per-member primary channel and quiet hours with working defaults; the in-app notification written whatever the channel decides; the message builder degrading to text plus appended links where a capability is missing; the one-time reconnect notice as a nudge with its own rule key.
+Test plan: a nudge routes to the member's primary channel and falls back to email when it fails; an unlinked member falls back to email and in-app; the log records every send with its outcome; a member inside quiet hours has the message queued to the next open window, and an urgent escalation is sent anyway.
 Acceptance: Given a member whose primary channel is unreachable, when a nudge is delivered, then it arrives by email, the failure is logged, and the member is told once that their channel needs reconnecting.
 
+### P5-T01c: The session entry point [S]
+Depends on: P4-T10b
+Goal: a member can reach a session without typing a URL.
+
+**Why this is a row at all.** S-22 to S-25 were built across P4-T07 to P4-T10 and nothing in the navigation links to any of them. `/session/<id>` is reachable only by typing it, so every session feature this product has is invisible to the people it was built for. Raised twice during Phase 4 and answered on 27 August 2026.
+
+Deliverables: a session list showing scheduled, running and closed sessions for the spaces the member can read; an entry point from the space page and from the dashboard; the running-session state visible from the list so a facilitator can rejoin; loading, empty, error and permission-denied states.
+Test plan: a member sees only sessions in spaces they can read; a running session is distinguishable from a scheduled one in the list; a member with no sessions sees an empty state that says how one is created.
+Acceptance: Given a member with a session scheduled in their space, when they open the product, then they can reach that session in two clicks without knowing its identifier.
+
 ### P5-T02: Slack driver [L]
-Depends on: P5-T01b
+Depends on: P5-T01b-b
 Goal: the first chat provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: self-serve installation and workspace connection; identity linking; outbound rich messages with buttons for direct messages and space channels; inbound signature verification with replay protection; slash command and button action handling; a modal-based check-in.
@@ -881,14 +901,14 @@ Test plan: a tampered inbound payload is rejected; an unlinked sender receives n
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
 ### P5-T03: Microsoft Teams driver [L]
-Depends on: P5-T01b
+Depends on: P5-T01b-b
 Goal: the enterprise chat provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the application manifest and tenant consent flow; connection and identity linking; adaptive card outbound for direct messages and channels; inbound verification; command and card action handling.
 Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
 
 ### P5-T04: WhatsApp driver [L]
-Depends on: P5-T01b
+Depends on: P5-T01b-b
 Goal: the reach provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: Business API connection; template registration per nudge kind with the template-versus-free-form window handled by the message builder; identity linking with verification; conversational inbound handling for check-in and blocker capture; a documented setup runbook.
@@ -896,7 +916,7 @@ Test plan: an outbound message outside the conversation window uses an approved 
 Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
 
 ### P5-T05: Telegram driver [M]
-Depends on: P5-T01b
+Depends on: P5-T01b-b
 Goal: the lightweight provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: bot connection, identity linking with a verification code, outbound messages with inline keyboards, and inbound command and callback handling.
@@ -1137,7 +1157,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (15, P5-T01 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **106 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (18: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **109 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

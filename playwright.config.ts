@@ -86,7 +86,12 @@ export default defineConfig({
       command: "sh e2e/start-server.sh",
       url: APP_URL,
       reuseExistingServer: false,
-      timeout: 120_000,
+      // Generous, because the first start after a fresh build is much slower
+      // than the rest: on Windows, start-server.sh rewrites eighty traced pnpm
+      // symlinks as junctions before the server binds. At 120 seconds that
+      // first run timed out and the second passed, which reads as flakiness
+      // and is not (P5-T01b-a).
+      timeout: 240_000,
       stdout: "pipe",
       stderr: "pipe",
       env: {
@@ -99,7 +104,12 @@ export default defineConfig({
       command: "sh e2e/start-server.sh",
       url: WIZARD_URL,
       reuseExistingServer: false,
-      timeout: 120_000,
+      // Generous, because the first start after a fresh build is much slower
+      // than the rest: on Windows, start-server.sh rewrites eighty traced pnpm
+      // symlinks as junctions before the server binds. At 120 seconds that
+      // first run timed out and the second passed, which reads as flakiness
+      // and is not (P5-T01b-a).
+      timeout: 240_000,
       stdout: "pipe",
       stderr: "pipe",
       env: {

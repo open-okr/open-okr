@@ -73,6 +73,16 @@ import {
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
+  connect as connectChannel,
+  disconnect as disconnectChannel,
+  linkIdentity,
+  listConnections,
+  listIdentities,
+  listMessages,
+  send as sendChannelMessage,
+  unlinkIdentity,
+} from "./channels.ts";
+import {
   acknowledgeCheckIn,
   castConfidenceVote,
   deleteCheckIn,
@@ -323,6 +333,14 @@ export const ACTION_MAP = {
   "invitations.revokeLink": revokeLink,
   "invitations.acceptLink": acceptLink,
   "invitations.joinByTrustedDomain": joinByTrustedDomain,
+  "channels.listConnections": listConnections,
+  "channels.connect": connectChannel,
+  "channels.disconnect": disconnectChannel,
+  "channels.listIdentities": listIdentities,
+  "channels.linkIdentity": linkIdentity,
+  "channels.unlinkIdentity": unlinkIdentity,
+  "channels.send": sendChannelMessage,
+  "channels.listMessages": listMessages,
   "copilot.ask": ask,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,

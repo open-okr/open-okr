@@ -45,6 +45,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "invitation.link_revoked": z.object({}),
   "invitation.accepted": z.object({}).catchall(z.unknown()),
   "invitation.joined_by_trusted_domain": z.object({}).catchall(z.unknown()),
+  // Channels (P5-T01b-a). The provider, never a credential and never a
+  // message body: an activity row is read by people.
+  "channel.connected": z.object({ provider: z.string() }),
+  "channel.disconnected": z.object({ provider: z.string() }),
+  "channel.identity_linked": z.object({ provider: z.string() }),
+  "channel.identity_unlinked": z.object({ provider: z.string() }),
+  "channel.message_queued": z.object({
+    provider: z.string(),
+    /** True when this key had already been queued, so nothing new was sent. */
+    duplicate: z.boolean(),
+  }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
   "notification.read": z.object({}),

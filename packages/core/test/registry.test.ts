@@ -88,8 +88,20 @@ describe("the registry", () => {
       // Both actions refuse a thread that is not the caller's as a not-found,
       // which is what `nudges.snooze` relies on too.
       const ownConversation = action.name.startsWith("copilot.");
+      // Channel identities are the fourth, and it is `nudges.snooze`'s reason
+      // once more (P5-T01b-a). Linking and unlinking touch one row that is
+      // about the member and nobody else, and both resolve the member from the
+      // caller's own session rather than from an input, so there is no
+      // identifier a caller could pass to reach somebody else's. A member at
+      // `view` still receives nudges, and telling the product where to send
+      // them cannot be a privilege only editors have. `channels.connect`,
+      // `channels.disconnect` and `channels.send` are workspace-wide and stay
+      // at `full`.
+      const ownIdentity =
+        action.name === "channels.linkIdentity" ||
+        action.name === "channels.unlinkIdentity";
       const floor =
-        discussion || ownMessages || ownConversation
+        discussion || ownMessages || ownConversation || ownIdentity
           ? ACCESS_LEVELS.comment
           : ACCESS_LEVELS.edit;
       expect(

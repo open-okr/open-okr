@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
+import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
   dispatchOutbox,
@@ -210,7 +211,9 @@ describe("the table against the code that enqueues", () => {
     expect([...found].filter((topic) => !(topic in OUTBOX_HANDLERS))).toEqual(
       [],
     );
-    // The one topic enqueued through a constant rather than a literal.
+    // The topics enqueued through a constant rather than a literal, which the
+    // scan above cannot see.
     expect(EMBED_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    expect(CHANNEL_MESSAGE_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

@@ -455,14 +455,20 @@ The typed catalogue lives in code (`packages/core/src/activities/catalogue.ts`),
 
 Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-PLAN's "and role obligations" is not built, because no role tag carries a notification meaning yet. Creating the rows (`notifyRecipients`) and driving the actual send are separate: nothing dispatches a `pending` batch or an unsent immediate row yet, and nothing calls `notifyRecipients` from an activity — "notification fan-out driven from activities" is P2-T07's own deliverable. Per-reason mail templates exist as pure string builders (`packages/core/src/notifications/templates.ts`), HTML and plain text, with no development preview page: there is no app shell yet (P2-T10) to serve one into.
 
-### channel_connections
-`provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `credentials_ciphertext`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`.
+### channel_connections *(built at P5-T01b-a)*
+`provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `ciphertext`, `data_key`, `key_id`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`, `error?`. Unique on `(workspace_id, provider)` where not deleted.
 
-### channel_identities
-`member_id` to workspace_members, `provider`, `external_id`, `external_handle?`, `verified_at?`.
+Email is absent from the provider list on purpose: it is the instance’s own mail settings and needs no connection row, which is what lets routing always fall back to it. The three key columns are TECHNICAL-PLAN’s single `credentials_ciphertext` split into the envelope shape `ai_credentials` already uses, so one rotation command covers both. `last_verified_at` stays null until something actually calls the provider: connecting stores a credential, verifying proves it, and a card that says verified because a string was pasted is worse than one that says nothing.
 
-### channel_messages
-`provider`, `direction` (`out` / `in`), `member_id?` to workspace_members, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status`, `error?`, `at`.
+### channel_identities *(built at P5-T01b-a)*
+`member_id` to workspace_members, `provider`, `external_id`, `external_handle?`, `verified_at?`. Unique on `(workspace_id, provider, external_id)` **and** on `(workspace_id, provider, member_id)`, both where not deleted.
+
+Both directions, because one constraint alone leaves a hole: without the first, two members can claim the same chat account; without the second, one member holds two identities that inbound resolution would have to choose between. Resolution reads `external_id` and never the handle, which is changeable, reusable and sometimes shared.
+
+### channel_messages *(built at P5-T01b-a)*
+`provider` (the four plus `email`), `direction` (`out` / `in`), `member_id?` to workspace_members, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status` (`queued` / `sent` / `failed` / `suppressed`), `error?`, `sent_at?`.
+
+Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
 
 ### nudges
 `kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.

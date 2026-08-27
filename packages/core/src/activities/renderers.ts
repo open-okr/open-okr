@@ -297,6 +297,17 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "copilot.proposalApplied": () => "Applied a copilot proposal",
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "channel.connected": (p) => `Connected ${p.provider}`,
+  "channel.disconnected": (p) => `Disconnected ${p.provider}`,
+  "channel.identity_linked": (p) => `Linked their ${p.provider} account`,
+  "channel.identity_unlinked": (p) => `Unlinked their ${p.provider} account`,
+  // Named by what it is rather than by what it says. The body is not in the
+  // payload and this line is read by people who may be entitled to know a
+  // message went out without being entitled to read it.
+  "channel.message_queued": (p) =>
+    p.duplicate
+      ? `A ${p.provider} message was already queued`
+      : `Queued a ${p.provider} message`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */
