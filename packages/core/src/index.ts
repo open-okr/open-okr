@@ -38,6 +38,7 @@ export {
   type ActionDefinition,
   defineReadAction,
   defineWriteAction,
+  type PageContract,
   type SafetyClass,
 } from "./actions/define.ts";
 export {
@@ -170,6 +171,41 @@ export {
   summariseUsage,
   type UsageSummaryRow,
 } from "./ai/usage.ts";
+export {
+  API_ERROR_CODES,
+  type ApiError,
+  type ApiErrorCode,
+  apiError,
+  errorFor,
+  statusFor,
+} from "./api/errors.ts";
+export {
+  API_BASE,
+  API_VERSION,
+  type ApiMethod,
+  decodeCursor,
+  decodeParam,
+  encodeCursor,
+  inputFrom,
+  nextCursorFor,
+  REST_ROUTES,
+  type RestRoute,
+  routeAt,
+} from "./api/surface.ts";
+export {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
+  audienceFromText,
+  bearerFrom,
+  hashApiToken,
+  type MintedToken,
+  mintApiToken,
+  resolveApiToken,
+  scopeFor,
+  stampTokenUse,
+  type TokenRejection,
+  type TokenResolution,
+} from "./api/tokens.ts";
 export {
   type AuditRow,
   auditRowHash,

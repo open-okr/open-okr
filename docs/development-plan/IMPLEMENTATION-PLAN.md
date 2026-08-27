@@ -975,12 +975,29 @@ Deliverables: resolving the running session for what the sender named, which is 
 Test plan: a blocker raised from chat is the same row the session screen writes; a member who names a key result with no running session in its space is told that rather than refused silently.
 Acceptance: Given a running weekly session, when a participant raises a blocker from chat, then it appears on the session's own board with the channel on its audit row.
 
-### P5-T07: Public contract projections: REST, OpenAPI and the command line [L]
+### P5-T07a: The REST surface and its tokens [M]
 Depends on: P1-T07, Phase 4 complete
-Goal: the public surfaces generated from one registry (TECHNICAL-PLAN.md §14).
-Deliverables: the versioned REST surface with cursor pagination, the filter grammar, typed errors and scoped hashed bearer tokens with separated audiences; the OpenAPI document generated from the schemas; the generated command line with typed flags, file inputs, profiles and a browser device login; the drift check comparing regenerated artifacts against the committed ones.
-Test plan: a token without write scope is refused on every write; a forbidden resource returns not-found; the drift check fails when a registry action changes without regeneration.
+Goal: the registry reachable from outside the browser, on credentials of its own (TECHNICAL-PLAN.md §14).
+
+**Cut in three along what each part can be used without.** This row listed five things: a REST surface, scoped tokens, a generated OpenAPI document, a generated command line, and a drift check. The seam is which of them a person can use on their own. A REST surface with tokens is usable the day it lands, with curl and nothing else. A generated document and a drift check need a surface to describe, and are worth their own row because the drift check is this task's acceptance criterion and a generator is only proved by one. A command line needs both and adds a device login, which is a flow rather than a projection.
+
+Deliverables: the `api_tokens` table with tokens hashed at rest, audiences separated so a REST token is refused at the agent endpoint and the reverse, scopes, expiry, revocation and a last-used stamp; the pre-tenant lookup policy, because a token names its workspace and nothing else can before it resolves; minting, listing and revoking as registry actions, with the raw token shown exactly once; the personal token screen; the versioned route projecting every registry action, with the method derived from the safety class; the typed error enumeration; cursor pagination and the filter grammar declared on a read action rather than faked in the transport, so an action that has not declared them refuses the parameter instead of paging in memory.
+Test plan: a token without write scope is refused on every write action; a token of the wrong audience is refused; a revoked or expired token is refused; a forbidden resource returns not-found; the raw token appears in no row; a paging parameter on an action that has not declared paging is refused by name.
+Acceptance: Given a token minted with read scope only, when it is presented to any write action on the versioned surface, then the call is refused for scope before the action runs, and the refusal names the scope it needed.
+
+### P5-T07b: The generated OpenAPI document and the drift check [M]
+Depends on: P5-T07a
+Goal: the surface described by something that cannot disagree with it.
+Deliverables: the OpenAPI document generated from the registry's own schemas; `pnpm gen:contract`; the committed artifacts; the drift check comparing a regeneration against what is committed and naming the action that moved.
+Test plan: the drift check fails when a registry action changes without regeneration, and the failure names the action.
 Acceptance: Given a change to a registry action's schema, when continuous integration runs without regenerating, then the drift check fails naming the action.
+
+### P5-T07c: The generated command line [M]
+Depends on: P5-T07b
+Goal: the same registry as a terminal tool.
+Deliverables: the command line generated from the registry with typed flags and file inputs; multiple profiles; the browser device login that mints a scoped token; the generated command list included in the drift check.
+Test plan: a flag whose type the schema refuses fails before any request; a profile with a revoked token reports that rather than an authentication error; the device login mints a token with the scopes it asked for and no more.
+Acceptance: Given a signed-out terminal, when a person runs the device login and completes it in the browser, then the profile holds a scoped token and the next command runs as them.
 
 ### P5-T08: MCP authorisation server [L]
 Depends on: P5-T07, P2-T09
@@ -1203,7 +1220,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (22: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **113 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (24: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **115 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

@@ -133,6 +133,14 @@ export {
   keyResultDependencies,
 } from "./schema/alignment.ts";
 export {
+  type ApiToken,
+  apiTokens,
+  TOKEN_AUDIENCES,
+  TOKEN_SCOPES,
+  type TokenAudience,
+  type TokenScope,
+} from "./schema/api-tokens.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,
@@ -466,6 +474,7 @@ export {
   USER_SETTING,
   WORKSPACE_SETTING,
   type WorkspaceTx,
+  withApiToken,
   withContext,
   withInstanceAdmin,
   withProviderTeam,

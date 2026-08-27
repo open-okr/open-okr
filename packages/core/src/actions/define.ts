@@ -24,6 +24,30 @@ import type { KeyRing } from "../secrets/key-ring.ts";
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
 
+/**
+ * How a read action pages, when it does (P5-T07a).
+ *
+ * Declared here rather than inferred, and only by an action that genuinely
+ * takes a cursor. The public surface builds the next cursor from the fields
+ * named below and refuses a cursor on an action that declares nothing, instead
+ * of loading everything and slicing it in the transport. Paging in the
+ * transport is not paging: it costs the same query and tells the caller it did
+ * not.
+ */
+export interface PageContract {
+  /**
+   * Fields of the last returned item that make up the next cursor.
+   *
+   * The cursor is opaque to clients, so this can change without a version.
+   */
+  readonly cursorFrom: readonly string[];
+  /**
+   * Where the array sits in the output, when the output is an object wrapping
+   * it. Absent when the output is the array itself.
+   */
+  readonly itemsAt?: string;
+}
+
 /** What every action needs to run: the database and who is asking.
  * `ring` is optional because only the handful of actions that seal or open a
  * credential need it (P2-T14 onward) — every other action's context stays
@@ -70,6 +94,8 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly output: ZodType<TOutput>;
   readonly access: AccessLevel;
   readonly safety: SafetyClass;
+  /** Set when this action takes a cursor. Reads only. */
+  readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
@@ -85,6 +111,8 @@ export function defineReadAction<TInput, TOutput>(definition: {
   input: ZodType<TInput>;
   output: ZodType<TOutput>;
   access?: AccessLevel;
+  /** Declare this only if the input really takes a cursor. */
+  page?: PageContract;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }): ActionDefinition<TInput, TOutput> {
   return {

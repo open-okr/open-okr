@@ -41,6 +41,21 @@ const PUBLIC_PREFIXES = [
   // The container health check has no session and must answer while the
   // instance is still starting.
   "/api/health",
+  // **Two surfaces that authenticate themselves, and must not be gated by a
+  // cookie (P5-T07a).** A cookie is not the only credential this product
+  // accepts, and this list was written when it was.
+  //
+  // The versioned REST surface resolves a bearer token and refuses without
+  // one. A redirect here would answer every API call with the sign-in page at
+  // status 200, which is what an HTTP client sees as success.
+  "/api/v1",
+  // The inbound channel webhooks verify a provider signature or shared secret
+  // over the raw bytes before reading them at all. Slack and Telegram send no
+  // cookie, so before this line every inbound message was answered with a 307
+  // to /sign-in and nothing the channel layer does could ever have run in a
+  // deployed instance. The unit tests call the handler directly and could not
+  // see it; found while writing this task's first end-to-end request.
+  "/api/channels",
 ];
 
 /**

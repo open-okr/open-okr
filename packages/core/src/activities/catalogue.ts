@@ -36,6 +36,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     to: z.enum(["active", "read_only", "frozen"]),
   }),
   "member.profile_updated": z.object({ name: z.string() }),
+  "api_token.created": z.object({
+    name: z.string(),
+    audience: z.string(),
+  }),
+  "api_token.revoked": z.object({ name: z.string() }),
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),

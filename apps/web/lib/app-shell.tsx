@@ -188,7 +188,11 @@ export async function AppShellLayout({
             avatarMenu={
               <AvatarMenu
                 name={workspace.name}
-                securityHref="/account/security"
+                items={[
+                  { href: "/account/security", label: "Security settings" },
+                  { href: "/account/channels", label: "Where to reach you" },
+                  { href: "/account/api-tokens", label: "API tokens" },
+                ]}
                 signOut={<SignOut />}
               />
             }

@@ -13,11 +13,19 @@ import type { ReactNode } from "react";
  */
 export function AvatarMenu({
   name,
-  securityHref,
+  items,
   signOut,
 }: {
   readonly name: string;
-  readonly securityHref: string;
+  /**
+   * The account pages, in the order they appear.
+   *
+   * A list rather than one href per page (P5-T07a): there are three of these
+   * now, and a fourth prop named after its own destination is how a menu ends
+   * up with pages that exist and cannot be reached. Both channels and tokens
+   * were unreachable from anywhere in the interface before this.
+   */
+  readonly items: readonly { readonly href: string; readonly label: string }[];
   readonly signOut: ReactNode;
 }) {
   return (
@@ -31,12 +39,15 @@ export function AvatarMenu({
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="end">
           <Menu.Popup className="min-w-45 rounded-lg border border-line bg-surface p-1 shadow-(--shadow-popover)">
-            <Menu.Item
-              render={<Link href={securityHref} />}
-              className="block rounded-md px-2.5 py-1.5 text-sm text-ink-2 data-highlighted:bg-raised"
-            >
-              Security settings
-            </Menu.Item>
+            {items.map((item) => (
+              <Menu.Item
+                key={item.href}
+                render={<Link href={item.href} />}
+                className="block rounded-md px-2.5 py-1.5 text-sm text-ink-2 data-highlighted:bg-raised"
+              >
+                {item.label}
+              </Menu.Item>
+            ))}
             <Menu.Separator className="my-1 h-px bg-line" />
             {/* Not a Menu.Item: signing out is a real form submission (a
              * Server Function), and Base UI's item semantics expect to be

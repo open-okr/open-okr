@@ -92,6 +92,18 @@ export const INSTANCE_ADMIN_SETTING = "app.instance_admin";
  */
 const CHANNEL_TEAM_SETTING = "app.channel_team_id";
 
+/**
+ * Names one token's hash, for the pre-tenant token lookup (P5-T07a).
+ *
+ * A REST request carries a bearer token and nothing else, so which workspace it
+ * belongs to is the question rather than the context. `api_tokens` admits a row
+ * either through the ordinary tenant setting or through this one matching its
+ * own `token_hash`, so the caller can reach exactly the row whose token it
+ * already holds. Somebody who does not have the token learns nothing, including
+ * whether it exists.
+ */
+const API_TOKEN_HASH_SETTING = "app.api_token_hash";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -105,6 +117,13 @@ export interface TenantContext {
    * equals it, and nothing else in the database.
    */
   readonly channelTeamId?: string;
+  /**
+   * Names one token hash, for the token lookup only (P5-T07a).
+   *
+   * Reveals exactly the `api_tokens` row whose `token_hash` equals it, and
+   * nothing else in the database.
+   */
+  readonly apiTokenHash?: string;
 }
 
 /**
@@ -124,6 +143,24 @@ export async function withProviderTeam<
   fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
 ): Promise<T> {
   return withContext(db, { channelTeamId: teamId }, fn);
+}
+
+/**
+ * Opens a transaction that can resolve one bearer token (P5-T07a).
+ *
+ * Use it for that lookup and nothing else. The row it can reach is the one the
+ * caller already named by hash, and the tenant setting for the workspace the
+ * token names is applied afterwards, for the call itself.
+ */
+export async function withApiToken<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  tokenHash: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { apiTokenHash: tokenHash }, fn);
 }
 
 /**
@@ -160,7 +197,8 @@ export async function withContext<
   context: TenantContext,
   fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
 ): Promise<T> {
-  const { workspaceId, userId, instanceAdmin, channelTeamId } = context;
+  const { workspaceId, userId, instanceAdmin, channelTeamId, apiTokenHash } =
+    context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
     throw new Error("Invalid workspace id: expected a UUID.");
@@ -178,14 +216,20 @@ export async function withContext<
       "Invalid provider team id: expected a non-empty identifier.",
     );
   }
+  // A hash, not a token: the caller has already digested it, so a length
+  // check is a shape check rather than a bound on a secret.
+  if (apiTokenHash !== undefined && !/^[0-9a-f]{64}$/.test(apiTokenHash)) {
+    throw new Error("Invalid token hash: expected a SHA-256 hex digest.");
+  }
   if (
     workspaceId === undefined &&
     userId === undefined &&
     channelTeamId === undefined &&
+    apiTokenHash === undefined &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, or instance admin.",
     );
   }
 
@@ -210,6 +254,11 @@ export async function withContext<
     if (channelTeamId !== undefined) {
       await tx.execute(
         sql`select set_config(${CHANNEL_TEAM_SETTING}, ${channelTeamId}, true)`,
+      );
+    }
+    if (apiTokenHash !== undefined) {
+      await tx.execute(
+        sql`select set_config(${API_TOKEN_HASH_SETTING}, ${apiTokenHash}, true)`,
       );
     }
     return fn(tx);

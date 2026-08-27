@@ -70,6 +70,7 @@ import {
   removeKeyResultDependency,
   setDependencyRiskOwner,
 } from "./alignment.ts";
+import { createApiToken, listMyTokens, revokeApiToken } from "./api-tokens.ts";
 import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
@@ -348,6 +349,9 @@ export const ACTION_MAP = {
   "channels.listMessages": listMessages,
   "channels.mySettings": mySettings,
   "channels.testSend": testSend,
+  "tokens.mine": listMyTokens,
+  "tokens.create": createApiToken,
+  "tokens.revoke": revokeApiToken,
   "copilot.ask": ask,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,

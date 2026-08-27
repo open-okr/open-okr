@@ -171,7 +171,7 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 | Command | Arrives at | What it will do |
 |---|---|---|
 | `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
-| `pnpm gen:contract` | P5-T07 | Regenerate OpenAPI and the command line from the action registry, with the drift check against committed artifacts that task builds. The chat command surface (P5-T06) and the MCP tool catalogue (P5-T09) are their own generated projections of the same registry, each landing with its own task |
+| `pnpm gen:contract` | P5-T07b | Regenerate OpenAPI and the command line from the action registry, with the drift check against committed artifacts that task builds. The versioned REST surface itself landed at P5-T07a and needs no generation step: its routes are derived from the registry at import time. The chat command surface (P5-T06) and the MCP tool catalogue (P5-T09) are their own generated projections of the same registry, each landing with its own task |
 | `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
 | `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
 | `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |

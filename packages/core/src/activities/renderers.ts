@@ -22,6 +22,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
+  "api_token.created": (p) =>
+    `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
+  "api_token.revoked": (p) =>
+    `The API token "${asString(p.name, "unnamed")}" was revoked`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,

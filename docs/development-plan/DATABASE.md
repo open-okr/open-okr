@@ -517,12 +517,24 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `agents` | `member_id` to workspace_members, `builtin_kind` (`coach` / `champion` / `custom`), `definition`, `planning_instructions`, `execution_instructions`, `provider?`, `tier`, `schedule` (`manual` / `continuous` / `nightly` / `hourly` / `daily` / `weekly`), `autonomy` (`sandbox` / `propose` / `scoped_direct`), `scope jsonb`, `enabled`. The Champion's own row stays `hourly`: the column names the finest cadence an agent runs, and P4-T05b's daily, weekly and per-cycle sweeps are separate runs with their own `agent_runs.trigger` |
 | `agent_runs` | `agent_id` to agents, `trigger`, `status`, `tasks jsonb`, `log text`, `started_at`, `finished_at?`, `error?`, `cost` |
 | `proposed_changes` | `run_id?` to agent_runs, `thread_id?` to ai_threads, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `result jsonb?`, `undone_at?`, `ai_generated bool` (P4-T05c-a, P4-T14b-a). A proposal names its origin, a run or a thread, exactly one, and a check constraint enforces that: a copilot proposal came from a member's question and inventing an agent run for it would put a run in the log that nobody scheduled. `result` is what applying it returned, which is the only place the created entity's identifier exists and therefore what undo needs. `undone_at` is set on an applied row rather than becoming a status, because it was applied and then it was undone and both are true. On `ai_generated`: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated; every copilot proposal is. |
+| `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
 | `oauth_clients` | Registered and cached client metadata |
 | `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
 | `oauth_codes` | `code_hash`, `challenge`, `resource`, `consumed_at?` |
 | `oauth_access_tokens` | `token_hash`, `grant_id`, `resource`, `expires_at` |
 | `oauth_refresh_tokens` | `token_hash`, `grant_id`, `used_at?`, `replaced_by?`, `expires_at` |
 | `mcp_sessions` | `grant_id`, `protocol_version`, `last_seen_at`, `closed_at?` |
+
+### api_tokens *(built at P5-T07a)*
+The second table in the product read before a tenant is known, after `channel_installations`, and for the same reason. A REST request arrives with a bearer token and nothing else: which workspace it belongs to *is* the question. Its policy admits a row through `app.workspace_id` or through `app.api_token_hash` matching its own `token_hash`, and `withApiToken` is the only wrapper that sets the second key. A caller reaches exactly the row whose digest it already holds; the `with check` clause takes the tenant setting alone, so nothing can be written through the second key.
+
+`audience` is on the row rather than read off the token's text. The text carries a readable prefix (`okr_rest_`, `okr_mcp_`) so a person can tell two of their own tokens apart and so a wrong-door request can be refused without a query, but a string a caller presents is not evidence.
+
+`scopes` holds the action registry's own three safety classes, so "may this token run this action" is set membership rather than a mapping table with two chances to disagree. There is deliberately no access level: a token carries the minting member's authority narrowed by its scopes, and `can()` decides as it does in the browser. A write-scoped token held by a view-level member writes nothing. That is what makes it safe for any member to mint one, and it is why there is no service account.
+
+`revoked_at` is separate from `deleted_at`. Revoking keeps the row, marked, so a person debugging a service that stopped working can see what they turned off; the soft-delete column is the repository default scope and nothing sets it yet.
+
+`last_used_at` is stamped outside the request's own transaction, on purpose: a person wants to know which of their four tokens is still in something's configuration file, and a failed stamp must never fail a call that was otherwise fine.
 
 Credentials and every token hash are never selected to the client.
 

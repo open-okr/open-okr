@@ -22,6 +22,16 @@
  * second database.
  */
 
+/**
+ * The signed-in cookies, kept for the rest of the run (P5-T07a).
+ *
+ * A module variable rather than a file, because the suite runs single-worker in
+ * one process and nothing outside it should inherit a session.
+ */
+let cachedState: Awaited<
+  ReturnType<import("@playwright/test").BrowserContext["storageState"]>
+>["cookies"] | null = null;
+
 /** The person every application-instance spec signs in as. */
 export const INSTANCE_ACCOUNT = {
   email: "ada@example.com",
@@ -52,6 +62,27 @@ export async function signIn(
   page: import("@playwright/test").Page,
 ): Promise<void> {
   const { expect } = await import("@playwright/test");
+
+  // **Authenticate once for the whole run, then reuse the cookies.**
+  // Better Auth allows ten sign-ins per address per minute (TECHNICAL-PLAN
+  // §8.2, and P2-T09 built it), the suite runs `workers: 1` in one process, and
+  // by P5-T07a ten spec files sign in as the same person. The eleventh gets
+  // refused, and the failure lands on whichever file happens to be running,
+  // which is how this looked like flakiness in `sessions.spec.ts` twice.
+  // Restoring the cookies is what a browser does anyway, and it means the
+  // limit is exercised by the specs that are about it rather than by every
+  // other spec's setup.
+  if (cachedState) {
+    await page.context().addCookies(cachedState);
+    await page.goto("/");
+    if (!page.url().includes("/sign-in")) {
+      await page.waitForLoadState("load");
+      return;
+    }
+    // The session went away. Fall through and authenticate again.
+    cachedState = null;
+  }
+
   await page.goto("/");
 
   if (page.url().includes("/setup")) {
@@ -85,6 +116,7 @@ export async function signIn(
   // supersedes it and fails with `net::ERR_ABORTED`. Two specs hit that on
   // separate runs before this line existed.
   await page.waitForLoadState("load");
+  cachedState = (await page.context().storageState()).cookies;
 }
 
 /**
