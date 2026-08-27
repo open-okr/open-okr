@@ -57,6 +57,34 @@ export interface InboundMessage {
   readonly text: string;
   readonly threadKey?: string;
   readonly externalMessageId?: string;
+  /**
+   * A short-lived token letting the product open a form in the provider's own
+   * client (P5-T02b).
+   *
+   * On the port rather than only on the Slack driver, because Teams has the
+   * same idea under a different name and the endpoint that decides "form or
+   * conversation" should not branch on which provider it is talking to. Absent
+   * for a provider with no modal, and absent for a message that arrived
+   * without one, which is what makes the conversational path the fallback
+   * rather than the exception.
+   */
+  readonly triggerId?: string;
+}
+
+/**
+ * A form somebody filled in, as the provider handed it back (P5-T02b).
+ *
+ * Separate from `InboundMessage` because it is not a message: nobody typed it,
+ * it has no text, and what it carries is one answer per field. A driver that
+ * flattened it into `text` would be inventing a sentence the member never said.
+ */
+export interface InboundSubmission {
+  readonly provider: ChannelProvider;
+  readonly externalSenderId: string;
+  /** What the form was about, put there by whoever opened it. */
+  readonly reference: string;
+  /** One entry per field, by the name the driver was given. */
+  readonly fields: Readonly<Record<string, string>>;
 }
 
 export interface ChannelCapabilities {

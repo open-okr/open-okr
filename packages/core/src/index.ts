@@ -239,6 +239,14 @@ export {
   capabilitiesFor,
 } from "./channels/capabilities.ts";
 export {
+  beginCheckIn,
+  CHECK_IN_COMMAND,
+  continueCheckIn,
+  type FlowOutcome,
+  type FlowRequest,
+  submitCheckIn,
+} from "./channels/check-in-flow.ts";
+export {
   CHAT_COMMANDS,
   type ChatCommand,
   helpText,
@@ -253,6 +261,11 @@ export {
   parseSlackSecret,
   type SlackSecret,
 } from "./channels/connections.ts";
+export {
+  type Conversation,
+  type ConversationField,
+  findConversation,
+} from "./channels/conversation.ts";
 export {
   generateLinkCode,
   handleInbound,

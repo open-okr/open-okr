@@ -24,7 +24,6 @@ import {
   channelConversations,
   keyResults,
   type WorkspaceTx,
-  withWorkspace,
 } from "@openokr/db";
 import { and, asc, eq, gt } from "drizzle-orm";
 import type { ChannelConnectionKey } from "./capabilities.ts";

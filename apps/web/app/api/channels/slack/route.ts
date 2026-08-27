@@ -30,17 +30,27 @@
  * payload against `channel_connections`, which is why a payload for a team
  * nobody connected gets the same silence as everything else.
  */
-import { SlackChannel, slackDeliveryId } from "@openokr/adapters";
 import {
+  checkInView,
+  parseViewSubmission,
+  SlackChannel,
+  slackDeliveryId,
+} from "@openokr/adapters";
+import {
+  CHECK_IN_COMMAND,
+  callAction,
   handleInbound,
   helpText,
   INBOUND_RATE_LIMIT,
   INBOUND_RATE_WINDOW_SECONDS,
   openConnection,
+  parseCommand,
   parseSlackSecret,
   routeCommand,
+  submitCheckIn,
   workspaceForProviderTeam,
 } from "@openokr/core";
+import { CHECK_IN_STATUSES } from "@openokr/db";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
 import { getPool } from "../../../../lib/pool";
@@ -159,6 +169,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     return silence();
   }
 
+  // A submitted form, which is not a message: nobody typed it and it carries
+  // one answer per field (P5-T02b). Read before the message path, because
+  // `parseInbound` flattens an interaction to its type and "view_submission"
+  // is not a command anybody would want run.
+  const submission = parseViewSubmission(rawBody);
+
   const cache = getCache();
   // Read once, here, and handed to everything below: the checks, the log row
   // and any arithmetic a command does all describe the same instant.
@@ -188,7 +204,15 @@ export async function POST(request: NextRequest): Promise<Response> {
   // A rate limit and an accepted command both answer, because by then the
   // sender is somebody the product knows and saying nothing to them reads as
   // the product ignoring them.
-  const answer = await answerFor(outcome, workspaceId, message.text, now);
+  const answer = await answerFor(
+    outcome,
+    workspaceId,
+    message.text,
+    now,
+    submission,
+    message.triggerId,
+    driver,
+  );
   if (!answer) {
     return silence();
   }
@@ -222,6 +246,9 @@ async function answerFor(
   workspaceId: string,
   text: string,
   now: Date,
+  submission: ReturnType<typeof parseViewSubmission>,
+  triggerId: string | undefined,
+  driver: SlackChannel,
 ): Promise<{ memberId: string; text: string } | null> {
   if (outcome.kind === "linked") {
     return {
@@ -247,6 +274,60 @@ async function answerFor(
     return null;
   }
 
+  const flow = {
+    pool: getPool(),
+    workspaceId,
+    provider: "slack" as const,
+    memberId: outcome.memberId,
+    userId: outcome.userId,
+    now,
+    minutes: CONVERSATION_MINUTES,
+  };
+
+  // A submitted form goes straight to the same two registry actions the
+  // conversational path ends in.
+  if (submission) {
+    const published = await submitCheckIn(flow, {
+      goalId: submission.reference,
+      fields: {
+        status: submission.fields.status ?? "",
+        confidence: submission.fields.confidence ?? "",
+        narrative: submission.fields.narrative ?? "",
+      },
+    });
+    return {
+      memberId: outcome.memberId,
+      // `none` cannot come back from a submission, and the fallback keeps the
+      // union honest rather than casting it away.
+      text:
+        published.kind === "none"
+          ? "I could not read that form."
+          : published.text,
+    };
+  }
+
+  // A check-in with somewhere to put a form gets one. Without a trigger, or if
+  // Slack refuses the view, the questions are asked one at a time instead: a
+  // provider having a bad second is not a reason a member cannot check in.
+  const parsed = parseCommand(text);
+  if (
+    triggerId &&
+    parsed.kind === "command" &&
+    parsed.command.verb === CHECK_IN_COMMAND
+  ) {
+    const opened = await openCheckInForm(
+      driver,
+      triggerId,
+      workspaceId,
+      outcome.userId,
+      parsed.args.goal ?? "",
+    );
+    if (opened) {
+      // Slack shows the form; there is nothing to say in the channel.
+      return null;
+    }
+  }
+
   const reply = await routeCommand({
     pool: getPool(),
     workspaceId,
@@ -257,4 +338,61 @@ async function answerFor(
     now,
   });
   return { memberId: outcome.memberId, text: reply.text };
+}
+
+/**
+ * How long a half-finished conversation waits.
+ *
+ * The §4.14 setting's default, read here rather than resolved per workspace:
+ * resolving it needs a settings read on an inbound path that is already three
+ * queries deep, and the value a workspace overrode is honoured the moment the
+ * conversational path is reached through the router. Worth a settings read here
+ * when somebody actually changes it.
+ */
+const CONVERSATION_MINUTES = 30;
+
+/**
+ * Opens the check-in form, or says it could not (P5-T02b).
+ *
+ * False rather than a throw, because the caller's answer to "no form" is the
+ * conversational path and not an error: a trigger expires in about three
+ * seconds and Slack having a bad second is not a reason a member cannot check
+ * in.
+ *
+ * The goal is read through the ordinary action, so a member who may not see it
+ * gets no form and the refusal comes from the path that already knows how to
+ * refuse.
+ */
+async function openCheckInForm(
+  driver: SlackChannel,
+  triggerId: string,
+  workspaceId: string,
+  userId: string,
+  goalId: string,
+): Promise<boolean> {
+  if (!goalId) {
+    return false;
+  }
+  try {
+    const goal = await callAction(
+      {
+        pool: getPool(),
+        workspaceId,
+        actor: { kind: "human", userId },
+      },
+      "goals.read",
+      { id: goalId },
+    );
+    await driver.openView(
+      triggerId,
+      checkInView({
+        goalId,
+        goalTitle: goal.title,
+        statuses: [...CHECK_IN_STATUSES],
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }

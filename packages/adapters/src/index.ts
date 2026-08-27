@@ -43,6 +43,8 @@ export {
   renderEmailBody,
 } from "./drivers/channel/email.ts";
 export {
+  checkInView,
+  parseViewSubmission,
   SlackChannel,
   type SlackChannelOptions,
   SlackPermanentError,
@@ -85,6 +87,7 @@ export type {
   DeliveryResult,
   InboundMessage,
   InboundRequest,
+  InboundSubmission,
 } from "./ports/channel.ts";
 export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
 export type {

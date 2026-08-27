@@ -27,6 +27,7 @@ import type {
   DeliveryResult,
   InboundMessage,
   InboundRequest,
+  InboundSubmission,
 } from "../../ports/channel.ts";
 
 /** Slack's own version prefix. `v0` is the only one it has ever sent. */
@@ -41,6 +42,17 @@ const SIGNATURE_VERSION = "v0";
 const REPLAY_WINDOW_SECONDS = 300;
 
 const API = "https://slack.com/api";
+
+/**
+ * How a button says "run this command" rather than "open this page".
+ *
+ * A scheme rather than a second field on `ChannelMessage`, because every
+ * provider renders a button differently and only some can carry a value: the
+ * email driver turns the same button into a labelled link, and a link to
+ * `okr:checkin ...` is one nobody can click, which is why only a provider
+ * that reports `buttons` is ever given one.
+ */
+const COMMAND_SCHEME = "okr:";
 
 const CAPABILITIES: ChannelCapabilities = {
   outbound: true,
@@ -136,7 +148,20 @@ export function toBlocks(
       elements: message.buttons.slice(0, 5).map((button) => ({
         type: "button",
         text: { type: "plain_text", text: button.label },
-        url: button.url,
+        // **A command becomes a Slack action; anything else stays a link.**
+        // A button whose url is an `okr:` command is not a place a browser can
+        // go, so it is sent as a value Slack posts back to the endpoint, which
+        // is what makes "Check in" on a nudge start the flow in the
+        // conversation it arrived in rather than opening a browser tab
+        // (P5-T02b). Every other button is a real URL and stays one, because a
+        // link into the product is the right answer for a link into the
+        // product.
+        ...(button.url.startsWith(COMMAND_SCHEME)
+          ? {
+              value: button.url.slice(COMMAND_SCHEME.length),
+              action_id: "okr_command",
+            }
+          : { url: button.url }),
       })),
     });
   }
@@ -334,6 +359,11 @@ export class SlackChannel implements Channel {
               : typeof record.type === "string"
                 ? record.type
                 : "",
+          // A button press carries one too, so pressing "Check in" on a nudge
+          // can open the form rather than starting four messages (P5-T02b).
+          ...(typeof record.trigger_id === "string"
+            ? { triggerId: record.trigger_id }
+            : {}),
         };
       }
     }
@@ -343,14 +373,38 @@ export class SlackChannel implements Channel {
     if (userId) {
       const command = form.get("command") ?? "";
       const text = form.get("text") ?? "";
+      const trigger = form.get("trigger_id");
       return {
         provider: "slack",
         externalSenderId: userId,
         text: `${command} ${text}`.trim(),
+        // Short-lived, and only present on an interaction Slack expects a
+        // form for. Its absence is what makes the conversational path the
+        // fallback rather than an error (P5-T02b).
+        ...(trigger ? { triggerId: trigger } : {}),
       };
     }
 
     return null;
+  }
+
+  /**
+   * Opens a form in the member's own Slack client (P5-T02b).
+   *
+   * Not on the `Channel` port: a port method every driver must implement and
+   * two of the four cannot is a port that lies. The endpoint asks for a
+   * `triggerId` from the message instead, and its absence is what routes a
+   * member to the conversational path.
+   *
+   * The trigger is valid for about three seconds, so this is called before
+   * anything slow. A failure here is not a failure to check in: the caller
+   * falls back to asking the questions one at a time.
+   */
+  async openView(
+    triggerId: string,
+    view: Record<string, unknown>,
+  ): Promise<void> {
+    await this.#call("views.open", { trigger_id: triggerId, view });
   }
 
   capabilities(): ChannelCapabilities {
@@ -396,4 +450,132 @@ export function slackDeliveryId(input: {
     return retryOf ? `${signature}` : signature;
   }
   return null;
+}
+
+/**
+ * The check-in form, as Block Kit (P5-T02b).
+ *
+ * Three inputs in one view, which is what a provider with a modal buys over
+ * four messages: a member sees every question at once and can change an answer
+ * before submitting. The conversational path in `packages/core` asks the same
+ * questions in METHOD.md §3.2's order, and both end in the same registry
+ * action.
+ *
+ * **The key results are not on the form.** A modal can hold them and the next
+ * task can add them; what would be wrong is a form that silently dropped a
+ * number somebody typed, so until the fields exist the values stay with the
+ * conversational path and the browser.
+ *
+ * `private_metadata` carries the goal, which is how the submission knows what
+ * it was about: Slack hands the view back with no memory of who opened it.
+ */
+export function checkInView(input: {
+  readonly goalId: string;
+  readonly goalTitle: string;
+  readonly statuses: readonly string[];
+}): Record<string, unknown> {
+  return {
+    type: "modal",
+    callback_id: "openokr_check_in",
+    private_metadata: input.goalId,
+    title: { type: "plain_text", text: "Check in" },
+    submit: { type: "plain_text", text: "Publish" },
+    close: { type: "plain_text", text: "Cancel" },
+    blocks: [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: `*${input.goalTitle}*` },
+      },
+      {
+        type: "input",
+        block_id: "status",
+        label: { type: "plain_text", text: "How is it going?" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          options: input.statuses.map((status) => ({
+            text: { type: "plain_text", text: status.replace(/_/g, " ") },
+            value: status,
+          })),
+        },
+      },
+      {
+        type: "input",
+        block_id: "confidence",
+        label: {
+          type: "plain_text",
+          text: "How confident are you it lands, 0 to 10?",
+        },
+        element: { type: "plain_text_input", action_id: "value" },
+      },
+      {
+        type: "input",
+        block_id: "narrative",
+        label: { type: "plain_text", text: "One line on why" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          multiline: true,
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Reads a submitted view, or null when this payload is not one.
+ *
+ * Slack's shape is `view.state.values[block_id][action_id]`, and which key
+ * holds the answer depends on the element: a select puts it under
+ * `selected_option.value` and a text input under `value`. Flattened here
+ * because that is provider knowledge, and `packages/core` should receive one
+ * answer per field rather than Slack's tree.
+ */
+export function parseViewSubmission(payload: string): InboundSubmission | null {
+  const form = new URLSearchParams(payload);
+  const raw = safeJson(form.get("payload") ?? "") ?? safeJson(payload);
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  if (record.type !== "view_submission") {
+    return null;
+  }
+  const user = record.user as Record<string, unknown> | undefined;
+  const view = record.view as Record<string, unknown> | undefined;
+  if (!user || typeof user.id !== "string" || !view) {
+    return null;
+  }
+
+  const state = view.state as Record<string, unknown> | undefined;
+  const values = (state?.values ?? {}) as Record<
+    string,
+    Record<string, Record<string, unknown>>
+  >;
+
+  const fields: Record<string, string> = {};
+  for (const [blockId, actions] of Object.entries(values)) {
+    for (const action of Object.values(actions)) {
+      const selected = action.selected_option as
+        | Record<string, unknown>
+        | undefined;
+      const value =
+        typeof selected?.value === "string"
+          ? selected.value
+          : typeof action.value === "string"
+            ? action.value
+            : null;
+      if (value !== null) {
+        fields[blockId] = value;
+      }
+    }
+  }
+
+  return {
+    provider: "slack",
+    externalSenderId: user.id,
+    reference:
+      typeof view.private_metadata === "string" ? view.private_metadata : "",
+    fields,
+  };
 }

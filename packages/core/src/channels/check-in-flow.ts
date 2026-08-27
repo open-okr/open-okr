@@ -290,3 +290,76 @@ async function publish(
     text: "Checked in. Your reviewer has been asked to acknowledge it.",
   };
 }
+
+/**
+ * A check-in submitted as one form rather than across turns (P5-T02b).
+ *
+ * The same two registry actions the conversational path ends in, which is the
+ * point: a modal is a nicer way to ask the same questions, not a second way to
+ * write a check-in. Anything a provider's form cannot carry stays absent rather
+ * than being guessed at, which today means the key results' values: a form that
+ * silently dropped a number somebody typed would be worse than one that never
+ * asked.
+ *
+ * Parsing is the same as the conversation's, field by field, so "8" means the
+ * same confidence in a modal as in a message and a status spelled with a space
+ * is read the same way.
+ */
+export async function submitCheckIn(
+  request: FlowRequest,
+  submission: {
+    readonly goalId: string;
+    readonly fields: Readonly<Record<string, string>>;
+  },
+): Promise<FlowOutcome> {
+  const db = drizzle(request.pool);
+  const fields = await withWorkspace(db, request.workspaceId, (tx) =>
+    checkInFields(tx, {
+      workspaceId: request.workspaceId,
+      goalId: submission.goalId,
+    }),
+  );
+
+  const collected: Record<string, unknown> = {};
+  for (const field of fields) {
+    const answer = submission.fields[field.name];
+    if (answer === undefined) {
+      // A field the form did not carry. Left out rather than defaulted: the
+      // action's own schema decides whether it was required.
+      continue;
+    }
+    const parsed = field.parse(answer);
+    if (!parsed.ok) {
+      return {
+        kind: "abandoned",
+        text: `"${answer}" is not an answer to "${field.question}" Nothing was saved.`,
+      };
+    }
+    collected[field.name] = parsed.value;
+  }
+
+  // No conversation row is involved: a modal holds its own state until it is
+  // submitted, which is exactly what makes it worth having. `publish` still
+  // wants one to clear, so it is handed a conversation whose id clears nothing.
+  return publish(
+    request,
+    {
+      id: NO_CONVERSATION,
+      command: CHECK_IN_COMMAND,
+      subjectId: submission.goalId,
+      collected,
+      awaiting: "",
+    },
+    submission.goalId,
+    collected,
+  );
+}
+
+/**
+ * The id a modal submission carries instead of a conversation.
+ *
+ * A uuid that matches nothing, so `publish`'s clear-up deletes no rows rather
+ * than needing a branch. Named rather than inlined because a bare zero uuid in
+ * the middle of a call reads like a bug.
+ */
+const NO_CONVERSATION = "00000000-0000-0000-0000-000000000000";

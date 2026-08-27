@@ -903,11 +903,14 @@ Deliverables: the Slack driver against the existing `Channel` port, with Block K
 Test plan: a tampered signature is refused before parsing and nothing is written; a payload outside the replay window is refused; a repeated delivery id is ignored as a duplicate; an unlinked sender receives nothing at all; a suspended member receives nothing; the driver's `capabilities()` matches the core matrix; buttons render as Block Kit actions.
 Acceptance: Given a workspace with Slack connected and a member who has linked their account, when a nudge is delivered to them, then it arrives as a Slack message with its action buttons, and `channel_messages` holds one row naming Slack.
 
-### P5-T02b: Slack commands, buttons and the modal check-in [M]
-Depends on: P5-T02a, P5-T06
-Goal: a champion can complete a check-in without leaving Slack.
-Deliverables: the slash command rendered from P5-T06's router, button action handling, the modal check-in and its submission, §6's steps seven and eight (the command resolving to a registry action and `can()` on it), and the audit entry naming the channel.
-Test plan: a check-in submitted from a modal produces the same record as one from the browser, with the channel recorded in the audit entry; a member without edit access gets the same refusal sentence the browser shows; an unknown command names what is available.
+### P5-T02b: Slack buttons and the modal check-in [S]
+Depends on: P5-T02a, P5-T06a, P5-T06b
+Goal: a champion can complete a check-in without leaving Slack, in one form rather than four messages.
+
+**Smaller than [M] now, because most of what this row listed has already shipped.** P5-T06a delivered the slash command rendered from the router, §6's steps seven and eight, the refusal being the browser's own sentence, the unknown-command reply, and the audit entry naming the channel. P5-T06b delivered a check-in completed across turns, which already works on Slack. What is left is the two things only a provider with a modal can do.
+
+Deliverables: nudge buttons that are Slack actions rather than links, so pressing "Check in" on a nudge starts the flow in the conversation it arrived in; the modal, opened on a slash command where the provider offers one, with status, confidence and narrative in one form; the submission handled as one registry action.
+Test plan: a check-in submitted from a modal produces the same record as one from the conversational path and from the browser, with the channel on its audit row; a payload with no trigger falls back to the conversation rather than failing; a submission whose fields are missing is refused without writing anything.
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
 ### P5-T02c: The channel settings surface [M]

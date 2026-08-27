@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  checkInView,
+  parseViewSubmission,
   SlackChannel,
   SlackPermanentError,
   slackDeliveryId,
@@ -413,5 +415,157 @@ describe("what Slack refuses", () => {
     await expect(
       channel.send({ memberId: "m-1" }, { text: "Hello." }),
     ).rejects.toThrow(/HTTP 503/);
+  });
+});
+
+describe("the modal", () => {
+  it("carries the goal in private_metadata, because Slack hands the view back with no memory", () => {
+    const view = checkInView({
+      goalId: "g-1",
+      goalTitle: "Grow enterprise",
+      statuses: ["on_track", "caution", "off_track"],
+    });
+    expect(view.private_metadata).toBe("g-1");
+    expect(view.callback_id).toBe("openokr_check_in");
+  });
+
+  it("asks the same three questions the conversation asks", () => {
+    const view = checkInView({
+      goalId: "g-1",
+      goalTitle: "Grow enterprise",
+      statuses: ["on_track"],
+    });
+    const blocks = view.blocks as Array<Record<string, unknown>>;
+    expect(
+      blocks.filter((block) => block.type === "input").map((b) => b.block_id),
+    ).toEqual(["status", "confidence", "narrative"]);
+  });
+
+  it("opens through views.open with the trigger", async () => {
+    const { channel, calls } = channelFor({ "views.open": { ok: true } });
+    await channel.openView("T-123", { type: "modal" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body.trigger_id).toBe("T-123");
+  });
+});
+
+describe("reading a submitted form", () => {
+  const submission = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      type: "view_submission",
+      user: { id: "U-sam" },
+      view: {
+        private_metadata: "g-1",
+        state: {
+          values: {
+            status: { value: { selected_option: { value: "on_track" } } },
+            confidence: { value: { value: "8" } },
+            narrative: { value: { value: "Two renewals landed." } },
+          },
+        },
+      },
+      ...over,
+    });
+
+  it("flattens Slack's tree into one answer per field", () => {
+    const parsed = parseViewSubmission(
+      `payload=${encodeURIComponent(submission())}`,
+    );
+    expect(parsed).toEqual({
+      provider: "slack",
+      externalSenderId: "U-sam",
+      reference: "g-1",
+      fields: {
+        status: "on_track",
+        confidence: "8",
+        narrative: "Two renewals landed.",
+      },
+    });
+  });
+
+  it("reads a select and a text input, which store their value in different keys", () => {
+    // A select puts it under `selected_option.value` and a text input under
+    // `value`. Handling only one of the two is how a form silently loses a
+    // field.
+    const parsed = parseViewSubmission(
+      `payload=${encodeURIComponent(submission())}`,
+    );
+    expect(parsed?.fields.status).toBe("on_track");
+    expect(parsed?.fields.confidence).toBe("8");
+  });
+
+  it("is null for anything that is not a submission", () => {
+    expect(parseViewSubmission("user_id=U-sam&command=%2Fokr")).toBeNull();
+    expect(
+      parseViewSubmission(
+        `payload=${encodeURIComponent(
+          JSON.stringify({ type: "block_actions", user: { id: "U-sam" } }),
+        )}`,
+      ),
+    ).toBeNull();
+    expect(parseViewSubmission("")).toBeNull();
+  });
+});
+
+describe("buttons that run a command", () => {
+  it("becomes a Slack action rather than a link", () => {
+    const blocks = toBlocks({
+      text: "Your check-in is due.",
+      buttons: [{ label: "Check in", url: "okr:checkin g-1" }],
+    });
+    const actions = blocks.find((block) => block.type === "actions");
+    const elements = (actions?.elements ?? []) as Array<
+      Record<string, unknown>
+    >;
+    const element = elements[0];
+    expect(element?.value).toBe("checkin g-1");
+    // A value, not a url: `okr:checkin g-1` is not a place a browser can go.
+    expect(element?.url).toBeUndefined();
+  });
+
+  it("leaves a real link a link", () => {
+    const blocks = toBlocks({
+      text: "Your check-in is due.",
+      buttons: [{ label: "Open", url: "https://okr.example.com/goal/1" }],
+    });
+    const actions = blocks.find((block) => block.type === "actions");
+    const elements = (actions?.elements ?? []) as Array<
+      Record<string, unknown>
+    >;
+    const element = elements[0];
+    expect(element?.url).toBe("https://okr.example.com/goal/1");
+    expect(element?.value).toBeUndefined();
+  });
+});
+
+describe("the trigger a form needs", () => {
+  it("comes through on a slash command", async () => {
+    const { channel } = channelFor();
+    const parsed = await channel.parseInbound(
+      "user_id=U-sam&command=%2Fokr&text=checkin+g-1&trigger_id=T-999",
+    );
+    expect(parsed?.triggerId).toBe("T-999");
+  });
+
+  it("comes through on a button press", async () => {
+    const { channel } = channelFor();
+    const payload = JSON.stringify({
+      type: "block_actions",
+      user: { id: "U-sam" },
+      trigger_id: "T-888",
+      actions: [{ value: "checkin g-1" }],
+    });
+    const parsed = await channel.parseInbound(
+      `payload=${encodeURIComponent(payload)}`,
+    );
+    expect(parsed?.triggerId).toBe("T-888");
+  });
+
+  it("is absent when the provider did not send one, which is what makes the conversation the fallback", async () => {
+    const { channel } = channelFor();
+    const parsed = await channel.parseInbound(
+      JSON.stringify({ event: { user: "U-sam", text: "checkin g-1" } }),
+    );
+    expect(parsed?.triggerId).toBeUndefined();
   });
 });

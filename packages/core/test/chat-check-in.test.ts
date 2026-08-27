@@ -1,6 +1,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { submitCheckIn } from "../src/channels/check-in-flow.ts";
 import { routeCommand } from "../src/channels/router.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -415,5 +416,122 @@ describe("the whole thing", () => {
     expect((audited.rows[0].payload as Record<string, unknown>).channel).toBe(
       "slack",
     );
+  });
+});
+
+describe("the same check-in through a form", () => {
+  const submit = async (
+    fields: Record<string, string>,
+    at = new Date("2026-08-27T09:00:00.000Z"),
+  ) => {
+    const wb = await workerDb();
+    return submitCheckIn(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        provider: "slack",
+        memberId: championMemberId,
+        userId: CHAMPION,
+        now: at,
+        minutes: 30,
+      },
+      { goalId, fields },
+    );
+  };
+
+  /**
+   * The acceptance criterion for P5-T02b, and it is deliberately a comparison
+   * rather than a fresh set of assertions: a modal is a nicer way to ask the
+   * same questions, not a second way to write a check-in. If the two paths ever
+   * produce different records, this is what says so.
+   */
+  it("produces what the conversational path produces (acceptance)", async () => {
+    const wb = await workerDb();
+
+    // The conversational path first, on this goal.
+    await say(`checkin ${goalId}`);
+    await say("on track");
+    await say("8");
+    await say("Two enterprise renewals landed early.");
+    await say("112");
+
+    const throughChat = (await checkInRows()).filter(
+      (row) => row.published_at !== null,
+    );
+    expect(throughChat).toHaveLength(1);
+
+    // A second workspace would be cleaner but the comparison that matters is
+    // the shape, so the same goal is checked in again through the form: the
+    // draft reopens rather than duplicating, which P3-T08 already guarantees.
+    const published = await submit({
+      status: "on track",
+      confidence: "8",
+      narrative: "Two enterprise renewals landed early.",
+    });
+    expect(published.kind).toBe("done");
+
+    const rows = (await checkInRows()).filter(
+      (row) => row.published_at !== null,
+    );
+    // Same status and same confidence, whichever way it arrived.
+    expect(rows.map((row) => row.status)).toEqual(rows.map(() => "on_track"));
+    for (const row of rows) {
+      expect(Number(row.confidence)).toBeCloseTo(0.8, 5);
+      expect(row.narrative).toMatchObject({ type: "doc" });
+    }
+
+    const audited = await wb.admin.query(
+      "select payload from audit_events where workspace_id = $1 and action = 'goals.publishCheckIn'",
+      [workspaceId],
+    );
+    // Every publication, from either path, names the channel.
+    expect(audited.rows.length).toBeGreaterThan(0);
+    for (const row of audited.rows) {
+      expect((row.payload as Record<string, unknown>).channel).toBe("slack");
+    }
+  });
+
+  it("refuses a form whose answers are not answers, and writes nothing", async () => {
+    const outcome = await submit({
+      status: "brilliant",
+      confidence: "8",
+      narrative: "All good.",
+    });
+
+    expect(outcome.kind).toBe("abandoned");
+    if (outcome.kind === "abandoned") {
+      expect(outcome.text).toMatch(/not an answer/);
+    }
+    expect(
+      (await checkInRows()).every((row) => row.published_at === null),
+    ).toBe(true);
+  });
+
+  it("leaves out a field the form did not carry rather than guessing at it", async () => {
+    // The key result's value is not on the form yet. Absent, not zero: a form
+    // that silently wrote a number nobody typed would be worse than one that
+    // never asked.
+    const outcome = await submit({
+      status: "caution",
+      confidence: "5",
+      narrative: "Waiting on two renewals.",
+    });
+    expect(outcome.kind).toBe("done");
+
+    const wb = await workerDb();
+    const kr = await wb.admin.query(
+      "select current_value from key_results where id = $1",
+      [keyResultIds[0]],
+    );
+    expect(Number(kr.rows[0].current_value)).toBe(100);
+  });
+
+  it("starts no conversation, because a form holds its own state", async () => {
+    await submit({
+      status: "on track",
+      confidence: "9",
+      narrative: "Ahead of plan.",
+    });
+    expect(await conversationRows()).toEqual([]);
   });
 });
