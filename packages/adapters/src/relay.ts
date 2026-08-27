@@ -21,6 +21,22 @@
  * gets it from the data it receives, never from arrival order.
  */
 
+/**
+ * Thrown by a dispatcher when retrying cannot possibly help (P5-T01a).
+ *
+ * The relay's default is to retry, because most delivery failures are a
+ * provider having a bad minute. Some are not: a topic nothing handles, a
+ * payload that does not parse, a row naming an entity that has since been
+ * deleted. Retrying those ten times over an hour produces ten identical
+ * failures and one dead letter an hour late.
+ *
+ * A dispatcher that throws this dead-letters the row at once, so the problem is
+ * visible while somebody is still looking.
+ */
+export class PermanentDispatchError extends Error {
+  override readonly name = "PermanentDispatchError";
+}
+
 /** The database surface the relay needs: a pool that can hand out clients. */
 export interface RelayPool {
   connect(): Promise<RelayClient>;
@@ -275,15 +291,20 @@ export class OutboxRelay {
    * Once `attempts` reaches the ceiling, this dead-letters the row instead:
    * `available_at` stops moving, so it drops out of the claim query for
    * good, and `onDeadLetter` fires so giving up is not a silent event.
+   *
+   * A `PermanentDispatchError` skips the ceiling and dead-letters on the first
+   * attempt, because the dispatcher has said retrying cannot help (P5-T01a).
    */
   async #markFailed(record: OutboxRecord, error: unknown): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     // Truncated: the text is diagnostic, and a driver can return a very
     // large body.
     const truncated = message.slice(0, 2000);
+    const permanent =
+      error instanceof Error && error.name === "PermanentDispatchError";
     const client = await this.#pool.connect();
     try {
-      if (record.attempts >= this.#options.maxAttempts) {
+      if (permanent || record.attempts >= this.#options.maxAttempts) {
         await client.query(
           `update outbox
               set last_error = $2, dead_lettered_at = now()

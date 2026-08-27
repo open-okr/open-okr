@@ -855,15 +855,25 @@ Goal: the design documents for channels, the external agent surface and the work
 Deliverables: design documents covering the channel port and per-provider capability matrix, the conversational check-in and blocker flows per provider, identity linking and inbound security; the authorisation server and tool catalogue; and the work layer (initiatives, tasks, board ordering and the key result linkage semantics).
 Acceptance: the human approves with an explicit statement.
 
-### P5-T01: Channel port, email driver and routing [L]
-Depends on: P5-T00, P4-T04c
+### P5-T01a: The outbox relay host [M]
+Depends on: P5-T00
+Goal: something actually delivers what every write enqueues.
+
+**Why this is a separate row.** P5-T01 was cut as one task on the assumption that a relay host existed. None does: `OutboxRelay` has been in `packages/adapters` since P1-T07 and nothing has ever constructed one, so every outbox row written since Phase 2 is still sitting in the table. No invitation email has been sent, no session event has reached a second browser, nothing has been indexed. Routing a nudge to a channel through a queue nobody drains would have shipped a second layer of undelivered work on top of the first, and the channel task is [L] before it absorbs any of this.
+
+Deliverables: a dispatch table in `packages/core` mapping every enqueued topic to a handler, with dependencies taken as plain functions so it stays out of `packages/adapters`; handlers for embedding, invitation email and the three session realtime events; a permanent-failure error that dead-letters a row on its first attempt rather than retrying what cannot work; the host itself, started at boot from the web process, with `OPENOKR_RELAY=off` for an operator who wants one dedicated drainer.
+Test plan: a topic with no handler dead-letters at once while an ordinary failure still retries; a handler whose dependency is absent skips rather than fails, so an instance with no SMTP collects no dead letters; an invitation written by the real action produces the email a member would receive; a build worker does not start a relay; a test proves every `topic:` literal in the action sources has a handler.
+Acceptance: Given a fresh instance with mail configured, when an owner invites an address, then the invitation email is sent without anybody running a command, and PLAN.md §12 R10 is closed.
+
+### P5-T01b: Channel port, email driver and routing [L]
+Depends on: P5-T01a, P4-T04c
 Goal: the delivery layer (AI-NATIVE-PLAN.md §5).
 Deliverables: the channel port with send, verify, parse and capability reporting; the email driver as the always-available baseline with one-click action links; the connection and identity tables with envelope-encrypted credentials; per-member primary channel and quiet hours; the message log with idempotency; routing so every nudge, digest and escalation reaches the member's chosen channel; the message builder degrading to plain text with a link where a capability is missing.
 Test plan: a nudge routes to the member's primary channel and falls back to email when it fails; an unlinked member falls back to email and in-app; the log records every send with its outcome; idempotency prevents a duplicate send on relay retry.
 Acceptance: Given a member whose primary channel is unreachable, when a nudge is delivered, then it arrives by email, the failure is logged, and the member is told once that their channel needs reconnecting.
 
 ### P5-T02: Slack driver [L]
-Depends on: P5-T01
+Depends on: P5-T01b
 Goal: the first chat provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: self-serve installation and workspace connection; identity linking; outbound rich messages with buttons for direct messages and space channels; inbound signature verification with replay protection; slash command and button action handling; a modal-based check-in.
@@ -871,14 +881,14 @@ Test plan: a tampered inbound payload is rejected; an unlinked sender receives n
 Acceptance: Given a champion with a due check-in, when they receive the nudge in Slack and complete the modal, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
 ### P5-T03: Microsoft Teams driver [L]
-Depends on: P5-T01
+Depends on: P5-T01b
 Goal: the enterprise chat provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: the application manifest and tenant consent flow; connection and identity linking; adaptive card outbound for direct messages and channels; inbound verification; command and card action handling.
 Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
 
 ### P5-T04: WhatsApp driver [L]
-Depends on: P5-T01
+Depends on: P5-T01b
 Goal: the reach provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: Business API connection; template registration per nudge kind with the template-versus-free-form window handled by the message builder; identity linking with verification; conversational inbound handling for check-in and blocker capture; a documented setup runbook.
@@ -886,7 +896,7 @@ Test plan: an outbound message outside the conversation window uses an approved 
 Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
 
 ### P5-T05: Telegram driver [M]
-Depends on: P5-T01
+Depends on: P5-T01b
 Goal: the lightweight provider.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
 Deliverables: bot connection, identity linking with a verification code, outbound messages with inline keyboards, and inbound command and callback handling.
@@ -1127,7 +1137,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (14). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **105 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (15, P5-T01 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **106 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

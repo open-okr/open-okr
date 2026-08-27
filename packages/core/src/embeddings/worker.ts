@@ -64,7 +64,16 @@ export async function runEmbedJob(
   job: EmbedJob,
   deps: {
     readonly pool: Pool;
-    readonly embed: EmbedFunction;
+    /**
+     * Null when no provider can embed, which is the ordinary self-hosted case
+     * (P5-T01a).
+     *
+     * `EmbeddingService.index()` already handles it: the chunk is stored with a
+     * null vector, so full-text retrieval works and the vector column fills in
+     * whenever a provider arrives. The type said `EmbedFunction` only because
+     * every caller so far had one.
+     */
+    readonly embed: EmbedFunction | null;
   },
 ): Promise<EmbedJobOutcome> {
   if (!isEmbeddableType(job.entityType)) {

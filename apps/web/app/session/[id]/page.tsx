@@ -433,6 +433,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
                 return (
                   <li
                     key={step.step}
+                    // Which step the session is on was carried by colour alone,
+                    // which a screen reader cannot hear and a test cannot read
+                    // without asserting on a class name (P5-T01a).
+                    aria-current={isCurrent ? "step" : undefined}
                     className={[
                       "flex items-start gap-3 rounded-md p-3",
                       isCurrent ? "bg-brand/10 ring-1 ring-brand" : "",

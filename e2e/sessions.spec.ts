@@ -190,25 +190,23 @@ test("facilitator opens the session — stage 1 becomes active", async () => {
 // Step 5: Acceptance criterion — two contexts, live stage sync
 // ---------------------------------------------------------------------------
 /**
- * **This test could not fail, and it is marked so rather than left green.**
+ * **Un-skipped at P5-T01a, and rewritten, because it could not fail before.**
  *
  * It asserted that the second client shows "Diagnose what is low" after the
  * advance. That is a weekly step title, and the rail renders all four titles at
  * every stage, so the assertion held before the advance as well as after it.
  * P4-T07a's acceptance criterion was never actually proven.
  *
- * The criterion is also not satisfiable today, which is the more important
- * half. Nothing published `session.stageChanged`: the event was declared in
- * `packages/core/src/sessions/live.ts`, listened for by `use-session-live` and
- * forwarded by the SSE route, and emitted by no code. P4-T10a-a adds the outbox
- * rows `sessions.open` and `sessions.advanceStage` should always have written,
- * so the write path is complete and correct now. Nothing drains the outbox yet,
- * so no event reaches a browser.
+ * It was also not satisfiable. `session.stageChanged` was declared in
+ * `packages/core/src/sessions/live.ts`, listened for by `use-session-live`,
+ * forwarded by the SSE route, and written to the outbox by P4-T10a-a, and
+ * nothing drained the outbox, so no event ever reached a browser. P5-T01a
+ * starts the relay, which is the last missing link in that chain.
  *
- * `fixme` keeps the claim visible and unmistakably unproven. Remove it when a
- * relay host exists; the gap is recorded in PHASE-4-SPLIT.md.
+ * The assertion now reads `aria-current="step"`, which names one step out of
+ * the four rather than matching a title that is always on the page.
  */
-test.fixme("acceptance criterion: second context sees stage advance without reload", async ({
+test("acceptance criterion: second context sees stage advance without reload", async ({
   browser,
 }) => {
   const second = await browser.newContext();
@@ -228,17 +226,26 @@ test.fixme("acceptance criterion: second context sees stage advance without relo
   // Give the SSE connection a moment to establish.
   await page.waitForTimeout(1500);
 
+  // Where the second client starts, so the assertion at the end is about a
+  // change rather than about a state it might have been in all along.
+  await expect(secondPage.locator("li[aria-current=\"step\"]")).toContainText(
+    "Confidence round",
+  );
+
   // Facilitator (first context) advances the stage.
   const continueBtn = page.getByRole("button", { name: "Continue to next step" });
   await expect(continueBtn).toBeVisible({ timeout: 5_000 });
   await continueBtn.click();
   await page.waitForLoadState("networkidle");
 
-  // Second context: SessionLive hook received the SSE event → router.refresh()
-  // The session re-fetches and shows the new current stage.
-  await expect(
-    secondPage.getByText("Diagnose what is low"),
-  ).toBeVisible({ timeout: 8_000 });
+  // Second context: SessionLive hook received the SSE event, called
+  // router.refresh(), and the rail moved. No reload, no click, no navigation
+  // in this context at all: the only thing that touched it was the event the
+  // relay delivered.
+  await expect(secondPage.locator("li[aria-current=\"step\"]")).toContainText(
+    "Diagnose what is low",
+    { timeout: 8_000 },
+  );
 
   await second.close();
 });

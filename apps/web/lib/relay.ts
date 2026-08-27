@@ -1,0 +1,209 @@
+/**
+ * The outbox relay host (P5-T01a).
+ *
+ * **This is the process PLAN.md §12's R10 said did not exist.** Every write in
+ * the product enqueues its outbox rows correctly, `OutboxRelay` has been in
+ * `packages/adapters` since P1-T07, and nothing ever constructed one. So no
+ * invitation email was ever sent, no live session event ever reached a second
+ * browser except by a refresh, and nothing was ever indexed for retrieval. This
+ * module is the missing constructor, and `instrumentation.node.ts` starts it.
+ *
+ * **Inside the web process, not a separate container.** R10 called a timer in
+ * the application process the lesser option because several replicas would each
+ * drain the queue on their own schedule. That turns out not to be a
+ * correctness problem: the relay claims rows with `FOR UPDATE SKIP LOCKED`
+ * under a lease, which is exactly the mechanism that makes concurrent relays
+ * safe, and P1-T04's own test proves several drain the same queue without
+ * double delivery. What is left is a little wasted polling.
+ *
+ * Against that: a separate container needs the whole adapter layer resolvable
+ * outside the Next.js bundle. Next traces only `pg` into the standalone output
+ * and compiles the rest into its server chunks, so a second entry point would
+ * mean either shipping the AI, mail and socket dependencies again (the same
+ * 400MB the Dockerfile already refused once for the migration runner) or adding
+ * a bundler. Running in the process that already has every driver loaded costs
+ * nothing and works in every deployment shape, including one container started
+ * by hand.
+ *
+ * An operator who does want a dedicated drainer sets `OPENOKR_RELAY=off` on the
+ * serving replicas and leaves one instance with it on.
+ */
+import { createAIProvider, OutboxRelay } from "@openokr/adapters";
+import { type Env, loadEnv } from "@openokr/config";
+import {
+  dispatchOutbox,
+  findSeededModel,
+  type OutboxDelivery,
+  type OutboxHandlerDeps,
+  resolveAICredential,
+  resolveTierRoute,
+} from "@openokr/core";
+import { getMailSettings, mailerFrom } from "./mail";
+import { getPool } from "./pool";
+import { getRealtime } from "./realtime";
+import { getKeyRing } from "./secrets";
+
+/** How long one delivery may take before another relay may claim the row. */
+const LEASE_SECONDS = 120;
+
+const log = (message: string): void => {
+  process.stdout.write(`relay: ${message}\n`);
+};
+
+const logError = (message: string): void => {
+  process.stderr.write(`relay: ${message}\n`);
+};
+
+const reason = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * The embedding function for one workspace, or null.
+ *
+ * **Resolved per delivery rather than once at start.** A provider key is a
+ * setting somebody can add at three in the afternoon, and a relay that resolved
+ * its provider at boot would ignore it until the next restart.
+ *
+ * Null is an ordinary answer, not a failure: the chunk is stored with no
+ * vector, full-text retrieval keeps working, and the vector fills in when a
+ * provider arrives and the content next changes.
+ */
+async function embedFor(workspaceId: string) {
+  const pool = getPool();
+  const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
+    workspaceId,
+    provider: "openrouter",
+  });
+  if (resolved.source === "off") {
+    return undefined;
+  }
+  const route = await resolveTierRoute(pool, { workspaceId, tier: "embed" });
+  if (!route || !findSeededModel(route.provider, route.modelId)) {
+    // An unpriced model cannot be metered, and an unmetered embedding loop is
+    // the one place a runaway cost would not show until the bill.
+    return undefined;
+  }
+
+  const provider = createAIProvider({
+    provider: "openrouter",
+    apiKey: resolved.apiKey,
+    appName: "OpenOKR",
+    appUrl: loadEnv().BETTER_AUTH_URL,
+  });
+  return async (inputs: readonly string[]) => {
+    const result = await provider.embed({
+      model: route.modelId,
+      input: [...inputs],
+    });
+    return {
+      vectors: result.vectors,
+      dimensions: result.dimensions,
+      model: route.modelId,
+    };
+  };
+}
+
+/**
+ * What one delivery is handed.
+ *
+ * Built per delivery, for the same reason `getMailSettings` is read per use:
+ * mail settings, provider keys and tier routing all live in the database, and
+ * an administrator can change any of them while this process runs.
+ */
+async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
+  const workspaceId =
+    typeof delivery.payload.workspaceId === "string"
+      ? delivery.payload.workspaceId
+      : null;
+  // Never fatal to a delivery: an instance with no mail configured should skip
+  // its invitation rows, not fail them.
+  const mail = await getMailSettings().catch(() => null);
+
+  return {
+    pool: getPool(),
+    ...(workspaceId ? { embed: await embedFor(workspaceId) } : {}),
+    async publish(channel, event, data) {
+      await getRealtime().publish(channel, { name: event, data });
+    },
+    ...(mail
+      ? {
+          async sendMail(message) {
+            await mailerFrom(mail).send(message);
+          },
+        }
+      : {}),
+    baseUrl: loadEnv().BETTER_AUTH_URL,
+    onSkipped(skipped, why) {
+      // Logged rather than silent. One skip is ordinary; a run of them is not.
+      // "no mail transport is configured" a hundred times is how an operator
+      // finds out their invitations are going nowhere.
+      log(`skipped ${skipped.topic} (${skipped.idempotencyKey}): ${why}`);
+    },
+  };
+}
+
+/**
+ * Whether this process drains the queue.
+ *
+ * Read through the validated environment rather than `process.env` directly, so
+ * `OPENOKR_RELAY=fasle` is a boot error naming the variable rather than a
+ * deployment that quietly stops delivering.
+ */
+export function relayEnabled(
+  env: Pick<Env, "OPENOKR_RELAY"> = loadEnv(),
+): boolean {
+  return env.OPENOKR_RELAY !== "off";
+}
+
+const globals = globalThis as typeof globalThis & {
+  openokrRelay?: OutboxRelay;
+};
+
+/**
+ * Starts the relay once per process.
+ *
+ * Idempotent, and cached on `globalThis` for the same reason the pool is:
+ * Next.js reloads modules in development, and a second relay per reload would
+ * leave the first one polling forever.
+ */
+export function startRelay(): OutboxRelay | null {
+  if (!relayEnabled()) {
+    log("disabled by OPENOKR_RELAY=off");
+    return null;
+  }
+  if (globals.openokrRelay) {
+    return globals.openokrRelay;
+  }
+
+  const relay = new OutboxRelay(getPool(), {
+    leaseSeconds: LEASE_SECONDS,
+    async dispatch(record) {
+      await dispatchOutbox(record, await relayDeps(record));
+    },
+    onError(error) {
+      logError(`drain failed: ${reason(error)}`);
+    },
+    onDeadLetter(record, error) {
+      // The loudest line this process writes. A dead letter is work the product
+      // decided to do and then gave up on, and nothing else will mention it.
+      logError(
+        `dead letter ${record.topic} (${record.idempotencyKey}) after ` +
+          `${record.attempts} attempts: ${reason(error)}`,
+      );
+    },
+  });
+
+  globals.openokrRelay = relay;
+  relay.start();
+  log("started");
+
+  // Finishes the drain in flight rather than cutting it off, so a deploy does
+  // not turn an in-flight delivery into a retry.
+  const stop = () => {
+    void relay.stop();
+  };
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+
+  return relay;
+}

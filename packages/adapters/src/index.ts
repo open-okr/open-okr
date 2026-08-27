@@ -98,6 +98,7 @@ export {
   type OutboxRecord,
   OutboxRelay,
   type OutboxRelayOptions,
+  PermanentDispatchError,
   type RelayClient,
   type RelayPool,
 } from "./relay.ts";

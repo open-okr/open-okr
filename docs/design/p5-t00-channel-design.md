@@ -35,11 +35,12 @@ enqueues an outbox row. A relay picks it up, resolves the channel, calls the
 driver and records the outcome in `channel_messages`. Nothing about delivery
 happens inside the transaction that decided to nudge.
 
-That has a consequence worth stating plainly: **Phase 5's channel work does not
-deliver anything until a host consumes the outbox** (PLAN.md §12, R10). The
-tables, the drivers, the routing and the command surface are all testable
-without one, and none of them sends a message in a running instance until the
-relay exists.
+That had a consequence worth stating plainly: **Phase 5's channel work delivers
+nothing until a host consumes the outbox** (PLAN.md §12, R10). It was answered
+before the channel row rather than around it: P5-T01a, cut out of P5-T01 on
+27 August 2026, starts the relay with the web process and maps every enqueued
+topic to a handler. A channel driver added by P5-T01b inherits a queue that is
+actually drained.
 
 ## 2. Tables
 
@@ -271,7 +272,7 @@ what it most needs, so the narrative and the values are asked last.
 
 | # | Question | My position |
 |---|---|---|
-| C1 | Does the channel work land before a relay host exists? | Yes, and the design says so out loud: everything is testable without one, nothing delivers with one absent, and R10 already records the gap |
+| C1 | ~~Does the channel work land before a relay host exists?~~ Answered 27 August 2026 | No. The relay was cut out as P5-T01a and built first, because routing nudges into a queue nobody drains would have stacked a second layer of undelivered work on the first |
 | C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail |
 | C3 | Where do WhatsApp templates live? | A per-nudge-kind registry in `packages/method`, because a template is a coaching message and §11 already owns those |
 | C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |

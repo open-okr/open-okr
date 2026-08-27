@@ -324,6 +324,14 @@ export {
   runOperation,
 } from "./operations/operation.ts";
 export {
+  dispatchOutbox,
+  OUTBOX_HANDLERS,
+  type OutboxDelivery,
+  type OutboxHandler,
+  type OutboxHandlerDeps,
+} from "./outbox/handlers.ts";
+export { PermanentDispatchError } from "./outbox/permanent.ts";
+export {
   type ErasureExport,
   isLastFullAccessHolder,
   refuseIfLastOwner,

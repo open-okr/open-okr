@@ -103,6 +103,14 @@ const envSchema = z.object({
    * per-process fallback default only distinguishes "restarted", not "the
    * same release on a different instance". */
   APP_BUILD_ID: optional(z.string().min(1).default(PROCESS_BUILD_ID)),
+
+  /** Whether this process drains the outbox (P5-T01a). On by default, because
+   * a deployment that drains nothing sends no invitation email and publishes
+   * no live event, and that was the state of every deployment until now
+   * (PLAN.md §12 R10). Concurrent relays are safe: rows are claimed with
+   * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
+   * when you want one dedicated drainer instead of all of them polling. */
+  OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
 });
 
 export type Env = z.infer<typeof envSchema>;
