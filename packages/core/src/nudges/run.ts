@@ -17,20 +17,17 @@
  * It takes a transaction and writes on it. Both callers are Operations, so the
  * nudge rows, the inbox rows and the audit row commit together or not at all.
  */
-import {
-  activeOnly,
-  cycles,
-  notifications,
-  type WorkspaceTx,
-} from "@openokr/db";
-import type { SuppressionReason } from "@openokr/method";
+import { activeOnly, cycles, type WorkspaceTx } from "@openokr/db";
+import { deferralFor, type SuppressionReason } from "@openokr/method";
 import { desc, eq, ne } from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import { sweepDivergenceInTx } from "../alignment/divergence.ts";
 import { sweepSemanticInTx } from "../alignment/semantic.ts";
 import { sweepStaleness } from "../cadence/service.ts";
+import { localTimeIn } from "../channels/members.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { deliverDueNudges, unreachableRecipients } from "./deliver.ts";
 import { dueQualityNudges } from "./quality.ts";
 import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
@@ -94,6 +91,16 @@ export interface NudgeRunInput {
 
 export interface NudgeRunResult {
   readonly recorded: number;
+  /**
+   * Nudges routed and stamped as sent on this pass (P5-T01b-b).
+   *
+   * Not the same number as `recorded`: a nudge written inside its
+   * recipient’s quiet hours is recorded now and delivered by a later run, and
+   * a nudge an earlier run deferred is delivered here without being recorded.
+   */
+  readonly delivered: number;
+  /** Of those, the ones that went to a provider rather than in-app only. */
+  readonly toChannel: number;
   /** Written with a reason and never sent. Noise the product chose to hold. */
   readonly suppressed: number;
   readonly ruleKeys: readonly string[];
@@ -268,20 +275,59 @@ export async function runDueNudgesInTx(
     now: at,
     workspaceTimeZone: timeZone,
   });
+  // The reconnect notice, raised before suppression is decided so it goes
+  // through the same deduplication, ceiling and quiet-hours rules as anything
+  // else the product says (P5-T01b-b). One per member per day falls out of
+  // §11’s own rule rather than being counted here.
+  const unreachable = await unreachableRecipients(tx, {
+    workspaceId,
+    memberIds: [...new Set(deliverable.map((n) => n.recipientMemberId))],
+    now: at,
+  });
+  const withNotices = [
+    ...deliverable,
+    ...unreachable.map((memberId) => ({
+      ruleKey: "channel.reconnect_needed",
+      kind: "rhythm" as const,
+      subjectType: "member" as const,
+      subjectId: memberId,
+      recipientMemberId: memberId,
+      channel: "in_app",
+      escalationStep: 0,
+      urgent: false,
+    })),
+  ] as typeof deliverable;
+
   const decided: {
     nudge: (typeof deliverable)[number];
     suppressedReason: SuppressionReason | null;
+    deliverAt?: Date;
   }[] = [];
-  for (const nudge of deliverable) {
+  for (const nudge of withNotices) {
+    const suppressedReason = await decideSuppression(tx, {
+      workspaceId,
+      nudge,
+      now: at,
+      context,
+      thresholds,
+    });
+    const member = context.members.get(nudge.recipientMemberId);
+    // Inside the member’s own night the row is written now and delivered
+    // later, which is what §5.4 means by queuing to the next open window.
+    const minutes =
+      suppressedReason === null
+        ? deferralFor({
+            urgent: nudge.urgent,
+            localTime: localTimeIn(at, member?.timeZone ?? "UTC"),
+            quietHours: member?.quietHours ?? null,
+          })
+        : 0;
     decided.push({
       nudge,
-      suppressedReason: await decideSuppression(tx, {
-        workspaceId,
-        nudge,
-        now: at,
-        context,
-        thresholds,
-      }),
+      suppressedReason,
+      ...(minutes > 0
+        ? { deliverAt: new Date(at.getTime() + minutes * 60_000) }
+        : {}),
     });
   }
 
@@ -292,38 +338,19 @@ export async function runDueNudgesInTx(
     ...(input.runId ? { runId: input.runId } : {}),
   });
 
-  // The in-app inbox, one row per nudge that was actually sent, linked by the
-  // `nudge_id` the notifications table has carried since 0013. A suppressed
-  // nudge gets no inbox row: the point of suppressing it was that nobody sees
-  // it.
-  for (const [index, written] of ids.entries()) {
-    if (!written.sent) {
-      continue;
-    }
-    const entry = decided[index]?.nudge;
-    if (!entry) {
-      continue;
-    }
-    // openokr:allow-mutation: the calling Operation's own transaction.
-    await tx.insert(notifications).values({
-      workspaceId,
-      recipientMemberId: entry.recipientMemberId,
-      nudgeId: written.id,
-      // The notifications table's reason list predates the four cadences, and
-      // every nudge on any of them is a reminder about something the recipient
-      // owes. One reason across all four keeps the inbox honest about what it
-      // is: a list of obligations, not a taxonomy of clocks. The rule key on
-      // the nudge row is what says which trigger fired.
-      reason: "check_in",
-      channel: entry.channel,
-      sentAt: at,
-    });
-  }
+  // Routing, the inbox row and the channel message, for everything now due:
+  // what this run just wrote, and anything an earlier run deferred into this
+  // window (P5-T01b-b). One pass, so a deferred nudge and a fresh one take the
+  // same path, and the inbox row is written where the channel is chosen rather
+  // than in two places that could disagree about what was sent.
+  const delivery = await deliverDueNudges(tx, { workspaceId, now: at });
 
   const sent = ids.filter((written) => written.sent).length;
   return {
     recorded: sent,
     suppressed: ids.length - sent,
+    delivered: delivery.delivered,
+    toChannel: delivery.toChannel,
     staleFlipped,
     diverged,
     reviewed,

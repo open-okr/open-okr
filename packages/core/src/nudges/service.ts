@@ -372,6 +372,14 @@ export async function recordNudgesInTx(
     readonly due: readonly {
       readonly nudge: DueNudge;
       readonly suppressedReason: SuppressionReason | null;
+      /**
+       * When this one may be delivered (P5-T01b-b).
+       *
+       * Defaults to `at`. Later than `at` inside the member’s own quiet
+       * hours, which AI-NATIVE-PLAN §5.4 says queues to the next open window
+       * rather than dropping the message.
+       */
+      readonly deliverAt?: Date;
     }[];
     readonly at: Date;
     /**
@@ -397,7 +405,7 @@ export async function recordNudgesInTx(
     sent: boolean;
     proposalId: string | null;
   }[] = [];
-  for (const { nudge, suppressedReason } of input.due) {
+  for (const { nudge, suppressedReason, deliverAt } of input.due) {
     if (!isTriggerKey(nudge.ruleKey)) {
       throw new OperationError(
         "forbidden",
@@ -436,10 +444,15 @@ export async function recordNudgesInTx(
         recipientMemberId: nudge.recipientMemberId,
         channel: nudge.channel,
         escalationStep: nudge.escalationStep,
-        scheduledFor: input.at,
+        scheduledFor: deliverAt ?? input.at,
+        // Never stamped here (P5-T01b-b). A recorded nudge is owed to somebody
+        // and not yet delivered; `deliverDueNudges` is what routes it, writes
+        // the inbox row and stamps `sent_at`. Writing it here would have said
+        // a message was sent before anything decided where it was going.
+        //
         // A suppressed nudge is a row with a reason and no `sent_at`. Both
         // halves matter: the row is what makes the silence answerable.
-        sentAt: suppressedReason === null ? input.at : null,
+        sentAt: null,
         suppressedReason,
         proposalId,
       })

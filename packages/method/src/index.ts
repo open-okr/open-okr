@@ -207,6 +207,7 @@ export {
   type WeeklyStep,
 } from "./sessions.ts";
 export {
+  deferralFor,
   insideQuietHours,
   type SuppressionInput,
   type SuppressionReason,

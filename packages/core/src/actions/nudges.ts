@@ -33,13 +33,24 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 export const runNudges = defineWriteAction({
   name: "nudges.run",
   summary:
-    "Computes what is due for every member and records a nudge row for each, delivering to the in-app inbox.",
+    "Computes what is due for every member, records a nudge row for each, and delivers what is due to the inbox and the member's own channel.",
   input: z.object({
     /** Defaults to the moment the request arrives. Overridden by tests and backfills. */
     now: z.string().optional(),
   }),
   output: z.object({
     recorded: z.number().int(),
+    /**
+     * Routed and stamped as sent on this pass (P5-T01b-b).
+     *
+     * Not the same number as `recorded`: a nudge written inside its
+     * recipient's quiet hours is recorded now and delivered by a later run,
+     * and one an earlier run deferred is delivered here without being
+     * recorded again.
+     */
+    delivered: z.number().int(),
+    /** Of those, the ones that went to a provider rather than in-app only. */
+    toChannel: z.number().int(),
     /** Written with a reason and never sent. Noise the product chose to hold. */
     suppressed: z.number().int(),
     ruleKeys: z.array(z.string()),

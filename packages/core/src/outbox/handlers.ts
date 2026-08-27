@@ -21,6 +21,7 @@
  */
 import {
   activeOnly,
+  channelConnections,
   channelMessages,
   users,
   withWorkspace,
@@ -243,6 +244,7 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     tx
       .select({
         memberId: channelMessages.memberId,
+        provider: channelMessages.provider,
         payload: channelMessages.payload,
         status: channelMessages.status,
         idempotencyKey: channelMessages.idempotencyKey,
@@ -335,9 +337,37 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
   );
 
   if (status === "failed") {
+    // The connection is marked broken, which is what closes the loop
+    // (P5-T01b-b): routing reads `state = 'connected'`, so the next nudge for
+    // anybody on this provider goes to email and its owner is told once that
+    // it needs reconnecting. Without this the same send would fail again every
+    // hour and nobody would ever be told why.
+    if (row.provider !== "email") {
+      // openokr:allow-mutation: the delivery side of the outbox, recording
+      // what a driver just reported. Not a domain write.
+      await withWorkspace(db, workspaceId, (tx) =>
+        tx
+          .update(channelConnections)
+          .set({
+            state: "error",
+            error: (failure ?? "the driver failed").slice(0, 500),
+            updatedAt: new Date(),
+          })
+          .where(
+            activeOnly(
+              channelConnections,
+              eq(channelConnections.workspaceId, workspaceId),
+              eq(
+                channelConnections.provider,
+                row.provider as "slack" | "teams" | "whatsapp" | "telegram",
+              ),
+            ),
+          ),
+      );
+    }
     // Rethrown so the relay retries and, at the ceiling, dead-letters. The row
     // already says what happened, so this is about the queue, not the record.
-    throw new Error(failure);
+    throw new Error(failure ?? "the driver failed");
   }
   if (status === "suppressed") {
     deps.onSkipped?.(

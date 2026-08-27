@@ -44,10 +44,11 @@ const rows = async () => {
     subject_type: string;
     subject_id: string;
     sent_at: string | null;
+    scheduled_for: string;
     suppressed_reason: string | null;
   }>(
     `select rule_key, kind, channel, escalation_step, recipient_member_id,
-            subject_type, subject_id, sent_at, suppressed_reason
+            subject_type, subject_id, sent_at, scheduled_for, suppressed_reason
      from nudges where workspace_id = $1 order by escalation_step, rule_key`,
     [workspaceId],
   );
@@ -168,7 +169,11 @@ describe("what fires, and exactly when", () => {
       // value: a run that reported correctly and stored nothing usable would
       // pass a test written against its output.
       expect(row.rule_key).not.toBe("");
-      expect(row.channel).toBe("in_app");
+      // Email, and that is the change P5-T01b-b made. The channel used to be
+      // written as "in_app" by the run and resolved nowhere; it is now the
+      // channel the delivery pass actually chose, and a fresh member’s
+      // primary channel is email. A member on "app" would read in_app here.
+      expect(row.channel).toBe("email");
       expect(row.escalation_step).toBeGreaterThanOrEqual(0);
       expect(row.kind).toBe("rhythm");
       expect(row.sent_at).not.toBeNull();
@@ -422,7 +427,7 @@ describe("what the product decides not to say", () => {
     expect((await runAt(0)).recorded).toBe(1);
   });
 
-  it("holds an ordinary nudge inside a member's own quiet hours", async () => {
+  it("defers an ordinary nudge inside a member's own quiet hours, and delivers it in the morning", async () => {
     const wb = await workerDb();
     // The run below lands at 02:00 in this member's timezone.
     await wb.admin.query(
@@ -437,8 +442,31 @@ describe("what the product decides not to say", () => {
       "nudges.run",
       { now: at.toISOString() },
     );
-    expect(result.recorded).toBe(0);
-    expect((await rows())[0]?.suppressed_reason).toBe("quiet_hours");
+
+    // Written, not dropped. Until P5-T01b-b this was suppressed with the
+    // reason "quiet_hours" and nothing ever sent it, so a member whose night
+    // covered the sweep never heard about their overdue check-in at all.
+    // AI-NATIVE-PLAN §5.4 says it queues to the next open window.
+    expect(result.recorded).toBeGreaterThan(0);
+    expect(result.delivered).toBe(0);
+
+    const held = (await rows())[0];
+    expect(held?.suppressed_reason).toBeNull();
+    expect(held?.sent_at).toBeNull();
+    // Five hours later, at the edge of the window.
+    expect(new Date(held?.scheduled_for as string).toISOString()).toBe(
+      `${dueOn}T07:00:00.000Z`,
+    );
+
+    // And the next run inside the open window delivers it, without recording
+    // a second one: deduplication sees the row that is already waiting.
+    const morning = await callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.run",
+      { now: new Date(`${dueOn}T08:00:00Z`).toISOString() },
+    );
+    expect(morning.delivered).toBeGreaterThan(0);
+    expect((await rows())[0]?.sent_at).not.toBeNull();
   });
 });
 

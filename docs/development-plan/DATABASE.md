@@ -470,7 +470,9 @@ Both directions, because one constraint alone leaves a hole: without the first, 
 
 Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
 
-### nudges
+### nudges *(delivery semantics changed at P5-T01b-b)*
+A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
+
 `kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules

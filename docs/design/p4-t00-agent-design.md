@@ -191,6 +191,7 @@ the build.
 | `cycle.starts` | Day one | Everyone | No | Yes |
 | `cycle.review_due` | 2 weeks before cycle ends | Facilitator | No | Yes |
 | `cycle.closing` | Cycle ends unscored | Facilitator + sponsor | No | Yes |
+| `channel.reconnect_needed` | A send to the member’s primary channel fails | The member | No | Yes | Added at P5-T01b-b, approved 27 August 2026. Operational rather than a practice rule: it is a trigger key because every proactive message is a nudge row and every nudge row cites a key the package defines |
 
 ### 3.2 Quality triggers (owned by the Coach)
 

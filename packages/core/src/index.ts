@@ -224,6 +224,33 @@ export {
   validateUpload,
 } from "./blobs/validation.ts";
 export {
+  type BuildOptions,
+  type BuiltMessage,
+  buildMessage,
+  type MessageButton,
+  type MessageDraft,
+  withLinkedButtons,
+} from "./channels/builder.ts";
+export {
+  CHANNEL_CAPABILITIES,
+  type ChannelCapabilityRow,
+  type ChannelProviderKey,
+  capabilitiesFor,
+} from "./channels/capabilities.ts";
+export {
+  connectedProviders,
+  loadRoutingMembers,
+} from "./channels/members.ts";
+export {
+  type Delivery,
+  type DeliveryChannel,
+  fallbackAfterFailure,
+  type PrimaryChannel,
+  type RoutingInput,
+  type RoutingMember,
+  resolveDelivery,
+} from "./channels/routing.ts";
+export {
   type AnswerQuestionInput,
   type AnswerQuestionResult,
   type AnswerSource,
@@ -311,6 +338,7 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export { deliverDueNudges, unreachableRecipients } from "./nudges/deliver.ts";
 export { isRecoveryAction } from "./operations/freeze.ts";
 export {
   type ActivityInput,

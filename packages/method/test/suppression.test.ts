@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { insideQuietHours, suppressionFor } from "../src/suppression.ts";
+import {
+  deferralFor,
+  insideQuietHours,
+  suppressionFor,
+} from "../src/suppression.ts";
 import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
 
 /**
@@ -131,24 +135,29 @@ describe("quiet hours in the member's own timezone", () => {
     ).toBe(false);
   });
 
-  it("holds an ordinary nudge and lets an escalation through", () => {
+  it("defers an ordinary nudge rather than dropping it, and lets an escalation through", () => {
     const night = { start: "22:00", end: "07:00" };
     const asleep = {
       ...base,
       localTime: { hour: 2, minute: 0 },
       quietHours: night,
     };
-    expect(suppressionFor(asleep, thresholds)).toBe("quiet_hours");
-    // Step 1 is the due-day reminder to the champion, and it is still held.
-    // Deriving urgency from "step > 0" would have woken somebody at two in the
-    // morning to tell them a check-in was due today, which is what this
-    // distinction exists to prevent.
-    expect(suppressionFor({ ...asleep, escalationStep: 1 }, thresholds)).toBe(
-      "quiet_hours",
-    );
-    expect(suppressionFor({ ...asleep, escalationStep: 2 }, thresholds)).toBe(
-      "quiet_hours",
-    );
+
+    // Not suppressed. Until P5-T01b-b this returned "quiet_hours", which wrote
+    // a row with a reason and never sent it: a member whose night covered the
+    // sweep never heard about their overdue check-in at all. AI-NATIVE-PLAN
+    // §5.4 says it queues to the next open window instead.
+    expect(suppressionFor(asleep, thresholds)).toBeNull();
+    expect(deferralFor(asleep)).toBe(5 * 60);
+
+    // Step 1 is the due-day reminder to the champion, and it is still held
+    // until morning. Deriving urgency from "step > 0" would have woken
+    // somebody at two in the morning to tell them a check-in was due today,
+    // which is what this distinction exists to prevent.
+    // The step is irrelevant to the wait, which is the distinction: only
+    // urgency, set by the caller, sends through somebody’s night.
+    expect(deferralFor(asleep)).toBe(5 * 60);
+
     // §6.3: an escalation delivers during quiet hours. A blocker aging past its
     // clock at three in the morning is still aging.
     expect(
@@ -157,6 +166,43 @@ describe("quiet hours in the member's own timezone", () => {
         thresholds,
       ),
     ).toBeNull();
+    expect(deferralFor({ ...asleep, urgent: true })).toBe(0);
+  });
+
+  it("waits until the window ends, whichever side of midnight it starts", () => {
+    const night = { start: "22:00", end: "07:00" };
+    // 23:00 is eight hours from a seven-o-clock morning, across midnight.
+    expect(
+      deferralFor({
+        urgent: false,
+        localTime: { hour: 23, minute: 0 },
+        quietHours: night,
+      }),
+    ).toBe(8 * 60);
+    // 06:30 is half an hour.
+    expect(
+      deferralFor({
+        urgent: false,
+        localTime: { hour: 6, minute: 30 },
+        quietHours: night,
+      }),
+    ).toBe(30);
+    // Awake already: nothing to wait for.
+    expect(
+      deferralFor({
+        urgent: false,
+        localTime: { hour: 9, minute: 0 },
+        quietHours: night,
+      }),
+    ).toBe(0);
+    // No window set is the default a fresh member has, and it never defers.
+    expect(
+      deferralFor({
+        urgent: false,
+        localTime: { hour: 3, minute: 0 },
+        quietHours: null,
+      }),
+    ).toBe(0);
   });
 });
 
@@ -269,6 +315,9 @@ describe("which reason wins when two apply", () => {
   it("reports quiet hours ahead of the ceiling", () => {
     // Both are the product's decisions, and the earlier one is the one that
     // actually stopped it.
+    // The ceiling, not the quiet hours: a member’s own night defers rather
+    // than suppresses now, so the ceiling is the decision that actually
+    // stopped this one (P5-T01b-b).
     expect(
       suppressionFor(
         {
@@ -279,6 +328,6 @@ describe("which reason wins when two apply", () => {
         },
         thresholds,
       ),
-    ).toBe("quiet_hours");
+    ).toBe("ceiling");
   });
 });

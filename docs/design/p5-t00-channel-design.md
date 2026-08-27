@@ -112,7 +112,7 @@ The order it decides in, which is §5.4's own order:
 | 1 | The workspace is in quiet mode and the nudge is not an escalation | Suppressed, reason `workspace_quiet_mode` |
 | 2 | The member has a verified identity on their primary channel | That channel |
 | 3 | No verified identity, or the provider is disconnected | Email, plus in-app |
-| 4 | The chosen channel is inside the member's quiet hours | Queued to the next open window |
+| 4 | The chosen channel is inside the member's quiet hours | Queued to the next open window. **Built at P5-T01b-b, and it found the opposite shipped**: `suppressionFor` returned `quiet_hours` and the row was written with a reason and never sent, so a member whose night covered the sweep never heard about their overdue check-in at all. Member quiet hours now defer; workspace quiet mode still suppresses, because an organisation that switched the product off for a week is not asking to be told everything at once when it comes back |
 | 5 | The nudge is an escalation the workspace marked urgent | Sent inside quiet hours anyway |
 
 **In-app is never routed away.** A notification row is written whatever the
