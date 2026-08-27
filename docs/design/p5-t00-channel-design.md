@@ -140,13 +140,13 @@ reconnecting however many nudges fail that day.
 §5.2's table, as `capabilities()` returns it. The message builder reads this
 and degrades; no driver refuses a message it cannot render.
 
-| Provider | outbound | inbound | richCards | buttons | threads | templateOnlyOutbound |
-|---|---|---|---|---|---|---|
-| Email | yes | no | no | yes, as links | no | no |
-| Slack | yes | yes | yes | yes | yes | no |
-| Teams | yes | yes | yes | yes | no | no |
-| WhatsApp | yes | yes | no | no | no | **yes, outside the window** |
-| Telegram | yes | yes | no | yes, inline | no | no |
+| Provider | outbound | inbound | richCards | buttons | threads | templateOnlyOutbound | Notes |
+|---|---|---|---|---|---|---|---|
+| Email | yes | no | no | yes, as links | no | no | Built at P5-T01b-a |
+| Slack | yes | yes | yes | yes | yes | no | Built at P5-T02a and P5-T02b |
+| Teams | yes | yes | yes | yes | no | no | |
+| WhatsApp | yes | yes | no | no | no | **yes, outside the window** | |
+| Telegram | yes | yes | no | yes, inline | no | no | Built at P5-T05. `callback_data` is capped at 64 bytes, so a button carrying a command too long to fit is dropped rather than truncated: half a command is a command that would run the wrong thing |
 
 **Degradation is one direction and it is always the same.** A message is built
 once, as text plus optional blocks plus optional buttons. A provider without
@@ -184,7 +184,7 @@ Every inbound request, in this order, before anything reads the body as data:
 | Step | Check | On failure |
 |---|---|---|
 | 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | Silence |
-| 1 | Signature over the raw bytes, per provider | 401, nothing parsed |
+| 1 | Signature over the raw bytes, per provider | 401, nothing parsed. **One provider cannot do this, found at P5-T05:** Telegram does not sign the body at all. It echoes a shared secret, chosen when the webhook is registered, and that is the strongest claim it makes available. The comparison is still timing-safe and the endpoint still refuses before parsing, but a tampered body under a valid secret passes on Telegram and fails on Slack. The difference is structural rather than an oversight, and there is a test that states it |
 | 2 | Timestamp inside the replay window | 401 |
 | 3 | The delivery id has not been seen | 200, ignored as a duplicate |
 | 4 | The sender resolves to a verified identity | 200, no reply |

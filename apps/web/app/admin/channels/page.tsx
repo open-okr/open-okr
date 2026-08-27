@@ -51,8 +51,8 @@ const PROVIDERS = [
   {
     id: "telegram" as const,
     label: "Telegram",
-    hint: "",
-    ready: false,
+    hint: "The bot token from BotFather, and a webhook secret you choose. Register the webhook at /api/channels/telegram/<your bot id>, and put that bot id in the workspace id field.",
+    ready: true,
   },
 ];
 
@@ -294,7 +294,10 @@ function ConnectFields({
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-2">
-        Signing secret
+        {/* Slack signs the body; Telegram echoes a secret it was given. Two
+            different claims, one field, because both are a string the
+            product compares an inbound request against. */}
+        Signing or webhook secret
         <input
           name="signingSecret"
           type="password"

@@ -57,7 +57,14 @@ export async function connectProvider(
       provider: provider as "slack" | "teams" | "whatsapp" | "telegram",
       // One string, the provider's own shape. The table stays the same for
       // every provider and the driver decides what its secret looks like.
-      credentials: JSON.stringify({ botToken, signingSecret }),
+      // The provider's own shape. Slack signs the body and Telegram echoes
+      // a secret it was given, so the second field means something different
+      // to each: one string, two claims, and each driver parses its own.
+      credentials: JSON.stringify(
+        provider === "telegram"
+          ? { botToken, webhookSecret: signingSecret }
+          : { botToken, signingSecret },
+      ),
       config: { teamId },
     });
   } catch (error) {

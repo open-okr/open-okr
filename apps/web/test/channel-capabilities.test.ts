@@ -1,4 +1,4 @@
-import { EmailChannel, SlackChannel } from "@openokr/adapters";
+import { EmailChannel, SlackChannel, TelegramChannel } from "@openokr/adapters";
 import { CHANNEL_CAPABILITIES } from "@openokr/core";
 import { expect, test } from "vitest";
 
@@ -38,6 +38,16 @@ test("the Slack driver reports what the core matrix says Slack can do", () => {
   });
 
   expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.slack);
+});
+
+test("the Telegram driver reports what the core matrix says Telegram can do", () => {
+  const driver = new TelegramChannel({
+    botToken: "unused",
+    webhookSecret: "unused",
+    chatIdFor: () => null,
+  });
+
+  expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.telegram);
 });
 
 test("every provider the matrix names is one the router can choose", () => {

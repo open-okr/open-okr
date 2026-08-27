@@ -143,3 +143,32 @@ export async function memberExternalId(
   );
   return row?.externalId ?? null;
 }
+
+/** What a Telegram connection's secret holds. */
+export interface TelegramSecret {
+  /** The bot token. Goes in an outbound URL, so it never reaches a log. */
+  readonly botToken: string;
+  /** The secret Telegram echoes on every inbound request. */
+  readonly webhookSecret: string;
+}
+
+/**
+ * The Telegram secret, or null when the stored string is not one.
+ *
+ * The same shape as `parseSlackSecret` and for the same reason: the connection
+ * holds one envelope-encrypted string and each provider decides what its own
+ * secret looks like, so the table stays one shape for all four.
+ */
+export function parseTelegramSecret(secret: string): TelegramSecret | null {
+  try {
+    const parsed = JSON.parse(secret) as Record<string, unknown>;
+    const botToken = parsed.botToken;
+    const webhookSecret = parsed.webhookSecret;
+    if (typeof botToken !== "string" || typeof webhookSecret !== "string") {
+      return null;
+    }
+    return { botToken, webhookSecret };
+  } catch {
+    return null;
+  }
+}

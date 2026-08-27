@@ -259,7 +259,9 @@ export {
   type OpenedConnection,
   openConnection,
   parseSlackSecret,
+  parseTelegramSecret,
   type SlackSecret,
+  type TelegramSecret,
 } from "./channels/connections.ts";
 export {
   type Conversation,

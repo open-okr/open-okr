@@ -33,6 +33,7 @@ import {
   EmailChannel,
   OutboxRelay,
   SlackChannel,
+  TelegramChannel,
 } from "@openokr/adapters";
 import { type Env, loadEnv } from "@openokr/config";
 import {
@@ -44,6 +45,7 @@ import {
   type OutboxHandlerDeps,
   openConnection,
   parseSlackSecret,
+  parseTelegramSecret,
   resolveAICredential,
   resolveTierRoute,
 } from "@openokr/core";
@@ -196,6 +198,34 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
                   memberExternalId(getPool(), {
                     workspaceId,
                     provider: "slack",
+                    memberId: recipient.memberId,
+                  }),
+              });
+              return channel.send({ memberId: message.memberId }, outbound);
+            }
+
+            if (message.provider === "telegram") {
+              const connection = await openConnection(getPool(), getKeyRing(), {
+                workspaceId,
+                provider: "telegram",
+              });
+              const secret = connection
+                ? parseTelegramSecret(connection.secret)
+                : null;
+              if (!secret) {
+                return {
+                  delivered: false,
+                  suppressedReason:
+                    "Telegram is not connected, or its stored credentials are not readable",
+                };
+              }
+              const channel = new TelegramChannel({
+                botToken: secret.botToken,
+                webhookSecret: secret.webhookSecret,
+                chatIdFor: (recipient) =>
+                  memberExternalId(getPool(), {
+                    workspaceId,
+                    provider: "telegram",
                     memberId: recipient.memberId,
                   }),
               });

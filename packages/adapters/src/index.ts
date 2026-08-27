@@ -51,6 +51,13 @@ export {
   slackDeliveryId,
   toBlocks,
 } from "./drivers/channel/slack.ts";
+export {
+  TelegramChannel,
+  type TelegramChannelOptions,
+  TelegramPermanentError,
+  telegramDeliveryId,
+  toInlineKeyboard,
+} from "./drivers/channel/telegram.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {
