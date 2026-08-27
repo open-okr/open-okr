@@ -166,6 +166,8 @@ Format: purpose, layout, primary actions, states.
 - Step 3, commitments: last week's list with delivered and not-yet controls, then this week's with text, owner and linked key result.
 - Step 4, digest: the generated digest with headline, on track, at risk, blockers and commitments, plus a coordinator note, a summary panel, and controls to copy it or post it to the space's channel.
 
+**The session list, added at P5-T01c**, is at `/sessions`: every session in a space the reader belongs to, running first and then soonest, with a facilitator chip and a rejoin action. It is not a screen this document numbered, and it exists because S-22’s own door is a space home, which only helps a member who already knows which of their spaces has a session in it. S-22 to S-25 shipped across P4-T07 to P4-T10 with nothing in the interface linking to any of them, so `/session/<id>` was reachable only by typing it. The space home also gained the card S-22 describes.
+
 **S-23 Monthly review.** Trend per objective, the dependency and risk log, resource and priority shifts, and the decision log where each decision carries a date, the key result it affects and its text.
 
 **S-24 Quarterly review.** A facilitated session. The header carries a lap bar segmented by stage duration, the stage timer with pacing cues, an add-a-minute control, and export actions. A left rail lists the eleven stages grouped by act with per-stage minutes and a private facilitator notes field. The centre renders the current stage: **Mockup:** [08-quarterly-review](../stakeholder/mockups/png/08-quarterly-review.png).

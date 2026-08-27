@@ -140,6 +140,23 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "sessions",
+    navigation: [
+      {
+        id: "sessions",
+        label: "Sessions",
+        href: "/sessions",
+        section: "sidebar",
+        // Every member reaches it, and every member sees a different list: it
+        // is scoped by the same access filter the space list uses, so a
+        // session in a space somebody cannot read is not in it. S-22 to S-25
+        // were built in Phase 4 with nothing linking to them, which made every
+        // session feature reachable only by typing a URL (P5-T01c).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "spaces",
     navigation: [
       {

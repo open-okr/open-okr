@@ -1,5 +1,6 @@
 import { callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
@@ -45,6 +46,23 @@ export default async function SpacePage({
     }
     throw error;
   }
+
+  // This space's own sessions (P5-T01c). The space is where a session is
+  // scheduled and run, so this is the entry point that matters most: a
+  // facilitator opening their team home should see the room they are about to
+  // run without going anywhere else first.
+  const sessions = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "sessions.list",
+    { spaceId: id },
+  );
+  const liveOrAhead = sessions.filter(
+    (row) => row.state === "running" || row.state === "scheduled",
+  );
 
   // The board, ranked by §11's ladder. Deterministic and needs no provider
   // (P4-T15b-b).
@@ -105,6 +123,47 @@ export default async function SpacePage({
                 </p>
               ) : null}
             </div>
+          </CardBody>
+        </Card>
+
+        {/* P5-T01c: the door to S-22 to S-25, which nothing linked to. */}
+        <Card>
+          <CardHeader className="justify-between">
+            <span>Sessions</span>
+            <Link
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+              href="/sessions"
+            >
+              All sessions
+            </Link>
+          </CardHeader>
+          <CardBody>
+            {liveOrAhead.length === 0 ? (
+              <p className="text-sm text-ink-3">
+                Nothing scheduled in this space.
+              </p>
+            ) : (
+              <ul aria-label="Sessions" className="flex flex-col gap-1.5">
+                {liveOrAhead.map((row) => (
+                  <li key={row.id}>
+                    <Link
+                      href={`/session/${row.id}`}
+                      className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 transition-colors hover:border-brand hover:bg-raised"
+                    >
+                      <span className="truncate text-sm font-medium text-ink">
+                        {row.title}
+                      </span>
+                      {row.state === "running" ? (
+                        <Chip tone="brand">In progress</Chip>
+                      ) : null}
+                      <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
+                        {row.state === "running" ? "Rejoin" : "Open"}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardBody>
         </Card>
 

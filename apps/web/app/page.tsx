@@ -209,6 +209,13 @@ export default async function HomePage({
           <a className="text-brand-text underline" href="/review">
             What you owe
           </a>
+          {/* P5-T01c. The sidebar carries it on every page; this is here
+              because the task asks for a door from the front door itself, and
+              a member who lands here should not have to know the product has
+              a sidebar item for the room they are late to. */}
+          <a className="text-brand-text underline" href="/sessions">
+            Sessions
+          </a>
         </p>
       </div>
     </AppShellLayout>

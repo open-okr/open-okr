@@ -245,6 +245,7 @@ import {
   draftNextCycle,
   giveKudos,
   givePulse,
+  listMySessions,
   listParticipants,
   listSessionCommitments,
   listSessions,
@@ -512,6 +513,7 @@ export const ACTION_MAP = {
   "sessions.close": closeSession,
   "sessions.read": readSession,
   "sessions.list": listSessions,
+  "sessions.mine": listMySessions,
   "sessions.participants": listParticipants,
   // Confidence round (P4-T07b)
   "sessions.castVote": castSessionVote,

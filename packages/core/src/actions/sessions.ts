@@ -49,6 +49,7 @@ import {
   sessionParticipants,
   okrSessions as sessions,
   spaceMembers,
+  spaces,
   streaks,
   withContext,
   workspaceMembers,
@@ -69,7 +70,18 @@ import {
   roomPulseRead,
   WEEKLY_STAGE_KEYS,
 } from "@openokr/method";
-import { and, avg, count, desc, eq, isNull, lt, ne, sql } from "drizzle-orm";
+import {
+  and,
+  avg,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -1097,6 +1109,151 @@ export const readSession = defineReadAction({
         }
 
         return toOutput(row, member.id);
+      },
+    );
+  },
+});
+
+/**
+ * Every session the reader can reach, across every space (P5-T01c).
+ *
+ * **Why this exists at all.** S-22 to S-25 were built across P4-T07 to P4-T10
+ * and nothing in the interface linked to any of them: `/session/<id>` was
+ * reachable only by typing it. Every session feature this product has was
+ * invisible to the people it was built for, and it was raised twice during
+ * Phase 4 before being answered on 27 August 2026.
+ *
+ * `sessions.list` needs a space id, which is the wrong shape for a front door:
+ * a member does not know which of their spaces has a session running.
+ *
+ * **Scoped by space membership, which is `sessions.read`’s own rule and not the
+ * broader one.** Every space is readable at `view` by every member, on purpose:
+ * without that nobody could discover a space to join. A *session* is stricter,
+ * because it is a room you are in rather than a page you can look at, and
+ * `sessions.read` refuses a caller who is not in the space. Matching that here
+ * matters more than being generous: a list offering rows that then refuse to
+ * open is worse than a shorter list.
+ */
+export const listMySessions = defineReadAction({
+  name: "sessions.mine",
+  summary: "Sessions in every space this member can read, running first.",
+  input: z.object({
+    /** Closed and skipped sessions, off by default: the front door is about what is next. */
+    includeFinished: z.boolean().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      kind: z.enum(SESSION_KINDS),
+      title: z.string(),
+      state: z.enum(SESSION_STATES),
+      scheduledFor: z.string(),
+      spaceId: z.uuid().nullable(),
+      spaceName: z.string().nullable(),
+      /** So a facilitator can tell which of these is theirs to run. */
+      isFacilitator: z.boolean(),
+      /** Set while the session is running, so a rejoin is one click. */
+      stageKey: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+        if (!member) {
+          throw new OperationError("not_found", "No such workspace.");
+        }
+
+        const states = input.includeFinished
+          ? (["running", "scheduled", "closed", "skipped"] as const)
+          : (["running", "scheduled"] as const);
+
+        const rows = await tx
+          .select({
+            id: sessions.id,
+            kind: sessions.kind,
+            title: sessions.title,
+            state: sessions.state,
+            scheduledFor: sessions.scheduledFor,
+            spaceId: sessions.spaceId,
+            spaceName: spaces.name,
+            facilitatorId: sessions.facilitatorId,
+            stageKey: sessions.stageKey,
+          })
+          // openokr:allow-raw-read: this is the list form of what
+          // `sessions.read` checks for one row, and it checks the same thing:
+          // the space membership join below is not a filter a caller could
+          // omit. Reading through the single-row getter instead would mean one
+          // query per session.
+          .from(sessions)
+          .innerJoin(
+            spaces,
+            activeOnly(
+              spaces,
+              eq(spaces.id, sessions.spaceId),
+              eq(spaces.workspaceId, context.workspaceId),
+            ),
+          )
+          // The membership join is the access rule, and an inner join is what
+          // makes it one: a space this member is not in contributes no row at
+          // all rather than a row something later has to remember to drop.
+          .innerJoin(
+            spaceMembers,
+            activeOnly(
+              spaceMembers,
+              eq(spaceMembers.workspaceId, context.workspaceId),
+              eq(spaceMembers.spaceId, spaces.id),
+              eq(spaceMembers.memberId, member.id),
+            ),
+          )
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              inArray(sessions.state, [...states]),
+            ),
+          )
+          // Running first, because a session in progress is the only one on
+          // this list that somebody is waiting in. Then soonest, so the next
+          // thing a member has to turn up to is at the top.
+          .orderBy(
+            sql`case when ${sessions.state} = 'running' then 0 else 1 end`,
+            sessions.scheduledFor,
+          )
+          .limit(input.limit ?? 25);
+
+        return rows.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          title: row.title,
+          state: row.state,
+          scheduledFor: row.scheduledFor.toISOString(),
+          spaceId: row.spaceId,
+          spaceName: row.spaceName,
+          isFacilitator: row.facilitatorId === member.id,
+          stageKey: row.stageKey,
+        }));
       },
     );
   },
