@@ -15,7 +15,6 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   accessContexts,
   activeOnly,
-  BLOCKER_SOURCES,
   BLOCKER_TYPES,
   blockers,
   checkInVotes,
@@ -298,7 +297,7 @@ export const createSession = defineWriteAction({
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -358,7 +357,7 @@ export const openSession = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -439,7 +438,7 @@ export const advanceStage = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid(), realtimeChannel: z.string() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -578,12 +577,9 @@ export const advanceStage = defineWriteAction({
             );
 
             if (unblockedLowKrs.length > 0) {
-              // Look up names for the error message.
-              const krNames = confirmations
-                .filter((c) => unblockedLowKrs.includes(c.keyResultId))
-                .map((c) => c.keyResultId);
-
-              // Get titles from the key_results table.
+              // The titles, for the refusal's own sentence: an error that names
+              // "three key results" and not which three is an error somebody
+              // has to go and look up.
               const krRows = await tx
                 .select({ id: keyResults.id, title: keyResults.title })
                 .from(keyResults)
@@ -730,7 +726,7 @@ export const skipSession = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -803,7 +799,7 @@ export const closeSession = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -1397,7 +1393,7 @@ export const castSessionVote = defineWriteAction({
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -1494,7 +1490,7 @@ export const revealSessionVotes = defineWriteAction({
   }),
   output: z.object({ revealed: z.number().int() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -1561,7 +1557,7 @@ export const confirmSessionConfidence = defineWriteAction({
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -1896,7 +1892,7 @@ export const createSessionBlocker = defineWriteAction({
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -1965,7 +1961,7 @@ export const resolveSessionBlocker = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -2108,7 +2104,7 @@ export const setSessionCommitments = defineWriteAction({
   }),
   output: z.object({ count: z.number().int() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -2175,7 +2171,7 @@ export const closeSessionCommitments = defineWriteAction({
   }),
   output: z.object({ closed: z.number().int() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -2284,7 +2280,7 @@ export const setCoordinatorNote = defineWriteAction({
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
-  operation: (context, input) => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
       if (!memberId) {
@@ -5073,7 +5069,9 @@ export const setRootCause = defineWriteAction({
         throw new OperationError("not_found", "No such workspace.");
       }
 
-      const session = await requireQuarterly(
+      // The access check, not a value. `requireQuarterly` refuses when the
+      // session is not this member's to change; nothing below needs the row.
+      await requireQuarterly(
         tx,
         workspaceId,
         memberId,

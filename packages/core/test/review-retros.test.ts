@@ -29,7 +29,6 @@ let workspaceId: string;
 let cycleId: string;
 let spaceId: string;
 let facilitatorMemberId: string;
-let managerMemberId: string;
 let sessionId: string;
 
 const context = (userId = FACILITATOR) => ({
@@ -131,9 +130,6 @@ beforeEach(async () => {
       [workspaceId, userId, name],
     );
     const memberId = row.rows[0]?.id as string;
-    if (role === "manager") {
-      managerMemberId = memberId;
-    }
     await call("spaces.addMember", { spaceId, memberId, role });
   }
 

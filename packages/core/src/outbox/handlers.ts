@@ -27,7 +27,7 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
@@ -154,6 +154,27 @@ const embedContent: OutboxHandler = async (delivery, deps) => {
 };
 
 /**
+ * Trims trailing slashes without a regular expression.
+ *
+ * It was an anchored `/\/+$/` replace, which CodeQL flags as a polynomial
+ * denial of service: a `+` anchored to the end is retried from every position,
+ * so the work is quadratic in the number of slashes and a base URL made of
+ * thousands of them would spend real time here. The value comes from
+ * configuration rather than from a request, so nothing an attacker controls
+ * reaches it, and it is still worth fixing rather than annotating: the loop is
+ * linear, shorter to read, and leaves nothing for the next person to re-derive.
+ *
+ * 47 is `/`.
+ */
+function withoutTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+/**
  * Sends one invitation email.
  *
  * **Safe to run twice** only in the sense that the link is still the same link:
@@ -176,7 +197,7 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
     return;
   }
 
-  const link = `${deps.baseUrl.replace(/\/+$/, "")}/join/${token}`;
+  const link = `${withoutTrailingSlashes(deps.baseUrl)}/join/${token}`;
   await deps.sendMail({
     to,
     subject: "You have been invited to OpenOKR",

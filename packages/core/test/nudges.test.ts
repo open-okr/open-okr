@@ -324,7 +324,7 @@ describe("the nudge log", () => {
  */
 describe("what the product decides not to say", () => {
   it("writes a row with a reason rather than nothing at all", async () => {
-    const wb = await workerDb();
+    const _wb = await workerDb();
     await runAt(0);
     // The same day, the same subject, the same step: deduplication.
     const again = await runAt(0);

@@ -25,9 +25,6 @@ export default async function SpacePage({
   const { session, workspace } = await requireWorkspace();
 
   let space: Awaited<ReturnType<typeof callAction<"spaces.read">>>;
-  let board: Awaited<ReturnType<typeof callAction<"blockers.board">>> = {
-    blockers: [],
-  };
   try {
     space = await callAction(
       {
@@ -66,7 +63,7 @@ export default async function SpacePage({
 
   // The board, ranked by §11's ladder. Deterministic and needs no provider
   // (P4-T15b-b).
-  board = await callAction(
+  const board = await callAction(
     {
       pool: getPool(),
       workspaceId: workspace.workspaceId,
