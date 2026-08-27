@@ -166,6 +166,20 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    * the operation's own logic is the whole of what authorises it.
    */
   readonly bootstrap?: boolean;
+  /**
+   * Where this write came from, when it did not come from the browser
+   * (P5-T06a).
+   *
+   * Merged into the audit payload here rather than by each action, for the
+   * reason every cross-cutting fact belongs in one place: `channels.md`'s §7
+   * requires "an audit event with the channel named" for *every* inbound
+   * action, and forty actions each remembering to add it is forty chances to
+   * forget. Absent for a browser write, which is what "no channel" means.
+   *
+   * The payload is inside the hash chain, so the channel is as tamper-evident
+   * as the rest of the row without a migration to the append-only table.
+   */
+  readonly channel?: string;
   /** Freshly loaded rows the authorisation and the change both depend on. */
   readonly load?: (context: {
     tx: OperationTx;
@@ -421,8 +435,20 @@ export async function runOperation<TResult, TLoaded = undefined>(
         });
       }
 
-      // 6. The audit row, chained.
-      await appendAudit(tx, spec.workspaceId, actor, outcome.audit);
+      // 6. The audit row, chained. The channel is merged in here, once, so
+      //    "she checked in from Slack" is answerable for every action rather
+      //    than only for the ones whose author remembered (P5-T06a).
+      await appendAudit(tx, spec.workspaceId, actor, {
+        ...outcome.audit,
+        ...(spec.channel
+          ? {
+              payload: {
+                ...(outcome.audit.payload ?? {}),
+                channel: spec.channel,
+              },
+            }
+          : {}),
+      });
 
       // 7. Side effects, as outbox rows. The relay delivers them after this
       //    transaction commits, so nothing fires for a change that rolls back.

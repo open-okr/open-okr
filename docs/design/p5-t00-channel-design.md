@@ -211,15 +211,28 @@ carries no detail about why.
 One router, generated from the action registry, in `packages/core`. §5.3's
 seven commands, each mapping to exactly one registry action:
 
-| Command | Registry action | Access it needs |
-|---|---|---|
-| check in | `goals.startCheckIn` then `goals.publishCheckIn` | edit on the goal |
-| blocker | `sessions.createBlocker` | edit |
-| status | `goals.read` / `kpis.detail` / `notifications.list` | view |
-| ack | `goals.acknowledgeCheckIn` | edit |
-| commit | `sessions.setCommitments` | edit |
-| ask | `copilot.ask` then `answerQuestion` | comment |
-| snooze | `nudges.snooze` | comment |
+| Command | Registry action | Access it needs | Built |
+|---|---|---|---|
+| check in | `goals.startCheckIn` then `goals.publishCheckIn` | edit on the goal | P5-T06b |
+| blocker | `sessions.createBlocker` | edit | P5-T06b |
+| status | `goals.read` | view | Built at P5-T06a |
+| ack | `goals.acknowledgeCheckIn` | edit | Built at P5-T06a |
+| commit | `sessions.setCommitments` | edit | P5-T06b |
+| ask | `copilot.ask` | comment | Built at P5-T06a |
+| snooze | `nudges.snooze` | comment | Built at P5-T06a |
+
+**Two corrections to this table, made at P5-T06a.** The access column is not
+where access lives: the registry action declares its own level and `can()`
+enforces it, and a second number here would be a second answer to "who may do
+this". The column is kept as documentation of what each command needs and is
+asserted by nothing. And `status` and `ask` listed several actions each; a
+command names exactly one, which is the invariant a test now walks the
+catalogue for. `kpis.detail` and `notifications.list` are commands of their own
+whenever they are wanted.
+
+**The seam the build follows.** Four of these fit on one line and are built.
+The other three collect fields, which is a modal on Slack and Teams and §8's
+state machine on WhatsApp and Telegram, and they are P5-T06b.
 
 **One definition, four renderings.** A command is declared once with its
 arguments; each driver renders it as that provider's own idiom, a slash command

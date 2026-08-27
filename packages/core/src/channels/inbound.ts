@@ -60,7 +60,18 @@ export type InboundOutcome =
   | { readonly kind: "rate_limited" }
   /** A code the member sent to prove their account, now verified. */
   | { readonly kind: "linked"; readonly memberId: string }
-  | { readonly kind: "accepted"; readonly memberId: string };
+  | {
+      readonly kind: "accepted";
+      readonly memberId: string;
+      /**
+       * The user behind that member (P5-T06a).
+       *
+       * Carried because the router calls a registry action, and access is
+       * resolved for a human actor by user rather than by member. Reading it
+       * here costs nothing: the member row was already fetched for step five.
+       */
+      readonly userId: string | null;
+    };
 
 export interface InboundRequestFacts {
   readonly workspaceId: string;
@@ -270,7 +281,7 @@ export async function resolveInbound(
 
   // Step 5.
   const [member] = await tx
-    .select({ id: workspaceMembers.id })
+    .select({ id: workspaceMembers.id, userId: workspaceMembers.userId })
     .from(workspaceMembers)
     .where(
       activeOnly(
@@ -312,7 +323,7 @@ export async function resolveInbound(
       ),
     );
 
-  return { kind: "accepted", memberId: member.id };
+  return { kind: "accepted", memberId: member.id, userId: member.userId };
 }
 
 /**

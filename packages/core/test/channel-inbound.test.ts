@@ -192,7 +192,13 @@ describe("step four: who sent it", () => {
     );
 
     const outcome = await handleInbound(wb.appPool, facts());
-    expect(outcome).toEqual({ kind: "accepted", memberId: ownerMemberId });
+    // The user id is on the outcome as well (P5-T06a): the router calls a
+    // registry action, and access is resolved for a human actor by user.
+    expect(outcome).toEqual({
+      kind: "accepted",
+      memberId: ownerMemberId,
+      userId: OWNER,
+    });
     expect((await inboundRows())[0]?.member_id).toBe(ownerMemberId);
   });
 

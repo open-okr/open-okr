@@ -943,12 +943,24 @@ Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Ref
 Deliverables: bot connection, identity linking with a verification code, outbound messages with inline keyboards, and inbound command and callback handling.
 Acceptance: Given a Telegram-linked member, when they send the status command with a goal identifier, then they receive that goal's health, progress, confidence and next check-in date, subject to their permissions.
 
-### P5-T06: The chat command surface [L]
-Depends on: P5-T02, P5-T03, P5-T04, P5-T05
+### P5-T06a: The command router and the one-line commands [M]
+Depends on: P5-T02a
 Goal: one command surface generated from the action registry (AI-NATIVE-PLAN.md §5.3).
-Deliverables: the command router mapping each command to exactly one registry action; the commands for check in, blocker, status, acknowledge, commit, ask and snooze; per-provider rendering from one definition; rate limiting per member and per provider; audit entries naming the channel.
-Test plan: every command resolves to a registry action and is refused when the member lacks the access level; the same command produces identical results across all four providers; rate limiting returns a clear message rather than silence for a linked member.
-Acceptance: Given a member without edit access on a goal, when they attempt a check-in from chat, then it is refused with the same message the browser would show, and the attempt is audited.
+
+**The dependency line on P5-T06 was backwards, and it is corrected here.** It read "depends on P5-T02, P5-T03, P5-T04, P5-T05", all four drivers, while P5-T02's own acceptance criterion needed the router. The design says the opposite of that line, "one definition, four renderings", so the router is what a driver consumes. It needs exactly one driver to be provable and P5-T02a is that driver. Each later driver inherits the surface rather than extending it, and the "identical across all four providers" test line grows as each one lands.
+
+**Cut in two along a real seam: a command that is one line against a command that is a conversation.** Status, ask, acknowledge and snooze carry everything they need in the text somebody typed. Check in, blocker and commit collect fields, which on Slack and Teams is a modal and on WhatsApp and Telegram is §8's state machine across turns. Those are a different problem and they are P5-T06b.
+
+Deliverables: the command catalogue as data, each command naming exactly one registry action and the access it needs; the parser turning one line into a command and its arguments, or a refusal that names what is available; resolution through `callAction`, so `can()` decides and the refusal is the sentence the browser shows; the channel named on the audit row of every inbound action, added once in the Operation pipeline rather than per action; the help reply, rendered from the catalogue so it cannot drift; the rate-limit reply for a linked member; the Slack endpoint wired to all of it.
+Test plan: every command in the catalogue names an action the registry defines; a member without the access level gets the browser's own refusal and the attempt is audited with the channel on it; an unknown command names what is available rather than failing silently; the audit row carries the channel for an inbound action and does not for a browser one.
+Acceptance: Given a member without edit access on a goal, when they attempt an action from chat, then it is refused with the same message the browser would show, and the attempt is audited with the channel named.
+
+### P5-T06b: The commands that collect fields [M]
+Depends on: P5-T06a
+Goal: a check-in, a blocker and a commitment can be completed from chat.
+Deliverables: the modal path for providers that have one; §8's conversational state machine as a row per conversation, holding the fields collected so far and an expiry, for providers that do not; the three commands and their argument prompts.
+Test plan: a check-in submitted from a modal produces the same record as one from the browser; a conversation resumed after a process restart still holds its collected fields; an expired conversation starts again rather than completing with half its answers.
+Acceptance: Given a champion with a due check-in, when they complete it from chat, then the check-in is published, the cadence advances and the reviewer's obligation is created, identically to the browser path.
 
 ### P5-T07: Public contract projections: REST, OpenAPI and the command line [L]
 Depends on: P1-T07, Phase 4 complete
@@ -1178,7 +1190,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (20: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **111 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (21: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **112 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

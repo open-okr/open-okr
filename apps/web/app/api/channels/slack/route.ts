@@ -15,8 +15,9 @@
  * Steps 1 and 2 are the driver's, because the algorithm is Slack's own. Steps 3
  * to 6 are `resolveInbound`'s, because they are the same four questions for
  * every provider. Steps 7 and 8, resolving a command and authorising it, are
- * P5-T06's router and are deliberately absent: this endpoint accepts and
- * records, and does not act.
+ * `routeCommand`'s (P5-T06a), which calls the registry action the command names
+ * and lets `can()` decide: the refusal a member reads here is the sentence the
+ * browser shows them, because it is the same code path.
  *
  * **Every answer is a 200 with an empty body, except a failed signature.** §6
  * says so and the reason is in §5.3: a helpful error confirms the workspace
@@ -32,10 +33,12 @@
 import { SlackChannel, slackDeliveryId } from "@openokr/adapters";
 import {
   handleInbound,
+  helpText,
   INBOUND_RATE_LIMIT,
   INBOUND_RATE_WINDOW_SECONDS,
   openConnection,
   parseSlackSecret,
+  routeCommand,
   workspaceForProviderTeam,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
@@ -157,13 +160,16 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   const cache = getCache();
+  // Read once, here, and handed to everything below: the checks, the log row
+  // and any arithmetic a command does all describe the same instant.
+  const now = new Date();
   const outcome = await handleInbound(getPool(), {
     workspaceId,
     provider: "slack",
     deliveryId,
     externalSenderId: message.externalSenderId,
     text: message.text,
-    now: new Date(),
+    now,
     async withinRateLimit(key) {
       const result = await cache.rateLimit(
         key,
@@ -175,29 +181,80 @@ export async function POST(request: NextRequest): Promise<Response> {
   });
 
   // A linked identity is the one case that earns a reply, because the member
-  // asked for one and is now known. Everything else is silence, whether it was
-  // a duplicate, an unknown sender, a suspended member or a rate limit: §6
-  // gives the rate limit a plain message, and that message needs the router to
-  // send it (P5-T02b), so for now it is recorded and quiet rather than a reply
-  // this endpoint invents.
-  if (outcome.kind === "linked") {
-    // openokr:allow-side-effect: the reply to a member who has just proved
-    // their own account, on an inbound path rather than a write path. Nothing
-    // was queued for it because nothing else needs to know it happened, and a
-    // confirmation that arrived a minute after the code was typed would read
-    // as a failure.
-    const replier = new SlackChannel({
-      botToken: secret.botToken,
-      signingSecret: secret.signingSecret,
-      slackUserFor: () => message.externalSenderId,
-    });
-    // openokr:allow-side-effect: the reply to a member who has just proved
-    // their own account, on an inbound path rather than a write path.
-    await replier.send(
-      { memberId: outcome.memberId, externalId: message.externalSenderId },
-      { text: "Your account is linked. OpenOKR will send your nudges here." },
-    );
+  // asked for one and is now known. A duplicate, an unknown sender and a
+  // suspended member stay silent, which is §6's rule and §5.3's reason: a
+  // helpful error confirms the workspace exists.
+  //
+  // A rate limit and an accepted command both answer, because by then the
+  // sender is somebody the product knows and saying nothing to them reads as
+  // the product ignoring them.
+  const answer = await answerFor(outcome, workspaceId, message.text, now);
+  if (!answer) {
+    return silence();
   }
 
+  const replier = new SlackChannel({
+    botToken: secret.botToken,
+    signingSecret: secret.signingSecret,
+    slackUserFor: () => message.externalSenderId,
+  });
+  // openokr:allow-side-effect: the reply on an inbound path, not a write path.
+  // It is sent rather than queued because a confirmation that arrived a minute
+  // after somebody typed would read as a failure, and because nothing else in
+  // the product needs to know it happened.
+  await replier.send(
+    { memberId: answer.memberId, externalId: message.externalSenderId },
+    { text: answer.text },
+  );
+
   return silence();
+}
+
+/**
+ * What to say back, or null for silence.
+ *
+ * The three silent outcomes are grouped here rather than branched at the call
+ * site, so the rule reads as one rule: a sender the product cannot vouch for
+ * learns nothing, including whether this instance exists.
+ */
+async function answerFor(
+  outcome: Awaited<ReturnType<typeof handleInbound>>,
+  workspaceId: string,
+  text: string,
+  now: Date,
+): Promise<{ memberId: string; text: string } | null> {
+  if (outcome.kind === "linked") {
+    return {
+      memberId: outcome.memberId,
+      text: [
+        "Your account is linked. OpenOKR will send your nudges here.",
+        "",
+        helpText(),
+      ].join("\n"),
+    };
+  }
+
+  if (outcome.kind === "rate_limited") {
+    // §6 step six gives this a plain message rather than silence, because by
+    // now the sender is a member the product knows.
+    return {
+      memberId: "",
+      text: "That is a lot of messages at once. Try again in a minute.",
+    };
+  }
+
+  if (outcome.kind !== "accepted" || !outcome.userId) {
+    return null;
+  }
+
+  const reply = await routeCommand({
+    pool: getPool(),
+    workspaceId,
+    provider: "slack",
+    memberId: outcome.memberId,
+    userId: outcome.userId,
+    text,
+    now,
+  });
+  return { memberId: outcome.memberId, text: reply.text };
 }

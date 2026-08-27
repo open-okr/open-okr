@@ -239,6 +239,14 @@ export {
   capabilitiesFor,
 } from "./channels/capabilities.ts";
 export {
+  CHAT_COMMANDS,
+  type ChatCommand,
+  helpText,
+  incompleteText,
+  type ParsedCommand,
+  parseCommand,
+} from "./channels/commands.ts";
+export {
   memberExternalId,
   type OpenedConnection,
   openConnection,
@@ -261,6 +269,11 @@ export {
   connectedProviders,
   loadRoutingMembers,
 } from "./channels/members.ts";
+export {
+  type RouterReply,
+  type RouterRequest,
+  routeCommand,
+} from "./channels/router.ts";
 export {
   type Delivery,
   type DeliveryChannel,

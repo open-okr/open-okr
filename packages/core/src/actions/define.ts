@@ -52,6 +52,15 @@ export interface ActionCallContext {
    * workspace can have one and not the other.
    */
   readonly embed?: EmbedFunction;
+  /**
+   * Where this call came from, when it did not come from the browser
+   * (P5-T06a).
+   *
+   * Set by the chat router and by nothing else. It reaches the audit row
+   * through the Operation pipeline, in one place, so that every inbound action
+   * is answerable a quarter later without each action having to remember.
+   */
+  readonly channel?: string;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
@@ -135,6 +144,10 @@ export function defineWriteAction<
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,
+          // Carried from the call context, so an action reached from chat is
+          // audited with the channel on it without the action knowing there
+          // are channels (P5-T06a). Absent for a browser call.
+          ...(context.channel ? { channel: context.channel } : {}),
         },
       );
     },
