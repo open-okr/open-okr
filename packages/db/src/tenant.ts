@@ -104,6 +104,18 @@ const CHANNEL_TEAM_SETTING = "app.channel_team_id";
  */
 const API_TOKEN_HASH_SETTING = "app.api_token_hash";
 
+/**
+ * Names one device code's hash, for the device login (P5-T07c-b).
+ *
+ * A terminal running `okr login` has no session and no workspace: finding out
+ * which workspace it belongs to *is* the flow. `device_authorisations` admits a
+ * row through the ordinary tenant setting or through this one matching either of
+ * its two code hashes, so a caller reaches exactly the request whose code it
+ * already holds. The third table in the product read before a tenant is known,
+ * after `channel_installations` and `api_tokens`, and the same shape as both.
+ */
+const DEVICE_CODE_HASH_SETTING = "app.device_code_hash";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -124,6 +136,13 @@ export interface TenantContext {
    * nothing else in the database.
    */
   readonly apiTokenHash?: string;
+  /**
+   * Names one device code hash, for the device login only (P5-T07c-b).
+   *
+   * Reveals exactly the `device_authorisations` row whose device code or user
+   * code hashes to it, and nothing else in the database.
+   */
+  readonly deviceCodeHash?: string;
 }
 
 /**
@@ -164,6 +183,25 @@ export async function withApiToken<
 }
 
 /**
+ * Opens a transaction that can read and write one device authorisation
+ * (P5-T07c-b).
+ *
+ * Use it for the device login and nothing else. Either code's hash reaches the
+ * request, which is what lets the terminal poll with one and the browser look
+ * up with the other.
+ */
+export async function withDeviceCode<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  codeHash: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { deviceCodeHash: codeHash }, fn);
+}
+
+/**
  * Opens a transaction that may write instance settings.
  *
  * Deliberately separate from `withWorkspace` and `withUser`: instance settings
@@ -197,8 +235,14 @@ export async function withContext<
   context: TenantContext,
   fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
 ): Promise<T> {
-  const { workspaceId, userId, instanceAdmin, channelTeamId, apiTokenHash } =
-    context;
+  const {
+    workspaceId,
+    userId,
+    instanceAdmin,
+    channelTeamId,
+    apiTokenHash,
+    deviceCodeHash,
+  } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
     throw new Error("Invalid workspace id: expected a UUID.");
@@ -218,6 +262,9 @@ export async function withContext<
   }
   // A hash, not a token: the caller has already digested it, so a length
   // check is a shape check rather than a bound on a secret.
+  if (deviceCodeHash !== undefined && !/^[0-9a-f]{64}$/.test(deviceCodeHash)) {
+    throw new Error("Invalid device code hash: expected a SHA-256 hex digest.");
+  }
   if (apiTokenHash !== undefined && !/^[0-9a-f]{64}$/.test(apiTokenHash)) {
     throw new Error("Invalid token hash: expected a SHA-256 hex digest.");
   }
@@ -226,10 +273,11 @@ export async function withContext<
     userId === undefined &&
     channelTeamId === undefined &&
     apiTokenHash === undefined &&
+    deviceCodeHash === undefined &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, or instance admin.",
     );
   }
 
@@ -259,6 +307,11 @@ export async function withContext<
     if (apiTokenHash !== undefined) {
       await tx.execute(
         sql`select set_config(${API_TOKEN_HASH_SETTING}, ${apiTokenHash}, true)`,
+      );
+    }
+    if (deviceCodeHash !== undefined) {
+      await tx.execute(
+        sql`select set_config(${DEVICE_CODE_HASH_SETTING}, ${deviceCodeHash}, true)`,
       );
     }
     return fn(tx);

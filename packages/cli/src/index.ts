@@ -15,6 +15,14 @@ export {
   findCommand,
   loadContract,
 } from "./contract.ts";
+export {
+  clientName,
+  type DevicePoll,
+  type DeviceStart,
+  openBrowser,
+  pollDevice,
+  startDevice,
+} from "./device.ts";
 export { coerce, commandHelp, type Globals, parseFlags } from "./flags.ts";
 export {
   type Config,

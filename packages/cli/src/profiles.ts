@@ -157,7 +157,16 @@ export function resolveProfile(
   };
 }
 
-/** Enough of a token to recognise, never enough to use. */
+/**
+ * Enough of a token to recognise, never enough to use.
+ *
+ * Sixteen characters of a real one, which is `okr_rest_` and seven characters of
+ * a forty-three character secret. Bounded at half the length as well, because
+ * sixteen characters of a shorter string is the whole string: a test with a
+ * sixteen-character token found this printing it in full, and a rule that holds
+ * only for values of the expected length is not a rule.
+ */
 export function tokenHint(token: string): string {
-  return `${token.slice(0, 16)}…`;
+  const keep = Math.max(1, Math.min(16, Math.floor(token.length / 2)));
+  return `${token.slice(0, keep)}…`;
 }

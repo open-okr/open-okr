@@ -9,7 +9,7 @@ says why.
 | P5-T07a | The REST surface, its tokens, the typed errors, paging | built |
 | P5-T07b | The OpenAPI document, `pnpm gen:contract`, the drift check | built |
 | P5-T07c-a | The command line, typed flags, file inputs, profiles | built |
-| P5-T07c-b | The browser device login | not started |
+| P5-T07c-b | The browser device login | built |
 
 ## 1. The shape of the surface
 
@@ -240,6 +240,44 @@ token back, including the command that was just given one.
 `jq` works. The one thing the tool says alongside an answer, the next cursor,
 goes to stderr for that reason.
 
+## 6d. The device login (P5-T07c-b)
+
+RFC 8628's device authorization grant, narrowed. A terminal cannot open a browser
+and a browser cannot write to a terminal, so the two meet through a row.
+
+| Step | Who | What |
+|---|---|---|
+| 1 | terminal | `POST /api/v1/cli/device` with the scopes it wants and a name for itself |
+| 2 | terminal | prints the link and the short code, opens a browser if it can |
+| 3 | person | `/account/device?code=ABCD-EFGH`, behind the ordinary session gate |
+| 4 | person | sees the scopes asked for and presses approve or refuse |
+| 5 | terminal | `POST /api/v1/cli/device/token` until it is answered |
+| 6 | terminal | writes the granted token into the profile |
+
+**The token is minted at poll time and never stored.** Approval records who and
+when. The poll claims the row and mints the token in one transaction, so a code
+approved twice grants once and no granted credential waits in a table.
+
+**What is granted is what was asked, because approval takes no scopes.** The
+approve action's input is a code and one bit. There is no field through which a
+grant could be widened, which is stronger than checking that none was.
+
+**The workspace is learned rather than given.** A terminal has not chosen one;
+the approver does, by being in it. That is why the row starts with no workspace,
+why the table needs a second policy key, and why `OperationSpec` gained a
+`deviceCodeHash` field: the approving write puts a workspace onto a row the
+tenant setting cannot yet see.
+
+**Both codes are hashed, and the refusals are the protocol's.**
+`authorization_pending`, `slow_down`, `expired_token` and `access_denied` come
+back as the `error.code` this surface uses everywhere, so a client that speaks
+RFC 8628 needs no special case and one that speaks only this API's error shape
+needs none either.
+
+**The default is read and write, never destructive.** A login should not quietly
+acquire the scope that removes things other people can see. `--scopes` narrows
+it.
+
 ## 7. Acceptance criteria
 
 ### P5-T07a
@@ -270,6 +308,10 @@ browser and then spawns the bin as a process against the running instance.
 **Given** a signed-out terminal, **when** a person runs the device login and
 completes it in the browser, **then** the profile holds a scoped token and the
 next command runs as them.
+
+Proved in `e2e/s38-device-login.spec.ts`, with the login spawned as a real
+process whose link is read from its own output, approved in a real browser, and
+the next command run from the profile it wrote.
 
 ## 8. Found while building this
 

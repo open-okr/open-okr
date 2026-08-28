@@ -26,6 +26,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
   "api_token.revoked": (p) =>
     `The API token "${asString(p.name, "unnamed")}" was revoked`,
+  "device.approved": (p) =>
+    `${asString(p.clientName, "A terminal")} was authorised to sign in`,
+  "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,

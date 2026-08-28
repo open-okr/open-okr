@@ -182,6 +182,19 @@ export {
   flagName,
 } from "./api/cli-contract.ts";
 export {
+  DEVICE_CODE_TTL_SECONDS,
+  DEVICE_POLL_INTERVAL_SECONDS,
+  type DeviceGrant,
+  generateDeviceCode,
+  generateUserCode,
+  hashDeviceCode,
+  type PendingDevice,
+  pendingDevice,
+  pollDeviceAuthorisation,
+  type StartedDevice,
+  startDeviceAuthorisation,
+} from "./api/device.ts";
+export {
   API_ERROR_CODES,
   type ApiError,
   type ApiErrorCode,

@@ -259,6 +259,10 @@ export {
   objectiveTrends,
 } from "./schema/decisions.ts";
 export {
+  type DeviceAuthorisation,
+  deviceAuthorisations,
+} from "./schema/device-authorisations.ts";
+export {
   DIGEST_PERIODS,
   DIGEST_SCOPES,
   type Digest,
@@ -476,6 +480,7 @@ export {
   type WorkspaceTx,
   withApiToken,
   withContext,
+  withDeviceCode,
   withInstanceAdmin,
   withProviderTeam,
   withUser,

@@ -180,6 +180,18 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    * as the rest of the row without a migration to the append-only table.
    */
   readonly channel?: string;
+  /**
+   * A pre-tenant policy key this operation's own transaction needs (P5-T07c-b).
+   *
+   * Three tables are readable before a workspace is known, each through a second
+   * policy key: `channel_installations`, `api_tokens` and
+   * `device_authorisations`. Only the last of them is *written* through the
+   * pipeline: approving a device login puts a workspace onto a row that has none,
+   * and the policy cannot see that row through the tenant setting alone. Absent
+   * on every other operation, which is what "this write is about rows that
+   * already belong to a workspace" means.
+   */
+  readonly deviceCodeHash?: string;
   /** Freshly loaded rows the authorisation and the change both depend on. */
   readonly load?: (context: {
     tx: OperationTx;
@@ -339,6 +351,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
     {
       workspaceId: spec.workspaceId,
       ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
+      ...(spec.deviceCodeHash ? { deviceCodeHash: spec.deviceCodeHash } : {}),
     },
     async (tx) => {
       // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`

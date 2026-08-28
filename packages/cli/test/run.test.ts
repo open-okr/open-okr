@@ -133,7 +133,9 @@ describe("profiles", () => {
     );
     expect(result.code).toBe(0);
     expect(result.out).not.toContain("okr_rest_secretvalue");
-    expect(result.out).toContain("okr_rest_secretv…");
+    // Half the length, capped at sixteen: for this twenty-character token that
+    // is ten, and for a real fifty-two character one it is sixteen.
+    expect(result.out).toContain("okr_rest_s…");
 
     const stored = readConfig(configFile);
     expect(stored.current).toBe("default");

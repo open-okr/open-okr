@@ -8,7 +8,13 @@
  */
 import { run } from "../run.ts";
 
-const result = await run(process.argv.slice(2));
+const result = await run(process.argv.slice(2), {
+  // A device login prints a link and then waits, so it cannot hold its output
+  // until the end. On stderr, which keeps it out of a pipe.
+  say: (line) =>
+    process.stderr.write(`${line}
+`),
+});
 if (result.out !== "") {
   process.stdout.write(`${result.out}\n`);
 }

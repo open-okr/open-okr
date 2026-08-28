@@ -17,6 +17,7 @@ import {
   findCommand,
   loadContract,
 } from "./contract.ts";
+import { openBrowser, pollDevice, startDevice } from "./device.ts";
 import { commandHelp, parseFlags } from "./flags.ts";
 import {
   type Config,
@@ -34,6 +35,18 @@ export interface RunOptions {
   readonly configFile?: string;
   readonly fetch?: typeof globalThis.fetch;
   readonly env?: NodeJS.ProcessEnv;
+  /**
+   * Where the device login's progress is written (P5-T07c-b).
+   *
+   * A login prints a link and then waits, so it cannot hold its output until the
+   * end the way every other command does: a person needs the link *now*.
+   * Defaults to stderr, which keeps it out of a pipe.
+   */
+  readonly say?: (line: string) => void;
+  /** How the poll waits. Passed in so a test does not spend ten seconds. */
+  readonly wait?: (milliseconds: number) => Promise<void>;
+  /** Opens the browser. Passed in so a test does not open one. */
+  readonly open?: (url: string) => void;
 }
 
 export interface RunResult {
@@ -103,23 +116,125 @@ function profilesText(config: Config, path: string): string {
   ].join("\n");
 }
 
-/** `okr login`, which stores what it is given. */
-function login(argv: readonly string[], file: string): RunResult {
+/**
+ * `okr login`.
+ *
+ * Two ways in, and the difference is whether a token was supplied. With one, it
+ * is stored. Without one, the device login runs: the instance is asked to start
+ * a request, the link is printed, and this waits for somebody to answer it in a
+ * browser. Nothing here ever holds a password.
+ */
+async function login(
+  argv: readonly string[],
+  file: string,
+  options: RunOptions,
+): Promise<RunResult> {
   const flags = simpleFlags(argv);
   const url = flags.url;
-  const token = flags.token;
-  if (!url || !token) {
+  if (!url) {
     return usage(
-      "okr login needs --url and --token. Mint the token at /account/api-tokens; it is shown once.",
+      "okr login needs --url. Add --token to store one you already have, or leave it out and approve the login in a browser.",
     );
   }
   if (!/^https?:\/\//i.test(url)) {
     return usage(`--url must start with http:// or https://, not "${url}".`);
   }
   const name = flags.profile ?? "default";
-  saveProfile(name, { url, token }, file);
-  // Never the token itself: a terminal scrollback is a place secrets survive.
-  return ok(`Saved profile "${name}" for ${url} (${tokenHint(token)}).`);
+
+  if (flags.token) {
+    saveProfile(name, { url, token: flags.token }, file);
+    // Never the token itself: a terminal scrollback is a place secrets survive.
+    return ok(
+      `Saved profile "${name}" for ${url} (${tokenHint(flags.token)}).`,
+    );
+  }
+
+  return deviceLogin({ url, name, file, flags, options });
+}
+
+/** The scopes a login asks for when nobody says. */
+const DEFAULT_SCOPES = ["read", "write"] as const;
+
+async function deviceLogin(input: {
+  readonly url: string;
+  readonly name: string;
+  readonly file: string;
+  readonly flags: Record<string, string>;
+  readonly options: RunOptions;
+}): Promise<RunResult> {
+  const say = input.options.say ?? (() => {});
+  const wait =
+    input.options.wait ??
+    ((milliseconds: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, milliseconds);
+      }));
+  const open = input.options.open ?? openBrowser;
+  const call = input.options.fetch ?? globalThis.fetch;
+
+  // Asked for explicitly or read and write, which is what a person at a terminal
+  // usually wants. Never destructive by default: that scope removes things other
+  // people can see, and a login should not quietly acquire it.
+  const scopes = input.flags.scopes
+    ? input.flags.scopes.split(",").map((scope) => scope.trim())
+    : [...DEFAULT_SCOPES];
+
+  let started: Awaited<ReturnType<typeof startDevice>>;
+  try {
+    started = await startDevice(input.url, scopes, call);
+  } catch (error) {
+    return failed(
+      `Could not reach ${input.url}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  if ("error" in started) {
+    return failed(started.error);
+  }
+
+  const { deviceCode, userCode, verificationUri, interval, expiresIn } =
+    started.started;
+  say(`Open this to authorise this terminal:\n  ${verificationUri}`);
+  say(
+    `The code is ${userCode}. It expires in ${Math.round(expiresIn / 60)} minutes.`,
+  );
+  open(verificationUri);
+
+  let every = Math.max(1, interval) * 1000;
+  const deadline = Date.now() + expiresIn * 1000;
+  while (Date.now() < deadline) {
+    await wait(every);
+    let poll: Awaited<ReturnType<typeof pollDevice>>;
+    try {
+      poll = await pollDevice(input.url, deviceCode, call);
+    } catch (error) {
+      return failed(
+        `Could not reach ${input.url}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (poll.kind === "granted") {
+      saveProfile(
+        input.name,
+        { url: input.url, token: poll.token },
+        input.file,
+      );
+      return ok(
+        `Saved profile "${input.name}" for ${input.url} (${tokenHint(poll.token)}).`,
+      );
+    }
+    if (poll.kind === "ended") {
+      return failed(poll.message);
+    }
+    if (poll.slowDown) {
+      // The protocol asking for more room. Doubling rather than adding, because
+      // a client that is too fast is usually much too fast.
+      every *= 2;
+    }
+  }
+  return failed("That login expired before anybody answered it.");
 }
 
 /** A tiny parser for the tool's own commands, which have no action behind them. */
@@ -167,7 +282,7 @@ export async function run(
   }
 
   if (words[0] === "login") {
-    return login(words.slice(1), file);
+    return login(words.slice(1), file, options);
   }
 
   if (words[0] === "logout") {

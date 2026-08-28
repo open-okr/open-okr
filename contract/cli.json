@@ -675,6 +675,46 @@
       "pages": false
     },
     {
+      "name": "tokens pendingDevice",
+      "action": "tokens.pendingDevice",
+      "method": "GET",
+      "path": "/tokens/pendingDevice",
+      "scope": "read",
+      "summary": "The terminal request one device code names, if it is still open.",
+      "flags": [
+        {
+          "name": "user-code",
+          "field": "userCode",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tokens approveDevice",
+      "action": "tokens.approveDevice",
+      "method": "POST",
+      "path": "/tokens/approveDevice",
+      "scope": "write",
+      "summary": "Approve or deny a terminal that asked to sign in as you.",
+      "flags": [
+        {
+          "name": "user-code",
+          "field": "userCode",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "approve",
+          "field": "approve",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "copilot ask",
       "action": "copilot.ask",
       "method": "POST",

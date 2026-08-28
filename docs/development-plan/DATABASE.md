@@ -517,6 +517,7 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `agents` | `member_id` to workspace_members, `builtin_kind` (`coach` / `champion` / `custom`), `definition`, `planning_instructions`, `execution_instructions`, `provider?`, `tier`, `schedule` (`manual` / `continuous` / `nightly` / `hourly` / `daily` / `weekly`), `autonomy` (`sandbox` / `propose` / `scoped_direct`), `scope jsonb`, `enabled`. The Champion's own row stays `hourly`: the column names the finest cadence an agent runs, and P4-T05b's daily, weekly and per-cycle sweeps are separate runs with their own `agent_runs.trigger` |
 | `agent_runs` | `agent_id` to agents, `trigger`, `status`, `tasks jsonb`, `log text`, `started_at`, `finished_at?`, `error?`, `cost` |
 | `proposed_changes` | `run_id?` to agent_runs, `thread_id?` to ai_threads, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `result jsonb?`, `undone_at?`, `ai_generated bool` (P4-T05c-a, P4-T14b-a). A proposal names its origin, a run or a thread, exactly one, and a check constraint enforces that: a copilot proposal came from a member's question and inventing an agent run for it would put a run in the log that nobody scheduled. `result` is what applying it returned, which is the only place the created entity's identifier exists and therefore what undo needs. `undone_at` is set on an applied row rather than becoming a status, because it was applied and then it was undone and both are true. On `ai_generated`: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated; every copilot proposal is. |
+| `device_authorisations` *(built at P5-T07c-b)* | `workspace_id?`, `device_code_hash`, `user_code_hash`, `client_name`, `requested_scopes text[]`, `approved_member_id?`, `approved_at?`, `denied_at?`, `consumed_at?`, `last_polled_at?`, `expires_at`. Unique on each code hash |
 | `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
 | `oauth_clients` | Registered and cached client metadata |
 | `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
@@ -524,6 +525,38 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `oauth_access_tokens` | `token_hash`, `grant_id`, `resource`, `expires_at` |
 | `oauth_refresh_tokens` | `token_hash`, `grant_id`, `used_at?`, `replaced_by?`, `expires_at` |
 | `mcp_sessions` | `grant_id`, `protocol_version`, `last_seen_at`, `closed_at?` |
+
+### device_authorisations *(built at P5-T07c-b)*
+The third table read before a tenant is known, and the only one *written* before
+one: a terminal running `okr login` has no session and no workspace, and finding
+out which workspace it belongs to is the whole flow. `workspace_id` is null until
+a member approves the request, and the policy admits a row through
+`app.device_code_hash` matching either code hash. `withDeviceCode` is the only
+wrapper that sets it, and the check clause permits a workspace-less write only
+when the caller names its own code, so nobody can insert or edit a request they
+do not hold.
+
+Approving is the write that names the workspace, and it goes through the
+Operation pipeline: `tokens.approveDevice` carries `deviceCodeHash` on its
+operation spec, which is why `OperationSpec` has that field at all. Starting a
+request does not, and is marked as an allowed exception with its reason: there is
+no actor and no workspace for a pipeline to authorise against, and nothing is
+granted by it.
+
+**No granted token is stored here.** The poll mints the token and claims the row
+in one transaction, with `consumed_at is null` in the where clause, so a code
+approved twice grants once and no credential sits in a short-lived table waiting
+to be collected. The tenant setting is applied inside that transaction, after the
+row has said which workspace it belongs to: the one place in the product where
+the workspace is learned rather than given.
+
+Both codes are hashed with the same function, which upper-cases and trims,
+because a person retypes the short one. The alphabet has no 0/O and no 1/I/L for
+the same reason.
+
+State is the timestamps rather than a `state` column beside them. Pending is
+`approved_at` and `denied_at` both null; granted and collected is `consumed_at`
+set. A column carrying the same facts is a second answer that can disagree.
 
 ### api_tokens *(built at P5-T07a)*
 The second table in the product read before a tenant is known, after `channel_installations`, and for the same reason. A REST request arrives with a bearer token and nothing else: which workspace it belongs to *is* the question. Its policy admits a row through `app.workspace_id` or through `app.api_token_hash` matching its own `token_hash`, and `withApiToken` is the only wrapper that sets the second key. A caller reaches exactly the row whose digest it already holds; the `with check` clause takes the tenant setting alone, so nothing can be written through the second key.

@@ -41,6 +41,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     audience: z.string(),
   }),
   "api_token.revoked": z.object({ name: z.string() }),
+  "device.approved": z.object({ clientName: z.string() }),
+  "device.denied": z.object({ clientName: z.string() }),
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
