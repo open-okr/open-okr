@@ -114,6 +114,12 @@ test("the conversation is there when the panel is reopened", async () => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible({ timeout: 10_000 });
+  // **Network idle, not just the heading.** The heading is server-rendered and
+  // visible before the bundle has run, and the shortcut is registered in an
+  // effect, so pressing as soon as the heading appears can press into a page
+  // with no handler. That is what "element(s) not found" on the dialog meant on
+  // CI.
+  await page.waitForLoadState("networkidle");
 
   await page.keyboard.press("ControlOrMeta+j");
   const panel = page.getByRole("dialog", { name: "Copilot" });
@@ -131,6 +137,16 @@ test("the conversation is there when the panel is reopened", async () => {
   await expect(earlier.first()).toBeVisible();
 
   await earlier.first().click();
+  // **Wait for the list to go before looking for the question.** Loading a
+  // thread replaces "Earlier conversations" with the conversation itself, so
+  // until it is gone the only thing on the panel carrying this text is the list
+  // entry that was just clicked. Asserting before then passed whether or not
+  // the click did anything, and it failed on CI as a strict-mode violation the
+  // moment a retry created a second thread with the same title. The turn is
+  // what this test is about.
+  await expect(panel.getByText("Earlier conversations")).toBeHidden({
+    timeout: 15_000,
+  });
   await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
 });
 
@@ -155,6 +171,12 @@ test("⌘J still works after a reload, so the shortcut is really registered", as
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible({ timeout: 10_000 });
+  // **Network idle, not just the heading.** The heading is server-rendered and
+  // visible before the bundle has run, and the shortcut is registered in an
+  // effect, so pressing as soon as the heading appears can press into a page
+  // with no handler. That is what "element(s) not found" on the dialog meant on
+  // CI.
+  await page.waitForLoadState("networkidle");
   await page.keyboard.press("ControlOrMeta+j");
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeVisible();
 });
