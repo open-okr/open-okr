@@ -172,6 +172,16 @@ export {
   type UsageSummaryRow,
 } from "./ai/usage.ts";
 export {
+  buildCliContract,
+  type CliCommand,
+  type CliContract,
+  type CliDifference,
+  type CliFlag,
+  diffCliContract,
+  type FlagType,
+  flagName,
+} from "./api/cli-contract.ts";
+export {
   API_ERROR_CODES,
   type ApiError,
   type ApiErrorCode,

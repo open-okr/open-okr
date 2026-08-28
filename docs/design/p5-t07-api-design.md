@@ -8,7 +8,8 @@ says why.
 |---|---|---|
 | P5-T07a | The REST surface, its tokens, the typed errors, paging | built |
 | P5-T07b | The OpenAPI document, `pnpm gen:contract`, the drift check | built |
-| P5-T07c | The command line, profiles, the browser device login | not started |
+| P5-T07c-a | The command line, typed flags, file inputs, profiles | built |
+| P5-T07c-b | The browser device login | not started |
 
 ## 1. The shape of the surface
 
@@ -196,6 +197,49 @@ megabyte of repeated boilerplate out of the file.
 instance whatever version it is on, and the committed copy is kept honest by the
 gate rather than by being the source.
 
+## 6c. The command line (P5-T07c-a)
+
+**The tool reads `contract/cli.json` and nothing else.** `@openokr/core` appears
+in one type-only import, which TypeScript erases, so the types are declared once
+in the generator and the terminal tool still carries no Drizzle, no Postgres
+driver and no domain code. That is also what makes the drift check meaningful:
+if the tool imported the registry there would be nothing to drift.
+
+| Piece | Rule |
+|---|---|
+| Command name | the action's name as two words: `okr goals list` |
+| Flag name | the input field, kebab-cased: `spaceId` is `--space-id` |
+| Flag type | the field's own schema: string, number, integer, boolean, array, object |
+| Enum | the schema's, so `--level marketing` is refused with the list |
+| Method and body | the artifact's, which got them from the safety class |
+| File input | `--flag @path`, and `@@` for a value that really starts with one |
+
+**Everything the tool can be sure about is decided before a socket opens.** An
+unknown flag, a value the type refuses, an enum value that is not in the list, a
+required flag that is absent: each is exit code 2 with the flag named and what
+the command actually takes. Anything the generator could not read arrives as
+`string` and is passed through, because a command line that refuses what the API
+would have accepted is worse than one that lets the server answer.
+
+**Three exit codes, and they mean different things.** 0 is the answer, 2 is a
+usage error decided locally, 1 is the instance refusing or unreachable. A script
+that retries on 1 and gives up on 2 is doing the right thing.
+
+**The instance's own sentence is what a person reads.** Every refusal on the REST
+surface is a typed code and a sentence written for a person. A revoked token says
+it was revoked; a tool that classified the status itself would say
+"authentication failed" and send somebody hunting for a typo in a token that is
+perfectly well formed.
+
+**Profiles hold a URL and a token**, in `%APPDATA%/openokr/config.json` or
+`$XDG_CONFIG_HOME/openokr/config.json`, owner-readable only where the platform
+has mode bits. The first one created becomes the default. Nothing ever prints a
+token back, including the command that was just given one.
+
+**Clean JSON on stdout.** The action's output and nothing else, so a pipe into
+`jq` works. The one thing the tool says alongside an answer, the next cursor,
+goes to stderr for that reason.
+
 ## 7. Acceptance criteria
 
 ### P5-T07a
@@ -212,7 +256,16 @@ asserted afterwards through a read the same token can do.
 **Given** a change to a registry action's schema, **when** continuous integration
 runs without regenerating, **then** the drift check fails naming the action.
 
-### P5-T07c
+### P5-T07c-a
+
+**Given** a token minted in the browser and stored in a profile, **when** a
+person runs a read command in a terminal, **then** it is sent as that member and
+the answer is printed, and a mistyped flag is refused before anything is sent.
+
+Proved in `e2e/s37-api-tokens.spec.ts`, which mints the token through the
+browser and then spawns the bin as a process against the running instance.
+
+### P5-T07c-b
 
 **Given** a signed-out terminal, **when** a person runs the device login and
 completes it in the browser, **then** the profile holds a scoped token and the

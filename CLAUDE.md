@@ -125,6 +125,8 @@ packages/adapters   Ports and drivers (the only place vendor SDKs live) plus
 packages/agents     The Coach and Champion runtimes, the trigger catalogue and
                     scheduler, run state machines, proposal envelopes
 packages/importer   Spreadsheet and FlowyTeam importers (command line)
+packages/cli        The `okr` command line. Reads contract/cli.json and calls
+                    the REST surface. No runtime dependency on anything
 packages/ui         Shared components
 packages/config     Shared TypeScript, lint and environment schema
 packages/test-support  Factory building through core services, test harness
@@ -147,7 +149,8 @@ Keep this list current once scaffolded.
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
 - `pnpm dead-code`: the dead-code gate
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate. Sign-off runs in CI on pull requests only, so a branch can look green for days and fail the moment one opens. `docs/development-plan/CI-GATES.md` lists every gate and the order to run them in
-- `pnpm gen:contract` and `pnpm check:contract`: regenerate `contract/openapi.json` from the action registry, then the drift gate that compares a fresh document against the committed one and fails naming the actions that moved. One script in two modes, so a generator and a checker cannot disagree about what the artifact should be. The document is also served live at `/api/v1/openapi.json`, built by the same function, so it describes the running instance
+- `pnpm okr`: the command line, generated from the registry. `pnpm okr help` lists the domains, `pnpm okr <domain> <verb> --help` one command's flags. It reads `contract/cli.json` and nothing else, so it has no database and no domain code in it. `okr login --url <instance> --token <token>` stores a profile; the token comes from `/account/api-tokens`. Exit 2 is a usage error decided before anything is sent, exit 1 is the instance refusing
+- `pnpm gen:contract` and `pnpm check:contract`: regenerate `contract/openapi.json` and `contract/cli.json` from the action registry, then the drift gate that compares fresh artifacts against the committed ones and fails naming the actions and commands that moved. One script in two modes, so a generator and a checker cannot disagree about what the artifact should be. The document is also served live at `/api/v1/openapi.json`, built by the same function, so it describes the running instance
 - `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline)
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. Cron or by hand until a scheduler host exists
@@ -172,7 +175,6 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 | Command | Arrives at | What it will do |
 |---|---|---|
 | `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
-| `pnpm gen:contract --with the command line` | P5-T07c | The command line's own generated artifact joins the same run and the same drift check. The OpenAPI half landed at P5-T07b |
 | `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
 | `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
 | `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |

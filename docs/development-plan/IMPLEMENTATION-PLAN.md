@@ -992,11 +992,33 @@ Deliverables: the OpenAPI document generated from the registry's own schemas; `p
 Test plan: the drift check fails when a registry action changes without regeneration, and the failure names the action.
 Acceptance: Given a change to a registry action's schema, when continuous integration runs without regenerating, then the drift check fails naming the action.
 
-### P5-T07c: The generated command line [M]
+### P5-T07c-a: The generated command line [M]
 Depends on: P5-T07b
 Goal: the same registry as a terminal tool.
-Deliverables: the command line generated from the registry with typed flags and file inputs; multiple profiles; the browser device login that mints a scoped token; the generated command list included in the drift check.
-Test plan: a flag whose type the schema refuses fails before any request; a profile with a revoked token reports that rather than an authentication error; the device login mints a token with the scopes it asked for and no more.
+
+**Cut in two, because the login is a protocol and the rest is a tool.** This row
+listed a generated command line and a browser device login. The command line is
+a generated artifact, a flag parser and an HTTP client, and it is usable the day
+it lands with a token pasted from the account screen. A device login is a device
+code table with its own row-level security, two endpoints, an approval screen and
+a polling loop, which is a second session's work and reads as a protocol rather
+than as a tool. Splitting them means the command line is not held back by it.
+
+Deliverables: `contract/cli.json` generated from the registry beside the OpenAPI
+document, in the same run and the same drift check; the `okr` command reading
+that artifact and nothing else, so it needs no database and no domain code;
+typed flags derived from each action's input schema, refused by name and by type
+before any request is made; file inputs; named profiles holding a URL and a
+token, with the token file readable only by its owner; the server's own typed
+error carried through, so a revoked token says it was revoked.
+Test plan: a flag whose type or enum the schema refuses fails before any request and names the flag; a profile with a revoked token reports that rather than a generic authentication error; a read is sent as a GET with query parameters and a write as a POST with a JSON body; the drift check fails when a registry action changes without regeneration, naming the command.
+Acceptance: Given a token minted in the browser and stored in a profile, when a person runs a read command in a terminal, then it is sent as that member and the answer is printed, and a mistyped flag is refused before anything is sent.
+
+### P5-T07c-b: The browser device login [M]
+Depends on: P5-T07c-a
+Goal: a terminal that has never held a token can get one without a copy and paste.
+Deliverables: the device code table with its row-level security; the start and poll endpoints; the approval screen naming the scopes being asked for; the polling loop with its expiry and its refusal to grant more than was asked; `okr login` writing the granted token into the profile.
+Test plan: the device login mints a token with the scopes it asked for and no more; an expired device code is refused; a code approved twice grants once.
 Acceptance: Given a signed-out terminal, when a person runs the device login and completes it in the browser, then the profile holds a scoped token and the next command runs as them.
 
 ### P5-T08: MCP authorisation server [L]
@@ -1220,7 +1242,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (24: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **115 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (25: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **116 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

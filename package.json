@@ -23,6 +23,7 @@
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
+    "okr": "pnpm --filter @openokr/cli okr",
     "gen:contract": "pnpm --filter @openokr/core gen:contract",
     "check:contract": "pnpm --filter @openokr/core check:contract",
     "check:boundaries": "node --experimental-strip-types --no-warnings scripts/check-boundaries.ts",

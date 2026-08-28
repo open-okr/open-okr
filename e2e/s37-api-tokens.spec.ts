@@ -13,9 +13,50 @@
  * revocation, is proved against a real database in
  * `packages/core/test/api-tokens.test.ts`.
  */
+import { execFile } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { goTo, signIn } from "./instance-account.ts";
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * The `okr` tool, run as a process (P5-T07c-a).
+ *
+ * Spawned rather than imported, because the acceptance criterion is about a
+ * terminal: what is being proved is that the bin resolves the generated command
+ * list, parses the flags, reads the profile and reaches the running instance.
+ * Importing `run` would skip the first and the last of those.
+ */
+async function okr(
+  args: readonly string[],
+  configFile: string,
+): Promise<{ code: number; out: string; err: string }> {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        "--no-warnings",
+        "packages/cli/src/bin/okr.ts",
+        ...args,
+      ],
+      { env: { ...process.env, OPENOKR_CONFIG: configFile } },
+    );
+    return { code: 0, out: stdout, err: stderr };
+  } catch (error) {
+    const failure = error as { code?: number; stdout?: string; stderr?: string };
+    return {
+      code: failure.code ?? 1,
+      out: failure.stdout ?? "",
+      err: failure.stderr ?? "",
+    };
+  }
+}
 
 test.describe.configure({ mode: "serial" });
 
@@ -24,12 +65,16 @@ let page: Page;
 let api: APIRequestContext;
 /** The raw token, held for this file only. It exists nowhere else. */
 let token = "";
+/** The instance's address, captured from the project's own baseURL. */
+let base = "";
+const baseUrl = (): string => base;
 
 const authed = (value = token) => ({
   authorization: `Bearer ${value}`,
 });
 
 test.beforeAll(async ({ browser, playwright, baseURL }) => {
+  base = baseURL ?? "";
   context = await browser.newContext();
   page = await context.newPage();
   // A request context with no cookies, so nothing here can pass because a
@@ -102,6 +147,49 @@ test("the OpenAPI document describes the surface it is served from", async () =>
   // committed copy honest; this proves the running one is real.
   expect(document.paths["/goals/list"].get["x-openokr-scope"]).toBe("read");
   expect(document.servers[0].url).toBe("/api/v1");
+});
+
+test("the command line runs a read as the member whose token it holds (P5-T07c-a acceptance)", async () => {
+  const configFile = join(mkdtempSync(join(tmpdir(), "okr-e2e-")), "config.json");
+
+  const saved = await okr(
+    ["login", "--url", baseUrl(), "--token", token],
+    configFile,
+  );
+  expect(saved.code).toBe(0);
+  // The token is not printed back, even by the command that was given it.
+  expect(saved.out).not.toContain(token);
+
+  const listed = await okr(["goals", "list"], configFile);
+  expect(listed.code).toBe(0);
+  // Clean JSON on stdout, which is what makes it pipeable.
+  expect(JSON.parse(listed.out)).toHaveProperty("goals");
+
+  // And a mistyped flag is refused before anything is sent: exit 2, the usage
+  // code, rather than 1, which is the instance refusing.
+  const mistyped = await okr(
+    ["goals", "list", "--level", "marketing"],
+    configFile,
+  );
+  expect(mistyped.code).toBe(2);
+  expect(mistyped.err).toContain("--level must be one of");
+});
+
+test("the command line carries the instance's own refusal", async () => {
+  const configFile = join(mkdtempSync(join(tmpdir(), "okr-e2e-")), "config.json");
+  await okr(["login", "--url", baseUrl(), "--token", token], configFile);
+
+  // A read token on a write action, and one whose flags are all satisfiable, so
+  // the tool does not refuse it first: what is being tested is the sentence a
+  // person reads, and it is the one the surface wrote rather than one the tool
+  // invented over the top of a status code.
+  const refused = await okr(
+    ["people", "updateOwnProfile", "--timezone", "Asia/Jakarta"],
+    configFile,
+  );
+  expect(refused.code).toBe(1);
+  expect(refused.err).toContain("write scope");
+  expect(refused.err).toContain("people.updateOwnProfile");
 });
 
 test("a write is refused for scope, and the refusal names the scope (acceptance)", async () => {
