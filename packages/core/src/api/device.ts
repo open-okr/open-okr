@@ -21,7 +21,7 @@
  * that already speaks the protocol needs no special case for this instance.
  */
 
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import {
   activeOnly,
   apiTokens,
@@ -62,11 +62,20 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const hashDeviceCode = (code: string): string =>
   createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
 
-/** The long code, which stays in the terminal. Forty characters of the alphabet. */
+/**
+ * The long code, which stays in the terminal. Forty characters of the alphabet.
+ *
+ * `randomInt` rather than a byte modulo the alphabet length. The alphabet has
+ * thirty-one characters and a byte has two hundred and fifty-six values, so
+ * `byte % 31` makes the first eight characters of the alphabet very slightly
+ * more likely than the rest: real, measurable bias in a code that is the whole
+ * credential. CodeQL flagged it, correctly, and `randomInt` rejects out-of-range
+ * draws instead of folding them.
+ */
 export function generateDeviceCode(): string {
   let code = "";
-  for (const byte of randomBytes(40)) {
-    code += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+  for (let index = 0; index < 40; index += 1) {
+    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   }
   return code;
 }
