@@ -16,7 +16,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import pg from "pg";
-import { INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -82,10 +82,22 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
   try {
     await client.query("begin");
     await client.query(`set local app.workspace_id = '${member.workspace_id}'`);
+    // **Only if it is not already there.** This file is a serial group, and a
+    // retry re-runs it from this test, so a plain insert adds a second
+    // identical session. The next test then finds two "Entry point weekly"
+    // rows and fails on strict mode, which reports a duplicate rather than the
+    // navigation problem that caused the retry. Happened on CI once.
     await client.query(
       `insert into okr_sessions
          (id, workspace_id, space_id, kind, title, scheduled_for, facilitator_id, state)
-       values (gen_random_uuid(), $1, $2, 'weekly', 'Entry point weekly', now() + interval '2 hours', $3, 'scheduled')`,
+       select gen_random_uuid(), $1, $2, 'weekly', 'Entry point weekly',
+              now() + interval '2 hours', $3, 'scheduled'
+        where not exists (
+          select 1 from okr_sessions
+           where workspace_id = $1
+             and title = 'Entry point weekly'
+             and deleted_at is null
+        )`,
       [member.workspace_id, space.id, member.id],
     );
     await client.query("commit");
@@ -95,14 +107,18 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
 });
 
 test("the navigation offers Sessions at all, which is what was missing", async () => {
-  await page.goto("/");
+  // `goTo` rather than a bare `goto`: a first navigation after signing in can
+  // be superseded and answer `net::ERR_ABORTED`, which is why the wrapper
+  // exists. This spec was the last one still calling `goto` directly, and it
+  // is what turned one race into a failed CI run.
+  await goTo(page, "/");
   await expect(page.getByRole("link", { name: "Sessions" }).first()).toBeVisible(
     { timeout: 10_000 },
   );
 });
 
 test("acceptance: two clicks from the front door to the session", async () => {
-  await page.goto("/");
+  await goTo(page, "/");
 
   // One.
   await page.getByRole("link", { name: "Sessions" }).first().click();
