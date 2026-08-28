@@ -92,6 +92,18 @@ test("the index lists the surface, for a caller that holds a token", async () =>
   expect(listed.find((row) => row.action === "goals.list")?.method).toBe("GET");
 });
 
+test("the OpenAPI document describes the surface it is served from", async () => {
+  const response = await api.get("/api/v1/openapi.json", { headers: authed() });
+  expect(response.status()).toBe(200);
+  const document = await response.json();
+  expect(document.openapi).toBe("3.1.0");
+  // Generated from the registry on request, so it describes this instance
+  // rather than whatever was committed. `pnpm check:contract` keeps the
+  // committed copy honest; this proves the running one is real.
+  expect(document.paths["/goals/list"].get["x-openokr-scope"]).toBe("read");
+  expect(document.servers[0].url).toBe("/api/v1");
+});
+
 test("a write is refused for scope, and the refusal names the scope (acceptance)", async () => {
   const response = await api.post("/api/v1/goals/create", {
     headers: authed(),

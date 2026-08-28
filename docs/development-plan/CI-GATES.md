@@ -17,6 +17,7 @@ pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage
 pnpm check:boundaries # the architecture gate
 pnpm check:licences   # dependency licences
+pnpm check:contract   # the committed OpenAPI document against the registry
 pnpm test             # unit and integration, needs a database
 pnpm build            # then pnpm test:e2e
 ```
@@ -28,7 +29,7 @@ If all of those pass locally, CI passes, with one exception named under
 
 | Job | Steps | Skipped when |
 |---|---|---|
-| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries` | The push changed no code |
+| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
 | End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |

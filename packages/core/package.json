@@ -12,6 +12,8 @@
     "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts",
     "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts",
     "cadence:sweep": "node --experimental-strip-types --no-warnings src/bin/sweep-staleness.ts",
+    "gen:contract": "node --experimental-strip-types --no-warnings src/bin/gen-contract.ts",
+    "check:contract": "node --experimental-strip-types --no-warnings src/bin/gen-contract.ts --check",
     "seed": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed.ts"
   },
   "dependencies": {

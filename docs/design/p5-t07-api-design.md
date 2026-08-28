@@ -7,7 +7,7 @@ says why.
 | Part | What it delivers | State |
 |---|---|---|
 | P5-T07a | The REST surface, its tokens, the typed errors, paging | built |
-| P5-T07b | The OpenAPI document, `pnpm gen:contract`, the drift check | not started |
+| P5-T07b | The OpenAPI document, `pnpm gen:contract`, the drift check | built |
 | P5-T07c | The command line, profiles, the browser device login | not started |
 
 ## 1. The shape of the surface
@@ -156,6 +156,45 @@ which actions an instance has, one 404 at a time. Checking the scope after
 running the action would be checking it too late, and the end-to-end spec asserts
 exactly that by sending a write whose body is incomplete: a scope refusal that
 ran second would answer 422 about the fields instead of 403 about the scope.
+
+## 6b. The document and the drift check (P5-T07b)
+
+The document is built by the same `REST_ROUTES` the transport serves, so it
+cannot describe an action the surface does not have or miss one it does.
+
+| Piece | Where it comes from |
+|---|---|
+| Path, method, operation id | the route, which comes from the action's name and safety class |
+| Query parameters | the input schema's own properties, one parameter each |
+| Request body | the input schema, for a write |
+| Response `data` | the output schema |
+| `x-openokr-scope`, `x-openokr-safety` | the registry's declared safety class |
+| Errors | the typed enumeration, declared once under `components.responses` |
+
+The schemas are the actions' own Zod schemas through `z.toJSONSchema`, which
+emits JSON Schema 2020-12, the dialect OpenAPI 3.1 uses. No shape is described
+twice anywhere.
+
+**One script in two modes.** `pnpm gen:contract` writes `contract/openapi.json`
+and `pnpm check:contract` compares a fresh document against it. A separate
+generator and checker are two programs that can disagree about what the artifact
+should be, and then the check passes on a file the generator would never write.
+
+**The failure names the action.** A byte difference is the trigger; the message
+is a per-action diff, so a stale document reports `changed: goals.create` rather
+than a JSON path. A change outside `paths` is reported against the document
+itself, which is rare and worth saying plainly.
+
+**The artifact is committed** so a change to the public surface appears in a diff
+a person reviews. That is the point of the gate: not to catch a broken
+generator, but to make a contract change impossible to ship silently. The error
+responses are shared through `$ref` for the same reason, which took half a
+megabyte of repeated boilerplate out of the file.
+
+**The served document is generated, not read from the artifact.**
+`GET /api/v1/openapi.json` calls the same builder, so it describes the running
+instance whatever version it is on, and the committed copy is kept honest by the
+gate rather than by being the source.
 
 ## 7. Acceptance criteria
 

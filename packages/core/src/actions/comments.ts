@@ -98,8 +98,19 @@ export const listCommentsAction = defineReadAction({
       authorMemberId: z.string().uuid(),
       authorName: z.string(),
       body: z.unknown(),
-      editedAt: z.date().nullable(),
-      createdAt: z.date(),
+      /**
+       * ISO strings, not `Date` objects (P5-T07b).
+       *
+       * They were `z.date()`, which no JSON surface can carry: the REST
+       * response has always sent a string here and the schema said otherwise,
+       * and the OpenAPI generator refused to describe it, which is how this was
+       * found. Every other action in the registry already declares an ISO
+       * string, and the goal page was calling `.toISOString()` on the way into
+       * its own component, so this moves that one line to where the contract is
+       * declared instead of past it.
+       */
+      editedAt: z.string().nullable(),
+      createdAt: z.string(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -112,12 +123,17 @@ export const listCommentsAction = defineReadAction({
         resourceType: input.subjectType,
         resourceId: input.subjectId,
       });
-      return listComments(
+      const rows = await listComments(
         tx,
         ctx.workspaceId,
         input.subjectType,
         input.subjectId,
       );
+      return rows.map((row) => ({
+        ...row,
+        editedAt: row.editedAt ? row.editedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      }));
     });
   },
 });

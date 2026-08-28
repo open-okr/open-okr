@@ -180,6 +180,13 @@ export {
   statusFor,
 } from "./api/errors.ts";
 export {
+  buildOpenApiDocument,
+  type ContractDifference,
+  diffContract,
+  type JsonObject,
+  serialiseContract,
+} from "./api/openapi.ts";
+export {
   API_BASE,
   API_VERSION,
   type ApiMethod,

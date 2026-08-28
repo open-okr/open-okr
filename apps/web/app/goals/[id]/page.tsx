@@ -601,10 +601,6 @@ export default async function GoalPage({
                 goalId={id}
                 comments={comments.map((comment) => ({
                   ...comment,
-                  createdAt: comment.createdAt.toISOString(),
-                  editedAt: comment.editedAt
-                    ? comment.editedAt.toISOString()
-                    : null,
                   reactions: reactions.get(comment.id) ?? [],
                 }))}
                 currentMemberId={workspace.memberId}

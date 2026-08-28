@@ -27,6 +27,7 @@ import {
   type ApiError,
   apiError,
   bearerFrom,
+  buildOpenApiDocument,
   callAction,
   errorFor,
   inputFrom,
@@ -132,6 +133,14 @@ async function handle(
 
   if (segments.length === 0) {
     return indexResponse();
+  }
+
+  // The document, generated from the registry on request rather than read from
+  // the committed artifact (P5-T07b). It therefore describes *this* instance,
+  // whatever it is running, and `pnpm check:contract` is what keeps the
+  // committed copy honest. Both call the same builder, so they cannot disagree.
+  if (segments.length === 1 && segments[0] === "openapi.json") {
+    return json(buildOpenApiDocument(), 200);
   }
 
   const route = routeAt(segments);

@@ -62,6 +62,16 @@ export interface RestRoute {
   readonly scope: TokenScope;
   /** The input fields this action declares, in schema order. */
   readonly parameters: readonly string[];
+  /**
+   * The action's own schemas, carried rather than looked up again (P5-T07b).
+   *
+   * The OpenAPI generator needs them, and a second lookup by name is a second
+   * place the projection could miss an action. These are the same objects the
+   * action declares, not a copy: nothing here serialises a route record whole,
+   * so a Zod object on it costs nothing.
+   */
+  readonly inputSchema: ZodType;
+  readonly outputSchema: ZodType;
   /** Set when the action takes a cursor and this surface can build the next. */
   readonly page: PageContract | null;
 }
@@ -92,6 +102,8 @@ function routeFor(action: ActionDefinition): RestRoute {
     safety: action.safety,
     scope: action.safety,
     parameters: fieldsOf(action.input) ?? [],
+    inputSchema: action.input,
+    outputSchema: action.output,
     page: action.page ?? null,
   };
 }
