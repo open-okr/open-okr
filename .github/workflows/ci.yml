@@ -100,6 +100,15 @@ jobs:
       matrix:
         # Sharding scaffold. Raise this as the suite grows; nothing else changes.
         shard: [1, 2]
+    # **A port and a stack name per shard.** The compose stack used to bind a
+    # fixed 55432, which fails the moment two jobs share a host: shard 1 lost a
+    # run to "address already in use" while *starting* Postgres, which reads as
+    # a broken test suite rather than as an occupied port. Both numbers are the
+    # ones the harness already reads, so the stack and the suite move together.
+    env:
+      TEST_DB_PORT: ${{ 55432 + matrix.shard }}
+      TEST_PGBOUNCER_PORT: ${{ 56432 + matrix.shard }}
+      COMPOSE_PROJECT_NAME: openokr-test-shard${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -130,6 +139,11 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code == 'true'
     runs-on: ubuntu-latest
+    # Its own pair, for the same reason as the shards above.
+    env:
+      TEST_DB_PORT: 55440
+      TEST_PGBOUNCER_PORT: 56440
+      COMPOSE_PROJECT_NAME: openokr-test-e2e
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup

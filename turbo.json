@@ -4,14 +4,24 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"],
-      "passThroughEnv": ["TEST_DB_PORT", "DATABASE_URL"]
+      "passThroughEnv": [
+        "TEST_DB_PORT",
+        "TEST_PGBOUNCER_PORT",
+        "TEST_DB_HOST",
+        "DATABASE_URL"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "test": {
-      "passThroughEnv": ["TEST_DB_PORT", "DATABASE_URL", "TEST_DB_HOST"]
+      "passThroughEnv": [
+        "TEST_DB_PORT",
+        "TEST_PGBOUNCER_PORT",
+        "TEST_DB_HOST",
+        "DATABASE_URL"
+      ]
     },
     "typecheck": {}
   }
