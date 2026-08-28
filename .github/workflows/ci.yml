@@ -90,6 +90,12 @@ jobs:
         # and nowhere else, and every approved corpus entry is exercised.
         run: pnpm method:check
 
+      - name: Contract drift gate
+        # The committed OpenAPI document and the action registry have to agree.
+        # It fails naming the actions that moved, and the fix is always
+        # `pnpm gen:contract` committed with the change that caused it.
+        run: pnpm check:contract
+
   test:
     name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope
@@ -98,16 +104,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Sharding scaffold. Raise this as the suite grows; nothing else changes.
-        shard: [1, 2]
+        # **A port pair per shard, written out rather than computed.** GitHub
+        # Actions expressions have no arithmetic operators, so
+        # `${{ 55432 + matrix.shard }}` is not an expression that parses and the
+        # whole workflow file is rejected before a single job is created. Adding
+        # a shard therefore means adding its two ports here, which is the one
+        # thing this list costs.
+        include:
+          - shard: 1
+            dbPort: 55433
+            pgbouncerPort: 56433
+          - shard: 2
+            dbPort: 55434
+            pgbouncerPort: 56434
     # **A port and a stack name per shard.** The compose stack used to bind a
     # fixed 55432, which fails the moment two jobs share a host: shard 1 lost a
     # run to "address already in use" while *starting* Postgres, which reads as
     # a broken test suite rather than as an occupied port. Both numbers are the
     # ones the harness already reads, so the stack and the suite move together.
     env:
-      TEST_DB_PORT: ${{ 55432 + matrix.shard }}
-      TEST_PGBOUNCER_PORT: ${{ 56432 + matrix.shard }}
+      TEST_DB_PORT: ${{ matrix.dbPort }}
+      TEST_PGBOUNCER_PORT: ${{ matrix.pgbouncerPort }}
       COMPOSE_PROJECT_NAME: openokr-test-shard${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v7
