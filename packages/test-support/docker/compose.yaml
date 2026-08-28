@@ -23,6 +23,10 @@
 # would now try to publish the container on 5432 and collide with that server.
 # Pointing the suite at your own Postgres means not needing this stack at all.
 #
+# Set either to `0` and Docker picks a free port; `pnpm db:ports` reads back
+# which. That is what continuous integration does, because two rounds of choosing
+# numbers by hand both ended in "address already in use".
+#
 # Start with: pnpm db:up   Stop with: pnpm db:down
 name: openokr-test
 

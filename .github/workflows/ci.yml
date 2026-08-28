@@ -67,7 +67,13 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Type check (affected only)
-        run: pnpm turbo run typecheck --affected
+        # **Three at a time.** Turbo runs one task per core by default, and
+        # `tsc` over the Next application is the heaviest of them: with eleven
+        # packages the runner's memory ran out and the kernel killed that one
+        # process, which turbo reported as a cancelled run with no error in it.
+        # Serialising it entirely would cost minutes; three is under the limit
+        # and still parallel.
+        run: pnpm turbo run typecheck --affected --concurrency=3
 
       - name: Lint
         run: pnpm lint
@@ -104,27 +110,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # **A port pair per shard, written out rather than computed.** GitHub
-        # Actions expressions have no arithmetic operators, so
-        # `${{ 55432 + matrix.shard }}` is not an expression that parses and the
-        # whole workflow file is rejected before a single job is created. Adding
-        # a shard therefore means adding its two ports here, which is the one
-        # thing this list costs.
-        include:
-          - shard: 1
-            dbPort: 55433
-            pgbouncerPort: 56433
-          - shard: 2
-            dbPort: 55434
-            pgbouncerPort: 56434
-    # **A port and a stack name per shard.** The compose stack used to bind a
-    # fixed 55432, which fails the moment two jobs share a host: shard 1 lost a
-    # run to "address already in use" while *starting* Postgres, which reads as
-    # a broken test suite rather than as an occupied port. Both numbers are the
-    # ones the harness already reads, so the stack and the suite move together.
+        # Sharding scaffold. Raise this as the suite grows; nothing else changes.
+        shard: [1, 2]
     env:
-      TEST_DB_PORT: ${{ matrix.dbPort }}
-      TEST_PGBOUNCER_PORT: ${{ matrix.pgbouncerPort }}
       COMPOSE_PROJECT_NAME: openokr-test-shard${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v7
@@ -133,7 +121,18 @@ jobs:
       - name: Start the test database stack
         # Postgres plus PgBouncer in transaction mode; the P1-T03 isolation
         # and pooling-spike suites run against it on every shard.
-        run: pnpm db:up
+        #
+        # **Nothing here picks a port.** A fixed 55432 collided; a pair per
+        # shard collided too, on a number nothing in this repository uses. Port
+        # 0 asks Docker for a free one and `db:ports` reads back what it chose,
+        # into the environment every later step sees. There is nothing left to
+        # collide with.
+        env:
+          TEST_DB_PORT: 0
+          TEST_PGBOUNCER_PORT: 0
+        run: |
+          pnpm db:up
+          pnpm db:ports >> "$GITHUB_ENV"
 
       - name: Run tests
         env:
@@ -156,17 +155,20 @@ jobs:
     needs: scope
     if: needs.scope.outputs.code == 'true'
     runs-on: ubuntu-latest
-    # Its own pair, for the same reason as the shards above.
+    # Its own stack name; the ports are whatever Docker gives it.
     env:
-      TEST_DB_PORT: 55440
-      TEST_PGBOUNCER_PORT: 56440
       COMPOSE_PROJECT_NAME: openokr-test-e2e
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
       - name: Start the test database stack
-        run: pnpm db:up
+        env:
+          TEST_DB_PORT: 0
+          TEST_PGBOUNCER_PORT: 0
+        run: |
+          pnpm db:up
+          pnpm db:ports >> "$GITHUB_ENV"
 
       # Chromium only, and the headless shell rather than the full browser.
       # The suite exists for the claims a browser has to settle, not for

@@ -155,7 +155,7 @@ Keep this list current once scaffolded.
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
 - `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. Cron or by hand until a scheduler host exists
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
-- `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
+- `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker). `TEST_DB_PORT` and `TEST_PGBOUNCER_PORT` choose the host ports; set either to `0` and Docker picks a free one, which `pnpm db:ports` then reads back as the two lines the harness needs. Continuous integration does exactly that, because choosing numbers by hand collided twice
 - `pnpm db:migrate`: migrations
 - `pnpm db:change`: the data-change runner. Batched, resumable, idempotent-by-ledger backfills, kept out of schema migrations. Scripts declare the columns and types they depend on and the runner checks every one before each run, so a later migration cannot silently change what an old script does
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
