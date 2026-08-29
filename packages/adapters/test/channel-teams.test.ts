@@ -100,13 +100,23 @@ const stubFetch: typeof globalThis.fetch = async (input, init) => {
     headers: (init?.headers ?? {}) as Record<string, string>,
   });
 
-  if (url.includes("openidconfiguration")) {
+  // **Matched by host and path, not by substring.** A stub that routed on
+  // `url.includes("login.microsoftonline.com")` would also answer for
+  // `https://attacker.example/?x=login.microsoftonline.com`, which is a habit
+  // worth not having even in a test: CodeQL flags it at high severity wherever
+  // it appears, and it is right that the pattern is the problem rather than the
+  // file it is in.
+  const host = new URL(url).host;
+  const path = new URL(url).pathname;
+
+  if (host === "login.botframework.com") {
+    expect(path).toContain("openidconfiguration");
     return Response.json({ jwks_uri: "https://keys.example/keys" });
   }
   if (url === "https://keys.example/keys") {
     return Response.json(keysAnswer as object);
   }
-  if (url.includes("login.microsoftonline.com")) {
+  if (host === "login.microsoftonline.com") {
     return new Response(JSON.stringify(tokenAnswer.body), {
       status: tokenAnswer.status,
       headers: { "content-type": "application/json" },
@@ -149,7 +159,7 @@ describe("sending", () => {
     expect(result.externalMessageId).toBe("sent-1");
 
     const token = calls[0] as Call;
-    expect(token.url).toContain("login.microsoftonline.com");
+    expect(new URL(token.url).host).toBe("login.microsoftonline.com");
     expect(token.body).toContain("grant_type=client_credentials");
     expect(token.body).toContain("api.botframework.com");
 
@@ -170,7 +180,9 @@ describe("sending", () => {
     await teams.sendToChannel("c1", { text: "two" });
 
     expect(
-      calls.filter((call) => call.url.includes("microsoftonline")),
+      calls.filter(
+        (call) => new URL(call.url).host === "login.microsoftonline.com",
+      ),
     ).toHaveLength(1);
   });
 
@@ -330,7 +342,7 @@ describe("verifying an inbound activity", () => {
   it("refuses when Microsoft's keys cannot be read at all", async () => {
     keysAnswer = undefined;
     const failing: typeof globalThis.fetch = async (input) =>
-      String(input).includes("openidconfiguration")
+      new URL(String(input)).host === "login.botframework.com"
         ? new Response("", { status: 503 })
         : new Response("{}", { status: 200 });
     const teams = new TeamsChannel({
@@ -372,7 +384,9 @@ describe("verifying an inbound activity", () => {
       rawBody: activity(),
     });
     expect(
-      calls.filter((call) => call.url.includes("openidconfiguration")),
+      calls.filter(
+        (call) => new URL(call.url).host === "login.botframework.com",
+      ),
     ).toHaveLength(1);
   });
 });
