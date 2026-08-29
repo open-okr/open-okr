@@ -325,8 +325,11 @@ export {
   type OpenedConnection,
   openConnection,
   parseSlackSecret,
+  parseTeamsSecret,
   parseTelegramSecret,
+  rememberConnectionConfig,
   type SlackSecret,
+  type TeamsSecret,
   type TelegramSecret,
 } from "./channels/connections.ts";
 export {

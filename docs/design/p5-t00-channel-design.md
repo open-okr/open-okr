@@ -304,3 +304,37 @@ what it most needs, so the narrative and the values are asked last.
 | C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail. **Built at P5-T02a**, and enforced by the database rather than by a check: two unique indexes, one each way |
 | C3 | Where do WhatsApp templates live? | A per-nudge-kind registry in `packages/method`, because a template is a coaching message and §11 already owns those |
 | C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |
+
+## Teams, and what a third provider proved (P5-T03a)
+
+Nothing in `packages/core` changed to add Teams. The command catalogue, the
+router, §6's inbound steps three to six, the identity linking and the
+conversational check-in are the same code Slack and Telegram reach. What is
+Teams' own is three things, and each is different in a way worth naming.
+
+| | Slack | Telegram | Teams |
+|---|---|---|---|
+| Outbound authentication | a bot token in a header | a bot token in the URL | an OAuth2 token fetched per hour |
+| Inbound verification | HMAC over the raw body | a shared secret echoed back | a token Microsoft signed, verified against its published keys |
+| Where to send | any channel id | any chat id | only a service URL learned from an inbound activity |
+
+**The service URL is the one genuinely new problem.** Slack and Telegram will
+accept an outbound call at a fixed address. Teams will not: every inbound
+activity carries the `serviceUrl` for its own region, and outbound has to go
+back to that one. There is no way to look it up. So a workspace whose bot has
+never been messaged cannot be messaged, and the driver suppresses with exactly
+that reason rather than failing. The inbound door records the URL on the
+connection, which is what `rememberConnectionConfig` exists for, and the runbook
+in `deploy/teams/README.md` makes "say something to it" a numbered step rather
+than a footnote.
+
+**The token binds the service URL, and checking that is load-bearing.** Microsoft
+signs a `serviceUrl` claim into every inbound token. Comparing it with the
+activity's own is what stops a caller holding a valid token for some other bot
+from pointing this instance's replies at a host they control. It would be the
+easiest of the five checks to leave out and it is the one whose absence is worst.
+
+**A card action arrives as an activity with no text and a `value`.** The driver
+reads `value.command` as the text when there is none, which is what lets a card
+button reach the same router a typed command does. The cards themselves are
+P5-T03b; until then a nudge's actions are links under the message.

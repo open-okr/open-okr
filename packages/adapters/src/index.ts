@@ -52,6 +52,17 @@ export {
   toBlocks,
 } from "./drivers/channel/slack.ts";
 export {
+  decodeToken,
+  stripMentions,
+  TeamsChannel,
+  type TeamsChannelOptions,
+  TeamsPermanentError,
+  teamsDeliveryId,
+  teamsServiceUrl,
+  teamsTenantId,
+  toActivity,
+} from "./drivers/channel/teams.ts";
+export {
   TelegramChannel,
   type TelegramChannelOptions,
   TelegramPermanentError,

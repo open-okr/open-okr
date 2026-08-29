@@ -33,6 +33,7 @@ import {
   EmailChannel,
   OutboxRelay,
   SlackChannel,
+  TeamsChannel,
   TelegramChannel,
 } from "@openokr/adapters";
 import { type Env, loadEnv } from "@openokr/config";
@@ -45,6 +46,7 @@ import {
   type OutboxHandlerDeps,
   openConnection,
   parseSlackSecret,
+  parseTeamsSecret,
   parseTelegramSecret,
   resolveAICredential,
   resolveTierRoute,
@@ -198,6 +200,39 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
                   memberExternalId(getPool(), {
                     workspaceId,
                     provider: "slack",
+                    memberId: recipient.memberId,
+                  }),
+              });
+              return channel.send({ memberId: message.memberId }, outbound);
+            }
+
+            if (message.provider === "teams") {
+              const connection = await openConnection(getPool(), getKeyRing(), {
+                workspaceId,
+                provider: "teams",
+              });
+              const secret = connection
+                ? parseTeamsSecret(connection.secret)
+                : null;
+              if (!secret) {
+                return {
+                  delivered: false,
+                  suppressedReason:
+                    "Teams is not connected, or its stored credentials are not readable",
+                };
+              }
+              // The service URL was learned from an inbound activity and kept
+              // on the connection. Without one the driver suppresses with that
+              // reason rather than failing, because there is nowhere to send.
+              const serviceUrl = connection?.config.serviceUrl;
+              const channel = new TeamsChannel({
+                appId: secret.appId,
+                appPassword: secret.appPassword,
+                ...(typeof serviceUrl === "string" ? { serviceUrl } : {}),
+                conversationFor: (recipient) =>
+                  memberExternalId(getPool(), {
+                    workspaceId,
+                    provider: "teams",
                     memberId: recipient.memberId,
                   }),
               });

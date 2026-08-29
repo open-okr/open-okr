@@ -144,6 +144,94 @@ export async function memberExternalId(
   return row?.externalId ?? null;
 }
 
+/**
+ * Records something the provider told us about itself (P5-T03a).
+ *
+ * Teams needs this and nothing else does yet. There is no fixed endpoint to
+ * send a Teams message to: every inbound activity carries the `serviceUrl` for
+ * its own region, and outbound has to go back to that one, so a workspace whose
+ * bot has never been messaged cannot be messaged either. The inbound door
+ * records it here and the next outbound send has one.
+ *
+ * openokr:allow-mutation: a routing fact the provider supplied, not domain
+ * state. Nothing reads it to decide anything about a person, no activity or
+ * audit row describes it, and it is written on an inbound path where there is
+ * no actor to attribute an Operation to.
+ */
+export async function rememberConnectionConfig(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly provider: ChannelConnectionKey;
+    readonly patch: Readonly<Record<string, unknown>>;
+  },
+): Promise<void> {
+  const db = drizzle(pool);
+  await withWorkspace(db, input.workspaceId, async (tx) => {
+    const [row] = await tx
+      .select({ config: channelConnections.config })
+      .from(channelConnections)
+      .where(
+        activeOnly(
+          channelConnections,
+          eq(channelConnections.workspaceId, input.workspaceId),
+          eq(channelConnections.provider, input.provider),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return;
+    }
+    const current = (row.config ?? {}) as Record<string, unknown>;
+    const next = { ...current, ...input.patch };
+    if (JSON.stringify(current) === JSON.stringify(next)) {
+      // Nothing moved. Writing anyway would touch the row on every inbound
+      // message, which is a lot of writes to say the same thing.
+      return;
+    }
+    // openokr:allow-mutation: see the note on this function.
+    await tx
+      .update(channelConnections)
+      .set({ config: next, updatedAt: new Date() })
+      .where(
+        activeOnly(
+          channelConnections,
+          eq(channelConnections.workspaceId, input.workspaceId),
+          eq(channelConnections.provider, input.provider),
+        ),
+      );
+  });
+}
+
+/** What a Teams connection's secret holds. */
+export interface TeamsSecret {
+  /** The bot's application id, which is also the inbound token's audience. */
+  readonly appId: string;
+  /** The bot's client secret. Never logged. */
+  readonly appPassword: string;
+}
+
+/**
+ * The Teams secret, or null when the stored string is not one.
+ *
+ * The same shape as the other two parsers, for the same reason: one
+ * envelope-encrypted string per connection, and each provider decides what its
+ * own secret looks like, so the table stays one shape for all four.
+ */
+export function parseTeamsSecret(secret: string): TeamsSecret | null {
+  try {
+    const parsed = JSON.parse(secret) as Record<string, unknown>;
+    const appId = parsed.appId;
+    const appPassword = parsed.appPassword;
+    if (typeof appId !== "string" || typeof appPassword !== "string") {
+      return null;
+    }
+    return { appId, appPassword };
+  } catch {
+    return null;
+  }
+}
+
 /** What a Telegram connection's secret holds. */
 export interface TelegramSecret {
   /** The bot token. Goes in an outbound URL, so it never reaches a log. */

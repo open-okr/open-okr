@@ -1,4 +1,9 @@
-import { EmailChannel, SlackChannel, TelegramChannel } from "@openokr/adapters";
+import {
+  EmailChannel,
+  SlackChannel,
+  TeamsChannel,
+  TelegramChannel,
+} from "@openokr/adapters";
 import { CHANNEL_CAPABILITIES } from "@openokr/core";
 import { expect, test } from "vitest";
 
@@ -38,6 +43,16 @@ test("the Slack driver reports what the core matrix says Slack can do", () => {
   });
 
   expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.slack);
+});
+
+test("the Teams driver reports what the core matrix says Teams can do", () => {
+  const driver = new TeamsChannel({
+    appId: "unused",
+    appPassword: "unused",
+    conversationFor: () => null,
+  });
+
+  expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.teams);
 });
 
 test("the Telegram driver reports what the core matrix says Telegram can do", () => {

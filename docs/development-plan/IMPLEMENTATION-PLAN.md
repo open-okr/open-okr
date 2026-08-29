@@ -924,11 +924,27 @@ Deliverables: the notifications-and-channels card in workspace admin (UIUX-PLAN.
 Test plan: a member without workspace administration sees the permission-denied state and not the card; a connected provider shows its state and never its credential; a test send writes one log row; a member issues a code, and the code is shown once and not stored; disconnecting removes the provider from the list and frees its installation.
 Acceptance: Given a workspace administrator with a Slack bot token, when they connect Slack and a member links their account from their own settings, then a nudge for that member arrives in Slack, and neither screen has ever displayed the token.
 
-### P5-T03: Microsoft Teams driver [L]
+### P5-T03a: The Teams driver and its inbound door [M]
 Depends on: P5-T01b-b
-Goal: the enterprise chat provider.
+Goal: Teams reachable, in and out, on the same router every other provider uses.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: the application manifest and tenant consent flow; connection and identity linking; adaptive card outbound for direct messages and channels; inbound verification; command and card action handling.
+
+**Cut in two along the same seam Slack was.** P5-T02a built a driver and an
+inbound door, and P5-T02b built what only a provider with a rich surface can do.
+Teams divides the same way: getting a message in and out of Teams at all is one
+session, and adaptive cards with actions on them is another. The acceptance
+criterion belongs to the second, because a card with a blocker's age and a
+reassign action is a card.
+
+Deliverables: the `TeamsChannel` driver with no vendor SDK, sending through the Bot Framework with a client-credentials token; the tenant's service URL learned from inbound and held on the connection, because Teams gives no way to open a conversation without one; inbound verification of Microsoft's signed token against its own published keys, including the audience, the issuer and the service URL the token binds; the installation row so an inbound activity can find its workspace before a tenant is known; identity linking through the existing code flow; the application manifest and the runbook for installing it; the connection form on the channel settings screen.
+Test plan: a token signed by the wrong key, for the wrong audience, from the wrong issuer, past its expiry, or naming a different service URL is refused, and each for its own reason; a message from an unlinked sender is answered with silence; the same command typed in Teams reaches the same registry action as in Slack.
+Acceptance: Given a workspace with Teams connected and a member linked, when they type a command in Teams, then it is refused or acted on exactly as the same command in Slack, and the attempt is audited with the channel named.
+
+### P5-T03b: Adaptive cards and card actions [M]
+Depends on: P5-T03a, P5-T06a
+Goal: a nudge that can be acted on where it arrives.
+Deliverables: the adaptive card rendering for a nudge, with the card's actions carrying the same command scheme the Slack buttons and the Telegram keyboard already use; the blocker escalation card with the blocker, its age and the actions to reassign or resolve; card action payloads handled through the one inbound door; posting to a channel as well as to a person.
+Test plan: a card action reaches the same registry action a typed command does; a card whose action does not fit the scheme is sent as a link rather than a broken button.
 Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
 
 ### P5-T04: WhatsApp driver [L]
@@ -1242,7 +1258,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (25: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **116 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (26: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **117 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

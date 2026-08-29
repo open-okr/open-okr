@@ -61,8 +61,17 @@ export interface InboundEndpoint {
     readonly rawBody: string;
     readonly headers: Readonly<Record<string, string>>;
   }) => Promise<string | null>;
-  /** Builds the driver from the connection's decrypted secret, or null. */
-  readonly buildDriver: (secret: string) => Channel | null;
+  /**
+   * Builds the driver from the connection's decrypted secret, or null.
+   *
+   * The connection's `config` comes too, because Teams keeps the service URL it
+   * learned there and cannot send without one (P5-T03a). Every other provider
+   * ignores it.
+   */
+  readonly buildDriver: (
+    secret: string,
+    config: Readonly<Record<string, unknown>>,
+  ) => Channel | null;
   /** The provider's own delivery id, for the duplicate check. */
   readonly deliveryId: (input: {
     readonly rawBody: string;
@@ -81,6 +90,19 @@ export interface InboundEndpoint {
     readonly secret: string;
     readonly now: Date;
   }) => Promise<Response | null>;
+  /**
+   * Something to record before the message is handled, having verified it
+   * (P5-T03a).
+   *
+   * Teams uses it for the service URL, which is the only way this product ever
+   * learns where to send a Teams message. Returning nothing, unlike
+   * `beforeMessage`, because this is a side effect rather than an answer: a hook
+   * that could short-circuit would be a second place a request can end.
+   */
+  readonly remember?: (input: {
+    readonly rawBody: string;
+    readonly workspaceId: string;
+  }) => Promise<void>;
   /**
    * A chance to answer with something other than a chat reply, once the sender
    * is known. Slack opens a modal here.
@@ -126,7 +148,7 @@ export async function runInbound(
   if (!connection) {
     return silence();
   }
-  const driver = endpoint.buildDriver(connection.secret);
+  const driver = endpoint.buildDriver(connection.secret, connection.config);
   if (!driver) {
     return silence();
   }
@@ -146,6 +168,8 @@ export async function runInbound(
   if (short) {
     return short;
   }
+
+  await endpoint.remember?.({ rawBody, workspaceId });
 
   const message = await driver.parseInbound(rawBody);
   const deliveryId = endpoint.deliveryId({ rawBody, headers });

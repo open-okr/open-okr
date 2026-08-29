@@ -39,8 +39,8 @@ const PROVIDERS = [
   {
     id: "teams" as const,
     label: "Microsoft Teams",
-    hint: "",
-    ready: false,
+    hint: "The Application (client) ID and a client secret from the Azure bot registration, and the Directory (tenant) ID in the workspace id field. Point the bot's messaging endpoint at /api/channels/teams. The manifest to upload is in deploy/teams.",
+    ready: true,
   },
   {
     id: "whatsapp" as const,
