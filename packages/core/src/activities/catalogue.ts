@@ -300,6 +300,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     type: z.string(),
   }),
   "session.blockerResolved": z.object({ type: z.string() }),
+  "session.blockerReassigned": z.object({
+    type: z.string(),
+    ownerName: z.string(),
+  }),
   // Commitments, digest, streaks (P4-T08)
   "session.commitmentsSet": z.object({ count: z.number() }),
   "session.commitmentsClosed": z.object({ count: z.number() }),

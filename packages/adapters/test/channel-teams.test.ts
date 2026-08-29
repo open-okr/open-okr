@@ -8,6 +8,7 @@ import {
   teamsServiceUrl,
   teamsTenantId,
   toActivity,
+  toAdaptiveCard,
 } from "../src/drivers/channel/teams.ts";
 
 /**
@@ -232,7 +233,9 @@ describe("sending", () => {
 });
 
 describe("the activity a message becomes", () => {
-  it("carries the text, as markdown", () => {
+  it("stays a plain message when there is nothing for a card to hold", () => {
+    // Wrapping every sentence in a card would make an ordinary reply look like
+    // a form.
     expect(toActivity({ text: "Hello" })).toEqual({
       type: "message",
       textFormat: "markdown",
@@ -240,25 +243,79 @@ describe("the activity a message becomes", () => {
     });
   });
 
-  it("renders link buttons under the message", () => {
+  it("becomes a card the moment there is an action or a block", () => {
     const built = toActivity({
-      text: "Your check-in is due.",
-      buttons: [{ label: "Check in", url: "https://okr.example/check-in" }],
+      text: "A dependency blocker has been open for 26 hours.",
+      buttons: [{ label: "Resolve", url: "okr:resolve abc" }],
     });
-    expect(built.text).toContain("[Check in](https://okr.example/check-in)");
+
+    expect(built.type).toBe("message");
+    // The text is still there: it is what the notification preview and an
+    // accessibility reader use, and what a client that cannot render the card
+    // falls back to.
+    expect(built.text).toContain("26 hours");
+    const attachments = built.attachments as { contentType: string }[];
+    expect(attachments[0]?.contentType).toBe(
+      "application/vnd.microsoft.card.adaptive",
+    );
   });
 
-  it("leaves command buttons out until there is a card to put them on", () => {
-    // P5-T03b renders these as card actions. A link to `okr:status` would be a
-    // link a person can click and nothing would happen.
-    const built = toActivity({
-      text: "Your check-in is due.",
-      buttons: [{ label: "Check in", url: "okr:checkin g-1" }],
+  it("renders a command as a submit action and a link as an open action", () => {
+    const card = toAdaptiveCard({
+      text: "A blocker needs you.",
+      buttons: [
+        { label: "Resolve", url: "okr:resolve abc" },
+        { label: "Open the board", url: "https://okr.example/spaces/1" },
+      ],
     });
-    expect(built.text).toBe("Your check-in is due.");
+
+    expect(card.actions).toEqual([
+      {
+        type: "Action.Submit",
+        title: "Resolve",
+        // Read back off the activity's `value` on the way in, which is what
+        // makes a card button reach the same router a typed command does.
+        data: { command: "resolve abc" },
+      },
+      {
+        type: "Action.OpenUrl",
+        title: "Open the board",
+        url: "https://okr.example/spaces/1",
+      },
+    ]);
+  });
+
+  it("puts the builder's blocks in the card's body, after the text", () => {
+    const card = toAdaptiveCard({
+      text: "A blocker needs you.",
+      blocks: [
+        { type: "FactSet", facts: [{ title: "Open for", value: "26 hours" }] },
+      ],
+    });
+
+    const body = card.body as Record<string, unknown>[];
+    expect(body[0]).toMatchObject({ type: "TextBlock" });
+    expect(body[1]).toMatchObject({ type: "FactSet" });
+  });
+
+  it("declares a schema and a version, so a client knows what it is reading", () => {
+    const card = toAdaptiveCard({
+      text: "x",
+      buttons: [{ label: "a", url: "okr:b" }],
+    });
+    expect(card.type).toBe("AdaptiveCard");
+    expect(card.version).toBe("1.5");
+    expect(card.$schema).toContain("adaptivecards.io");
+  });
+
+  it("carries no actions key at all when there are no buttons", () => {
+    const card = toAdaptiveCard({
+      text: "x",
+      blocks: [{ type: "TextBlock", text: "y" }],
+    });
+    expect(card.actions).toBeUndefined();
   });
 });
-
 describe("verifying an inbound activity", () => {
   const verify = (
     token: string,

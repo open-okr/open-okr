@@ -61,6 +61,7 @@ export {
   teamsServiceUrl,
   teamsTenantId,
   toActivity,
+  toAdaptiveCard,
 } from "./drivers/channel/teams.ts";
 export {
   TelegramChannel,

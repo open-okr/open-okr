@@ -68,7 +68,26 @@ export interface BuildOptions {
   readonly insideConversationWindow?: boolean;
 }
 
-/** Text with one labelled link per button, which is what a link-only provider gets. */
+/**
+ * The scheme a button uses when it runs a command rather than going somewhere.
+ *
+ * The same one the Slack blocks, the Telegram keyboard and the Teams card
+ * actions read, which is what lets a message be written once and rendered three
+ * ways.
+ */
+const COMMAND_SCHEME = "okr:";
+
+/**
+ * Text with one line per button, which is what a provider with no buttons gets.
+ *
+ * **A command button is not a link and must never be printed as one.** A button
+ * carrying `okr:resolve abc` rendered as "Resolve: okr:resolve abc" is a line
+ * somebody clicks and nothing happens. Every provider that can receive a message
+ * can receive a typed command, so a command button degrades into the words to
+ * type instead. Nothing passed a command button through the builder before
+ * P5-T03b, so no message was ever broken by this; the escalation card reaching
+ * email would have been the first.
+ */
 export function withLinkedButtons(draft: MessageDraft): string {
   if (!draft.buttons || draft.buttons.length === 0) {
     return draft.text;
@@ -76,7 +95,11 @@ export function withLinkedButtons(draft: MessageDraft): string {
   return [
     draft.text,
     "",
-    ...draft.buttons.map((button) => `${button.label}: ${button.url}`),
+    ...draft.buttons.map((button) =>
+      button.url.startsWith(COMMAND_SCHEME)
+        ? `${button.label}: reply "${button.url.slice(COMMAND_SCHEME.length)}"`
+        : `${button.label}: ${button.url}`,
+    ),
   ].join("\n");
 }
 

@@ -27,6 +27,7 @@ import type { ChannelProviderKey } from "../channels/capabilities.ts";
 import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { resolveDelivery } from "../channels/routing.ts";
+import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
   /** Nudges stamped as sent on this pass. */
@@ -99,6 +100,15 @@ export async function deliverDueNudges(
     readonly now: Date;
     /** Bounded so one pass cannot hold a transaction open over a backlog. */
     readonly limit?: number;
+    /**
+     * The instance's own address, for links inside a message (P5-T03b).
+     *
+     * Optional, because every caller before the escalation card had nothing to
+     * link to and a required argument would have been a required argument for
+     * nothing. Absent means the card is sent without its board link, not that
+     * it is not sent.
+     */
+    readonly baseUrl?: string;
   },
 ): Promise<DeliveryResult> {
   const due = await tx
@@ -107,6 +117,10 @@ export async function deliverDueNudges(
       ruleKey: nudges.ruleKey,
       recipientMemberId: nudges.recipientMemberId,
       escalationStep: nudges.escalationStep,
+      // Read so a blocker rule can say which blocker (P5-T03b). Every other
+      // rule ignores both.
+      subjectType: nudges.subjectType,
+      subjectId: nudges.subjectId,
     })
     .from(nudges)
     .where(
@@ -190,7 +204,21 @@ export async function deliverDueNudges(
 
     if (delivery.channel !== "in_app") {
       const provider = delivery.channel as ChannelProviderKey;
-      const message = buildMessage(draftFor(row.ruleKey), provider);
+      // A blocker rule carries the blocker's own words, its age and the two
+      // actions worth offering; everything else carries the generic line.
+      // Falls back when the blocker has gone or was resolved between the nudge
+      // being scheduled and this pass running, which is an ordinary race.
+      const draft =
+        isBlockerRule(row.ruleKey) && row.subjectType === "blocker"
+          ? ((await blockerDraft(tx, {
+              workspaceId: input.workspaceId,
+              blockerId: row.subjectId,
+              ruleKey: row.ruleKey,
+              now: input.now,
+              ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+            })) ?? draftFor(row.ruleKey))
+          : draftFor(row.ruleKey);
+      const message = buildMessage(draft, provider);
       await queueChannelMessageInTx(tx, {
         workspaceId: input.workspaceId,
         memberId: row.recipientMemberId,

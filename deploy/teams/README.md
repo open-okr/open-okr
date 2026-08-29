@@ -59,8 +59,12 @@ account settings: press "Get a code" for Teams, then send that code to the bot.
 Until they do, nothing they type is honoured, which is deliberate: a message from
 an account the product cannot vouch for is answered with silence.
 
-## What is not here yet
+## What a nudge looks like
 
-Adaptive cards. P5-T03a sends text, and a nudge's actions arrive as links under
-the message. The cards, and the blocker escalation card with a reassign action,
-are P5-T03b.
+A reminder with nothing to act on arrives as an ordinary message. One with
+actions arrives as an adaptive card: a blocker that has been open too long shows
+its age, what it blocks and the next action its owner wrote, with **Resolve** and
+**Take it on** as buttons and a link to the board.
+
+Pressing one runs the same command somebody could have typed, checked the same
+way, and audited with Teams named on the row.

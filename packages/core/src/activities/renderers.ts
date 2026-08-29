@@ -258,6 +258,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Blockers (P4-T07c)
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
+  "session.blockerReassigned": (p) =>
+    `A ${asString(p.type, "blocker")} blocker was handed to ${asString(p.ownerName, "somebody else")}`,
   // Commitments, digest, streaks (P4-T08)
   "session.commitmentsSet": (p) =>
     `Set ${asString(p.count, "0")} commitments for this week`,

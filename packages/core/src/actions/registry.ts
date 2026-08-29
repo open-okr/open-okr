@@ -276,6 +276,7 @@ import {
   readScoringStatus,
   readSession,
   readStreak,
+  reassignSessionBlocker,
   recordDecision,
   recordDiagnostic,
   removeRetroNote,
@@ -542,6 +543,7 @@ export const ACTION_MAP = {
   // Blockers (P4-T07c)
   "sessions.createBlocker": createSessionBlocker,
   "sessions.resolveBlocker": resolveSessionBlocker,
+  "sessions.reassignBlocker": reassignSessionBlocker,
   "sessions.blockerStatus": sessionBlockerStatus,
   "blockers.board": readBlockerBoard,
   "blockers.summarise": summariseBlockers,

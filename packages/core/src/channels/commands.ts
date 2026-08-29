@@ -64,7 +64,7 @@ export interface ChatCommand {
   ) => Record<string, unknown>;
 }
 
-/** §5.3's seven commands. */
+/** §5.3's commands, plus the two the escalation card needs (P5-T03b). */
 export const CHAT_COMMANDS: readonly ChatCommand[] = [
   {
     /**
@@ -120,6 +120,40 @@ export const CHAT_COMMANDS: readonly ChatCommand[] = [
       { name: "text", hint: "what you are committing to", required: true },
     ],
     toInput: (args) => ({ text: args.text }),
+  },
+  {
+    /**
+     * Closing a blocker, which is the other half of raising one (P5-T03b).
+     *
+     * One line, for the same reason `blocker` is: somebody closing one is
+     * usually answering a card or a reminder, and the whole message is an
+     * identifier they did not type themselves.
+     */
+    verb: "resolve",
+    action: "sessions.resolveBlocker",
+    summary: "Close a blocker that is done.",
+    args: [
+      { name: "blocker", hint: "the blocker's identifier", required: true },
+    ],
+    toInput: (args) => ({ id: args.blocker }),
+  },
+  {
+    /**
+     * Taking a blocker on (P5-T03b).
+     *
+     * The escalation ladder ends at somebody who did not raise the blocker, and
+     * the two useful answers are "it is done" and "I will take it". The new
+     * owner is the sender and the router fills it in, because a command that
+     * accepted a member id would be a command for handing work to other people
+     * from a phone.
+     */
+    verb: "take",
+    action: "sessions.reassignBlocker",
+    summary: "Take a blocker on yourself.",
+    args: [
+      { name: "blocker", hint: "the blocker's identifier", required: true },
+    ],
+    toInput: (args) => ({ id: args.blocker }),
   },
   {
     verb: "status",

@@ -5664,6 +5664,29 @@
       "pages": false
     },
     {
+      "name": "sessions reassignBlocker",
+      "action": "sessions.reassignBlocker",
+      "method": "POST",
+      "path": "/sessions/reassignBlocker",
+      "scope": "write",
+      "summary": "Moves a blocker to a different owner.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions blockerStatus",
       "action": "sessions.blockerStatus",
       "method": "GET",

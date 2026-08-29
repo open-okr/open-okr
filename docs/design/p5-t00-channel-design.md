@@ -336,5 +336,13 @@ easiest of the five checks to leave out and it is the one whose absence is worst
 
 **A card action arrives as an activity with no text and a `value`.** The driver
 reads `value.command` as the text when there is none, which is what lets a card
-button reach the same router a typed command does. The cards themselves are
-P5-T03b; until then a nudge's actions are links under the message.
+button reach the same router a typed command does.
+
+**The cards themselves landed at P5-T03b**, and with them the answer to a
+question the other two providers had already half-answered: a button is either
+somewhere to go or something to run. A link becomes `Action.OpenUrl` on Teams, a
+URL button on Slack and a URL keyboard button on Telegram. A command carries the
+`okr:` scheme and becomes `Action.Submit` with the command in its `data`, a
+Block Kit action, or `callback_data`. A provider with no buttons at all gets the
+words to type, which is the degradation the builder was missing: it printed
+`okr:resolve abc` as a link, and a command button is not a link.

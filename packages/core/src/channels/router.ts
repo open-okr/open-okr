@@ -186,6 +186,14 @@ export async function routeCommand(
     });
   }
 
+  const ownerField = SENDER_OWNED[command.verb];
+  if (ownerField) {
+    return runAction(request, command, {
+      ...command.toInput(args, request.now),
+      [ownerField]: request.memberId,
+    });
+  }
+
   // The one command that is a conversation. Everything below it is a line.
   if (command.verb === CHECK_IN_COMMAND) {
     const begun = await beginCheckIn(flow, args.goal ?? "");
@@ -235,6 +243,18 @@ const SESSION_BOUND: Readonly<
       items: [{ text: args.text ?? "", ownerId: memberId }],
     }),
   },
+};
+
+/**
+ * Commands whose action needs the sender as a member id (P5-T03b).
+ *
+ * Separate from `SESSION_BOUND` because there is no lookup: the sender is
+ * already known and the only question is which field wants it. A command that
+ * took a member id from the line would be a command for handing work to other
+ * people from a phone, which is a board's job and not a chat line's.
+ */
+const SENDER_OWNED: Readonly<Record<string, string>> = {
+  take: "ownerId",
 };
 
 /**

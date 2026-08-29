@@ -2007,6 +2007,93 @@ export const resolveSessionBlocker = defineWriteAction({
   }),
 });
 
+/**
+ * Moves a blocker to a different owner (P5-T03b).
+ *
+ * **Built because the escalation card needs it, and it did not exist.** A
+ * blocker's escalation ladder ends at a coordinator, and the two things they can
+ * usefully do are close it or take it on. Closing it had an action;
+ * taking it on had none, so the card's own acceptance criterion ("an action to
+ * reassign or resolve") could not have been met without one.
+ *
+ * **The new owner is named, not chosen here.** `blocker take` from chat passes
+ * the sender, which is the case the card sends; a board that reassigns to a
+ * third person passes them. Neither is this action's decision.
+ */
+export const reassignSessionBlocker = defineWriteAction({
+  name: "sessions.reassignBlocker",
+  summary: "Moves a blocker to a different owner.",
+  input: z.object({ id: z.uuid(), ownerId: z.uuid() }),
+  output: z.object({ id: z.uuid(), ownerId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      if (!actor.memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            // A suspended member cannot be handed work. The access getter
+            // excludes them everywhere else and this is the same rule.
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError(
+          "not_found",
+          "No such member to hand this to.",
+        );
+      }
+
+      // openokr:allow-mutation: the change this action exists to make, inside
+      // the Operation pipeline's own transaction.
+      const [moved] = await tx
+        .update(blockers)
+        .set({ ownerId: input.ownerId, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            blockers,
+            eq(blockers.workspaceId, workspaceId),
+            eq(blockers.id, input.id),
+            // An open one. Reassigning something already closed moves nothing
+            // and reads as a change that mattered.
+            isNull(blockers.resolvedAt),
+          ),
+        )
+        .returning({ id: blockers.id, type: blockers.type });
+      if (!moved) {
+        throw new OperationError("not_found", "No such open blocker.");
+      }
+
+      return {
+        result: { id: moved.id, ownerId: input.ownerId },
+        activity: {
+          kind: "session.blockerReassigned",
+          subjectType: "space",
+          subjectId: workspaceId,
+          // The name at the moment of the change, so the feed keeps reading
+          // sensibly after a rename or an erasure.
+          payload: { type: moved.type, ownerName: owner.name },
+        },
+        audit: {
+          action: "sessions.reassignBlocker",
+          targetType: "blocker",
+          targetId: moved.id,
+          payload: { ownerId: input.ownerId },
+        },
+      };
+    },
+  }),
+});
+
 export const sessionBlockerStatus = defineReadAction({
   name: "sessions.blockerStatus",
   summary: "Blockers for a session, with aging information.",

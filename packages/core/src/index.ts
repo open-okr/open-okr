@@ -460,6 +460,11 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export {
+  ageInWords,
+  blockerDraft,
+  isBlockerRule,
+} from "./nudges/blocker-card.ts";
 export { deliverDueNudges, unreachableRecipients } from "./nudges/deliver.ts";
 export { isRecoveryAction } from "./operations/freeze.ts";
 export {

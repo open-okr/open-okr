@@ -70,7 +70,7 @@ const KEY_CACHE_SECONDS = 24 * 60 * 60;
 const CAPABILITIES: ChannelCapabilities = {
   outbound: true,
   inbound: true,
-  // Adaptive cards. P5-T03a sends text; P5-T03b sends the cards themselves.
+  // Adaptive cards, with the buttons as real actions on them (P5-T03b).
   richCards: true,
   buttons: true,
   // Teams has replies to an activity, but the product's threading model is one
@@ -527,31 +527,89 @@ export function stripMentions(text: string): string {
   return text.replace(/<at>[^<]*<\/at>/g, "").trim();
 }
 
+/** The schema version every card below declares. */
+const ADAPTIVE_CARD_VERSION = "1.5";
+
+/**
+ * One message as an adaptive card (P5-T03b).
+ *
+ * **Two kinds of button, two kinds of action, and the difference is who acts.**
+ * A link button is somewhere to go, so it is `Action.OpenUrl` and the browser
+ * does the work. A command button is something to run, so it is
+ * `Action.Submit` carrying the command in its `data`, which arrives back on the
+ * activity's `value` and is read as the message's text. That is the same
+ * `okr:` scheme the Slack buttons and the Telegram keyboard already use, so a
+ * command is written once and rendered three ways.
+ *
+ * **The body is the text, plus whatever the builder shaped.** `blocks` for Teams
+ * are adaptive-card body elements, appended after the text. A provider-shaped
+ * block is exactly what the port says `blocks` is, and the builder already drops
+ * them for a provider with no rich cards.
+ */
+export function toAdaptiveCard(
+  message: ChannelMessage,
+): Record<string, unknown> {
+  const body: Record<string, unknown>[] = [];
+  if (message.text.trim() !== "") {
+    body.push({ type: "TextBlock", text: message.text, wrap: true });
+  }
+  for (const block of message.blocks ?? []) {
+    body.push(block as Record<string, unknown>);
+  }
+
+  const actions = (message.buttons ?? []).map((button) =>
+    button.url.startsWith(COMMAND_SCHEME)
+      ? {
+          type: "Action.Submit",
+          title: button.label,
+          data: { command: button.url.slice(COMMAND_SCHEME.length) },
+        }
+      : { type: "Action.OpenUrl", title: button.label, url: button.url },
+  );
+
+  return {
+    type: "AdaptiveCard",
+    $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+    version: ADAPTIVE_CARD_VERSION,
+    body,
+    ...(actions.length > 0 ? { actions } : {}),
+  };
+}
+
 /**
  * One message as a Bot Framework activity.
  *
- * Text only in P5-T03a. Buttons become a plain list of links under the message,
- * which is what every provider's fallback looks like: the adaptive card that
- * renders them as real actions is P5-T03b, and a half-built card would be worse
- * than a link that works.
+ * **A card only when there is something for a card to hold.** A plain reminder
+ * with no actions and no blocks is a plain message: wrapping every sentence in a
+ * card would make an ordinary reply look like a form. `text` is set either way,
+ * because it is what a notification preview and an accessibility reader use, and
+ * because a client that cannot render the card still shows something true.
  */
 export function toActivity(message: ChannelMessage): Record<string, unknown> {
-  const links = (message.buttons ?? []).filter(
-    (button) => !button.url.startsWith(COMMAND_SCHEME),
-  );
-  const text =
-    links.length === 0
-      ? message.text
-      : [
-          message.text,
-          "",
-          ...links.map((button) => `[${button.label}](${button.url})`),
-        ].join("\n");
+  const hasCard =
+    (message.buttons?.length ?? 0) > 0 || (message.blocks?.length ?? 0) > 0;
+
+  if (!hasCard) {
+    return {
+      type: "message",
+      textFormat: "markdown",
+      text: message.text,
+    };
+  }
 
   return {
     type: "message",
     textFormat: "markdown",
-    text,
+    // The fallback, and the preview. Not the card's own text repeated into the
+    // body twice: Teams shows this in the notification and the card in the
+    // conversation.
+    text: message.text,
+    attachments: [
+      {
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: toAdaptiveCard(message),
+      },
+    ],
   };
 }
 
