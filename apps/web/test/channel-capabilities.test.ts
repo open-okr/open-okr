@@ -3,6 +3,7 @@ import {
   SlackChannel,
   TeamsChannel,
   TelegramChannel,
+  WhatsAppChannel,
 } from "@openokr/adapters";
 import { CHANNEL_CAPABILITIES } from "@openokr/core";
 import { expect, test } from "vitest";
@@ -63,6 +64,17 @@ test("the Telegram driver reports what the core matrix says Telegram can do", ()
   });
 
   expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.telegram);
+});
+
+test("the WhatsApp driver reports what the core matrix says WhatsApp can do", () => {
+  const driver = new WhatsAppChannel({
+    phoneNumberId: "unused",
+    accessToken: "unused",
+    appSecret: "unused",
+    numberFor: () => null,
+  });
+
+  expect(driver.capabilities()).toEqual(CHANNEL_CAPABILITIES.whatsapp);
 });
 
 test("every provider the matrix names is one the router can choose", () => {

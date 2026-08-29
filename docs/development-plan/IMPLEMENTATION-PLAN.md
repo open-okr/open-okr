@@ -947,12 +947,36 @@ Deliverables: the adaptive card rendering for a nudge, with the card's actions c
 Test plan: a card action reaches the same registry action a typed command does; a card whose action does not fit the scheme is sent as a link rather than a broken button.
 Acceptance: Given a Teams-connected workspace, when a blocker escalates, then the coordinator receives an adaptive card in Teams with the blocker, its age and an action to reassign or resolve.
 
-### P5-T04: WhatsApp driver [L]
+### P5-T04a: The WhatsApp driver and its inbound door [M]
 Depends on: P5-T01b-b
-Goal: the reach provider.
+Goal: WhatsApp reachable, in and out, on the same router every other provider uses.
 Reference mockup: [09-channels](../stakeholder/mockups/png/09-channels.png). Reference, not authority: UIUX-PLAN.md §10.
-Deliverables: Business API connection; template registration per nudge kind with the template-versus-free-form window handled by the message builder; identity linking with verification; conversational inbound handling for check-in and blocker capture; a documented setup runbook.
-Test plan: an outbound message outside the conversation window uses an approved template; inside it, free form is used; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
+
+**Cut in two, the same way Slack and Teams were, and along a line this provider
+draws itself.** Sending and receiving a WhatsApp message is one session. The
+conversation window is a different problem: it decides *what may be sent at all*
+rather than how it looks, it needs the last inbound moment recorded per member,
+and it needs a registry of approved templates whose home is an open question
+(design C3). Building the door first means the window is not held up by it, and
+the acceptance criterion belongs to the window because a template is what it is
+about.
+
+Deliverables: the `WhatsAppChannel` driver over the Cloud API with no vendor SDK; inbound verification of Meta's HMAC signature over the raw body; the webhook verification handshake, which is a GET and therefore the one inbound path that is not a message; the installation row keyed on the phone number id, so an inbound message finds its workspace before a tenant is known; identity linking through the existing code flow; the connection form and the setup runbook.
+Test plan: a body whose signature does not match is refused before it is parsed; the verification handshake answers only for the right token; a message from an unlinked sender is answered with silence; a command typed in WhatsApp reaches the same registry action as in Slack.
+Acceptance: Given a workspace with WhatsApp connected and a member linked, when they type a command, then it is refused or acted on exactly as the same command in Slack, and the attempt is audited with the channel named.
+
+### P5-T04b: The conversation window and its templates [M]
+Depends on: P5-T04a, P5-T06b
+Goal: the product may only speak first with words the provider approved.
+
+**The open question this part has to settle first.** Design C3's position is that
+the per-nudge-kind template registry belongs in `packages/method`, because a
+template is a coaching message and §11 already owns those. That would mean
+METHOD.md defining the templates, which is a human's decision and not this
+agent's. Ask before building.
+
+Deliverables: the last inbound moment recorded per identity, which is what the window is measured from; the builder told which side of the window it is on, rather than assuming; the approved-template registry wherever the answer to C3 puts it; template sending in the driver; the conversational check-in reached from a template reply.
+Test plan: an outbound message outside the window uses an approved template; inside it, free form is used; a message outside the window with no registered template is not sent and says so; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
 Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
 
 ### P5-T05: Telegram driver [M]
@@ -1258,7 +1282,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (26: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **117 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (27: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **118 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

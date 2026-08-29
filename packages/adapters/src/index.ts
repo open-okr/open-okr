@@ -70,6 +70,14 @@ export {
   telegramDeliveryId,
   toInlineKeyboard,
 } from "./drivers/channel/telegram.ts";
+export {
+  verifySubscription,
+  WhatsAppChannel,
+  type WhatsAppChannelOptions,
+  WhatsAppPermanentError,
+  whatsAppDeliveryId,
+  whatsAppPhoneNumberId,
+} from "./drivers/channel/whatsapp.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {

@@ -327,10 +327,12 @@ export {
   parseSlackSecret,
   parseTeamsSecret,
   parseTelegramSecret,
+  parseWhatsAppSecret,
   rememberConnectionConfig,
   type SlackSecret,
   type TeamsSecret,
   type TelegramSecret,
+  type WhatsAppSecret,
 } from "./channels/connections.ts";
 export {
   type Conversation,

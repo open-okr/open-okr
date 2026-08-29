@@ -203,6 +203,48 @@ export async function rememberConnectionConfig(
   });
 }
 
+/** What a WhatsApp connection's secret holds. */
+export interface WhatsAppSecret {
+  /** The permanent access token that sends. Never logged. */
+  readonly accessToken: string;
+  /** The app secret that signs every inbound body. Never logged. */
+  readonly appSecret: string;
+  /**
+   * The token echoed back during Meta's subscription handshake.
+   *
+   * Chosen by the administrator rather than issued, like Telegram's webhook
+   * secret, and stored beside the other two because all three are set once on
+   * the same screen.
+   */
+  readonly verifyToken: string;
+}
+
+/**
+ * The WhatsApp secret, or null when the stored string is not one.
+ *
+ * Three fields rather than two, because this provider has three separate
+ * credentials and folding any of them into another would mean one screen
+ * pretending they are the same thing.
+ */
+export function parseWhatsAppSecret(secret: string): WhatsAppSecret | null {
+  try {
+    const parsed = JSON.parse(secret) as Record<string, unknown>;
+    const accessToken = parsed.accessToken;
+    const appSecret = parsed.appSecret;
+    const verifyToken = parsed.verifyToken;
+    if (
+      typeof accessToken !== "string" ||
+      typeof appSecret !== "string" ||
+      typeof verifyToken !== "string"
+    ) {
+      return null;
+    }
+    return { accessToken, appSecret, verifyToken };
+  } catch {
+    return null;
+  }
+}
+
 /** What a Teams connection's secret holds. */
 export interface TeamsSecret {
   /** The bot's application id, which is also the inbound token's audience. */

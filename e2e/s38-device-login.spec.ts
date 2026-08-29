@@ -150,7 +150,15 @@ test("acceptance: a signed-out terminal ends up holding a scoped token", async (
   // file that does not exist yet. It never sees a password.
   expect(storedProfiles().default).toBeUndefined();
 
-  const login = startLogin(["--url", base, "--scopes", "read"]);
+  const login = startLogin([
+    "--url",
+    base,
+    "--scopes",
+    "read",
+    // Nothing opens. A test run must not put a tab in the browser of whoever
+    // is watching it.
+    "--no-browser",
+  ]);
   const printed = await login.link;
 
   await goTo(page, printed.slice(printed.indexOf("/account/device")));
@@ -202,7 +210,13 @@ test("the token appears in the account list, named after the terminal", async ()
 });
 
 test("refusing one in the browser ends the terminal's login", async () => {
-  const login = startLogin(["--url", base, "--profile", "refused"]);
+  const login = startLogin([
+    "--url",
+    base,
+    "--profile",
+    "refused",
+    "--no-browser",
+  ]);
   const printed = await login.link;
 
   await goTo(page, printed.slice(printed.indexOf("/account/device")));

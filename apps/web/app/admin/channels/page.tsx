@@ -45,8 +45,8 @@ const PROVIDERS = [
   {
     id: "whatsapp" as const,
     label: "WhatsApp",
-    hint: "",
-    ready: false,
+    hint: "The permanent access token in the bot token box, the app secret in the signing secret box, and the Phone number ID in the workspace id field. Choose a verify token of your own and put it after the app secret, separated by a space. Point the webhook at /api/channels/whatsapp?phone_number_id=<your phone number id>. deploy/whatsapp has the runbook.",
+    ready: true,
   },
   {
     id: "telegram" as const,

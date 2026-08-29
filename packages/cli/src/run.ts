@@ -64,7 +64,7 @@ function topHelp(contract: CliContract): string {
     "okr — OpenOKR from a terminal.",
     "",
     "  okr <domain> <verb> [--flag value]",
-    "  okr login --url <instance> --token <token> [--profile name]",
+    "  okr login --url <instance> [--token <token>] [--no-browser]",
     "  okr logout [--profile name]",
     "  okr profiles",
     "",
@@ -169,7 +169,13 @@ async function deviceLogin(input: {
       new Promise<void>((resolve) => {
         setTimeout(resolve, milliseconds);
       }));
-  const open = input.options.open ?? openBrowser;
+  // **`--no-browser` opens nothing.** A login over SSH, in a container, or on a
+  // machine whose browser belongs to somebody who is using it should print the
+  // link and stop there. The end-to-end suite passes it for exactly that
+  // reason: a test run must not put a tab in the window of whoever is watching
+  // it, which it did until somebody watching said so.
+  const wanted = input.flags["no-browser"] === undefined;
+  const open = input.options.open ?? (wanted ? openBrowser : () => {});
   const call = input.options.fetch ?? globalThis.fetch;
 
   // Asked for explicitly or read and write, which is what a person at a terminal

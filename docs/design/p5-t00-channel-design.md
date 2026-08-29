@@ -346,3 +346,35 @@ URL button on Slack and a URL keyboard button on Telegram. A command carries the
 Block Kit action, or `callback_data`. A provider with no buttons at all gets the
 words to type, which is the degradation the builder was missing: it printed
 `okr:resolve abc` as a link, and a command button is not a link.
+
+## WhatsApp, and the provider that limits what may be said (P5-T04a)
+
+The fourth provider, and again nothing in `packages/core` changed to add it. What
+is new is a kind of constraint the other three do not have.
+
+| | Slack | Teams | Telegram | WhatsApp |
+|---|---|---|---|---|
+| Inbound verification | HMAC over the body | a signed token | a shared secret | HMAC over the body |
+| Buttons | Block Kit | card actions | inline keyboard | none |
+| May speak first | always | always | always | only with an approved template, outside a window |
+
+**The other three limit how a message looks. This one limits whether it may be
+sent at all.** Outside a twenty-four hour window opened by the member's own last
+message, Meta will carry only templates it approved in advance. The builder has
+known how to answer that since P5-T01b-b and the matrix has carried
+`templateOnlyOutbound` since then; what is missing is the fact of which side of
+the window a given member is on, which needs their last inbound moment recorded.
+That is P5-T04b, and it carries this task's acceptance criterion because a
+template is what the criterion is about.
+
+**The verification handshake is a GET, and it is the first inbound path in this
+product that is not a message.** Meta proves the endpoint belongs to whoever
+configured it by asking it to echo a challenge, with no body and no signature to
+verify. It cannot go through §6's order, so it is answered by the endpoint
+itself, against a token the administrator chose, compared in constant time. A
+wrong token and a number this instance does not know get the same refusal.
+
+**No buttons, and the degradation built at P5-T03b turns out to be this
+provider's native shape.** A command button folds into the text as `Resolve:
+reply "resolve abc"`, which on WhatsApp is the literal instruction. What was
+written to stop a broken link is what this provider wanted all along.

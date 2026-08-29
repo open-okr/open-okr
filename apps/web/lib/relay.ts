@@ -35,6 +35,7 @@ import {
   SlackChannel,
   TeamsChannel,
   TelegramChannel,
+  WhatsAppChannel,
 } from "@openokr/adapters";
 import { type Env, loadEnv } from "@openokr/config";
 import {
@@ -48,6 +49,7 @@ import {
   parseSlackSecret,
   parseTeamsSecret,
   parseTelegramSecret,
+  parseWhatsAppSecret,
   resolveAICredential,
   resolveTierRoute,
 } from "@openokr/core";
@@ -233,6 +235,36 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
                   memberExternalId(getPool(), {
                     workspaceId,
                     provider: "teams",
+                    memberId: recipient.memberId,
+                  }),
+              });
+              return channel.send({ memberId: message.memberId }, outbound);
+            }
+
+            if (message.provider === "whatsapp") {
+              const connection = await openConnection(getPool(), getKeyRing(), {
+                workspaceId,
+                provider: "whatsapp",
+              });
+              const secret = connection
+                ? parseWhatsAppSecret(connection.secret)
+                : null;
+              const phoneNumberId = connection?.config.teamId;
+              if (!secret || typeof phoneNumberId !== "string") {
+                return {
+                  delivered: false,
+                  suppressedReason:
+                    "WhatsApp is not connected, or its stored credentials are not readable",
+                };
+              }
+              const channel = new WhatsAppChannel({
+                phoneNumberId,
+                accessToken: secret.accessToken,
+                appSecret: secret.appSecret,
+                numberFor: (recipient) =>
+                  memberExternalId(getPool(), {
+                    workspaceId,
+                    provider: "whatsapp",
                     memberId: recipient.memberId,
                   }),
               });

@@ -1,0 +1,395 @@
+/**
+ * The WhatsApp driver, over Meta's Cloud API (AI-NATIVE-PLAN.md §5, P5-T04a).
+ *
+ * **The fourth provider, and the one whose constraint is about what may be said
+ * rather than how it looks.** Slack, Teams and Telegram will carry any message
+ * at any time. WhatsApp will not: outside a twenty-four hour window opened by
+ * the member's own last message, only templates Meta approved in advance may be
+ * sent. The window is P5-T04b; this driver can send a template and says so, and
+ * the capability matrix has carried `templateOnlyOutbound: true` for it since
+ * P5-T01b-b.
+ *
+ * **No buttons, and that turns out to be exactly right.** The matrix says
+ * WhatsApp has none, so the builder folds them into the text, and P5-T03b made a
+ * command button degrade into the words to type. On WhatsApp that is literally
+ * the instruction: reply with `resolve abc`. What began as a fix for a broken
+ * link is the native shape of this provider.
+ *
+ * **The verification handshake is a GET, and it is not a message.** Meta proves
+ * the endpoint is yours by asking it to echo a challenge before it will send
+ * anything. That is the one inbound path here that carries no signature and no
+ * body, so it is answered by the endpoint rather than by this driver's
+ * `verifyInbound`, and it is the reason the route has a GET at all.
+ *
+ * **No SDK.** JSON over HTTPS, and an HMAC-SHA256 over the raw body.
+ */
+import { createHmac, timingSafeEqual } from "node:crypto";
+import type {
+  Channel,
+  ChannelCapabilities,
+  ChannelMessage,
+  ChannelProvider,
+  ChannelRecipient,
+  DeliveryResult,
+  InboundMessage,
+  InboundRequest,
+} from "../../ports/channel.ts";
+
+/** The Cloud API. Pinned, because a graph version is a contract. */
+const API = "https://graph.facebook.com/v21.0";
+
+const CAPABILITIES: ChannelCapabilities = {
+  outbound: true,
+  inbound: true,
+  richCards: false,
+  // Meta has interactive reply buttons, and the product does not use them: the
+  // builder folds a button into the text, which on this provider is the
+  // instruction to reply with a command, and that works inside and outside the
+  // window alike.
+  buttons: false,
+  threads: false,
+  // Outside the conversation window. The builder is told which side it is on;
+  // the flag says the provider has a window at all.
+  templateOnlyOutbound: true,
+};
+
+export interface WhatsAppChannelOptions {
+  /** The business phone number that sends. Also names the workspace inbound. */
+  readonly phoneNumberId: string;
+  /** The permanent access token. Never logged. */
+  readonly accessToken: string;
+  /** The app secret, which signs every inbound body. Never logged. */
+  readonly appSecret: string;
+  /** Resolves a member to the number they linked. */
+  readonly numberFor: (
+    recipient: ChannelRecipient,
+  ) => Promise<string | null> | string | null;
+  /** The language an approved template is sent in. Meta requires one. */
+  readonly templateLanguage?: string;
+  /** Test seam. Defaults to global `fetch`. */
+  readonly fetch?: typeof globalThis.fetch;
+}
+
+/**
+ * A refusal from Meta that retrying cannot fix.
+ *
+ * A number that is not on WhatsApp, a token the app no longer holds, and a
+ * template that was never approved all say the same thing on the tenth attempt.
+ */
+export class WhatsAppPermanentError extends Error {
+  override readonly name = "PermanentDispatchError";
+  readonly detail: string;
+
+  constructor(detail: string) {
+    super(`WhatsApp refused this permanently: ${detail}`);
+    this.detail = detail;
+  }
+}
+
+interface GraphError {
+  readonly message?: string;
+  readonly code?: number;
+  readonly error_subcode?: number;
+}
+
+/**
+ * Which Graph errors are worth another attempt.
+ *
+ * 131047 is "outside the window", 132000 and its neighbours are template
+ * problems, 190 is a token the app no longer holds: none of them changes on a
+ * retry. A rate limit (4, 80007) and anything unrecognised do.
+ */
+const PERMANENT_CODES = new Set([100, 131_026, 131_047, 132_000, 132_001, 190]);
+
+const isPermanent = (error: GraphError): boolean =>
+  PERMANENT_CODES.has(error.code ?? -1);
+
+export class WhatsAppChannel implements Channel {
+  readonly provider: ChannelProvider = "whatsapp";
+  readonly #phoneNumberId: string;
+  readonly #accessToken: string;
+  readonly #appSecret: string;
+  readonly #numberFor: WhatsAppChannelOptions["numberFor"];
+  readonly #templateLanguage: string;
+  readonly #fetch: typeof globalThis.fetch;
+
+  constructor(options: WhatsAppChannelOptions) {
+    this.#phoneNumberId = options.phoneNumberId;
+    this.#accessToken = options.accessToken;
+    this.#appSecret = options.appSecret;
+    this.#numberFor = options.numberFor;
+    this.#templateLanguage = options.templateLanguage ?? "en";
+    this.#fetch = options.fetch ?? globalThis.fetch;
+  }
+
+  async #post(body: unknown): Promise<{ id?: string }> {
+    const response = await this.#fetch(
+      `${API}/${encodeURIComponent(this.#phoneNumberId)}/messages`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.#accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (response.ok) {
+      const parsed = (await response.json().catch(() => ({}))) as {
+        messages?: { id?: string }[];
+      };
+      return {
+        ...(parsed.messages?.[0]?.id ? { id: parsed.messages[0].id } : {}),
+      };
+    }
+
+    const parsed = (await response.json().catch(() => ({}))) as {
+      error?: GraphError;
+    };
+    const error = parsed.error ?? {};
+    // The message, never the token: this body is the one place a log would
+    // otherwise pick one up.
+    const detail = error.message ?? `HTTP ${response.status}`;
+    if (isPermanent(error)) {
+      throw new WhatsAppPermanentError(detail);
+    }
+    throw new Error(`WhatsApp refused this message: ${detail}`);
+  }
+
+  async send(
+    recipient: ChannelRecipient,
+    message: ChannelMessage,
+  ): Promise<DeliveryResult> {
+    const number = recipient.externalId ?? (await this.#numberFor(recipient));
+    if (!number) {
+      return {
+        delivered: false,
+        suppressedReason: "this member has no linked WhatsApp number",
+      };
+    }
+    return this.sendToChannel(number, message);
+  }
+
+  /**
+   * A message to one number.
+   *
+   * WhatsApp has no channels in the sense the other providers do: a group has an
+   * id but the Cloud API will not post into one, so `sendToChannel` addresses a
+   * number like `send` does. Named for the port rather than for the provider.
+   */
+  async sendToChannel(
+    target: string,
+    message: ChannelMessage,
+  ): Promise<DeliveryResult> {
+    // A template was asked for, so the caller has decided it is outside the
+    // window. Sending free text here would be the send Meta refuses.
+    const body = message.templateKey
+      ? {
+          messaging_product: "whatsapp",
+          to: target,
+          type: "template",
+          template: {
+            name: message.templateKey,
+            language: { code: this.#templateLanguage },
+          },
+        }
+      : {
+          messaging_product: "whatsapp",
+          to: target,
+          type: "text",
+          text: { body: message.text, preview_url: true },
+        };
+
+    if (!message.templateKey && message.text.trim() === "") {
+      // Meta refuses an empty body with a code this driver would report as
+      // permanent, which is true but unhelpful: nothing was ever going to be
+      // sent, and saying so is better than a dead letter.
+      return {
+        delivered: false,
+        suppressedReason: "there was nothing to send",
+      };
+    }
+
+    const sent = await this.#post(body);
+    return {
+      delivered: true,
+      ...(sent.id ? { externalMessageId: sent.id } : {}),
+    };
+  }
+
+  /**
+   * Meta's signature over the raw body.
+   *
+   * `X-Hub-Signature-256` is `sha256=` and an HMAC of the exact bytes, keyed
+   * with the app secret. Compared in constant time, and the length check in
+   * front is not an optimisation: `timingSafeEqual` throws on a length
+   * mismatch, so a forged header of the wrong size would crash the handler
+   * rather than be refused.
+   */
+  async verifyInbound(request: InboundRequest): Promise<boolean> {
+    const given =
+      request.headers["x-hub-signature-256"] ??
+      request.headers["X-Hub-Signature-256"];
+    if (!given || this.#appSecret === "") {
+      return false;
+    }
+    const expected = `sha256=${createHmac("sha256", this.#appSecret)
+      .update(request.rawBody, "utf8")
+      .digest("hex")}`;
+
+    const a = Buffer.from(given.trim(), "utf8");
+    const b = Buffer.from(expected, "utf8");
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /**
+   * Who said what.
+   *
+   * The sender is the number, which is what a reply is addressed to and what the
+   * identity stores. A status callback (delivered, read) arrives on the same
+   * webhook and is not somebody saying something, so it parses to null.
+   */
+  async parseInbound(payload: string): Promise<InboundMessage | null> {
+    const message = firstMessage(payload);
+    if (!message) {
+      return null;
+    }
+
+    const from = message.from;
+    if (typeof from !== "string" || from === "") {
+      return null;
+    }
+
+    const text = readText(message);
+    if (text === null) {
+      // An image, a location, a sticker. Real messages, and none of them is
+      // something this product can act on.
+      return null;
+    }
+
+    return {
+      provider: "whatsapp",
+      externalSenderId: from,
+      text,
+      ...(typeof message.id === "string"
+        ? { externalMessageId: message.id }
+        : {}),
+    };
+  }
+
+  capabilities(): ChannelCapabilities {
+    return CAPABILITIES;
+  }
+
+  async stop(): Promise<void> {
+    // Nothing held open: `fetch` owns its own connections.
+  }
+}
+
+/** The first message on a webhook body, or null for anything else. */
+function firstMessage(payload: string): Record<string, unknown> | null {
+  try {
+    const body = JSON.parse(payload) as Record<string, unknown>;
+    const entry = (body.entry as Record<string, unknown>[] | undefined)?.[0];
+    const change = (
+      entry?.changes as Record<string, unknown>[] | undefined
+    )?.[0];
+    const value = change?.value as Record<string, unknown> | undefined;
+    const messages = value?.messages as Record<string, unknown>[] | undefined;
+    return messages?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The words in one inbound message, or null when there are none.
+ *
+ * A reply button comes back as its own shape and carries the id it was sent
+ * with, which is the command. Nothing here interprets either: the router does.
+ */
+function readText(message: Record<string, unknown>): string | null {
+  const text = message.text as Record<string, unknown> | undefined;
+  if (typeof text?.body === "string") {
+    return text.body;
+  }
+
+  const interactive = message.interactive as
+    | Record<string, unknown>
+    | undefined;
+  const button = interactive?.button_reply as
+    | Record<string, unknown>
+    | undefined;
+  if (typeof button?.id === "string") {
+    return button.id;
+  }
+  const list = interactive?.list_reply as Record<string, unknown> | undefined;
+  if (typeof list?.id === "string") {
+    return list.id;
+  }
+  return null;
+}
+
+/**
+ * The provider's own id for one inbound delivery, for the duplicate check.
+ *
+ * Meta retries a webhook it did not get a 200 for, with the same message id.
+ * A body with no message (a status callback) has no id worth deduplicating,
+ * which the endpoint reads as "nothing to do".
+ */
+export function whatsAppDeliveryId(rawBody: string): string | null {
+  const message = firstMessage(rawBody);
+  return typeof message?.id === "string" && message.id !== ""
+    ? message.id
+    : null;
+}
+
+/**
+ * The business number one webhook body is about.
+ *
+ * This is what finds the workspace before a tenant is known: one WhatsApp
+ * business number belongs to one OpenOKR workspace, the same arrangement
+ * Slack's team id and the Teams directory tenant have.
+ */
+export function whatsAppPhoneNumberId(rawBody: string): string | null {
+  try {
+    const body = JSON.parse(rawBody) as Record<string, unknown>;
+    const entry = (body.entry as Record<string, unknown>[] | undefined)?.[0];
+    const change = (
+      entry?.changes as Record<string, unknown>[] | undefined
+    )?.[0];
+    const value = change?.value as Record<string, unknown> | undefined;
+    const metadata = value?.metadata as Record<string, unknown> | undefined;
+    return typeof metadata?.phone_number_id === "string" &&
+      metadata.phone_number_id !== ""
+      ? metadata.phone_number_id
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Meta's subscription handshake, which is a GET and not a message.
+ *
+ * Answered with the challenge only when the token matches the one the
+ * administrator chose, compared in constant time. Everything else gets null,
+ * which the endpoint turns into a refusal: echoing a challenge to a caller who
+ * guessed the URL would let them confirm the endpoint exists.
+ */
+export function verifySubscription(
+  parameters: URLSearchParams,
+  verifyToken: string,
+): string | null {
+  if (parameters.get("hub.mode") !== "subscribe" || verifyToken === "") {
+    return null;
+  }
+  const given = parameters.get("hub.verify_token") ?? "";
+  const a = Buffer.from(given, "utf8");
+  const b = Buffer.from(verifyToken, "utf8");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return null;
+  }
+  return parameters.get("hub.challenge");
+}

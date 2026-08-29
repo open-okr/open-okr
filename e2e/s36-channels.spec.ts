@@ -29,15 +29,18 @@ const TEAM_ID = "T-e2e-acme";
 /**
  * The card for one provider.
  *
- * Two providers have drivers now, so two connect forms are on the page and
- * every locator has to say which one it means. The hint text is what
- * distinguishes them, because it is the one thing on a form that names its
- * provider.
+ * All four have drivers now, so four connect forms are on the page and every
+ * locator has to say which one it means. The hint text is what distinguishes
+ * them, because it is the one thing on a form that names its provider.
  */
 const slackForm = () =>
   page.locator("form").filter({ hasText: "Bot User OAuth Token" });
 const telegramForm = () =>
   page.locator("form").filter({ hasText: "BotFather" });
+const teamsForm = () =>
+  page.locator("form").filter({ hasText: "Azure bot registration" });
+const whatsAppForm = () =>
+  page.locator("form").filter({ hasText: "Phone number ID" });
 
 test.describe.configure({ mode: "serial" });
 
@@ -61,20 +64,20 @@ test("sign in and reach the channels card", async () => {
   ).toBeVisible({ timeout: 10_000 });
 });
 
-test("a provider with no driver says so instead of taking a credential", async () => {
-  // Storing a token nothing can use is worse than refusing it: the card would
-  // show a connected provider that never sends.
-  const teams = page.locator("section, div").filter({
-    hasText: "Microsoft Teams",
-  });
-  await expect(teams.first()).toContainText("No driver yet");
-});
-
-test("a provider with a driver offers a form", async () => {
-  // Two of the four have drivers now, so the card offers two forms and every
-  // locator below has to say which (P5-T05).
+test("every provider offers a form, because every one has a driver now", async () => {
+  // **This test used to assert the opposite.** It read "a provider with no
+  // driver says so instead of taking a credential", and pointed at Teams,
+  // because storing a token nothing can use is worse than refusing it. Teams
+  // got a driver at P5-T03a and WhatsApp at P5-T04a, so there is no such
+  // provider left and the card that said "No driver yet" is gone. The rule it
+  // protected is still enforced by the page: `ready: false` on a provider
+  // shows the notice instead of the form, and the next provider added without
+  // a driver will meet it.
   await expect(slackForm().getByLabel("Bot token")).toBeVisible();
   await expect(telegramForm().getByLabel("Bot token")).toBeVisible();
+  await expect(teamsForm().getByLabel("Bot token")).toBeVisible();
+  await expect(whatsAppForm().getByLabel("Bot token")).toBeVisible();
+  await expect(page.getByText("No driver yet")).toHaveCount(0);
 });
 
 test("connecting Slack stores it and does not claim it is verified", async () => {

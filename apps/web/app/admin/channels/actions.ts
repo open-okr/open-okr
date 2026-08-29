@@ -63,13 +63,24 @@ export async function connectProvider(
       credentials: JSON.stringify(
         provider === "telegram"
           ? { botToken, webhookSecret: signingSecret }
-          : provider === "teams"
-            ? // Teams calls them an application id and a client secret, and the
-              // first is also the audience its inbound tokens are issued for.
-              // The form's two boxes carry them; naming them here rather than
-              // in the form keeps one form for every provider.
-              { appId: botToken, appPassword: signingSecret }
-            : { botToken, signingSecret },
+          : provider === "whatsapp"
+            ? // Three credentials, and one form with two secret boxes. The
+              // second holds the app secret and the verify token, in that
+              // order, because they are set together and a third box for a
+              // value only this provider has would be a box every other
+              // provider's card had to explain away.
+              (() => {
+                const [appSecret = "", verifyToken = ""] =
+                  signingSecret.split(/\s+/);
+                return { accessToken: botToken, appSecret, verifyToken };
+              })()
+            : provider === "teams"
+              ? // Teams calls them an application id and a client secret, and the
+                // first is also the audience its inbound tokens are issued for.
+                // The form's two boxes carry them; naming them here rather than
+                // in the form keeps one form for every provider.
+                { appId: botToken, appPassword: signingSecret }
+              : { botToken, signingSecret },
       ),
       config: { teamId },
     });
