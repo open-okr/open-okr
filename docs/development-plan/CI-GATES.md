@@ -12,7 +12,7 @@ In this order. The first four take seconds; the rest take minutes.
 
 ```
 pnpm typecheck        # strict types across all ten packages
-pnpm lint             # Biome
+pnpm lint             # Biome. Read the whole tail, not the last few lines
 pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage
 pnpm check:boundaries # the architecture gate
@@ -21,6 +21,14 @@ pnpm check:contract   # the committed OpenAPI document against the registry
 pnpm test             # unit and integration, needs a database
 pnpm build            # then pnpm test:e2e
 ```
+
+**Read `pnpm lint`'s last three lines, not its last one.** Biome counts errors,
+warnings and infos on three separate lines in that order, so a `tail` short
+enough to cut the first one shows two clean-looking numbers over a red build.
+That has cost this branch twice. The script also passes
+`--max-diagnostics=400`: the default cap of 20 stops Biome *emitting* the rest,
+so an error past the cap is neither shown nor counted, and this repository is
+long past 20.
 
 If all of those pass locally, CI passes, with one exception named under
 **Sign-off** below that no local command checks unless you ask it to.

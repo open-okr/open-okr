@@ -545,7 +545,8 @@ describe("a check-in asked for and answered over WhatsApp", () => {
     expect(message?.payload.templateKey).toBe("checkin_due");
 
     // The words the member is told to reply, sent back as a member would.
-    const told = (message?.payload.templateParameters as string[])[1] as string;
+    const parameters = message?.payload.templateParameters as string[];
+    const told = parameters[1] as string;
     const reply = await routeCommand({
       pool: wb.appPool,
       workspaceId,

@@ -707,7 +707,7 @@ describe("sessions.createBlocker (P4-T07c)", () => {
     )) as Array<{ dueAt: string; openedAt: string }>;
 
     expect(status.length).toBe(1);
-    const blocker = status[0]!;
+    const blocker = status[0] as { dueAt: string; openedAt: string };
     const opened = new Date(blocker.openedAt);
     const due = new Date(blocker.dueAt);
     const diffHours = (due.getTime() - opened.getTime()) / (1000 * 60 * 60);
