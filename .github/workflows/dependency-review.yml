@@ -41,5 +41,17 @@ jobs:
           # Recheck this on a rou3 major bump. If upstream ever ships MS-PL
           # code in the tarball, drop the exception and stop, do not widen the
           # licence list.
-          allow-dependencies-licenses: pkg:npm/rou3
+          #
+          # The second package, and the same shape of answer. GitHub reports
+          # json-schema-typed as "BSD-2-Clause AND JSON" because its LICENSE.md
+          # carries IETF copyright notices for the JSON Schema wording it
+          # embeds, and the classifier reads "JSON" as a licence identifier.
+          # The file is BSD 2-Clause throughout: read in full on 8.0.2,
+          # 2026-08-31, and it contains no "Good, not Evil" clause and no JSON
+          # licence text. package.json declares "BSD-2-Clause", which is on the
+          # list above. It reaches us transitively:
+          # json-schema-typed -> @modelcontextprotocol/sdk -> @openokr/adapters.
+          #
+          # Recheck on a major bump, and read the file rather than the report.
+          allow-dependencies-licenses: pkg:npm/rou3, pkg:npm/json-schema-typed
           comment-summary-in-pr: on-failure
