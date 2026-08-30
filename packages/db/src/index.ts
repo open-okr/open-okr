@@ -342,6 +342,7 @@ export {
   kpiTrees,
 } from "./schema/kpis.ts";
 export { type Kudo, kudos } from "./schema/kudos.ts";
+export { type McpSession, mcpSessions } from "./schema/mcp.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,

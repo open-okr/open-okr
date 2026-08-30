@@ -203,6 +203,40 @@ export {
   statusFor,
 } from "./api/errors.ts";
 export {
+  buildCatalogue,
+  CATALOGUE_VERSION,
+  type CatalogueDifference,
+  diffCatalogue,
+  MCP_PROMPTS,
+  MCP_RESOURCES,
+  MCP_TOOLS,
+  type McpCatalogue,
+  type McpPrompt,
+  type McpResource,
+  type McpTool,
+  toolNamed,
+} from "./api/mcp/catalogue.ts";
+export {
+  type DispatchPrincipal,
+  type DispatchResult,
+  dispatchResource,
+  dispatchTool,
+  matchTemplate,
+} from "./api/mcp/dispatch.ts";
+export {
+  closeSession,
+  closeSessionFor,
+  negotiateVersion,
+  newSessionId,
+  originAllowed,
+  recordSession,
+  recordSessionFor,
+  type SessionRecord,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  sessionFor,
+  stampSessionUse,
+} from "./api/mcp/sessions.ts";
+export {
   ALLOW_LISTED_CLIENTS,
   type ClientRejection,
   type ClientResolution,
@@ -230,6 +264,7 @@ export {
   OAUTH_PATHS,
   openIdConfiguration,
   protectedResourceMetadata,
+  resourceIdentifier,
   SUPPORTED_SCOPES,
 } from "./api/oauth/discovery.ts";
 export {

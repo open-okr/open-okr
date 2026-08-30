@@ -149,6 +149,36 @@ describe("resources and prompts", () => {
     }
   });
 
+  it("binds every template variable to a field the action actually has", () => {
+    // The template reads as {goalId} and the action's field is `id`, which is
+    // fine because the resource declares the mapping. What is not fine is a
+    // mapping to a field that does not exist: the read would run with an empty
+    // input and answer something nobody asked for.
+    const inputs = new Map(
+      REST_ROUTES.map((route) => [route.action, new Set(route.parameters)]),
+    );
+    for (const resource of MCP_RESOURCES) {
+      const fields = inputs.get(resource.action);
+      for (const [variable, field] of Object.entries(resource.binds)) {
+        expect(
+          fields?.has(field),
+          `${resource.name}: ${variable} -> ${field}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("binds every variable its own template declares, and no other", () => {
+    for (const resource of MCP_RESOURCES) {
+      const declared = [...resource.uriTemplate.matchAll(/{([^}]+)}/g)].map(
+        (found) => found[1] as string,
+      );
+      for (const variable of Object.keys(resource.binds)) {
+        expect(declared, resource.name).toContain(variable);
+      }
+    }
+  });
+
   it("names every prompt once, and describes it", () => {
     const names = MCP_PROMPTS.map((prompt) => prompt.name);
     expect(new Set(names).size).toBe(names.length);

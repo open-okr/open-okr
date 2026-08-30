@@ -526,7 +526,7 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `oauth_codes` *(built at P5-T08a)* | `grant_id`, `code_hash`, `challenge`, `challenge_method`, `redirect_uri`, `resource`, `consumed_at?`, `expires_at`. Unique on `code_hash` |
 | `oauth_access_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `resource`, `expires_at`, `revoked_at?`. Unique on `token_hash` |
 | `oauth_refresh_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `used_at?`, `replaced_by?` to itself, `revoked_at?`, `expires_at`. Unique on `token_hash` |
-| `mcp_sessions` | `grant_id`, `protocol_version`, `last_seen_at`, `closed_at?` |
+| `mcp_sessions` *(built at P5-T09b)* | `grant_id` to oauth_grants, `session_hash`, `protocol_version`, `client_name?`, `client_version?`, `last_seen_at`, `closed_at?`. Unique on `session_hash` |
 
 ### device_authorisations *(built at P5-T07c-b)*
 The third table read before a tenant is known, and the only one *written* before
@@ -677,6 +677,32 @@ grant. The allow-list is a fallback in the lookup rather than a seeding step: a
 row is written the first time somebody actually uses an allow-listed client,
 which works on a fresh install and on one upgraded from an earlier release, where
 the first-run wizard never runs again.
+
+### mcp_sessions *(built at P5-T09b)*
+**A record, never an authority.** Every request from an external agent presents
+its own access token and is resolved from scratch, so a session whose grant was
+revoked a second ago is refused a second ago. What this table buys is that a
+person can see what is connected, and that a question about which protocol
+version a client agreed to has an answer.
+
+**The session is this product's, not the transport's.** The protocol SDK keeps
+session state in memory, and a server built per request has no memory to keep it
+in; a module map of transports stops working the moment a second instance
+answers a request. So the transport runs stateless, the identifier is generated
+at `initialize`, and the row is what carries it. That is also what the design
+claimed a session was before the first implementation tried to let the library
+own one.
+
+**The identifier is stored as a digest**, like every other secret here. It is
+not a credential and must never become one; hashing costs nothing and means a
+table of live sessions is not a table of ways to attach to somebody's stream if
+the transport ever comes to trust it. It reaches its row through the same
+`app.oauth_secret_hash` pre-tenant key the OAuth secrets use, because a
+transport holding only an identifier does not yet know which workspace it
+belongs to.
+
+**Cascade on the grant.** A session under a grant that has gone is a session for
+nothing, so revoking a connection takes its sessions with it.
 
 ## 16. Import, export and tenancy (domain M)
 

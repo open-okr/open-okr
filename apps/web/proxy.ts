@@ -64,6 +64,17 @@ const PUBLIC_PREFIXES = [
   // Registration is open by design (RFC 7591, P5-T08b): registering grants
   // nothing, and every authority still comes from the consent screen.
   "/api/mcp/register",
+  // **The agent endpoint itself (P5-T09b).** It resolves an access token on
+  // every request and refuses without one, carrying the challenge that says
+  // where to get one. A redirect here would answer every tool call with the
+  // sign-in page at status 200, which is what an HTTP client reads as success:
+  // the same defect that hid behind this list until P5-T07a, when every inbound
+  // channel webhook turned out to be answered with a 307.
+  //
+  // A prefix, so anything added under `/api/mcp` inherits it. Everything there
+  // authenticates itself, and a path that did not would have to say so by
+  // living somewhere else.
+  "/api/mcp",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

@@ -31,7 +31,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { resolveClient } from "./clients.ts";
-import { SUPPORTED_SCOPES } from "./discovery.ts";
+import { resourceIdentifier, SUPPORTED_SCOPES } from "./discovery.ts";
 import { issueAuthorisationCode } from "./flow.ts";
 import { createGrant } from "./grants.ts";
 import { CHALLENGE_METHOD } from "./pkce.ts";
@@ -173,7 +173,7 @@ export async function checkAuthoriseRequest(
   }
   if (
     request.resource.trim() !== "" &&
-    request.resource.replace(/\/+$/, "") !== input.issuer.replace(/\/+$/, "")
+    request.resource.replace(/\/+$/, "") !== resourceIdentifier(input.issuer)
   ) {
     return {
       kind: "refused",
@@ -346,8 +346,10 @@ export async function approveAuthorisationForMember(
       redirectUri: input.redirectUri,
       challenge: input.challenge,
       challengeMethod: input.challengeMethod,
-      // Always this instance. The check above already refused any other.
-      resource: input.issuer.replace(/\/+$/, ""),
+      // The protected resource this instance guards, which is what RFC 9728's
+      // metadata names and what every token is checked against. The check above
+      // already refused any other.
+      resource: resourceIdentifier(input.issuer),
       now: input.now,
     });
 

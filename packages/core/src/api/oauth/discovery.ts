@@ -44,6 +44,22 @@ const at = (issuer: string, path: string) =>
   `${issuer.replace(/\/+$/, "")}${path}`;
 
 /**
+ * The identifier every grant is bound to and every token is checked against.
+ *
+ * **The protected resource, not the issuer**, which RFC 9728 settles: the thing
+ * being guarded is the agent endpoint, and the metadata says so. A client that
+ * reads that document and sends it back as RFC 8707's `resource` has to find
+ * the same string here, and one function is what makes that true rather than
+ * hoped for. The two were different for one task, and the transport is what
+ * found it: a spec-following client would have been refused at the authorise
+ * step, and every token minted before it would have been refused at the
+ * endpoint.
+ */
+export function resourceIdentifier(issuer: string): string {
+  return at(issuer, OAUTH_PATHS.resource);
+}
+
+/**
  * RFC 9728: what guards the resource, and what a client should ask for.
  *
  * The `resource` value here is the same string every grant is bound to and every

@@ -473,3 +473,65 @@ that says "the file differs" sends somebody hunting.
 **Given** the action registry, **when** the catalogue is generated, **then**
 every tool carries its safety hint, its scope and its input schema, and the
 drift gate refuses a change that leaves them out of step.
+
+## The transport and the session (P5-T09b)
+
+### The order of checks, which is not rearrangeable
+
+| # | Check | What it stops |
+|---|---|---|
+| 1 | Origin | A page in a browser talked into pointing at a local agent's instance |
+| 2 | Access token | An unauthenticated caller learning which tools exist, one refusal at a time |
+| 3 | Protocol version | A client and a server speaking past each other |
+| 4 | Session | An identifier from one grant used on another |
+
+### The session is ours, not the transport's
+
+The SDK keeps session state in memory. A server built per request has no memory
+to keep it in, and a module map of transports stops working the moment a second
+instance answers a request.
+
+So the transport runs **stateless**, the identifier is generated at
+`initialize`, written against the grant, and checked against that same grant on
+every later request. It authorises nothing: the token on each request is
+resolved from scratch, so a grant revoked a second ago is refused a second ago.
+
+That was a correction. The first implementation asked the library to generate
+session identifiers, and it could not work; the design had already said a session
+was a record rather than an authority, and the code now matches it.
+
+### Two gates on every call
+
+| Gate | Where | Decides |
+|---|---|---|
+| Scope | `dispatchTool`, before the action runs | What a token reaches |
+| `can()` | Inside the action, as for a click | Whether that member reaches it |
+
+A token with write scope held by a view-level member writes nothing.
+
+### A refusal is a result, not a thrown error
+
+The protocol has `isError` on a tool result exactly so an agent can read a denial
+and report it. Throwing reaches a client as a transport fault, which is a thing
+to retry, and an agent retrying a permission denial looks broken to the person
+watching it.
+
+The refusal names the scope held and the scope needed. What it never carries is
+anything about a workspace the caller cannot see: a not-found stays not-found.
+
+### The resource identifier, and a bug the transport found
+
+Grants were bound to the issuer while RFC 9728's metadata named
+`${issuer}/api/mcp` as the protected resource. A spec-following client that read
+the document and sent it back as RFC 8707's `resource` would have been refused at
+the authorise step, and any token minted before that refused at the endpoint.
+
+There is now one `resourceIdentifier()`, and the metadata, the grant, the token
+endpoint and the agent endpoint all read it.
+
+### Acceptance
+
+**Given** an external agent holding read scope, **when** it calls a write tool,
+**then** the call is denied by the permission layer, the denial is audited with
+the channel named, and the agent receives a clear error rather than a partial
+result.

@@ -61,6 +61,15 @@ export interface McpResource {
   readonly mimeType: string;
   /** The action a read of this resource runs. */
   readonly action: string;
+  /**
+   * Which of the action's input fields the template's variable fills.
+   *
+   * Declared rather than inferred from the variable's name. A template reads
+   * better as `{goalId}` than as `{id}`, and an address that has to be named
+   * after a field is an address that changes when the field is renamed. This is
+   * one line and a test walks it against the registry.
+   */
+  readonly binds: Readonly<Record<string, string>>;
 }
 
 export interface McpPrompt {
@@ -177,6 +186,7 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     description: "One goal, with its key results and current health.",
     mimeType: "application/json",
     action: "goals.read",
+    binds: { goalId: "id" },
   },
   {
     uriTemplate: "openokr://cycle/{cycleId}",
@@ -184,6 +194,9 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     description: "One cycle, with its phase and its dates.",
     mimeType: "application/json",
     action: "cycles.list",
+    // Answers the workspace's cycles; the identifier in the address is what a
+    // client holds a reference by, and the list is filtered on the way out.
+    binds: {},
   },
   {
     uriTemplate: "openokr://scorecard/{memberId}",
@@ -191,6 +204,7 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     description: "One member's scorecard for the current cycle.",
     mimeType: "application/json",
     action: "cycles.scorecard",
+    binds: {},
   },
   {
     uriTemplate: "openokr://kpi-tree/{kpiId}",
@@ -198,6 +212,7 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     description: "One KPI and the tree beneath it, with health corridors.",
     mimeType: "application/json",
     action: "kpis.tree",
+    binds: { kpiId: "treeId" },
   },
   {
     uriTemplate: "openokr://work-map/{spaceId}",
@@ -205,6 +220,7 @@ export const MCP_RESOURCES: readonly McpResource[] = [
     description: "The goals and initiatives in one space.",
     mimeType: "application/json",
     action: "goals.list",
+    binds: { spaceId: "spaceId" },
   },
 ];
 

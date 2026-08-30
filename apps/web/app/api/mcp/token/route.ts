@@ -22,6 +22,7 @@ import { loadEnv } from "@openokr/config";
 import {
   redeemCodeForTokens,
   refreshForTokens,
+  resourceIdentifier,
   type TokenOutcome,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
@@ -43,9 +44,15 @@ const json = (body: unknown, status: number): Response =>
 const refusal = (error: string, description: string, status = 400): Response =>
   json({ error, error_description: description }, status);
 
-/** The instance this server is, which every grant is bound to. */
-export function instanceResource(): string {
-  return loadEnv().BETTER_AUTH_URL.replace(/\/+$/, "");
+/**
+ * The protected resource every grant is bound to.
+ *
+ * The agent endpoint rather than the instance root, because that is what RFC
+ * 9728's metadata names and therefore what a spec-following client sends back
+ * as RFC 8707's `resource`.
+ */
+function instanceResource(): string {
+  return resourceIdentifier(loadEnv().BETTER_AUTH_URL);
 }
 
 const answer = (outcome: TokenOutcome): Response =>

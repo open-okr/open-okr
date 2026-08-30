@@ -23,6 +23,7 @@ export {
   defaultTierModelsFor,
 } from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
+export { McpAgentServer } from "./drivers/agent/mcp.ts";
 // The mock driver is exported by name, the same way the socket server is:
 // infrastructure another package's own test suite constructs directly,
 // not something resolved through createAIProvider.
@@ -102,6 +103,16 @@ export {
   type OutboundResult,
   outboundFetch,
 } from "./outbound/guard.ts";
+export type {
+  AgentDispatch,
+  AgentPrompt,
+  AgentResource,
+  AgentResourceReader,
+  AgentServerConfig,
+  AgentServerPort,
+  AgentTool,
+  AgentToolResult,
+} from "./ports/agent.ts";
 export type {
   AIProvider,
   ChatMessage,

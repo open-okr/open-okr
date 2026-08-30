@@ -27,6 +27,12 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 const OWNER = "consent-owner";
 const OTHER = "consent-other";
 const ISSUER = "https://okr.example";
+/**
+ * What a grant is bound to: the protected resource, not the instance root.
+ * RFC 9728 names the agent endpoint, so that is what a client sends back and
+ * what every token is checked against.
+ */
+const RESOURCE = `${ISSUER}/api/mcp`;
 const REDIRECT = "http://127.0.0.1:7777/callback";
 const VERIFIER = "a".repeat(64);
 
@@ -206,7 +212,7 @@ describe("approving", () => {
       code: outcome.code,
       verifier: VERIFIER,
       redirectUri: REDIRECT,
-      resource: ISSUER,
+      resource: RESOURCE,
       now: new Date(),
     });
     expect(tokens.kind).toBe("issued");
@@ -249,7 +255,8 @@ describe("approving", () => {
           .from(oauthGrants)
           .where(eq(oauthGrants.workspaceId, workspaceId)),
     );
-    expect(grant?.resource).toBe(ISSUER);
+    // The protected resource, which is what the metadata names.
+    expect(grant?.resource).toBe(RESOURCE);
   });
 
   it("refuses somebody who is not an active member of that workspace", async () => {
@@ -316,7 +323,7 @@ describe("the connections list", () => {
       code: outcome.code,
       verifier: VERIFIER,
       redirectUri: REDIRECT,
-      resource: ISSUER,
+      resource: RESOURCE,
       now: new Date(),
     });
     if (tokens.kind !== "issued") {
@@ -338,7 +345,7 @@ describe("the connections list", () => {
     expect(
       await resolveAccessToken(wb.appPool, {
         raw: tokens.tokens.accessToken,
-        resource: ISSUER,
+        resource: RESOURCE,
         now: new Date(),
       }),
     ).toEqual({ kind: "rejected", reason: "revoked" });
@@ -372,7 +379,7 @@ describe("the connections list", () => {
       code: outcome.code,
       verifier: VERIFIER,
       redirectUri: REDIRECT,
-      resource: ISSUER,
+      resource: RESOURCE,
       now: new Date(),
     });
     if (first.kind !== "issued") {
@@ -382,7 +389,7 @@ describe("the connections list", () => {
     const { refreshForTokens } = await import("../src/index.ts");
     const second = await refreshForTokens(wb.appPool, {
       refreshToken: first.tokens.refreshToken,
-      resource: ISSUER,
+      resource: RESOURCE,
       now: new Date(),
     });
     if (second.kind !== "issued") {
@@ -392,7 +399,7 @@ describe("the connections list", () => {
     // The copy somebody else kept.
     await refreshForTokens(wb.appPool, {
       refreshToken: first.tokens.refreshToken,
-      resource: ISSUER,
+      resource: RESOURCE,
       now: new Date(),
     });
 
@@ -405,7 +412,7 @@ describe("the connections list", () => {
       (
         await refreshForTokens(wb.appPool, {
           refreshToken: second.tokens.refreshToken,
-          resource: ISSUER,
+          resource: RESOURCE,
           now: new Date(),
         })
       ).kind,
@@ -414,7 +421,7 @@ describe("the connections list", () => {
       (
         await resolveAccessToken(wb.appPool, {
           raw: second.tokens.accessToken,
-          resource: ISSUER,
+          resource: RESOURCE,
           now: new Date(),
         })
       ).kind,

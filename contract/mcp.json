@@ -9646,35 +9646,46 @@
       "name": "Goal",
       "description": "One goal, with its key results and current health.",
       "mimeType": "application/json",
-      "action": "goals.read"
+      "action": "goals.read",
+      "binds": {
+        "goalId": "id"
+      }
     },
     {
       "uriTemplate": "openokr://cycle/{cycleId}",
       "name": "Cycle",
       "description": "One cycle, with its phase and its dates.",
       "mimeType": "application/json",
-      "action": "cycles.list"
+      "action": "cycles.list",
+      "binds": {}
     },
     {
       "uriTemplate": "openokr://scorecard/{memberId}",
       "name": "Scorecard",
       "description": "One member's scorecard for the current cycle.",
       "mimeType": "application/json",
-      "action": "cycles.scorecard"
+      "action": "cycles.scorecard",
+      "binds": {}
     },
     {
       "uriTemplate": "openokr://kpi-tree/{kpiId}",
       "name": "KPI tree",
       "description": "One KPI and the tree beneath it, with health corridors.",
       "mimeType": "application/json",
-      "action": "kpis.tree"
+      "action": "kpis.tree",
+      "binds": {
+        "kpiId": "treeId"
+      }
     },
     {
       "uriTemplate": "openokr://work-map/{spaceId}",
       "name": "Work Map slice",
       "description": "The goals and initiatives in one space.",
       "mimeType": "application/json",
-      "action": "goals.list"
+      "action": "goals.list",
+      "binds": {
+        "spaceId": "spaceId"
+      }
     }
   ],
   "prompts": [
