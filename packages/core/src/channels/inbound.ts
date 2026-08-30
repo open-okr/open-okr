@@ -296,6 +296,28 @@ export async function resolveInbound(
     return { kind: "ignored", reason: "this member is not active" };
   }
 
+  // **The conversation window opens here** (P5-T04b-b). WhatsApp will carry a
+  // free-form message only within twenty-four hours of the member's own last
+  // one, and this is that moment. Stamped for every provider because the column
+  // is on the identity and one code path is cheaper to keep right than four;
+  // nothing but WhatsApp reads it.
+  //
+  // openokr:allow-mutation: a fact about when somebody wrote, recorded on the
+  // inbound path where there is no actor to attribute an Operation to. No
+  // activity or audit row describes a member sending a message: the message log
+  // is the record of that.
+  await tx
+    .update(channelIdentities)
+    .set({ lastInboundAt: facts.now, updatedAt: facts.now })
+    .where(
+      activeOnly(
+        channelIdentities,
+        eq(channelIdentities.workspaceId, facts.workspaceId),
+        eq(channelIdentities.provider, facts.provider),
+        eq(channelIdentities.externalId, facts.externalSenderId),
+      ),
+    );
+
   // Step 6. Only now, when the sender is somebody the product knows.
   if (facts.withinRateLimit) {
     const allowed = await facts.withinRateLimit(

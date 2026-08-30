@@ -340,6 +340,10 @@ export {
   findConversation,
 } from "./channels/conversation.ts";
 export {
+  type DueCheckIn,
+  dueCheckInFor,
+} from "./channels/due-check-in.ts";
+export {
   generateLinkCode,
   handleInbound,
   hashLinkCode,
@@ -375,6 +379,26 @@ export {
   type SessionLookup,
 } from "./channels/sessions.ts";
 export {
+  BINDING_LABELS,
+  BINDING_SOURCES,
+  type BindingFacts,
+  type BindingSource,
+  isBindingSource,
+  loadBindingFacts,
+  replyCommandFor,
+  resolveBinding,
+  resolveBindings,
+} from "./channels/template-bindings.ts";
+export {
+  listMappings,
+  mappingFor,
+  type ResolvedMapping,
+  removeMapping,
+  type SaveOutcome,
+  saveMapping,
+  type TemplateMapping,
+} from "./channels/template-mappings.ts";
+export {
   listTemplates,
   recordTemplates,
   type StoredTemplate,
@@ -382,6 +406,12 @@ export {
   type SyncOutcome,
   usableTemplates,
 } from "./channels/templates.ts";
+export {
+  CONVERSATION_WINDOW_MS,
+  insideConversationWindow,
+  type WhatsAppEnvelope,
+  whatsAppEnvelope,
+} from "./channels/whatsapp-window.ts";
 export {
   type AnswerQuestionInput,
   type AnswerQuestionResult,

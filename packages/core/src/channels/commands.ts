@@ -78,7 +78,17 @@ export const CHAT_COMMANDS: readonly ChatCommand[] = [
     verb: "checkin",
     action: "goals.startCheckIn",
     summary: "Check in on a goal you champion, one question at a time.",
-    args: [{ name: "goal", hint: "the goal's identifier", required: true }],
+    args: [
+      {
+        name: "goal",
+        // **Optional since P5-T04b-b, because a reminder has to be answerable.**
+        // Nobody reading a message on a phone knows a goal's identifier, and
+        // WhatsApp has no buttons to carry one. Left out, the router finds the
+        // one check-in this member owes and refuses when there is more than one.
+        hint: "the goal's identifier, or nothing for the one you owe",
+        required: false,
+      },
+    ],
     toInput: (args) => ({ goalId: args.goal }),
   },
   {

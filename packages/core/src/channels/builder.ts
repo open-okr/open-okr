@@ -40,6 +40,8 @@ export interface MessageDraft {
    * throwing.
    */
   readonly templateKey?: string;
+  /** The values that template's placeholders take, in placeholder order. */
+  readonly templateParameters?: readonly string[];
 }
 
 export interface BuiltMessage {
@@ -48,6 +50,7 @@ export interface BuiltMessage {
   readonly blocks?: readonly Record<string, unknown>[];
   readonly buttons?: readonly MessageButton[];
   readonly templateKey?: string;
+  readonly templateParameters?: readonly string[];
   /**
    * What the provider could not take, in the words a log entry wants.
    *
@@ -129,6 +132,9 @@ export function buildMessage(
     return {
       text: "",
       templateKey: draft.templateKey,
+      ...(draft.templateParameters
+        ? { templateParameters: draft.templateParameters }
+        : {}),
       degraded: [
         `${provider} is outside its conversation window, so the approved template was sent and the body was not`,
       ],

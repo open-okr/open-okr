@@ -569,3 +569,45 @@ describe("what a second member cannot do", () => {
     expect(secondMemberId).not.toBe(ownerMemberId);
   });
 });
+
+/**
+ * When somebody last wrote in (P5-T04b-b).
+ *
+ * WhatsApp's conversation window is measured from this moment and nothing else,
+ * so it is stamped on the inbound path rather than derived from the message log
+ * later: a log query per outbound message would be the same fact, read the
+ * slower way.
+ */
+describe("the conversation window's clock", () => {
+  it("stamps the moment a verified sender wrote in", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...asOwner() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+
+    await handleInbound(wb.appPool, facts());
+
+    const stamped = await wb.admin.query(
+      "select last_inbound_at from channel_identities where external_id = $1",
+      ["U-owner"],
+    );
+    expect(stamped.rows[0].last_inbound_at).toEqual(NOW);
+  });
+
+  it("leaves it null for an identity nobody has written from", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...asOwner() },
+      "channels.linkIdentity",
+      { provider: "slack", externalId: "U-owner" },
+    );
+
+    const stamped = await wb.admin.query(
+      "select last_inbound_at from channel_identities where external_id = $1",
+      ["U-owner"],
+    );
+    expect(stamped.rows[0].last_inbound_at).toBeNull();
+  });
+});

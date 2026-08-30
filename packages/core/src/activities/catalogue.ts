@@ -40,6 +40,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     recorded: z.number(),
     withdrawn: z.number(),
   }),
+  "channel.templateMapped": z.object({
+    ruleKey: z.string(),
+    templateId: z.string(),
+  }),
+  "channel.templateUnmapped": z.object({ ruleKey: z.string() }),
   "api_token.created": z.object({
     name: z.string(),
     audience: z.string(),

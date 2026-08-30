@@ -27,6 +27,15 @@ export interface ChannelMessage {
   readonly threadKey?: string;
   /** Required by template-only providers outside a conversation window. */
   readonly templateKey?: string;
+  /**
+   * The values a template's placeholders take, in placeholder order
+   * (P5-T04b-b).
+   *
+   * Only meaningful beside `templateKey`. Meta refuses a send whose parameter
+   * count does not match the template, so this is built from a mapping whose
+   * count was checked when an administrator saved it.
+   */
+  readonly templateParameters?: readonly string[];
   readonly idempotencyKey?: string;
 }
 

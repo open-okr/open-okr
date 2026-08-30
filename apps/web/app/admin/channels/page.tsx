@@ -1,4 +1,11 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  BINDING_LABELS,
+  BINDING_SOURCES,
+  type BindingSource,
+  callAction,
+} from "@openokr/core";
+import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
@@ -6,10 +13,12 @@ import { requireWorkspace } from "../../../lib/workspace";
 import {
   connectProvider,
   disconnectProvider,
+  removeTemplateMapping,
   sendTest,
   syncTemplates,
 } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
+import { TemplateMappingForm } from "./template-mapping-form.tsx";
 
 /**
  * Notifications and channels (UIUX-PLAN.md §6 S-36, P5-T02c).
@@ -131,6 +140,15 @@ export default async function ChannelsPage() {
   const { templates } = whatsAppConnected
     ? await callAction(context, "channels.templates", {})
     : { templates: [] };
+  const { mappings } = whatsAppConnected
+    ? await callAction(context, "channels.templateMappings", {})
+    : { mappings: [] };
+  // Only the approved ones can be mapped: Meta refuses a send using anything
+  // else, so offering one would be offering a choice that silently never
+  // arrives.
+  const approved = templates.filter(
+    (template) => template.status.toUpperCase() === "APPROVED",
+  );
 
   // A stamp for the test button, computed on the server where the clock is
   // allowed to be read, so pressing it twice is two messages rather than one.
@@ -212,10 +230,89 @@ export default async function ChannelsPage() {
               </ul>
             )}
 
-            <p className="text-xs text-ink-3">
-              Choosing which template a reminder uses, and what fills its
-              variables, is the next task.
-            </p>
+            <div className="flex flex-col gap-2 border-t border-line pt-3">
+              <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                Which template answers which reminder
+                <Chip tone="neutral">{mappings.length}</Chip>
+              </span>
+              <p className="text-xs text-ink-3">
+                Outside the twenty-four hours after somebody last writes to you,
+                WhatsApp carries only an approved template. A reminder with no
+                template mapped still reaches the member's inbox here; it just
+                does not reach their phone.
+              </p>
+
+              {mappings.length === 0 ? (
+                <p className="text-xs text-ink-3">Nothing mapped yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {mappings.map((mapping) => (
+                    <li
+                      key={mapping.id}
+                      className="flex flex-col gap-1 rounded-lg border border-line p-3"
+                      data-testid="whatsapp-mapping"
+                    >
+                      <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                        <span className="font-medium">{mapping.ruleKey}</span>
+                        uses
+                        <span className="font-medium">
+                          {mapping.templateName}
+                        </span>
+                        {mapping.withdrawn ? (
+                          <Chip tone="bad">Meta no longer lists it</Chip>
+                        ) : mapping.templateStatus.toUpperCase() ===
+                          "APPROVED" ? null : (
+                          <Chip tone="warn">
+                            {mapping.templateStatus.toLowerCase()}
+                          </Chip>
+                        )}
+                      </span>
+                      {mapping.bindings.length > 0 ? (
+                        <span className="text-xs text-ink-3">
+                          {mapping.bindings
+                            .map(
+                              (source, index) =>
+                                `{{${index + 1}}} ${BINDING_LABELS[source as BindingSource] ?? source}`,
+                            )
+                            .join(", ")}
+                        </span>
+                      ) : null}
+                      <ChannelForm
+                        action={removeTemplateMapping}
+                        className="w-fit"
+                      >
+                        <input
+                          type="hidden"
+                          name="ruleKey"
+                          value={mapping.ruleKey}
+                        />
+                        <Button type="submit" variant="ghost" size="sm">
+                          Remove
+                        </Button>
+                      </ChannelForm>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <TemplateMappingForm
+                rules={TRIGGER_CATALOGUE.map((entry) => ({
+                  key: entry.key,
+                  fires: entry.fires,
+                }))}
+                templates={approved.map((template) => ({
+                  id: template.id,
+                  name: template.name,
+                  language: template.language,
+                  variables: template.variables,
+                  bodyText: template.bodyText ?? null,
+                }))}
+                sources={BINDING_SOURCES.map((source) => ({
+                  value: source,
+                  label: BINDING_LABELS[source],
+                }))}
+              />
+            </div>
           </CardBody>
         </Card>
       ) : null}

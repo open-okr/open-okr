@@ -165,6 +165,15 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
               text: message.text,
               ...(message.subject ? { subject: message.subject } : {}),
               ...(message.buttons ? { buttons: message.buttons } : {}),
+              // WhatsApp outside its conversation window (P5-T04b-b). Every
+              // other driver ignores both, which is why they are carried here
+              // rather than in a WhatsApp-shaped branch.
+              ...(message.templateKey
+                ? { templateKey: message.templateKey }
+                : {}),
+              ...(message.templateParameters
+                ? { templateParameters: message.templateParameters }
+                : {}),
               idempotencyKey: message.idempotencyKey,
             };
 

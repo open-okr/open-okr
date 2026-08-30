@@ -535,3 +535,83 @@ describe("the same check-in through a form", () => {
     expect(await conversationRows()).toEqual([]);
   });
 });
+
+/**
+ * "checkin" on its own (P5-T04b-b).
+ *
+ * A reminder that arrives as words with no buttons is answered by typing, and
+ * nobody types a goal identifier from memory. The command therefore has to find
+ * the one check-in this member owes, and say which when there is more than one
+ * rather than picking.
+ */
+describe("checkin with no goal named", () => {
+  const owe = async (at: Date | null, id = goalId) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = $1 where id = $2",
+      [at, id],
+    );
+  };
+
+  const secondGoal = async () => {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...asChampion() },
+      "cycles.current",
+      { mode: "quarterly" },
+    );
+    const goal = (await callAction(
+      { pool: wb.appPool, ...asChampion() },
+      "goals.create",
+      {
+        cycleId: cycle?.id as string,
+        level: "company",
+        title: "Cut onboarding time to under a week",
+        ownerKind: "workspace",
+        championId: championMemberId,
+        reviewerId: reviewerMemberId,
+        weight: 1,
+      },
+    )) as { id: string };
+    return goal.id;
+  };
+
+  it("starts the one check-in this member owes", async () => {
+    await owe(new Date("2026-08-26T09:00:00.000Z"));
+
+    const reply = await say("checkin");
+    expect(reply.text).toMatch(/How is it going/);
+    expect(await conversationRows()).toHaveLength(1);
+  });
+
+  it("says so, and starts nothing, when none is due", async () => {
+    await owe(null);
+
+    const reply = await say("checkin");
+    expect(reply.text).toMatch(/no check-in due/i);
+    expect(await conversationRows()).toEqual([]);
+  });
+
+  it("asks which one rather than guessing when two are due", async () => {
+    await owe(new Date("2026-08-26T09:00:00.000Z"));
+    await owe(new Date("2026-08-25T09:00:00.000Z"), await secondGoal());
+
+    const reply = await say("checkin");
+    // Named by title, because a title is the only thing the member recognises.
+    expect(reply.text).toMatch(/more than one/i);
+    expect(reply.text).toMatch(/Cut onboarding time/);
+    expect(await conversationRows()).toEqual([]);
+  });
+
+  it("still takes a named goal, which wins over whatever is owed", async () => {
+    const other = await secondGoal();
+    await owe(new Date("2026-08-26T09:00:00.000Z"));
+
+    const reply = await say(`checkin ${other}`);
+    expect(reply.text).toMatch(/How is it going/);
+
+    const rows = await conversationRows();
+    expect(rows).toHaveLength(1);
+    expect((rows[0]?.collected as Record<string, unknown>) ?? {}).toEqual({});
+  });
+});

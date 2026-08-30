@@ -453,6 +453,10 @@ export {
 } from "./schema/streaks.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {
+  type WhatsAppTemplateMapping,
+  whatsappTemplateMappings,
+} from "./schema/whatsapp-mappings.ts";
+export {
   type WhatsAppTemplate,
   whatsappTemplates,
 } from "./schema/whatsapp-templates.ts";

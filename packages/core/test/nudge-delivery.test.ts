@@ -1,6 +1,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { routeCommand } from "../src/channels/router.ts";
 import { parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -351,5 +352,209 @@ describe("a channel that cannot be reached", () => {
     expect(String(messages[0]?.payload.fallbackReason)).toMatch(
       /not connected/,
     );
+  });
+});
+
+/**
+ * WhatsApp's conversation window (P5-T04b-b).
+ *
+ * The one provider with a clock on it. Inside twenty-four hours of the member's
+ * own last message the ordinary body goes; outside it Meta carries only an
+ * approved template, and a rule with none mapped reaches the inbox and stops
+ * there rather than being sent as something Meta bounces.
+ */
+describe("WhatsApp outside the window", () => {
+  const connectWhatsApp = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'whatsapp' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "whatsapp",
+      credentials: JSON.stringify({
+        accessToken: "a-token",
+        appSecret: "a-secret",
+        verifyToken: "a-verify-token",
+      }),
+      config: { teamId: "123456789012345" },
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "whatsapp", externalId: "447700900000" },
+    );
+  };
+
+  const wroteInAt = async (at: string | null) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update channel_identities set last_inbound_at = $1 where member_id = $2 and provider = 'whatsapp'",
+      [at, ownerMemberId],
+    );
+  };
+
+  const mapEveryRule = async (bindings: string[]) => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.syncTemplates",
+      {
+        templates: [
+          {
+            metaId: "meta-1",
+            name: "reminder",
+            language: "en",
+            status: "APPROVED",
+            category: "UTILITY",
+            bodyText: "Hi {{1}}, reply {{2}}.",
+            variables: bindings.length,
+          },
+        ],
+      },
+    );
+    const { templates } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.templates",
+      {},
+    );
+    const templateId = templates[0]?.id as string;
+    // Every rule the run could fire, because which one fires first is the
+    // engine's business and this test is about the window.
+    for (const rule of ["checkin.due_soon", "checkin.due", "checkin.overdue"]) {
+      await callAction(
+        { pool: wb.appPool, ...context() },
+        "channels.saveTemplateMapping",
+        { ruleKey: rule, templateId, bindings },
+      );
+    }
+  };
+
+  it("sends the body when the member wrote in an hour ago", async () => {
+    await connectWhatsApp();
+    await wroteInAt(`${dueOn}T08:00:00Z`);
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const messages = await messageRows();
+    expect(messages.length).toBeGreaterThan(0);
+    expect(String(messages[0]?.payload.text)).toMatch(/Rule: /);
+    expect(messages[0]?.payload.templateKey).toBeUndefined();
+  });
+
+  it("sends the mapped template, filled in, when they have not", async () => {
+    await connectWhatsApp();
+    await wroteInAt(null);
+    await mapEveryRule(["member.name", "reply.command"]);
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const messages = await messageRows();
+    expect(messages.length).toBeGreaterThan(0);
+    expect(messages[0]?.payload.templateKey).toBe("reminder");
+    // The name is the member's own, and the command carries the goal's id,
+    // because a phone has no other way to know it.
+    expect(messages[0]?.payload.templateParameters).toEqual([
+      "Owner",
+      `checkin ${goalId}`,
+    ]);
+    // The body is not sent beside it: Meta will not carry it.
+    expect(messages[0]?.payload.text).toBe("");
+  });
+
+  it("writes the inbox row and queues nothing when no template is mapped", async () => {
+    await connectWhatsApp();
+    await wroteInAt(null);
+
+    const result = await runAt(`${dueOn}T09:00:00Z`);
+    expect(result.delivered).toBeGreaterThan(0);
+    expect(await messageRows()).toEqual([]);
+
+    const wb = await workerDb();
+    const inbox = await wb.admin.query(
+      "select count(*)::int as count from notifications where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(inbox.rows[0].count).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The acceptance criterion, end to end (P5-T04b-b).
+ *
+ * A member whose primary channel is WhatsApp and who has not written in gets
+ * the approved template, and the words it tells them to reply are the words
+ * that start the check-in. The two halves are built in different files, so the
+ * one test that proves they meet is worth having.
+ */
+describe("a check-in asked for and answered over WhatsApp", () => {
+  it("sends the template, and its own reply starts the conversation", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspace_members set primary_channel = 'whatsapp' where id = $1",
+      [ownerMemberId],
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "channels.connect", {
+      provider: "whatsapp",
+      credentials: JSON.stringify({
+        accessToken: "a-token",
+        appSecret: "a-secret",
+        verifyToken: "a-verify-token",
+      }),
+      config: { teamId: "123456789012345" },
+    });
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.linkIdentity",
+      { provider: "whatsapp", externalId: "447700900000" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.syncTemplates",
+      {
+        templates: [
+          {
+            metaId: "meta-1",
+            name: "checkin_due",
+            language: "en",
+            status: "APPROVED",
+            category: "UTILITY",
+            bodyText: "Hi {{1}}, your check-in is due. Reply {{2}}.",
+            variables: 2,
+          },
+        ],
+      },
+    );
+    const { templates } = await callAction(
+      { pool: wb.appPool, ...context() },
+      "channels.templates",
+      {},
+    );
+    for (const rule of ["checkin.due_soon", "checkin.due", "checkin.overdue"]) {
+      await callAction(
+        { pool: wb.appPool, ...context() },
+        "channels.saveTemplateMapping",
+        {
+          ruleKey: rule,
+          templateId: templates[0]?.id as string,
+          bindings: ["member.name", "reply.command"],
+        },
+      );
+    }
+
+    await runAt(`${dueOn}T09:00:00Z`);
+    const [message] = await messageRows();
+    expect(message?.payload.templateKey).toBe("checkin_due");
+
+    // The words the member is told to reply, sent back as a member would.
+    const told = (message?.payload.templateParameters as string[])[1] as string;
+    const reply = await routeCommand({
+      pool: wb.appPool,
+      workspaceId,
+      provider: "whatsapp",
+      memberId: ownerMemberId,
+      userId: OWNER,
+      text: told,
+      now: new Date(`${dueOn}T09:05:00Z`),
+    });
+    expect(reply.text).toMatch(/How is it going/);
   });
 });

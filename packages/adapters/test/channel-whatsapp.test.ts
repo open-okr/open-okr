@@ -136,6 +136,48 @@ describe("sending", () => {
     });
   });
 
+  it("fills the template's placeholders, in placeholder order", async () => {
+    // Meta refuses a send whose parameter count does not match the template,
+    // so the order and the count are the whole contract (P5-T04b-b).
+    await driver().sendToChannel("628123456789", {
+      text: "",
+      templateKey: "checkin_due",
+      templateParameters: ["Ada", "checkin g-1"],
+    });
+
+    expect(JSON.parse((calls[0] as Call).body)).toEqual({
+      messaging_product: "whatsapp",
+      to: "628123456789",
+      type: "template",
+      template: {
+        name: "checkin_due",
+        language: { code: "en" },
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Ada" },
+              { type: "text", text: "checkin g-1" },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it("sends no components at all for a template that takes none", async () => {
+    // An empty components list is refused as readily as a wrong one.
+    await driver().sendToChannel("628123456789", {
+      text: "",
+      templateKey: "checkin_due",
+      templateParameters: [],
+    });
+    const body = JSON.parse((calls[0] as Call).body) as {
+      template: Record<string, unknown>;
+    };
+    expect(body.template.components).toBeUndefined();
+  });
+
   it("sends a template in the language the connection chose", async () => {
     await driver({ templateLanguage: "id" }).sendToChannel("628123456789", {
       text: "x",

@@ -37,6 +37,7 @@ import {
   incompleteText,
   parseCommand,
 } from "./commands.ts";
+import { dueCheckInFor } from "./due-check-in.ts";
 import { runningSessionFor } from "./sessions.ts";
 
 export interface RouterRequest {
@@ -196,7 +197,15 @@ export async function routeCommand(
 
   // The one command that is a conversation. Everything below it is a line.
   if (command.verb === CHECK_IN_COMMAND) {
-    const begun = await beginCheckIn(flow, args.goal ?? "");
+    // **"checkin" on its own has to work** (P5-T04b-b). A reminder that arrives
+    // as words with no button is answered by typing, and nobody types a uuid
+    // from memory. Named goal wins; nothing named means the one this member
+    // owes, and two owed means saying which rather than the product guessing.
+    const goalId = args.goal ?? (await theOneOwed(request));
+    if (typeof goalId !== "string") {
+      return { kind: "reply", text: goalId.text };
+    }
+    const begun = await beginCheckIn(flow, goalId);
     return {
       kind: "reply",
       // `none` cannot happen for a start, and a fallback here rather than a
@@ -206,6 +215,44 @@ export async function routeCommand(
   }
 
   return runAction(request, command, command.toInput(args, request.now));
+}
+
+/**
+ * The goal this member is being asked about, or the sentence to say instead.
+ *
+ * A string is a goal to check in on. An object is an answer to send: none owed
+ * is good news said plainly, and several owed asks which, listing them by name
+ * because a name is the only thing the member recognises.
+ */
+async function theOneOwed(
+  request: RouterRequest,
+): Promise<string | { readonly text: string }> {
+  const due = await withWorkspace(
+    drizzle(request.pool),
+    request.workspaceId,
+    (tx) =>
+      dueCheckInFor(tx, {
+        workspaceId: request.workspaceId,
+        memberId: request.memberId,
+        now: request.now,
+      }),
+  );
+  if (due.kind === "one") {
+    return due.goalId;
+  }
+  if (due.kind === "none") {
+    return {
+      text: "You have no check-in due right now. Name a goal to check in early.",
+    };
+  }
+  return {
+    text: [
+      "You have more than one check-in due. Which one?",
+      ...due.titles.map((title) => `  ${title}`),
+      "",
+      "Reply with checkin and the goal's identifier.",
+    ].join("\n"),
+  };
 }
 
 /**

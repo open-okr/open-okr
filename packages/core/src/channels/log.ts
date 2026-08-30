@@ -73,6 +73,11 @@ export async function queueChannelMessageInTx(
         ...(input.message.templateKey
           ? { templateKey: input.message.templateKey }
           : {}),
+        // Meaningless without a template key, and required with one: Meta
+        // refuses a send whose parameter count does not match (P5-T04b-b).
+        ...(input.message.templateParameters
+          ? { templateParameters: input.message.templateParameters }
+          : {}),
         ...(input.message.degraded.length > 0
           ? { degraded: input.message.degraded }
           : {}),

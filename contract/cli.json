@@ -636,6 +636,62 @@
       "pages": false
     },
     {
+      "name": "channels templateMappings",
+      "action": "channels.templateMappings",
+      "method": "GET",
+      "path": "/channels/templateMappings",
+      "scope": "read",
+      "summary": "Which WhatsApp template each reminder rule uses.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "channels saveTemplateMapping",
+      "action": "channels.saveTemplateMapping",
+      "method": "POST",
+      "path": "/channels/saveTemplateMapping",
+      "scope": "write",
+      "summary": "Points one reminder rule at one approved WhatsApp template.",
+      "flags": [
+        {
+          "name": "rule-key",
+          "field": "ruleKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "template-id",
+          "field": "templateId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "bindings",
+          "field": "bindings",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "channels removeTemplateMapping",
+      "action": "channels.removeTemplateMapping",
+      "method": "POST",
+      "path": "/channels/removeTemplateMapping",
+      "scope": "write",
+      "summary": "Forgets which WhatsApp template a reminder rule used.",
+      "flags": [
+        {
+          "name": "rule-key",
+          "field": "ruleKey",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",

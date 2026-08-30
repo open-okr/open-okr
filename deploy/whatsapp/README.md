@@ -60,16 +60,23 @@ WhatsApp is the one provider that limits *when* the product may speak. Outside a
 twenty-four hour window opened by the member's own last message, only templates
 Meta approved in advance may be sent.
 
-**The templates are synced, the window is not built yet (P5-T04b-b).** Press
-**Sync from Meta** on the channel settings screen once your number has received
-a message, and the templates this account has are listed with the variables each
-one expects. Choosing which template a reminder uses is the next task.
+**Two steps on the channel settings screen, both of them one-off.**
 
-Until then, this connection carries
-free-form messages, which Meta accepts inside the window and refuses outside it
-with "more than 24 hours have passed". The refusal is recorded as permanent and
-the message is dead-lettered rather than retried, so nothing is lost quietly, but
-a reminder sent to somebody who has not written in a day will not arrive.
+1. Press **Sync from Meta** once your number has received a message. The
+   templates this account has are listed, with the variables each one expects
+   and whether Meta has approved it.
+2. Under **Which template answers which reminder**, choose a reminder, choose an
+   approved template, and choose what fills each of its `{{n}}` placeholders.
+
+The five things a placeholder can be filled with are the person's name, the
+workspace's name, what the reminder is about by name, the rule that fired, and
+**the command to reply with**. That last one is what makes a reminder answerable:
+WhatsApp has no buttons, so a template saying "Reply {{2}}" arrives as "Reply
+checkin 8f2c…", and typing that back starts the check-in.
+
+A reminder with no template mapped still reaches the member's inbox inside the
+product. It does not reach their phone, and the settings screen says so rather
+than the message failing quietly at Meta.
 
 ## What a message looks like
 

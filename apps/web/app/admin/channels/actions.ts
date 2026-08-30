@@ -251,3 +251,76 @@ export async function syncTemplates(
         : `${outcome.recorded} templates.`,
   };
 }
+
+/**
+ * Points one reminder rule at one approved template (P5-T04b-b).
+ *
+ * The sources arrive as one form field per placeholder, named `binding0`,
+ * `binding1` and so on, because a form is a flat list of strings and the order
+ * of the placeholders is the whole meaning. Read until one is missing rather
+ * than trusting a count field the browser also sent.
+ */
+export async function saveTemplateMapping(
+  _previous: FormResult | null,
+  form: FormData,
+): Promise<FormResult> {
+  const ruleKey = String(form.get("ruleKey") ?? "").trim();
+  const templateId = String(form.get("templateId") ?? "").trim();
+  if (ruleKey === "" || templateId === "") {
+    return { ok: false, message: "Choose a reminder and a template." };
+  }
+
+  const bindings: string[] = [];
+  for (let index = 0; ; index += 1) {
+    const value = form.get(`binding${index}`);
+    if (value === null) {
+      break;
+    }
+    bindings.push(String(value));
+  }
+
+  try {
+    await callAction(await context(), "channels.saveTemplateMapping", {
+      ruleKey,
+      templateId,
+      bindings,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "That mapping could not be saved.",
+    };
+  }
+
+  revalidatePath("/admin/channels");
+  return { ok: true, message: "Saved." };
+}
+
+/** Forgets one mapping, so the rule has no template again. */
+export async function removeTemplateMapping(
+  _previous: FormResult | null,
+  form: FormData,
+): Promise<FormResult> {
+  const ruleKey = String(form.get("ruleKey") ?? "").trim();
+  if (ruleKey === "") {
+    return { ok: false, message: "Nothing to remove." };
+  }
+
+  try {
+    await callAction(await context(), "channels.removeTemplateMapping", {
+      ruleKey,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "That could not be removed.",
+    };
+  }
+
+  revalidatePath("/admin/channels");
+  return { ok: true, message: "Removed." };
+}

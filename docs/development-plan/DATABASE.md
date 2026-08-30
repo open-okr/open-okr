@@ -519,6 +519,7 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `proposed_changes` | `run_id?` to agent_runs, `thread_id?` to ai_threads, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `result jsonb?`, `undone_at?`, `ai_generated bool` (P4-T05c-a, P4-T14b-a). A proposal names its origin, a run or a thread, exactly one, and a check constraint enforces that: a copilot proposal came from a member's question and inventing an agent run for it would put a run in the log that nobody scheduled. `result` is what applying it returned, which is the only place the created entity's identifier exists and therefore what undo needs. `undone_at` is set on an applied row rather than becoming a status, because it was applied and then it was undone and both are true. On `ai_generated`: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated; every copilot proposal is. |
 | `device_authorisations` *(built at P5-T07c-b)* | `workspace_id?`, `device_code_hash`, `user_code_hash`, `client_name`, `requested_scopes text[]`, `approved_member_id?`, `approved_at?`, `denied_at?`, `consumed_at?`, `last_polled_at?`, `expires_at`. Unique on each code hash |
 | `whatsapp_templates` *(built at P5-T04b-a)* | `meta_id`, `name`, `language`, `status`, `category?`, `body_text?`, `variables`, `synced_at`. Unique on `(workspace_id, meta_id)`, deliberately not partial on `deleted_at` |
+| `whatsapp_template_mappings` *(built at P5-T04b-b)* | `rule_key`, `template_id` to whatsapp_templates, `bindings jsonb` (one source name per placeholder, in placeholder order). Unique on `(workspace_id, rule_key)` where not deleted |
 | `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
 | `oauth_clients` | Registered and cached client metadata |
 | `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
@@ -583,6 +584,48 @@ nudge is due.
 Templates that are not approved are kept and labelled, because an administrator
 wants to know their submission is pending rather than that it does not exist.
 Only approved ones are offered for a mapping.
+
+### whatsapp_template_mappings *(built at P5-T04b-b)*
+Which of a workspace's approved templates answers which reminder, and where each
+of its `{{n}}` placeholders gets its value. One row per rule key, so a reminder
+that could arrive as either of two templates is not expressible: that would be a
+reminder nobody could predict.
+
+`bindings` is an ordered list rather than a map keyed on "1". The first entry
+fills `{{1}}`, and Meta refuses a send whose parameter count does not match, so
+storing it as a list makes that check a length comparison rather than a walk
+looking for gaps. The vocabulary is closed and `packages/core` owns it:
+`member.name`, `workspace.name`, `subject.title`, `rule.key` and
+`reply.command`. Not an expression language, because a settings screen is not
+the place for a second query language and every value one could reach is already
+in that list.
+
+Every source resolves to a non-empty string. Meta refuses a blank parameter, so
+a member with no name is "you" and a subject with no title is "your goal".
+`reply.command` is the one that makes the flow work: WhatsApp has no buttons,
+so a template that wants an answer has to say what to type, identifier and all.
+
+The count, the template's approval and the source names are all checked when the
+mapping is **saved**. The two moments that check could happen are "an
+administrator is looking at the screen" and "it is seven in the morning and a
+reminder did not arrive".
+
+A withdrawn template keeps its mapping. Meta removing a template does not remove
+the administrator's decision about which reminder it answered; the mapping stops
+resolving until the template comes back or another is chosen, and the screen says
+which.
+
+### channel_identities.last_inbound_at *(added at P5-T04b-b)*
+When this member last wrote to us on this provider, and the only thing WhatsApp's
+conversation window is measured from. Meta carries a free-form message only
+within twenty-four hours of the member's own last one; outside that, an approved
+template or nothing. Null means they have never written, which is outside every
+window.
+
+Stamped on the inbound path for every provider, because the column is on the
+identity and one code path is cheaper to keep right than four. Nothing but
+WhatsApp reads it. Deriving it from the message log instead would be the same
+fact read the slower way, once per outbound message.
 
 ### api_tokens *(built at P5-T07a)*
 The second table in the product read before a tenant is known, after `channel_installations`, and for the same reason. A REST request arrives with a bearer token and nothing else: which workspace it belongs to *is* the question. Its policy admits a row through `app.workspace_id` or through `app.api_token_hash` matching its own `token_hash`, and `withApiToken` is the only wrapper that sets the second key. A caller reaches exactly the row whose digest it already holds; the `with check` clause takes the tenant setting alone, so nothing can be written through the second key.

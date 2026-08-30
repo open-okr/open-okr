@@ -408,3 +408,82 @@ say which template it meant after Meta has removed it.
 **The business account id is learned from a webhook**, the way the Teams service
 URL is: Meta names it on every inbound body, and asking an administrator to find
 it in a console would be a form field for a fact the product is already told.
+
+## The window, the mapping and the variables (P5-T04b-b)
+
+The other half of C3's answer. The sync says which templates exist; this says
+which one answers which reminder, what fills its placeholders, and when a
+template is needed at all.
+
+### When a template is needed
+
+| The member last wrote | What is sent |
+|---|---|
+| Under 24 hours ago | The ordinary body. No template is looked up |
+| Over 24 hours ago, or never | The mapped template and its filled-in parameters |
+| Over 24 hours ago, nothing mapped | Nothing is queued. The inbox row still stands, and the recipient counts as unreachable |
+
+`channel_identities.last_inbound_at` is the only thing the window is measured
+from, stamped on the inbound path for every provider. Never written in means
+never inside: a member who has only ever received messages has not opened a
+session, whatever the identity row's creation date says.
+
+### What fills a placeholder
+
+A closed vocabulary of five, not an expression language. An administrator picks
+one per placeholder from a select, and the screen renders exactly as many
+selects as the template has placeholders.
+
+| Source | Value | Falls back to |
+|---|---|---|
+| `member.name` | The recipient's name | "you" |
+| `workspace.name` | The workspace's name | "your workspace" |
+| `subject.title` | The goal's title, or the blocker's key result | "your goal" |
+| `rule.key` | The rule that fired | never empty |
+| `reply.command` | The command that answers this nudge | "help" |
+
+Every source resolves to a non-empty string, because Meta refuses a blank
+parameter and a whole reminder bouncing over an unnamed member is a worse
+answer than a plain word.
+
+`reply.command` is the one that makes the flow work. WhatsApp has no buttons, so
+a template that wants an answer has to say what to type, and it carries the
+identifier because a person reading a message on a phone has no other way to
+know it. `checkin.*` on a goal resolves to `checkin <goal id>`; `blocker.*` on a
+blocker to `resolve <blocker id>`.
+
+### `checkin` on its own
+
+The command's goal argument became optional in this task, and that is a product
+change rather than a WhatsApp accommodation: nobody in Slack should paste a uuid
+either.
+
+| What is due | What happens |
+|---|---|
+| One | It starts, no argument needed |
+| None | "You have no check-in due right now. Name a goal to check in early." |
+| Two or more | The titles, and a request to say which |
+
+Never a guess. Picking the older one would be the product deciding what somebody
+meant about the thing it is asking them to be honest about.
+
+### Where each check happens
+
+| Check | When | Why there |
+|---|---|---|
+| The template is approved | Saving the mapping | Meta would refuse the send, which nobody sees |
+| The source count matches the placeholders | Saving the mapping | The alternative is finding out at seven in the morning |
+| Every source is one this product can fill | Saving the mapping | Same |
+| Which side of the window | Sending | It is a fact about a moment, not about a setting |
+
+The screen makes all three refusals unreachable in the ordinary case: it offers
+only approved templates, renders one select per placeholder, and offers only
+sources from the vocabulary. A refusal therefore means the form is stale, which
+is why it comes back as `not_found` carrying the sentence that says which.
+
+### Acceptance
+
+**Given** a member whose primary channel is WhatsApp and whose check-in is due,
+**when** they have not written in for a day, **then** they receive the approved
+template with their name and the words to reply, **and** sending exactly those
+words back starts the check-in conversation.

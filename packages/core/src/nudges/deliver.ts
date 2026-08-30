@@ -27,6 +27,7 @@ import type { ChannelProviderKey } from "../channels/capabilities.ts";
 import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { resolveDelivery } from "../channels/routing.ts";
+import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
@@ -218,20 +219,58 @@ export async function deliverDueNudges(
               ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
             })) ?? draftFor(row.ruleKey))
           : draftFor(row.ruleKey);
-      const message = buildMessage(draft, provider);
-      await queueChannelMessageInTx(tx, {
-        workspaceId: input.workspaceId,
-        memberId: row.recipientMemberId,
-        channel: provider,
-        message,
-        // The nudge's own id. One nudge is one message however many times a
-        // delivery pass runs over it.
-        idempotencyKey: `nudge:${row.id}`,
-        ...(delivery.fallbackReason
-          ? { fallbackReason: delivery.fallbackReason }
-          : {}),
-      });
-      toChannel++;
+      // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside
+      // Meta's twenty-four hour window the body will not go at all, so the
+      // rule's approved template and its filled-in variables are looked up and
+      // the builder sends that instead. Every other provider skips the query.
+      const envelope =
+        provider === "whatsapp"
+          ? await whatsAppEnvelope(tx, {
+              workspaceId: input.workspaceId,
+              memberId: row.recipientMemberId,
+              ruleKey: row.ruleKey,
+              subjectType: row.subjectType,
+              subjectId: row.subjectId,
+              now: input.now,
+            })
+          : null;
+      const message = buildMessage(
+        envelope?.templateKey
+          ? {
+              ...draft,
+              templateKey: envelope.templateKey,
+              ...(envelope.templateParameters
+                ? { templateParameters: envelope.templateParameters }
+                : {}),
+            }
+          : draft,
+        provider,
+        envelope
+          ? { insideConversationWindow: envelope.insideConversationWindow }
+          : {},
+      );
+      if (message.text === "" && !message.templateKey) {
+        // Outside WhatsApp's window with no template mapped for this rule.
+        // Meta would refuse the send, so nothing is queued: the inbox row
+        // above is already written and the obligation stands. Counted as
+        // unreachable, which is what raises the reconnect notice and is the
+        // honest word for a member the product currently cannot reach.
+        unreachable.add(member.memberId);
+      } else {
+        await queueChannelMessageInTx(tx, {
+          workspaceId: input.workspaceId,
+          memberId: row.recipientMemberId,
+          channel: provider,
+          message,
+          // The nudge's own id. One nudge is one message however many times a
+          // delivery pass runs over it.
+          idempotencyKey: `nudge:${row.id}`,
+          ...(delivery.fallbackReason
+            ? { fallbackReason: delivery.fallbackReason }
+            : {}),
+        });
+        toChannel++;
+      }
     }
 
     // openokr:allow-mutation: the calling Operation's own transaction.

@@ -83,6 +83,9 @@ export interface OutboxHandlerDeps {
     readonly text: string;
     readonly subject?: string;
     readonly buttons?: readonly { label: string; url: string }[];
+    /** The approved template, for a provider that will carry nothing else. */
+    readonly templateKey?: string;
+    readonly templateParameters?: readonly string[];
     readonly idempotencyKey: string;
   }) => Promise<{
     readonly delivered: boolean;
@@ -303,9 +306,16 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     text?: unknown;
     subject?: unknown;
     buttons?: unknown;
+    templateKey?: unknown;
+    templateParameters?: unknown;
   };
   const text = asString(payload.text);
-  if (!text) {
+  const templateKey = asString(payload.templateKey);
+  // **A template message has no text, and that is not an empty message**
+  // (P5-T04b-b). WhatsApp outside its conversation window carries the approved
+  // template and nothing else, so the row is a template name and its filled-in
+  // parameters. A row with neither is the only one there is nothing to send.
+  if (!text && !templateKey) {
     throw new PermanentDispatchError("The message row has no text to send.");
   }
 
@@ -313,7 +323,9 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     .sendChannel({
       provider: row.provider,
       memberId: row.memberId,
-      text,
+      // Empty for a template-only send, which is the shape the driver expects:
+      // it decides on the template key, not on whether there are words.
+      text: text ?? "",
       ...(asString(payload.subject)
         ? { subject: payload.subject as string }
         : {}),
@@ -323,6 +335,12 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
               label: string;
               url: string;
             }[],
+          }
+        : {}),
+      ...(templateKey ? { templateKey } : {}),
+      ...(Array.isArray(payload.templateParameters)
+        ? {
+            templateParameters: payload.templateParameters as readonly string[],
           }
         : {}),
       idempotencyKey: row.idempotencyKey,

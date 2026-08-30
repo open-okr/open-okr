@@ -80,6 +80,13 @@ export const channelIdentities = pgTable(
     /** Display only. A handle is changeable, reusable and sometimes shared. */
     externalHandle: text("external_handle"),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    /**
+     * When this member last wrote to us on this provider (P5-T04b-b).
+     *
+     * What a conversation window is measured from. Null means they never have,
+     * which is outside every window.
+     */
+    lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

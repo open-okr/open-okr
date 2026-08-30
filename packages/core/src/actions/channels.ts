@@ -43,6 +43,11 @@ import {
   LINK_CODE_TTL_SECONDS,
 } from "../channels/inbound.ts";
 import {
+  listMappings,
+  removeMapping,
+  saveMapping,
+} from "../channels/template-mappings.ts";
+import {
   listTemplates,
   recordTemplates,
   type StoredTemplate,
@@ -1142,6 +1147,139 @@ export const syncTemplates = defineWriteAction({
             recorded: outcome.recorded,
             withdrawn: outcome.withdrawn,
           },
+        },
+      };
+    },
+  }),
+});
+
+const mappingOutput = z.object({
+  id: z.string(),
+  ruleKey: z.string(),
+  templateId: z.string(),
+  templateName: z.string(),
+  templateLanguage: z.string(),
+  templateStatus: z.string(),
+  withdrawn: z.boolean(),
+  bindings: z.array(z.string()),
+});
+
+/**
+ * Which template answers which reminder (P5-T04b-b).
+ *
+ * Carries the template's current status and whether Meta still lists it, so the
+ * screen can say "this mapping no longer resolves" rather than showing a name
+ * that stopped working weeks ago.
+ */
+export const readTemplateMappings = defineReadAction({
+  name: "channels.templateMappings",
+  summary: "Which WhatsApp template each reminder rule uses.",
+  input: z.object({}),
+  output: z.object({ mappings: z.array(mappingOutput) }),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (tx) => ({
+      mappings: (await listMappings(tx, context.workspaceId)).map((row) => ({
+        ...row,
+        bindings: [...row.bindings],
+      })),
+    }));
+  },
+});
+
+/**
+ * Points one rule key at one approved template, with a source per placeholder.
+ *
+ * **Every refusal here is a stale form, not a normal path.** The screen offers
+ * only approved templates, renders exactly as many source pickers as the
+ * template has placeholders, and offers only sources this product can fill in.
+ * So a refusal means what the administrator is looking at no longer matches
+ * what Meta last told us, and `not_found` carrying the sentence that says which
+ * is the honest answer: the thing they picked is not there any more.
+ */
+export const saveTemplateMapping = defineWriteAction({
+  name: "channels.saveTemplateMapping",
+  summary: "Points one reminder rule at one approved WhatsApp template.",
+  input: z.object({
+    ruleKey: z.string().min(1),
+    templateId: z.string().uuid(),
+    bindings: z.array(z.string().min(1)).max(50),
+  }),
+  output: z.object({ id: z.string() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const outcome = await saveMapping(tx, {
+        workspaceId,
+        ruleKey: input.ruleKey,
+        templateId: input.templateId,
+        bindings: input.bindings,
+        now: new Date(),
+      });
+
+      if (outcome.kind === "refused") {
+        throw new OperationError("not_found", outcome.reason);
+      }
+
+      return {
+        result: { id: outcome.id },
+        activity: {
+          kind: "channel.templateMapped",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { ruleKey: input.ruleKey, templateId: input.templateId },
+        },
+        audit: {
+          action: "channels.saveTemplateMapping",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { ruleKey: input.ruleKey, templateId: input.templateId },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Forgets a mapping, so the rule falls back to having no template.
+ *
+ * Refuses when there is nothing to forget rather than answering "removed
+ * nothing", because the only way to ask is from a list that showed one.
+ */
+export const removeTemplateMapping = defineWriteAction({
+  name: "channels.removeTemplateMapping",
+  summary: "Forgets which WhatsApp template a reminder rule used.",
+  input: z.object({ ruleKey: z.string().min(1) }),
+  output: z.object({ removed: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const removed = await removeMapping(tx, {
+        workspaceId,
+        ruleKey: input.ruleKey,
+        now: new Date(),
+      });
+      if (!removed) {
+        throw new OperationError(
+          "not_found",
+          "That rule has no template mapped to it.",
+        );
+      }
+
+      return {
+        result: { removed: true },
+        activity: {
+          kind: "channel.templateUnmapped",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { ruleKey: input.ruleKey },
+        },
+        audit: {
+          action: "channels.removeTemplateMapping",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { ruleKey: input.ruleKey },
         },
       };
     },

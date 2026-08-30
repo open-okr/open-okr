@@ -24,6 +24,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `${asString(p.name, "A member")} updated their profile`,
   "channel.templatesSynced": (p) =>
     `Synced ${asString(p.recorded, "0")} WhatsApp templates, withdrawing ${asString(p.withdrawn, "0")}`,
+  "channel.templateMapped": (p) =>
+    `The "${asString(p.ruleKey, "unnamed")}" reminder was pointed at a WhatsApp template`,
+  "channel.templateUnmapped": (p) =>
+    `The "${asString(p.ruleKey, "unnamed")}" reminder no longer uses a WhatsApp template`,
   "api_token.created": (p) =>
     `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
   "api_token.revoked": (p) =>

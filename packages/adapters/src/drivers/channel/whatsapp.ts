@@ -239,6 +239,20 @@ export class WhatsAppChannel implements Channel {
           template: {
             name: message.templateKey,
             language: { code: this.#templateLanguage },
+            // Only when there are any: Meta refuses an empty components list
+            // as readily as a wrong one.
+            ...((message.templateParameters?.length ?? 0) > 0
+              ? {
+                  components: [
+                    {
+                      type: "body",
+                      parameters: (message.templateParameters ?? []).map(
+                        (text) => ({ type: "text", text }),
+                      ),
+                    },
+                  ],
+                }
+              : {}),
           },
         }
       : {
