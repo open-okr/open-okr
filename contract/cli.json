@@ -609,6 +609,33 @@
       "pages": false
     },
     {
+      "name": "channels templates",
+      "action": "channels.templates",
+      "method": "GET",
+      "path": "/channels/templates",
+      "scope": "read",
+      "summary": "The WhatsApp templates this workspace has at Meta.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "channels syncTemplates",
+      "action": "channels.syncTemplates",
+      "method": "POST",
+      "path": "/channels/syncTemplates",
+      "scope": "write",
+      "summary": "Records the WhatsApp templates a sync read from Meta.",
+      "flags": [
+        {
+          "name": "templates",
+          "field": "templates",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",

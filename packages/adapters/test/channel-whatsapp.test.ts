@@ -1,9 +1,12 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  countVariables,
+  templateBody,
   verifySubscription,
   WhatsAppChannel,
   WhatsAppPermanentError,
+  whatsAppBusinessAccountId,
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "../src/drivers/channel/whatsapp.ts";
@@ -340,6 +343,119 @@ describe("reading an inbound body", () => {
     ).toBeNull();
     expect(await driver().parseInbound("not json")).toBeNull();
     expect(await driver().parseInbound("{}")).toBeNull();
+  });
+});
+
+describe("listing the templates Meta holds (P5-T04b-a)", () => {
+  const metaTemplate = (over: Record<string, unknown> = {}) => ({
+    id: "meta-1",
+    name: "checkin_due",
+    language: "en",
+    status: "APPROVED",
+    category: "UTILITY",
+    components: [
+      { type: "HEADER", text: "OpenOKR" },
+      { type: "BODY", text: "Hi {{1}}, your check-in for {{2}} is due." },
+      { type: "FOOTER", text: "Reply STOP to opt out" },
+    ],
+    ...over,
+  });
+
+  it("asks the business account, with the token, and reads the list", async () => {
+    answer = { status: 200, body: { data: [metaTemplate()] } };
+    const found = await driver().listTemplates("waba-1");
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.name).toBe("checkin_due");
+    const call = calls[0] as Call;
+    expect(call.url).toBe(
+      "https://graph.facebook.com/v21.0/waba-1/message_templates?limit=100",
+    );
+    expect(call.headers.authorization).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it("follows Meta's paging rather than seeing the first page only", async () => {
+    let page = 0;
+    const paging: typeof globalThis.fetch = async (input, init) => {
+      calls.push({
+        url: String(input),
+        body: typeof init?.body === "string" ? init.body : "",
+        headers: (init?.headers ?? {}) as Record<string, string>,
+      });
+      page += 1;
+      return Response.json(
+        page === 1
+          ? {
+              data: [metaTemplate()],
+              paging: { next: "https://graph.facebook.com/v21.0/next-page" },
+            }
+          : { data: [metaTemplate({ id: "meta-2", name: "blocker_open" })] },
+      );
+    };
+
+    const found = await driver({ fetch: paging }).listTemplates("waba-1");
+    expect(found.map((one) => one.name)).toEqual([
+      "checkin_due",
+      "blocker_open",
+    ]);
+  });
+
+  it("stops rather than following a cursor that never ends", async () => {
+    const endless: typeof globalThis.fetch = async (input, init) => {
+      calls.push({
+        url: String(input),
+        body: typeof init?.body === "string" ? init.body : "",
+        headers: (init?.headers ?? {}) as Record<string, string>,
+      });
+      return Response.json({
+        data: [metaTemplate()],
+        paging: { next: "https://graph.facebook.com/v21.0/forever" },
+      });
+    };
+
+    // A loop this process would not come back from is worse than a truncated
+    // list somebody can see is truncated.
+    const found = await driver({ fetch: endless }).listTemplates("waba-1");
+    expect(found).toHaveLength(20);
+  });
+
+  it("dead-letters a token the app no longer holds", async () => {
+    answer = {
+      status: 401,
+      body: { error: { message: "Invalid OAuth access token", code: 190 } },
+    };
+    await expect(driver().listTemplates("waba-1")).rejects.toBeInstanceOf(
+      WhatsAppPermanentError,
+    );
+  });
+
+  it("reads the body component, and not the header or the footer", () => {
+    expect(templateBody(metaTemplate())).toBe(
+      "Hi {{1}}, your check-in for {{2}} is due.",
+    );
+    expect(
+      templateBody({ components: [{ type: "HEADER", text: "x" }] }),
+    ).toBeNull();
+    expect(templateBody({})).toBeNull();
+  });
+
+  it("counts the highest placeholder, not how many times one appears", () => {
+    // Meta numbers from one with no gaps, and a body that says {{1}} twice
+    // still takes one parameter.
+    expect(countVariables("Hi {{1}}, thanks {{1}}.")).toBe(1);
+    expect(countVariables("Hi {{1}}, your {{2}} is due.")).toBe(2);
+    expect(countVariables("Nothing here")).toBe(0);
+    expect(countVariables(null)).toBe(0);
+    // Whitespace inside the braces is legal and means the same thing.
+    expect(countVariables("Hi {{ 3 }}")).toBe(3);
+  });
+
+  it("finds the business account on a webhook, where Meta puts it", () => {
+    expect(whatsAppBusinessAccountId(webhook(textMessage("hi")))).toBe(
+      "business-1",
+    );
+    expect(whatsAppBusinessAccountId("{}")).toBeNull();
+    expect(whatsAppBusinessAccountId("nonsense")).toBeNull();
   });
 });
 

@@ -195,22 +195,37 @@ describe("resolving", () => {
     expect(resolved).toEqual({ kind: "rejected", reason: "revoked" });
   });
 
+  /**
+   * **Both moments come from the row, not from the calendar.**
+   *
+   * `apiTokens.create` computes the expiry from the real clock, as it must, and
+   * this test originally compared against two dates written out in full. It
+   * passed for two days and then started failing on its own, because the world
+   * moved past them. A test about "before and after this row's expiry" should
+   * ask the row when that is.
+   */
   it("refuses an expired token, on the clock the caller supplies", async () => {
     const wb = await workerDb();
     const created = await mint({ expiresInDays: 1 });
 
+    const row = await wb.admin.query<{ expires_at: Date }>(
+      "select expires_at from api_tokens where id = $1",
+      [created.id],
+    );
+    const expiresAt = row.rows[0]?.expires_at as Date;
+
     const stillGood = await resolveApiToken(wb.appPool, {
       raw: created.token,
       audience: "rest",
-      now: new Date(Date.parse("2026-08-28T09:00:00.000Z")),
+      now: new Date(expiresAt.getTime() - 60_000),
     });
     expect(stillGood.kind).toBe("ok");
 
-    // Two days on. Nothing had to run for this to stop working.
+    // A minute past it. Nothing had to run for this to stop working.
     const expired = await resolveApiToken(wb.appPool, {
       raw: created.token,
       audience: "rest",
-      now: new Date(Date.parse("2026-08-30T09:00:00.000Z")),
+      now: new Date(expiresAt.getTime() + 60_000),
     });
     expect(expired).toEqual({ kind: "rejected", reason: "expired" });
   });

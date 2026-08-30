@@ -60,7 +60,12 @@ WhatsApp is the one provider that limits *when* the product may speak. Outside a
 twenty-four hour window opened by the member's own last message, only templates
 Meta approved in advance may be sent.
 
-**That window is not built yet (P5-T04b).** Until it is, this connection carries
+**The templates are synced, the window is not built yet (P5-T04b-b).** Press
+**Sync from Meta** on the channel settings screen once your number has received
+a message, and the templates this account has are listed with the variables each
+one expects. Choosing which template a reminder uses is the next task.
+
+Until then, this connection carries
 free-form messages, which Meta accepts inside the window and refuses outside it
 with "more than 24 hours have passed". The refusal is recorded as permanent and
 the message is dead-lettered rather than retried, so nothing is lost quietly, but

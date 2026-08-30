@@ -22,6 +22,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
+  "channel.templatesSynced": (p) =>
+    `Synced ${asString(p.recorded, "0")} WhatsApp templates, withdrawing ${asString(p.withdrawn, "0")}`,
   "api_token.created": (p) =>
     `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
   "api_token.revoked": (p) =>

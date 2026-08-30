@@ -86,6 +86,53 @@ export class WhatsAppPermanentError extends Error {
   }
 }
 
+/** One template, in the shape Meta lists it. */
+export interface MetaTemplate {
+  readonly id?: string;
+  readonly name?: string;
+  readonly language?: string;
+  readonly status?: string;
+  readonly category?: string;
+  readonly components?: readonly {
+    readonly type?: string;
+    readonly text?: string;
+  }[];
+}
+
+/**
+ * A template's body text, which is the component Meta calls BODY.
+ *
+ * A template can also have a header, a footer and buttons. The body is the one
+ * that carries the message and the one whose placeholders a send must fill.
+ */
+export function templateBody(template: MetaTemplate): string | null {
+  const body = (template.components ?? []).find(
+    (component) => component.type?.toUpperCase() === "BODY",
+  );
+  return typeof body?.text === "string" ? body.text : null;
+}
+
+/**
+ * How many `{{n}}` placeholders a body has.
+ *
+ * Counted as the highest index rather than the number of occurrences: a body
+ * that says `{{1}}` twice still takes one parameter, and Meta numbers them from
+ * one with no gaps allowed. Reading the highest is what a send has to supply.
+ */
+export function countVariables(body: string | null): number {
+  if (!body) {
+    return 0;
+  }
+  let highest = 0;
+  for (const match of body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)) {
+    const index = Number(match[1]);
+    if (Number.isInteger(index) && index > highest) {
+      highest = index;
+    }
+  }
+  return highest;
+}
+
 interface GraphError {
   readonly message?: string;
   readonly code?: number;
@@ -278,6 +325,52 @@ export class WhatsAppChannel implements Channel {
     };
   }
 
+  /**
+   * The templates this business account has, as Meta holds them (P5-T04b-a).
+   *
+   * **Not on the `Channel` port**, and deliberately: no other provider has
+   * anything like it, and a port method three drivers would have to answer
+   * "not applicable" to is a port that has stopped describing what a channel is.
+   * The one caller is the settings screen, which already knows it is looking at
+   * WhatsApp.
+   *
+   * Paged, because Meta pages everything and a workspace with sixty templates
+   * would otherwise silently see the first twenty-five.
+   */
+  async listTemplates(
+    businessAccountId: string,
+  ): Promise<readonly MetaTemplate[]> {
+    const found: MetaTemplate[] = [];
+    let url = `${API}/${encodeURIComponent(businessAccountId)}/message_templates?limit=100`;
+
+    // Bounded rather than while(true): a paging cursor that never ends is a
+    // loop this process would not come back from.
+    for (let page = 0; page < 20 && url !== ""; page += 1) {
+      const response = await this.#fetch(url, {
+        headers: { authorization: `Bearer ${this.#accessToken}` },
+      });
+      if (!response.ok) {
+        const parsed = (await response.json().catch(() => ({}))) as {
+          error?: GraphError;
+        };
+        const error = parsed.error ?? {};
+        const detail = error.message ?? `HTTP ${response.status}`;
+        if (isPermanent(error)) {
+          throw new WhatsAppPermanentError(detail);
+        }
+        throw new Error(`WhatsApp refused the template list: ${detail}`);
+      }
+
+      const body = (await response.json()) as {
+        data?: MetaTemplate[];
+        paging?: { next?: string };
+      };
+      found.push(...(body.data ?? []));
+      url = body.paging?.next ?? "";
+    }
+    return found;
+  }
+
   capabilities(): ChannelCapabilities {
     return CAPABILITIES;
   }
@@ -365,6 +458,25 @@ export function whatsAppPhoneNumberId(rawBody: string): string | null {
       metadata.phone_number_id !== ""
       ? metadata.phone_number_id
       : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The WhatsApp Business Account one webhook body belongs to (P5-T04b-a).
+ *
+ * On `entry[].id`, where Meta has always put it. Learned rather than configured,
+ * the way the Teams service URL is: it is what the template list is asked for,
+ * and asking an administrator to find it in a console when the product is
+ * already being told it every time somebody writes would be a form field for
+ * nothing.
+ */
+export function whatsAppBusinessAccountId(rawBody: string): string | null {
+  try {
+    const body = JSON.parse(rawBody) as Record<string, unknown>;
+    const entry = (body.entry as Record<string, unknown>[] | undefined)?.[0];
+    return typeof entry?.id === "string" && entry.id !== "" ? entry.id : null;
   } catch {
     return null;
   }

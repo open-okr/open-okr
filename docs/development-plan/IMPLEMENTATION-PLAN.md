@@ -965,18 +965,29 @@ Deliverables: the `WhatsAppChannel` driver over the Cloud API with no vendor SDK
 Test plan: a body whose signature does not match is refused before it is parsed; the verification handshake answers only for the right token; a message from an unlinked sender is answered with silence; a command typed in WhatsApp reaches the same registry action as in Slack.
 Acceptance: Given a workspace with WhatsApp connected and a member linked, when they type a command, then it is refused or acted on exactly as the same command in Slack, and the attempt is audited with the channel named.
 
-### P5-T04b: The conversation window and its templates [M]
-Depends on: P5-T04a, P5-T06b
-Goal: the product may only speak first with words the provider approved.
+### P5-T04b-a: Syncing Meta's approved templates [M]
+Depends on: P5-T04a
+Goal: the product knows which templates this workspace actually has.
 
-**The open question this part has to settle first.** Design C3's position is that
-the per-nudge-kind template registry belongs in `packages/method`, because a
-template is a coaching message and §11 already owns those. That would mean
-METHOD.md defining the templates, which is a human's decision and not this
-agent's. Ask before building.
+**Design C3 is corrected here, and the correction came from the human on 29
+August 2026.** C3 put a per-nudge-kind template registry in `packages/method`,
+"because a template is a coaching message and §11 already owns those". Two
+things are wrong with that. §11 is the *threshold* registry, which holds numbers
+rather than words. And a template is not canon at all: it is registered and
+approved inside one customer's own Meta Business account, so two workspaces
+cannot share one and no document could name them for everybody. Templates are
+therefore synchronised *from* Meta rather than declared, which is what this row
+builds.
 
-Deliverables: the last inbound moment recorded per identity, which is what the window is measured from; the builder told which side of the window it is on, rather than assuming; the approved-template registry wherever the answer to C3 puts it; template sending in the driver; the conversational check-in reached from a template reply.
-Test plan: an outbound message outside the window uses an approved template; inside it, free form is used; a message outside the window with no registered template is not sent and says so; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
+Deliverables: the WhatsApp Business Account id, learned from an inbound webhook the way the Teams service URL is, because the body already carries it; the `whatsapp_templates` table with its row-level security; the driver's list call; the sync, run from the settings screen so the vendor call stays in the one place that may hold both a driver and the domain; the template list on the channel settings screen, showing each template's status and the variables it expects.
+Test plan: a sync records every approved template and marks the rest by their status; a sync with no business account known yet says so rather than failing; a template that Meta has removed stops being offered; the variables a template expects are read from its body rather than guessed.
+Acceptance: Given a workspace whose WhatsApp bot has received a message, when an administrator syncs, then the workspace's approved templates are listed with the variables each one expects.
+
+### P5-T04b-b: The mapping, the variables and the window [M]
+Depends on: P5-T04b-a, P5-T06b
+Goal: the product may speak first, in words Meta approved, filled from its own data.
+Deliverables: the per-rule-key mapping from a nudge to a chosen template; a binding per template variable, from a named source in the product's own data, so `{{1}}` becomes the member's name and `{{2}}` the goal's title; the last inbound moment recorded per identity, which is what the window is measured from; the builder told which side of the window it is on rather than assuming; template sending with its parameters; the conversational check-in reached from a template reply.
+Test plan: an outbound message outside the window uses the mapped template with its variables filled; inside it, free form is used; a message outside the window with no mapping is not sent and says so; a mapping whose variable count does not match the template is refused when it is saved rather than when it is sent; a conversational check-in collects status, confidence, narrative and values across turns and can be abandoned safely.
 Acceptance: Given a member whose primary channel is WhatsApp, when their check-in is due, then they receive the approved template, and replying walks them through the check-in conversationally to a published result.
 
 ### P5-T05: Telegram driver [M]
@@ -1282,7 +1293,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (27: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **118 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (28: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **119 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

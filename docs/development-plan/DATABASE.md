@@ -518,6 +518,7 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `agent_runs` | `agent_id` to agents, `trigger`, `status`, `tasks jsonb`, `log text`, `started_at`, `finished_at?`, `error?`, `cost` |
 | `proposed_changes` | `run_id?` to agent_runs, `thread_id?` to ai_threads, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `result jsonb?`, `undone_at?`, `ai_generated bool` (P4-T05c-a, P4-T14b-a). A proposal names its origin, a run or a thread, exactly one, and a check constraint enforces that: a copilot proposal came from a member's question and inventing an agent run for it would put a run in the log that nobody scheduled. `result` is what applying it returned, which is the only place the created entity's identifier exists and therefore what undo needs. `undone_at` is set on an applied row rather than becoming a status, because it was applied and then it was undone and both are true. On `ai_generated`: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated; every copilot proposal is. |
 | `device_authorisations` *(built at P5-T07c-b)* | `workspace_id?`, `device_code_hash`, `user_code_hash`, `client_name`, `requested_scopes text[]`, `approved_member_id?`, `approved_at?`, `denied_at?`, `consumed_at?`, `last_polled_at?`, `expires_at`. Unique on each code hash |
+| `whatsapp_templates` *(built at P5-T04b-a)* | `meta_id`, `name`, `language`, `status`, `category?`, `body_text?`, `variables`, `synced_at`. Unique on `(workspace_id, meta_id)`, deliberately not partial on `deleted_at` |
 | `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
 | `oauth_clients` | Registered and cached client metadata |
 | `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
@@ -557,6 +558,31 @@ the same reason.
 State is the timestamps rather than a `state` column beside them. Pending is
 `approved_at` and `denied_at` both null; granted and collected is `consumed_at`
 set. A column carrying the same facts is a second answer that can disagree.
+
+### whatsapp_templates *(built at P5-T04b-a)*
+A mirror of one customer's Meta Business account, not something this product
+authors. The words are theirs, the approval is Meta's, and two workspaces cannot
+share a template, which is why design C3's answer (a registry in
+`packages/method` because "a template is a coaching message") was wrong: §11 is
+the threshold registry and holds numbers, and no document here could name
+templates for everybody.
+
+A sync replaces rather than merges: there is no local edit to conflict with, so
+what Meta no longer lists is marked withdrawn. Withdrawn rather than removed, and
+the unique index is deliberately **not** partial on `deleted_at`, so one template
+is one row for the life of the workspace and a mapping that referred to a
+withdrawn one can still say which it meant. A template Meta lists again is the
+same row, back.
+
+`variables` is the highest `{{n}}` in the body rather than how many times a
+placeholder appears: Meta numbers them from one with no gaps, and a body that
+says `{{1}}` twice still takes one parameter. Counted at sync time so a mapping
+with the wrong number of bindings is refused when it is saved rather than when a
+nudge is due.
+
+Templates that are not approved are kept and labelled, because an administrator
+wants to know their submission is pending rather than that it does not exist.
+Only approved ones are offered for a mapping.
 
 ### api_tokens *(built at P5-T07a)*
 The second table in the product read before a tenant is known, after `channel_installations`, and for the same reason. A REST request arrives with a bearer token and nothing else: which workspace it belongs to *is* the question. Its policy admits a row through `app.workspace_id` or through `app.api_token_hash` matching its own `token_hash`, and `withApiToken` is the only wrapper that sets the second key. A caller reaches exactly the row whose digest it already holds; the `with check` clause takes the tenant setting alone, so nothing can be written through the second key.

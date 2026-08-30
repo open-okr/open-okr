@@ -18,12 +18,14 @@
 import {
   verifySubscription,
   WhatsAppChannel,
+  whatsAppBusinessAccountId,
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "@openokr/adapters";
 import {
   openConnection,
   parseWhatsAppSecret,
+  rememberConnectionConfig,
   workspaceForProviderTeam,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
@@ -107,6 +109,20 @@ export async function POST(request: NextRequest): Promise<Response> {
         // reply goes back to the number the message came from.
         numberFor: () => null,
       });
+    },
+    async remember({ rawBody, workspaceId }) {
+      // The business account the template list is asked for, learned rather
+      // than configured (P5-T04b-a). Recorded after verification, for the same
+      // reason the Teams service URL is: taking it from an unverified body
+      // would let a caller choose which account this workspace syncs from.
+      const businessAccountId = whatsAppBusinessAccountId(rawBody);
+      if (businessAccountId) {
+        await rememberConnectionConfig(getPool(), {
+          workspaceId,
+          provider: "whatsapp",
+          patch: { businessAccountId },
+        });
+      }
     },
     deliveryId: ({ rawBody }) => whatsAppDeliveryId(rawBody),
   });

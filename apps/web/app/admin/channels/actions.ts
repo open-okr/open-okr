@@ -1,6 +1,12 @@
 "use server";
 
-import { callAction } from "@openokr/core";
+import {
+  countVariables,
+  type MetaTemplate,
+  templateBody,
+  WhatsAppChannel,
+} from "@openokr/adapters";
+import { callAction, openConnection, parseWhatsAppSecret } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
@@ -154,5 +160,94 @@ export async function sendTest(
     ok: true,
     message:
       "Queued. The relay delivers it within the minute; the log below says what happened.",
+  };
+}
+
+/**
+ * Asks Meta which templates this workspace has, and records the answer
+ * (P5-T04b-a).
+ *
+ * **The one place that may hold both a driver and the domain.** `packages/core`
+ * may not call a provider, so the fetch happens here and the write goes through
+ * `channels.syncTemplates`, which is one Operation. The same division the relay
+ * already uses.
+ *
+ * **The business account is learned, not configured.** Every inbound webhook
+ * body names it, so the inbound door records it on the connection the way the
+ * Teams service URL is recorded. A workspace whose number has never received a
+ * message has no account id to ask about, and is told that rather than shown an
+ * empty list that looks like an answer.
+ */
+export async function syncTemplates(
+  _previous: FormResult | null,
+  // Unused: the button carries nothing. Present because `ChannelForm` passes
+  // one, and a form component per arity would be a component per arity.
+  _form?: FormData,
+): Promise<FormResult> {
+  const acting = await context();
+
+  const connection = await openConnection(getPool(), getKeyRing(), {
+    workspaceId: acting.workspaceId,
+    provider: "whatsapp",
+  });
+  const secret = connection ? parseWhatsAppSecret(connection.secret) : null;
+  const phoneNumberId = connection?.config.teamId;
+  const businessAccountId = connection?.config.businessAccountId;
+
+  if (!secret || typeof phoneNumberId !== "string") {
+    return { ok: false, message: "WhatsApp is not connected." };
+  }
+  if (typeof businessAccountId !== "string") {
+    return {
+      ok: false,
+      message:
+        "This number has not received a message yet, so the business account it belongs to is not known. Send anything to it and try again.",
+    };
+  }
+
+  const driver = new WhatsAppChannel({
+    phoneNumberId,
+    accessToken: secret.accessToken,
+    appSecret: secret.appSecret,
+    numberFor: () => null,
+  });
+
+  let found: readonly MetaTemplate[];
+  try {
+    found = await driver.listTemplates(businessAccountId);
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error
+          ? `Meta refused the template list: ${error.message}`
+          : "Meta refused the template list.",
+    };
+  }
+
+  const outcome = await callAction(acting, "channels.syncTemplates", {
+    templates: found
+      .filter((template) => template.id && template.name && template.language)
+      .map((template) => {
+        const body = templateBody(template);
+        return {
+          metaId: template.id as string,
+          name: template.name as string,
+          language: template.language as string,
+          status: template.status ?? "UNKNOWN",
+          category: template.category ?? null,
+          bodyText: body,
+          variables: countVariables(body),
+        };
+      }),
+  });
+
+  revalidatePath("/admin/channels");
+  return {
+    ok: true,
+    message:
+      outcome.withdrawn > 0
+        ? `${outcome.recorded} templates, and ${outcome.withdrawn} Meta no longer lists.`
+        : `${outcome.recorded} templates.`,
   };
 }

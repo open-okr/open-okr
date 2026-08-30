@@ -30,6 +30,7 @@ import {
   // then fail on the insert.
   includeDeleted,
   withContext,
+  withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -41,6 +42,11 @@ import {
   hashLinkCode,
   LINK_CODE_TTL_SECONDS,
 } from "../channels/inbound.ts";
+import {
+  listTemplates,
+  recordTemplates,
+  type StoredTemplate,
+} from "../channels/templates.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
 import {
@@ -1032,6 +1038,111 @@ export const testSend = defineWriteAction({
             idempotencyKey: `${CHANNEL_MESSAGE_TOPIC}:${row.id}`,
           },
         ],
+      };
+    },
+  }),
+});
+
+/** One template, as the settings screen shows it. */
+const templateOutput = z.object({
+  id: z.uuid(),
+  metaId: z.string(),
+  name: z.string(),
+  language: z.string(),
+  status: z.string(),
+  category: z.string().nullable(),
+  bodyText: z.string().nullable(),
+  variables: z.number().int(),
+  syncedAt: z.string(),
+});
+
+/**
+ * The templates this workspace has at Meta (P5-T04b-a).
+ *
+ * Every one of them, including the ones Meta has not approved: an administrator
+ * looking at this wants to know that the template they submitted is pending
+ * rather than that it does not exist.
+ */
+export const readTemplates = defineReadAction({
+  name: "channels.templates",
+  summary: "The WhatsApp templates this workspace has at Meta.",
+  input: z.object({}),
+  output: z.object({ templates: z.array(templateOutput) }),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (tx) => ({
+      templates: [
+        ...((await listTemplates(tx, context.workspaceId)) as StoredTemplate[]),
+      ],
+    }));
+  },
+});
+
+/**
+ * Records what a sync found (P5-T04b-a).
+ *
+ * **The fetch is not here, and that is the architecture rather than an
+ * oversight.** `packages/core` may not import a vendor SDK or call a provider,
+ * so the settings screen asks the driver for the list and hands it to this,
+ * which is the same division the relay already uses. What this owns is the
+ * write: one Operation, so a half-recorded list cannot leave a workspace
+ * offering templates that no longer exist beside ones that do.
+ *
+ * **It replaces rather than merges.** Nothing here is authored in this product,
+ * so there is no local edit for a sync to overwrite. A template Meta no longer
+ * lists is marked withdrawn and stops being offered.
+ */
+export const syncTemplates = defineWriteAction({
+  name: "channels.syncTemplates",
+  summary: "Records the WhatsApp templates a sync read from Meta.",
+  input: z.object({
+    templates: z.array(
+      z.object({
+        metaId: z.string().min(1),
+        name: z.string().min(1),
+        language: z.string().min(1),
+        status: z.string().min(1),
+        category: z.string().nullable().optional(),
+        bodyText: z.string().nullable().optional(),
+        variables: z.number().int().min(0).max(50),
+      }),
+    ),
+  }),
+  output: z.object({
+    recorded: z.number().int(),
+    withdrawn: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const now = new Date();
+      const outcome = await recordTemplates(tx, {
+        workspaceId,
+        templates: input.templates,
+        now,
+      });
+
+      return {
+        result: outcome,
+        activity: {
+          kind: "channel.templatesSynced",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            recorded: outcome.recorded,
+            withdrawn: outcome.withdrawn,
+          },
+        },
+        audit: {
+          action: "channels.syncTemplates",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {
+            recorded: outcome.recorded,
+            withdrawn: outcome.withdrawn,
+          },
+        },
       };
     },
   }),

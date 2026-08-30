@@ -36,6 +36,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     to: z.enum(["active", "read_only", "frozen"]),
   }),
   "member.profile_updated": z.object({ name: z.string() }),
+  "channel.templatesSynced": z.object({
+    recorded: z.number(),
+    withdrawn: z.number(),
+  }),
   "api_token.created": z.object({
     name: z.string(),
     audience: z.string(),

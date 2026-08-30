@@ -71,10 +71,14 @@ export {
   toInlineKeyboard,
 } from "./drivers/channel/telegram.ts";
 export {
+  countVariables,
+  type MetaTemplate,
+  templateBody,
   verifySubscription,
   WhatsAppChannel,
   type WhatsAppChannelOptions,
   WhatsAppPermanentError,
+  whatsAppBusinessAccountId,
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "./drivers/channel/whatsapp.ts";

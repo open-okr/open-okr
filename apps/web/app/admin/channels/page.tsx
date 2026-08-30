@@ -3,7 +3,12 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
-import { connectProvider, disconnectProvider, sendTest } from "./actions.ts";
+import {
+  connectProvider,
+  disconnectProvider,
+  sendTest,
+  syncTemplates,
+} from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
 
 /**
@@ -117,6 +122,15 @@ export default async function ChannelsPage() {
   const { messages } = await callAction(context, "channels.listMessages", {
     limit: 10,
   });
+  // Only if WhatsApp is connected: a workspace that has never touched it has
+  // nothing to sync and a section explaining that would be a section about
+  // nothing.
+  const whatsAppConnected = connections.some(
+    (row) => row.provider === "whatsapp" && row.state === "connected",
+  );
+  const { templates } = whatsAppConnected
+    ? await callAction(context, "channels.templates", {})
+    : { templates: [] };
 
   // A stamp for the test button, computed on the server where the clock is
   // allowed to be read, so pressing it twice is two messages rather than one.
@@ -129,6 +143,82 @@ export default async function ChannelsPage() {
         Email always works and needs nothing here. A chat provider is installed
         once per workspace; each member then links their own account.
       </p>
+
+      {whatsAppConnected ? (
+        <Card>
+          <CardHeader>
+            <span className="flex flex-wrap items-center gap-2">
+              WhatsApp templates
+              <Chip tone="neutral">{templates.length}</Chip>
+            </span>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            <p className="text-sm text-ink-3">
+              WhatsApp will only carry a message you send first if Meta approved
+              the words in advance. These are the templates this workspace has,
+              read from Meta rather than written here: the words are yours, the
+              approval is theirs.
+            </p>
+
+            <ChannelForm action={syncTemplates}>
+              <Button type="submit" variant="default" size="sm">
+                Sync from Meta
+              </Button>
+            </ChannelForm>
+
+            {templates.length === 0 ? (
+              <p className="text-xs text-ink-3">
+                Nothing synced yet. Press the button, or submit a template in
+                the Meta console first.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {templates.map((template) => (
+                  <li
+                    key={template.id}
+                    className="flex flex-col gap-1 rounded-lg border border-line p-3"
+                    data-testid="whatsapp-template"
+                  >
+                    <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                      {template.name}
+                      <Chip
+                        tone={
+                          template.status.toUpperCase() === "APPROVED"
+                            ? "ok"
+                            : template.status.toUpperCase() === "REJECTED"
+                              ? "bad"
+                              : "warn"
+                        }
+                      >
+                        {template.status.toLowerCase()}
+                      </Chip>
+                      <span className="text-xs font-normal text-ink-3">
+                        {template.language}
+                      </span>
+                      {template.variables > 0 ? (
+                        <Chip tone="neutral">
+                          {template.variables} variable
+                          {template.variables === 1 ? "" : "s"}
+                        </Chip>
+                      ) : null}
+                    </span>
+                    {template.bodyText ? (
+                      <span className="whitespace-pre-wrap text-xs text-ink-3">
+                        {template.bodyText}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="text-xs text-ink-3">
+              Choosing which template a reminder uses, and what fills its
+              variables, is the next task.
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
 
       {PROVIDERS.map((provider) => {
         const connection = connections.find(

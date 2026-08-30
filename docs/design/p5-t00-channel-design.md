@@ -302,7 +302,7 @@ what it most needs, so the narrative and the values are asked last.
 |---|---|---|
 | C1 | ~~Does the channel work land before a relay host exists?~~ Answered 27 August 2026 | No. The relay was cut out as P5-T01a and built first, because routing nudges into a queue nobody drains would have stacked a second layer of undelivered work on the first |
 | C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail. **Built at P5-T02a**, and enforced by the database rather than by a check: two unique indexes, one each way |
-| C3 | Where do WhatsApp templates live? | A per-nudge-kind registry in `packages/method`, because a template is a coaching message and §11 already owns those |
+| C3 | ~~Where do WhatsApp templates live?~~ **Answered 29 August 2026, and my position was wrong** | Not in `packages/method`. §11 is the *threshold* registry, which holds numbers rather than words, and a template is not canon at all: it is registered and approved inside one customer's own Meta Business account, so two workspaces cannot share one and no document could name them for everybody. Agung's answer: synchronise them from Meta, let an administrator choose which a nudge uses, and fill their variables from the product's own data. **Built at P5-T04b-a** (the sync) and P5-T04b-b (the mapping and the variables) |
 | C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |
 
 ## Teams, and what a third provider proved (P5-T03a)
@@ -378,3 +378,33 @@ wrong token and a number this instance does not know get the same refusal.
 provider's native shape.** A command button folds into the text as `Resolve:
 reply "resolve abc"`, which on WhatsApp is the literal instruction. What was
 written to stop a broken link is what this provider wanted all along.
+
+## Templates are synchronised, not declared (P5-T04b-a)
+
+The one thing about WhatsApp that no other provider has is that the product may
+not always speak first. Outside a twenty-four hour window, Meta carries only
+templates it approved in advance.
+
+**C3 answered that wrongly and is corrected above.** A template looked like
+coaching copy, and coaching copy belongs to METHOD.md. It is not. The words are
+written by the customer, submitted to Meta, and approved or refused by Meta,
+inside one Business account. Two workspaces cannot share one, so nothing in this
+repository could name them.
+
+So the product asks Meta what this workspace has and records the answer:
+
+| | Where it lives | Who decides it |
+|---|---|---|
+| The template's words | Meta | the customer, approved by Meta |
+| Which templates exist here | `whatsapp_templates`, synced | Meta |
+| Which template a nudge uses | a mapping, P5-T04b-b | the administrator |
+| What fills its variables | a binding, P5-T04b-b | the administrator |
+
+**A sync is a replacement, not a merge.** There is no local edit to conflict
+with, so what Meta no longer lists is withdrawn. Withdrawn rather than deleted,
+and one row per template for the life of the workspace, so a mapping can still
+say which template it meant after Meta has removed it.
+
+**The business account id is learned from a webhook**, the way the Teams service
+URL is: Meta names it on every inbound body, and asking an administrator to find
+it in a console would be a form field for a fact the product is already told.

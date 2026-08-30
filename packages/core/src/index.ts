@@ -375,6 +375,14 @@ export {
   type SessionLookup,
 } from "./channels/sessions.ts";
 export {
+  listTemplates,
+  recordTemplates,
+  type StoredTemplate,
+  type SyncedTemplate,
+  type SyncOutcome,
+  usableTemplates,
+} from "./channels/templates.ts";
+export {
   type AnswerQuestionInput,
   type AnswerQuestionResult,
   type AnswerSource,
