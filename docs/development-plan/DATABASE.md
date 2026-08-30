@@ -521,11 +521,11 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 | `whatsapp_templates` *(built at P5-T04b-a)* | `meta_id`, `name`, `language`, `status`, `category?`, `body_text?`, `variables`, `synced_at`. Unique on `(workspace_id, meta_id)`, deliberately not partial on `deleted_at` |
 | `whatsapp_template_mappings` *(built at P5-T04b-b)* | `rule_key`, `template_id` to whatsapp_templates, `bindings jsonb` (one source name per placeholder, in placeholder order). Unique on `(workspace_id, rule_key)` where not deleted |
 | `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
-| `oauth_clients` | Registered and cached client metadata |
-| `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
-| `oauth_codes` | `code_hash`, `challenge`, `resource`, `consumed_at?` |
-| `oauth_access_tokens` | `token_hash`, `grant_id`, `resource`, `expires_at` |
-| `oauth_refresh_tokens` | `token_hash`, `grant_id`, `used_at?`, `replaced_by?`, `expires_at` |
+| `oauth_clients` *(built at P5-T08a)* | `client_id`, `name`, `redirect_uris text[]`, `source` (`allow_list` / `registered`), `metadata_url?`. Unique on `client_id` where not deleted. **Not tenant scoped:** a client registers with the instance, not a workspace |
+| `oauth_grants` *(built at P5-T08a)* | `member_id`, `client_id` to oauth_clients, `scopes text[]`, `resource`, `revoked_at?`, `revoked_reason?`, `last_used_at?` |
+| `oauth_codes` *(built at P5-T08a)* | `grant_id`, `code_hash`, `challenge`, `challenge_method`, `redirect_uri`, `resource`, `consumed_at?`, `expires_at`. Unique on `code_hash` |
+| `oauth_access_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `resource`, `expires_at`, `revoked_at?`. Unique on `token_hash` |
+| `oauth_refresh_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `used_at?`, `replaced_by?` to itself, `revoked_at?`, `expires_at`. Unique on `token_hash` |
 | `mcp_sessions` | `grant_id`, `protocol_version`, `last_seen_at`, `closed_at?` |
 
 ### device_authorisations *(built at P5-T07c-b)*
@@ -639,6 +639,44 @@ The second table in the product read before a tenant is known, after `channel_in
 `last_used_at` is stamped outside the request's own transaction, on purpose: a person wants to know which of their four tokens is still in something's configuration file, and a failed stamp must never fail a call that was otherwise fine.
 
 Credentials and every token hash are never selected to the client.
+
+### The five OAuth tables *(built at P5-T08a)*
+Five tables because the flow has five lifetimes. A client lives for years, a
+grant until somebody ends it, a code for a minute, an access token for an hour,
+and a refresh token until its first use. Collapsing any two puts two lifetimes in
+one row.
+
+**A fourth pre-tenant key, and the only one three tables share.** The token
+endpoint receives a secret and nothing else: which workspace it belongs to *is*
+the question. So `oauth_codes`, `oauth_access_tokens` and
+`oauth_refresh_tokens` each admit a row whose own hash equals
+`app.oauth_secret_hash`, the same shape `channel_installations`,
+`api_tokens` and `device_authorisations` use with their own keys. Sharing the
+setting name widens nothing: each policy compares against its own column, so a
+caller holding a code hash cannot reach an access token.
+
+**The grant is the unit that gets revoked**, and every other row points at one.
+Revoking is one update rather than a sweep, and a token whose grant is gone stops
+working on its next use without anything having had to find it.
+
+**Membership is read on every use rather than cached on the grant.** Somebody
+suspended a minute ago is refused a minute ago, and a person who leaves a
+workspace loses everything they connected, with nobody having to remember.
+
+**`replaced_by` is self-referential, which is what makes reuse detection
+work.** Each refresh token is used exactly once and points at what replaced it.
+A second presentation of a used one means the value was copied, so the whole
+lineage is revoked rather than the one link refused: an attacker holding one copy
+holds whatever the client holds.
+
+**`oauth_clients` is the one table here with no tenant floor**, marked
+`openokr:not-tenant-scoped`. The same agent connecting to two workspaces on one
+instance is one piece of software; a per-workspace copy would mean two
+registrations and two places to allow-list it. What is per workspace is the
+grant. The allow-list is a fallback in the lookup rather than a seeding step: a
+row is written the first time somebody actually uses an allow-listed client,
+which works on a fresh install and on one upgraded from an earlier release, where
+the first-run wizard never runs again.
 
 ## 16. Import, export and tenancy (domain M)
 

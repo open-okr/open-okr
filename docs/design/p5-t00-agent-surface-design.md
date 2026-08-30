@@ -229,3 +229,64 @@ generator that already works rather than a parallel implementation of it.
 | A2 | Does the command line ship with the product or as a separate package? | The same repository, published separately. It is generated, so it cannot drift, and a separate install is what people expect |
 | A3 | Are API tokens per member or per workspace? | Per member, always. A workspace token is an ambient authority with no accountable person, which is the thing CLAUDE.md's agent rules exist to prevent |
 | A4 | Rate limits: per token, per member, or both? | Both, with the tighter one applying. A person with five tokens is still one person |
+
+## The authorisation server: the token half (P5-T08a)
+
+The half a client can hold a token from. Discovery and registration are P5-T08b;
+the consent screen is P5-T08c.
+
+### Five tables, five lifetimes
+
+| Table | Lives for | Ends when |
+|---|---|---|
+| `oauth_clients` | Years | The operator removes it |
+| `oauth_grants` | Until somebody ends it | Revoked, or membership is lost |
+| `oauth_codes` | 60 seconds | Redeemed once, or it expires |
+| `oauth_access_tokens` | 1 hour | Expiry, or the grant is revoked |
+| `oauth_refresh_tokens` | 30 days, or one use | Rotation, replay, or revocation |
+
+Collapsing any two of these puts two lifetimes in one row.
+
+### Every dangerous moment is a race, so every one is a transaction
+
+| Moment | The race | What stops it |
+|---|---|---|
+| Redeeming a code | Two redemptions of one code | Consumed in the same transaction that mints, conditioned on still being unconsumed |
+| Rotating a refresh token | Two refreshes of one token | Claimed before anything is minted, conditioned on still being unused |
+
+### A replayed secret is evidence, not an error
+
+Both a code and a refresh token are used exactly once. A second presentation
+means the value was copied, and one of the two holders is not the client. The
+answer in both cases is to end the whole grant: revoking one link and leaving the
+chain would refuse one request and change nothing an attacker cares about.
+
+The person is told which happened. `REVOCATION_REASONS` distinguishes "you ended
+this", "a refresh token was presented twice" and "you are no longer a member",
+because those are three very different things to read in a connections list.
+
+### Resource binding
+
+Every grant carries the instance URL it was made against, and it is compared at
+issue and on every use. A token minted for one instance is refused by another
+even if the databases were somehow shared.
+
+An API token is not an MCP token, and the rule is not a comparison anybody could
+forget to write: the two live in different tables with different prefixes, so
+presenting one where the other belongs finds nothing at all.
+
+### Where the allow-list lives
+
+In the lookup, not in a seeding step. A seed has to run somewhere, and the only
+place that runs once per instance is the first-run wizard, which an instance
+upgraded from an earlier release never runs again. So an allow-listed client's
+row is written the first time somebody actually uses it: no configuration, and
+correct on both a fresh install and an upgrade. A row that already exists wins,
+so an operator's edit survives and P5-T08b's registered clients are read by the
+same query.
+
+### Acceptance
+
+**Given** an external client holding a grant, **when** it presents a
+rotated-away refresh token, **then** the entire lineage is revoked, every token
+in it stops working, and the grant records that a token was replayed.

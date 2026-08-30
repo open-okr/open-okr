@@ -56,6 +56,11 @@ const PUBLIC_PREFIXES = [
   // deployed instance. The unit tests call the handler directly and could not
   // see it; found while writing this task's first end-to-end request.
   "/api/channels",
+  // The token endpoint of the authorisation server (P5-T08a). A client
+  // redeeming a code has no session by definition: getting one is the point of
+  // the exchange. The consent screen at /oauth/authorize is deliberately not
+  // here, because that one *is* a person in a browser and must be signed in.
+  "/api/mcp/token",
 ];
 
 /**

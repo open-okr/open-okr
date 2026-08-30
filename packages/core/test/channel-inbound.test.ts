@@ -344,9 +344,17 @@ describe("linking by short code", () => {
   it("refuses an expired code", async () => {
     const wb = await workerDb();
     const code = await codeFor();
-    await wb.admin.query(
-      "update channel_link_codes set expires_at = now() - interval '1 minute'",
-    );
+    // **Expired relative to the moment this test says it is, not to the
+    // database's clock.** `NOW` is stamped when this module loads, and the
+    // request carries it; a suite that takes thirteen minutes to reach this
+    // test leaves `now() - 1 minute` comfortably in `NOW`'s future, and the
+    // code is not expired at all. Found as a single failure in a full run,
+    // after two tests appended to this file pushed it far enough down the
+    // schedule. Fourth appearance of the fixed-clock-versus-real-clock trap on
+    // this branch.
+    await wb.admin.query("update channel_link_codes set expires_at = $1", [
+      new Date(NOW.getTime() - 60_000),
+    ]);
 
     expect(
       (

@@ -116,6 +116,17 @@ const API_TOKEN_HASH_SETTING = "app.api_token_hash";
  */
 const DEVICE_CODE_HASH_SETTING = "app.device_code_hash";
 
+/**
+ * The fourth pre-tenant key, and the only one three tables share (P5-T08a).
+ *
+ * An OAuth authorisation code, access token and refresh token are all secrets a
+ * client presents before any workspace is known, and in all three cases the row
+ * it may reach is the one whose own digest equals this. Sharing the name does
+ * not widen anything: each policy still compares against its own column, so a
+ * caller holding a code hash cannot reach an access token and the reverse.
+ */
+const OAUTH_SECRET_HASH_SETTING = "app.oauth_secret_hash";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -143,6 +154,15 @@ export interface TenantContext {
    * code hashes to it, and nothing else in the database.
    */
   readonly deviceCodeHash?: string;
+  /**
+   * Names one OAuth secret's hash, for the authorisation server only
+   * (P5-T08a).
+   *
+   * Reveals exactly the `oauth_codes`, `oauth_access_tokens` or
+   * `oauth_refresh_tokens` row whose own hash equals it, and nothing else in
+   * the database.
+   */
+  readonly oauthSecretHash?: string;
 }
 
 /**
@@ -202,6 +222,24 @@ export async function withDeviceCode<
 }
 
 /**
+ * Opens a transaction that can resolve one OAuth secret (P5-T08a).
+ *
+ * Use it for the token endpoint and the access-token lookup, and nothing else.
+ * The row it reaches is the one the caller already named by hash, and the
+ * ordinary tenant setting is applied afterwards for the work itself.
+ */
+export async function withOAuthSecret<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  secretHash: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { oauthSecretHash: secretHash }, fn);
+}
+
+/**
  * Opens a transaction that may write instance settings.
  *
  * Deliberately separate from `withWorkspace` and `withUser`: instance settings
@@ -242,6 +280,7 @@ export async function withContext<
     channelTeamId,
     apiTokenHash,
     deviceCodeHash,
+    oauthSecretHash,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -269,15 +308,24 @@ export async function withContext<
     throw new Error("Invalid token hash: expected a SHA-256 hex digest.");
   }
   if (
+    oauthSecretHash !== undefined &&
+    !/^[0-9a-f]{64}$/.test(oauthSecretHash)
+  ) {
+    throw new Error(
+      "Invalid OAuth secret hash: expected a SHA-256 hex digest.",
+    );
+  }
+  if (
     workspaceId === undefined &&
     userId === undefined &&
     channelTeamId === undefined &&
     apiTokenHash === undefined &&
     deviceCodeHash === undefined &&
+    oauthSecretHash === undefined &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, or instance admin.",
     );
   }
 
@@ -312,6 +360,11 @@ export async function withContext<
     if (deviceCodeHash !== undefined) {
       await tx.execute(
         sql`select set_config(${DEVICE_CODE_HASH_SETTING}, ${deviceCodeHash}, true)`,
+      );
+    }
+    if (oauthSecretHash !== undefined) {
+      await tx.execute(
+        sql`select set_config(${OAUTH_SECRET_HASH_SETTING}, ${oauthSecretHash}, true)`,
       );
     }
     return fn(tx);

@@ -370,6 +370,19 @@ export {
   type NudgeSuppressionReason,
   nudges,
 } from "./schema/nudges.ts";
+export {
+  OAUTH_CLIENT_SOURCES,
+  type OAuthAccessToken,
+  type OAuthClient,
+  type OAuthCode,
+  type OAuthGrant,
+  type OAuthRefreshToken,
+  oauthAccessTokens,
+  oauthClients,
+  oauthCodes,
+  oauthGrants,
+  oauthRefreshTokens,
+} from "./schema/oauth.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
   type ManagementAnswer,
@@ -490,6 +503,7 @@ export {
   withContext,
   withDeviceCode,
   withInstanceAdmin,
+  withOAuthSecret,
   withProviderTeam,
   withUser,
   withWorkspace,

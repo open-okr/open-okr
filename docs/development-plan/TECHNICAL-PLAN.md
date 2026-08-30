@@ -415,6 +415,7 @@ Keep current in every schema change.
 | No legacy source | `channel_conversations` | A half-finished chat conversation is a thirty-minute artefact of a flow. Importing one would be importing a question nobody asked |
 | No legacy source | `whatsapp_templates` | A mirror of one customer's Meta account. There is nothing in a source system that corresponds, and a sync rebuilds it in seconds |
 | No legacy source | `whatsapp_template_mappings` | A choice an administrator makes about one customer's own Meta templates. No source system has the concept |
+| No legacy source | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_access_tokens`, `oauth_refresh_tokens` | Credentials and one person's decision about one client. Nothing in a source system corresponds, and importing a live secret would be importing a way in |
 | No legacy source | `device_authorisations` | A ten-minute request from a terminal. There is nothing in a source system that corresponds to one, and importing it would be importing a half-finished login |
 | No legacy source | `api_tokens` | A token is a credential this instance issued. Importing one would be importing a way to act as somebody, and no source system has an OpenOKR token to give |
 | No legacy source | `channel_link_codes`, `channel_installations` | A link code is a thirty-second artefact of a flow and an installation is a routing fact about this instance. Neither has a source-system analogue, and importing either would be importing a way to reach somebody |

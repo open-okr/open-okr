@@ -1072,12 +1072,33 @@ Deliverables: the device code table with its row-level security; the start and p
 Test plan: the device login mints a token with the scopes it asked for and no more; an expired device code is refused; a code approved twice grants once.
 Acceptance: Given a signed-out terminal, when a person runs the device login and completes it in the browser, then the profile holds a scoped token and the next command runs as them.
 
-### P5-T08: MCP authorisation server [L]
+### P5-T08a: The grant, the codes and the token endpoint [M]
 Depends on: P5-T07, P2-T09
-Goal: the authorisation half of the external agent surface (AI-NATIVE-PLAN.md §8.2).
-Deliverables: the authorise, token and registration endpoints; the consent screen with a workspace picker (screen S-40); discovery documents with their transport variants and preflight; client allow-listing, metadata documents and dynamic registration, all fetched through the outbound-request rules; native redirect rules; single-use codes consumed in a transaction; short-lived access tokens; refresh rotation with reuse detection that revokes the whole lineage; resource binding validated at issue and on every use; every secret stored hashed; revocation on membership loss.
-Test plan: a replayed authorisation code is refused; a reused refresh token revokes the lineage; an API token is rejected at the agent endpoint and the reverse; losing membership invalidates the grant on the next call.
-Acceptance: Given an external client completing the flow, when it later presents a rotated-away refresh token, then the entire grant is revoked and the user is told in their connections list.
+Goal: the half of AI-NATIVE-PLAN.md §8.2 a client can hold a token from.
+
+**Cut in three, along what a client can complete without.** The original row was one [L] task holding four separable things: the token machinery, the documents that let a client find it, the screen a person approves it on, and a client registry. Nothing in the second or third can be built before the first, and the first is provable on its own against a hand-registered client, which is exactly what the static allow-list is for. The parts are named here so the cut is visible rather than inferred from four commits.
+
+Deliverables: the tables for clients, grants, codes and refresh tokens, every secret stored as a hash with a type prefix; the authorise endpoint's server half, issuing a single-use code against a PKCE challenge; the token endpoint with the authorisation-code and refresh-token grants; codes consumed in a transaction; short-lived access tokens; refresh rotation with reuse detection that revokes the whole lineage; resource binding validated at issue and on every use, so an API token is not an MCP token and the reverse; membership and suspension revalidated per use, with loss of membership revoking the grant; a static client allow-list, enough to complete the flow before registration exists.
+Test plan: a replayed authorisation code is refused; a reused refresh token revokes the lineage; a code redeemed with the wrong verifier is refused; an API token presented at the agent endpoint is refused, and an MCP token at the REST endpoint is refused; losing membership invalidates the grant on the next call.
+Acceptance: Given an external client holding a grant, when it presents a rotated-away refresh token, then the entire lineage is revoked and every token in it stops working.
+
+### P5-T08b: Discovery, registration and the outbound-request rules [M]
+Depends on: P5-T08a
+Goal: a client that has been told nothing but the instance URL can find the server and register itself.
+
+**The outbound-request rules land here, and they are not only this task's.** TECHNICAL-PLAN.md §11 requires every outbound fetch to validate the literal host and the resolved address, block private and metadata ranges, follow no redirects, and cap size and time. Nothing has needed one until now: the channel drivers call fixed provider hosts. A client metadata document is the first fetch of a URL somebody else chose, so the helper is built here and the AI base URL and webhook paths adopt it.
+
+Deliverables: the outbound-request helper in `packages/adapters`, with its own tests; protected-resource metadata, authorisation-server metadata and OpenID configuration, each with the transport-suffixed variants and cross-origin preflight; the challenge on unauthorised responses pointing at the resource metadata; client metadata documents fetched through the helper; dynamic client registration; native-application redirect rules, with custom schemes allowed only to the callback path, dangerous schemes denied, and transport security required outside development.
+Test plan: a metadata fetch of a private address is refused and named; a redirect is not followed; a registration with a dangerous redirect scheme is refused; an unauthorised call carries a challenge naming the resource metadata; each discovery document is served at its transport-suffixed path and answers preflight.
+Acceptance: Given a client that knows only the instance URL, when it reads the discovery documents and registers itself, then it can complete the authorisation flow without an administrator having entered anything.
+
+### P5-T08c: The consent screen and the connections list [M]
+Depends on: P5-T08a
+Goal: screen S-40, and the place a person sees and ends what they granted.
+
+Deliverables: the consent screen, showing the client's identity, a workspace picker, the scopes in plain language, and approve or deny; the granted-connections list, with each client, its workspace, its scopes and its last use; a revoke control that ends the lineage; audit events for granting and revoking; the notice a person sees when a grant was revoked by reuse detection rather than by them.
+Test plan: denying issues no code; a member of two workspaces picks one and the grant names the one they picked; revoking stops the next call; a lineage revoked by reuse detection appears in the list as revoked, and says why.
+Acceptance: Given a user whose refresh token was replayed by a client, when they open their connections list, then the grant is shown as revoked, the reason is named, and no token in the lineage works.
 
 ### P5-T09: MCP transport, sessions and tool catalogue [L]
 Depends on: P5-T08
@@ -1293,7 +1314,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (28: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **119 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (30: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **121 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

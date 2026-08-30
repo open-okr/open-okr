@@ -203,6 +203,58 @@ export {
   statusFor,
 } from "./api/errors.ts";
 export {
+  ALLOW_LISTED_CLIENTS,
+  type ClientRejection,
+  type ClientResolution,
+  redirectAllowed,
+  resolveClient,
+} from "./api/oauth/clients.ts";
+export {
+  digest,
+  type GrantRefusal,
+  type IssuedTokens,
+  issueAuthorisationCode,
+  redeemAuthorisationCode,
+  rotateRefreshToken,
+  type TokenOutcome,
+} from "./api/oauth/flow.ts";
+export {
+  createGrant,
+  type GrantInput,
+  type GrantRejection,
+  type LiveGrant,
+  liveGrant,
+  REVOCATION_REASONS,
+  type RevocationReason,
+  revokeGrant,
+  stampGrantUse,
+} from "./api/oauth/grants.ts";
+export {
+  CHALLENGE_METHOD,
+  challengeFor,
+  isValidVerifier,
+  verifierMatches,
+} from "./api/oauth/pkce.ts";
+export {
+  type AccessRejection,
+  type AccessResolution,
+  redeemCodeForTokens,
+  refreshForTokens,
+  resolveAccessToken,
+  workspaceForCode,
+  workspaceForRefreshToken,
+} from "./api/oauth/resolve.ts";
+export {
+  ACCESS_TOKEN_TTL_SECONDS,
+  CODE_TTL_SECONDS,
+  hashSecret,
+  kindFromText,
+  type MintedSecret,
+  mintSecret,
+  type OAuthSecretKind,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from "./api/oauth/secrets.ts";
+export {
   buildOpenApiDocument,
   type ContractDifference,
   diffContract,
