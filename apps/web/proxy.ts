@@ -61,6 +61,13 @@ const PUBLIC_PREFIXES = [
   // the exchange. The consent screen at /oauth/authorize is deliberately not
   // here, because that one *is* a person in a browser and must be signed in.
   "/api/mcp/token",
+  // Registration is open by design (RFC 7591, P5-T08b): registering grants
+  // nothing, and every authority still comes from the consent screen.
+  "/api/mcp/register",
+  // The discovery documents are what a client reads *before* it has anything
+  // to authenticate with. Gating them behind a session would mean no client
+  // could ever find the endpoints it needs to get one.
+  "/.well-known",
 ];
 
 /**

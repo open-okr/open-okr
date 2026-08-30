@@ -210,6 +210,16 @@ export {
   resolveClient,
 } from "./api/oauth/clients.ts";
 export {
+  authorisationServerMetadata,
+  challengeHeader,
+  DISCOVERY_ROUTES,
+  discoveryDocumentAt,
+  OAUTH_PATHS,
+  openIdConfiguration,
+  protectedResourceMetadata,
+  SUPPORTED_SCOPES,
+} from "./api/oauth/discovery.ts";
+export {
   digest,
   type GrantRefusal,
   type IssuedTokens,
@@ -235,6 +245,17 @@ export {
   isValidVerifier,
   verifierMatches,
 } from "./api/oauth/pkce.ts";
+export {
+  type FetchedMetadata,
+  parseClientMetadata,
+  type RegistrationInput,
+  type RegistrationOutcome,
+  type RegistrationRefusal,
+  redirectRegistrable,
+  registerClient,
+  registerClientForInstance,
+  registrationResponse,
+} from "./api/oauth/registration.ts";
 export {
   type AccessRejection,
   type AccessResolution,

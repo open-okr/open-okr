@@ -290,3 +290,89 @@ same query.
 **Given** an external client holding a grant, **when** it presents a
 rotated-away refresh token, **then** the entire lineage is revoked, every token
 in it stops working, and the grant records that a token was replayed.
+
+## Discovery, registration and the outbound rules (P5-T08b)
+
+The half that lets a client which has been told only the instance URL find the
+server and register itself.
+
+### Three documents, one builder, six paths
+
+| Document | Specification | Answers |
+|---|---|---|
+| Protected resource metadata | RFC 9728 | Which authorisation server guards this |
+| Authorisation server metadata | RFC 8414 | Where to send a person, and where to redeem a code |
+| OpenID configuration | OpenID Connect Discovery | The same, for clients that only look there |
+
+They overlap heavily, and that is fine because all three come from one builder.
+Two builders would be two answers to where the token endpoint lives.
+
+Each is served at its plain path and at its transport-suffixed one: RFC 9728
+puts the resource path *after* the well-known segment, so a resource at
+`/api/mcp` has its document at
+`/.well-known/oauth-protected-resource/api/mcp`. Clients differ on which they
+try, and serving one is how a connection fails with nothing in a log to explain
+it.
+
+`S256` is the only challenge method advertised, because it is the only one
+accepted. Advertising `plain` and refusing it would be a downgrade an attacker
+could ask for.
+
+### The outbound rules
+
+Four rules, and each closes a different way around the others.
+
+| Rule | What it stops |
+|---|---|
+| The literal host is checked | `http://127.0.0.1/admin` |
+| **Every** resolved address is checked | `http://evil.test/` where the name resolves to `10.0.0.5` |
+| No redirect is followed | A public address answering `302 http://169.254.169.254/` |
+| Size and time are capped | A URL that streams forever, or answers a gigabyte |
+
+Checking the name alone is defeated by DNS. Checking only the first resolved
+address is defeated by a name that returns one public and one private answer.
+Following one redirect is enough to reach anything the address checks refused.
+And the size cap is enforced on what arrives rather than on `content-length`,
+which a hostile server is free to understate or omit.
+
+The cloud metadata address is the reason this matters: a plain GET of
+`169.254.169.254` returns credentials on most hosting, with no authentication,
+because the service assumes only the instance can reach it.
+
+The helper lives in `packages/adapters` because it is the one place code that
+touches the network lives. It is not a driver: there is no vendor, only the
+platform `fetch` with the rules a hostile URL requires.
+
+### Why open registration is not a hole
+
+Registering grants nothing. It records a name and a set of redirect addresses.
+Every authority still comes from a person approving a specific client, in a
+specific workspace, with specific scopes, on the consent screen. What
+registration buys is that an agent nobody has heard of can start the flow with
+no operator pasting anything, which is the same rule every setting in this
+product follows.
+
+The identifier is issued by this server rather than chosen by the client. A
+client that picked its own could claim another's, and every grant is keyed on it.
+No `client_secret` is returned at all: every client here is public, and emitting
+an empty one would be worse than omitting it, because a client that finds the
+field will try to use it.
+
+### Redirect rules, checked twice
+
+| Scheme | Rule |
+|---|---|
+| `https:` | Allowed |
+| `http:` | Loopback only, where there is no network to listen on |
+| Custom (`myagent://host/callback`) | Allowed, but only to a path: claiming the bare scheme claims every address in it |
+| `javascript:`, `data:`, `file:`, `vbscript:`, `blob:` | Never |
+
+Checked at registration and again at authorisation. A registration is a claim
+and an authorisation is a use, and a check that ran only once ran before the
+rules were last changed.
+
+### Acceptance
+
+**Given** a client that knows only the instance URL, **when** it reads the
+discovery documents and registers itself, **then** it can complete the
+authorisation flow without an administrator having entered anything.

@@ -93,6 +93,15 @@ export {
   type RealtimeSocketServerOptions,
   type SocketPrincipal,
 } from "./drivers/realtime/socket-server.ts";
+export {
+  type CheckedUrl,
+  checkUrl,
+  isBlockedAddress,
+  type OutboundOptions,
+  type OutboundRefusal,
+  type OutboundResult,
+  outboundFetch,
+} from "./outbound/guard.ts";
 export type {
   AIProvider,
   ChatMessage,
