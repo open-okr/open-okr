@@ -430,3 +430,46 @@ the request. The way to grant less is to refuse and ask for less.
 **Given** a user whose refresh token was replayed by a client, **when** they
 open their connections list, **then** the grant is shown as revoked, the reason
 is named, and no token in the lineage works.
+
+## The tool catalogue (P5-T09a)
+
+A third projection of the one action registry, beside `contract/openapi.json`
+and `contract/cli.json`. 275 tools, one per action.
+
+| What a tool carries | Where it comes from |
+|---|---|
+| Name | The action's own name, dots and all |
+| Description | The action's summary |
+| Input schema | The action's Zod schema, converted to JSON Schema |
+| Scope | The action's safety class |
+| `readOnlyHint`, `destructiveHint`, `idempotentHint` | The same safety class |
+| Example | The schema's own required fields |
+
+### The safety class does two jobs, and only one is enforcement
+
+It is the **scope** a grant must carry, which the server checks before an action
+runs. And it is the **hint** a client shows a person before it lets an agent
+call something, which the server never reads.
+
+Losing either fails in a different direction. A tool with no scope reaches a
+surface no grant narrowed. A write tool that claims to be read-only is a client
+telling somebody an agent is only looking while it deletes a goal. The invariant
+test pins both, across every tool rather than a sampled few.
+
+### Destructive tools are listed, not hidden
+
+Leaving them out would make the surface look safer than it is while an agent
+reached them through the REST endpoint anyway. What protects somebody is that
+the scope is separate, the grant has to carry it, and the client is told.
+
+### The drift gate names what moved
+
+A scope change is reported as *its scope moved from read to destructive*, not as
+"changed". One of those is a security change and the rest are not, and a gate
+that says "the file differs" sends somebody hunting.
+
+### Acceptance
+
+**Given** the action registry, **when** the catalogue is generated, **then**
+every tool carries its safety hint, its scope and its input schema, and the
+drift gate refuses a change that leaves them out of step.

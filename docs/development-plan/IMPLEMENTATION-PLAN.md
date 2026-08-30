@@ -1100,12 +1100,31 @@ Deliverables: the consent screen, showing the client's identity, a workspace pic
 Test plan: denying issues no code; a member of two workspaces picks one and the grant names the one they picked; revoking stops the next call; a lineage revoked by reuse detection appears in the list as revoked, and says why.
 Acceptance: Given a user whose refresh token was replayed by a client, when they open their connections list, then the grant is shown as revoked, the reason is named, and no token in the lineage works.
 
-### P5-T09: MCP transport, sessions and tool catalogue [L]
-Depends on: P5-T08
-Goal: the tool half (AI-NATIVE-PLAN.md §8.3).
-Deliverables: the streaming HTTP transport and the local standard-input transport; session lifecycle bound to the grant with version negotiation, header discipline and origin validation; the tool catalogue generated from the registry with safety hints, scopes, schemas and examples, pinned by an invariant test; the permission-filtered global search tool and the fetch tool turning a canonical URL into cited content; read-only resources; prompt templates.
-Test plan: a live end-to-end run over the real transport asserting that an under-privileged call is denied by the permission layer and no cross-tenant data appears in any result; the catalogue invariant test fails when a tool loses its safety classification.
+### P5-T09a: The tool catalogue, resources and prompts [M]
+Depends on: P5-T08a
+Goal: everything an external agent can be offered, projected from the action registry.
+
+**Cut in three, and the first part needs no protocol library at all.** The original row was one [L] task holding the transports, the session lifecycle, the catalogue, and two tools that are their own feature. The catalogue is a projection of the action registry exactly as `contract/openapi.json` and `contract/cli.json` are, so it is buildable, testable and pinnable before any transport exists, and the transport that follows has something real to serve. Agung approved `@modelcontextprotocol/sdk` as the agent protocol SDK on 30 August 2026, so P5-T09b is unblocked; the cut is about order, not permission.
+
+Deliverables: the tool catalogue generated from the registry, one tool per action, carrying the JSON Schema of its input, its safety class as a read-only or destructive hint, the scope it needs, a summary and an example; read-only resource handles for a goal, a cycle, a scorecard, a KPI tree and a slice of the Work Map; the server-side prompt templates from AI-NATIVE-PLAN.md §8.3; the catalogue committed as an artifact with a drift gate, the same shape `check:contract` already uses; a catalogue invariant test that fails when a tool loses its safety classification.
+Test plan: every tool names an action the registry defines and no action is missing without a stated reason; a destructive action carries the destructive hint and the destructive scope; the committed artifact matches a freshly generated one; removing a safety class fails the invariant test.
+Acceptance: Given the action registry, when the catalogue is generated, then every tool carries its safety hint, its scope and its input schema, and the drift gate refuses a change that leaves them out of step.
+
+### P5-T09b: The transport and the session [L]
+Depends on: P5-T09a
+Goal: an external agent can connect, negotiate and call (AI-NATIVE-PLAN.md §8.3).
+
+Deliverables: `@modelcontextprotocol/sdk` in `packages/adapters` behind a port, the only place it may live; the streaming HTTP transport at the resource the discovery documents already name; the local standard-input transport for a desktop or air-gapped agent; `mcp_sessions` bound to the grant, with protocol version negotiation, header discipline and origin validation against rebinding; the access token resolved per request through P5-T08a's resolver, with the challenge header on every unauthorised answer; errors sanitised so a refusal says nothing about the schema behind it.
+Test plan: a session is bound to one grant and dies with it; an origin the instance does not serve is refused; a version it cannot speak is refused with the versions it can; an unauthorised call carries the challenge naming the resource metadata; a revoked grant stops the next call on the same session.
 Acceptance: Given an external agent holding read scope, when it calls a write tool, then the call is denied by the permission layer, the denial is audited, and the agent receives a clear error rather than a partial result.
+
+### P5-T09c: Search and fetch [M]
+Depends on: P5-T09b
+Goal: the two tools that make a research connector work.
+
+Deliverables: the global `search` tool, permission-filtered through the same access layer as every read, so a result a member cannot see never appears; the `fetch` tool turning a canonical OpenOKR URL into structured content with a citation; both in the catalogue with the rest.
+Test plan: a live end-to-end run over the real transport asserting that an under-privileged call is denied and no cross-tenant data appears in any result; a search by a member who cannot see a goal never returns it; a fetch of a URL in another workspace answers not-found.
+Acceptance: Given two workspaces with similar goals, when an agent in one searches for the other's wording, then nothing from the other workspace appears in any result.
 
 ### P5-T10: Initiatives [M]
 Depends on: P5-T00, P3-T04
@@ -1314,7 +1333,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (30: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **121 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (32: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **123 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

@@ -14,8 +14,9 @@
  * is the whole reason for the drift check: not to catch a broken generator, but
  * to make a change to the contract impossible to ship silently.
  *
- * Two artifacts now, generated in the same run so they cannot describe different
- * registries: the OpenAPI document, and the command list the `okr` tool reads.
+ * Three artifacts now, generated in the same run so they cannot describe
+ * different registries: the OpenAPI document, the command list the `okr` tool
+ * reads, and the tool catalogue an external agent is offered (P5-T09a).
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -25,6 +26,11 @@ import {
   type CliContract,
   diffCliContract,
 } from "../api/cli-contract.ts";
+import {
+  buildCatalogue,
+  diffCatalogue,
+  type McpCatalogue,
+} from "../api/mcp/catalogue.ts";
 import {
   buildOpenApiDocument,
   diffContract,
@@ -36,6 +42,7 @@ import {
 const ROOT = resolve(import.meta.dirname, "../../../..");
 const OPENAPI = resolve(ROOT, "contract/openapi.json");
 const CLI = resolve(ROOT, "contract/cli.json");
+const MCP = resolve(ROOT, "contract/mcp.json");
 
 const relative = (path: string): string =>
   path
@@ -87,6 +94,22 @@ const artifacts: readonly Artifact[] = [
       ).map((difference) => ({
         kind: difference.kind,
         subject: difference.command,
+        detail: difference.detail,
+      })),
+  },
+  {
+    file: MCP,
+    text: `${JSON.stringify(buildCatalogue(), null, 2)}
+`,
+    summary: (text) =>
+      `${(JSON.parse(text) as McpCatalogue).tools.length} tool(s) offered`,
+    differences: (committed, fresh) =>
+      diffCatalogue(
+        JSON.parse(committed) as McpCatalogue,
+        JSON.parse(fresh) as McpCatalogue,
+      ).map((difference) => ({
+        kind: difference.kind,
+        subject: difference.tool,
         detail: difference.detail,
       })),
   },

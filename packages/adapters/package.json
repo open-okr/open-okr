@@ -13,6 +13,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "catalog:",
     "@google/genai": "catalog:",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@openokr/config": "workspace:*",
     "nodemailer": "catalog:",
     "openai": "catalog:",
