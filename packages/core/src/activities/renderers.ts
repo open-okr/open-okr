@@ -28,6 +28,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `The "${asString(p.ruleKey, "unnamed")}" reminder was pointed at a WhatsApp template`,
   "channel.templateUnmapped": (p) =>
     `The "${asString(p.ruleKey, "unnamed")}" reminder no longer uses a WhatsApp template`,
+  "connection.revoked": () => "A connection to an external agent was ended",
   "api_token.created": (p) =>
     `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
   "api_token.revoked": (p) =>

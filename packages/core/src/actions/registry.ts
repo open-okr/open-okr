@@ -219,6 +219,7 @@ import {
   updateOwnNotificationSettings,
 } from "./notifications.ts";
 import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
+import { listMyConnections, revokeConnection } from "./oauth-connections.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
   convertToGuest,
@@ -366,6 +367,8 @@ export const ACTION_MAP = {
   "channels.templateMappings": readTemplateMappings,
   "channels.saveTemplateMapping": saveTemplateMapping,
   "channels.removeTemplateMapping": removeTemplateMapping,
+  "connections.mine": listMyConnections,
+  "connections.revoke": revokeConnection,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,

@@ -45,6 +45,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     templateId: z.string(),
   }),
   "channel.templateUnmapped": z.object({ ruleKey: z.string() }),
+  "connection.revoked": z.object({ grantId: z.string() }),
   "api_token.created": z.object({
     name: z.string(),
     audience: z.string(),

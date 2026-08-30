@@ -376,3 +376,57 @@ rules were last changed.
 **Given** a client that knows only the instance URL, **when** it reads the
 discovery documents and registers itself, **then** it can complete the
 authorisation flow without an administrator having entered anything.
+
+## The consent screen and the connections list (P5-T08c)
+
+### Where a refusal goes
+
+RFC 6749 §4.1.2.1 draws the line, and it is the right one.
+
+| What is wrong | Where the error goes | Why |
+|---|---|---|
+| Unknown client | The person | The redirect cannot be trusted with it |
+| Unregistered redirect | The person | Same |
+| Wrong response type, missing or `plain` challenge, wrong resource | The client | The address is the client's own by then |
+| The person refused | The client, as `access_denied` | It is waiting on the redirect either way |
+
+### `form-action` and the redirect Chromium blocks
+
+The consent form posts to this instance and the answer is a 303 to an address
+the client owns. Chromium enforces `form-action` across redirects, so a bare
+`form-action 'self'` blocks that navigation with **no console error, no failed
+request, and a page that does not move**.
+
+The proxy therefore widens `form-action` on `/oauth/authorize` alone, to the
+origin named in that request's own `redirect_uri` (or its scheme, for a native
+application). Only an origin or a scheme reaches the header, never a path or a
+query.
+
+Widening it authorises nothing. The header decides where a browser may
+*navigate*; whether a code is *issued* to that address is decided on the server
+against what the client registered, and an unregistered one is refused before
+the person is shown a button.
+
+### Validated twice, on purpose
+
+The screen validates the request to decide what to show. The handler validates
+it again to decide what to grant. They are a page load apart, the fields in
+between travelled through a browser, and a client can be revoked or a field
+edited in that gap. Re-running the check is a few queries.
+
+### What no control can do
+
+| Field | Comes from |
+|---|---|
+| Scopes | The request, narrowed to what this server issues |
+| Workspace | The picker, checked against this person's own memberships |
+| Member | The session, never the form |
+
+A field that could widen a request is a path by which a grant becomes wider than
+the request. The way to grant less is to refuse and ask for less.
+
+### Acceptance
+
+**Given** a user whose refresh token was replayed by a client, **when** they
+open their connections list, **then** the grant is shown as revoked, the reason
+is named, and no token in the lineage works.

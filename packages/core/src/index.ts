@@ -210,6 +210,19 @@ export {
   resolveClient,
 } from "./api/oauth/clients.ts";
 export {
+  type ApprovalOutcome,
+  type AuthoriseCheck,
+  type AuthoriseRefusal,
+  type AuthoriseRequest,
+  approveAuthorisation,
+  approveAuthorisationForMember,
+  checkAuthoriseRequest,
+  checkAuthoriseRequestFor,
+  redirectWith,
+  SCOPE_DESCRIPTIONS,
+  scopesFrom,
+} from "./api/oauth/consent.ts";
+export {
   authorisationServerMetadata,
   challengeHeader,
   DISCOVERY_ROUTES,

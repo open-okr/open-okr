@@ -692,6 +692,33 @@
       "pages": false
     },
     {
+      "name": "connections mine",
+      "action": "connections.mine",
+      "method": "GET",
+      "path": "/connections/mine",
+      "scope": "read",
+      "summary": "The external agents this member connected, newest first.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "connections revoke",
+      "action": "connections.revoke",
+      "method": "POST",
+      "path": "/connections/revoke",
+      "scope": "destructive",
+      "summary": "End one of your own connections to an external agent.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",

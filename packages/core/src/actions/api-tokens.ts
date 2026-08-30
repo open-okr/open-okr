@@ -51,7 +51,7 @@ const iso = (value: Date | null): string | null =>
   value ? value.toISOString() : null;
 
 /** The acting member, or a refusal. Every action here is about them. */
-async function actingMemberId(
+export async function actingMemberId(
   tx: WorkspaceTx,
   workspaceId: string,
   userId: string | undefined,
