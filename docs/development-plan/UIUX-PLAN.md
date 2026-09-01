@@ -265,6 +265,8 @@ Specified only enough that the v1 data model does not block them: a saved query 
 - [ ] Meets the relevant performance budget on seeded data.
 - [ ] Every AI affordance is hidden or disabled when the provider is off, no AI value commits without a preview and apply, and AI values carry provenance.
 
+This checklist is what a UI task must satisfy to ship. To check whether one did, run the `ui-audit` skill in `.claude/skills/ui-audit/`: it measures a running screen against §2, §4, §7 and this list, and reports rather than fixes.
+
 ## 10. Reference mockups
 
 Eleven of the screens in §6 are drawn as working HTML in `docs/stakeholder/mockups/`, rendered to PNG. Look at the mockup before starting a UI task. It shows the target: the density, the chips, the states and the composition that this document describes in words.
