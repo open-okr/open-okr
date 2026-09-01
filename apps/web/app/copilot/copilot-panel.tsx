@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   applyCopilotProposalAction,
   copilotAvailabilityAction,
@@ -480,152 +481,163 @@ export function CopilotPanel({
         <span className="hidden sm:inline">Ask</span>
         <Kbd>⌘J</Kbd>
       </Button>
-      <aside
-        role="dialog"
-        aria-label="Copilot"
-        className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
-      >
-        <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
-          <h2 className="text-sm font-medium text-ink">Copilot</h2>
-          {availability.providerConfigured ? null : (
-            <Chip tone="neutral">AI off</Chip>
-          )}
-          <Button
-            variant="ghost"
-            className="ml-auto"
-            onClick={() => setOpen(false)}
-            aria-label="Close the copilot"
-          >
-            <X className="size-4" />
-          </Button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          {messages.length === 0 && streaming === null ? (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-ink-3">
-                Ask about this workspace's goals, metrics and reviews. Answers
-                cite what they came from, and only what you can already read.
-              </p>
-              {threads.length > 0 ? (
-                <div>
-                  <p className="text-xs text-ink-4">Earlier conversations</p>
-                  <ul className="mt-1 flex flex-col gap-1">
-                    {threads.map((thread) => (
-                      <li key={thread.id}>
-                        <button
-                          type="button"
-                          className="text-left text-xs text-ink-2 underline"
-                          onClick={() => void loadThread(thread.id)}
-                        >
-                          {thread.title ?? "Untitled"}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {messages.map((message) => (
-                <Turn key={message.id} message={message} />
-              ))}
-              {proposals.map((proposal) => (
-                <ProposalCard
-                  key={proposal.id}
-                  proposal={proposal}
-                  busy={busy}
-                  onApply={() =>
-                    void decide(proposal.id, applyCopilotProposalAction)
-                  }
-                  onDismiss={() =>
-                    void decide(proposal.id, dismissCopilotProposalAction)
-                  }
-                  onUndo={() =>
-                    void decide(proposal.id, undoCopilotProposalAction)
-                  }
-                />
-              ))}
-              {streaming !== null ? (
-                <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
-                  {streaming === "" ? (
-                    <span className="flex items-center gap-2 text-ink-4">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Reading your workspace
-                    </span>
-                  ) : (
-                    streaming
-                  )}
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {/* Only when it says something the footer does not. With the provider
-              off the stream's reason and the footer's reason are the same
-              sentence, and printing it twice reads as two problems. */}
-          {notice && notice !== availability.reason ? (
-            <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-3">
-              {notice}
-            </p>
-          ) : null}
-          {/* The passages, shown whether or not a model used them. With the
-              provider off this is the answer. */}
-          <SourceList title="Passages that match" items={sources} />
-        </div>
-
-        <footer className="flex-none border-t border-line px-4 py-3">
-          {canAsk ? null : (
-            <p className="mb-2 text-xs text-ink-3">
-              {availability.reason ??
-                "The copilot cannot answer in this workspace right now."}
-            </p>
-          )}
-          <div className="flex items-end gap-2">
-            <label className="flex-1">
-              <span className="sr-only">Your question</span>
-              <textarea
-                ref={inputRef}
-                rows={2}
-                value={question}
-                disabled={busy}
-                onChange={(event) => setQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder={
-                  canAsk
-                    ? "Ask a question"
-                    : "Search your workspace for matching passages"
-                }
-                className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
-              />
-            </label>
-            {busy && availability.streaming ? (
-              <Button
-                variant="ghost"
-                onClick={stop}
-                aria-label="Stop the answer"
-              >
-                <Square className="size-4" />
-                Stop
-              </Button>
-            ) : (
-              <Button
-                onClick={() => void send()}
-                disabled={busy || question.trim() === ""}
-                aria-label="Send the question"
-              >
-                <Send className="size-4" />
-              </Button>
+      {/* **Portalled to the body, and it has to be.** The trigger above lives in
+          `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes an
+          element the containing block for every `position: fixed` descendant, so
+          rendered in place the panel's `inset-y-0` resolved against the 50px
+          topbar: a 49px strip with its content spilling over the page and no
+          background painted under it. `document.body` is safe to read here
+          because `open` starts false, so this branch is only ever reached after
+          a click or the shortcut, which is to say only in a browser. */}
+      {createPortal(
+        <aside
+          role="dialog"
+          aria-label="Copilot"
+          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
+        >
+          <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
+            <h2 className="text-sm font-medium text-ink">Copilot</h2>
+            {availability.providerConfigured ? null : (
+              <Chip tone="neutral">AI off</Chip>
             )}
+            <Button
+              variant="ghost"
+              className="ml-auto"
+              onClick={() => setOpen(false)}
+              aria-label="Close the copilot"
+            >
+              <X className="size-4" />
+            </Button>
+          </header>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {messages.length === 0 && streaming === null ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-ink-3">
+                  Ask about this workspace's goals, metrics and reviews. Answers
+                  cite what they came from, and only what you can already read.
+                </p>
+                {threads.length > 0 ? (
+                  <div>
+                    <p className="text-xs text-ink-4">Earlier conversations</p>
+                    <ul className="mt-1 flex flex-col gap-1">
+                      {threads.map((thread) => (
+                        <li key={thread.id}>
+                          <button
+                            type="button"
+                            className="text-left text-xs text-ink-2 underline"
+                            onClick={() => void loadThread(thread.id)}
+                          >
+                            {thread.title ?? "Untitled"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {messages.map((message) => (
+                  <Turn key={message.id} message={message} />
+                ))}
+                {proposals.map((proposal) => (
+                  <ProposalCard
+                    key={proposal.id}
+                    proposal={proposal}
+                    busy={busy}
+                    onApply={() =>
+                      void decide(proposal.id, applyCopilotProposalAction)
+                    }
+                    onDismiss={() =>
+                      void decide(proposal.id, dismissCopilotProposalAction)
+                    }
+                    onUndo={() =>
+                      void decide(proposal.id, undoCopilotProposalAction)
+                    }
+                  />
+                ))}
+                {streaming !== null ? (
+                  <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
+                    {streaming === "" ? (
+                      <span className="flex items-center gap-2 text-ink-4">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Reading your workspace
+                      </span>
+                    ) : (
+                      streaming
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Only when it says something the footer does not. With the provider
+                off the stream's reason and the footer's reason are the same
+                sentence, and printing it twice reads as two problems. */}
+            {notice && notice !== availability.reason ? (
+              <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-3">
+                {notice}
+              </p>
+            ) : null}
+            {/* The passages, shown whether or not a model used them. With the
+                provider off this is the answer. */}
+            <SourceList title="Passages that match" items={sources} />
           </div>
-        </footer>
-      </aside>
+
+          <footer className="flex-none border-t border-line px-4 py-3">
+            {canAsk ? null : (
+              <p className="mb-2 text-xs text-ink-3">
+                {availability.reason ??
+                  "The copilot cannot answer in this workspace right now."}
+              </p>
+            )}
+            <div className="flex items-end gap-2">
+              <label className="flex-1">
+                <span className="sr-only">Your question</span>
+                <textarea
+                  ref={inputRef}
+                  rows={2}
+                  value={question}
+                  disabled={busy}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void send();
+                    }
+                  }}
+                  placeholder={
+                    canAsk
+                      ? "Ask a question"
+                      : "Search your workspace for matching passages"
+                  }
+                  className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
+                />
+              </label>
+              {busy && availability.streaming ? (
+                <Button
+                  variant="ghost"
+                  onClick={stop}
+                  aria-label="Stop the answer"
+                >
+                  <Square className="size-4" />
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => void send()}
+                  disabled={busy || question.trim() === ""}
+                  aria-label="Send the question"
+                >
+                  <Send className="size-4" />
+                </Button>
+              )}
+            </div>
+          </footer>
+        </aside>,
+        document.body,
+      )}
     </>
   );
 }

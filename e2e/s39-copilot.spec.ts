@@ -80,6 +80,27 @@ test("⌘J opens the panel, and it says the copilot cannot write prose", async (
   await expect(panel.getByPlaceholder("Search your workspace")).toBeVisible();
 });
 
+/**
+ * **The panel has to escape the topbar, and a height is how a browser can say
+ * so.** `CopilotPanel` renders both the trigger and the panel, and the trigger
+ * lives in `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes
+ * an element the containing block for every `position: fixed` descendant, so
+ * `inset-y-0` on the panel resolved against the 50px topbar rather than the
+ * viewport: a 49px strip with its content spilling out over the page and
+ * nothing painted behind it. Every class on the panel was correct, which is why
+ * this assertion is a measurement rather than a class name.
+ */
+test("the panel fills the viewport rather than the topbar", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const box = await panel.boundingBox();
+  const viewport = page.viewportSize();
+  if (!box || !viewport) {
+    throw new Error("The panel or the viewport has no box to measure.");
+  }
+  expect(box.y).toBeLessThanOrEqual(1);
+  expect(box.height).toBeGreaterThan(viewport.height * 0.9);
+});
+
 test("⌘J closes it again", async () => {
   await page.keyboard.press("ControlOrMeta+j");
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeHidden();
