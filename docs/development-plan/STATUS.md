@@ -234,8 +234,18 @@ specification, not against the picture:
 | Gap | Owner | Why not now |
 |---|---|---|
 | The sidebar lists one `Spaces` link; §3 asks for the spaces themselves nested under it | P3-T11 | Spaces exist, so this one is buildable today. Deferred because P3-T11 replaces the `/` route and reworks the primary nav anyway, and touching the shell twice for it is worse than once |
-| §3 shows three separated nav blocks; the module registry (P2-T08) has `section` but no grouping, so the structure cannot be expressed | P3-T11 | Same reason. It is a registry change plus a shell change, and P3-T11 is where the nav is next opened |
+| ~~§3 shows three separated nav blocks; the module registry (P2-T08) has `section` but no grouping, so the structure cannot be expressed~~ | ~~P3-T11~~ | **Done 2026-09-01, deferral overridden by decision.** The sidebar was drawing eleven items in one unlabelled column, which is what made the shell read as a different product from the mockup, and the deferral's "P3-T11 opens the nav anyway" reasoning did not survive somebody actually looking at it. `NavigationItem` now carries `group` (`primary`, `practice`, `spaces`, `account`), `apps/web/lib/nav-groups.ts` splits and labels the blocks, and both packages have tests that fail when a module arrives without a block |
 | The topbar shows the workspace name; §3 asks for a breadcrumb | P3-T11 | Same |
+
+### Two follow-ups from the shell audit (2026-09-01)
+
+Found while auditing the sidebar and topbar against `01-work-map`. Both are
+about the mockup tooling, not the product.
+
+| Follow-up | What is left | Why it stopped |
+|---|---|---|
+| Re-render the eight mockups whose sidebar shows a badge | `.navitem .badge` in `mockups/src/style.css` now uses `--bad` instead of `--bad-dot`, because white on `#EF4444` measures 3.75:1 and misses §7's 4.5:1 floor. The CSS is fixed; the PNGs still show the old colour | `optimise.py` cannot run on the machine the fix was made on: no `python`, `python3` or `py`, and no `pngquant` or ImageMagick either. That step quantises to 256 colours, and without it one PNG goes from 193 KB to 590 KB. Eight files is roughly 3 MB of avoidable weight, so the render waits for a machine with Python rather than landing fat and being redone |
+| Make `render.sh` work off macOS | Its `CHROME` default is a macOS Playwright cache path, and the Windows `chrome-headless-shell` it falls back to renders blank PNGs even with `--virtual-time-budget=8000`. Playwright's own `chromium` renders them correctly at identical dimensions (2880x1536 verified) | Needs a decision on whether the script may depend on Playwright, and on what replaces `optimise.py` for people without Python |
 
 The cycle strip is **already** on P3-T03's card ("the cycle strip in the shell").
 Its component exists in `packages/ui` from P2-T10 and its data exists from

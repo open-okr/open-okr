@@ -121,6 +121,12 @@ const pairs: ReadonlyArray<
 
   // Brand fills carry --on-brand, which is white on both themes.
   ["--on-brand", "--brand", TEXT, "a primary button's label"],
+
+  // A solid count badge. The mockups draw the sidebar's overdue badge as
+  // white on --bad-dot (#ef4444), which measures 3.75:1 and misses the 4.5:1
+  // floor §7 sets, so the badge uses its own darker pair and the mockup is
+  // the thing that is wrong (§10: the specification wins).
+  ["--on-bad-solid", "--bad-solid", TEXT, "a sidebar overdue badge's count"],
   ["--on-brand", "--brand-700", TEXT, "a primary button, pressed"],
 
   // Status pills: the label on its own background. This is the assertion

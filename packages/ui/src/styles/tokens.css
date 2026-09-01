@@ -96,6 +96,12 @@
   --bad: #b91c1c;
   --bad-bg: #fde9e9;
   --bad-dot: #ef4444;
+  /* A solid count badge, for the sidebar's overdue badge (§3). Not --bad-dot:
+   * the mockups draw white on #ef4444, which measures 3.75:1 and misses the
+   * 4.5:1 floor. One stop darker clears it at 6.5:1 and reads the same at
+   * badge size. */
+  --bad-solid: #b91c1c;
+  --on-bad-solid: #ffffff;
   --info: #1d4ed8;
   --info-bg: #e3eefd;
   --info-dot: #3b82f6;
@@ -108,6 +114,12 @@
    * motion uses --motion-* below rather than --duration and --ease directly. */
   --card-radius: 10px;
   --card-radius-lg: 14px;
+  /* Controls are not cards. --card-radius-lg (14px) on a 30px-tall control
+   * renders as a pill, which is how the sidebar rows, the inputs and the
+   * buttons all drifted away from the mockups' own 8px. This is the control
+   * step; the inputs and buttons still point at the card one, recorded as a
+   * follow-up rather than changed here. */
+  --control-radius: 8px;
 
   /* Elevation. A card gets none: it is separated from --bg by its border
    * and its lighter surface, which is what the colour system's own
@@ -191,6 +203,10 @@
   --warn-bg: #3a2a05;
   --bad: #f87171;
   --bad-bg: #3a0a0a;
+  /* Inverted on this theme: a light red field with dark text, because white
+   * on #f87171 is 2.6:1. */
+  --bad-solid: #f87171;
+  --on-bad-solid: #3a0a0a;
   --info: #60a5fa;
   --info-bg: #0b2545;
 
@@ -266,10 +282,13 @@
   --color-bad: var(--bad);
   --color-bad-bg: var(--bad-bg);
   --color-bad-dot: var(--bad-dot);
+  --color-bad-solid: var(--bad-solid);
+  --color-on-bad-solid: var(--on-bad-solid);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
   --color-info-dot: var(--info-dot);
 
+  --radius-control: var(--control-radius);
   --radius-md: var(--card-radius);
   --radius-lg: var(--card-radius-lg);
 

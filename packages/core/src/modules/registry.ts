@@ -21,12 +21,39 @@ import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 
 export type NavigationSection = "sidebar" | "admin";
 
+/**
+ * Which of the sidebar's separated blocks an item sits in (UIUX-PLAN.md §3:
+ * "Home, Review, Inbox, then Cycle, Goals, KPIs, Work, then Spaces, then
+ * Admin").
+ *
+ * `section` says which surface an item belongs to. This says where inside it.
+ * Without the distinction the sidebar could only draw one flat list, which is
+ * what it did: eleven items in a single column with no headings, against a
+ * specification asking for three labelled blocks.
+ *
+ * The order here is the order they render in.
+ */
+export const NAVIGATION_GROUPS = [
+  "primary",
+  "practice",
+  "spaces",
+  "account",
+] as const;
+
+export type NavigationGroup = (typeof NAVIGATION_GROUPS)[number];
+
 export interface NavigationItem {
   /** Unique across the whole registry, not just its own section. */
   readonly id: string;
   readonly label: string;
   readonly href: string;
   readonly section: NavigationSection;
+  /**
+   * The sidebar block. Sidebar items all declare one; admin items declare
+   * none, because they collapse into a single "Admin" entry rather than
+   * rendering as a block of their own.
+   */
+  readonly group?: NavigationGroup;
   /** The member's resolved level on the workspace must be at least this. */
   readonly minLevel: AccessLevel;
 }
@@ -45,6 +72,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Overview",
         href: "/",
         section: "sidebar",
+        group: "primary",
         minLevel: ACCESS_LEVELS.view,
       },
     ],
@@ -57,6 +85,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Review",
         href: "/review",
         section: "sidebar",
+        group: "primary",
         // Every member reaches it, and every member sees a different page: the
         // inbox only ever lists what the reader themselves owes, so there is
         // nothing here to withhold from anybody (P3-T08).
@@ -72,6 +101,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Cycle",
         href: "/cycle",
         section: "sidebar",
+        group: "practice",
         // Every member can watch the cycle being planned. The writes on the
         // screen each ask for edit access of their own, so a reader sees the
         // workflow without being handed a control they cannot use (P3-T03).
@@ -87,6 +117,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Goals",
         href: "/goals",
         section: "sidebar",
+        group: "practice",
         // Every member can read the set. An OKR set nobody can read is not one,
         // which is the same reason a goal's context binds `workspace_standard`
         // at view (P3-T04). The writes on each row ask for their own access.
@@ -102,6 +133,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "KPIs",
         href: "/kpis",
         section: "sidebar",
+        group: "practice",
         // Every member reads the grid. A measure nobody can see is not a
         // shared measure, which is the same reason a company objective binds
         // workspace_standard at view (P3-T12).
@@ -117,6 +149,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Scorecard",
         href: "/scorecard",
         section: "sidebar",
+        group: "practice",
         // The result of every closed cycle, which is a shared record rather
         // than a private one: a team that cannot see how the last quarter went
         // cannot learn from it (P3-T15).
@@ -132,6 +165,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Check in",
         href: "/check-in",
         section: "sidebar",
+        group: "practice",
         // Every member can reach it. The walker only ever lists the goals they
         // champion, so a member with nothing due sees an empty list rather than
         // somebody else's obligations (P3-T07).
@@ -147,6 +181,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Sessions",
         href: "/sessions",
         section: "sidebar",
+        group: "practice",
         // Every member reaches it, and every member sees a different list: it
         // is scoped by the same access filter the space list uses, so a
         // session in a space somebody cannot read is not in it. S-22 to S-25
@@ -164,6 +199,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Spaces",
         href: "/spaces",
         section: "sidebar",
+        group: "spaces",
         // Every human member can see that spaces exist and join one, which is
         // what makes a team home a home rather than a locked room (P3-T01).
         minLevel: ACCESS_LEVELS.view,
@@ -178,6 +214,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Where to reach you",
         href: "/account/channels",
         section: "sidebar",
+        group: "account",
         // Every member. Telling the product where to send its reminders cannot
         // be a privilege only editors have: a member at view still receives
         // nudges (P5-T02c).
@@ -188,6 +225,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Security",
         href: "/account/security",
         section: "sidebar",
+        group: "account",
         minLevel: ACCESS_LEVELS.view,
       },
     ],

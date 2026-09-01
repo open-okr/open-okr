@@ -574,6 +574,8 @@ export {
   isRouteAllowed,
   MODULE_REGISTRY,
   type ModuleDefinition,
+  NAVIGATION_GROUPS,
+  type NavigationGroup,
   type NavigationItem,
   type NavigationSection,
   navigationFor,

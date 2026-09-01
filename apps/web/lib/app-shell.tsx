@@ -11,17 +11,7 @@ import {
   Topbar,
   TopbarSearch,
 } from "@openokr/ui";
-import {
-  BarChart3,
-  CheckCircle2,
-  ClipboardCheck,
-  Home,
-  Inbox,
-  RefreshCw,
-  Settings,
-  Shield,
-  Target,
-} from "lucide-react";
+import { Settings } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
@@ -32,6 +22,8 @@ import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
+import { navBlocks } from "./nav-groups.ts";
+import { iconFor } from "./nav-icons.tsx";
 import { loadReviewBadge } from "./review-badge.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { requireWorkspace } from "./workspace.ts";
@@ -46,26 +38,13 @@ import { requireWorkspace } from "./workspace.ts";
  * P2-T08, P2-T09) for no behavioural gain — a shared function composes
  * the same chrome without moving a single existing file.
  *
- * Icon mapping is local to this file, not the registry: `NavigationItem`
+ * Icon mapping lives in `nav-icons.tsx`, not the registry: `NavigationItem`
  * (P2-T08) deliberately carries no icon field, because the registry is
  * DB-free, synchronous data and an icon is a presentation detail its
  * consumers (this file, one day a mobile client) each choose for
- * themselves.
+ * themselves. It moved out of this file so a test can assert the map covers
+ * the registry without importing a server component.
  */
-
-const ICONS: Readonly<Record<string, ReactNode>> = {
-  overview: <Home className="size-full" />,
-  review: <ClipboardCheck className="size-full" />,
-  cycle: <RefreshCw className="size-full" />,
-  goals: <Target className="size-full" />,
-  kpis: <BarChart3 className="size-full" />,
-  "check-in": <CheckCircle2 className="size-full" />,
-  "account-security": <Shield className="size-full" />,
-};
-
-function iconFor(id: string): ReactNode {
-  return ICONS[id] ?? <Inbox className="size-full" />;
-}
 
 /**
  * Which navigation item the reader is on.
@@ -138,21 +117,23 @@ export async function AppShellLayout({
     { id: "admin", href: "/admin" },
   ]);
 
-  const groups: SidebarGroup[] = [
-    {
-      id: "primary",
-      items: sidebarItems.map((item) => ({
-        id: item.id,
-        label: item.label,
-        href: item.href,
-        icon: iconFor(item.id),
-        active: item.id === active,
-        ...(item.id === "review" && reviewBadge !== null
-          ? { badge: reviewBadge }
-          : {}),
-      })),
-    },
-  ];
+  // §3's separated blocks rather than one flat column. The split is the
+  // registry's `group` field, read through `navBlocks` so the ordering and the
+  // headings are testable without rendering a server component.
+  const groups: SidebarGroup[] = navBlocks(sidebarItems).map((block) => ({
+    id: block.id,
+    ...(block.label === undefined ? {} : { label: block.label }),
+    items: block.items.map((item) => ({
+      id: item.id,
+      label: item.label,
+      href: item.href,
+      icon: iconFor(item.id),
+      active: item.id === active,
+      ...(item.id === "review" && reviewBadge !== null
+        ? { badge: reviewBadge }
+        : {}),
+    })),
+  }));
   if (adminItems.length > 0) {
     groups.push({
       id: "admin",
