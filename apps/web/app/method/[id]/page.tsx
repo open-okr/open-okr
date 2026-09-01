@@ -73,7 +73,7 @@ export default async function RulePage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">
@@ -180,7 +180,7 @@ export default async function RulePage({
 function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

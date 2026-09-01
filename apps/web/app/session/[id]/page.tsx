@@ -374,7 +374,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     stageKeys.length > 0 && currentStageIndex === stageKeys.length - 1;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <div className="space-y-6 p-6">
       {/* Live sync: subscribes to SSE and calls router.refresh() on stage changes */}
       {isRunning && <SessionLive sessionId={id} />}
 

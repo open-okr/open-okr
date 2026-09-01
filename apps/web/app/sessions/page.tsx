@@ -102,7 +102,7 @@ export default async function SessionsPage({
 
   return (
     <AppShellLayout>
-      <div className="stagger mx-auto flex max-w-3xl flex-col gap-4.5">
+      <div className="stagger flex flex-col gap-4.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

@@ -78,7 +78,7 @@ export default async function MinutesPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
+      <div className="flex w-full flex-col gap-4 p-4">
         <header className="flex flex-col gap-1">
           <span className="flex flex-wrap items-center gap-2">
             <h1 className="flex-1 text-lg font-bold text-ink">

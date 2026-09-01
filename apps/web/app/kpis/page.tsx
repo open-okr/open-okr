@@ -48,7 +48,7 @@ export default async function KpisPage() {
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <SectionTabs items={KPI_TABS} active="/kpis" />
         <Card>
           <CardHeader className="justify-between">

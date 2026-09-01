@@ -31,7 +31,7 @@ export default async function SpacesPage() {
 
   return (
     <AppShellLayout>
-      <div className="stagger mx-auto flex max-w-3xl flex-col gap-4.5">
+      <div className="stagger flex flex-col gap-4.5">
         <Card>
           <CardHeader>
             <h1 className="text-lg font-bold text-ink">Spaces</h1>

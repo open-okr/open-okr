@@ -120,7 +120,7 @@ export default async function GoalsPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex max-w-5xl flex-col gap-4.5">
+      <div className="flex flex-col gap-4.5">
         <SectionTabs items={GOAL_TABS} active="/goals" />
         <Card>
           <CardHeader className="justify-between">

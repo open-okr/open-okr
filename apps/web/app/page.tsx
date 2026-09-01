@@ -172,7 +172,7 @@ export default async function HomePage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <WorkMapContextStrip
           context={workMapContext}
           cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}

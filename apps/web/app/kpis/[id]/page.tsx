@@ -110,7 +110,7 @@ export default async function KpiDetailPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

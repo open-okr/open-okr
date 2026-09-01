@@ -157,7 +157,7 @@ export default async function GoalPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4.5 lg:flex-row lg:items-start">
+      <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-4.5">
           <Card>
             <CardHeader className="justify-between">

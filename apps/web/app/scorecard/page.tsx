@@ -75,7 +75,7 @@ export default async function ScorecardPage() {
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

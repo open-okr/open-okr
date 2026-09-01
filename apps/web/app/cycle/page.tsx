@@ -69,7 +69,7 @@ export default async function CyclePage({
   if (!cycle) {
     return (
       <AppShellLayout>
-        <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+        <div className="flex flex-col gap-4.5">
           <Card>
             <CardHeader>
               <h1 className="text-lg font-bold text-ink">No cycle yet</h1>
