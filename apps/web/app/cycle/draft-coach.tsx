@@ -163,10 +163,10 @@ export function DraftCoach({
   return (
     <div className="flex flex-col gap-3">
       {/* An explicit `htmlFor` rather than wrapping the input in the label.
-        * Implicit association takes the whole label's text content as the
-        * accessible name, and this label now also contains the firing count
-        * and the hint, so a screen reader would announce all three as the
-        * field's name. */}
+       * Implicit association takes the whole label's text content as the
+       * accessible name, and this label now also contains the firing count
+       * and the hint, so a screen reader would announce all three as the
+       * field's name. */}
       <div className="flex flex-col gap-1">
         <label
           htmlFor="draft-coach-objective"

@@ -27,13 +27,10 @@ describe("globals.css layering", () => {
     // Strip layer and at-rule blocks, then look for anything left that opens a
     // declaration block. `@import`, `@source` and `@theme` are directives, not
     // rules competing with utilities.
-    const withoutLayers = source.replace(
-      /@layer[^{]*\{[\s\S]*?\n\}/g,
-      "",
+    const withoutLayers = source.replace(/@layer[^{]*\{[\s\S]*?\n\}/g, "");
+    const stray = [...withoutLayers.matchAll(/^([^@\s][^{}\n]*)\{/gm)].map(
+      (match) => (match[1] as string).trim(),
     );
-    const stray = [
-      ...withoutLayers.matchAll(/^([^@\s][^{}\n]*)\{/gm),
-    ].map((match) => (match[1] as string).trim());
     expect(stray).toEqual([]);
   });
 

@@ -3,6 +3,7 @@ import { resolveAccessLevelFor } from "../lib/access";
 import { AppShellLayout } from "../lib/app-shell.tsx";
 import { getPool } from "../lib/auth";
 import { requireWorkspace } from "../lib/workspace";
+import { mapNodesFor } from "./goal-nodes.ts";
 import { type MapNode, WorkMap } from "./work-map.tsx";
 import {
   type ScopeTab,
@@ -259,57 +260,7 @@ function flatten(goals: readonly Goal[]): MapNode[] {
       return;
     }
     seen.add(goal.id);
-
-    const confidences = goal.keyResults
-      .map((keyResult) => keyResult.confidence)
-      .filter((value): value is number => value !== null);
-
-    out.push({
-      id: goal.id,
-      kind: "goal",
-      title: goal.title,
-      depth,
-      owner: goal.champion.name,
-      health: goal.health,
-      progressPct: goal.progressPct,
-      confidence:
-        confidences.length === 0
-          ? null
-          : confidences.reduce((sum, value) => sum + value, 0) /
-            confidences.length,
-      timeframe: goal.timeframe
-        ? `${goal.timeframe.startsOn} to ${goal.timeframe.endsOn}`
-        : null,
-      nextStep: nextStepFor(goal),
-      goalId: goal.id,
-      keyResultId: null,
-      currentValue: null,
-      unit: null,
-    });
-
-    for (const keyResult of goal.keyResults) {
-      out.push({
-        id: keyResult.id,
-        kind: "key_result",
-        title: keyResult.title,
-        depth: depth + 1,
-        owner: goal.champion.name,
-        // A key result carries no health of its own: §3.5 puts health on the
-        // goal, and inventing one per measure would be a second answer.
-        health: goal.health,
-        progressPct: keyResult.progressPct,
-        confidence: keyResult.confidence,
-        timeframe: keyResult.dueOn,
-        nextStep: `${keyResult.currentValue} of ${keyResult.targetValue}${
-          keyResult.unit ? ` ${keyResult.unit}` : ""
-        }`,
-        goalId: goal.id,
-        keyResultId: keyResult.id,
-        currentValue: keyResult.currentValue,
-        unit: keyResult.unit,
-      });
-    }
-
+    out.push(...mapNodesFor(goal, depth));
     for (const child of childrenOf.get(goal.id) ?? []) {
       walk(child, depth + 1);
     }
@@ -318,20 +269,4 @@ function flatten(goals: readonly Goal[]): MapNode[] {
     walk(root, 0);
   }
   return out;
-}
-
-/** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(goal: Goal): string {
-  if (goal.closedAt) {
-    return `closed · ${goal.successStatus ?? "no outcome"}`;
-  }
-  if (goal.daysPastDue !== null && goal.daysPastDue > 0) {
-    return `check-in ${goal.daysPastDue} day${
-      goal.daysPastDue === 1 ? "" : "s"
-    } overdue`;
-  }
-  if (goal.nextCheckInOn) {
-    return `check in by ${goal.nextCheckInOn}`;
-  }
-  return "no cadence set";
 }

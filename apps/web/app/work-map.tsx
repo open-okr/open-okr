@@ -4,6 +4,7 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
+import type { ReactNode } from "react";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
 
@@ -87,6 +88,162 @@ export interface MapNode {
   readonly keyResultId: string | null;
   readonly currentValue: number | null;
   readonly unit: string | null;
+  /**
+   * Something true of this row rather than of the goal. The explorer says a
+   * parent is outside the current filter with it; nothing else sets one yet.
+   */
+  readonly note?: string;
+}
+
+/**
+ * The goal rows, as `01-work-map` draws them: one table, a row per objective
+ * and per key result, indented by what each one supports.
+ *
+ * Split out of `WorkMap` so the goals explorer wears the same treatment rather
+ * than a second one. S-13 has no mockup of its own, and §10 makes an undrawn
+ * detail's mockup value the proposed default, so the explorer stopped drawing a
+ * card per goal from the same action and the same data.
+ *
+ * `empty` belongs to the caller: the two screens are empty for different
+ * reasons and each one knows what to suggest next.
+ */
+export function GoalTable({
+  nodes,
+  selected,
+  rowHref,
+  empty,
+}: {
+  readonly nodes: readonly MapNode[];
+  readonly selected: MapNode | null;
+  /**
+   * Where a row points. Takes the node rather than its id, because a key
+   * result row has to link to the goal it belongs to and only the node carries
+   * both.
+   */
+  readonly rowHref: (node: MapNode) => string;
+  readonly empty: ReactNode;
+}) {
+  const thresholds = canonThresholds();
+
+  return (
+    <Card>
+      <CardBody className="p-0">
+        {nodes.length === 0 ? (
+          empty
+        ) : (
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-line border-b">
+                <th
+                  scope="col"
+                  className="px-3 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                >
+                  Goal / key result
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                >
+                  Health
+                </th>
+                <th
+                  scope="col"
+                  className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase md:table-cell"
+                >
+                  Confidence
+                </th>
+                <th
+                  scope="col"
+                  className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase sm:table-cell"
+                >
+                  Progress
+                </th>
+                <th
+                  scope="col"
+                  className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase lg:table-cell"
+                >
+                  Next step
+                </th>
+                <th
+                  scope="col"
+                  className="px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase"
+                >
+                  Champion
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {nodes.map((node) => (
+                <tr
+                  key={node.id}
+                  aria-current={selected?.id === node.id ? "true" : undefined}
+                  className={
+                    selected?.id === node.id
+                      ? "border-line border-b bg-brand-weak last:border-b-0"
+                      : "border-line border-b last:border-b-0 hover:bg-raised"
+                  }
+                >
+                  <th scope="row" className="max-w-0 px-3 py-2 font-normal">
+                    <a
+                      href={rowHref(node)}
+                      className="flex items-center gap-2"
+                      style={{ paddingLeft: `${node.depth * 18}px` }}
+                    >
+                      <RowKindChip kind={node.kind} />
+                      <span
+                        className={
+                          node.kind === "goal"
+                            ? "truncate text-sm font-semibold text-ink"
+                            : "truncate text-sm text-ink-2"
+                        }
+                      >
+                        {node.title}
+                      </span>
+                      {node.note ? (
+                        <Chip tone="info" className="flex-none">
+                          {node.note}
+                        </Chip>
+                      ) : null}
+                    </a>
+                  </th>
+                  <td className="px-2 py-2">
+                    <HealthChip health={node.health} />
+                  </td>
+                  <td className="hidden px-2 py-2 md:table-cell">
+                    <ConfidenceChip
+                      confidence={node.confidence}
+                      thresholds={thresholds}
+                    />
+                  </td>
+                  <td className="hidden px-2 py-2 sm:table-cell">
+                    <span className="flex items-center gap-2">
+                      <Bar
+                        value={node.progressPct}
+                        className="h-1.5 w-20 lg:w-28"
+                      />
+                      <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
+                        {Math.round(node.progressPct)}%
+                      </span>
+                    </span>
+                  </td>
+                  <td className="hidden max-w-[16rem] px-2 py-2 lg:table-cell">
+                    <span className="block truncate text-xs text-ink-3">
+                      {node.nextStep}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="flex justify-end">
+                      <Avatar name={node.owner} size="sm" />
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardBody>
+    </Card>
+  );
 }
 
 export function WorkMap({
@@ -101,135 +258,27 @@ export function WorkMap({
   /** Deep links every node, so a row is a URL somebody can send. */
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
-  const thresholds = canonThresholds();
-
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
       <div className="min-w-0 flex-1">
-        <Card>
-          <CardBody className="p-0">
-            {nodes.length === 0 ? (
-              <div className="flex flex-col gap-1.5 p-3">
-                <p className="text-sm text-ink-2">Nothing in this cycle yet.</p>
-                <p className="text-xs text-ink-3">
-                  Objectives are drafted in phase 4 of the cycle workspace,
-                  where every rule is checked as they are written.{" "}
-                  <a className="underline" href="/cycle?phase=4">
-                    Start drafting
-                  </a>
-                  .
-                </p>
-              </div>
-            ) : (
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="border-line border-b">
-                    <th
-                      scope="col"
-                      className="px-3 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
-                    >
-                      Goal / key result
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
-                    >
-                      Health
-                    </th>
-                    <th
-                      scope="col"
-                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase md:table-cell"
-                    >
-                      Confidence
-                    </th>
-                    <th
-                      scope="col"
-                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase sm:table-cell"
-                    >
-                      Progress
-                    </th>
-                    <th
-                      scope="col"
-                      className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase lg:table-cell"
-                    >
-                      Next step
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase"
-                    >
-                      Champion
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {nodes.map((node) => (
-                    <tr
-                      key={node.id}
-                      aria-current={
-                        selected?.id === node.id ? "true" : undefined
-                      }
-                      className={
-                        selected?.id === node.id
-                          ? "border-line border-b bg-brand-weak last:border-b-0"
-                          : "border-line border-b last:border-b-0 hover:bg-raised"
-                      }
-                    >
-                      <th scope="row" className="max-w-0 px-3 py-2 font-normal">
-                        <a
-                          href={hrefFor(node.id)}
-                          className="flex items-center gap-2"
-                          style={{ paddingLeft: `${node.depth * 18}px` }}
-                        >
-                          <RowKindChip kind={node.kind} />
-                          <span
-                            className={
-                              node.kind === "goal"
-                                ? "truncate text-sm font-semibold text-ink"
-                                : "truncate text-sm text-ink-2"
-                            }
-                          >
-                            {node.title}
-                          </span>
-                        </a>
-                      </th>
-                      <td className="px-2 py-2">
-                        <HealthChip health={node.health} />
-                      </td>
-                      <td className="hidden px-2 py-2 md:table-cell">
-                        <ConfidenceChip
-                          confidence={node.confidence}
-                          thresholds={thresholds}
-                        />
-                      </td>
-                      <td className="hidden px-2 py-2 sm:table-cell">
-                        <span className="flex items-center gap-2">
-                          <Bar
-                            value={node.progressPct}
-                            className="h-1.5 w-20 lg:w-28"
-                          />
-                          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
-                            {Math.round(node.progressPct)}%
-                          </span>
-                        </span>
-                      </td>
-                      <td className="hidden max-w-[16rem] px-2 py-2 lg:table-cell">
-                        <span className="block truncate text-xs text-ink-3">
-                          {node.nextStep}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="flex justify-end">
-                          <Avatar name={node.owner} size="sm" />
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardBody>
-        </Card>
+        <GoalTable
+          nodes={nodes}
+          selected={selected}
+          rowHref={(node) => hrefFor(node.id)}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
+              <p className="text-sm text-ink-2">Nothing in this cycle yet.</p>
+              <p className="text-xs text-ink-3">
+                Objectives are drafted in phase 4 of the cycle workspace, where
+                every rule is checked as they are written.{" "}
+                <a className="underline" href="/cycle?phase=4">
+                  Start drafting
+                </a>
+                .
+              </p>
+            </div>
+          }
+        />
       </div>
 
       {selected ? (

@@ -1,18 +1,15 @@
 import { callAction } from "@openokr/core";
-import {
-  ALIGNMENT_LEVEL_ORDER,
-  canonThresholds,
-  confidenceBand,
-} from "@openokr/method";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
+import { Card, CardBody, CardHeader } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../lib/workspace";
+import { mapNodesFor } from "../goal-nodes.ts";
+import { GoalTable } from "../work-map.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
-import { HealthChip } from "./health-chip.tsx";
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).
@@ -171,11 +168,33 @@ export default async function GoalsPage({
           </CardBody>
         </Card>
 
-        {goals.length === 0 ? (
-          <Card>
-            <CardBody>
+        {/* The same table the Work Map draws (`01-work-map`), not a card per
+         * goal. S-13 has no mockup, and §10 treats a detail only the mockups
+         * show as the proposed default, so the one drawing of a goal row this
+         * repository has is the one both screens use. The explorer's own tree
+         * ordering stays here: it walks what survived the filters and has to
+         * mark a goal whose parent did not. */}
+        <GoalTable
+          nodes={(tree
+            ? inTreeOrder(goals)
+            : goals.map((goal) => ({
+                goal,
+                depth: 0,
+                detached: false,
+              }))
+          ).flatMap(({ goal, depth, detached }) =>
+            mapNodesFor(
+              goal,
+              depth,
+              detached ? "parent is outside this filter" : undefined,
+            ),
+          )}
+          selected={null}
+          rowHref={(node) => `/goals/${node.goalId}`}
+          empty={
+            <div className="flex flex-col gap-1.5 p-3">
               <p className="text-sm text-ink-2">No goals match this view.</p>
-              <p className="mt-1 text-xs text-ink-3">
+              <p className="text-xs text-ink-3">
                 Objectives are drafted in phase 4 of the cycle workspace, where
                 the rules are checked as they are written.{" "}
                 <a className="underline" href="/cycle?phase=4">
@@ -183,24 +202,9 @@ export default async function GoalsPage({
                 </a>
                 .
               </p>
-            </CardBody>
-          </Card>
-        ) : (
-          <ol className="flex flex-col gap-1.5">
-            {(tree
-              ? inTreeOrder(goals)
-              : goals.map((goal) => ({
-                  goal,
-                  depth: 0,
-                  detached: false,
-                }))
-            ).map(({ goal, depth, detached }) => (
-              <li key={goal.id} style={{ marginLeft: `${depth * 22}px` }}>
-                <GoalRow goal={goal} detached={detached ?? false} />
-              </li>
-            ))}
-          </ol>
-        )}
+            </div>
+          }
+        />
       </div>
     </AppShellLayout>
   );
@@ -414,89 +418,4 @@ function inTreeOrder(
     walk(root.goal, 0, root.detached);
   }
   return ordered;
-}
-
-function GoalRow({
-  goal,
-  detached,
-}: {
-  readonly goal: Goal;
-  readonly detached: boolean;
-}) {
-  const thresholds = canonThresholds();
-  const confidences = goal.keyResults
-    .map((keyResult) => keyResult.confidence)
-    .filter((value): value is number => value !== null);
-  // The mean of the key results that carry one. A goal has no confidence of its
-  // own: §3.2 puts confidence on the measure, and the goal's figure is a summary
-  // of them rather than a number anybody typed.
-  const verdict =
-    confidences.length === 0
-      ? null
-      : confidenceBand(
-          confidences.reduce((sum, value) => sum + value, 0) /
-            confidences.length,
-          thresholds,
-        );
-
-  return (
-    <Card>
-      <CardBody className="flex items-start justify-between gap-3.5 py-2.5">
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <a
-            href={`/goals/${goal.id}`}
-            className="text-sm font-semibold text-ink hover:underline"
-          >
-            {goal.title}
-          </a>
-          <span className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
-            <span>{goal.level}</span>
-            <span aria-hidden="true">·</span>
-            <span>{goal.champion.name}</span>
-            <span aria-hidden="true">·</span>
-            <span>
-              {goal.keyResults.length} key result
-              {goal.keyResults.length === 1 ? "" : "s"}
-            </span>
-            {goal.daysPastDue !== null && goal.daysPastDue > 0 ? (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="font-semibold text-bad">
-                  {goal.daysPastDue} day{goal.daysPastDue === 1 ? "" : "s"}{" "}
-                  overdue
-                </span>
-              </>
-            ) : null}
-            {detached ? (
-              <Chip tone="info">parent is outside this filter</Chip>
-            ) : null}
-          </span>
-          <span className="flex items-center gap-2">
-            {/* No tone on the fill: progress is not health (the colour system's
-                rule 2). The health word sits beside it. */}
-            <Bar value={goal.progressPct} className="h-1.5 max-w-64 flex-1" />
-            <span className="text-xs font-semibold text-ink-3">
-              {Math.round(goal.progressPct)}%
-            </span>
-          </span>
-        </span>
-        <span className="flex flex-none flex-col items-end gap-1">
-          <HealthChip health={goal.health} />
-          {verdict ? (
-            <Chip
-              tone={
-                verdict.band === "high"
-                  ? "ok"
-                  : verdict.band === "medium"
-                    ? "warn"
-                    : "bad"
-              }
-            >
-              {verdict.band} confidence
-            </Chip>
-          ) : null}
-        </span>
-      </CardBody>
-    </Card>
-  );
 }
