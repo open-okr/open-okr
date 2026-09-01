@@ -2,24 +2,15 @@
   "mcpServers": {
     "next-devtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "next-devtools-mcp@latest"
-      ]
+      "args": ["-y", "next-devtools-mcp@latest"]
     },
     "better-icons": {
       "command": "npx",
-      "args": [
-        "-y",
-        "better-icons@latest"
-      ]
+      "args": ["-y", "better-icons@latest"]
     },
     "playwright": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ]
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }

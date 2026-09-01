@@ -66,7 +66,13 @@ beforeEach(async () => {
      values (gen_random_uuid(), $1, $2, 'Second Member', 'active') returning id`,
     [workspaceId, SECOND],
   );
-  secondMemberId = second.rows[0]!.id;
+  const secondRow = second.rows[0];
+  if (!secondRow) {
+    // Fails here with a reason, rather than letting an undefined member id
+    // reach four tests that would each fail for a different-looking cause.
+    throw new Error("the second member was not inserted");
+  }
+  secondMemberId = secondRow.id;
 });
 
 afterAll(async () => {
@@ -113,7 +119,7 @@ describe("comments", () => {
       { subjectType: "goal" as const, subjectId: goalId },
     );
     expect(list).toHaveLength(1);
-    expect(list[0]!.authorName).toBe("Comment Owner");
+    expect(list[0]?.authorName).toBe("Comment Owner");
   });
 
   it("soft-deletes a comment", async () => {
@@ -198,8 +204,8 @@ describe("reactions", () => {
       { subjectType: "goal", subjectId: goalId },
     );
     expect(groups).toHaveLength(1);
-    expect(groups[0]!.emoji).toBe("\u{1F44D}");
-    expect(groups[0]!.own).toBe(true);
+    expect(groups[0]?.emoji).toBe("\u{1F44D}");
+    expect(groups[0]?.own).toBe(true);
   });
 
   it("is idempotent for the same emoji", async () => {
@@ -223,6 +229,6 @@ describe("reactions", () => {
       { subjectType: "goal", subjectId: goalId },
     );
     expect(groups).toHaveLength(1);
-    expect(groups[0]!.count).toBe(1);
+    expect(groups[0]?.count).toBe(1);
   });
 });

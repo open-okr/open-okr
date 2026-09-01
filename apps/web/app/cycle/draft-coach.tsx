@@ -133,13 +133,19 @@ export function DraftCoach({
     };
   }, [objective, keyResults, thresholds, title, titles]);
 
-  const counts = verdicts.reduce(
-    (carry, verdict) => ({
-      ...carry,
-      [verdict.status]: carry[verdict.status] + 1,
-    }),
-    { pass: 0, warn: 0, fail: 0, todo: 0 } as Record<QualityStatus, number>,
-  );
+  // Counted with a mutable local rather than a spread into the accumulator:
+  // the spread rebuilt the whole record once per verdict, which is O(n²) on a
+  // list that grows with every rule the method adds, and it is the one lint
+  // error in the repository.
+  const counts: Record<QualityStatus, number> = {
+    pass: 0,
+    warn: 0,
+    fail: 0,
+    todo: 0,
+  };
+  for (const verdict of verdicts) {
+    counts[verdict.status] += 1;
+  }
 
   return (
     <div className="flex flex-col gap-3">

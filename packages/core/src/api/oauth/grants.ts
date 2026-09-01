@@ -191,7 +191,7 @@ export async function liveGrant(
     .where(activeOnly(workspaceMembers, eq(workspaceMembers.id, row.memberId)))
     .limit(1);
 
-  if (!member || member.status !== "active" || !member.userId) {
+  if (member?.status !== "active" || !member.userId) {
     return { kind: "rejected", reason: "no_member" };
   }
 

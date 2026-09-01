@@ -337,7 +337,7 @@ export const recordAnswer = defineWriteAction({
       // One answer per question. A retry that lost its first response would
       // otherwise leave two answers to one question and no way to tell which
       // the reader saw.
-      if (!last || last.role !== "member") {
+      if (last?.role !== "member") {
         throw new OperationError(
           "forbidden",
           "There is no unanswered question in this conversation.",

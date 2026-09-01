@@ -203,7 +203,7 @@ export async function resolveApiToken(
     return found;
   });
 
-  if (!member || member.status !== "active" || !member.userId) {
+  if (member?.status !== "active" || !member.userId) {
     return { kind: "rejected", reason: "no_member" };
   }
 

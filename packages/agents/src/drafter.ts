@@ -149,7 +149,7 @@ const passagesFor = (context: GroundedQuestionContext): string =>
   context.sources
     .map(
       (source, index) =>
-        `[${index + 1}] ${source.label}` + NEWLINE + source.content,
+        `[${index + 1}] ${source.label}${NEWLINE}${source.content}`,
     )
     .join(NEWLINE + NEWLINE);
 
@@ -165,7 +165,7 @@ const copilotMessages = (context: GroundedQuestionContext) => [
     content:
       (context.sources.length === 0
         ? "There are no passages for this question."
-        : "Passages:" + NEWLINE + passagesFor(context)) +
+        : `Passages:${NEWLINE}${passagesFor(context)}`) +
       NEWLINE +
       NEWLINE +
       `Question: ${context.question}`,
@@ -1100,7 +1100,7 @@ export function createProviderDrafter(
               content:
                 `Ambition: ${context.ambition}` +
                 (context.spaceName
-                  ? NEWLINE + `Team: ${context.spaceName}`
+                  ? `${NEWLINE}Team: ${context.spaceName}`
                   : "") +
                 (context.existingTitles.length === 0
                   ? ""
@@ -1142,7 +1142,7 @@ export function createProviderDrafter(
                 NEWLINE +
                 `Key result so far: ${context.keyResultTitle}` +
                 (context.unit
-                  ? NEWLINE + `Unit already chosen: ${context.unit}`
+                  ? `${NEWLINE}Unit already chosen: ${context.unit}`
                   : ""),
             },
           ],
@@ -1181,7 +1181,7 @@ export function createProviderDrafter(
               content:
                 `This objective: ${context.childTitle}` +
                 (context.childDescription
-                  ? NEWLINE + `  about: ${context.childDescription}`
+                  ? `${NEWLINE}  about: ${context.childDescription}`
                   : "") +
                 NEWLINE +
                 "Possible parents:" +
@@ -1225,7 +1225,7 @@ export function createProviderDrafter(
             { role: "system", content: DIGEST_NARRATION_SYSTEM },
             {
               role: "user",
-              content: "The digest:" + NEWLINE + context.lines.join(NEWLINE),
+              content: `The digest:${NEWLINE}${context.lines.join(NEWLINE)}`,
             },
           ],
         });
@@ -1386,7 +1386,7 @@ export function createProviderDrafter(
               content:
                 `What they want to measure: ${context.description}` +
                 (context.existing.length === 0
-                  ? NEWLINE + "There are no existing metrics to combine."
+                  ? `${NEWLINE}There are no existing metrics to combine.`
                   : NEWLINE +
                     "Existing metrics:" +
                     NEWLINE +
@@ -1514,7 +1514,7 @@ export function createProviderDrafter(
             {
               role: "user",
               content: context.sections
-                .map((section) => `${section.label}:` + NEWLINE + section.body)
+                .map((section) => `${section.label}:${NEWLINE}${section.body}`)
                 .join(NEWLINE + NEWLINE),
             },
           ],
@@ -1650,7 +1650,7 @@ export function createProviderDrafter(
               : goal.keyResultTitles.join("; ");
           const where = goal.spaceName ? `, ${goal.spaceName}` : "";
           const about = goal.description
-            ? NEWLINE + `    about: ${goal.description}`
+            ? `${NEWLINE}    about: ${goal.description}`
             : "";
           return (
             `#${index} [${goal.level}${where}] ${goal.title}` +

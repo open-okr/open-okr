@@ -16,7 +16,7 @@ describe("chunkText", () => {
     const text = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.";
     const result = chunkText(text, { maxChunkSize: 30, overlap: 5 });
     expect(result.length).toBeGreaterThanOrEqual(2);
-    expect(result[0]!.content).toBe("First paragraph.");
+    expect(result[0]?.content).toBe("First paragraph.");
   });
 
   it("splits at sentence boundaries when no paragraph break fits", () => {
@@ -24,7 +24,7 @@ describe("chunkText", () => {
     const result = chunkText(text, { maxChunkSize: 35, overlap: 5 });
     expect(result.length).toBeGreaterThanOrEqual(2);
     // First chunk should end at a sentence boundary
-    expect(result[0]!.content).toMatch(/\.$/);
+    expect(result[0]?.content).toMatch(/\.$/);
   });
 
   it("splits at word boundaries as fallback", () => {
@@ -41,7 +41,7 @@ describe("chunkText", () => {
     const text = "A".repeat(500);
     const result = chunkText(text, { maxChunkSize: 100, overlap: 10 });
     for (let i = 0; i < result.length; i++) {
-      expect(result[i]!.index).toBe(i);
+      expect(result[i]?.index).toBe(i);
     }
   });
 

@@ -199,8 +199,8 @@ describe("sessions.advanceStage", () => {
       { id: sessionId },
     );
     const elapsed = (read as { elapsed: Record<string, number> }).elapsed;
-    expect(typeof elapsed["confidence"]).toBe("number");
-    expect(elapsed["confidence"]).toBeGreaterThanOrEqual(0);
+    expect(typeof elapsed.confidence).toBe("number");
+    expect(elapsed.confidence).toBeGreaterThanOrEqual(0);
   });
 
   it("is refused when already on the last stage", async () => {

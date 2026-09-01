@@ -336,8 +336,20 @@ export class EmbeddingService {
     input: RetrievalInput,
     limit: number,
   ): Promise<RetrievalHit[]> {
-    // Embed the query
-    const embedResult = await this.#embed!([input.query]);
+    // `#embed` is non-null on this path: `#retrieve` only calls it when
+    // `this.#embed && (await this.hasPgvector())` held. Captured into a local
+    // and guarded rather than asserted with `!`, so the compiler proves it
+    // rather than being told, and the fallback is the one the empty-vector
+    // case below already takes.
+    //
+    // Not `this.#embed?.(...)`, which is what the linter's own unsafe fix
+    // suggested: that makes `embedResult` possibly undefined and the next line
+    // reads `.vectors` off it.
+    const embed = this.#embed;
+    if (!embed) {
+      return this.#fullTextRetrieve(input, limit);
+    }
+    const embedResult = await embed([input.query]);
     const queryVector = embedResult.vectors[0];
     if (!queryVector) {
       return this.#fullTextRetrieve(input, limit);
