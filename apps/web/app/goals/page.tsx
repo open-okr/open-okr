@@ -246,7 +246,12 @@ function Filters({
   return (
     <div className="flex flex-col gap-2">
       {filterAssist}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {/* The bar scrolls, the page never does. Three attempts to make the
+       * groups shrink inside the viewport failed measurement at 375: the level
+       * track came out 328px and health 523px against 319px of bar. This is
+       * the repository's own rule for wide content, and it is the one that
+       * holds without depending on flex shrink behaviour. */}
+      <div className="-mx-0.5 flex flex-wrap items-center gap-x-4 gap-y-2 overflow-x-auto px-0.5">
         <Group label="Cycle">
           {cycles.map((cycle) => (
             <Tab
@@ -338,12 +343,30 @@ function Group({
     // text below is the label and a legend would say it twice.
     <fieldset
       aria-label={label}
-      className="flex items-center gap-1.5 border-0 p-0"
+      // `min-w-0` and not `flex-none`. With `flex-none` a track wider than the
+      // viewport pushed straight through the page: at 375 the level and health
+      // tracks were clipped mid-word. The track wraps instead, so a long group
+      // becomes two rows of chips inside its own boundary and no option ends up
+      // behind an invisible scroll edge.
+      className="flex w-full min-w-0 items-center gap-1.5 border-0 p-0 sm:w-auto"
     >
-      <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
+      {/* 10px against the options' 12px, and `--ink-3` rather than `--ink-4`.
+       * The label used to be the same 12px as the words it labels, so the only
+       * thing separating "HEALTH" from "pending" was colour, and that colour
+       * measured 2.56:1 against §7's 4.5:1 floor. Rank now comes from size,
+       * where it costs no contrast. */}
+      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
         {label}
       </span>
-      <div className="flex flex-wrap gap-1">{children}</div>
+      {/* A segmented track, which is one move for three of the audit's
+       * findings. It gives twenty options that looked like plain text a
+       * visible boundary, it makes each group a unit the eye can find without
+       * relying on a 16px gap, and it separates the groups from each other
+       * without a divider. The active segment lifts out of the track rather
+       * than only changing colour. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-0.5 rounded-control bg-raised p-0.5">
+        {children}
+      </div>
     </fieldset>
   );
 }
@@ -361,10 +384,13 @@ function Tab({
     <a
       href={href}
       aria-current={active ? "true" : undefined}
+      // `h-6` is 24px, which is WCAG 2.2 SC 2.5.8's floor. These were 20px
+      // links, and the inline-in-a-sentence exemption does not cover a chip in
+      // a toolbar.
       className={
         active
-          ? "rounded-md bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
-          : "rounded-md px-2 py-0.5 text-xs font-medium text-ink-3 hover:bg-raised"
+          ? "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-[6px] bg-surface px-2.5 text-xs font-semibold text-brand-text shadow-control"
+          : "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-[6px] px-2.5 text-xs font-medium text-ink-3 hover:bg-surface/60 hover:text-ink-2"
       }
     >
       {children}
