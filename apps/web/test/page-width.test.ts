@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { glob } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 /**
@@ -34,7 +35,12 @@ const BOUNDED = [
 /** Screens outside the app shell, which draw their own centred card (S-35). */
 const OUTSIDE_SHELL = ["(auth)/", "setup/"];
 
-const APP = join(process.cwd(), "app");
+// Resolved from this file, not from `process.cwd()`. Under `pnpm test` the cwd
+// is this package; under `pnpm test:ci` it is the repository root, which made
+// the glob find nothing and every assertion here pass on an empty list until
+// CI failed on the one that checks the list is not empty. CLAUDE.md warns about
+// exactly this for tokens-contrast.test.ts.
+const APP = fileURLToPath(new URL("../app/", import.meta.url));
 
 async function pageFiles(): Promise<string[]> {
   const found: string[] = [];

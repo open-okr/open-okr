@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 /**
@@ -18,7 +18,8 @@ import { describe, expect, test } from "vitest";
  * `rgb(228, 233, 242)`, which is `--line`.
  */
 
-const GLOBALS = join(process.cwd(), "app", "globals.css");
+// From this file rather than the cwd: see page-width.test.ts.
+const GLOBALS = fileURLToPath(new URL("../app/globals.css", import.meta.url));
 
 describe("globals.css layering", () => {
   const source = readFileSync(GLOBALS, "utf8");

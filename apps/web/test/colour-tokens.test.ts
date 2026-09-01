@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 /**
@@ -23,7 +24,8 @@ import { describe, expect, test } from "vitest";
  * depends on `@openokr/ui`.
  */
 
-const ROOT = join(process.cwd(), "..", "..");
+// From this file rather than the cwd: see page-width.test.ts.
+const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const TOKENS = join(ROOT, "packages", "ui", "src", "styles", "tokens.css");
 
 /** Colour words Tailwind supplies itself, which name no token. */
