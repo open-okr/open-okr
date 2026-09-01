@@ -66,7 +66,7 @@ export function NudgeProvenance({
               {nudge.ruleKey}
             </span>
             {nudge.escalationStep > 1 ? (
-              <span className="rounded-full bg-warn-weak px-2 py-0.5 text-[0.65rem] font-semibold text-warn-text">
+              <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[0.65rem] font-semibold text-warn">
                 escalation step {nudge.escalationStep}
               </span>
             ) : null}

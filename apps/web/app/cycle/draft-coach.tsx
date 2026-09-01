@@ -60,6 +60,14 @@ export interface CoachObjective {
   readonly level: "company" | "department" | "team" | "individual";
 }
 
+/** The field's dot, at the worst verdict on screen. `.vd` in the mockup. */
+const WORST_DOT: Record<QualityStatus, string> = {
+  pass: "bg-ok",
+  warn: "bg-warn",
+  fail: "bg-bad",
+  todo: "bg-ink-4",
+};
+
 const viewOf = (
   verdict: QualityVerdict,
   titles: ReadonlyMap<string, string>,
@@ -147,22 +155,52 @@ export function DraftCoach({
     counts[verdict.status] += 1;
   }
 
+  /** What the field's own dot and count report: anything that is not a pass. */
+  const firing = counts.fail + counts.warn;
+  const worst: QualityStatus =
+    counts.fail > 0 ? "fail" : counts.warn > 0 ? "warn" : "pass";
+
   return (
     <div className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-semibold text-ink-2">
+      {/* An explicit `htmlFor` rather than wrapping the input in the label.
+        * Implicit association takes the whole label's text content as the
+        * accessible name, and this label now also contains the firing count
+        * and the hint, so a screen reader would announce all three as the
+        * field's name. */}
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="draft-coach-objective"
+          className="text-xs font-semibold text-ink-2"
+        >
           Objective, checked as you type
+        </label>
+        {/* `.field` from `03b-rule-card`: the worst verdict as a dot on the
+         * left, the sentence at the size somebody is actually writing at, and
+         * the count of what is firing on the right. The field was a plain
+         * 13px input, so the thing being judged was smaller than the chips
+         * judging it. */}
+        <span className="flex items-center gap-2.5 rounded-control border border-line-2 bg-surface px-3 py-2.5 shadow-control focus-within:border-brand">
+          <span
+            aria-hidden="true"
+            className={`size-2.25 flex-none rounded-full ${WORST_DOT[worst]}`}
+          />
+          <input
+            id="draft-coach-objective"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-ink outline-none"
+          />
+          {firing > 0 ? (
+            <span className="inline-flex h-5 flex-none items-center rounded-full bg-bad-bg px-2 text-xs font-bold text-bad">
+              {firing === 1 ? "1 rule firing" : `${firing} rules firing`}
+            </span>
+          ) : null}
         </span>
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-        />
         <span className="text-xs text-ink-4">
           Nothing is saved by typing here. Warnings never block writing, which
           is §4's own rule.
         </span>
-      </label>
+      </div>
 
       <StrengthMeter
         score={strengthScore(verdicts)}
@@ -179,7 +217,7 @@ export function DraftCoach({
       </div>
 
       {views.every((view) => view.status === "pass") ? (
-        <p className="text-xs text-ok-text">
+        <p className="text-xs text-ok">
           Every check passes. Read it aloud once more, then publish.
         </p>
       ) : null}

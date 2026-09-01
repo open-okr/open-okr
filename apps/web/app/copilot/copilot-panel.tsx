@@ -139,7 +139,7 @@ function Turn({ message }: { readonly message: Message }) {
     <div className={mine ? "text-right" : ""}>
       <div
         className={`inline-block max-w-[46ch] whitespace-pre-wrap rounded-lg px-3 py-2 text-left text-sm ${
-          mine ? "bg-surface-2 text-ink" : "bg-surface text-ink"
+          mine ? "bg-raised text-ink" : "bg-surface text-ink"
         }`}
       >
         {message.content}
@@ -576,7 +576,7 @@ export function CopilotPanel({
                 off the stream's reason and the footer's reason are the same
                 sentence, and printing it twice reads as two problems. */}
             {notice && notice !== availability.reason ? (
-              <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-3">
+              <p className="mt-3 rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
                 {notice}
               </p>
             ) : null}

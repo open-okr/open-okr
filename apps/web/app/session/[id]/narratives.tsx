@@ -81,7 +81,7 @@ function ObjectiveRow({
   return (
     <li
       className={`flex flex-col gap-2 rounded-md border p-2.5 ${
-        objective.hasMic ? "border-brand bg-brand-bg" : "border-line"
+        objective.hasMic ? "border-brand bg-brand-weak" : "border-line"
       }`}
     >
       <span className="flex flex-wrap items-center gap-2">

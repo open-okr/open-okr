@@ -1,6 +1,7 @@
 "use client";
 
 import type { QualityStatus } from "@openokr/method";
+import { Button, buttonVariants } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -42,10 +43,26 @@ export interface RuleVerdictView {
 }
 
 const TONE: Record<QualityStatus, string> = {
-  pass: "border-ok/40 bg-ok-weak text-ok-text",
-  warn: "border-warn/40 bg-warn-weak text-warn-text",
-  fail: "border-bad/40 bg-bad-weak text-bad-text",
+  pass: "border-ok/40 bg-ok-bg text-ok",
+  warn: "border-warn/40 bg-warn-bg text-warn",
+  fail: "border-bad/40 bg-bad-bg text-bad",
   todo: "border-line bg-raised text-ink-3",
+};
+
+/** `.vchip`: the verdict word, on its own tint. No border, so it needs no
+ * class undoing one. */
+const CHIP: Record<QualityStatus, string> = {
+  pass: "bg-ok-bg text-ok",
+  warn: "bg-warn-bg text-warn",
+  fail: "bg-bad-bg text-bad",
+  todo: "bg-raised text-ink-3",
+};
+
+const BAND: Record<QualityStatus, string> = {
+  pass: "bg-ok-bg",
+  warn: "bg-warn-bg",
+  fail: "bg-bad-bg",
+  todo: "bg-raised",
 };
 
 const DOT: Record<QualityStatus, string> = {
@@ -86,50 +103,86 @@ export function RuleVerdict({
       </button>
 
       {open ? (
-        <div className="mt-1.5 flex flex-col gap-2 rounded-md border border-line bg-surface p-3">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-ink">{label}</h3>
+        <div className="mt-1.5 overflow-hidden rounded-lg border border-line bg-surface">
+          {/* `.pop-h`: a tinted band the width of the card, not a title inside
+           * the body. The band is what makes a fail card read as a fail
+           * before anybody reads a word of it. */}
+          <div
+            className={`flex items-center gap-2.5 border-b border-line px-4 py-3 ${BAND[verdict.status]}`}
+          >
             <span
-              className={`text-xs font-bold ${TONE[verdict.status]} border-0 bg-transparent p-0`}
+              aria-hidden="true"
+              className={`size-2.25 flex-none rounded-full ${DOT[verdict.status]}`}
+            />
+            <h3 className="flex-1 text-sm font-bold text-ink">{label}</h3>
+            {/* `.vchip`: a real chip with its own tint. This was bare text
+             * wearing the trigger chip's classes with `border-0
+             * bg-transparent p-0` bolted on to undo them, which is a chip
+             * fighting its own definition. */}
+            <span
+              className={`inline-flex h-5 flex-none items-center rounded-[5px] px-2 text-xs font-extrabold tracking-wide ${CHIP[verdict.status]}`}
             >
               {LABEL[verdict.status]}
             </span>
           </div>
 
-          <p className="text-sm text-ink-2">{verdict.prompt}</p>
+          <div className="flex flex-col gap-2.5 p-4">
+            <p className="text-sm text-ink-2">{verdict.prompt}</p>
 
-          <p className="text-xs text-ink-3">
-            <span className="font-semibold text-ink-2">What was seen. </span>
-            {verdict.condition}
-            {verdict.offenders.length > 0
-              ? `: ${verdict.offenders.map((title) => `"${title}"`).join(", ")}`
-              : ""}
-          </p>
+            <p className="text-xs text-ink-3">
+              <span className="font-semibold text-ink-2">What was seen. </span>
+              {verdict.condition}
+              {verdict.offenders.length > 0
+                ? `: ${verdict.offenders.map((title) => `"${title}"`).join(", ")}`
+                : ""}
+            </p>
 
-          {verdict.examples.map((pair) => (
-            <div key={pair.weak} className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md border border-bad/40 bg-bad-weak p-2">
-                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad-text">
-                  Weak
-                </p>
-                <p className="text-sm text-ink">{pair.weak}</p>
+            {verdict.examples.map((pair) => (
+              <div key={pair.weak} className="grid gap-3 sm:grid-cols-2">
+                {/* `.exbox.w` and `.exbox.s`: a solid status border, not the
+                 * 40 percent one that was here. At 40 percent the pair reads
+                 * as two grey boxes, and the whole point of §4.6's pair is
+                 * that you can tell which half is which at a glance. */}
+                <div className="rounded-control border border-bad-dot bg-bad-bg p-3">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-bad">
+                    Weak
+                  </p>
+                  <p className="text-sm font-medium leading-snug text-ink">
+                    {pair.weak}
+                  </p>
+                </div>
+                <div className="rounded-control border border-ok-dot bg-ok-bg p-3">
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-ok">
+                    Strong
+                  </p>
+                  <p className="text-sm font-medium leading-snug text-ink">
+                    {pair.strong}
+                  </p>
+                </div>
+                <p className="text-xs text-ink-3 sm:col-span-2">{pair.why}</p>
               </div>
-              <div className="rounded-md border border-ok/40 bg-ok-weak p-2">
-                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok-text">
-                  Strong
-                </p>
-                <p className="text-sm text-ink">{pair.strong}</p>
-              </div>
-              <p className="text-xs text-ink-3 sm:col-span-2">{pair.why}</p>
+            ))}
+
+            <div className="flex items-center gap-2 pt-0.5">
+              {/* Styled as the mockup's `.btn`, still an anchor, because it
+               * navigates. A `<button>` here would take the link out of the
+               * keyboard and screen-reader path §7 asks for, and would break
+               * the end-to-end test that looks for it by its link role. */}
+              <Link
+                href={`/method/${verdict.id}`}
+                className={buttonVariants({ variant: "default" })}
+              >
+                See the rule in METHOD
+              </Link>
+              <Button
+                variant="ghost"
+                className="ml-auto"
+                onClick={() => setOpen(false)}
+              >
+                Dismiss
+              </Button>
             </div>
-          ))}
-
-          <Link
-            href={`/method/${verdict.id}`}
-            className="w-fit text-xs font-semibold text-brand-text hover:underline"
-          >
-            See the rule in METHOD
-          </Link>
+          </div>
         </div>
       ) : null}
     </div>
@@ -166,10 +219,10 @@ export function StrengthMeter({
   }
   const tone =
     score >= bands.green
-      ? { text: "text-ok-text", bar: "bg-ok", word: "Green" }
+      ? { text: "text-ok", bar: "bg-ok", word: "Green" }
       : score < bands.red
-        ? { text: "text-bad-text", bar: "bg-bad", word: "Red" }
-        : { text: "text-warn-text", bar: "bg-warn", word: "Amber" };
+        ? { text: "text-bad", bar: "bg-bad", word: "Red" }
+        : { text: "text-warn", bar: "bg-warn", word: "Amber" };
 
   return (
     <div className="flex flex-col gap-1">

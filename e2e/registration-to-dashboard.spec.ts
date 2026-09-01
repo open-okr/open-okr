@@ -369,6 +369,19 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
     page.getByText(/Launch the new mobile app by end of Q3/),
   ).toBeVisible();
 
+  // The field reports how much is firing, so the count is not only in the
+  // chips below it (mockup 03b-rule-card's own `.field`).
+  await expect(page.getByText(/rules? firing/)).toBeVisible();
+
+  // The card closes from inside itself. The chip toggles it too, but a card
+  // that can only be closed by the control that opened it is a card somebody
+  // hunts for.
+  await page.getByRole("button", { name: "Dismiss" }).first().click();
+  await expect(
+    page.getByText(/Your objective starts with a deliverable, not a destination/),
+  ).toBeHidden();
+  await chip.click();
+
   // Every verdict links to the rule itself.
   await page.getByRole("link", { name: "See the rule in METHOD" }).first().click();
   await expect(page).toHaveURL("/method/OBJ-1");

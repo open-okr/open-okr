@@ -106,7 +106,7 @@ export function TemplateMappingForm({
       </label>
 
       {chosen?.bodyText ? (
-        <p className="whitespace-pre-wrap rounded-md bg-surface-2 px-2.5 py-1.5 text-xs text-ink-3">
+        <p className="whitespace-pre-wrap rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-3">
           {chosen.bodyText}
         </p>
       ) : null}

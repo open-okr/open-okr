@@ -58,6 +58,10 @@
    * between them, so its label must not either. Never --surface, which is
    * near-black in dark. */
   --on-brand: #ffffff;
+  /* Text on the --ok fill, for a completed step in the quarterly stepper.
+   * White clears 5.02:1 on this theme; on dark it would be 2.28:1, so the
+   * dark block inverts it. Named for the fill it sits on, like --on-brand. */
+  --on-ok: #ffffff;
 
   /* Neutral grey ramp (§2). */
   --ink: #0f172a;
@@ -199,6 +203,9 @@
    * because #ef4444 and #3b82f6 as *text* miss 4.5:1 on --raised. */
   --ok: #22c55e;
   --ok-bg: #052e1b;
+  /* Same inversion as --on-bad-solid below, for the same reason: white on
+   * #22c55e is 2.28:1, and the deep green reads at 6.52:1. */
+  --on-ok: #052e1b;
   --warn: #f59e0b;
   --warn-bg: #3a2a05;
   --bad: #f87171;
@@ -261,6 +268,7 @@
   --color-brand-weak: var(--brand-weak);
   --color-brand-line: var(--brand-line);
   --color-on-brand: var(--on-brand);
+  --color-on-ok: var(--on-ok);
 
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
