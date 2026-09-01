@@ -1,6 +1,6 @@
 import { callAction } from "@openokr/core";
 import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
@@ -73,6 +73,12 @@ export default async function GoalsPage({
   const mine = query.mine === "1";
   const includeClosed = query.closed === "1";
   const tree = query.view !== "list";
+  // Whether anything is narrowing the set. Derived rather than counted a second
+  // time: the difference between "this cycle has no goals" and "your filters
+  // left nothing" is knowable from the query alone, and getting it wrong is
+  // what made the header claim an empty cycle that held two goals.
+  const filtered =
+    level !== undefined || health !== undefined || mine || includeClosed;
 
   const { goals } = cycleId
     ? await callAction(context, "goals.list", {
@@ -120,33 +126,56 @@ export default async function GoalsPage({
       <div className="flex flex-col gap-4.5">
         <SectionTabs items={GOAL_TABS} active="/goals" />
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Goals</h1>
-              <p className="text-xs text-ink-3">
+          <CardHeader className="justify-between gap-4">
+            {/* Identity and state as one unit on the left, rather than a title
+             * with a sentence under it that repeated what the table below
+             * already says. The chip reports what is on screen; the table owns
+             * the empty state and its suggestion. */}
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h1 className="flex-none text-lg font-bold text-ink">Goals</h1>
+              <Chip tone={filtered ? "brand" : "neutral"}>
+                {/* Never "nothing in this cycle" from a filtered count. The
+                 * cycle had two goals and the filters excluded both, and this
+                 * line claimed the cycle was empty while the table forty
+                 * pixels below correctly said no goals matched. One screen,
+                 * two answers, and the wrong one was the louder. */}
                 {goals.length === 0
-                  ? "Nothing in this cycle yet."
+                  ? filtered
+                    ? "No match for these filters"
+                    : "No goals in this cycle yet"
                   : `${goals.length} goal${goals.length === 1 ? "" : "s"}${
-                      tree ? ", indented by what each one supports" : ""
-                    }.`}
-              </p>
+                      filtered ? ", filtered" : ""
+                    }${tree ? ", as a tree" : ""}`}
+              </Chip>
             </div>
             {alignment?.score !== null && alignment !== null ? (
               <a
                 href={`/cycle?phase=5`}
-                className="flex flex-none flex-col items-end"
+                className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
               >
-                <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
                   Alignment
                 </span>
-                <span
-                  className={
-                    alignment.healthy
-                      ? "text-lg font-bold text-ok"
-                      : "text-lg font-bold text-warn"
-                  }
-                >
-                  {alignment.score}
+                {/* With its denominator. "ALIGNMENT 100" on its own could be a
+                 * percentage, a score out of a hundred, or a points total;
+                 * `05-alignment-studio` writes "73 / 100". Only the value is
+                 * coloured, because the total carries no verdict. */}
+                <span className="flex items-baseline gap-0.5">
+                  <span
+                    className={
+                      alignment.healthy
+                        ? "text-lg font-bold tabular-nums text-ok"
+                        : "text-lg font-bold tabular-nums text-warn"
+                    }
+                  >
+                    {alignment.score}
+                  </span>
+                  {/* `--ink-3`, not `--ink-4`. The denominator is content, and
+                   * `--ink-4` measures 2.56:1 on this surface, which is the
+                   * violation the group labels above were just fixed for. */}
+                  <span className="text-xs font-semibold tabular-nums text-ink-3">
+                    / 100
+                  </span>
                 </span>
               </a>
             ) : null}
