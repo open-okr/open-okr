@@ -32,6 +32,7 @@ import {
 import { eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { withoutTrailingSlashes } from "../urls.ts";
 import { mintApiToken } from "./tokens.ts";
 
 /**
@@ -90,15 +91,6 @@ export function generateUserCode(): string {
     return text;
   };
   return `${half()}-${half()}`;
-}
-
-/** Trims trailing slashes without a regular expression. 47 is `/`. */
-function withoutTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
-    end -= 1;
-  }
-  return value.slice(0, end);
 }
 
 export interface StartedDevice {

@@ -21,6 +21,7 @@
  * `/.well-known/oauth-protected-resource/api/mcp`, not at the resource's own
  * path with a suffix. Clients differ on which they try, so both are served.
  */
+import { withoutTrailingSlashes } from "../../urls.ts";
 
 /** Every scope this server issues, in the action registry's own vocabulary. */
 export const SUPPORTED_SCOPES = ["read", "write", "destructive"] as const;
@@ -41,7 +42,7 @@ export const OAUTH_PATHS: DiscoveryPaths = {
 };
 
 const at = (issuer: string, path: string) =>
-  `${issuer.replace(/\/+$/, "")}${path}`;
+  `${withoutTrailingSlashes(issuer)}${path}`;
 
 /**
  * The identifier every grant is bound to and every token is checked against.
@@ -71,7 +72,7 @@ export function protectedResourceMetadata(
 ): Record<string, unknown> {
   return {
     resource: at(issuer, OAUTH_PATHS.resource),
-    authorization_servers: [issuer.replace(/\/+$/, "")],
+    authorization_servers: [withoutTrailingSlashes(issuer)],
     scopes_supported: [...SUPPORTED_SCOPES],
     bearer_methods_supported: ["header"],
   };
@@ -87,7 +88,7 @@ export function protectedResourceMetadata(
 export function authorisationServerMetadata(
   issuer: string,
 ): Record<string, unknown> {
-  const base = issuer.replace(/\/+$/, "");
+  const base = withoutTrailingSlashes(issuer);
   return {
     issuer: base,
     authorization_endpoint: at(base, OAUTH_PATHS.authorize),
@@ -172,6 +173,6 @@ export function discoveryDocumentAt(
   path: string,
   issuer: string,
 ): Record<string, unknown> | null {
-  const build = DISCOVERY_ROUTES[path.replace(/\/+$/, "") || path];
+  const build = DISCOVERY_ROUTES[withoutTrailingSlashes(path) || path];
   return build ? build(issuer) : null;
 }

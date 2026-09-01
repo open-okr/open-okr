@@ -773,6 +773,7 @@ export {
   type SetupState,
   setupRefusal,
 } from "./setup/state.ts";
+export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,
   type Membership,

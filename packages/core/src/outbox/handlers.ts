@@ -34,6 +34,7 @@ import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import { parseEmbedJob, runEmbedJob } from "../embeddings/worker.ts";
+import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
 /** One delivered outbox row, as a handler sees it. */
@@ -155,27 +156,6 @@ const embedContent: OutboxHandler = async (delivery, deps) => {
     deps.onSkipped?.(delivery, result.reason);
   }
 };
-
-/**
- * Trims trailing slashes without a regular expression.
- *
- * It was an anchored `/\/+$/` replace, which CodeQL flags as a polynomial
- * denial of service: a `+` anchored to the end is retried from every position,
- * so the work is quadratic in the number of slashes and a base URL made of
- * thousands of them would spend real time here. The value comes from
- * configuration rather than from a request, so nothing an attacker controls
- * reaches it, and it is still worth fixing rather than annotating: the loop is
- * linear, shorter to read, and leaves nothing for the next person to re-derive.
- *
- * 47 is `/`.
- */
-function withoutTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
-    end -= 1;
-  }
-  return value.slice(0, end);
-}
 
 /**
  * Sends one invitation email.

@@ -31,6 +31,28 @@ export function mintSecret(kind: OAuthSecretKind): MintedSecret {
   return { raw, hash: hashSecret(raw) };
 }
 
+/**
+ * The digest stored for a code, an access token, a refresh token or an MCP
+ * session id.
+ *
+ * **SHA-256 rather than a slow key derivation, and that is the right choice
+ * here.** CodeQL reports this line as `js/insufficient-password-hash`, which is
+ * the correct question asked of the wrong value. A password is short, chosen by
+ * a person and guessable, so hashing it has to be made expensive. Every value
+ * that reaches this function is 32 bytes from `randomBytes` behind a fixed
+ * prefix, minted by `mintSecret` or `mintApiToken` and never chosen by anybody.
+ * There is nothing to guess, so there is nothing for work factor to buy. What it
+ * would cost is real: this runs on every request that carries a bearer token,
+ * and a deliberately slow hash on that path is a denial of service somebody
+ * could trigger with a made-up token.
+ *
+ * The alert exists because `packages/core/test/oauth-flow.test.ts` hands a
+ * minted API token to the resolver, to prove the two token tables are separate.
+ * CodeQL reads "token" as "password" and follows it here. It is dismissed as a
+ * false positive on the repository's code scanning page rather than suppressed
+ * with a comment, so the judgement is recorded where a reviewer of the alert
+ * will actually meet it.
+ */
 export function hashSecret(raw: string): string {
   return createHash("sha256").update(raw.trim()).digest("hex");
 }

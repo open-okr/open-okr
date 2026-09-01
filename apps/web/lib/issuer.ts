@@ -1,4 +1,5 @@
 import { loadEnv } from "@openokr/config";
+import { withoutTrailingSlashes } from "@openokr/core";
 
 /**
  * The instance this server is (P5-T08a, P5-T08b).
@@ -13,5 +14,5 @@ import { loadEnv } from "@openokr/config";
  * against it, so one spelling is the whole point.
  */
 export function instanceIssuer(): string {
-  return loadEnv().BETTER_AUTH_URL.replace(/\/+$/, "");
+  return withoutTrailingSlashes(loadEnv().BETTER_AUTH_URL);
 }

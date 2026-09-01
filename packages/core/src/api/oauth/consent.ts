@@ -30,6 +30,7 @@ import {
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { withoutTrailingSlashes } from "../../urls.ts";
 import { resolveClient } from "./clients.ts";
 import { resourceIdentifier, SUPPORTED_SCOPES } from "./discovery.ts";
 import { issueAuthorisationCode } from "./flow.ts";
@@ -173,7 +174,8 @@ export async function checkAuthoriseRequest(
   }
   if (
     request.resource.trim() !== "" &&
-    request.resource.replace(/\/+$/, "") !== resourceIdentifier(input.issuer)
+    withoutTrailingSlashes(request.resource) !==
+      resourceIdentifier(input.issuer)
   ) {
     return {
       kind: "refused",
