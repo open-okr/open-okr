@@ -72,10 +72,10 @@ export function FilterAssist() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Capped rather than full width. A one-line sentence box stretched to
-       * 1100px on a wide screen, which is the same defect as an 1800px input
-       * for somebody's name: the field should be as wide as what goes in it. */}
-      <div className="flex max-w-2xl items-center gap-2">
+      {/* No max width of its own. The box used to stretch to about 1100px for a
+       * one-line phrase; it is bounded now by the toolbar column it sits in,
+       * which is the right place for that decision. */}
+      <div className="flex items-center gap-2">
         <Chip tone="agent">
           <Sparkles className="size-3" />
           AI

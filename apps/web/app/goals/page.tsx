@@ -244,92 +244,108 @@ function Filters({
   readonly filterAssist?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4">
-      {filterAssist}
-      {/* Two rows, composed rather than wrapped, because six groups running
-       * along one line is what made this read as a paragraph of links. The
-       * split is by the question each group answers: the first row says what
-       * you are looking at, the second narrows it down. Each group's label
-       * sits above its own track, so the boundary between groups needs no gap
-       * to carry it.
-       *
-       * The rows scroll, the page never does. Three attempts to make the
-       * groups shrink inside the viewport failed measurement at 375: the level
-       * track came out 328px and health 523px against 319px of bar. This is
-       * the repository's own rule for wide content, and it is the one that
-       * holds without depending on flex shrink behaviour. */}
-      <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-        <Group label="Cycle">
-          {cycles.map((cycle) => (
-            <Tab
-              key={cycle.id}
-              href={href({ cycle: cycle.id })}
-              active={cycle.id === cycleId}
-            >
-              {cycle.name}
-            </Tab>
-          ))}
-        </Group>
+    // Two columns from `2xl` (1536px), not `xl`. Measured at 1280 the split
+    // left only 536px for the groups, which pushed them from two rows to four
+    // and made the toolbar 244px tall against 114px at 1600. Two columns are
+    // worth it only where there is genuinely room for two.
+    //
+    // The filter groups on the left, the sentence box on
+    // the right. The groups are sized by their content and stop at about 55
+    // percent of a wide card, which left the right half of the toolbar empty.
+    // Filling it with the control that was sitting in a row of its own uses the
+    // space and removes a row, where stretching the tracks would only have made
+    // long grey slabs with the chips packed at one end.
+    <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-8">
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* Two rows, composed rather than wrapped, because six groups running
+         * along one line is what made this read as a paragraph of links. The
+         * split is by the question each group answers: the first row says what
+         * you are looking at, the second narrows it down. Each group's label
+         * sits above its own track, so the boundary between groups needs no gap
+         * to carry it.
+         *
+         * The rows scroll, the page never does. Three attempts to make the
+         * groups shrink inside the viewport failed measurement at 375: the level
+         * track came out 328px and health 523px against 319px of bar. This is
+         * the repository's own rule for wide content, and it is the one that
+         * holds without depending on flex shrink behaviour. */}
+        <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
+          <Group label="Cycle">
+            {cycles.map((cycle) => (
+              <Tab
+                key={cycle.id}
+                href={href({ cycle: cycle.id })}
+                active={cycle.id === cycleId}
+              >
+                {cycle.name}
+              </Tab>
+            ))}
+          </Group>
 
-        <Group label="Level">
-          <Tab href={href({ level: null })} active={level === null}>
-            All
-          </Tab>
-          {ALIGNMENT_LEVEL_ORDER.map((entry) => (
-            <Tab
-              key={entry}
-              href={href({ level: entry })}
-              active={level === entry}
-            >
-              {entry}
+          <Group label="Level">
+            <Tab href={href({ level: null })} active={level === null}>
+              All
             </Tab>
-          ))}
-        </Group>
+            {ALIGNMENT_LEVEL_ORDER.map((entry) => (
+              <Tab
+                key={entry}
+                href={href({ level: entry })}
+                active={level === entry}
+              >
+                {entry}
+              </Tab>
+            ))}
+          </Group>
 
-        <Group label="View">
-          <Tab href={href({ view: null })} active={tree}>
-            Tree
-          </Tab>
-          <Tab href={href({ view: "list" })} active={!tree}>
-            List
-          </Tab>
-        </Group>
+          <Group label="View">
+            <Tab href={href({ view: null })} active={tree}>
+              Tree
+            </Tab>
+            <Tab href={href({ view: "list" })} active={!tree}>
+              List
+            </Tab>
+          </Group>
+        </div>
+
+        <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
+          <Group label="Health">
+            <Tab href={href({ health: null })} active={health === null}>
+              Any
+            </Tab>
+            {GOAL_HEALTH_BANDS.map((band) => (
+              <Tab
+                key={band}
+                href={href({ health: band })}
+                active={health === band}
+              >
+                {band.replace("_", " ")}
+              </Tab>
+            ))}
+          </Group>
+
+          <Group label="Whose">
+            <Tab href={href({ mine: null })} active={!mine}>
+              Everyone's
+            </Tab>
+            <Tab href={href({ mine: "1" })} active={mine}>
+              Mine
+            </Tab>
+          </Group>
+
+          <Group label="Closed">
+            <Tab href={href({ closed: null })} active={!includeClosed}>
+              Hidden
+            </Tab>
+            <Tab href={href({ closed: "1" })} active={includeClosed}>
+              Shown
+            </Tab>
+          </Group>
+        </div>
       </div>
 
-      <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
-        <Group label="Health">
-          <Tab href={href({ health: null })} active={health === null}>
-            Any
-          </Tab>
-          {GOAL_HEALTH_BANDS.map((band) => (
-            <Tab
-              key={band}
-              href={href({ health: band })}
-              active={health === band}
-            >
-              {band.replace("_", " ")}
-            </Tab>
-          ))}
-        </Group>
-
-        <Group label="Whose">
-          <Tab href={href({ mine: null })} active={!mine}>
-            Everyone's
-          </Tab>
-          <Tab href={href({ mine: "1" })} active={mine}>
-            Mine
-          </Tab>
-        </Group>
-
-        <Group label="Closed">
-          <Tab href={href({ closed: null })} active={!includeClosed}>
-            Hidden
-          </Tab>
-          <Tab href={href({ closed: "1" })} active={includeClosed}>
-            Shown
-          </Tab>
-        </Group>
-      </div>
+      {filterAssist ? (
+        <div className="2xl:w-96 2xl:flex-none">{filterAssist}</div>
+      ) : null}
     </div>
   );
 }
