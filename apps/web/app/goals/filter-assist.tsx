@@ -72,12 +72,15 @@ export function FilterAssist() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
+      {/* Capped rather than full width. A one-line sentence box stretched to
+       * 1100px on a wide screen, which is the same defect as an 1800px input
+       * for somebody's name: the field should be as wide as what goes in it. */}
+      <div className="flex max-w-2xl items-center gap-2">
         <Chip tone="agent">
           <Sparkles className="size-3" />
           AI
         </Chip>
-        <label className="flex-1">
+        <label className="min-w-0 flex-1">
           <span className="sr-only">Describe the list you want</span>
           <input
             value={sentence}

@@ -244,14 +244,21 @@ function Filters({
   readonly filterAssist?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       {filterAssist}
-      {/* The bar scrolls, the page never does. Three attempts to make the
+      {/* Two rows, composed rather than wrapped, because six groups running
+       * along one line is what made this read as a paragraph of links. The
+       * split is by the question each group answers: the first row says what
+       * you are looking at, the second narrows it down. Each group's label
+       * sits above its own track, so the boundary between groups needs no gap
+       * to carry it.
+       *
+       * The rows scroll, the page never does. Three attempts to make the
        * groups shrink inside the viewport failed measurement at 375: the level
        * track came out 328px and health 523px against 319px of bar. This is
        * the repository's own rule for wide content, and it is the one that
        * holds without depending on flex shrink behaviour. */}
-      <div className="-mx-0.5 flex flex-wrap items-center gap-x-4 gap-y-2 overflow-x-auto px-0.5">
+      <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
         <Group label="Cycle">
           {cycles.map((cycle) => (
             <Tab
@@ -279,6 +286,17 @@ function Filters({
           ))}
         </Group>
 
+        <Group label="View">
+          <Tab href={href({ view: null })} active={tree}>
+            Tree
+          </Tab>
+          <Tab href={href({ view: "list" })} active={!tree}>
+            List
+          </Tab>
+        </Group>
+      </div>
+
+      <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
         <Group label="Health">
           <Tab href={href({ health: null })} active={health === null}>
             Any
@@ -300,15 +318,6 @@ function Filters({
           </Tab>
           <Tab href={href({ mine: "1" })} active={mine}>
             Mine
-          </Tab>
-        </Group>
-
-        <Group label="View">
-          <Tab href={href({ view: null })} active={tree}>
-            Tree
-          </Tab>
-          <Tab href={href({ view: "list" })} active={!tree}>
-            List
           </Tab>
         </Group>
 
@@ -343,12 +352,10 @@ function Group({
     // text below is the label and a legend would say it twice.
     <fieldset
       aria-label={label}
-      // `min-w-0` and not `flex-none`. With `flex-none` a track wider than the
-      // viewport pushed straight through the page: at 375 the level and health
-      // tracks were clipped mid-word. The track wraps instead, so a long group
-      // becomes two rows of chips inside its own boundary and no option ends up
-      // behind an invisible scroll edge.
-      className="flex w-full min-w-0 items-center gap-1.5 border-0 p-0 sm:w-auto"
+      // A column: the label above its own track. Six groups running along one
+      // line with the label beside each track is what made this read as a
+      // paragraph, and no gap between groups can fix that on its own.
+      className="flex min-w-0 flex-col gap-1.5 border-0 p-0"
     >
       {/* 10px against the options' 12px, and `--ink-3` rather than `--ink-4`.
        * The label used to be the same 12px as the words it labels, so the only
