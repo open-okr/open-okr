@@ -92,12 +92,26 @@ export interface CreatedInitiative {
   readonly contextId: string;
 }
 
-/** The member, or not-found. A member of another workspace is not a member. */
+/**
+ * The member who may own work, or not-found.
+ *
+ * **An agent is refused, and that is not a technicality.** An owner is who is
+ * accountable for the work and who holds `full` on its context, and neither is
+ * a thing an agent can be: AI-NATIVE-PLAN.md §1.3 gives an agent named bindings
+ * and no standing authority. Every workspace ships with two agent members, so
+ * without this the Coach and the Champion sit in every owner picker. A
+ * placeholder is refused for the plainer reason that nobody has claimed it yet,
+ * and a guest because a guest is somebody outside the organisation.
+ *
+ * Found by opening the screen rather than by reading it: `people.directory`
+ * answers with every active member, so the picker offered "OKR Coach" as
+ * somebody who could own a project.
+ */
 async function requireMember<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(tx: AnyTx<TSchema>, workspaceId: string, memberId: string): Promise<void> {
   const [row] = await tx
-    .select({ id: workspaceMembers.id })
+    .select({ id: workspaceMembers.id, kind: workspaceMembers.kind })
     .from(workspaceMembers)
     .where(
       activeOnly(
@@ -109,6 +123,12 @@ async function requireMember<
     .limit(1);
   if (!row) {
     throw new OperationError("not_found", "No such member.");
+  }
+  if (row.kind !== "human") {
+    throw new OperationError(
+      "forbidden",
+      "An initiative is owned by a person. An agent proposes work; it does not carry it.",
+    );
   }
 }
 

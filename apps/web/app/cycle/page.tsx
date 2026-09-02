@@ -13,6 +13,7 @@ import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { assistsAvailableAction } from "./assist-actions.ts";
+import { Capacity } from "./capacity.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
 import { Drafting } from "./drafting.tsx";
@@ -154,6 +155,15 @@ export default async function CyclePage({
           checkTitles: [],
         };
 
+  // Only phase 5 needs the capacity check, and only phase 5 pays for reading
+  // it. The same rule the phase-4 block above follows (P5-T10b).
+  const capacity =
+    viewing === 5
+      ? await callAction(context, "initiatives.capacity", {
+          cycleId: workflow.cycleId,
+        })
+      : null;
+
   return (
     <AppShellLayout>
       <div className="flex flex-col gap-4.5 xl:flex-row">
@@ -245,6 +255,13 @@ export default async function CyclePage({
               issues={workflow.issues}
               bounds={workflow.asks.priorities}
               canEdit={canEdit}
+            />
+          ) : null}
+
+          {capacity ? (
+            <Capacity
+              keyResults={capacity.keyResults}
+              initiatives={capacity.initiatives}
             />
           ) : null}
 

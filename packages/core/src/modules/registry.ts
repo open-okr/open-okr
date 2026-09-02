@@ -142,6 +142,23 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "initiatives",
+    navigation: [
+      {
+        id: "initiatives",
+        label: "Initiatives",
+        href: "/initiatives",
+        section: "sidebar",
+        group: "practice",
+        // Every member reads the work behind the measures. An initiative binds
+        // `workspace_standard` at view for the same reason a goal does:
+        // alignment reads across spaces, and a key result whose work is
+        // invisible looks like a measure nobody is moving (P5-T10a).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "scorecard",
     navigation: [
       {

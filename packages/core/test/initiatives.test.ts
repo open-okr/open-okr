@@ -403,6 +403,29 @@ describe("access, which is the space's and the owner's", () => {
     ).rejects.toThrow(/No such member/);
   });
 
+  it("refuses an agent as owner, because an agent carries nothing", async () => {
+    const wb = await workerDb();
+    // Every workspace is provisioned with the Coach and the Champion, so this
+    // is not a contrived member: without the check they sat in the owner picker
+    // on the real screen, which is where this was found.
+    const { rows } = await wb.admin.query<{ id: string; name: string }>(
+      `select id, name from workspace_members
+        where workspace_id = $1 and kind = 'agent' and deleted_at is null
+        limit 1`,
+      [workspaceId],
+    );
+    const agent = rows[0];
+    expect(agent).toBeDefined();
+
+    await expect(
+      call("initiatives.create", {
+        spaceId,
+        title: "Owned by an agent",
+        ownerId: agent?.id,
+      }),
+    ).rejects.toThrow(/does not carry it/);
+  });
+
   it("moves the binding when ownership moves, not just the column", async () => {
     const created = await createInitiative();
     await call("initiatives.update", {

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Circle,
   ClipboardCheck,
+  Hammer,
   Home,
   Layers,
   MessageSquare,
@@ -36,6 +37,9 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   cycle: <RefreshCw className="size-full" />,
   goals: <Target className="size-full" />,
   kpis: <BarChart3 className="size-full" />,
+  // Work rather than a measure: an initiative is the thing somebody does, and
+  // the sidebar sits it beside the numbers it is meant to move (P5-T10b).
+  initiatives: <Hammer className="size-full" />,
   scorecard: <Trophy className="size-full" />,
   "check-in": <CheckCircle2 className="size-full" />,
   sessions: <CalendarDays className="size-full" />,
