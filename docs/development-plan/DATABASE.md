@@ -391,11 +391,17 @@ Every table references `session_id` to sessions.
 
 ## 12. The work (domain I)
 
-### initiatives *(short_id, importable)*
-`space_id` to spaces, `title`, `description` (rich), `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity` (`fits` / `tight` / `exceeds`), `progress_pct`.
+### initiatives *(importable, built at P5-T10a)*
+`space_id` to spaces, `title`, `description` (rich) with `description_version`, `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`, default `planned`), `confidence numeric(3,2)?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric(5,2)`, `position`.
 
-### initiative_key_results
-`initiative_id` to initiatives, `key_result_id` to key_results.
+No `short_id` yet: TECHNICAL-PLAN §4.9 does not ask for one and nothing addresses an initiative by a short code until the palette at P5-T13. `capacity` is nullable and null means nobody has judged it, which publish gate five reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks at P5-T11 and holds its default of zero until then; no input schema accepts one, which is the work-layer design's answer to W2.
+
+A check constraint refuses a window that ends before it starts. There is no `cycle_id`: an initiative reaches a cycle through the key results it serves, which is the only relationship METHOD.md §5.5 describes, and a column would be a second answer that disagrees the first time one initiative serves two cycles.
+
+Each initiative owns an access context (`resourceType: "initiative"`): `workspace_standard` at view because alignment reads across spaces, the owning space's `space_standard` at edit, and the owner's own `member` group at full. The owner binding is untagged, unlike a goal's champion, because the tag column carries a fixed set of five role names and `owner_id` already names the owner. Moving ownership is a rebind, not a column write. It inherits the goal's open question with the shape: `initiatives.delete` needs `full` at the workspace and `full` on the initiative, so an initiative whose owner is suspended has nobody left who can remove it.
+
+### initiative_key_results *(built at P5-T10a)*
+`initiative_id` to initiatives, `key_result_id` to key_results. Unique on `(workspace_id, initiative_id, key_result_id)` while live, so recording the same link twice is one link; a soft-deleted link is revived rather than duplicated.
 
 ### tasks *(short_id, importable)*
 `space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb`.

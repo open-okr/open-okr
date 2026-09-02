@@ -199,6 +199,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "goal.deleted": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
   "goal.moved_to_cycle": z.object({ title: z.string() }),
+  // Initiatives (P5-T10a). The title travels for the same reason a goal's does:
+  // "deleted Rebuild the activation flow" has to keep reading as a sentence
+  // after the initiative is gone.
+  "initiative.created": z.object({ title: z.string(), spaceId: z.uuid() }),
+  "initiative.updated": z.object({ fields: z.array(z.string()) }),
+  "initiative.deleted": z.object({ title: z.string() }),
+  // The key result, because the feed entry a reader wants is "this work is now
+  // behind that number" rather than "an initiative changed".
+  "initiative.linked": z.object({ keyResultId: z.uuid() }),
+  "initiative.unlinked": z.object({ keyResultId: z.uuid() }),
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),

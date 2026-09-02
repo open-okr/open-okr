@@ -3293,6 +3293,302 @@
       "pages": false
     },
     {
+      "name": "initiatives list",
+      "action": "initiatives.list",
+      "method": "GET",
+      "path": "/initiatives/list",
+      "scope": "read",
+      "summary": "Initiatives in a space, or the ones serving one key result. Drives screen S-26.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "planned",
+            "active",
+            "done",
+            "dropped"
+          ]
+        },
+        {
+          "name": "capacity",
+          "field": "capacity",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "fits",
+            "tight",
+            "exceeds"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives read",
+      "action": "initiatives.read",
+      "method": "GET",
+      "path": "/initiatives/read",
+      "scope": "read",
+      "summary": "One initiative with the key results it serves.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives create",
+      "action": "initiatives.create",
+      "method": "POST",
+      "path": "/initiatives/create",
+      "scope": "write",
+      "summary": "Creates an initiative in a space, owned by one member.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "starts-on",
+          "field": "startsOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "ends-on",
+          "field": "endsOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "planned",
+            "active",
+            "done",
+            "dropped"
+          ]
+        },
+        {
+          "name": "confidence",
+          "field": "confidence",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "capacity",
+          "field": "capacity",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "fits",
+            "tight",
+            "exceeds"
+          ]
+        },
+        {
+          "name": "key-result-ids",
+          "field": "keyResultIds",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives update",
+      "action": "initiatives.update",
+      "method": "POST",
+      "path": "/initiatives/update",
+      "scope": "write",
+      "summary": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "description",
+          "field": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "starts-on",
+          "field": "startsOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "ends-on",
+          "field": "endsOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "planned",
+            "active",
+            "done",
+            "dropped"
+          ]
+        },
+        {
+          "name": "confidence",
+          "field": "confidence",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "capacity",
+          "field": "capacity",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives delete",
+      "action": "initiatives.delete",
+      "method": "POST",
+      "path": "/initiatives/delete",
+      "scope": "destructive",
+      "summary": "Soft-deletes an initiative and the links it held.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives linkKeyResult",
+      "action": "initiatives.linkKeyResult",
+      "method": "POST",
+      "path": "/initiatives/linkKeyResult",
+      "scope": "write",
+      "summary": "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives unlinkKeyResult",
+      "action": "initiatives.unlinkKeyResult",
+      "method": "POST",
+      "path": "/initiatives/unlinkKeyResult",
+      "scope": "write",
+      "summary": "Removes the link between an initiative and a key result.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "initiatives capacity",
+      "action": "initiatives.capacity",
+      "method": "GET",
+      "path": "/initiatives/capacity",
+      "scope": "read",
+      "summary": "One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5).",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals list",
       "action": "goals.list",
       "method": "GET",

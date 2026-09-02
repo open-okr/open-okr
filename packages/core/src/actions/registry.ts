@@ -189,6 +189,16 @@ import {
   updateKeyResult,
 } from "./goals.ts";
 import {
+  createInitiative,
+  deleteInitiative,
+  linkInitiativeKeyResult,
+  listInitiatives,
+  readCapacity,
+  readInitiative,
+  unlinkInitiativeKeyResult,
+  updateInitiative,
+} from "./initiatives.ts";
+import {
   acceptLink,
   createPersonalLink,
   createWorkspaceLink,
@@ -469,6 +479,14 @@ export const ACTION_MAP = {
   "workflow.setCapacityNotes": setCapacityNotes,
   "workflow.calibrate": calibrateCycle,
   "workflow.publish": publishCycle,
+  "initiatives.list": listInitiatives,
+  "initiatives.read": readInitiative,
+  "initiatives.create": createInitiative,
+  "initiatives.update": updateInitiative,
+  "initiatives.delete": deleteInitiative,
+  "initiatives.linkKeyResult": linkInitiativeKeyResult,
+  "initiatives.unlinkKeyResult": unlinkInitiativeKeyResult,
+  "initiatives.capacity": readCapacity,
   "goals.list": listGoals,
   "goals.read": readGoal,
   "goals.create": createGoal,

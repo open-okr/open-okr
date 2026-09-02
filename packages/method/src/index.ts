@@ -266,6 +266,7 @@ export {
   type GateResult,
   type GoalSnapshot,
   INPUT_PACK_ITEMS,
+  type InitiativeSnapshot,
   type KeyResultSnapshot,
   PHASE_TITLES,
   type PhaseResult,

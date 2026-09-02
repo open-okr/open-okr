@@ -293,6 +293,9 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   // and its callers resolve the owning goal first so the not-found answer covers
   // "no such key result" and "not yours to see" identically.
   goal: ownContextResolver("goal"),
+  // P5-T10a. An initiative owns a context so its owner can hold `full` on the
+  // work without holding it on the whole space.
+  initiative: ownContextResolver("initiative"),
   // P3-T16. Comments and reactions inherit their parent subject's context.
   comment: async (tx, subjectId, workspaceId) => {
     const [row] = await tx

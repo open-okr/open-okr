@@ -305,6 +305,14 @@ export {
   type ValueSource,
 } from "./schema/goals.ts";
 export {
+  INITIATIVE_STATUSES,
+  type Initiative,
+  type InitiativeKeyResult,
+  type InitiativeStatus,
+  initiativeKeyResults,
+  initiatives,
+} from "./schema/initiatives.ts";
+export {
   type InstanceAuditEvent,
   instanceAuditEvents,
 } from "./schema/instance-audit.ts";

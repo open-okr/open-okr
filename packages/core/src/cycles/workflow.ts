@@ -28,6 +28,8 @@ import {
   cycleRevalidations,
   cycles,
   goals,
+  initiativeKeyResults,
+  initiatives,
   keyResultDependencies,
   keyResults,
   newId,
@@ -39,6 +41,7 @@ import {
   type GateResult,
   type GoalSnapshot,
   INPUT_PACK_ITEMS,
+  type InitiativeSnapshot,
   type PhaseResult,
   phaseCompletion,
   publishGates,
@@ -233,7 +236,70 @@ export async function loadWorkflowInput<
     hasCapacityNotes: Boolean(capacity?.cuts),
     frame,
     goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
+    initiatives: await loadInitiativeSnapshots(tx, workspaceId, cycleId),
   };
+}
+
+/**
+ * The initiatives serving this cycle's key results (METHOD.md §5.5, P5-T10a).
+ *
+ * **Reached through the key results, because that is the only relationship §5.5
+ * describes.** An initiative has no cycle of its own: a project that moves a key
+ * result in this cycle is in this cycle's capacity check, and the same project
+ * moving a key result in the next one is in that check too. A `cycle_id` column
+ * would be a second answer, and the two would disagree the first time an
+ * initiative served both.
+ *
+ * An empty array is a real answer and `undefined` is not returned from here:
+ * the table exists, so gate 5 is evaluable, and a cycle with no initiatives
+ * recorded fails only on `hasCapacityNotes` as it did before.
+ */
+async function loadInitiativeSnapshots<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycleId: string,
+): Promise<InitiativeSnapshot[]> {
+  const rows = await tx
+    .selectDistinct({
+      id: initiatives.id,
+      title: initiatives.title,
+      capacity: initiatives.capacity,
+    })
+    .from(initiatives)
+    .innerJoin(
+      initiativeKeyResults,
+      and(
+        eq(initiativeKeyResults.initiativeId, initiatives.id),
+        eq(initiativeKeyResults.workspaceId, workspaceId),
+        isNull(initiativeKeyResults.deletedAt),
+      ),
+    )
+    .innerJoin(
+      keyResults,
+      and(
+        eq(keyResults.id, initiativeKeyResults.keyResultId),
+        eq(keyResults.workspaceId, workspaceId),
+        isNull(keyResults.deletedAt),
+      ),
+    )
+    .innerJoin(
+      goals,
+      and(
+        eq(goals.id, keyResults.goalId),
+        eq(goals.workspaceId, workspaceId),
+        eq(goals.cycleId, cycleId),
+        isNull(goals.deletedAt),
+      ),
+    )
+    .where(activeOnly(initiatives, eq(initiatives.workspaceId, workspaceId)));
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    capacity: row.capacity,
+  }));
 }
 
 /**
@@ -622,4 +688,37 @@ export async function readPackItems<
       note: row?.note ?? null,
     };
   });
+}
+
+/**
+ * Re-evaluates and stores one cycle's gate rows, skipping what cannot change.
+ *
+ * **Written for the callers that are not the cycle screen** (P5-T10a). An
+ * initiative's capacity verdict feeds publish gate five, so a write to an
+ * initiative has to leave the stored gates correct for every cycle that
+ * initiative serves. Those callers know an initiative, not a cycle, and they
+ * reach several cycles at once, so the load-evaluate-store sequence lives here
+ * instead of being copied per action.
+ *
+ * **A missing or closed cycle is skipped rather than refused.** The equivalent
+ * inside `actions/cycle-workflow.ts` throws, and it is right to: somebody is
+ * editing that cycle. Here the cycle is a consequence of the write rather than
+ * its subject, and refusing to link an initiative because one of the key results
+ * it serves belongs to an archived cycle would block a correct change for a
+ * reason nobody could act on.
+ */
+export async function refreshGateStateFor<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycleId: string,
+  thresholds: ResolvedThresholds,
+): Promise<void> {
+  const cycle = await loadCycleForWorkflow(tx, workspaceId, cycleId);
+  if (!cycle || cycle.status === "closed") {
+    return;
+  }
+  const snapshot = await evaluateWorkflow(tx, workspaceId, cycle, thresholds);
+  await recomputeGateState(tx, workspaceId, cycleId, snapshot.gates);
 }

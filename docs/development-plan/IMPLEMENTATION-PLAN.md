@@ -1128,14 +1128,26 @@ Acceptance: Given two workspaces with similar goals, when an agent in one search
 
 **Corrected while doing the work.** Two lines above turned out to describe things that were not there. The design named `search` as "P5-T13's own read with a tool wrapper", and P5-T13 is later in this plan and its index table is written by nothing, so the read did not exist; the tool stands on P4-T13's retrieval instead, and the P5-T13 row now says so. The test plan asked one live run to carry both claims, and the end-to-end harness registers one instance account, so the cross-tenant claim is proved against a real database in `packages/core/test/mcp-research.test.ts` and the transport claims stay in `e2e/s41-mcp-transport.spec.ts`. Agung chose both on 2 September 2026. A task whose test plan names a place its harness cannot reach is a Definition of Ready gap, and the next reader should meet the corrected row.
 
-### P5-T10: Initiatives [M]
+### P5-T10a: Initiatives: the data, the link and gate five [M]
 Depends on: P5-T00, P3-T04
-Goal: the work that moves a key result (screen S-26).
-Deliverables: initiatives with owner, dates, status, confidence and capacity verdict; the many-to-many link to key results; the list and detail surfaces; the capacity view feeding the cycle's align-and-commit capacity check (METHOD.md §5.5) and its publish gate, beside the per-key-result verdicts from P3-T04.
+Goal: the work that moves a key result, as rows and rules (METHOD.md §5.5).
+
+**Cut out of P5-T10 before any code.** The original row held a schema with its access model, eight registry actions, a change to a publish gate in `packages/method`, and two screens. That is two working sessions, and the seam is obvious: everything below the interface can be finished and proved on its own, and the screens then have something real to draw. The acceptance criterion belongs to this half, because it is about a gate rather than a surface.
+
+Deliverables: `initiatives` and `initiative_key_results` with their row-level security policies and the §7.2 mapping rows; the access context an initiative owns, with the owner rebound rather than the column rewritten; the eight registry actions (list, read, create, update, delete, link, unlink, capacity); `InitiativeSnapshot` and gate five in `packages/method` reading an initiative's verdict beside the per-key-result ones from P3-T04, unevaluable without the register; the loader supplying it, and the stored gate rows recomputed inside the transaction of any write that could move them.
+Test plan: an initiative marked `done` moves no key result's measured value or progress; the same link recorded twice is one link and a removed one revives rather than duplicates; an initiative serving no key result in the cycle is not in its gate; unlinking and deleting both take it back out; the owner holds `full` on that one context and nowhere else.
 Acceptance: Given an initiative linked to two key results and marked as exceeding capacity, when the cycle's gates are evaluated, then gate five is red and links to that initiative.
 
+### P5-T10b: Initiatives: the list and the detail panel [M]
+Depends on: P5-T10a
+Goal: screen S-26, and the capacity view the align-and-commit session reads.
+Reference: UIUX-PLAN.md §6 S-26.
+Deliverables: the initiative list per space and per key result with title, owner, dates, status, confidence, capacity verdict and linked key results, filterable the way `initiatives.list` already answers; inline editing; the detail panel with description, linked key results, and the places tasks and documents will attach at P5-T11 and P5-T12; the capacity view on the cycle's align-and-commit phase, showing every key result's verdict beside the initiatives behind it and linking a red gate five to what made it red.
+Test plan: the loading, empty, error and permission-denied states are all reachable; a member who cannot see an initiative never sees its row; the UIUX-PLAN §9 quality gates pass.
+Acceptance: Given a cycle whose gate five is red because of an initiative, when a facilitator opens the capacity view, then the initiative is named and one click reaches it.
+
 ### P5-T11: Tasks and the OKR board [L]
-Depends on: P5-T10
+Depends on: P5-T10a
 Goal: the board keyed to key results (screens S-27, S-28).
 Deliverables: tasks with status, due date, description and checklist; multiple assignees where assignment grants edit access and notifies; the key result and initiative links; the board across a space, an initiative or a key result with drag, optimistic updates, live presence and concurrency-safe ordering normalised against deleted and completed items; the objective and key result rail with progress derived from linked completed tasks shown as a separate signal beside measured progress; the task detail page; review-inbox coverage for tasks due.
 Test plan: two simultaneous reorders converge with no lost or duplicated cards; the derived linked-work signal never overwrites the measured key result value; assignment notifies everyone except the actor.
@@ -1337,7 +1349,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (32: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **123 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (33: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **124 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

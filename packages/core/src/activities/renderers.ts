@@ -170,6 +170,17 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `The goal's ${asString(p.role, "role")} was reassigned`,
   "goal.moved_to_cycle": (p) =>
     `Goal "${asString(p.title, "a goal")}" was moved to another cycle`,
+  // Initiatives (P5-T10a). "Work" rather than "an initiative" where the title
+  // is missing, because a feed line has to read as a sentence either way.
+  "initiative.created": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was created`,
+  "initiative.updated": () => "An initiative was edited",
+  "initiative.deleted": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was removed`,
+  "initiative.linked": () =>
+    "An initiative was recorded as work that will move a key result",
+  "initiative.unlinked": () =>
+    "An initiative is no longer recorded against a key result",
   "key_result.created": (p) =>
     `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",

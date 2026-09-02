@@ -2,8 +2,8 @@
 
 Part three of the Phase 5 design gate. Authority: TECHNICAL-PLAN.md §4.9,
 METHOD.md §5.5, UIUX-PLAN.md screens S-26 to S-29, S-32 and S-01. Implemented
-at P5-T10 (initiatives), P5-T11 (tasks and the board), P5-T12 (documents and
-attachments), P5-T13 (search, palette and exports).
+at P5-T10a and P5-T10b (initiatives), P5-T11 (tasks and the board), P5-T12
+(documents and attachments), P5-T13 (search, palette and exports).
 
 ## 0. What already exists
 
@@ -53,19 +53,41 @@ value has not moved,
 **then** it reports precisely that, naming both figures, and the key result's
 progress is still the measured one.
 
-## 2. Initiatives (P5-T10)
+## 2. Initiatives (P5-T10a for the data and the gate, P5-T10b for the screens)
 
 ### 2.1 Tables
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity` (`fits` / `tight` / `exceeds`), `progress_pct` | Importable, so `legacy_type` and `legacy_id` with the usual unique index |
+| `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct`, `position` | Importable, so `legacy_type` and `legacy_id` with the usual unique index |
 | `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many. Unique on the pair |
 
 `progress_pct` is derived from the initiative's own tasks, not from the key
 results it serves. An initiative is a piece of work and its progress is how much
 of that work is done; that is a different question from whether the measure
 moved.
+
+**Three things this table settled at P5-T10a, written down because they are not
+obvious from the row above.**
+
+`capacity` is nullable, and null is not `fits`. Null means nobody has judged the
+initiative, which is exactly the state §5.5 exists to end, and gate five must not
+read the two alike.
+
+There is no `cycle_id`. An initiative reaches a cycle through the key results it
+serves, which is the only relationship §5.5 describes. A column would be a second
+answer, and the two would disagree the first time one initiative served key
+results in two cycles at once.
+
+An initiative owns an access context rather than inheriting its space's:
+`workspace_standard` at view because alignment reads across spaces,
+`space_standard` at edit, and the owner's own group at `full`. Inheriting would
+make the owner binding impossible to express without handing them the whole
+space, and it gives §3.3's assignment somewhere to bind. The binding is untagged,
+because the tag column carries a fixed set of five role names and `owner_id`
+already names the owner. It inherits the goal's open question with the shape: a
+delete needs `full` at the workspace and `full` on the initiative, so an
+initiative whose owner is suspended has nobody left who can remove it.
 
 ### 2.2 Capacity, and the one place initiatives reach into the method
 

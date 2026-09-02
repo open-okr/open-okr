@@ -183,8 +183,8 @@ All keyed on a `session` of kind `quarterly`.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity` (`fits` / `tight` / `exceeds`), `progress_pct` | Importable. The work that moves a key result |
-| `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many |
+| `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct`, `position` | Importable. The work that moves a key result. It owns an access context: `workspace_standard` at view, the owning space at edit, the owner at full. `capacity` is nullable and null means nobody has judged it, which publish gate 5 reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks and no input schema accepts one. No `cycle_id`: an initiative reaches a cycle through the key results it serves, and a column would be a second answer that disagrees the first time one serves two cycles |
+| `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many. Unique on the pair while live, so recording the same link twice is one link rather than two |
 | `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable |
 | `task_assignees` | `task_id`, `member_id` | Multiple assignees. Assignment grants edit access through the member's group |
 | `checklist_items` | `task_id`, `title`, `done`, `position` | |
@@ -402,7 +402,8 @@ Keep current in every schema change.
 | `kpi_trees` | No legacy source | FlowyTeam has no named driver tree. An import leaves every KPI's `tree_id` null, and the trees are named afterwards; guessing a tree from the parent chain would name something nobody chose |
 | `kpi_dependencies` and `kpis.formula` | Indicator calculations and their token strings | Tokens translated into the expression tree. Unparseable formulas are dropped and logged |
 | `kpi_shares` | Indicator accesses | View scope becomes bindings or shares |
-| `initiatives` | Projects | Status mapped, owner becomes the initiative owner |
+| `initiatives` | Projects | Status mapped, owner becomes the initiative owner. `capacity` arrives null, because METHOD.md §5.5's verdict is a judgement a room makes and no source system holds one. `progress_pct` is recomputed from the imported tasks, never carried |
+| `initiative_key_results` | Project links to key results | One row per pair. A link to a key result that did not import is dropped and recorded in the report rather than invented |
 | `tasks`, `task_assignees`, `checklist_items` | Tasks, sub-tasks and task accesses | Status from the board column slug. Key result links preserved. Dependencies recorded in the report |
 | `comments`, `blobs`, `attachments` | Task comments and files | HTML converted to editor JSON. External file URLs become links in the body |
 | `learnings`, `decisions` | Where the source holds them | Otherwise created empty |
