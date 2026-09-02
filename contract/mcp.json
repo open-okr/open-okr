@@ -9638,6 +9638,72 @@
       "example": {
         "cycleId": "00000000-0000-4000-8000-000000000000"
       }
+    },
+    {
+      "name": "search",
+      "description": "Searches everything in this workspace the caller may read. Each result carries an address that fetch resolves.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "entityTypes": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "query": "…"
+      }
+    },
+    {
+      "name": "fetch",
+      "description": "Reads one OpenOKR address as structured content with a citation. Takes a browser path, an absolute instance URL, or an openokr:// address.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "url": "…"
+      }
     }
   ],
   "resources": [

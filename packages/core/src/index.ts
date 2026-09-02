@@ -214,6 +214,7 @@ export {
   type McpPrompt,
   type McpResource,
   type McpTool,
+  RESEARCH_TOOLS,
   toolNamed,
 } from "./api/mcp/catalogue.ts";
 export {
@@ -223,6 +224,20 @@ export {
   dispatchTool,
   matchTemplate,
 } from "./api/mcp/dispatch.ts";
+export {
+  canonicalAddress,
+  type FetchResult,
+  isResearchTool,
+  parseAddress,
+  RESEARCH_TOOL_SPECS,
+  type ResearchCaller,
+  type ResearchToolSpec,
+  type ResolvedAddress,
+  runFetch,
+  runResearchTool,
+  runSearch,
+  type SearchResult,
+} from "./api/mcp/research.ts";
 export {
   closeSession,
   closeSessionFor,

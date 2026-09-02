@@ -193,14 +193,37 @@ becoming something an agent may call without write scope.
 | `search` | A global, permission-filtered search across everything. It is one tool rather than fifteen list tools, because that is how research connectors expect to work |
 | `fetch` | Turns a canonical OpenOKR URL into structured content with a citation. Same access filter as any read |
 
-Both go through the same access layer as everything else. `search` is P5-T13's
-own read with a tool wrapper, and `fetch` resolves a URL to the action that
-would have served that page.
+Both go through the same access layer as everything else. `fetch` resolves a URL
+to the action that would have served that page.
+
+**Corrected at P5-T09c, 2 September 2026.** This section said `search` was
+P5-T13's own read with a tool wrapper. P5-T13 had not been built and its index
+table, `search_documents`, is written by nothing, so the sentence described a
+read that did not exist. What does exist is P4-T13's retrieval, which ranks in
+Postgres and then puts every candidate to `getAccessScoped` before keeping it.
+`search` stands on that. P5-T13's palette uses the same read rather than
+building a second one. Agung chose it on 2 September 2026.
+
+| | `search` | `fetch` |
+|---|---|---|
+| Backing | `EmbeddingService.retrieve` | The page's own read action, or `mayRead` plus the embedded reader for content with no page |
+| Reaches | Every embeddable content type: goal, key result, check-in, blocker, comment, learning, retro note, review narrative, kudos, next-cycle draft | Those, plus goal, KPI, space and session pages |
+| Ranking | Postgres full text. No embedding function is passed, so the tool answers with the AI provider off | Not ranked |
+| Addresses | Hands back an address `fetch` resolves | Takes a browser path, an absolute instance URL, or `openokr://<type>/<id>` |
+
+A refusal about an address gives one sentence whatever the reason. A goal in
+somebody else's workspace and a goal that never existed read alike, because the
+difference between them is a fact about a workspace the caller cannot see.
 
 **Given** an external agent holding read scope,
 **when** it calls a write tool,
 **then** the permission layer denies it, the denial is audited, and the agent
 receives a clear error rather than a partial result.
+
+**Given** two workspaces holding goals worded alike,
+**when** an agent in one searches for the other's wording,
+**then** no identifier, title or excerpt from the other workspace appears in the
+answer.
 
 ### 5.4 What the live test proves
 
@@ -213,6 +236,15 @@ transport stack end to end and asserts two things:
 2. No cross-tenant data appears in any result, checked by running two
    workspaces and asserting the second's identifiers never appear in the
    first's responses.
+
+**Where each of the two lives, decided at P5-T09c.** The first is in
+`e2e/s41-mcp-transport.spec.ts`, over the real transport, because only a
+transport can prove that a denial arrives as a tool result an agent can read
+rather than as a fault it would retry. The second is in
+`packages/core/test/mcp-research.test.ts`, against a real database, because the
+end-to-end harness registers one instance account and a second workspace there
+would be setup written for a single assertion. Splitting them is a deviation
+from P5-T09c's own test-plan line, and Agung chose it on 2 September 2026.
 
 ## 6. Sequencing
 

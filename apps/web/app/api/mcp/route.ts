@@ -183,6 +183,9 @@ async function answer(request: NextRequest): Promise<Response> {
     workspaceId: resolved.workspaceId,
     userId: resolved.userId,
     scopes: resolved.scopes,
+    // Only the transport knows which instance it is serving, and a citation
+    // worth quoting is one a person can open (P5-T09c).
+    instanceUrl: issuer,
   };
   const ring = getKeyRing();
 

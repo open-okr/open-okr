@@ -265,6 +265,60 @@ test("lists the resources and the prompts it offers", async () => {
   expect(listed.map((one) => one.name)).toContain("what-do-i-owe");
 });
 
+test("offers the two research tools, both marked as reads", async () => {
+  // P5-T09c. They are the only tools in the catalogue that are not registry
+  // actions, so a client that sees them here has seen the whole surface.
+  const body = await bodyOf(await rpc("tools/list"));
+  const tools = (body.result as { tools: Record<string, unknown>[] }).tools;
+
+  for (const name of ["search", "fetch"]) {
+    const tool = tools.find((candidate) => candidate.name === name);
+    expect(tool, name).toBeDefined();
+    const hints = tool?.annotations as Record<string, boolean>;
+    expect(hints.readOnlyHint, name).toBe(true);
+    expect(hints.destructiveHint, name).toBe(false);
+  }
+});
+
+test("search answers a read-scoped agent with a result envelope", async () => {
+  const body = await bodyOf(
+    await rpc("tools/call", {
+      name: "search",
+      arguments: { query: "activation" },
+    }),
+  );
+  const result = body.result as {
+    isError?: boolean;
+    content: { text: string }[];
+  };
+
+  expect(result.isError ?? false).toBe(false);
+  // What it found depends on what this instance holds; what it must always be
+  // is an envelope an agent can read. Which rows are permitted is proved
+  // against two workspaces in `packages/core/test/mcp-research.test.ts`.
+  const answer = JSON.parse(result.content[0]?.text ?? "null") as {
+    results: unknown[];
+  };
+  expect(Array.isArray(answer.results)).toBe(true);
+});
+
+test("fetch answers an address this instance does not hold with not-found", async () => {
+  const response = await rpc("tools/call", {
+    name: "fetch",
+    arguments: { url: "/goals/00000000-0000-4000-8000-000000000000" },
+  });
+
+  // A refusal rather than a transport fault, so an agent reports it instead of
+  // retrying it.
+  expect(response.status()).toBe(200);
+  const result = (await bodyOf(response)).result as {
+    isError: boolean;
+    content: { text: string }[];
+  };
+  expect(result.isError).toBe(true);
+  expect(result.content[0]?.text).toContain("No such goal");
+});
+
 test("the session was recorded against the grant, and appears as connected", async () => {
   await goTo(page, "/account/connections");
   const connection = page.getByTestId("connection").first();

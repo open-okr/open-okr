@@ -1126,6 +1126,8 @@ Deliverables: the global `search` tool, permission-filtered through the same acc
 Test plan: a live end-to-end run over the real transport asserting that an under-privileged call is denied and no cross-tenant data appears in any result; a search by a member who cannot see a goal never returns it; a fetch of a URL in another workspace answers not-found.
 Acceptance: Given two workspaces with similar goals, when an agent in one searches for the other's wording, then nothing from the other workspace appears in any result.
 
+**Corrected while doing the work.** Two lines above turned out to describe things that were not there. The design named `search` as "P5-T13's own read with a tool wrapper", and P5-T13 is later in this plan and its index table is written by nothing, so the read did not exist; the tool stands on P4-T13's retrieval instead, and the P5-T13 row now says so. The test plan asked one live run to carry both claims, and the end-to-end harness registers one instance account, so the cross-tenant claim is proved against a real database in `packages/core/test/mcp-research.test.ts` and the transport claims stay in `e2e/s41-mcp-transport.spec.ts`. Agung chose both on 2 September 2026. A task whose test plan names a place its harness cannot reach is a Definition of Ready gap, and the next reader should meet the corrected row.
+
 ### P5-T10: Initiatives [M]
 Depends on: P5-T00, P3-T04
 Goal: the work that moves a key result (screen S-26).
@@ -1150,6 +1152,8 @@ Acceptance: Given a document drafted on a goal and then published, when a space 
 Depends on: P5-T12, P4-T13b
 Goal: finding and extracting (screens S-32, S-01).
 Deliverables: the search document table with full-text indexing driven from the outbox across goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions, with semantic results blended when available; access-filtered queries; the search page and the command palette with entity jump, actions and recents; Work Map rows for initiatives and tasks; CSV and XLSX export of any list, run asynchronously for large sets and audited.
+
+**The read this task widens already exists (added at P5-T09c).** `search_documents` is written by nothing today, and P5-T09c needed a search before this row was built, so the agent tool stands on P4-T13's access-filtered retrieval over `embeddings`. This task extends that one read to the types retrieval does not reach, rather than building a second one: the palette and the `search` tool answer from the same function, filtered by the same `getAccessScoped` call. A second query path here would be a second answer about who can see what.
 Test plan: a term inside a private space's document returns nothing for a non-member and a highlighted result for a member; an export matches the visible rows and columns exactly.
 Acceptance: Given any screen, when the palette is opened and a short identifier typed, then the entity opens inside the budget.
 

@@ -8,8 +8,10 @@ import {
   MCP_RESOURCES,
   MCP_TOOLS,
   type McpCatalogue,
+  RESEARCH_TOOLS,
   toolNamed,
 } from "../src/api/mcp/catalogue.ts";
+import { isResearchTool } from "../src/api/mcp/research.ts";
 import { REST_ROUTES } from "../src/api/surface.ts";
 
 /**
@@ -23,18 +25,50 @@ import { REST_ROUTES } from "../src/api/surface.ts";
  */
 
 describe("every tool is an action, and every action is a tool", () => {
-  it("names an action the registry defines", () => {
+  it("names an action the registry defines, or is one of the two that cannot", () => {
     for (const tool of MCP_TOOLS) {
+      if (isResearchTool(tool.name)) {
+        continue;
+      }
       expect(tool.name in ACTION_MAP, tool.name).toBe(true);
     }
+  });
+
+  it("names exactly two tools that are not registry actions", () => {
+    // Pinned rather than counted loosely: `search` and `fetch` are the
+    // exception design §5.3 grants, and a third tool escaping the registry is
+    // a surface nobody generated. The list is the whole assertion.
+    expect(RESEARCH_TOOLS.map((tool) => tool.name)).toEqual([
+      "search",
+      "fetch",
+    ]);
+    expect(MCP_TOOLS.filter((tool) => isResearchTool(tool.name))).toHaveLength(
+      2,
+    );
   });
 
   it("offers every action the REST surface offers", () => {
     // One projection cannot quietly hold back what another exposes: an agent
     // and a REST client reach the same product.
-    expect(MCP_TOOLS.map((tool) => tool.name).sort()).toEqual(
-      REST_ROUTES.map((route) => route.action).sort(),
-    );
+    expect(
+      MCP_TOOLS.filter((tool) => !isResearchTool(tool.name))
+        .map((tool) => tool.name)
+        .sort(),
+    ).toEqual(REST_ROUTES.map((route) => route.action).sort());
+  });
+
+  it("marks both research tools as reads that no grant may widen", () => {
+    // The scope is enforcement and the hints are what a client shows somebody
+    // before it approves a call. A research tool that lost either would be a
+    // read surface a write-scoped agent could be told was harmless.
+    for (const tool of RESEARCH_TOOLS) {
+      expect(tool.scope, tool.name).toBe("read");
+      expect(tool.annotations, tool.name).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+    }
   });
 
   it("finds a tool by name, and nothing by a name it does not have", () => {
@@ -55,6 +89,9 @@ describe("the safety classification, which is what this test exists for", () => 
       REST_ROUTES.map((route) => [route.action, route.scope]),
     );
     for (const tool of MCP_TOOLS) {
+      if (isResearchTool(tool.name)) {
+        continue;
+      }
       expect(tool.scope, tool.name).toBe(declared.get(tool.name));
     }
   });

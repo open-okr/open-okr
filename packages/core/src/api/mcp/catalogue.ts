@@ -24,6 +24,7 @@
 import { type ZodType, z } from "zod";
 import type { JsonObject } from "../openapi.ts";
 import { REST_ROUTES, type RestRoute } from "../surface.ts";
+import { RESEARCH_TOOL_SPECS, type ResearchToolSpec } from "./research.ts";
 
 /** The catalogue's own version, bumped when its shape changes. */
 export const CATALOGUE_VERSION = 1;
@@ -262,8 +263,44 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
   },
 ];
 
-/** Every tool, in registry order, so the artifact has a stable shape. */
-export const MCP_TOOLS: readonly McpTool[] = REST_ROUTES.map(toolFor);
+/**
+ * The two tools that are not registry actions (P5-T09c).
+ *
+ * Converted here rather than declared here: `research.ts` owns what they are and
+ * this owns how a tool is built, so a research tool and a registry tool cannot
+ * come to carry different fields. Their safety class is fixed rather than read
+ * from a route, because neither has a route: both are reads and both say so.
+ */
+function researchToolFor(spec: ResearchToolSpec): McpTool {
+  const schema = jsonSchema(spec.input);
+  return {
+    name: spec.name,
+    description: spec.description,
+    inputSchema: schema,
+    scope: spec.scope,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    },
+    example: exampleFor(schema),
+  };
+}
+
+export const RESEARCH_TOOLS: readonly McpTool[] =
+  RESEARCH_TOOL_SPECS.map(researchToolFor);
+
+/**
+ * Every tool: the registry in its own order, then the two research tools.
+ *
+ * Appended rather than interleaved so that adding them moved no existing entry
+ * in `contract/mcp.json`, and the drift gate's first report of this change named
+ * exactly two additions.
+ */
+export const MCP_TOOLS: readonly McpTool[] = [
+  ...REST_ROUTES.map(toolFor),
+  ...RESEARCH_TOOLS,
+];
 
 export function buildCatalogue(): McpCatalogue {
   return {

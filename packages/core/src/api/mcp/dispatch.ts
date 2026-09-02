@@ -23,12 +23,20 @@ import { type ActionName, callAction } from "../../actions/registry.ts";
 import { OperationError } from "../../operations/errors.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
 import { toolNamed } from "./catalogue.ts";
+import { isResearchTool, runResearchTool } from "./research.ts";
 
 export interface DispatchPrincipal {
   readonly workspaceId: string;
   readonly userId: string;
   /** What the grant carries. A tool needing more than this is refused here. */
   readonly scopes: readonly string[];
+  /**
+   * The instance's own base URL, when the transport knows it (P5-T09c).
+   *
+   * Only `fetch` and `search` read it, and only to build a citation somebody can
+   * open. Absent is correct and the address falls back to the `openokr://` form.
+   */
+  readonly instanceUrl?: string;
 }
 
 export interface DispatchResult {
@@ -65,6 +73,26 @@ export async function dispatchTool(
   }
 
   try {
+    // The two tools that are not registry actions run here, after the same
+    // scope gate and inside the same catch, so a refusal from either reads the
+    // way a refusal from any other tool reads.
+    if (isResearchTool(tool.name)) {
+      const answer = await runResearchTool(
+        pool,
+        {
+          workspaceId: principal.workspaceId,
+          userId: principal.userId,
+          ...(principal.instanceUrl
+            ? { instanceUrl: principal.instanceUrl }
+            : {}),
+          ...(ring ? { ring } : {}),
+        },
+        tool.name,
+        input,
+      );
+      return { text: JSON.stringify(answer ?? null), isError: false };
+    }
+
     const result = await callAction(
       {
         pool,
