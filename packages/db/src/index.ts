@@ -459,6 +459,10 @@ export {
   scoreEntries,
 } from "./schema/scorecard.ts";
 export {
+  type SearchDocumentRow,
+  searchDocuments,
+} from "./schema/search.ts";
+export {
   type SessionConfidence,
   sessionConfidences,
 } from "./schema/session-confidences.ts";

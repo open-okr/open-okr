@@ -7,6 +7,8 @@ import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
+import { exportListAction } from "../search/actions.ts";
+import { ExportButton } from "../search/export-button.tsx";
 import { GoalTable } from "../work-map.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
@@ -179,6 +181,13 @@ export default async function GoalsPage({
                 </span>
               </a>
             ) : null}
+            {/*
+             * Taking the list away, beside the thing it is a list of (P5-T13).
+             * The file matches the rows and columns on screen, and every export
+             * writes an audit row: it is the one action that takes data out of
+             * the product.
+             */}
+            <ExportButton onExport={exportListAction.bind(null, "goals")} />
           </CardHeader>
           <CardBody className="flex flex-col gap-2.5">
             <Filters

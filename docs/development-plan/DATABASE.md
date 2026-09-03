@@ -44,7 +44,7 @@ Additional conventions:
 |---|---|---|---|
 | `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?`, `dead_lettered_at?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete. `dead_lettered_at` (P2-T06, closing a P1-hardening follow-up) is set once a row reaches `maxAttempts`: before it existed, a row that could never succeed retried on the lease interval forever, invisible to anyone, because nothing read `last_error` and `attempts` had no ceiling. `OutboxRelay.listDeadLettered()` is the visibility this was missing |
 | `cache_entries` | `key` primary key, `value jsonb`, `expires_at?` | Not tenant scoped | The Postgres cache driver's storage. Callers namespace keys with the workspace id. Reads filter on expiry, so a missed sweep cannot serve stale data |
-| `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. Queries return identifiers and a rank; the caller reloads each hit through the access getter |
+| `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, `context_id?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. `context_id` arrived at P5-T13 and is what lets a query filter in SQL rather than fetching and discarding: a null context is invisible to everybody |
 
 ## 2. Domains
 
@@ -734,6 +734,17 @@ belongs to.
 
 **Cascade on the grant.** A session under a grant that has gone is a session for
 nothing, so revoking a connection takes its sessions with it.
+
+### search_documents *(built at P2 as an empty table, filled at P5-T13)*
+`entity_type`, `entity_id`, `title`, `body`, `context_id` to access_contexts, `document tsvector` (generated: title at weight A, body at weight B), `updated_at`. Unique on `(workspace_id, entity_type, entity_id)`.
+
+**openokr:hard-delete**: a projection, not a record. When a source row is soft-deleted its projection is removed outright, because a surviving entry would leak a deleted title into somebody's results.
+
+Written by an outbox-driven worker on the `content.index` topic, enqueued by the Operation pipeline beside the `content.embed` row: the same write feeds both indexes, so they cannot come to disagree about what exists. The sets differ because the questions differ, and retrieval wants prose while search wants anything somebody might type the name of. Nine types are indexed: goal, key result, KPI, initiative, task, document, comment, check-in and session.
+
+`context_id` arrived at migration 0067 and is what lets a query filter in SQL through the same `EXISTS` clause every list read composes, rather than fetching rows and discarding them the way retrieval over `embeddings` does. A null context is invisible to everybody, which is the safe direction for a mistake to fall; a row whose context cannot be resolved is removed rather than written contextless.
+
+**An unpublished document is never indexed at all.** The index has one context per row and no notion of an author, so a draft in it would be findable by everybody who can read its subject: exactly the leak the draft rule exists to stop. The same applies to a draft check-in.
 
 ## 16. Import, export and tenancy (domain M)
 

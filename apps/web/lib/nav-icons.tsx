@@ -10,6 +10,7 @@ import {
   Layers,
   MessageSquare,
   RefreshCw,
+  Search,
   Shield,
   Target,
   Trophy,
@@ -43,6 +44,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   initiatives: <Hammer className="size-full" />,
   // Four columns, which is what a board is (P5-T11).
   board: <Columns3 className="size-full" />,
+  search: <Search className="size-full" />,
   scorecard: <Trophy className="size-full" />,
   "check-in": <CheckCircle2 className="size-full" />,
   sessions: <CalendarDays className="size-full" />,

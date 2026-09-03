@@ -174,6 +174,7 @@ import {
   readDocumentDifference,
   updateDocument,
 } from "./documents.ts";
+import { exportList } from "./exports.ts";
 import { parseListFilter } from "./filter-assist.ts";
 import {
   draftObjective,
@@ -263,6 +264,7 @@ import {
   proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
+import { readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
   addReviewAction,
@@ -516,6 +518,9 @@ export const ACTION_MAP = {
   "attachments.list": listAttachments,
   "attachments.attach": attachFile,
   "attachments.detach": detachFile,
+  "search.query": runSearch,
+  "search.jump": readPaletteJump,
+  "exports.list": exportList,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

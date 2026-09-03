@@ -9,18 +9,22 @@
  * that has to know which action served which page. Design
  * p5-t00-agent-surface-design.md §5.3 names them as the exception.
  *
- * **Neither is a second read path.** `search` is the retrieval P4-T13 already
- * built, which filters every candidate through `getAccessScoped` at read time.
+ * **Neither is a second read path.** `search` is the one index read every
+ * surface asks: the search page, the command palette and this tool all answer
+ * from `searchWorkspace`, filtered in SQL by the access context on each row.
  * `fetch` runs the read action that would have served the page, so `can()`
  * decides exactly as it does for a click; for the content types with no page of
  * their own it asks `mayRead`, the same function the copilot's citations ask.
  * Nothing here resolves access on its own.
  *
- * **Retrieval takes the full-text path here, deliberately.** No embedding
- * function is passed, so ranking is Postgres full text and the tool answers with
- * the AI provider off, which is what "deterministic first" means for a read. The
- * copilot's own route does the same today. A provider would widen the ranking
- * and would not widen what anybody is permitted to see.
+ * **The full-text path, deliberately.** No embedding function is passed, so
+ * ranking is Postgres full text and the tool answers with the AI provider off,
+ * which is what "deterministic first" means for a read. A provider would widen
+ * the ranking and would not widen what anybody is permitted to see.
+ *
+ * At P5-T09c this stood on P4-T13's retrieval over `embeddings`, because the
+ * search index was written by nothing. P5-T13 filled it, so the promise made on
+ * that row is kept here: the tool and the palette answer from one function.
  *
  * **A refusal about an address says the same thing whatever the reason.** A goal
  * in somebody else's workspace and a goal that never existed answer with one
@@ -35,13 +39,13 @@ import { askingMemberId } from "../../actions/copilot.ts";
 import { type ActionName, callAction } from "../../actions/registry.ts";
 import { citationLabel } from "../../copilot/citations.ts";
 import { mayRead } from "../../embeddings/governing.ts";
-import { EmbeddingService } from "../../embeddings/service.ts";
 import {
   embeddableTextInTx,
   isEmbeddableType,
 } from "../../embeddings/subjects.ts";
 import { OperationError } from "../../operations/errors.ts";
 import type { OperationTx } from "../../operations/operation.ts";
+import { searchWorkspace } from "../../search/service.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
 import { withoutTrailingSlashes } from "../../urls.ts";
 
@@ -276,9 +280,8 @@ export interface FetchResult {
  * Everything the caller may read that matches, most relevant first.
  *
  * The filtering is `EmbeddingService.retrieve`'s, unchanged: candidates are
- * ranked in Postgres and then each one is put to `getAccessScoped` before it is
- * kept. A member who loses access to a space stops seeing its content on the
- * next query, with no reindex.
+ * filtered in SQL by the access context on each row. A member who loses access
+ * to a space stops seeing its content on the next query, with no reindex.
  */
 export async function runSearch(
   pool: Pool,
@@ -288,11 +291,10 @@ export async function runSearch(
   const parsed = SEARCH_INPUT.parse(input);
   const memberId = await callerMemberId(pool, caller);
 
-  const service = new EmbeddingService(pool, null);
-  const hits = await service.retrieve({
+  const hits = await searchWorkspace(pool, {
     workspaceId: caller.workspaceId,
     memberId,
-    query: parsed.query,
+    text: parsed.query,
     ...(parsed.entityTypes ? { entityTypes: parsed.entityTypes } : {}),
     limit: parsed.limit ?? DEFAULT_SEARCH_LIMIT,
   });
@@ -301,10 +303,12 @@ export async function runSearch(
     results: hits.map((hit) => ({
       id: hit.entityId,
       entityType: hit.entityType,
-      title: citationLabel(hit.content),
+      title: hit.title,
       url: canonicalAddress(hit.entityType, hit.entityId, caller.instanceUrl),
-      excerpt: excerpt(hit.content),
-      score: hit.score,
+      // The index's own snippet, with the emphasis markers stripped: an agent
+      // wants the words, and `<b>` around them is a decision for a screen.
+      excerpt: excerpt(hit.snippet.replaceAll(/<\/?b>/g, "")),
+      score: hit.rank,
     })),
   };
 }

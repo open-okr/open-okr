@@ -1181,6 +1181,18 @@ Deliverables: the search document table with full-text indexing driven from the 
 Test plan: a term inside a private space's document returns nothing for a non-member and a highlighted result for a member; an export matches the visible rows and columns exactly.
 Acceptance: Given any screen, when the palette is opened and a short identifier typed, then the entity opens inside the budget.
 
+**Two lines of this row were corrected while doing the work (3 September 2026).** XLSX is not here: Agung approved `exceljs`, and this repository's own licence gate refused its tree (`buffers@0.1.1` has an unknown licence, and AGPL-3.0 cannot distribute what nobody can name). They chose to ship CSV and make the spreadsheet its own row, which is P5-T15 below. And the entity jump reaches a KPI and nothing else, because `kpis.short_id` is the only short identifier this product has: goals, initiatives and tasks carry none, and inventing an allocation scheme for three tables is a decision this row does not own. The palette falls back to the phrase search, which is what somebody typing a goal's name wanted.
+
+### P5-T15: The spreadsheet export [S]
+Depends on: P5-T13
+Goal: a list as a workbook, and the large-export path that delivers one.
+
+**Cut out of P5-T13 because it is a dependency question, not an export question.** `exceljs` was approved on 3 September 2026 and refused the same day by `pnpm check:licences`: its tree pulls `unzipper`, which pulls `buffers@0.1.1` (licence unknown), `chainsaw@0.1.0` and `traverse@0.3.9` (`MIT/X11`, an old spelling not on the allow list). AGPL-3.0 cannot distribute a package nobody can name a licence for, and the gate's own message says to ask before widening the list. Agung chose CSV first.
+
+Deliverables: an XLSX writer whose dependency tree passes `pnpm check:licences` unchanged, or a decision to widen the allow list with the reasoning written down; the `export.requested` outbox handler, which acknowledges today, building a file and delivering it; the file offered through the storage port rather than held in a response.
+Test plan: a workbook opens in a spreadsheet with the same rows and columns as the CSV; the licence gate passes with no entry added to its list, or the entry added is justified in the change; an export above the inline limit arrives without the request waiting for it.
+Acceptance: Given a list larger than the inline limit, when a member exports it, then they are told it is being prepared and the file reaches them without the request having waited.
+
 **Phase 5 exit:** all four chat providers deliver and accept commands with one generated command surface; the coach reaches members where they are and respects quiet hours; the public REST surface, OpenAPI and the command line are generated with drift checked; the external agent surface works end to end over the real transport with authorisation proven by machine; initiatives, tasks and the board are joined to key results; documents, search, the palette and exports are live.
 
 ---
@@ -1361,7 +1373,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T14 (34: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **125 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T15 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **126 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

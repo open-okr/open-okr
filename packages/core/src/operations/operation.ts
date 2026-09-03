@@ -55,6 +55,7 @@ import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import { INDEX_TOPIC, isIndexableSubject } from "../search/subjects.ts";
 import { OperationError } from "./errors.ts";
 import { isRecoveryAction } from "./freeze.ts";
 
@@ -501,6 +502,39 @@ export async function runOperation<TResult, TLoaded = undefined>(
             entityId: embedTarget.entityId,
           },
           idempotencyKey: `${EMBED_TOPIC}:${embedTarget.entityType}:${embedTarget.entityId}:${Date.now()}:${randomUUID()}`,
+        });
+      }
+
+      /**
+       * 9. The search indexing job, beside the embedding one (P5-T13).
+       *
+       * The same trigger and the same shape, from the same place, so the two
+       * indexes are refreshed by the same write and cannot come to disagree
+       * about what exists. The sets differ because the questions differ: a KPI,
+       * an initiative, a task and a session are searchable and hold no prose
+       * worth embedding.
+       */
+      const indexTarget =
+        outcome.activity.embed ??
+        (isIndexableSubject(outcome.activity.subjectType)
+          ? {
+              entityType: outcome.activity.subjectType,
+              entityId: outcome.activity.subjectId,
+            }
+          : null);
+      if (indexTarget) {
+        await enqueueOutbox(tx, {
+          topic: INDEX_TOPIC,
+          payload: {
+            workspaceId: spec.workspaceId,
+            entityType: indexTarget.entityType,
+            entityId: indexTarget.entityId,
+          },
+          // A timestamp and a fresh identifier, for the reason the embedding
+          // key above records: coalescing to one pending row per entity
+          // collides the moment a second edit arrives while the relay holds
+          // the first, and a failed enqueue would roll back a real write.
+          idempotencyKey: `${INDEX_TOPIC}:${indexTarget.entityType}:${indexTarget.entityId}:${Date.now()}:${randomUUID()}`,
         });
       }
 

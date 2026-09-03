@@ -181,6 +181,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "An initiative was recorded as work that will move a key result",
   "initiative.unlinked": () =>
     "An initiative is no longer recorded against a key result",
+  // Exports (P5-T13).
+  "export.taken": (p) =>
+    `${Number(p.rowCount ?? 0)} ${asString(p.list, "rows")} were exported`,
   // Documents and attachments (P5-T12).
   "document.drafted": (p) =>
     `A document "${asString(p.title, "untitled")}" was started`,

@@ -3567,6 +3567,87 @@
       "pages": false
     },
     {
+      "name": "search query",
+      "action": "search.query",
+      "method": "GET",
+      "path": "/search/query",
+      "scope": "read",
+      "summary": "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+      "flags": [
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "entity-types",
+          "field": "entityTypes",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "search jump",
+      "action": "search.jump",
+      "method": "GET",
+      "path": "/search/jump",
+      "scope": "read",
+      "summary": "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+      "flags": [
+        {
+          "name": "short-id",
+          "field": "shortId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "exports list",
+      "action": "exports.list",
+      "method": "POST",
+      "path": "/exports/list",
+      "scope": "write",
+      "summary": "One list as a CSV file, matching the rows and columns the screen shows. Audited.",
+      "flags": [
+        {
+          "name": "list",
+          "field": "list",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "goals",
+            "initiatives",
+            "tasks",
+            "kpis"
+          ]
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",

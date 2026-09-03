@@ -18,6 +18,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
+import { CommandPalette } from "../app/search/palette.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
@@ -203,6 +204,12 @@ export async function AppShellLayout({
       >
         {children}
       </AppShell>
+      {/*
+       * Beside the shell rather than inside the topbar, because the palette is
+       * an overlay over the whole page. Mounted once here, so ⌘K works on every
+       * screen without each one remembering to render it (P5-T13).
+       */}
+      <CommandPalette />
       <ShortcutOverlay />
       <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
     </KeyboardRegistryProvider>

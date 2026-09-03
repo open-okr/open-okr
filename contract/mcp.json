@@ -4978,6 +4978,112 @@
       }
     },
     {
+      "name": "search.query",
+      "description": "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "entityTypes": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "text": "…"
+      }
+    },
+    {
+      "name": "search.jump",
+      "description": "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shortId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "shortId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "shortId": "…"
+      }
+    },
+    {
+      "name": "exports.list",
+      "description": "One list as a CSV file, matching the rows and columns the screen shows. Audited.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "string",
+            "enum": [
+              "goals",
+              "initiatives",
+              "tasks",
+              "kpis"
+            ]
+          },
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "list"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "list": "goals"
+      }
+    },
+    {
       "name": "tasks.board",
       "description": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
       "inputSchema": {

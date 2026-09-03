@@ -209,6 +209,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // behind that number" rather than "an initiative changed".
   "initiative.linked": z.object({ keyResultId: z.uuid() }),
   "initiative.unlinked": z.object({ keyResultId: z.uuid() }),
+  // Exports (P5-T13). An export is the one action that takes data out of the
+  // product, so it leaves a trail in the feed as well as in the audit log.
+  "export.taken": z.object({
+    list: z.string(),
+    rowCount: z.number().int(),
+  }),
   // Documents and attachments (P5-T12). Drafting emits an activity but no
   // notification: the author's own record that they started one, with nothing
   // in anybody else's feed about something they cannot open.

@@ -158,13 +158,22 @@ test("the linking code is shown once, and asking again replaces it", async () =>
 
 test("quiet hours save, and the copy says a reminder waits rather than vanishes", async () => {
   await goTo(page, "/account/channels");
-  await page.locator('input[name="quietStart"]').fill("22:00");
-  await page.locator('input[name="quietEnd"]').fill("07:00");
-  // Asserted before submitting, and load-bearing: without it the click raced
-  // hydration, the uncontrolled inputs were reset to their stored values, and
-  // the form posted the old window back. The failure looked exactly like a
-  // write that did nothing.
-  await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00");
+  // **The fill is retried, not the assertion.** These inputs are uncontrolled,
+  // so a fill that lands before hydration is undone by it: the value goes back
+  // to what the server rendered and the form posts the old window. Asserting
+  // afterwards made that visible and could not prevent it, and the spec failed
+  // intermittently for exactly this reason, reading as "the write did nothing".
+  // Retrying the interaction is what actually settles it.
+  await expect(async () => {
+    await page.locator('input[name="quietStart"]').fill("22:00");
+    await page.locator('input[name="quietEnd"]').fill("07:00");
+    await expect(page.locator('input[name="quietStart"]')).toHaveValue("22:00", {
+      timeout: 1_000,
+    });
+    await expect(page.locator('input[name="quietEnd"]')).toHaveValue("07:00", {
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 20_000 });
   await page.getByRole("button", { name: "Save" }).click();
 
   // A refusal would be here, and a spec that only checked the value would read

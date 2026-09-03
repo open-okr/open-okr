@@ -34,6 +34,7 @@ import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import { parseEmbedJob, runEmbedJob } from "../embeddings/worker.ts";
+import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
@@ -131,6 +132,27 @@ const publishEvent: OutboxHandler = async (delivery, deps) => {
   }
   const { channel: _channel, ...data } = delivery.payload;
   await deps.publish(channel, delivery.topic, data);
+};
+
+/**
+ * Indexes one entity for search (P5-T13).
+ *
+ * **Safe to run twice**: the write is an upsert on the index's own unique key,
+ * so a repeat delivery costs one write rather than a duplicate row. An entity
+ * that has gone since the row was enqueued has its projection removed, which is
+ * what keeps a deleted title out of somebody's results.
+ */
+const indexContent: OutboxHandler = async (delivery, deps) => {
+  const job = parseIndexJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry an indexing job, so nothing can run it.`,
+    );
+  }
+  const outcome = await runIndexJob(job, { pool: deps.pool });
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
 };
 
 /**
@@ -429,6 +451,12 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // The board tells every watcher to re-read (P5-T11). Identifiers only, like
   // every event on a realtime channel.
   "board.changed": publishEvent,
+  "content.index": indexContent,
+  // The large-export path (P5-T13). Acknowledged rather than handled: the row
+  // records that somebody asked, and the worker that builds a file and delivers
+  // it is P5-T15's, along with the spreadsheet format. Naming it here rather
+  // than leaving it unhandled is what stops a real request dead-lettering.
+  "export.requested": acknowledge,
   "workspace.renamed": acknowledge,
 };
 

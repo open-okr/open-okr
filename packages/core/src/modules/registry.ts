@@ -175,6 +175,22 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "search",
+    navigation: [
+      {
+        id: "search",
+        label: "Search",
+        href: "/search",
+        section: "sidebar",
+        group: "primary",
+        // Every member searches, and every member gets a different answer: the
+        // index filters in SQL by the access context on each row, so there is
+        // nothing here to withhold from anybody (P5-T13).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "scorecard",
     navigation: [
       {

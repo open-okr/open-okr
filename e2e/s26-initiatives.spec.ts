@@ -147,6 +147,18 @@ test("acceptance: the red gate names the initiative and one click reaches it", a
 test("clearing the verdict takes it back out of the gate", async () => {
   await page.getByLabel("Capacity").selectOption("");
 
+  // Wait for the write, not for the browser. Navigating straight after the
+  // select raced the server action: the page loaded before the verdict landed
+  // and the banner was still there, which reads as a product defect and is a
+  // test that asked too early.
+  await expect(async () => {
+    const { rows } = await pool.query<{ capacity: string | null }>(
+      "select capacity from initiatives where workspace_id = $1 and title = $2 and deleted_at is null",
+      [workspaceId, TITLE],
+    );
+    expect(rows[0]?.capacity).toBeNull();
+  }).toPass({ timeout: 15_000 });
+
   await goTo(page, "/cycle?phase=5");
   await expect(page.getByTestId("capacity-over")).toHaveCount(0, {
     timeout: 15_000,
