@@ -3293,6 +3293,401 @@
       "pages": false
     },
     {
+      "name": "tasks board",
+      "action": "tasks.board",
+      "method": "GET",
+      "path": "/tasks/board",
+      "scope": "read",
+      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "initiative-id",
+          "field": "initiativeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks list",
+      "action": "tasks.list",
+      "method": "GET",
+      "path": "/tasks/list",
+      "scope": "read",
+      "summary": "Tasks, optionally only the caller's own or only the ones due by a date.",
+      "flags": [
+        {
+          "name": "mine",
+          "field": "mine",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "due-by",
+          "field": "dueBy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "backlog",
+            "todo",
+            "in_progress",
+            "done"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks read",
+      "action": "tasks.read",
+      "method": "GET",
+      "path": "/tasks/read",
+      "scope": "read",
+      "summary": "One task with its assignees and its checklist. Drives screen S-28.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks create",
+      "action": "tasks.create",
+      "method": "POST",
+      "path": "/tasks/create",
+      "scope": "write",
+      "summary": "Creates a task in a space, optionally behind a key result.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "description",
+          "field": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "initiative-id",
+          "field": "initiativeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "backlog",
+            "todo",
+            "in_progress",
+            "done"
+          ]
+        },
+        {
+          "name": "due-on",
+          "field": "dueOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "assignee-ids",
+          "field": "assigneeIds",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks update",
+      "action": "tasks.update",
+      "method": "POST",
+      "path": "/tasks/update",
+      "scope": "write",
+      "summary": "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "description",
+          "field": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "backlog",
+            "todo",
+            "in_progress",
+            "done"
+          ]
+        },
+        {
+          "name": "due-on",
+          "field": "dueOn",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "initiative-id",
+          "field": "initiativeId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks move",
+      "action": "tasks.move",
+      "method": "POST",
+      "path": "/tasks/move",
+      "scope": "write",
+      "summary": "Moves a card to a column and a slot, under a lock so two drags cannot lose one.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "backlog",
+            "todo",
+            "in_progress",
+            "done"
+          ]
+        },
+        {
+          "name": "after-task-id",
+          "field": "afterTaskId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks assign",
+      "action": "tasks.assign",
+      "method": "POST",
+      "path": "/tasks/assign",
+      "scope": "write",
+      "summary": "Assigns a member, which grants them edit on this task and notifies them.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks unassign",
+      "action": "tasks.unassign",
+      "method": "POST",
+      "path": "/tasks/unassign",
+      "scope": "write",
+      "summary": "Removes an assignment and the edit access it granted.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks addChecklistItem",
+      "action": "tasks.addChecklistItem",
+      "method": "POST",
+      "path": "/tasks/addChecklistItem",
+      "scope": "write",
+      "summary": "Adds one line to a task's checklist.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks setChecklistItem",
+      "action": "tasks.setChecklistItem",
+      "method": "POST",
+      "path": "/tasks/setChecklistItem",
+      "scope": "write",
+      "summary": "Ticks or unticks one checklist line.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "item-id",
+          "field": "itemId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "done",
+          "field": "done",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks removeChecklistItem",
+      "action": "tasks.removeChecklistItem",
+      "method": "POST",
+      "path": "/tasks/removeChecklistItem",
+      "scope": "write",
+      "summary": "Removes one checklist line.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "item-id",
+          "field": "itemId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks delete",
+      "action": "tasks.delete",
+      "method": "POST",
+      "path": "/tasks/delete",
+      "scope": "destructive",
+      "summary": "Soft-deletes a task, its assignments and its checklist.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "tasks linkedWork",
+      "action": "tasks.linkedWork",
+      "method": "GET",
+      "path": "/tasks/linkedWork",
+      "scope": "read",
+      "summary": "Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "initiatives list",
       "action": "initiatives.list",
       "method": "GET",

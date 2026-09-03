@@ -29,7 +29,10 @@ type ObligationKind =
   | "blocker"
   | "commitment"
   | "session"
-  | "proposal";
+  | "proposal"
+  // P5-T11. The first kind that does not hang off a goal, which is what
+  // widened `subjectId` below.
+  | "task";
 
 /** S-02's four buckets, in the order the screen renders them. */
 export type ObligationGroup = "overdue" | "today" | "this_week" | "upcoming";
@@ -49,7 +52,11 @@ export interface Obligation {
   readonly daysPastDue: number | null;
   readonly href: string;
   readonly actionLabel: string;
-  /** The goal this is about. Every obligation kind so far hangs off one. */
+  /**
+   * What this is about: a goal for every kind but `task`, which is about a
+   * task. Widened at P5-T11, where the first obligation that hangs off
+   * something other than a goal arrived.
+   */
   readonly subjectId: string;
   /** Set on an acknowledgement, so the row can act without a second lookup. */
   readonly checkInId: string | null;

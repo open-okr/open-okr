@@ -181,6 +181,16 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "An initiative was recorded as work that will move a key result",
   "initiative.unlinked": () =>
     "An initiative is no longer recorded against a key result",
+  // Tasks (P5-T11).
+  "task.created": (p) => `Task "${asString(p.title, "a task")}" was created`,
+  "task.updated": () => "A task was edited",
+  "task.moved": (p) =>
+    `A task moved to ${asString(p.status, "another column")}`,
+  "task.assigned": () => "A task was assigned",
+  "task.unassigned": () => "An assignment was removed from a task",
+  "task.checklist_changed": (p) =>
+    `A checklist line was ${asString(p.change, "changed")}`,
+  "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
   "key_result.created": (p) =>
     `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",

@@ -475,6 +475,17 @@ export {
 } from "./schema/streaks.ts";
 export { systemSettings } from "./schema/system-settings.ts";
 export {
+  type ChecklistItem,
+  checklistItems,
+  TASK_STATUSES,
+  type Task,
+  type TaskAssignee,
+  type TaskOrderingState,
+  type TaskStatus,
+  taskAssignees,
+  tasks,
+} from "./schema/tasks.ts";
+export {
   type WhatsAppTemplateMapping,
   whatsappTemplateMappings,
 } from "./schema/whatsapp-mappings.ts";

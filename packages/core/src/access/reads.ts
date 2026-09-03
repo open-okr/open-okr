@@ -296,6 +296,10 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   // P5-T10a. An initiative owns a context so its owner can hold `full` on the
   // work without holding it on the whole space.
   initiative: ownContextResolver("initiative"),
+  // P5-T11. A task owns a context so an assignee holds edit on that one task
+  // and nothing else. TECHNICAL-PLAN §4.9: assignment grants edit access
+  // through the member's group.
+  task: ownContextResolver("task"),
   // P3-T16. Comments and reactions inherit their parent subject's context.
   comment: async (tx, subjectId, workspaceId) => {
     const [row] = await tx

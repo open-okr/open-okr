@@ -19,10 +19,13 @@ import {
   activeOnly,
   checkIns,
   goals,
+  spaces,
+  taskAssignees,
+  tasks,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -53,6 +56,7 @@ const obligationSchema = z.object({
     "commitment",
     "session",
     "proposal",
+    "task",
   ]),
   group: z.enum(["overdue", "today", "this_week", "upcoming"]),
   title: z.string(),
@@ -263,6 +267,75 @@ export const reviewInbox = defineReadAction({
             actionLabel: "Acknowledge",
             subjectId: row.goalId,
             checkInId: row.id,
+          });
+        }
+
+        // Source 3: the tasks assigned to this member with a due date and no
+        // tick yet (P5-T11). Read through the task's own access context rather
+        // than through a goal: a task lives in a space and its assignee holds
+        // edit on it directly, so `canSeeGoal` is the wrong question here.
+        const assigned = await tx
+          .select({
+            id: tasks.id,
+            title: tasks.title,
+            dueOn: tasks.dueOn,
+            status: tasks.status,
+            spaceName: spaces.name,
+          })
+          .from(tasks)
+          .innerJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
+          .innerJoin(spaces, eq(spaces.id, tasks.spaceId))
+          .where(
+            and(
+              activeOnly(
+                tasks,
+                eq(tasks.workspaceId, context.workspaceId),
+                isNotNull(tasks.dueOn),
+                ne(tasks.status, "done"),
+              ),
+              eq(taskAssignees.memberId, memberId),
+              isNull(taskAssignees.deletedAt),
+            ),
+          )
+          .orderBy(asc(tasks.dueOn));
+
+        for (const row of assigned) {
+          if (!row.dueOn) {
+            continue;
+          }
+          const days = daysPastDue(
+            new Date(`${row.dueOn}T00:00:00Z`),
+            now,
+            timeZone,
+          );
+          if (days === null) {
+            continue;
+          }
+          const allowed = await getAccessScoped(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            resourceType: "task",
+            resourceId: row.id,
+          }).then(
+            () => true,
+            () => false,
+          );
+          if (!allowed) {
+            continue;
+          }
+          obligations.push({
+            id: `task:${row.id}`,
+            kind: "task",
+            group: groupFor(days),
+            title: `Finish "${row.title}"`,
+            meta: `Assigned · ${row.spaceName} · ${row.status.replace("_", " ")}`,
+            dueLabel: dueLabelFor(days, row.dueOn),
+            dueOn: row.dueOn,
+            daysPastDue: days,
+            href: `/tasks/${row.id}`,
+            actionLabel: "Open the task",
+            subjectId: row.id,
+            checkInId: null,
           });
         }
 

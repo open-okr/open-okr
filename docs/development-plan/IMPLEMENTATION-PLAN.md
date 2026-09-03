@@ -1153,6 +1153,18 @@ Deliverables: tasks with status, due date, description and checklist; multiple a
 Test plan: two simultaneous reorders converge with no lost or duplicated cards; the derived linked-work signal never overwrites the measured key result value; assignment notifies everyone except the actor.
 Acceptance: Given a key result whose linked tasks are all complete but whose measured value has not moved, when the Coach's divergence check runs, then it reports exactly that, naming both figures.
 
+**Kept as one task at Agung's decision, and half the acceptance criterion is deferred with it (3 September 2026).** The row holds a schema, an access model, thirteen registry actions, concurrency-safe ordering, two screens, a live stream and a review-inbox source. That is more than the one working session CLAUDE.md cuts a task to, and the concern was put to Agung before any code: they chose to keep it as one row and one commit. The deferral is separate and is the reason the acceptance reads "when the divergence is computed" in the tests rather than "when the Coach's divergence check runs": the rule reports it and the rail shows it, but `alignment_findings` carries `subject_goal_id` and a fixed `kind`, so a key-result-scoped finding needs the finding identity widened across four other sweeps. That widening is P5-T14, below.
+
+### P5-T14: The linked-work finding [S]
+Depends on: P5-T11
+Goal: the divergence P5-T11 computes reaches the Coach's finding inbox (TECHNICAL-PLAN.md §4.9).
+
+**Cut out of P5-T11 because it is a change to a shared surface, not to tasks.** `alignment_findings` has `subject_goal_id` and `target_goal_id` and a fixed `kind` enum, and `reconcileFindingsInTx` keys on (scope, source, kind), which is why the divergence sweep deliberately writes one finding per goal. A key result's own finding needs a subject column and a wider identity, and four existing sweeps share both.
+
+Deliverables: a `subject_key_result_id` column with its migration; the finding identity widened so one goal may carry a finding per key result without the rows colliding; `linkedWorkDivergence` wired into the Coach's sweep beside the two §6.1 cases; the four existing sweeps unchanged in behaviour.
+Test plan: a goal with two key results, both diverging, produces two findings and dismissing one leaves the other; the existing per-goal findings still reconcile to one row each.
+Acceptance: Given a key result whose linked tasks are all complete but whose measured value has not moved, when the Coach's divergence check runs, then it reports exactly that in the finding inbox, naming both figures.
+
 ### P5-T12: Documents and attachments [M]
 Depends on: P5-T11, P2-T11
 Goal: rich documents attached where they belong (screen S-29).
@@ -1349,7 +1361,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T13 (33: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **124 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T14 (34: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **125 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

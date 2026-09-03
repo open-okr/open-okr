@@ -209,6 +209,15 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // behind that number" rather than "an initiative changed".
   "initiative.linked": z.object({ keyResultId: z.uuid() }),
   "initiative.unlinked": z.object({ keyResultId: z.uuid() }),
+  // Tasks (P5-T11). The title travels on create and delete for the reason a
+  // goal's does: a feed line has to read as a sentence after the row is gone.
+  "task.created": z.object({ title: z.string(), assigned: z.number().int() }),
+  "task.updated": z.object({ fields: z.array(z.string()) }),
+  "task.moved": z.object({ status: z.string() }),
+  "task.assigned": z.object({ memberId: z.uuid() }),
+  "task.unassigned": z.object({ memberId: z.uuid() }),
+  "task.checklist_changed": z.object({ change: z.string() }),
+  "task.deleted": z.object({ title: z.string() }),
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),

@@ -159,6 +159,24 @@ The rail shows, per key result:
 
 Two numbers, labelled differently, never added together.
 
+**Where the divergence lives, decided at P5-T11.** The rule is
+`packages/method/src/linked-work.ts`, pure, and it names both figures in one
+sentence. What it is *not* yet is an `alignment_findings` row: that table carries
+`subject_goal_id` and `target_goal_id`, its `kind` is a fixed enum, and the
+existing sweep deliberately writes one finding per goal because the finding
+identity is (rule key, subject, target). A key-result-scoped finding needs the
+identity widened, which is a change to a coaching surface four other sweeps use.
+
+So the rail and `tasks.linkedWork` carry it, the Coach's finding inbox does not,
+and P5-T11's original acceptance criterion is half met on purpose. Agung chose
+this on 3 September 2026, with the widening left as its own row rather than
+folded into a task about tasks.
+
+**No new METHOD.md rule and no new §11 threshold.** The comparison is between two
+facts the product already holds, so there is no band to tune and no wording to
+choose. The message cites `quality.divergence`, the rule §6.4 already defines,
+exactly as `divergence.ts` does.
+
 ## 4. Documents and attachments (P5-T12)
 
 ### 4.1 Tables

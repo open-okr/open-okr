@@ -116,6 +116,13 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  type LinkedWork,
+  type LinkedWorkDivergence,
+  type LinkedWorkDivergenceInput,
+  linkedWorkDivergence,
+  linkedWorkShare,
+} from "./linked-work.ts";
+export {
   ALIGNMENT_CHECKS,
   type AlignmentCheckInput,
   applyStrictness,

@@ -403,14 +403,22 @@ Each initiative owns an access context (`resourceType: "initiative"`): `workspac
 ### initiative_key_results *(built at P5-T10a)*
 `initiative_id` to initiatives, `key_result_id` to key_results. Unique on `(workspace_id, initiative_id, key_result_id)` while live, so recording the same link twice is one link; a soft-deleted link is revived rather than duplicated.
 
-### tasks *(short_id, importable)*
-`space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb`.
+### tasks *(importable, built at P5-T11)*
+`space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich) with `description_version`, `status` (`backlog` / `todo` / `in_progress` / `done`, default `backlog`), `due_on?`, `position`, `ordering_state jsonb`.
 
-### task_assignees
-`task_id` to tasks, `member_id` to workspace_members.
+No `short_id` yet, for the reason `initiatives` has none: nothing addresses a task by a short code until the palette at P5-T13. Both links are optional and independent, which is the work-layer design's answer to W1: a task may serve a key result with no initiative behind it.
 
-### checklist_items
-`task_id` to tasks, `title`, `done bool`, `position`.
+`position` is sparse, spaced by 1024 (`TASK_POSITION_SPACING` in `packages/core`). A move reads the destination column under `select … for update` and places the card between its new neighbours; when the gap falls below two the whole column is renumbered inside the same transaction, never as a background job. The lock is over the space's column rather than whichever board the drag happened on, because three boards read one set of rows. `ordering_state` records the spacing and the last renumber, so a reader can tell a fresh column from one dragged a hundred times without reading every row.
+
+Each task owns an access context (`resourceType: "task"`): `workspace_standard` at view, the owning space's `space_standard` at edit, and each assignee's own `member` group at edit. The third is why a task owns a context rather than inheriting its initiative's: binding an assignee on the initiative would hand them every task under it.
+
+**Nothing here writes `key_results`.** Completing every task under a measure moves no number, and there is no trigger, no derived column and no code path that would. TECHNICAL-PLAN §4.9: the ratio of completed linked tasks is shown beside the measured value and never instead of it.
+
+### task_assignees *(built at P5-T11)*
+`task_id` to tasks, `member_id` to workspace_members. Unique on `(workspace_id, task_id, member_id)` while live; an unassigned member is revived rather than inserted beside. Assigning grants the edit binding, subscribes the member as `role`, and notifies everybody on the list except the actor. Unassigning takes the binding back. An agent is refused: an agent proposes work and does not carry it (AI-NATIVE-PLAN.md §1.3).
+
+### checklist_items *(built at P5-T11)*
+`task_id` to tasks, `title`, `done bool`, `position`. Appended at the end of its task's list; the count on a card is ticked over total.
 
 ### documents *(short_id)*
 `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` to workspace_members.

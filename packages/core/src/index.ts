@@ -790,6 +790,18 @@ export {
   type SetupState,
   setupRefusal,
 } from "./setup/state.ts";
+export {
+  type BoardChangedEvent,
+  boardChannel,
+} from "./tasks/live.ts";
+export {
+  assignTaskInTx,
+  createTaskInTx,
+  linkedWorkForKeyResults,
+  moveTaskInTx,
+  TASK_POSITION_SPACING,
+  unassignTaskInTx,
+} from "./tasks/service.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,

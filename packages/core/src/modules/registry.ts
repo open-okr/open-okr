@@ -159,6 +159,22 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "board",
+    navigation: [
+      {
+        id: "board",
+        label: "Board",
+        href: "/board",
+        section: "sidebar",
+        group: "practice",
+        // Every member reads the board. A shared record of what a team is
+        // doing is the same kind of thing as its goals, and each card asks for
+        // its own access before it can be changed (P5-T11).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "scorecard",
     navigation: [
       {

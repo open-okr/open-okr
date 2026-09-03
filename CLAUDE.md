@@ -147,6 +147,15 @@ Keep this list current once scaffolded.
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - **`pnpm test` and `pnpm build` at the root honour `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT`, `TEST_DB_HOST` and `DATABASE_URL`** through `passThroughEnv` in `turbo.json`. The same two port variables now also drive the compose stack itself, so the database and the suite move together, and continuous integration gives each job its own pair. Without that entry Turbo filters them out and the harness looks for the Docker stack on port 55432, which fails with `ECONNREFUSED` after running two of its ten tasks. Add any new variable a test needs to that list, or the root command will quietly not see it
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
+- **Clear the build caches when you are done with a stretch of builds or end-to-end runs.** Turborepo keeps every task's output forever and nothing prunes it, so a long task loop turns into tens of gigabytes: measured on 3 September 2026 at **112 GB in `.turbo/cache` alone**, with the whole checkout at 118 GB and 977 MB after clearing. All of it is in `.gitignore`, so nothing tracked is lost and the next build repopulates what it needs.
+
+  ```
+  rm -rf .turbo/cache apps/web/.next test-results .playwright-mcp
+  rm -rf packages/*/.turbo apps/*/.turbo
+  ```
+
+- **Never run two Vitest suites at once against the same Postgres.** The harness creates and drops a per-worker database, so a second run tears the first one's out from under it: 604 of 1987 tests failed that way on 3 September 2026, which reads as a regression and is not one. Worse, it can leave the server in recovery ("FATAL 57P03: the database system is not yet accepting connections") and the next run dies before it starts. Wait for a background suite to finish.
+
 - `pnpm dead-code`: the dead-code gate
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate. Sign-off runs in CI on pull requests only, so a branch can look green for days and fail the moment one opens. `docs/development-plan/CI-GATES.md` lists every gate and the order to run them in
 - `pnpm okr`: the command line, generated from the registry. `pnpm okr help` lists the domains, `pnpm okr <domain> <verb> --help` one command's flags. It reads `contract/cli.json` and nothing else, so it has no database and no domain code in it. `okr login --url <instance>` runs the device login: it prints a link, somebody approves it at `/account/device`, and the granted token lands in the profile. `--token` stores one you already have instead, from `/account/api-tokens`. `--scopes` narrows what is asked for; the default is read and write, never destructive. Exit 2 is a usage error decided before anything is sent, exit 1 is the instance refusing

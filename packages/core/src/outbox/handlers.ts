@@ -426,6 +426,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   "session.stageChanged": publishEvent,
   "session.micPassed": publishEvent,
   "session.scoresRevealed": publishEvent,
+  // The board tells every watcher to re-read (P5-T11). Identifiers only, like
+  // every event on a realtime channel.
+  "board.changed": publishEvent,
   "workspace.renamed": acknowledge,
 };
 
