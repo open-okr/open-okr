@@ -45,6 +45,26 @@ If all of those pass locally, CI passes, with one exception named under
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
+| Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
+
+**Dependency review is the second gate no local command covers**, and the
+first is sign-off above. It runs on pull requests only, reads the advisory
+database rather than the repository, and fails on **moderate**, so it can turn
+red on a branch that has not changed a single dependency: an advisory
+published today against a package installed last month is enough. It refused
+PR #40 on 3 September 2026 over two moderate advisories against a transitive
+`qs`, while every other check on the same commit passed.
+
+The fix is usually a lockfile refresh rather than an override. `qs` arrives
+under `@modelcontextprotocol/sdk` through `express` and `body-parser`, and
+`body-parser` declares `^6.15.2`, so the patched `6.16.0` satisfied a range the
+tree already had: `pnpm update -r --depth Infinity qs` was the whole change.
+Reach for `overrides` only when the parent's own range excludes the fix, and
+say why in the change.
+
+`gh pr checks <number>` is how to see it, because a green `pnpm test:ci` says
+nothing about it. Note that a run listed as failed against an older head sha
+stays in `gh run list` forever; what matters is the checks on the current head.
 
 A documentation-only change skips every code job. That is why a `.md` edit comes
 back green in a minute and a one-line code change does not.
