@@ -17,7 +17,7 @@
  * workspace and lives no longer, because an import is the one moment the
  * workspace is changing underneath the reader.
  */
-import { findLegacyRowInTx, type LegacyTable } from "@openokr/core";
+
 import {
   activeOnly,
   cycles,
@@ -34,6 +34,7 @@ import {
 import { and, eq, or, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { findLegacyRowInTx, type LegacyTable } from "./legacy.ts";
 import type { References } from "./templates/index.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

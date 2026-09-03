@@ -74,7 +74,9 @@ export function sheetToTable(sheet: readonly unknown[][]): Table {
  * `readSheet` and not the package default: the default returns one entry per
  * sheet wrapping the rows, and this wants the rows.
  */
-export async function readXlsx(path: string): Promise<Table> {
-  const sheet = (await readSheet(path)) as unknown as readonly unknown[][];
+export async function readXlsx(source: string | Buffer): Promise<Table> {
+  // A path from the command and a buffer from the wizard. The reader takes
+  // either, so neither surface has to write the file down first.
+  const sheet = (await readSheet(source)) as unknown as readonly unknown[][];
   return sheetToTable(sheet);
 }

@@ -38,20 +38,8 @@ export function templateFor(entity: string): EntityTemplate {
   return found;
 }
 
-export {
-  asBoolean,
-  asDay,
-  asEnum,
-  asNumber,
-  asText,
-  normalise,
-} from "./coerce.ts";
 export { goalsTemplate } from "./goals.ts";
-export { initiativesTemplate } from "./initiatives.ts";
 export { keyResultsTemplate } from "./key-results.ts";
-export { kpiRecordsTemplate } from "./kpi-records.ts";
-export { kpisTemplate } from "./kpis.ts";
-export { tasksTemplate } from "./tasks.ts";
 export type {
   ColumnSpec,
   EntityTemplate,

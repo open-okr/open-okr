@@ -24,6 +24,7 @@
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "pg": "catalog:",
+    "read-excel-file": "^9.3.10",
     "write-excel-file": "^4.1.1",
     "zod": "catalog:"
   },

@@ -22,7 +22,10 @@ import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { ASSIST_FEATURE_KEYS } from "../ai/assist-keys.ts";
+import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { LEGACY_SOURCES } from "../imports/legacy.ts";
+import { templateFor } from "../imports/templates/index.ts";
 import { OperationError } from "../operations/errors.ts";
 import { actingMemberId } from "./api-tokens.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -250,5 +253,100 @@ export const listImportRuns = defineReadAction({
         })),
       };
     });
+  },
+});
+
+/**
+ * A proposed column mapping, or nothing (P6-T01b-a).
+ *
+ * **A proposal, checked field by field before anybody sees it.** The model
+ * answers with one field name per column and this keeps only the names the
+ * entity's template actually has: a field it invented is dropped, and the
+ * column comes back unclaimed for a person to name. Two columns claiming one
+ * field keep the first, because a field can only carry one column and choosing
+ * between them is the reader's call, not a model's.
+ *
+ * **Null is a first-class answer.** No provider, the feature turned off, a
+ * refusal, a model that fell over: all of them mean the screen offers the
+ * manual path, which is the alias matching in `resolveMapping` and is complete
+ * on its own. That is AI-NATIVE-PLAN §1's deterministic-first rule as code.
+ */
+export const proposeImportMapping = defineReadAction({
+  name: "imports.proposeMapping",
+  summary:
+    "Proposes which column carries which field, for a human to confirm. Null with the provider off.",
+  input: z.object({
+    entity: z.string().trim().min(1).max(60),
+    /** The file's headers, in file order. */
+    headers: z.array(z.string().max(200)).min(1).max(200),
+    /** The first body row, when there is one. A header alone is often ambiguous. */
+    sample: z.array(z.string().max(500)).max(200).optional(),
+  }),
+  output: z
+    .object({
+      /** Header to field, for the headers the proposal claimed. */
+      columns: z.record(z.string(), z.string()),
+      /** Headers it left for a person, either by choice or because the field was not real. */
+      unclaimed: z.array(z.string()),
+      notes: z.string(),
+    })
+    .nullable(),
+  access: ACCESS_LEVELS.full,
+  async handler(context, input) {
+    const drafter = context.drafter;
+    if (!drafter?.proposeImportMapping) {
+      return null;
+    }
+    const template = templateFor(input.entity);
+    const availability = await checkFeatureAvailability(context.pool, {
+      workspaceId: context.workspaceId,
+      featureKey: ASSIST_FEATURE_KEYS.proposeImportMapping,
+      defaultTier: "fast",
+    });
+    if (!availability.available) {
+      return null;
+    }
+
+    let proposed: Awaited<
+      ReturnType<NonNullable<typeof drafter.proposeImportMapping>>
+    >;
+    try {
+      proposed = await drafter.proposeImportMapping({
+        entity: template.entity,
+        describe: template.describe,
+        headers: input.headers,
+        fields: template.columns.map((column) => ({
+          field: column.field,
+          describe: column.describe,
+          required: column.required,
+        })),
+        sample: input.sample ?? [],
+      });
+    } catch {
+      return null;
+    }
+    if (!proposed) {
+      return null;
+    }
+
+    const known = new Set(template.columns.map((column) => column.field));
+    const columns: Record<string, string> = {};
+    const unclaimed: string[] = [];
+    const taken = new Set<string>();
+
+    input.headers.forEach((header, index) => {
+      const field = (proposed.fields[index] ?? "").trim();
+      if (field === "" || !known.has(field) || taken.has(field)) {
+        // Unclaimed rather than refused, and the three reasons are on purpose
+        // indistinguishable to the reader: whichever it was, the column is
+        // theirs to name.
+        unclaimed.push(header);
+        return;
+      }
+      taken.add(field);
+      columns[header] = field;
+    });
+
+    return { columns, unclaimed, notes: proposed.notes.trim() };
   },
 });

@@ -10,11 +10,12 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { callAction, provisionWorkspaceForUser } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { runImport } from "../src/index";
+import { callAction } from "../src/actions/registry.ts";
+import { runImport } from "../src/imports/run.ts";
+import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const OWNER_EMAIL = "importer-owner@example.com";

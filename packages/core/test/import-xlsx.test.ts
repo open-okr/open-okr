@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import writeXlsxFile from "write-excel-file/node";
-import { readTable } from "../src/index";
+import { readTable } from "../src/imports/readers/index.ts";
 
 describe("reading a spreadsheet from disk", () => {
   it("reads its headers, its numbers and its dates", async () => {

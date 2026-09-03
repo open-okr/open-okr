@@ -13,8 +13,8 @@
  * is read.** That is a property of the file rather than of a row, and reporting
  * it a thousand times is worse than reporting it once.
  */
+import { normalise } from "./templates/coerce.ts";
 import type { EntityTemplate } from "./templates/index.ts";
-import { normalise } from "./templates/index.ts";
 
 /** A mapping file: which header carries which field, and which entity it is for. */
 export interface MappingFile {

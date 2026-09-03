@@ -12,8 +12,9 @@
  * agreed to. The file has to name them, which is a mapping question a person
  * can answer once for the whole file.
  */
-import { richTextFromPlainText } from "@openokr/core";
+
 import { GOAL_LEVELS } from "@openokr/db";
+import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { asDay, asEnum, asNumber, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
 

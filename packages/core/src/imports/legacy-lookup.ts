@@ -10,7 +10,7 @@
  * failure idempotency exists to prevent. Row-level security is still the floor:
  * the lookup runs inside `withWorkspace`, so it cannot see another tenant.
  */
-import { findLegacyRowInTx, type LegacyKey } from "@openokr/core";
+
 import {
   goals,
   initiatives,
@@ -21,6 +21,7 @@ import {
 } from "@openokr/db";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { findLegacyRowInTx, type LegacyKey } from "./legacy.ts";
 import type { LegacyTableName } from "./templates/index.ts";
 
 const TABLES = { goals, keyResults, kpis, initiatives, tasks } as const;

@@ -27,6 +27,8 @@ export const ASSIST_FEATURE_KEYS = {
   suggestParent: "assists.suggestParent",
   /** §2.4's list filter (P4-T15d). */
   parseFilter: "assists.parseFilter",
+  /** §7.1 step 2's column mapping for a spreadsheet import (P6-T01b-a). */
+  proposeImportMapping: "assists.proposeImportMapping",
 } as const;
 
 /** §2.3's review assists (P4-T15c). */

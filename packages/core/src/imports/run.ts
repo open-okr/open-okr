@@ -19,8 +19,10 @@
  * access bindings, its activity row, its audit row and its outbox row, and the
  * run can be resumed by running the same file again.
  */
-import { type ActionCallContext, callAction } from "@openokr/core";
+
 import type { Pool } from "pg";
+import type { ActionCallContext } from "../actions/define.ts";
+import { callAction } from "../actions/registry.ts";
 import { findExisting } from "./legacy-lookup.ts";
 import {
   type Mapping,

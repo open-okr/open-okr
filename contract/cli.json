@@ -3692,6 +3692,35 @@
       "pages": false
     },
     {
+      "name": "imports proposeMapping",
+      "action": "imports.proposeMapping",
+      "method": "GET",
+      "path": "/imports/proposeMapping",
+      "scope": "read",
+      "summary": "Proposes which column carries which field, for a human to confirm. Null with the provider off.",
+      "flags": [
+        {
+          "name": "entity",
+          "field": "entity",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "headers",
+          "field": "headers",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "sample",
+          "field": "sample",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "imports startRun",
       "action": "imports.startRun",
       "method": "POST",

@@ -322,6 +322,44 @@ export type ParsedFilter =
     }
   | { readonly kind: "refused"; readonly reason: string };
 
+/**
+ * The headers of a spreadsheet and the fields they might be (P6-T01b-a).
+ *
+ * **The model is given the fields with their own sentences, and answers by
+ * position.** A header is identified by where it sits in the file rather than
+ * by its text, so a model that rewrites "Objective ID" as "objective id" in
+ * its answer cannot silently map a column that is not there. The caller checks
+ * every field it names against the template anyway.
+ */
+export interface ImportMappingContext {
+  /** The entity being loaded, so the model knows what a row is. */
+  readonly entity: string;
+  readonly describe: string;
+  /** The headers, in file order. */
+  readonly headers: readonly string[];
+  /** The fields it may choose from, each with the sentence the template gives it. */
+  readonly fields: readonly {
+    readonly field: string;
+    readonly describe: string;
+    readonly required: boolean;
+  }[];
+  /** The first body row, when the file has one. A header alone is often ambiguous. */
+  readonly sample: readonly string[];
+}
+
+/**
+ * A proposed mapping: one entry per header, in the same order.
+ *
+ * An empty string means "this column is not one of the fields", which is a
+ * real answer and the commonest one for a file with a column the product has
+ * no place for.
+ */
+export interface ProposedImportMapping {
+  readonly fields: readonly string[];
+  /** What the model wants the reader to check, in one sentence. */
+  readonly notes: string;
+}
+
 /** One blocker as the summary assist is shown it (P4-T15b-b). */
 export interface SummarisableBlocker {
   /** One of §7.3's five types. */
@@ -537,6 +575,17 @@ export interface AgentDrafter {
    * becomes a refusal rather than a filter.
    */
   parseListFilter?(context: FilterContext): Promise<ParsedFilter | null>;
+  /**
+   * §7.1 step 2's column mapping, proposed for a human to confirm (P6-T01b-a).
+   *
+   * A proposal and never a write: the caller checks every field named against
+   * the entity's template, drops what it does not have, and hands the rest to
+   * a person who confirms or corrects it. Null with no provider, which leaves
+   * the alias matching as the whole of the manual path.
+   */
+  proposeImportMapping?(
+    context: ImportMappingContext,
+  ): Promise<ProposedImportMapping | null>;
   /**
    * §2.2's blocker summary, over a list the product has already ranked.
    *

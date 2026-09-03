@@ -10,8 +10,9 @@
  * tasks, which is §7.1 step 6: derived values are recomputed after load and
  * never carried from the source.
  */
-import { richTextFromPlainText } from "@openokr/core";
+
 import { INITIATIVE_STATUSES } from "@openokr/db";
+import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { asDay, asEnum, asNumber, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
 

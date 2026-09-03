@@ -11,8 +11,9 @@
  * would quietly assign "Smith" and "John" as two people. A second assignee is
  * something the board does in a second.
  */
-import { richTextFromPlainText } from "@openokr/core";
+
 import { TASK_STATUSES } from "@openokr/db";
+import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { asDay, asEnum, asText } from "./coerce.ts";
 import type { EntityTemplate, PlanContext, RowPlan } from "./types.ts";
 

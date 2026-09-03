@@ -1227,12 +1227,24 @@ Deliverables: CSV and XLSX readers in `packages/importer`, with `read-excel-file
 Test plan: a file with one bad row previews as creatable minus one with the error explained, and a real run writes exactly that; running the same file twice writes nothing the second time and leaves one completed run per attempt; a value the template cannot coerce is a row error rather than a refused file; notification dispatch is suppressed for every write the import makes.
 Acceptance: Given a spreadsheet and a mapping, when the command runs with `--dry-run`, then the report names every row it would write and every row it would skip with the reason, and the real run matches that report exactly.
 
-### P6-T01b: The AI mapper and the import wizard [L]
+### P6-T01b-a: One engine, and the AI mapper over it [M]
 Depends on: P6-T01a
-Goal: a person with unfamiliar headers gets a proposed mapping and a screen to confirm it.
+Goal: the wizard and the command share one engine, and a person with unfamiliar headers gets a proposed mapping.
 
-Deliverables: the AI mapper proposing a header-to-field mapping over the P6-T01a templates, as a proposal a human confirms or corrects and never as a write; the import wizard on S-36, carrying upload, mapping confirmation, the dry-run preview and the error report; the manual mapping path complete and every AI affordance hidden with the provider off.
-Test plan: unfamiliar headers get a proposed mapping that a human can correct before anything is written; with the provider off the screen offers the manual path and no proposal; the preview the screen shows is the report the command produces for the same file and mapping.
+**Cut in two before the screen was written, and Agung chose the seam (3 September 2026).** The row held a move, an assist and a four-step screen, which is two working sessions. The two halves fail differently: this one is a proposal that has to be checked field by field before a human ever sees it, and the next is a screen.
+
+**The move is the first deliverable and it settles a dependency question.** `apps/web` may not depend on `packages/importer`, so the spreadsheet engine (the readers, the six entity templates, the mapping and the runner) moves to `packages/core/src/imports` and `packages/importer` keeps the command line and, at P6-T02, the FlowyTeam connector. Agung chose this over widening the dependency table, which would have put P6-T02's MySQL client in the web application's dependency graph. TECHNICAL-PLAN §1 and CLAUDE.md are corrected in the same change.
+
+Deliverables: the engine in `packages/core/src/imports`, with the command line calling it and no behaviour changed; a `readBuffer` beside `readTable`, so a request with bytes and a terminal with a path read the same way; the AI mapper as one registry action proposing a header-to-field mapping over the templates, with every proposed field checked against the template before it is returned and a duplicate claim dropped rather than resolved; a feature key, so an administrator can turn it off; null when the provider is off, which is what leaves the alias matching as the whole of the manual path.
+Test plan: the moved engine's tests pass unchanged in their new home; a proposal naming a field the template does not have comes back without it rather than refused whole; two headers claiming one field keep the first; the action returns null with the provider off and the alias matching still maps a familiar file; the command still runs end to end.
+Acceptance: Given a goals spreadsheet with unfamiliar headers and a provider configured, when the mapper runs, then every header it claims is mapped to a field the goals template has, and with the provider off the same file still maps by alias with no proposal offered.
+
+### P6-T01b-b: The import wizard [M]
+Depends on: P6-T01b-a
+Goal: a screen that carries a file from upload to an import somebody confirmed.
+
+Deliverables: the import wizard on S-36 with its four steps, upload, mapping confirmation, the dry-run preview and the per-row error report; two registry actions taking a table rather than a path, so the browser parses nothing; a §4.14 setting bounding how many rows one run may carry, with a default a fresh workspace resolves; every AI affordance hidden with the provider off and the manual mapping path complete without it.
+Test plan: the preview the screen shows is the report the command produces for the same file and mapping; a file above the row bound is refused with the number rather than truncated; loading, empty, error and permission-denied states; the UIUX-PLAN §9 gates; one end-to-end path from upload to a confirmed import.
 Acceptance: Given a goals spreadsheet with unfamiliar headers, when the wizard runs, then a mapping is proposed, the human confirms or corrects it, the dry run reports accurately and the real run matches it.
 
 ### P6-T02: FlowyTeam connector [M]
@@ -1398,11 +1410,21 @@ Depends on: P8-T13
 Deliverables: the release, changelog, announcement, contributor onboarding with good first issues and the agreement bot live.
 Acceptance: the tagged release installs from the documented path on a clean machine, in both self-hosted forms and in the cloud, and an instance on the previous release upgrades to it through the lifecycle helper with its data intact.
 
+### P8-T15: The two unstable end-to-end specs [S]
+Depends on: -
+Goal: two specs that fail about one run in four stop failing, or say why they cannot.
+
+**Recorded with its evidence on 3 September 2026, when the suite was run eleven times in one day for the first time.** Both were invisible until then, and neither is caused by the work that found them. `s36-channels`'s quiet-hours field fails a `toHaveValue`, which reads as the form settling after the assertion. `sessions`'s last stage fails a click on a 4-second timeout, which is the shortest timeout in the suite and the only one that is not the harness default. Continuous integration retries twice, so neither holds the pipeline today; that is what makes this a Phase 8 row rather than a Phase 6 one, and also what will hide it until somebody looks.
+
+Deliverables: a root cause for each, named; a fix, or a quarantine entry with the sentence that says when it comes out again (CI-GATES.md's rule for `knip.json` applies here too).
+Test plan: ten consecutive end-to-end runs with neither spec failing. The flakiness report is the record.
+Acceptance: Given the end-to-end suite run ten times, when the reports are merged, then neither spec appears in the flakiness report.
+
 ---
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (8: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **127 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (9: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **129 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

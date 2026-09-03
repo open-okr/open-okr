@@ -28,6 +28,7 @@ import type {
   GroundedAnswer,
   GroundedChunk,
   GroundedQuestionContext,
+  ImportMappingContext,
   KpiRequestContext,
   MeasureContext,
   NarratedTrend,
@@ -36,6 +37,7 @@ import type {
   ParsedFilter,
   ProposalRequestContext,
   ProposedAction,
+  ProposedImportMapping,
   ProposedObjective,
   RecoveryTitleContext,
   RetrospectiveCheckIn,
@@ -447,6 +449,43 @@ const TREND_SYSTEM =
  * The caller re-checks every field against the grammar anyway, so a level or a
  * band the product does not have becomes a refusal rather than a filter.
  */
+/**
+ * The import column mapping (TECHNICAL-PLAN §7.1 step 2, P6-T01b-a).
+ *
+ * **One answer per header, in the order the headers were given.** Answering by
+ * position rather than by header text means a model that tidies up the spelling
+ * of a column cannot map a column that is not in the file. An empty string is a
+ * real answer: a spreadsheet exported from another system usually has a column
+ * this product has no field for.
+ *
+ * The caller checks every field against the entity's template, so a field name
+ * the model invented is dropped rather than trusted.
+ */
+const MAPPING_SHAPE = z.object({
+  fields: z.array(z.string().trim().max(60)),
+  notes: z.string().trim().max(300),
+});
+
+const MAPPING_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["fields", "notes"],
+  properties: {
+    fields: { type: "array", items: { type: "string" } },
+    notes: { type: "string", maxLength: 300 },
+  },
+} as const;
+
+const MAPPING_SYSTEM =
+  "You match the columns of a spreadsheet to the fields of one kind of " +
+  "record. Answer with one entry per column, in the order the columns were " +
+  "given, using the exact field names you are shown. **Use an empty string " +
+  "for a column that is not one of those fields**, which is the right answer " +
+  "for a column this record has no place for: a guess that looks right and " +
+  "puts a department in a title is worse than leaving it for a person. Never " +
+  "use one field for two columns. The notes are one sentence saying what a " +
+  "reader should check before confirming.";
+
 const FILTER_SHAPE = z.object({
   expressible: z.boolean(),
   reason: z.string().trim().max(300),
@@ -1323,6 +1362,59 @@ export function createProviderDrafter(
           mine: parsed.mine,
           includeClosed: parsed.includeClosed,
         };
+      } catch {
+        return null;
+      }
+    },
+
+    async proposeImportMapping(
+      context: ImportMappingContext,
+    ): Promise<ProposedImportMapping | null> {
+      if (!affordable() || context.headers.length === 0) {
+        return null;
+      }
+      try {
+        const parsed = await extractStructured({
+          provider: options.provider,
+          model: options.model,
+          schema: MAPPING_SHAPE,
+          jsonSchema: MAPPING_JSON_SCHEMA,
+          // Enough for one short field name per column plus the sentence.
+          maxTokens: 60 * context.headers.length + 200,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: MAPPING_SYSTEM },
+            {
+              role: "user",
+              content:
+                `Records: ${context.entity}. ${context.describe}` +
+                NEWLINE +
+                "Fields:" +
+                NEWLINE +
+                context.fields
+                  .map(
+                    (field) =>
+                      `  ${field.field}${field.required ? " (required)" : ""}: ${field.describe}`,
+                  )
+                  .join(NEWLINE) +
+                NEWLINE +
+                "Columns, in order:" +
+                NEWLINE +
+                context.headers
+                  .map(
+                    (header, index) =>
+                      `  ${index + 1}. ${header}${
+                        context.sample[index]
+                          ? ` (first value: ${context.sample[index]})`
+                          : ""
+                      }`,
+                  )
+                  .join(NEWLINE),
+            },
+          ],
+        });
+
+        return { fields: parsed.fields, notes: parsed.notes };
       } catch {
         return null;
       }

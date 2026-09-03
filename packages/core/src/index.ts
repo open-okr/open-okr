@@ -101,6 +101,7 @@ export type {
   GroundedChunk,
   GroundedQuestionContext,
   GroundingSource,
+  ImportMappingContext,
   KpiRequestContext,
   MeasureContext,
   NarratedTrend,
@@ -110,6 +111,7 @@ export type {
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
+  ProposedImportMapping,
   ProposedObjective,
   RecoveryTitleContext,
   RetrospectiveCheckIn,
@@ -587,6 +589,56 @@ export {
   legacyColumns,
   legacyKey,
 } from "./imports/legacy.ts";
+export { findExisting } from "./imports/legacy-lookup.ts";
+export {
+  type Mapping,
+  type MappingFile,
+  parseMappingFile,
+  resolveMapping,
+  valuesFor,
+} from "./imports/mapping.ts";
+export {
+  cellToText,
+  parseCsv,
+  parseCsvLines,
+  READABLE_EXTENSIONS,
+  readBuffer,
+  readTable,
+  readXlsx,
+  sheetToTable,
+  type Table,
+} from "./imports/readers/index.ts";
+export { type ReferenceHost, referencesFor } from "./imports/references.ts";
+export {
+  type RowOutcome,
+  type RunOptions,
+  type RunReport,
+  type RunResult,
+  runImport,
+} from "./imports/run.ts";
+export {
+  type ImportTarget,
+  resolveImportTarget,
+} from "./imports/target.ts";
+export {
+  asBoolean,
+  asDay,
+  asEnum,
+  asNumber,
+  asText,
+  normalise,
+} from "./imports/templates/coerce.ts";
+export {
+  type ColumnSpec,
+  ENTITIES,
+  type EntityTemplate,
+  type LegacyTableName,
+  type PlanContext,
+  type References,
+  type RowPlan,
+  TEMPLATES,
+  templateFor,
+} from "./imports/templates/index.ts";
 export {
   type ProvisionedMember,
   type ProvisionMemberInput,

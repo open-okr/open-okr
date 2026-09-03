@@ -102,7 +102,7 @@ Detailed designs live in `docs/design/`, written by you at each design gate. Kee
 - Import runs are idempotent: keep `legacy_id` and `legacy_type`, unique on `(workspace_id, legacy_type, legacy_id)`. Imports run through the normal Operation pipeline with notification dispatch suppressed.
 - Cannot map cleanly? Do not silently drop it. Record it in the import report and raise it as an open question.
 - Derived values (progress, health, achievement, alignment score, next check-in, streaks) are recomputed after load, never trusted from the source.
-- Importer code lives in `packages/importer`. It may depend on `packages/db` and `packages/core`, never on `apps/web`.
+- Importer code lives in `packages/importer`, **except the spreadsheet engine**, which lives in `packages/core/src/imports` because the wizard on S-36 needs the same readers, templates, mapping and runner the command uses and `apps/web` may not depend on `packages/importer` (P6-T01b, TECHNICAL-PLAN §1). Either way it may depend on `packages/db` and `packages/core`, never on `apps/web`.
 
 ## Locked stack
 
@@ -117,14 +117,15 @@ apps/web            Next.js app: interface, internal API, public REST, agent
                     endpoint, channel webhooks
 packages/method     The METHOD.md canon as data and pure functions. No I/O
 packages/core       Domain logic, the Operation pipeline, the action registry,
-                    can() and the access getter, the engines, rich text
+                    can() and the access getter, the engines, rich text, the
+                    spreadsheet import engine
 packages/db         Drizzle schema, migrations, row-level security, seed,
                     data-change runner, soft-delete scope
 packages/adapters   Ports and drivers (the only place vendor SDKs live) plus
                     the outbox relay
 packages/agents     The Coach and Champion runtimes, the trigger catalogue and
                     scheduler, run state machines, proposal envelopes
-packages/importer   Spreadsheet and FlowyTeam importers (command line)
+packages/importer   The import command line, and the FlowyTeam connector
 packages/cli        The `okr` command line. Reads contract/cli.json and calls
                     the REST surface. No runtime dependency on anything
 packages/ui         Shared components

@@ -1,19 +1,11 @@
-import { join } from "node:path";
 import { defineConfig } from "vitest/config";
 
-// The run tests write through the Operation pipeline against a real database,
-// the same harness `packages/core` and `packages/agents` use. The reader and
-// mapping tests need none, and pay a few seconds of setup for the company of
-// the ones that do.
-const testSupport = join(import.meta.dirname, "../test-support");
-
+// No database and no harness: what is left in this package is the command's
+// argument parsing and its report rendering, both pure. The engine's tests
+// moved with the engine into `packages/core`, where they run against a real
+// Postgres.
 export default defineConfig({
   test: {
-    globalSetup: [join(testSupport, "src/db-harness.ts")],
-    env: {
-      OPENOKR_DB_PROJECT: "importer",
-    },
-    testTimeout: 30_000,
-    hookTimeout: 60_000,
+    testTimeout: 10_000,
   },
 });

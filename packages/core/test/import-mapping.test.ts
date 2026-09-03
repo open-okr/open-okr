@@ -7,16 +7,20 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  parseMappingFile,
+  resolveMapping,
+  valuesFor,
+} from "../src/imports/mapping.ts";
+import {
   asDay,
   asEnum,
   asNumber,
   asText,
+} from "../src/imports/templates/coerce.ts";
+import {
   goalsTemplate,
   keyResultsTemplate,
-  parseMappingFile,
-  resolveMapping,
-  valuesFor,
-} from "../src/index";
+} from "../src/imports/templates/index.ts";
 
 describe("matching headers by alias", () => {
   it("matches a header however it is spelled", () => {

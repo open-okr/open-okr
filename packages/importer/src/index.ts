@@ -1,62 +1,27 @@
 /**
  * The importers (TECHNICAL-PLAN §7).
  *
- * The spreadsheet importer is P6-T01a: readers for the two formats, a template
- * per entity, a mapping, and a runner that plans every row and then either
- * writes it or does not. The FlowyTeam connector arrives at P6-T02 beside it
- * and shares the run record and the report shape.
+ * **What is here and what is not, after P6-T01b.** The spreadsheet engine, the
+ * readers, the six entity templates, the mapping and the runner live in
+ * `packages/core/src/imports`, because the wizard in `apps/web` needs the same
+ * engine the command uses and the dependency table does not let an application
+ * reach this package. What stays here is the command line: argument parsing,
+ * the report as lines a person reads, and the entry point that opens a pool.
+ * The FlowyTeam connector joins it at P6-T02, with the one pre-approved MySQL
+ * dependency, which is the other reason the engine moved: a web application has
+ * no business carrying a MySQL client in its dependency graph.
  */
 import { PACKAGE_NAME as CORE } from "@openokr/core";
-import { PACKAGE_NAME as DB } from "@openokr/db";
 
 export const PACKAGE_NAME = "@openokr/importer";
-export const DEPENDS_ON = [CORE, DB] as const;
+/**
+ * Core alone, since P6-T01b-a.
+ *
+ * The engine moved, so nothing here reaches the database directly any more:
+ * the command resolves its workspace and its member through core's own
+ * resolver and everything else through registry actions. The database package
+ * comes back at P6-T02, where the FlowyTeam connector reads a MySQL source.
+ */
+export const DEPENDS_ON = [CORE] as const;
 
-export { findExisting } from "./legacy-lookup.ts";
-export {
-  type Mapping,
-  type MappingFile,
-  parseMappingFile,
-  resolveMapping,
-  valuesFor,
-} from "./mapping.ts";
-export {
-  cellToText,
-  parseCsv,
-  parseCsvLines,
-  READABLE_EXTENSIONS,
-  readTable,
-  readXlsx,
-  sheetToTable,
-  type Table,
-} from "./readers/index.ts";
-export { type ReferenceHost, referencesFor } from "./references.ts";
-export {
-  type RowOutcome,
-  type RunOptions,
-  type RunReport,
-  type RunResult,
-  runImport,
-} from "./run.ts";
-export {
-  asBoolean,
-  asDay,
-  asEnum,
-  asNumber,
-  asText,
-  type ColumnSpec,
-  ENTITIES,
-  type EntityTemplate,
-  goalsTemplate,
-  initiativesTemplate,
-  keyResultsTemplate,
-  kpiRecordsTemplate,
-  kpisTemplate,
-  normalise,
-  type PlanContext,
-  type References,
-  type RowPlan,
-  TEMPLATES,
-  tasksTemplate,
-  templateFor,
-} from "./templates/index.ts";
+export { type Args, parseArgs, render, USAGE, UsageError } from "./cli.ts";

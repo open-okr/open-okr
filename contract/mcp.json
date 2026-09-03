@@ -5136,6 +5136,51 @@
       "example": {}
     },
     {
+      "name": "imports.proposeMapping",
+      "description": "Proposes which column carries which field, for a human to confirm. Null with the provider off.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "headers": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "sample": {
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            }
+          }
+        },
+        "required": [
+          "entity",
+          "headers"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "entity": "…",
+        "headers": []
+      }
+    },
+    {
       "name": "imports.startRun",
       "description": "Records an import run as it starts, before anything is loaded.",
       "inputSchema": {

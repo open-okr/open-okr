@@ -11,7 +11,7 @@ import {
   parseCsv,
   parseCsvLines,
   sheetToTable,
-} from "../src/index";
+} from "../src/imports/readers/index.ts";
 
 describe("the CSV reader", () => {
   it("reads a plain file", () => {

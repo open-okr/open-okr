@@ -24,13 +24,15 @@ Authority: below PLAN.md and METHOD.md, above IMPLEMENTATION-PLAN.md. Where this
 |---|---|---|
 | `packages/method` | The METHOD.md canon as data and pure functions: the quality rule catalogue, score and confidence bands, KPI corridors, blocker and root-cause taxonomies, publish gates, session definitions, phase completion rules, diagnostics | nothing |
 | `packages/db` | Schema, migrations, row-level security policies, seed, data-change runner, soft-delete scope | nothing app-specific |
-| `packages/core` | Domain services, the Operation pipeline, the action contract registry, `can()` and the access-aware getter, the stateful engines (scoring, cadence, KPI formulas, alignment, streaks), rich text, the typed event registry | `db`, `method` |
+| `packages/core` | Domain services, the Operation pipeline, the action contract registry, `can()` and the access-aware getter, the stateful engines (scoring, cadence, KPI formulas, alignment, streaks), rich text, the typed event registry, the spreadsheet import engine (§7.1's readers, entity templates, mapping and runner) | `db`, `method` |
 | `packages/adapters` | Ports and drivers, the only place vendor SDKs live, plus the outbox relay | `config` |
 | `packages/agents` | The Coach and Champion runtimes, the trigger catalogue and scheduler, run state machines, proposal envelopes, prompt assembly | `core`, `method`, `adapters` |
-| `packages/importer` | CSV/XLSX readers, the FlowyTeam MySQL reader, mappers, the command line | `db`, `core` |
+| `packages/importer` | The import command line, and the FlowyTeam MySQL reader with its mappers | `db`, `core` |
 | `packages/ui` | Shared components | `method` (for labels and bands only) |
 | `packages/test-support` | The factory that builds through core services, the test database harness | `core`, `db` |
 | `apps/web` | Routes, API endpoints, the MCP endpoint, channel webhooks, React UI | `core`, `agents`, `adapters`, `ui`, `method` |
+
+**The spreadsheet engine sits in `packages/core` and the command line in `packages/importer`, and the seam is deliberate** (P6-T01b, Agung's decision on 3 September 2026 from three options). The import wizard on S-36 needs the same readers, templates, mapping and runner the command uses, and `apps/web` may not depend on `packages/importer`: duplicating the engine would be two implementations of one report, and widening the table to let an application reach the importer would put P6-T02's MySQL client in the web application's dependency graph. What stays in `packages/importer` is what only a terminal has: argument parsing, the report as printed lines, and the entry point that opens a pool. The registry actions that write are in core anyway, which is where every write in this product is declared.
 
 `packages/config` (the shared TypeScript, lint and environment schema) is not listed in any row above because it sits underneath this table rather than inside it: every package and app may depend on it for `loadEnv()` and the shared lint/TypeScript config, the same way none of them list `zod` either. `packages/db`, `packages/core` and `apps/web` each already reach it from a command-line entry point or a boot-time check (P1-T02 confirmed this is allowed; this note is the missing line that confirmation was waiting on).
 
