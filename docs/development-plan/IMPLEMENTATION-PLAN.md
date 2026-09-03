@@ -1185,7 +1185,7 @@ Acceptance: Given any screen, when the palette is opened and a short identifier 
 
 **Two lines of this row were corrected while doing the work (3 September 2026).** XLSX is not here: Agung approved `exceljs`, and this repository's own licence gate refused its tree (`buffers@0.1.1` has an unknown licence, and AGPL-3.0 cannot distribute what nobody can name). They chose to ship CSV and make the spreadsheet its own row, which is P5-T15 below. And the entity jump reaches a KPI and nothing else, because `kpis.short_id` is the only short identifier this product has: goals, initiatives and tasks carry none, and inventing an allocation scheme for three tables is a decision this row does not own. The palette falls back to the phrase search, which is what somebody typing a goal's name wanted.
 
-### P5-T15: The spreadsheet export [S]
+### P5-T15: The spreadsheet export [M]
 Depends on: P5-T13
 Goal: a list as a workbook, and the large-export path that delivers one.
 
@@ -1194,6 +1194,12 @@ Goal: a list as a workbook, and the large-export path that delivers one.
 Deliverables: an XLSX writer whose dependency tree passes `pnpm check:licences` unchanged, or a decision to widen the allow list with the reasoning written down; the `export.requested` outbox handler, which acknowledges today, building a file and delivering it; the file offered through the storage port rather than held in a response.
 Test plan: a workbook opens in a spreadsheet with the same rows and columns as the CSV; the licence gate passes with no entry added to its list, or the entry added is justified in the change; an export above the inline limit arrives without the request waiting for it.
 Acceptance: Given a list larger than the inline limit, when a member exports it, then they are told it is being prepared and the file reaches them without the request having waited.
+
+**Cut as [S] and it is an [M], corrected while doing the work (3 September 2026).** The size was put to Agung before the second half was written and they chose to keep it as one row, as they did for P5-T11. The row is marked [M] here so the next reader meets the real size: a workbook writer, a table with its migration, the outbox worker, the first `FileStorage` instance this product has ever constructed, a read action, an authorised download route and a screen section.
+
+**The writer is `write-excel-file` (MIT) over `fflate` (MIT), and the licence gate passes unchanged.** Chosen from three options on 3 September 2026: this, `fflate` alone with the OOXML written by hand, or deferring the format again.
+
+**Three decisions worth carrying forward.** The file is collected from a "Your exports" list rather than emailed, because an instance with no mail configured would otherwise never deliver it. The download route authorises rather than redeeming a signed URL, because an export holds one member's access-filtered rows and a URL anybody holding it could redeem would be wider than the file. And the inline limit moved into the §4.14 settings map as `exportInlineRowLimit`, default 5000, because §4.9 asks for the behaviour and names no figure.
 
 **Phase 5 exit:** all four chat providers deliver and accept commands with one generated command surface; the coach reaches members where they are and respects quiet hours; the public REST surface, OpenAPI and the command line are generated with drift checked; the external agent surface works end to end over the real transport with authorisation proven by machine; initiatives, tasks and the board are joined to key results; documents, search, the palette and exports are live.
 
@@ -1375,7 +1381,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T15 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **126 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T15 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **126 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

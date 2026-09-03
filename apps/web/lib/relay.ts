@@ -57,6 +57,7 @@ import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
+import { getStorage } from "./storage";
 
 /** How long one delivery may take before another relay may claim the row. */
 const LEASE_SECONDS = 120;
@@ -139,6 +140,18 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
     ...(workspaceId ? { embed: await embedFor(workspaceId) } : {}),
     async publish(channel, event, data) {
       await getRealtime().publish(channel, { name: event, data });
+    },
+    /**
+     * Keeps one built export (P5-T15).
+     *
+     * Always present, because local disk is always available: the port's
+     * default driver needs a directory, not a service. The dependency is
+     * optional in `OutboxHandlerDeps` for a deployment that has genuinely
+     * turned storage off, not because this one might.
+     */
+    async putFile({ key, body, contentType }) {
+      const stored = await getStorage().put(key, body, { contentType });
+      return { key: stored.key, size: stored.size };
     },
     ...(mail
       ? {

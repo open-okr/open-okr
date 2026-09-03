@@ -3643,6 +3643,33 @@
           "field": "spaceId",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "format",
+          "field": "format",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "csv",
+            "xlsx"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "exports mine",
+      "action": "exports.mine",
+      "method": "GET",
+      "path": "/exports/mine",
+      "scope": "read",
+      "summary": "The exports you have asked for, and which of them are ready.",
+      "flags": [
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false

@@ -174,7 +174,7 @@ import {
   readDocumentDifference,
   updateDocument,
 } from "./documents.ts";
-import { exportList } from "./exports.ts";
+import { exportList, listMyExports } from "./exports.ts";
 import { parseListFilter } from "./filter-assist.ts";
 import {
   draftObjective,
@@ -521,6 +521,7 @@ export const ACTION_MAP = {
   "search.query": runSearch,
   "search.jump": readPaletteJump,
   "exports.list": exportList,
+  "exports.mine": listMyExports,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

@@ -111,6 +111,13 @@ const envSchema = z.object({
    * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
    * when you want one dedicated drainer instead of all of them polling. */
   OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
+
+  /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
+   * working directory, and `storage` is what the compose file already mounts a
+   * named volume at, so a container keeps its files across an upgrade with
+   * nothing set. An S3-compatible driver behind the same port is an
+   * alternative, never a requirement. */
+  OPENOKR_STORAGE_ROOT: optional(z.string().min(1).default("storage")),
 });
 
 export type Env = z.infer<typeof envSchema>;

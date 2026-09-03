@@ -115,6 +115,8 @@ export const trustedEmailDomainsSchema = z.array(
 
 const storageQuotaBytesSchema = z.number().int().positive();
 
+const exportInlineRowLimitSchema = z.number().int().positive();
+
 /** Dollars, not cents, and zero is allowed: it means "may not spend". */
 const agentRunCostCapSchema = z.number().nonnegative();
 
@@ -189,6 +191,19 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "card is a later task's follow-up, not this one's to invent.",
     resolve: () => 5 * 1024 * 1024 * 1024,
     schema: storageQuotaBytesSchema,
+  },
+  {
+    key: "exportInlineRowLimit",
+    scope: "workspace",
+    why:
+      "5000 rows: enough that every ordinary export is a file somebody gets " +
+      "in the moment they ask, small enough that a request never spends a " +
+      "minute building one. Above it the relay builds the file and the " +
+      "person collects it from their own list. TECHNICAL-PLAN §4.9 says to " +
+      "run large sets asynchronously and names no figure; P5-T15 picked " +
+      "this one. No S-36 card names it yet, so it has none here.",
+    resolve: () => 5000,
+    schema: exportInlineRowLimitSchema,
   },
   {
     key: "primaryChannel",

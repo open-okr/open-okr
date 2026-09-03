@@ -170,7 +170,9 @@ test("the export carries the rows the screen showed, and is audited", async () =
   );
 
   await goTo(page, "/goals");
-  await page.getByRole("button", { name: "Export as CSV" }).click();
+  // "Export", with the format beside it since P5-T15. CSV is the default, so
+  // this is the same click it always was.
+  await page.getByRole("button", { name: "Export" }).click();
 
   await expect(page.getByTestId("export-result")).toContainText("row", {
     timeout: 15_000,

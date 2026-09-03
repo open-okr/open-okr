@@ -31,9 +31,16 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import { parseEmbedJob, runEmbedJob } from "../embeddings/worker.ts";
+import { EXPORT_TOPIC } from "../exports/kinds.ts";
+import {
+  type PutFile,
+  parseExportJob,
+  runExportJob,
+} from "../exports/worker.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
@@ -94,6 +101,15 @@ export interface OutboxHandlerDeps {
     readonly externalMessageId?: string;
     readonly suppressedReason?: string;
   }>;
+  /**
+   * Keeps one built file (P5-T15).
+   *
+   * A function rather than the `FileStorage` port, for the reason every other
+   * dependency here is one: the port lives in `packages/adapters`. Absent
+   * means this deployment has no storage configured, and a large export is
+   * skipped rather than failed, the same as mail.
+   */
+  readonly putFile?: PutFile;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /** Where a skipped delivery is reported. */
@@ -430,6 +446,38 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
  * happened and a hook for whatever wants it later, and a dead letter for every
  * rename would be noise in the one place operators go to find real failures.
  */
+/**
+ * Builds one large export and puts it in storage (P5-T15).
+ *
+ * **Safe to run twice**: the run's state is the ledger. A redelivery for a run
+ * already `ready` does nothing, and one for a run left `building` by a relay
+ * that died rebuilds over its own storage key.
+ *
+ * A failure is written on the run rather than thrown, because the person who
+ * asked is watching a row that would otherwise say "being prepared" forever.
+ * That means this handler does not retry, which is right: an export that failed
+ * because a member was suspended will fail the same way ten more times.
+ */
+const buildExport: OutboxHandler = async (delivery, deps) => {
+  const job = parseExportJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} has no workspace and run on its payload, so nothing can be built.`,
+    );
+  }
+  if (!deps.putFile) {
+    deps.onSkipped?.(delivery, "no file storage is configured");
+    return;
+  }
+  const outcome = await runExportJob(job, {
+    pool: deps.pool,
+    putFile: deps.putFile,
+  });
+  if (outcome.kind === "skipped" || outcome.kind === "failed") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -452,11 +500,10 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // every event on a realtime channel.
   "board.changed": publishEvent,
   "content.index": indexContent,
-  // The large-export path (P5-T13). Acknowledged rather than handled: the row
-  // records that somebody asked, and the worker that builds a file and delivers
-  // it is P5-T15's, along with the spreadsheet format. Naming it here rather
-  // than leaving it unhandled is what stops a real request dead-lettering.
-  "export.requested": acknowledge,
+  // The large-export path (P5-T15). The row names a run; the worker rebuilds
+  // the list as the member who asked, writes the file to storage and marks the
+  // run ready. It acknowledged and did nothing between P5-T13 and P5-T15.
+  [EXPORT_TOPIC]: buildExport,
   "workspace.renamed": acknowledge,
 };
 

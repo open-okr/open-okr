@@ -95,6 +95,10 @@ export {
   type SocketPrincipal,
 } from "./drivers/realtime/socket-server.ts";
 export {
+  LocalDiskStorage,
+  type LocalDiskStorageOptions,
+} from "./drivers/storage/local-disk.ts";
+export {
   type CheckedUrl,
   checkUrl,
   isBlockedAddress,

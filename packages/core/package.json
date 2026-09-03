@@ -24,11 +24,13 @@
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "pg": "catalog:",
+    "write-excel-file": "^4.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "fflate": "^0.8.3",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

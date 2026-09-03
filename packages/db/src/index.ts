@@ -292,6 +292,12 @@ export {
   embeddings,
 } from "./schema/embeddings.ts";
 export {
+  type ExportFormat,
+  type ExportRun,
+  type ExportRunState,
+  exportRuns,
+} from "./schema/exports.ts";
+export {
   CAPACITY_VERDICTS,
   type CapacityVerdict,
   GOAL_CLOSE_DECISIONS,

@@ -89,18 +89,21 @@ export async function paletteSearchAction(
 }
 
 /**
- * One list as a file (P5-T13).
+ * One list as a file (P5-T13, both formats at P5-T15).
  *
  * The refusal comes back as a sentence rather than a thrown error, so a member
  * who may not export hears why instead of watching a button do nothing.
  */
 export async function exportListAction(
   list: "goals" | "initiatives" | "tasks" | "kpis",
+  format: "csv" | "xlsx" = "csv",
 ): Promise<{
   filename: string;
   csv: string | null;
+  xlsxBase64: string | null;
   rowCount: number;
   queued: boolean;
+  runId: string | null;
   error: string | null;
 }> {
   const { session, workspace } = await requireWorkspace();
@@ -112,7 +115,7 @@ export async function exportListAction(
         actor: { kind: "human", userId: session.user.id },
       },
       "exports.list",
-      { list },
+      { list, format },
     );
     return { ...outcome, error: null };
   } catch (error) {
@@ -120,11 +123,32 @@ export async function exportListAction(
       return {
         filename: "",
         csv: null,
+        xlsxBase64: null,
         rowCount: 0,
         queued: false,
+        runId: null,
         error: error.message,
       };
     }
     throw error;
   }
+}
+
+/**
+ * The exports this member has asked for (P5-T15).
+ *
+ * Read on the server and rendered beside the button, so somebody who queued a
+ * large one has a row to come back to rather than a tab to keep open.
+ */
+export async function myExportsAction() {
+  const { session, workspace } = await requireWorkspace();
+  return callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "exports.mine",
+    { limit: 10 },
+  );
 }

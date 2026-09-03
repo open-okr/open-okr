@@ -753,7 +753,12 @@ Written by an outbox-driven worker on the `content.index` topic, enqueued by the
 ### import_runs
 `source` (`csv` / `flowyteam`), `mode` (`dry_run` / `real`), `status`, `report jsonb`, `started_at`, `finished_at?`.
 
-### export_runs and workspace_imports
+### export_runs
+`kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?` to cycles, `space_id?` to spaces, `requested_by_id` to workspace_members, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?` to blobs, `error?`, `finished_at?`.
+
+One row per asked-for file (P5-T15). The blob is nullable until the worker has one, because a run is recorded the moment the request commits and the file is what the relay produces afterwards. `requested_by_id` is what scopes the read: the file holds exactly the rows that member could see when the worker built it, so nobody else may collect it, an administrator included. `kind` is `list` today; `archive` belongs to §7.3's portability engine, which adds a manifest and a checksum to the same lifecycle rather than a second table.
+
+### workspace_imports
 Archive manifest, checksum, status, progress.
 
 ### tenants *(cloud only)*

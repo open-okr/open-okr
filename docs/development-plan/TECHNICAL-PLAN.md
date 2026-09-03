@@ -238,7 +238,8 @@ Specified at this level of detail in AI-NATIVE-PLAN.md §7: providers, encrypted
 | Table | Key columns | Notes |
 |---|---|---|
 | `import_runs` | `source` (`csv` / `flowyteam`), `mode` (`dry_run` / `real`), `status`, `report jsonb`, `started_at`, `finished_at?` | Every run persisted, including failures |
-| `export_runs` / `workspace_imports` | Archive manifest, checksum, status, progress | The §7.3 portability engine |
+| `export_runs` | `kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?`, `space_id?`, `requested_by_id`, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?`, `error?`, `finished_at?` | One row per asked-for file. `kind` is `list` today (P5-T15); `archive` is the §7.3 portability engine's, which adds its manifest and checksum to the same lifecycle rather than a second table. The file holds exactly what `requested_by_id` could read when it was built, so only they may collect it |
+| `workspace_imports` | Archive manifest, checksum, status, progress | The §7.3 portability engine |
 | `tenants` | `workspace_id`, `plan_key?`, `seats?`, `state`, `trial_ends_at?`, `region` | Cloud only. Absent on self-hosted instances |
 | `operator_sessions` | `operator_user_id`, `workspace_id`, `reason`, `granted_at`, `expires_at`, `ended_at?` | Time-boxed support access, visible to the workspace owner |
 
@@ -280,6 +281,7 @@ The only exceptions are the instance connections that describe the deployment it
 | AI budgets | No workspace cap on self-host; the tenant's plan cap in the cloud |
 | Agent run cost cap | 2.00 US dollars per run (`agentRunCostCapUsd`, in `workspaces.settings`). It bounds AI spend only: the deterministic path costs nothing, so a run with the provider off never approaches it. Zero is valid and means the agent may not spend, which halts the run as cancelled with the reason in its log rather than failing it |
 | Spaces | One space named after the workspace, with the first member as its manager, who covers the coordinator's duties until one is named |
+| Export inline row limit | 5000 rows (`exportInlineRowLimit`, in `workspaces.settings`). At or below it a person clicking Export gets a file in the answer; above it the relay builds it and they collect it from their own list. §4.9 asks for the behaviour and names no figure; P5-T15 picked this one |
 | Member primary channel | Email, beside the always-on in-app inbox, until a chat identity is linked |
 | Member quiet hours | 19:00 to 08:00 in the member's own timezone |
 | Member notifications | Mentions immediate, everything else batched in a 30-minute window, daily summary on at 08:00 local |
@@ -433,6 +435,7 @@ Keep current in every schema change.
 | No legacy source | `root_causes`, `process_health_responses` | Both are answers given in a review. A cause invented for a historical miss would be the importer diagnosing a quarter nobody reviewed, and an anonymous survey cannot be imported at all without inventing the respondents |
 | No legacy source | `review_diagnostics`, `next_cycle_drafts`, `review_actions` | The diagnostic is computed from a review that was held, and drafts and actions are what a room agreed in it. `learnings` keeps its row at line 400 because a source that holds them can import them, with `source = 'manual'` and no session behind them |
 | No legacy source | `ai_threads`, `ai_messages` | A copilot conversation is one member's questions, asked of a product they were using at the time. FlowyTeam has no assistant and no transcript, and an imported thread would be a conversation nobody had. A fresh workspace has none and the first question opens the first one |
+| No legacy source | `export_runs` | A row saying somebody asked this instance for a file. It names a member, a moment and a file in this instance's own storage, none of which survives a move, and a run imported without its blob would offer a download of nothing (P5-T15) |
 | No legacy source | `objective_trends`, `decisions` | Both are recorded inside a monthly review, and the review itself is not imported. FlowyTeam has no decision log, so importing one would mean inventing an author and a date for a decision nobody recorded. Anything the source does carry about past decisions is written to the import report instead |
 
 Time logs, recurrence flags, points and rewards are read and recorded in the report as unmapped, because the corresponding features are out of v1. Nothing is silently dropped.

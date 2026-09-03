@@ -9,6 +9,7 @@ import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
 import { exportListAction } from "../search/actions.ts";
 import { ExportButton } from "../search/export-button.tsx";
+import { MyExports } from "../search/my-exports.tsx";
 import { GoalTable } from "../work-map.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
@@ -189,6 +190,12 @@ export default async function GoalsPage({
              */}
             <ExportButton onExport={exportListAction.bind(null, "goals")} />
           </CardHeader>
+          {/*
+           * Where a queued export is collected (P5-T15). Renders nothing until
+           * somebody has one, so a person who only ever exports small lists
+           * never sees an empty heading.
+           */}
+          <MyExports />
           <CardBody className="flex flex-col gap-2.5">
             <Filters
               cycles={cycles}
