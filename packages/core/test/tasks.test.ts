@@ -195,54 +195,67 @@ describe("ordering, and the problem it actually solves", () => {
     ]);
   });
 
-  it("acceptance: two simultaneous reorders converge, losing and duplicating nothing", async () => {
-    const cards = [];
-    for (const title of ["A", "B", "C", "D"]) {
-      cards.push(await createTask(title, { status: "todo" }));
-    }
-    const [a, b, c, d] = cards as { id: string }[];
+  // Ten rounds rather than one. The defect this asserts against appeared about
+  // once in four full runs of the suite and never when this file ran alone, so
+  // a single round is a coin toss dressed as a test.
+  it.each(Array.from({ length: 10 }, (_, round) => round + 1))(
+    "acceptance: two simultaneous reorders converge, losing and duplicating nothing (round %i)",
+    async () => {
+      const cards = [];
+      for (const title of ["A", "B", "C", "D"]) {
+        cards.push(await createTask(title, { status: "todo" }));
+      }
+      const [a, b, c, d] = cards as { id: string }[];
 
-    // Both moves are issued at once. Each opens its own Operation and therefore
-    // its own transaction, so the row lock inside `moveTaskInTx` is the only
-    // thing making them serialise. Without it both read the same neighbours and
-    // one move is lost or two cards share a slot.
-    await Promise.all([
-      call("tasks.move", {
-        id: (d as { id: string }).id,
-        status: "todo",
-        afterTaskId: (a as { id: string }).id,
-      }),
-      call("tasks.move", {
-        id: (c as { id: string }).id,
-        status: "todo",
-        afterTaskId: (a as { id: string }).id,
-      }),
-    ]);
+      // Both moves are issued at once, and both drop after the same card, which
+      // is the case that actually breaks. Each opens its own Operation and
+      // therefore its own transaction, so the lock inside `moveTaskInTx` is the
+      // only thing making them serialise.
+      //
+      // `for update` alone was not enough and this test found it: the second
+      // move's `order by position` is planned against its own snapshot, so the
+      // locked rows come back with the first move's fresh positions in the old
+      // order, and it computes the same midpoint. Nothing is lost and nothing is
+      // duplicated when that happens, so the distinctness assertion at the bottom
+      // is the only one that catches it.
+      await Promise.all([
+        call("tasks.move", {
+          id: (d as { id: string }).id,
+          status: "todo",
+          afterTaskId: (a as { id: string }).id,
+        }),
+        call("tasks.move", {
+          id: (c as { id: string }).id,
+          status: "todo",
+          afterTaskId: (a as { id: string }).id,
+        }),
+      ]);
 
-    const after = await column();
-    const ids = after.map((card) => card.id);
-    // Nothing lost.
-    expect(ids).toHaveLength(4);
-    // Nothing duplicated.
-    expect(new Set(ids).size).toBe(4);
-    // Every card still there, whatever order the two moves settled on.
-    expect(ids.sort()).toEqual(
-      [
-        (a as { id: string }).id,
-        (b as { id: string }).id,
-        (c as { id: string }).id,
-        (d as { id: string }).id,
-      ].sort(),
-    );
-    // And the positions are distinct, which is what "share a slot" would break.
-    const wb = await workerDb();
-    const { rows } = await wb.admin.query<{ position: number }>(
-      `select position from tasks
+      const after = await column();
+      const ids = after.map((card) => card.id);
+      // Nothing lost.
+      expect(ids).toHaveLength(4);
+      // Nothing duplicated.
+      expect(new Set(ids).size).toBe(4);
+      // Every card still there, whatever order the two moves settled on.
+      expect(ids.sort()).toEqual(
+        [
+          (a as { id: string }).id,
+          (b as { id: string }).id,
+          (c as { id: string }).id,
+          (d as { id: string }).id,
+        ].sort(),
+      );
+      // And the positions are distinct, which is what "share a slot" would break.
+      const wb = await workerDb();
+      const { rows } = await wb.admin.query<{ position: number }>(
+        `select position from tasks
         where workspace_id = $1 and status = 'todo' and deleted_at is null`,
-      [workspaceId],
-    );
-    expect(new Set(rows.map((row) => row.position)).size).toBe(4);
-  });
+        [workspaceId],
+      );
+      expect(new Set(rows.map((row) => row.position)).size).toBe(4);
+    },
+  );
 
   it("renumbers the column when the gap closes, in the same read", async () => {
     const first = await createTask("First", { status: "todo" });

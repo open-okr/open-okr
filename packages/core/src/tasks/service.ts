@@ -357,11 +357,28 @@ export interface MoveTaskResult {
 /**
  * Moves one card, under a lock on the column it lands in.
  *
- * **The lock is the whole design.** `select … for update` over the destination
- * column's live rows serialises two concurrent moves: the second waits, then
- * reads the positions the first actually wrote rather than the ones it saw
- * before. Without it both compute a midpoint from the same stale pair and one
- * move is lost or two cards share a slot.
+ * **The lock is the whole design, and `for update` alone was not enough.**
+ * `select … for update` does serialise two moves over the same rows: the second
+ * waits and then reads the values the first actually wrote. What it does not do
+ * is re-sort them. Postgres plans the query against the transaction's own
+ * snapshot, so the `order by position` is applied to the positions as they were
+ * before the wait; the locked rows come back with fresh values in a stale
+ * order. The second move then reads `others[afterIndex + 1]` and finds the card
+ * that used to be the next one, computes the same midpoint the first move
+ * already used, and two cards share a slot.
+ *
+ * It failed the acceptance test about once in four full runs of the suite and
+ * passed every time that file ran alone, which is why it read as a flake until
+ * it did not. Nothing lost and nothing duplicated held throughout: only the
+ * distinctness of the positions broke, which is the one assertion that catches
+ * it.
+ *
+ * So the column is claimed before it is read, with a transaction-scoped
+ * advisory lock. The second move now blocks before its select is planned, so it
+ * sorts data that is already settled. The lock is released when the Operation
+ * commits or rolls back, with nothing to remember. The row lock stays
+ * underneath it: an advisory lock binds only the callers that agree to take it,
+ * so a write reaching these rows another way must still block.
  *
  * **The column is the space's, not the board's.** Three boards read these rows
  * (a space, an initiative, a key result), so locking by whichever board the drag
@@ -391,9 +408,24 @@ export async function moveTaskInTx<
     throw new OperationError("not_found", "No such task.");
   }
 
-  // The lock. Raw because Drizzle has no `for update` on a select builder here,
-  // and the ordering matters: rows come back in the order the move reasons
-  // about, and the lock is held until this Operation's transaction commits.
+  // **Claim the column before reading it.** Transaction-scoped, so it is
+  // released on commit or rollback with nothing to remember and nothing to
+  // leak. Two keys rather than one hash of one string: the space in the first
+  // and the status in the second, so a hash collision would need both to
+  // collide at once. A collision would only cost throughput, never
+  // correctness, but a board stalling behind another team's drag is a bug
+  // somebody reports.
+  await tx.execute(sql`
+    select pg_advisory_xact_lock(
+      hashtext(${`${input.workspaceId}:${task.spaceId}`}),
+      hashtext(${input.status})
+    )
+  `);
+
+  // The row lock, underneath the advisory one. Raw because Drizzle has no
+  // `for update` on a select builder here, and the ordering matters: rows come
+  // back in the order the move reasons about, and the lock is held until this
+  // Operation's transaction commits.
   const locked = await tx.execute<{ id: string; position: number }>(sql`
     select id, position from tasks
      where workspace_id = ${input.workspaceId}

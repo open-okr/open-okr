@@ -127,7 +127,7 @@ the moves or duplicate a slot.
 | Decision | Why |
 |---|---|
 | `position` is a sparse integer, and `ordering_state` holds the ordering metadata | Sparse leaves room to insert without renumbering the column |
-| A move is written under a row lock on the column's own set | Two moves serialise instead of interleaving |
+| A move claims the column with a transaction-scoped advisory lock, then reads it under a row lock | Two moves serialise instead of interleaving. The row lock alone was not enough: `order by position … for update` is planned against the transaction's own snapshot, so the second move gets the first's fresh positions in the stale order and computes a midpoint that is already taken (P5-T11, corrected 3 September 2026) |
 | Normalisation runs when the gaps close, in the same transaction | Never as a background job, because a board that renumbers itself while somebody drags is worse than a slow drag |
 | Deleted and completed items are excluded from the normalisation | Otherwise a board's order drifts as things are finished |
 
