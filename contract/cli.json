@@ -3293,6 +3293,280 @@
       "pages": false
     },
     {
+      "name": "documents list",
+      "action": "documents.list",
+      "method": "GET",
+      "path": "/documents/list",
+      "scope": "read",
+      "summary": "The documents on one subject. Somebody else's draft is not among them.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "space",
+            "goal",
+            "key_result",
+            "initiative",
+            "cycle",
+            "session"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents read",
+      "action": "documents.read",
+      "method": "GET",
+      "path": "/documents/read",
+      "scope": "read",
+      "summary": "One document with its body and its version list. Drives screen S-29.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents difference",
+      "action": "documents.difference",
+      "method": "GET",
+      "path": "/documents/difference",
+      "scope": "read",
+      "summary": "What changed between two published versions of a document, line by line.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "from",
+          "field": "from",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "to",
+          "field": "to",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents create",
+      "action": "documents.create",
+      "method": "POST",
+      "path": "/documents/create",
+      "scope": "write",
+      "summary": "Starts a document on a subject. It is a draft, and a draft is private to its author.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "space",
+            "goal",
+            "key_result",
+            "initiative",
+            "cycle",
+            "session"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "field": "body",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents update",
+      "action": "documents.update",
+      "method": "POST",
+      "path": "/documents/update",
+      "scope": "write",
+      "summary": "Edits a document. Editing a published one changes it without publishing a version.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "body",
+          "field": "body",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents publish",
+      "action": "documents.publish",
+      "method": "POST",
+      "path": "/documents/publish",
+      "scope": "write",
+      "summary": "Publishes a document, writing a version and telling the subject's watchers.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "documents delete",
+      "action": "documents.delete",
+      "method": "POST",
+      "path": "/documents/delete",
+      "scope": "destructive",
+      "summary": "Soft-deletes a document and the versions under it.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "attachments list",
+      "action": "attachments.list",
+      "method": "GET",
+      "path": "/attachments/list",
+      "scope": "read",
+      "summary": "The files attached to one subject.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "space",
+            "goal",
+            "key_result",
+            "initiative",
+            "cycle",
+            "session",
+            "task",
+            "document",
+            "check_in"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "attachments attach",
+      "action": "attachments.attach",
+      "method": "POST",
+      "path": "/attachments/attach",
+      "scope": "write",
+      "summary": "Hangs an uploaded file on a subject.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "space",
+            "goal",
+            "key_result",
+            "initiative",
+            "cycle",
+            "session",
+            "task",
+            "document",
+            "check_in"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "blob-id",
+          "field": "blobId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "attachments detach",
+      "action": "attachments.detach",
+      "method": "POST",
+      "path": "/attachments/detach",
+      "scope": "write",
+      "summary": "Takes a file off a subject. The file itself is untouched.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",

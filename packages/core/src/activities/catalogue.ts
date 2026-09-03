@@ -209,6 +209,18 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // behind that number" rather than "an initiative changed".
   "initiative.linked": z.object({ keyResultId: z.uuid() }),
   "initiative.unlinked": z.object({ keyResultId: z.uuid() }),
+  // Documents and attachments (P5-T12). Drafting emits an activity but no
+  // notification: the author's own record that they started one, with nothing
+  // in anybody else's feed about something they cannot open.
+  "document.drafted": z.object({ title: z.string() }),
+  "document.edited": z.object({}),
+  "document.published": z.object({
+    title: z.string(),
+    version: z.number().int(),
+  }),
+  "document.deleted": z.object({ title: z.string() }),
+  "attachment.added": z.object({ duplicate: z.boolean() }),
+  "attachment.removed": z.object({}),
   // Tasks (P5-T11). The title travels on create and delete for the reason a
   // goal's does: a feed line has to read as a sentence after the row is gone.
   "task.created": z.object({ title: z.string(), assigned: z.number().int() }),

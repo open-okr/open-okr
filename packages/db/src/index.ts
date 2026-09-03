@@ -272,6 +272,20 @@ export {
   digests,
 } from "./schema/digests.ts";
 export {
+  ATTACHMENT_SUBJECT_TYPES,
+  type Attachment,
+  type AttachmentSubjectType,
+  attachments,
+  DOCUMENT_STATES,
+  DOCUMENT_SUBJECT_TYPES,
+  type Document,
+  type DocumentState,
+  type DocumentSubjectType,
+  type DocumentVersion,
+  documents,
+  documentVersions,
+} from "./schema/documents.ts";
+export {
   EMBEDDABLE_ENTITY_TYPES,
   type EmbeddableEntityType,
   type Embedding,

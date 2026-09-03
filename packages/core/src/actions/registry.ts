@@ -162,6 +162,18 @@ import {
   updateRhythmSettings,
 } from "./cycles.ts";
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
+import {
+  attachFile,
+  createDocument,
+  deleteDocument,
+  detachFile,
+  listAttachments,
+  listDocuments,
+  publishDocument,
+  readDocument,
+  readDocumentDifference,
+  updateDocument,
+} from "./documents.ts";
 import { parseListFilter } from "./filter-assist.ts";
 import {
   draftObjective,
@@ -494,6 +506,16 @@ export const ACTION_MAP = {
   "workflow.setCapacityNotes": setCapacityNotes,
   "workflow.calibrate": calibrateCycle,
   "workflow.publish": publishCycle,
+  "documents.list": listDocuments,
+  "documents.read": readDocument,
+  "documents.difference": readDocumentDifference,
+  "documents.create": createDocument,
+  "documents.update": updateDocument,
+  "documents.publish": publishDocument,
+  "documents.delete": deleteDocument,
+  "attachments.list": listAttachments,
+  "attachments.attach": attachFile,
+  "attachments.detach": detachFile,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

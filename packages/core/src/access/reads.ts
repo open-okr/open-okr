@@ -20,6 +20,7 @@ import {
   accessContexts,
   activeOnly,
   comments,
+  documents,
   reactions,
   type WorkspaceTx,
   withWorkspace,
@@ -300,6 +301,56 @@ const SUBJECT_RESOLVERS: Record<string, SubjectResolver> = {
   // and nothing else. TECHNICAL-PLAN §4.9: assignment grants edit access
   // through the member's group.
   task: ownContextResolver("task"),
+  // P5-T12. A document has no context of its own: it is readable by whoever
+  // reads its subject, and the draft rule in `actions/documents.ts` is the only
+  // thing that narrows it further. Registered so a comment on a document
+  // resolves, because `comment` walks its parent's resolver.
+  document: async (tx, subjectId, workspaceId) => {
+    const [row] = await tx
+      .select({
+        subjectType: documents.subjectType,
+        subjectId: documents.subjectId,
+      })
+      .from(documents)
+      .where(
+        activeOnly(
+          documents,
+          eq(documents.workspaceId, workspaceId),
+          eq(documents.id, subjectId),
+        ),
+      )
+      .limit(1);
+    if (!row) {
+      return undefined;
+    }
+    // A key result has no resolver of its own; its goal is what decides.
+    if (row.subjectType === "key_result") {
+      const goal = await tx.execute<{ goal_id: string }>(
+        sql`select goal_id from key_results
+             where id = ${row.subjectId}
+               and workspace_id = ${workspaceId}
+               and deleted_at is null
+             limit 1`,
+      );
+      const goalId = goal.rows[0]?.goal_id;
+      return goalId
+        ? SUBJECT_RESOLVERS.goal?.(tx, goalId, workspaceId)
+        : undefined;
+    }
+    // A cycle and a session belong to the workspace as far as access goes.
+    const parent =
+      row.subjectType === "cycle" || row.subjectType === "session"
+        ? "workspace"
+        : row.subjectType;
+    const resolver = SUBJECT_RESOLVERS[parent];
+    return resolver
+      ? resolver(
+          tx,
+          parent === "workspace" ? workspaceId : row.subjectId,
+          workspaceId,
+        )
+      : undefined;
+  },
   // P3-T16. Comments and reactions inherit their parent subject's context.
   comment: async (tx, subjectId, workspaceId) => {
     const [row] = await tx

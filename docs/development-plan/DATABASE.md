@@ -420,11 +420,28 @@ Each task owns an access context (`resourceType: "task"`): `workspace_standard` 
 ### checklist_items *(built at P5-T11)*
 `task_id` to tasks, `title`, `done bool`, `position`. Appended at the end of its task's list; the count on a card is ticked over total.
 
-### documents *(short_id)*
-`subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` to workspace_members.
+### documents *(built at P5-T12)*
+`subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich) with `body_version`, `state` (`draft` / `published`, default `draft`), `published_at?`, `author_member_id` to workspace_members.
 
-### attachments
-`subject_type`, `subject_id`, `blob_id` to blobs, `position`.
+No `short_id` yet, for the reason `initiatives` and `tasks` have none: nothing addresses a document by a short code until the palette at P5-T13.
+
+**A draft is visible to its author and to nobody else, and the query is what makes it so.** Every read composes `(state = 'published' or author_member_id = $me)`, so there is no code path that returns a draft to somebody else, including a direct identifier probe: that answers not-found, indistinguishable from a document that never existed. A filter in a component is a filter one careless read forgets.
+
+A document has no access context of its own. It inherits its subject's: a document on a goal is readable by whoever reads the goal, one on a space by whoever reads the space, and one on a cycle or a session through the workspace. A key result resolves through its owning goal, which is the rule the rest of the product follows. `SUBJECT_RESOLVERS.document` walks the same chain, so a comment on a document resolves too.
+
+A check constraint keeps `state` and `published_at` from disagreeing: a published document has a moment it was published and nothing else may.
+
+### document_versions *(built at P5-T12)*
+`document_id` to documents, `version`, `title`, `body` (rich) with `body_version`, `author_member_id` to workspace_members. Unique on `(workspace_id, document_id, version)`.
+
+**openokr:hard-delete**, unlike almost everything else here: a version is a snapshot of a document that still exists, so when the document goes the cascade takes its history. A surviving version row would be a readable copy of something the reader was told is gone.
+
+One row per publish and nothing else writes one. A draft edited forty times is one document with whatever versions it has published, because a version is a thing somebody decided to show other people. The difference a reader sees is computed from the stored editor JSON through `plainTextLines` in the one shared rich-text module, one line per block: the collapsed excerpt `excerptRichText` produces is right for a preview and makes every edit read as "the whole document changed" in a line comparison.
+
+### attachments *(built at P5-T12)*
+`subject_type`, `subject_id`, `blob_id` to blobs, `position`. Unique on `(workspace_id, subject_type, subject_id, blob_id)` while live: attaching the same file twice is the same decision made twice.
+
+The subject list is wider than the document one, because §4.9 says files go on any subject: a task, a document and a check-in are all in it. Detaching says "not here", never "gone": the blob is untouched and its own orphan cleanup decides its fate.
 
 ### blobs *(built at P2-T05, ahead of `initiatives`/`tasks`/`attachments` above, which are still Phase 3)*
 `filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`.

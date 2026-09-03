@@ -11,6 +11,7 @@ import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
+import { SubjectDocuments } from "../../documents/subject-documents.tsx";
 import {
   closeGoal,
   editGoal,
@@ -121,6 +122,22 @@ export default async function GoalPage({
   // The discussion (P3-T16). Read here rather than inside the client component
   // so the thread server-renders with the page, the way every other read on
   // this page does.
+  // Documents on this goal. The query has already dropped anybody else's
+  // draft, so this list is safe to render as it comes (P5-T12).
+  const documents = (
+    await callAction(context, "documents.list", {
+      subjectType: "goal",
+      subjectId: id,
+    })
+  ).map((document) => ({
+    id: document.id,
+    title: document.title,
+    state: document.state,
+    authorName: document.authorName,
+    versionCount: document.versionCount,
+    updatedAt: document.updatedAt,
+  }));
+
   const comments = await callAction(context, "comments.list", {
     subjectType: "goal",
     subjectId: id,
@@ -594,6 +611,13 @@ export default async function GoalPage({
               </CardBody>
             </Card>
           ) : null}
+
+          <SubjectDocuments
+            subjectType="goal"
+            subjectId={id}
+            documents={documents}
+            canEdit={canEdit}
+          />
 
           <Card>
             <CardBody>

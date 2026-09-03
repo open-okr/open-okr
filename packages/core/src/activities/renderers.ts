@@ -181,6 +181,16 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "An initiative was recorded as work that will move a key result",
   "initiative.unlinked": () =>
     "An initiative is no longer recorded against a key result",
+  // Documents and attachments (P5-T12).
+  "document.drafted": (p) =>
+    `A document "${asString(p.title, "untitled")}" was started`,
+  "document.edited": () => "A document was edited",
+  "document.published": (p) =>
+    `Document "${asString(p.title, "untitled")}" was published as version ${Number(p.version ?? 1)}`,
+  "document.deleted": (p) =>
+    `Document "${asString(p.title, "untitled")}" was removed`,
+  "attachment.added": () => "A file was attached",
+  "attachment.removed": () => "A file was detached",
   // Tasks (P5-T11).
   "task.created": (p) => `Task "${asString(p.title, "a task")}" was created`,
   "task.updated": () => "A task was edited",
