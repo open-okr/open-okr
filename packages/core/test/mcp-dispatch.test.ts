@@ -186,8 +186,33 @@ describe("what a refusal says, and what it does not", () => {
   });
 
   it("never throws, because a thrown error is a thing an agent retries", async () => {
-    // An input the schema refuses, which is a fault rather than a refusal.
+    // An input the schema refuses. It comes back as a refusal that names the
+    // field, not as a fault: an agent that is told "that could not be
+    // completed" retries the same call, and an agent told which field is wrong
+    // can fix it. Before P5-T16 a read never reached this branch at all,
+    // because the read builder did not parse, and the identifier went to the
+    // database instead.
     await expect(run("goals.read", { id: "not-a-uuid" })).resolves.toEqual({
+      text: expect.stringContaining("That input is not valid. id:"),
+      isError: true,
+    });
+  });
+
+  it("still says nothing specific when something genuinely failed", async () => {
+    // The generic sentence is still the right answer for a fault, and this is
+    // the difference the branch above turns on: no pool, so the call fails
+    // rather than being refused.
+    const outcome = await dispatchTool(
+      undefined as never,
+      {
+        workspaceId: "00000000-0000-4000-8000-000000000000",
+        userId: "00000000-0000-4000-8000-000000000000",
+        scopes: ["read"],
+      },
+      "goals.read",
+      { id: "00000000-0000-4000-8000-000000000000" },
+    );
+    expect(outcome).toEqual({
       text: "That call could not be completed.",
       isError: true,
     });

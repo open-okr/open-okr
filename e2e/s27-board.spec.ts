@@ -74,6 +74,14 @@ test("sign in", async () => {
 
 test("the sidebar reaches the board, and it says so when empty", async () => {
   await goTo(page, "/");
+  // **Settled before the click, not merely loaded.** The Work Map is a client
+  // bundle and this is the first page after signing in; clicking a link while
+  // the application is still finishing its own navigation gets the click's
+  // navigation replaced, which fails as "interrupted by another navigation".
+  // That is what flaked here once (P5-T16).
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible({ timeout: 15_000 });
   await page.getByRole("link", { name: "Board" }).first().click();
 
   await expect(

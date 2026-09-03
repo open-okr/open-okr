@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { ZodError, z } from "zod";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
+import { defineReadAction } from "../src/actions/define.ts";
 import { ACTIONS, actionNames, getAction } from "../src/actions/registry.ts";
+import { errorFor } from "../src/api/errors.ts";
 
 /**
  * The action contract registry (TECHNICAL-PLAN §14).
@@ -160,5 +163,97 @@ describe("action input validation", () => {
     expect(action.input.safeParse({ name: "x".repeat(201) }).success).toBe(
       false,
     );
+  });
+});
+
+describe("a read validates its input before its handler runs", () => {
+  // **P5-T16.** `defineWriteAction` has parsed its declared input since P1-T07,
+  // before the operation opens a transaction. The read builder did not, and
+  // `callAction` parses nothing either, so until this block every read in the
+  // product trusted the shape its caller passed. The callers are not the typed
+  // internal client alone: REST builds a read's input out of query strings, the
+  // agent transport out of a tool call, the chat router out of a message.
+
+  const CONTEXT = {
+    // A pool that would throw the moment anything queried it. That is the
+    // assertion: a refused input never reaches a database.
+    pool: undefined as never,
+    workspaceId: "00000000-0000-0000-0000-000000000000",
+    actor: {
+      kind: "human" as const,
+      userId: "00000000-0000-0000-0000-000000000000",
+    },
+  };
+
+  it("refuses input its schema refuses, without calling the handler", async () => {
+    let reached = false;
+    const action = defineReadAction({
+      name: "test.readOne",
+      summary: "A read that declares one identifier.",
+      input: z.object({ id: z.uuid() }),
+      output: z.object({ id: z.string() }),
+      async handler(_context, input) {
+        reached = true;
+        return { id: input.id };
+      },
+    });
+
+    await expect(
+      action.handler(CONTEXT, { id: "not-a-uuid" } as never),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(reached, "the handler ran on input the schema refuses").toBe(false);
+  });
+
+  it("hands the handler only the fields the schema declares", async () => {
+    let seen: unknown;
+    const action = defineReadAction({
+      name: "test.readTwo",
+      summary: "A read that declares one field and gets two.",
+      input: z.object({ id: z.uuid() }),
+      output: z.object({ id: z.string() }),
+      async handler(_context, input) {
+        seen = input;
+        return { id: input.id };
+      },
+    });
+
+    await action.handler(CONTEXT, {
+      id: "11111111-1111-4111-8111-111111111111",
+      // A surface that passes something the action never declared. Dropping it
+      // is the point: the handler cannot branch on what it does not know.
+      spaceId: "22222222-2222-4222-8222-222222222222",
+    } as never);
+
+    expect(seen).toEqual({ id: "11111111-1111-4111-8111-111111111111" });
+  });
+
+  it("refuses a registry read with a wrong-shaped identifier before it queries", async () => {
+    const action = getAction("goals.read");
+    if (!action) {
+      throw new Error("goals.read is missing");
+    }
+
+    // No database is reachable through this context, so a rejection that is a
+    // `ZodError` rather than a connection failure proves the order.
+    await expect(
+      action.handler(CONTEXT, { id: "nope" }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it("reports that refusal to a caller as invalid_input, naming the field", async () => {
+    const action = getAction("goals.read");
+    if (!action) {
+      throw new Error("goals.read is missing");
+    }
+
+    const thrown = await action
+      .handler(CONTEXT, { id: "nope" })
+      .catch((error: unknown) => error);
+
+    expect(errorFor(thrown)).toEqual({
+      code: "invalid_input",
+      message: "That input is not valid.",
+      fields: { id: expect.any(String) },
+    });
   });
 });

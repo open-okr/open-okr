@@ -19,9 +19,11 @@
  * caller cannot see: a not-found stays not-found.
  */
 import type { Pool } from "pg";
+import { ZodError } from "zod";
 import { type ActionName, callAction } from "../../actions/registry.ts";
 import { OperationError } from "../../operations/errors.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
+import { errorFor } from "../errors.ts";
 import { toolNamed } from "./catalogue.ts";
 import { isResearchTool, runResearchTool } from "./research.ts";
 
@@ -108,6 +110,23 @@ export async function dispatchTool(
     );
     return { text: JSON.stringify(result ?? null), isError: false };
   } catch (error) {
+    if (error instanceof ZodError) {
+      // **An input the schema refuses is a refusal, and it names the fields.**
+      // Until P5-T16 a read never got here, because the read builder did not
+      // parse; a wrong-shaped identifier reached the database and came back as
+      // a fault, and an agent reading "that could not be completed" retries the
+      // same call. Naming the field leaks nothing: the same schema is published
+      // in the tool catalogue the agent read to make the call.
+      const { fields } = errorFor(error);
+      const named = Object.entries(fields ?? {})
+        .map(([field, message]) => `${field}: ${message}`)
+        .join("; ");
+      return refusal(
+        named
+          ? `That input is not valid. ${named}`
+          : "That input is not valid.",
+      );
+    }
     if (error instanceof OperationError) {
       // The browser's own sentence, unchanged. A not-found stays not-found, so
       // a probe learns nothing about what exists in a workspace it cannot see.

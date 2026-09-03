@@ -26,7 +26,7 @@ import { expect, test } from "@playwright/test";
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
-import { INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -133,7 +133,7 @@ test("a weekly session has reached step 4", async () => {
 });
 
 test("the panel shows §7.2's six parts, with no provider involved", async () => {
-  await page.goto(`/session/${sessionId}`);
+  await goTo(page, `/session/${sessionId}`);
 
   const digest = page.getByRole("list", { name: "The digest" });
   await expect(digest).toBeVisible({ timeout: 15_000 });

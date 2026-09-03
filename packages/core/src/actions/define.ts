@@ -2,10 +2,12 @@
  * How an action is declared (TECHNICAL-PLAN §14).
  *
  * Two builders, and the difference between them is the point. A read action
- * gets a plain handler. A write action gets an *operation spec* instead of a
- * handler, and the builder runs it through the pipeline. There is no way to
- * declare a write that skips the audit row, because the shape that would
- * express it does not exist.
+ * gets a handler. A write action gets an *operation spec* instead, and the
+ * builder runs it through the pipeline. There is no way to declare a write that
+ * skips the audit row, because the shape that would express it does not exist.
+ *
+ * Both parse their declared input before anything else runs, so no surface can
+ * reach a handler with a shape the contract does not describe.
  */
 
 import type { Pool } from "pg";
@@ -104,6 +106,15 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
 /**
  * A read action. Its handler may query, and the mutation lint stops it
  * writing.
+ *
+ * The input is parsed before the handler runs, the same way the write builder
+ * parses before its operation opens a transaction (§8.2, "validate at the
+ * boundary"). Until P5-T16 it was not, and the asymmetry was invisible because
+ * the typed internal client keeps its own callers honest at compile time. The
+ * other callers are text: REST assembles a read's input out of query strings,
+ * the agent transport out of a tool call, the chat router out of a message.
+ * Each of those could hand a read a number where it declared a string, or a
+ * key it never declared, and the handler would carry it into SQL.
  */
 export function defineReadAction<TInput, TOutput>(definition: {
   name: string;
@@ -120,6 +131,12 @@ export function defineReadAction<TInput, TOutput>(definition: {
     access: definition.access ?? ACCESS_LEVELS.view,
     safety: "read",
     runsThroughPipeline: false,
+    // Declared after the spread, so it wraps the handler the caller passed
+    // rather than being replaced by it.
+    async handler(context, rawInput) {
+      const input = definition.input.parse(rawInput);
+      return definition.handler(context, input);
+    },
   };
 }
 

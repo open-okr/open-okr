@@ -120,18 +120,43 @@ export async function signIn(
 }
 
 /**
- * Navigates, retrying once.
+ * The two messages Playwright uses for a navigation that was replaced.
  *
- * `net::ERR_ABORTED` means a navigation was superseded rather than a page that
- * does not work, and it happens on a first `goto` after signing in. The
- * assertion that follows a `goto` is what proves the page loaded; this only
- * stops a race deciding whether the spec runs at all.
+ * `net::ERR_ABORTED` is the one a `goto` gets when the browser drops it;
+ * "interrupted by another navigation" is the one it gets when the application
+ * itself starts a second navigation, which is what a client-side `router.push`
+ * after hydration does. Neither says the page is broken, and both were read as
+ * flakiness before this list existed (P5-T16, after `s22-weekly-digest` and
+ * `s27-board` each failed once on that message).
+ */
+const SUPERSEDED = ["net::ERR_ABORTED", "interrupted by another navigation"];
+
+function wasSuperseded(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return SUPERSEDED.some((fragment) => message.includes(fragment));
+}
+
+/**
+ * Navigates, retrying a navigation that was superseded rather than refused.
+ *
+ * Two retries, and only for the messages above: any other failure is thrown
+ * where it happened, because a `goto` that fails for a real reason should say
+ * so on the first attempt rather than three times over. The assertion that
+ * follows a `goto` is still what proves the page loaded; this only stops a
+ * race deciding whether the spec runs at all.
  */
 export async function goTo(
   page: import("@playwright/test").Page,
   url: string,
 ): Promise<void> {
-  await page.goto(url).catch(async () => {
-    await page.goto(url);
-  });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url);
+      return;
+    } catch (error) {
+      if (attempt === 2 || !wasSuperseded(error)) {
+        throw error;
+      }
+    }
+  }
 }
