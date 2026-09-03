@@ -42,6 +42,14 @@ describe("navBlocks", () => {
   test("the first block carries no heading", () => {
     const first = navBlocks(items)[0];
     expect(first?.label).toBeUndefined();
-    expect(first?.items.map((i) => i.id)).toEqual(["overview", "review"]);
+    // Named rather than counted, so an item landing in the wrong group is a
+    // failure here rather than a surprise in the sidebar. Search joined them at
+    // P5-T13: every member searches and the index filters each row by access,
+    // so it is a destination rather than a part of the practice.
+    expect(first?.items.map((i) => i.id)).toEqual([
+      "overview",
+      "review",
+      "search",
+    ]);
   });
 });

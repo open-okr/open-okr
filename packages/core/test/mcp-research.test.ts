@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { dispatchTool } from "../src/index.ts";
+import { runIndexJob } from "../src/search/worker.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -63,16 +64,29 @@ const call = async (
   );
 };
 
-/** Indexes one entity the way the relay would: read the job, run the worker. */
+/**
+ * Indexes one entity the way the relay would: read the job, run the worker.
+ *
+ * **Both indexes, because the two tools read different ones.** `search`
+ * answers from the full-text index P5-T13 filled, and `fetch` reads the
+ * passage the embedding worker stored. One write enqueues an outbox row for
+ * each in the real product, and a test that ran only one worker would prove a
+ * tool against a store nothing had written. That is exactly what happened
+ * between P5-T09c and P5-T13.
+ */
 const indexEntity = async (
   workspaceId: string,
   entityType: string,
   entityId: string,
 ) => {
   const wb = await workerDb();
-  return runEmbedJob(
+  await runEmbedJob(
     { workspaceId, entityType, entityId },
     { pool: wb.appPool, embed: null },
+  );
+  return runIndexJob(
+    { workspaceId, entityType, entityId },
+    { pool: wb.appPool },
   );
 };
 

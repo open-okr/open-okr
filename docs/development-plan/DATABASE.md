@@ -256,9 +256,11 @@ Horizontal links between goals in different teams (METHOD.md §5.1). Two-way by 
 The §5.4 register. A provider is named either as a space in this workspace or as free text, and a check constraint requires one of the two. Only a space provider can be confirmed, and only by that space; only a space provider clears a silo finding, because only it names something the engine can find. Unconfirmed and unowned blocks publish gate 4.
 
 ### alignment_findings
-`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
+`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
 
 `subject_goal_id` is nullable, decision D-16: the anchor finding has no subject because no goal caused it, and attaching it to an arbitrary goal would send a facilitator to fix something that is not broken. Identity for the deterministic engine is `(scope, scope_id, cycle_id, rule_key, subject_goal_id, target_goal_id)`, held by a unique index that coalesces the nullable columns so two nulls do not read as distinct. The engine only ever touches `source = 'engine'` rows, so a structural recompute cannot delete the Coach's semantic findings.
+
+`subject_key_result_id` was added at P5-T14 so one goal can carry a finding per measure. TECHNICAL-PLAN §4.9's divergence is about a key result against the work behind it, and three measures that each finished their plan without moving are three separate conversations: dismissing one must leave the other two. It is always set alongside `subject_goal_id`, never instead of it, so every reader that asks about goals keeps working. It is null on every row the four structural sweeps write, and the engine's unique index is unchanged and still excludes it: that index is scoped to `source = 'engine'`, and the Coach's rows are reconciled by identity in application code.
 
 ### goal_retrospectives
 `goal_id` to goals, `body` (rich), `author_member_id` to workspace_members, `ai_drafted bool`.
@@ -272,7 +274,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members.
 
 ### alignment_findings
-`scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id` to goals, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
+`scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
 
 ### alignment_scores
 `scope`, `scope_id?`, `cycle_id` to cycles, `score smallint`, `breakdown jsonb`, `computed_at`.

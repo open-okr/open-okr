@@ -1165,6 +1165,8 @@ Deliverables: a `subject_key_result_id` column with its migration; the finding i
 Test plan: a goal with two key results, both diverging, produces two findings and dismissing one leaves the other; the existing per-goal findings still reconcile to one row each.
 Acceptance: Given a key result whose linked tasks are all complete but whose measured value has not moved, when the Coach's divergence check runs, then it reports exactly that in the finding inbox, naming both figures.
 
+**The engine's unique index is not widened, and that was the surprise (3 September 2026).** `alignment_findings_identity_idx` is scoped `where source = 'engine'`, so it never covered the Coach's rows at all: the collision this task exists to fix was in `reconcileFindingsInTx`'s identity string, not in the database. The column is added, the index is left alone, and the reason is written into the migration so nobody widens it later thinking it was an oversight.
+
 ### P5-T12: Documents and attachments [M]
 Depends on: P5-T11, P2-T11
 Goal: rich documents attached where they belong (screen S-29).

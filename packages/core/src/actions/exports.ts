@@ -55,12 +55,18 @@ export const exportList = defineWriteAction({
     /** True when the set was too large and the outbox is building it. */
     queued: z.boolean(),
   }),
-  // A read of the product's own data, so `view` rather than `edit`: an export
-  // takes out exactly what the person could already read on a screen, and
-  // asking for more would put the file behind a wall the list is not behind.
-  access: ACCESS_LEVELS.view,
+  // **`edit`, not `view`, and the first draft of this file had it wrong.**
+  // The argument for `view` was that an export takes out exactly what the
+  // person could already read on a screen. That is true of one row and false of
+  // a list: reading is bounded by attention and a file is not, so bulk
+  // extraction is its own act and the registry's own rule already says so. No
+  // write is reachable at `view`, whatever its domain, and this action writes.
+  // Every active member holds `edit` across the workspace through P3-T01's
+  // standard binding, so this narrows nobody except a deliberately view-only
+  // grant, which is the case the rule exists for.
+  access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
-    requires: ACCESS_LEVELS.view,
+    requires: ACCESS_LEVELS.edit,
     async execute({ workspaceId, actor }) {
       const table = await gather(context, input);
       const queued = table.rows.length > EXPORT_INLINE_LIMIT;
