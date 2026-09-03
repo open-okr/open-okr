@@ -139,24 +139,48 @@ function wasSuperseded(error: unknown): boolean {
 /**
  * Navigates, retrying a navigation that was superseded rather than refused.
  *
- * Two retries, and only for the messages above: any other failure is thrown
- * where it happened, because a `goto` that fails for a real reason should say
- * so on the first attempt rather than three times over. The assertion that
- * follows a `goto` is still what proves the page loaded; this only stops a
- * race deciding whether the spec runs at all.
+ * Three retries, each after letting the interrupting navigation finish, and
+ * only for the messages above: any other failure is thrown where it happened,
+ * because a `goto` that fails for a real reason should say so on the first
+ * attempt rather than four times over.
+ *
+ * **What interrupts it is the application arriving at the same address.** The
+ * failures all read "interrupted by another navigation to <the same URL>":
+ * the App Router settles a freshly loaded page with a navigation of its own,
+ * and a `goto` issued inside that window loses. It is a race in the harness
+ * rather than a defect in the page, which is why the answer is to wait and ask
+ * again rather than to change what the page does.
+ *
+ * **A `goto` to the address the page is already on is a reload, and it stays
+ * one.** Skipping it looked like the fix for `s27-board`'s collision with the
+ * application's own navigation, and it broke five specs that reload a page to
+ * prove a secret is not shown a second time. The collision is fixed where it
+ * happens instead: a spec that is already where it wants to be does not ask.
  */
 export async function goTo(
   page: import("@playwright/test").Page,
   url: string,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const attempts = 4;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       await page.goto(url);
       return;
     } catch (error) {
-      if (attempt === 2 || !wasSuperseded(error)) {
+      if (attempt === attempts - 1 || !wasSuperseded(error)) {
         throw error;
       }
+      // **Let whatever superseded it finish before asking again.** Retrying
+      // immediately races the same navigation and loses the same way, which
+      // is how three attempts in a row failed on one run. Both waits are
+      // bounded and both can fail while the page is mid-flight, so neither
+      // is allowed to end the spec.
+      await page
+        .waitForLoadState("load", { timeout: 5_000 })
+        .catch(() => undefined);
+      await page.waitForTimeout(250);
     }
   }
 }
+
+

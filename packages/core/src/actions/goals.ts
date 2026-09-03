@@ -73,6 +73,7 @@ import {
   unlinkKpiInTx,
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   recomputeGoalQualityInTx,
@@ -914,6 +915,14 @@ export const createGoal = defineWriteAction({
        * as written by a model, and one who accepts it verbatim should.
        */
       aiGenerated: z.boolean().optional(),
+      /**
+       * The source-system identity, when an import is creating this (P6-T01a).
+       *
+       * Absent for everything created in the product. Present, a second create
+       * carrying the same key is refused rather than duplicating the row, and
+       * the importer updates the row it finds instead.
+       */
+      legacy: legacyKey.optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -933,6 +942,8 @@ export const createGoal = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+
+      await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1009,6 +1020,7 @@ export const createGoal = defineWriteAction({
         weight: input.weight,
         contributionStatement: input.contributionStatement ?? null,
         aiGenerated: input.aiGenerated ?? false,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
@@ -1627,6 +1639,8 @@ export const createKeyResult = defineWriteAction({
     weight: z.number().default(1),
     kpiId: z.uuid().optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1645,6 +1659,14 @@ export const createKeyResult = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        keyResults,
+        input.legacy,
+        "key result",
+      );
+
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
@@ -1661,6 +1683,7 @@ export const createKeyResult = defineWriteAction({
         kpiId: input.kpiId ?? null,
         capacity: input.capacity ?? null,
         authorMemberId: memberId,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       await recompute(tx, workspaceId, input.goalId);

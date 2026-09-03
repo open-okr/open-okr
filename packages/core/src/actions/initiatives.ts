@@ -39,6 +39,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { refreshGateStateFor } from "../cycles/workflow.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import {
   asNumber,
   createInitiativeInTx,
@@ -465,6 +466,8 @@ export const createInitiative = defineWriteAction({
     confidence: z.number().min(0).max(1).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
     keyResultIds: z.array(z.uuid()).max(50).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid(), title: z.string() }),
   access: ACCESS_LEVELS.edit,
@@ -482,6 +485,14 @@ export const createInitiative = defineWriteAction({
       return undefined;
     },
     async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        initiatives,
+        input.legacy,
+        "initiative",
+      );
+
       const created = await createInitiativeInTx(tx, {
         workspaceId,
         spaceId: input.spaceId,
@@ -493,6 +504,7 @@ export const createInitiative = defineWriteAction({
         ...(input.status ? { status: input.status } : {}),
         confidence: input.confidence ?? null,
         capacity: input.capacity ?? null,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       for (const keyResultId of input.keyResultIds ?? []) {

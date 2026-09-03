@@ -20,6 +20,7 @@
     "db:ports": "node --experimental-strip-types --no-warnings packages/test-support/bin/db-ports.ts",
     "db:migrate": "pnpm --filter @openokr/db migrate",
     "db:change": "pnpm --filter @openokr/db change",
+    "import:csv": "pnpm --filter @openokr/importer import:csv",
     "db:seed": "pnpm --filter @openokr/core seed",
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",

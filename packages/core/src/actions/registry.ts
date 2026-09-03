@@ -201,6 +201,7 @@ import {
   updateGoal,
   updateKeyResult,
 } from "./goals.ts";
+import { finishImportRun, listImportRuns, startImportRun } from "./imports.ts";
 import {
   createInitiative,
   deleteInitiative,
@@ -522,6 +523,9 @@ export const ACTION_MAP = {
   "search.jump": readPaletteJump,
   "exports.list": exportList,
   "exports.mine": listMyExports,
+  "imports.listRuns": listImportRuns,
+  "imports.startRun": startImportRun,
+  "imports.finishRun": finishImportRun,
   "tasks.board": readBoard,
   "tasks.list": listTasks,
   "tasks.read": readTask,

@@ -46,6 +46,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import {
   ensureSubscriptionList,
   subscribeMember,
@@ -77,6 +78,8 @@ export interface CreateTaskInput {
   readonly keyResultId?: string | null;
   readonly status?: TaskStatus;
   readonly dueOn?: string | null;
+  /** The source-system identity, when an import created this row (P6-T01a). */
+  readonly legacy?: LegacyKey;
 }
 
 export interface CreatedTask {
@@ -168,6 +171,7 @@ export async function createTaskInTx<
         status,
       ),
       orderingState: { spacing: TASK_POSITION_SPACING },
+      ...legacyColumns(input.legacy),
     })
     .returning({ id: tasks.id, title: tasks.title });
 

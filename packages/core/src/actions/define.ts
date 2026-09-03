@@ -87,6 +87,22 @@ export interface ActionCallContext {
    * is answerable a quarter later without each action having to remember.
    */
   readonly channel?: string;
+  /**
+   * This call is one of many in a bulk load, so no notification is
+   * dispatched (TECHNICAL-PLAN §7.1 step 3, P6-T01a).
+   *
+   * Set by the importer and by nothing else. An import writes a quarter of
+   * somebody else's history in one run, and fanning that out would mean
+   * every member who subscribes to an imported goal reads a hundred
+   * notifications about work that was already finished. The activity row is
+   * still written, so the feed still shows what the import did, and so are
+   * the audit and outbox rows, because the import is a real thing this
+   * instance performed.
+   *
+   * It suppresses the fan-out and nothing else, and an action cannot set it:
+   * it comes from the caller, in one place, the way the channel does.
+   */
+  readonly bulk?: boolean;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
@@ -193,6 +209,10 @@ export function defineWriteAction<
           // audited with the channel on it without the action knowing there
           // are channels (P5-T06a). Absent for a browser call.
           ...(context.channel ? { channel: context.channel } : {}),
+          // Threaded rather than read inside the pipeline, so that a bulk
+          // load is a property of the call and not of a global the next
+          // caller inherits (P6-T01a).
+          ...(context.bulk ? { suppressNotifications: true } : {}),
         },
       );
     },

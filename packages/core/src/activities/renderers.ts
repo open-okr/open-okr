@@ -184,6 +184,17 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Exports (P5-T13).
   "export.taken": (p) =>
     `${Number(p.rowCount ?? 0)} ${asString(p.list, "rows")} were exported`,
+  // Imports (P6-T01a).
+  "import.started": (p) =>
+    `An import from ${asString(p.source, "a file")} started${
+      p.mode === "dry_run" ? " as a dry run" : ""
+    }`,
+  "import.finished": (p) =>
+    p.status === "completed"
+      ? `An import wrote ${Number(p.rowsWritten ?? 0)} rows and skipped ${Number(
+          p.rowsSkipped ?? 0,
+        )}`
+      : "An import failed",
   // Documents and attachments (P5-T12).
   "document.drafted": (p) =>
     `A document "${asString(p.title, "untitled")}" was started`,

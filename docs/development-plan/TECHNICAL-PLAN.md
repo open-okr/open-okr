@@ -364,7 +364,7 @@ Two sources, one target, one pipeline.
 
 ```
 pnpm import:csv --entity goals|key-results|kpis|kpi-records|initiatives|tasks \
-  --file <path> --workspace <slug> [--map <mapping.json>] [--dry-run]
+  --file <path> --workspace <slug> --as <email> [--map <mapping.json>] [--write]
 
 pnpm import:flowyteam --source <MYSQL_URL> --company <id> --workspace <slug> \
   [--dry-run] [--only objectives,indicators,tasks]
@@ -374,7 +374,7 @@ pnpm import:flowyteam --source <MYSQL_URL> --company <id> --workspace <slug> \
 
 1. **Connect read-only.** The FlowyTeam reader opens a read-only MySQL session and never writes, locks or migrates the source. Introspect, assert the required tables, and infer the version.
 2. **Map.** For CSV, a header-to-field mapping, either supplied or proposed by the AI mapper and confirmed by a human in the wizard. For FlowyTeam, the §7.2 table.
-3. **Extract, transform, load** per domain in dependency order, through the normal Operation pipeline with notification dispatch suppressed by a bulk flag.
+3. **Extract, transform, load** per domain in dependency order, through the normal Operation pipeline with notification dispatch suppressed by a bulk flag. The flag is `bulk` on the action call context (P6-T01a): it suppresses the fan-out and nothing else, so the activity, audit and outbox rows are written exactly as they are for a browser write. A spreadsheet run loads one entity per run and names it, and the row that names the person the run acts as is the acting member every write is authorised against; there is no ambient importer identity.
 4. **Deterministic identifiers.** Upsert on `(workspace_id, legacy_type, legacy_id)`. Re-runs are idempotent.
 5. **Two-phase rich text.** Load bodies through the sanitising parser, because imported content is untrusted, then run a reference-rewrite pass that remaps mentions and attachments.
 6. **Recompute, never trust.** Progress, health, next check-in, achievement, alignment score and streaks are all recomputed by the engines after load.
@@ -435,6 +435,7 @@ Keep current in every schema change.
 | No legacy source | `root_causes`, `process_health_responses` | Both are answers given in a review. A cause invented for a historical miss would be the importer diagnosing a quarter nobody reviewed, and an anonymous survey cannot be imported at all without inventing the respondents |
 | No legacy source | `review_diagnostics`, `next_cycle_drafts`, `review_actions` | The diagnostic is computed from a review that was held, and drafts and actions are what a room agreed in it. `learnings` keeps its row at line 400 because a source that holds them can import them, with `source = 'manual'` and no session behind them |
 | No legacy source | `ai_threads`, `ai_messages` | A copilot conversation is one member's questions, asked of a product they were using at the time. FlowyTeam has no assistant and no transcript, and an imported thread would be a conversation nobody had. A fresh workspace has none and the first question opens the first one |
+| No legacy source | `import_runs` | A row saying this instance loaded a file. It names the file, the member who ran it and what the run wrote here, none of which describes anything in a source system, and importing one would be importing a claim that an import happened that did not (P6-T01a) |
 | No legacy source | `export_runs` | A row saying somebody asked this instance for a file. It names a member, a moment and a file in this instance's own storage, none of which survives a move, and a run imported without its blob would offer a download of nothing (P5-T15) |
 | No legacy source | `objective_trends`, `decisions` | Both are recorded inside a monthly review, and the review itself is not imported. FlowyTeam has no decision log, so importing one would mean inventing an author and a date for a decision nobody recorded. Anything the source does carry about past decisions is written to the import report instead |
 

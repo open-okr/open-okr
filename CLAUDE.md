@@ -166,6 +166,7 @@ Keep this list current once scaffolded.
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
 - `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker). `TEST_DB_PORT` and `TEST_PGBOUNCER_PORT` choose the host ports; set either to `0` and Docker picks a free one, which `pnpm db:ports` then reads back as the two lines the harness needs. Continuous integration does exactly that, because choosing numbers by hand collided twice
 - `pnpm db:migrate`: migrations
+- `pnpm import:csv`: the spreadsheet importer (P6-T01a). `--entity`, `--file`, `--workspace <slug>` and `--as <email>` are required; `--map <mapping.json>` names the columns when the headers are not recognisable, and `--write` is what makes it real. **A dry run unless `--write` is given**, and the dry run reports exactly what the real run writes, because the two share every line up to the call. `--as` is the member every write is authorised as: there is no ambient importer identity, and the audit rows name whoever ran it. Exit 2 is a usage error, exit 1 means some rows were skipped, and the report names each one by its line in the file
 - `pnpm db:change`: the data-change runner. Batched, resumable, idempotent-by-ledger backfills, kept out of schema migrations. Scripts declare the columns and types they depend on and the runner checks every one before each run, so a later migration cannot silently change what an old script does
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
 - `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
@@ -185,7 +186,6 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 |---|---|---|
 | `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
 | `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
-| `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
 | `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |
 
 ## Definition of done for every task

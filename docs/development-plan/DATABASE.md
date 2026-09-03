@@ -751,7 +751,9 @@ Written by an outbox-driven worker on the `content.index` topic, enqueued by the
 ## 16. Import, export and tenancy (domain M)
 
 ### import_runs
-`source` (`csv` / `flowyteam`), `mode` (`dry_run` / `real`), `status`, `report jsonb`, `started_at`, `finished_at?`.
+`source` (`csv` / `flowyteam`), `entity?`, `mode` (`dry_run` / `real`), `status` (`running` / `completed` / `failed`), `filename?`, `rows_read`, `rows_written`, `rows_skipped`, `report jsonb`, `error?`, `requested_by_id` to workspace_members, `started_at`, `finished_at?`.
+
+One row per run at migration 0070, including a run that failed and a dry run that wrote nothing (P6-T01a). `entity` is what separates the two sources: a spreadsheet holds one kind of thing and names it, and a FlowyTeam run loads a company across every domain and names none. `mode` is stored rather than inferred, because a real run that wrote nothing and a dry run that would have written nothing produce the same counts and are not the same event. The report is jsonb because its shape belongs to the importer and differs per source: per-row errors against line numbers for a spreadsheet, per-table reconciliation for FlowyTeam.
 
 ### export_runs
 `kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?` to cycles, `space_id?` to spaces, `requested_by_id` to workspace_members, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?` to blobs, `error?`, `finished_at?`.

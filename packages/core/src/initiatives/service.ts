@@ -53,6 +53,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 
@@ -84,6 +85,8 @@ export interface CreateInitiativeInput {
   readonly confidence?: number | null;
   readonly capacity?: CapacityVerdict | null;
   readonly position?: number;
+  /** The source-system identity, when an import created this row (P6-T01a). */
+  readonly legacy?: LegacyKey;
 }
 
 export interface CreatedInitiative {
@@ -165,6 +168,7 @@ export async function createInitiativeInTx<
           : String(input.confidence),
       capacity: input.capacity ?? null,
       position: input.position ?? 0,
+      ...legacyColumns(input.legacy),
     })
     .returning({ id: initiatives.id, title: initiatives.title });
 

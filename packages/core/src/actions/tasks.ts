@@ -40,6 +40,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import type { OperationTx } from "../operations/operation.ts";
@@ -658,6 +659,8 @@ export const createTask = defineWriteAction({
     status: z.enum(TASK_STATUSES).optional(),
     dueOn: z.string().optional(),
     assigneeIds: z.array(z.uuid()).max(20).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid(), title: z.string() }),
   access: ACCESS_LEVELS.edit,
@@ -673,6 +676,8 @@ export const createTask = defineWriteAction({
       return undefined;
     },
     async execute({ tx, workspaceId, actor }) {
+      await assertLegacyKeyFree(tx, workspaceId, tasks, input.legacy, "task");
+
       const created = await createTaskInTx(tx, {
         workspaceId,
         spaceId: input.spaceId,
@@ -682,6 +687,7 @@ export const createTask = defineWriteAction({
         keyResultId: input.keyResultId ?? null,
         ...(input.status ? { status: input.status } : {}),
         dueOn: input.dueOn ?? null,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       const notified: string[] = [];

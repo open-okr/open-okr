@@ -325,6 +325,13 @@ export {
   type ValueSource,
 } from "./schema/goals.ts";
 export {
+  type ImportRun,
+  type ImportRunMode,
+  type ImportRunSource,
+  type ImportRunStatus,
+  importRuns,
+} from "./schema/imports.ts";
+export {
   INITIATIVE_STATUSES,
   type Initiative,
   type InitiativeKeyResult,

@@ -36,6 +36,11 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import {
+  assertLegacyKeyFree,
+  legacyColumns,
+  legacyKey,
+} from "../imports/legacy.ts";
+import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
   setKpiFormula,
@@ -140,12 +145,16 @@ export const createKpi = defineWriteAction({
     targetDefault: z.number().optional(),
     healthyPct: z.number().min(0).max(200).optional(),
     watchPct: z.number().min(0).max(200).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid(), shortId: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       await actingMember(tx, workspaceId, context.actor.userId);
+
+      await assertLegacyKeyFree(tx, workspaceId, kpis, input.legacy, "KPI");
 
       if (
         (input.healthyPct !== undefined || input.watchPct !== undefined) &&
@@ -189,6 +198,7 @@ export const createKpi = defineWriteAction({
         ...(input.watchPct === undefined
           ? {}
           : { watchPct: String(input.watchPct) }),
+        ...legacyColumns(input.legacy),
       });
 
       // No records yet, so this settles the KPI at `no_data` rather than leaving

@@ -154,7 +154,7 @@ importers:
         version: 2.10.10
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.10(@types/node@26.2.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0))
 
   apps/web:
     dependencies:
@@ -428,12 +428,24 @@ importers:
 
   packages/importer:
     dependencies:
+      '@openokr/config':
+        specifier: workspace:*
+        version: link:../config
       '@openokr/core':
         specifier: workspace:*
         version: link:../core
       '@openokr/db':
         specifier: workspace:*
         version: link:../db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.21.0)(kysely@0.29.4)(pg@8.23.0)
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.0
+      read-excel-file:
+        specifier: ^9.3.10
+        version: 9.3.10
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -444,6 +456,9 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.2.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0))
+      write-excel-file:
+        specifier: ^4.1.1
+        version: 4.1.1
 
   packages/method:
     dependencies:
@@ -1955,9 +1970,6 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
-  '@types/node@26.1.2':
-    resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
-
   '@types/node@26.2.0':
     resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
 
@@ -2946,6 +2958,9 @@ packages:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  node-int64@0.4.0:
+    resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
+
   nodemailer@9.0.5:
     resolution: {integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==}
     engines: {node: '>=6.0.0'}
@@ -3056,9 +3071,6 @@ packages:
     resolution: {integrity: sha512-gKtPkFdQPU3DksooVLi9LsjZxrsBUZIpa+7aVx+LV5pNh0KzP4Zleud2po+ConrxbuXGBJ6Hfer6hdgpIBpBaw==}
     peerDependencies:
       pg: '>=8.0'
-
-  pg-protocol@1.15.0:
-    resolution: {integrity: sha512-cq9sECI5s0+uPUXjbz8ioyPJni6RzsRib0US67i5IoTZKw8fNeYlVE7u8F4dG7vEJJtc5wdD1K189lCCUwqWTQ==}
 
   pg-protocol@1.16.0:
     resolution: {integrity: sha512-sILXutLVjCLjcDuOmvhX5e2Z4cS5qG/6Bu3VkpFwdf/633ElGLpEh9bgmuI5I4sqKqkifQiGyiCcx1HdtrK7tg==}
@@ -3229,6 +3241,10 @@ packages:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
     engines: {node: '>=0.10.0'}
 
+  read-excel-file@9.3.10:
+    resolution: {integrity: sha512-zFcBdzunLCGBmLRT4Q3mLPJnhKPAXXfGAZ83feODlEqX2aRUbgF1h/n2oY0UF7I8tVwnJNRas6fTRD5veDUs+g==}
+    engines: {node: '>=18'}
+
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
@@ -3269,6 +3285,10 @@ packages:
 
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
+
+  saxen@11.1.1:
+    resolution: {integrity: sha512-J4BkmJFaM7VgE7pgkFGsNEcqqM3h7+Mz80vfLWFhx7uNOCOXIu6LLjQHYWNejdst3pf/3JUaBIG9+pkk1umlow==}
+    engines: {node: '>= 20.12'}
 
   saxes@6.0.0:
     resolution: {integrity: sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA==}
@@ -3492,6 +3512,10 @@ packages:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
 
+  unzipper-esm@0.13.3:
+    resolution: {integrity: sha512-LUO6VZ6fCzkDbdMev0/fOhoIeVGKaOkTIOoYxVLE0SQjfvmAHK+oywl7lfhloSZIsdGJ25mJ18Mtd9CyTASjrA==}
+    engines: {node: '>=8.0.0'}
+
   use-sync-external-store@1.6.0:
     resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
     peerDependencies:
@@ -3625,6 +3649,10 @@ packages:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
     hasBin: true
+
+  worker-f@0.1.20:
+    resolution: {integrity: sha512-7z5K5z4x++FykhpDTfriT/dOu7CmSap9BBv38DVFU3CD38obopq+DoFH75yBV3butpGm+OeqR9BKdSvYJSnUfQ==}
+    engines: {node: '>=12'}
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
@@ -4864,10 +4892,6 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
-  '@types/node@26.1.2':
-    dependencies:
-      undici-types: 8.3.0
-
   '@types/node@26.2.0':
     dependencies:
       undici-types: 8.3.0
@@ -4878,8 +4902,8 @@ snapshots:
 
   '@types/pg@8.21.0':
     dependencies:
-      '@types/node': 26.1.2
-      pg-protocol: 1.15.0
+      '@types/node': 26.2.0
+      pg-protocol: 1.16.0
       pg-types: 2.2.0
 
   '@types/react-dom@19.2.4(@types/react@19.2.18)':
@@ -5703,6 +5727,8 @@ snapshots:
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
 
+  node-int64@0.4.0: {}
+
   nodemailer@9.0.5: {}
 
   non-error@0.1.0: {}
@@ -5826,8 +5852,6 @@ snapshots:
   pg-pool@3.14.0(pg@8.23.0):
     dependencies:
       pg: 8.23.0
-
-  pg-protocol@1.15.0: {}
 
   pg-protocol@1.16.0: {}
 
@@ -6043,6 +6067,13 @@ snapshots:
 
   react@19.2.8: {}
 
+  read-excel-file@9.3.10:
+    dependencies:
+      fflate: 0.8.3
+      saxen: 11.1.1
+      unzipper-esm: 0.13.3
+      worker-f: 0.1.20
+
   reflect-metadata@0.2.2: {}
 
   require-from-string@2.0.2: {}
@@ -6092,6 +6123,8 @@ snapshots:
   safe-buffer@5.2.1: {}
 
   safer-buffer@2.1.2: {}
+
+  saxen@11.1.1: {}
 
   saxes@6.0.0:
     dependencies:
@@ -6324,6 +6357,11 @@ snapshots:
 
   unpipe@1.0.0: {}
 
+  unzipper-esm@0.13.3:
+    dependencies:
+      graceful-fs: 4.2.11
+      node-int64: 0.4.0
+
   use-sync-external-store@1.6.0(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -6342,34 +6380,6 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.7.0
       yaml: 2.9.0
-
-  vitest@4.1.10(@types/node@26.1.2)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0)):
-    dependencies:
-      '@vitest/expect': 4.1.10
-      '@vitest/mocker': 4.1.10(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0))
-      '@vitest/pretty-format': 4.1.10
-      '@vitest/runner': 4.1.10
-      '@vitest/snapshot': 4.1.10
-      '@vitest/spy': 4.1.10
-      '@vitest/utils': 4.1.10
-      es-module-lexer: 2.3.1
-      expect-type: 1.4.0
-      magic-string: 0.30.21
-      obug: 2.1.4
-      pathe: 2.0.3
-      picomatch: 4.0.5
-      std-env: 4.2.0
-      tinybench: 2.9.0
-      tinyexec: 1.3.0
-      tinyglobby: 0.2.17
-      tinyrainbow: 3.1.1
-      vite: 8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0)
-      why-is-node-running: 2.3.0
-    optionalDependencies:
-      '@types/node': 26.1.2
-      jsdom: 30.0.1(@noble/hashes@2.2.0)
-    transitivePeerDependencies:
-      - msw
 
   vitest@4.1.10(@types/node@26.2.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.2.0)(jiti@2.7.0)(yaml@2.9.0)):
     dependencies:
@@ -6437,6 +6447,8 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  worker-f@0.1.20: {}
 
   wrappy@1.0.2: {}
 

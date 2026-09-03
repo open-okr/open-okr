@@ -1217,11 +1217,22 @@ Acceptance: Given a read action declared with an input schema, when any surface 
 
 # Phase 6: Data: import, export, portability
 
-### P6-T01: CSV and XLSX importer with the AI mapper [L]
+### P6-T01a: The spreadsheet importer and its command [L]
 Depends on: Phase 5 complete
-Goal: the generic migration path (TECHNICAL-PLAN.md §7).
-Deliverables: the import command and the admin wizard; entity templates for goals, key results, KPIs, KPI records, initiatives and tasks; column mapping either supplied or proposed by the AI mapper and confirmed by a human; a dry-run preview through the registry's validation endpoints; a per-row error report; idempotent upsert; persisted run records.
-Test plan: a file with one bad row previews as creatable minus one with the error explained and imports exactly that on the real run; re-running changes nothing; with AI off the manual mapping path is complete.
+Goal: the generic migration path as a mechanism (TECHNICAL-PLAN.md §7), driven from a file and a mapping rather than a screen.
+
+**Cut in two before any code, and Agung chose the seam.** The row held a reader for two formats, templates for six entities, a mapping supplied by hand, a mapping proposed by a model, a dry run with a per-row report, an idempotent upsert, a run record with its migration, a wizard on S-36 and a command. That is more than one working session, and the two halves fail differently: the mechanism is a spreadsheet turning into rows through the Operation pipeline, and the second half is a person being helped to describe their own columns. `import_runs` is in §4.13 and does not exist yet, so it arrives here.
+
+Deliverables: CSV and XLSX readers in `packages/importer`, with `read-excel-file` (MIT) as the reader Agung approved on 3 September 2026; entity templates for goals, key results, KPIs, KPI records, initiatives and tasks, each naming its columns, which are required, how a value is coerced and which registry action writes it; a mapping supplied as `--map <mapping.json>`; a dry run that reports exactly what a real run would write, without writing; a per-row error report naming the row number and the field; idempotent upsert on `(workspace_id, legacy_type, legacy_id)`; the `import_runs` table with its row-level security policy in the same migration, one row per run including a failure; `pnpm import:csv`, dry-run by default.
+Test plan: a file with one bad row previews as creatable minus one with the error explained, and a real run writes exactly that; running the same file twice writes nothing the second time and leaves one completed run per attempt; a value the template cannot coerce is a row error rather than a refused file; notification dispatch is suppressed for every write the import makes.
+Acceptance: Given a spreadsheet and a mapping, when the command runs with `--dry-run`, then the report names every row it would write and every row it would skip with the reason, and the real run matches that report exactly.
+
+### P6-T01b: The AI mapper and the import wizard [L]
+Depends on: P6-T01a
+Goal: a person with unfamiliar headers gets a proposed mapping and a screen to confirm it.
+
+Deliverables: the AI mapper proposing a header-to-field mapping over the P6-T01a templates, as a proposal a human confirms or corrects and never as a write; the import wizard on S-36, carrying upload, mapping confirmation, the dry-run preview and the error report; the manual mapping path complete and every AI affordance hidden with the provider off.
+Test plan: unfamiliar headers get a proposed mapping that a human can correct before anything is written; with the provider off the screen offers the manual path and no proposal; the preview the screen shows is the report the command produces for the same file and mapping.
 Acceptance: Given a goals spreadsheet with unfamiliar headers, when the wizard runs, then a mapping is proposed, the human confirms or corrects it, the dry run reports accurately and the real run matches it.
 
 ### P6-T02: FlowyTeam connector [M]
@@ -1391,7 +1402,7 @@ Acceptance: the tagged release installs from the documented path on a clean mach
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (7). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **126 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (8: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T14 (14). **127 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

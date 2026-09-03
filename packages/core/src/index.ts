@@ -579,6 +579,15 @@ export { myExportBlob } from "./exports/collect.ts";
 // reaches a caller that only needs to describe its own storage function.
 export type { PutFile } from "./exports/worker.ts";
 export {
+  assertLegacyKeyFree,
+  findLegacyRowInTx,
+  LEGACY_SOURCES,
+  type LegacyKey,
+  type LegacyTable,
+  legacyColumns,
+  legacyKey,
+} from "./imports/legacy.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,

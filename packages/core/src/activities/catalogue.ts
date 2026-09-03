@@ -215,6 +215,19 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     list: z.string(),
     rowCount: z.number().int(),
   }),
+  // Imports (P6-T01a). The counterpart of the line above: an import brings a
+  // quarter of somebody else's history in, and the run behind it is the thing
+  // an administrator asks about later. Neither notifies.
+  "import.started": z.object({
+    source: z.string(),
+    mode: z.string(),
+    entity: z.string().optional(),
+  }),
+  "import.finished": z.object({
+    status: z.string(),
+    rowsWritten: z.number().int(),
+    rowsSkipped: z.number().int(),
+  }),
   // Documents and attachments (P5-T12). Drafting emits an activity but no
   // notification: the author's own record that they started one, with nothing
   // in anybody else's feed about something they cannot open.

@@ -193,6 +193,16 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    * already belong to a workspace" means.
    */
   readonly deviceCodeHash?: string;
+  /**
+   * Skip notification fan-out for this write (P6-T01a).
+   *
+   * Set from the call context's bulk flag and by nothing else. §7.1 step 3
+   * asks for an import to run through the normal pipeline with notification
+   * dispatch suppressed by a bulk flag. Everything else about the write is
+   * unchanged, the activity row included, so the feed still shows what the
+   * import did.
+   */
+  readonly suppressNotifications?: boolean;
   /** Freshly loaded rows the authorisation and the change both depend on. */
   readonly load?: (context: {
     tx: OperationTx;
@@ -439,7 +449,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
         })
         .returning({ id: activities.id });
 
-      if (outcome.activity.notify) {
+      if (outcome.activity.notify && !spec.suppressNotifications) {
         await fanOutActivity(tx, {
           workspaceId: spec.workspaceId,
           activityId: (insertedActivity as { id: string }).id,

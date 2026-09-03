@@ -5114,6 +5114,143 @@
       "example": {}
     },
     {
+      "name": "imports.listRuns",
+      "description": "This workspace's import runs, newest first, with their reports.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "imports.startRun",
+      "description": "Records an import run as it starts, before anything is loaded.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "flowyteam"
+            ]
+          },
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "dry_run",
+              "real"
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "source",
+          "mode"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "source": "csv",
+        "mode": "dry_run"
+      }
+    },
+    {
+      "name": "imports.finishRun",
+      "description": "Closes an import run with its counts and its report.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed"
+            ]
+          },
+          "rowsRead": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rowsWritten": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "rowsSkipped": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "report": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "error": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "rowsRead",
+          "rowsWritten",
+          "rowsSkipped"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "status": "completed",
+        "rowsRead": 0,
+        "rowsWritten": 0,
+        "rowsSkipped": 0
+      }
+    },
+    {
       "name": "tasks.board",
       "description": "One board: every task in a space, an initiative or a key result, grouped by status. Drives screen S-27.",
       "inputSchema": {
@@ -5248,6 +5385,27 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
           }
         },
         "required": [
@@ -5739,6 +5897,27 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
           }
         },
         "required": [
@@ -6143,6 +6322,27 @@
           },
           "aiGenerated": {
             "type": "boolean"
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
           }
         },
         "required": [
@@ -6533,6 +6733,27 @@
               "fits",
               "tight",
               "exceeds"
+            ]
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
             ]
           }
         },
@@ -7768,6 +7989,27 @@
             "type": "number",
             "minimum": 0,
             "maximum": 200
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
           }
         },
         "required": [

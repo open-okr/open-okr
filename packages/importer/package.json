@@ -8,15 +8,21 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "import:csv": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/import-csv.ts"
   },
   "dependencies": {
+    "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
-    "@openokr/db": "workspace:*"
+    "@openokr/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
+    "read-excel-file": "^9.3.10"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "write-excel-file": "^4.1.1"
   }
 }

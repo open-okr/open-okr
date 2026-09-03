@@ -3675,6 +3675,123 @@
       "pages": false
     },
     {
+      "name": "imports listRuns",
+      "action": "imports.listRuns",
+      "method": "GET",
+      "path": "/imports/listRuns",
+      "scope": "read",
+      "summary": "This workspace's import runs, newest first, with their reports.",
+      "flags": [
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports startRun",
+      "action": "imports.startRun",
+      "method": "POST",
+      "path": "/imports/startRun",
+      "scope": "write",
+      "summary": "Records an import run as it starts, before anything is loaded.",
+      "flags": [
+        {
+          "name": "source",
+          "field": "source",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "csv",
+            "flowyteam"
+          ]
+        },
+        {
+          "name": "entity",
+          "field": "entity",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "mode",
+          "field": "mode",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "dry_run",
+            "real"
+          ]
+        },
+        {
+          "name": "filename",
+          "field": "filename",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports finishRun",
+      "action": "imports.finishRun",
+      "method": "POST",
+      "path": "/imports/finishRun",
+      "scope": "write",
+      "summary": "Closes an import run with its counts and its report.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "completed",
+            "failed"
+          ]
+        },
+        {
+          "name": "rows-read",
+          "field": "rowsRead",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "rows-written",
+          "field": "rowsWritten",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "rows-skipped",
+          "field": "rowsSkipped",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "report",
+          "field": "report",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "error",
+          "field": "error",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tasks board",
       "action": "tasks.board",
       "method": "GET",
@@ -3815,6 +3932,12 @@
           "name": "assignee-ids",
           "field": "assigneeIds",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
           "required": false
         }
       ],
@@ -4210,6 +4333,12 @@
           "field": "keyResultIds",
           "type": "array",
           "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false
@@ -4552,6 +4681,12 @@
           "field": "aiGenerated",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false
@@ -4884,6 +5019,12 @@
             "tight",
             "exceeds"
           ]
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false
@@ -5816,6 +5957,12 @@
           "name": "watch-pct",
           "field": "watchPct",
           "type": "number",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
           "required": false
         }
       ],

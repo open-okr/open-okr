@@ -313,11 +313,14 @@ describe("search, through the same access layer as every other read", () => {
     expect(outcome.text).toContain("search needs read");
   });
 
-  it("never throws on an input the schema refuses", async () => {
-    await expect(run("search", { query: "" })).resolves.toEqual({
-      text: "That call could not be completed.",
-      isError: true,
-    });
+  it("never throws on an input the schema refuses, and names the field", async () => {
+    // A research tool takes the same refusal path as a registry tool: an input
+    // the schema refuses comes back naming the field, so an agent can correct
+    // it rather than retrying the same call. P5-T16 changed the sentence for
+    // both and left this assertion behind, which the full suite caught.
+    const outcome = await run("search", { query: "" });
+    expect(outcome.isError).toBe(true);
+    expect(outcome.text).toContain("That input is not valid. query:");
   });
 });
 
