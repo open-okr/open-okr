@@ -61,6 +61,15 @@ export interface ActionCallContext {
   readonly actor: ActorInput;
   readonly ring?: KeyRing;
   /**
+   * Reads a file's bytes, when the host has a storage port to give (P6-T05a).
+   *
+   * One method rather than the whole `FileStorage`, because `packages/core`
+   * does not depend on `packages/adapters`: the driver satisfies this
+   * structurally and the app passes the one it already has. Absent means an
+   * archive carries rows and no bytes, and says so in its manifest.
+   */
+  readonly storage?: { get(key: string): Promise<Buffer> };
+  /**
    * Language for the agents, when the host has a provider to give (P4-T05c-b).
    *
    * Absent is the normal case and means the AI provider is off. Every trigger,

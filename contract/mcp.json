@@ -2127,6 +2127,26 @@
       "example": {}
     },
     {
+      "name": "workspace.exportArchive",
+      "description": "Exports the whole workspace as a versioned, checksummed, encrypted archive. Audited.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeFiles": {
+            "default": true,
+            "type": "boolean"
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "settings.readWorkspaceSettings",
       "description": "The workspace's own settings map, for the admin cards.",
       "inputSchema": {

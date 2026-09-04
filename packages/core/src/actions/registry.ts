@@ -273,6 +273,7 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
+import { exportArchive } from "./portability.ts";
 import { reviewInbox } from "./review.ts";
 import {
   clusterRetroNotes,
@@ -456,6 +457,8 @@ export const ACTION_MAP = {
   // P6-T04b. Restores a watcher an import found, by name.
   "subscriptions.importWatcher": importWatcher,
   "activities.workspaceFeed": workspaceFeed,
+  // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
+  "workspace.exportArchive": exportArchive,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,

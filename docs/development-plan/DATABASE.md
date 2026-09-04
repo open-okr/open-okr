@@ -768,6 +768,8 @@ One row per run at migration 0070, including a run that failed and a dry run tha
 ### export_runs
 `kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?` to cycles, `space_id?` to spaces, `requested_by_id` to workspace_members, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?` to blobs, `error?`, `finished_at?`.
 
+`kind: "archive"` is a whole-workspace export (§7.3, P6-T05a). It joins this lifecycle rather than needing a table of its own, at the cost of two columns reading oddly: `list` is not nullable so an archive repeats its kind there, and `format` has no archive value so it says `csv` while the filename says `.okr`. Recorded here because the alternative was widening two enums for one row shape. An archive run is written `ready` and not `queued`: the file is built inside the action and returned in its answer, so nothing comes back for it later.
+
 One row per asked-for file (P5-T15). The blob is nullable until the worker has one, because a run is recorded the moment the request commits and the file is what the relay produces afterwards. `requested_by_id` is what scopes the read: the file holds exactly the rows that member could see when the worker built it, so nobody else may collect it, an administrator included. `kind` is `list` today; `archive` belongs to §7.3's portability engine, which adds a manifest and a checksum to the same lifecycle rather than a second table.
 
 ### workspace_imports

@@ -1456,6 +1456,23 @@
       "pages": true
     },
     {
+      "name": "workspace exportArchive",
+      "action": "workspace.exportArchive",
+      "method": "POST",
+      "path": "/workspace/exportArchive",
+      "scope": "write",
+      "summary": "Exports the whole workspace as a versioned, checksummed, encrypted archive. Audited.",
+      "flags": [
+        {
+          "name": "include-files",
+          "field": "includeFiles",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "settings readWorkspaceSettings",
       "action": "settings.readWorkspaceSettings",
       "method": "GET",
