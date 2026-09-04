@@ -30,7 +30,7 @@ import {
   resolveMapping,
   valuesFor,
 } from "./mapping.ts";
-import { readTable } from "./readers/index.ts";
+import { readTable, type Table } from "./readers/index.ts";
 import { referencesFor } from "./references.ts";
 import { type EntityTemplate, templateFor } from "./templates/index.ts";
 
@@ -43,6 +43,28 @@ export interface RunOptions {
   readonly file: string;
   readonly mapping?: MappingFile;
   /** True by default at the command line: nothing is written. */
+  readonly dryRun: boolean;
+}
+
+/**
+ * A run over a table somebody already read (P6-T01b-b).
+ *
+ * The wizard holds a table because the request carried bytes and the server
+ * read them; the command holds a path. From here the two are one run: the same
+ * mapping, the same loop, the same report, the same `import_runs` row.
+ *
+ * `name` is what the report and the run row call the file. A path at the
+ * command line, an uploaded file's own name in the browser. It is a label and
+ * nothing reads it back.
+ */
+export interface TableRunOptions {
+  readonly pool: Pool;
+  readonly workspaceId: string;
+  readonly userId: string;
+  readonly entity: string;
+  readonly table: Table;
+  readonly name: string;
+  readonly mapping?: MappingFile;
   readonly dryRun: boolean;
 }
 
@@ -77,9 +99,28 @@ export interface RunResult {
 }
 
 export async function runImport(options: RunOptions): Promise<RunResult> {
-  const template = templateFor(options.entity);
+  // The path is read here and nowhere else. Everything after it is the same
+  // run the wizard performs, which is what stops the two surfaces drifting.
   const table = await readTable(options.file);
-  const mapping = resolveMapping(template, table.headers, options.mapping);
+  return runTable({
+    pool: options.pool,
+    workspaceId: options.workspaceId,
+    userId: options.userId,
+    entity: options.entity,
+    table,
+    name: options.file,
+    ...(options.mapping ? { mapping: options.mapping } : {}),
+    dryRun: options.dryRun,
+  });
+}
+
+export async function runTable(options: TableRunOptions): Promise<RunResult> {
+  const template = templateFor(options.entity);
+  const mapping = resolveMapping(
+    template,
+    options.table.headers,
+    options.mapping,
+  );
 
   const context: ActionCallContext = {
     pool: options.pool,
@@ -94,16 +135,22 @@ export async function runImport(options: RunOptions): Promise<RunResult> {
     source: "csv",
     entity: template.entity,
     mode: options.dryRun ? "dry_run" : "real",
-    filename: options.file,
+    filename: options.name,
   });
 
   try {
-    const report = await loadRows(context, template, mapping, table.rows, {
-      entity: template.entity,
-      file: options.file,
-      dryRun: options.dryRun,
-      unmappedHeaders: mapping.unmapped,
-    });
+    const report = await loadRows(
+      context,
+      template,
+      mapping,
+      options.table.rows,
+      {
+        entity: template.entity,
+        file: options.name,
+        dryRun: options.dryRun,
+        unmappedHeaders: mapping.unmapped,
+      },
+    );
 
     await callAction(context, "imports.finishRun", {
       id: runId,

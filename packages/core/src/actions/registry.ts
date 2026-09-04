@@ -204,7 +204,9 @@ import {
 import {
   finishImportRun,
   listImportRuns,
+  previewImportTable,
   proposeImportMapping,
+  runImportTable,
   startImportRun,
 } from "./imports.ts";
 import {
@@ -530,6 +532,8 @@ export const ACTION_MAP = {
   "exports.mine": listMyExports,
   "imports.listRuns": listImportRuns,
   "imports.proposeMapping": proposeImportMapping,
+  "imports.previewTable": previewImportTable,
+  "imports.runTable": runImportTable,
   "imports.startRun": startImportRun,
   "imports.finishRun": finishImportRun,
   "tasks.board": readBoard,

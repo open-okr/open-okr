@@ -593,6 +593,7 @@ export { findExisting } from "./imports/legacy-lookup.ts";
 export {
   type Mapping,
   type MappingFile,
+  matchHeadersByAlias,
   parseMappingFile,
   resolveMapping,
   valuesFor,
@@ -615,6 +616,8 @@ export {
   type RunReport,
   type RunResult,
   runImport,
+  runTable,
+  type TableRunOptions,
 } from "./imports/run.ts";
 export {
   type ImportTarget,
@@ -816,6 +819,7 @@ export {
 } from "./sessions/live.ts";
 export {
   brandingSchema,
+  DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,
   findSetting,
   INSTANCE_DEFAULT_LANGUAGE,

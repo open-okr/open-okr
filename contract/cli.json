@@ -3721,6 +3721,76 @@
       "pages": false
     },
     {
+      "name": "imports previewTable",
+      "action": "imports.previewTable",
+      "method": "POST",
+      "path": "/imports/previewTable",
+      "scope": "write",
+      "summary": "Reports what importing this table would write, writing nothing but the run record.",
+      "flags": [
+        {
+          "name": "entity",
+          "field": "entity",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "table",
+          "field": "table",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "mapping",
+          "field": "mapping",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "imports runTable",
+      "action": "imports.runTable",
+      "method": "POST",
+      "path": "/imports/runTable",
+      "scope": "write",
+      "summary": "Imports this table through the Operation pipeline, one row at a time.",
+      "flags": [
+        {
+          "name": "entity",
+          "field": "entity",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "table",
+          "field": "table",
+          "type": "object",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "mapping",
+          "field": "mapping",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "imports startRun",
       "action": "imports.startRun",
       "method": "POST",

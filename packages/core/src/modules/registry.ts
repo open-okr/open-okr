@@ -324,6 +324,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-imports",
+        label: "Import",
+        href: "/admin/imports",
+        section: "admin",
+        // An import writes across every domain at once, as the member who ran
+        // it, and its report names rows the reader may not otherwise reach
+        // (P6-T01b-b). The same level the two table actions require.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-agents",
         label: "Agents and runs",
         href: "/admin/agents",

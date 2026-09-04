@@ -5181,6 +5181,164 @@
       }
     },
     {
+      "name": "imports.previewTable",
+      "description": "Reports what importing this table would write, writing nothing but the run record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "table": {
+            "type": "object",
+            "properties": {
+              "headers": {
+                "minItems": 1,
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                }
+              }
+            },
+            "required": [
+              "headers",
+              "rows"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "mapping": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "entity",
+          "table",
+          "name"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "entity": "…",
+        "table": {},
+        "name": "…"
+      }
+    },
+    {
+      "name": "imports.runTable",
+      "description": "Imports this table through the Operation pipeline, one row at a time.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "table": {
+            "type": "object",
+            "properties": {
+              "headers": {
+                "minItems": 1,
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                }
+              }
+            },
+            "required": [
+              "headers",
+              "rows"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "mapping": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "entity",
+          "table",
+          "name"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "entity": "…",
+        "table": {},
+        "name": "…"
+      }
+    },
+    {
       "name": "imports.startRun",
       "description": "Records an import run as it starts, before anything is loaded.",
       "inputSchema": {

@@ -128,6 +128,36 @@ export function resolveMapping(
   return { fieldToIndex: byField, unmapped };
 }
 
+/**
+ * Which field each header answers to by alias, first claim winning (P6-T01b-b).
+ *
+ * `resolveMapping` refuses a file whose required fields nothing carries, and
+ * refuses two columns claiming one field. That is right for a run and wrong for
+ * a screen: the wizard has to draw the columns before anybody can answer them,
+ * and "nothing carries title yet" is what the mapping step is *for*. This is
+ * the same alias matching without either refusal, so the rule for what "Owner"
+ * means lives in one place rather than in the runner and again in a screen.
+ */
+export function matchHeadersByAlias(
+  template: EntityTemplate,
+  headers: readonly string[],
+): Record<string, string> {
+  const claimed: Record<string, string> = {};
+  const taken = new Set<string>();
+  for (const header of headers) {
+    if (header === "") {
+      continue;
+    }
+    const field = matchByAlias(template, header);
+    if (!field || taken.has(field)) {
+      continue;
+    }
+    taken.add(field);
+    claimed[header] = field;
+  }
+  return claimed;
+}
+
 function matchByAlias(
   template: EntityTemplate,
   header: string,

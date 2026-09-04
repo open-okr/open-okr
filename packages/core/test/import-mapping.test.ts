@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  matchHeadersByAlias,
   parseMappingFile,
   resolveMapping,
   valuesFor,
@@ -199,5 +200,42 @@ describe("coercing a cell", () => {
     expect(() => asText("title", "x".repeat(501))).toThrow(
       /rather than truncated/,
     );
+  });
+});
+
+describe("the aliases, without the runner's refusals (P6-T01b-b)", () => {
+  it("claims what it recognises and leaves the rest for a person", () => {
+    const claimed = matchHeadersByAlias(goalsTemplate, [
+      "Objective ID",
+      "Objective",
+      "Strategic pillar",
+      "Champion",
+    ]);
+    expect(claimed).toEqual({
+      "Objective ID": "externalId",
+      Objective: "title",
+      Champion: "champion",
+    });
+  });
+
+  it("does not refuse a file the runner would, because the screen has to draw it", () => {
+    // Nothing carries the required fields, which `resolveMapping` refuses
+    // outright. Here it is simply an empty answer: the mapping step exists to
+    // let somebody fill it in.
+    expect(matchHeadersByAlias(goalsTemplate, ["Ref", "Statement"])).toEqual(
+      {},
+    );
+    expect(() => resolveMapping(goalsTemplate, ["Ref", "Statement"])).toThrow(
+      /needs externalId/,
+    );
+  });
+
+  it("gives a field to the first column that claims it", () => {
+    // `resolveMapping` refuses this pair and says to supply a mapping. The
+    // screen shows the second column unclaimed instead, which is the same
+    // decision handed to the reader.
+    expect(matchHeadersByAlias(goalsTemplate, ["Objective", "Goal"])).toEqual({
+      Objective: "title",
+    });
   });
 });

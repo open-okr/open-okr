@@ -117,6 +117,18 @@ const storageQuotaBytesSchema = z.number().int().positive();
 
 const exportInlineRowLimitSchema = z.number().int().positive();
 
+const importRowLimitSchema = z.number().int().positive();
+
+/**
+ * How many rows one wizard run may carry (P6-T01b-b).
+ *
+ * Exported because the two table actions need it for workspaces provisioned
+ * before the setting existed, whose settings map has no key to read. One
+ * constant, so the default a fresh workspace stores and the default an old one
+ * falls back to cannot drift apart.
+ */
+export const DEFAULT_IMPORT_ROW_LIMIT = 1000;
+
 /** Dollars, not cents, and zero is allowed: it means "may not spend". */
 const agentRunCostCapSchema = z.number().nonnegative();
 
@@ -204,6 +216,23 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "this one. No S-36 card names it yet, so it has none here.",
     resolve: () => 5000,
     schema: exportInlineRowLimitSchema,
+  },
+  {
+    key: "importRowLimit",
+    scope: "workspace",
+    why:
+      "1000 rows: a run the browser waits for, and each row is its own " +
+      "transaction through the Operation pipeline, so a thousand is already " +
+      "a thousand transactions plus their reference lookups. A bigger file " +
+      "is what `pnpm import:csv` is for, and it reads a path rather than " +
+      "holding a table in a request, so the bound is on the wizard's two " +
+      "actions and not on the command. IMPLEMENTATION-PLAN asks for a bound " +
+      "and names no figure; P6-T01b-b picked this one. A file above it is " +
+      "refused with the number rather than truncated, because half an " +
+      "import nobody asked for is worse than none. No S-36 card names it " +
+      "yet, so it has none here.",
+    resolve: () => DEFAULT_IMPORT_ROW_LIMIT,
+    schema: importRowLimitSchema,
   },
   {
     key: "primaryChannel",

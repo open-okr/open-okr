@@ -27,8 +27,14 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { LEGACY_SOURCES } from "../imports/legacy.ts";
 import { templateFor } from "../imports/templates/index.ts";
 import { OperationError } from "../operations/errors.ts";
+import { DEFAULT_IMPORT_ROW_LIMIT } from "../settings/registry.ts";
 import { actingMemberId } from "./api-tokens.ts";
-import { defineReadAction, defineWriteAction } from "./define.ts";
+import {
+  type ActionCallContext,
+  defineReadAction,
+  defineWriteAction,
+} from "./define.ts";
+import { readWorkspaceSettings } from "./settings.ts";
 
 const IMPORT_MODES = ["dry_run", "real"] as const;
 const IMPORT_STATUSES = ["running", "completed", "failed"] as const;
@@ -350,3 +356,183 @@ export const proposeImportMapping = defineReadAction({
     return { columns, unclaimed, notes: proposed.notes.trim() };
   },
 });
+
+/**
+ * A table, as the wizard posts it (P6-T01b-b).
+ *
+ * **A table rather than a path, so the browser parses nothing.** The request
+ * carries the file's bytes, the server reads them with the same two readers the
+ * command uses, and what travels from here on is rows of text. There is no
+ * second CSV parser in the browser to disagree with the one in `packages/core`,
+ * and no format the wizard reads that the command does not.
+ */
+const importTableInput = z.object({
+  entity: z.string().trim().min(1).max(60),
+  table: z.object({
+    headers: z.array(z.string().max(200)).min(1).max(200),
+    rows: z.array(z.array(z.string().max(4000))),
+  }),
+  /** The uploaded file's own name. A label for the report and the run row. */
+  name: z.string().trim().min(1).max(400),
+  /**
+   * Header to field, as the reader confirmed it.
+   *
+   * A field of null ignores that column on purpose. Absent leaves every column
+   * to the template's aliases, which is the whole of the manual path when no
+   * provider is configured.
+   */
+  mapping: z.record(z.string(), z.string().nullable()).optional(),
+});
+
+const rowOutcome = z.object({
+  line: z.number().int(),
+  outcome: z.enum(["created", "updated", "skipped"]),
+  externalId: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+const runReport = z.object({
+  entity: z.string(),
+  file: z.string(),
+  mode: z.enum(IMPORT_MODES),
+  rowsRead: z.number().int(),
+  created: z.number().int(),
+  updated: z.number().int(),
+  skipped: z.number().int(),
+  unmappedHeaders: z.array(z.string()),
+  rows: z.array(rowOutcome),
+});
+
+const importTableOutput = z.object({
+  runId: z.uuid(),
+  report: runReport,
+});
+
+type ImportTableInput = z.infer<typeof importTableInput>;
+type ImportTableOutput = z.infer<typeof importTableOutput>;
+
+/**
+ * The workspace's row bound, and the refusal that names it.
+ *
+ * Read through `settings.readWorkspaceSettings`, which requires `full` and
+ * enforces it through the access getter. That is deliberate: it is the first
+ * thing either table action does, so a member below `full` is refused before a
+ * single row is read, and these two actions do not have to re-implement a
+ * check that already exists in one place.
+ */
+async function withinRowLimit(
+  context: ActionCallContext,
+  input: ImportTableInput,
+): Promise<void> {
+  // The read handler directly rather than through `callAction`, because this
+  // file is one of the registry's own and importing the registry back would
+  // close a circle. P4-T15a records what that costs: the registry's type stops
+  // being inferable and every typed call in the package becomes `any`.
+  const { settings } = await readWorkspaceSettings.handler(context, {});
+  const stored = (settings as Record<string, unknown>).importRowLimit;
+  const limit =
+    typeof stored === "number" && Number.isInteger(stored) && stored > 0
+      ? stored
+      : DEFAULT_IMPORT_ROW_LIMIT;
+
+  if (input.table.rows.length > limit) {
+    throw new OperationError(
+      "forbidden",
+      `That file has ${input.table.rows.length} rows and this workspace imports at most ${limit} in one run. Split it, raise the limit, or use the command line, which reads a file from disk and has no bound.`,
+    );
+  }
+}
+
+/** Both table actions do the same thing up to one boolean, which is the point. */
+async function runFromTable(
+  context: ActionCallContext,
+  input: ImportTableInput,
+  dryRun: boolean,
+): Promise<ImportTableOutput> {
+  await withinRowLimit(context, input);
+  // Imported where it is used rather than at the top of the file: the engine
+  // calls the registry by name, the registry imports this file, and a static
+  // import would close that circle. The same cycle P4-T15a fixed, avoided
+  // rather than repaired.
+  const { runTable } = await import("../imports/run.ts");
+  const result = await runTable({
+    pool: context.pool,
+    workspaceId: context.workspaceId,
+    userId: context.actor.userId ?? "",
+    entity: input.entity,
+    table: { headers: input.table.headers, rows: input.table.rows },
+    name: input.name,
+    ...(input.mapping ? { mapping: { columns: input.mapping } } : {}),
+    dryRun,
+  });
+  // Copied out of the engine's readonly arrays rather than cast: the report
+  // crosses a schema boundary here and the schema describes plain arrays.
+  return {
+    runId: result.runId,
+    report: {
+      ...result.report,
+      unmappedHeaders: [...result.report.unmappedHeaders],
+      rows: result.report.rows.map((row) => ({ ...row })),
+    },
+  };
+}
+
+/**
+ * The wizard's dry run (P6-T01b-b).
+ *
+ * **Declared by hand rather than through `defineWriteAction`, for the reason
+ * `workspace.provision` is.** A run is many Operations, not one: the run row as
+ * it starts, one per row it writes, the run row as it closes. Wrapping them in
+ * a further Operation would hold one transaction open across a thousand others
+ * and gain nothing, because every one of them already carries its own audit,
+ * activity and outbox rows. `runsThroughPipeline` records that the pipeline is
+ * still the only thing that writes here.
+ *
+ * **A write, not a read, and it records its `import_runs` row like the
+ * command's `--dry-run` does.** Two reasons, and they agree. A read is a GET in
+ * the REST projection, and a spreadsheet does not fit in a query string. And a
+ * preview is a real thing this instance performed on somebody's data: "they
+ * previewed this file twice and then imported it" is exactly what an audit
+ * trail is for.
+ */
+export const previewImportTable = {
+  name: "imports.previewTable" as const,
+  summary:
+    "Reports what importing this table would write, writing nothing but the run record.",
+  input: importTableInput,
+  output: importTableOutput,
+  access: ACCESS_LEVELS.full,
+  safety: "write" as const,
+  runsThroughPipeline: true,
+  async handler(
+    context: ActionCallContext,
+    rawInput: unknown,
+  ): Promise<ImportTableOutput> {
+    return runFromTable(context, importTableInput.parse(rawInput), true);
+  },
+};
+
+/**
+ * The wizard's real run (P6-T01b-b).
+ *
+ * Two actions rather than one with a flag. The audit row names which of the two
+ * happened without anybody reading a payload, the agent tool catalogue can
+ * offer the preview to something that may not write, and the safety class of
+ * each is its own rather than a property of an argument.
+ */
+export const runImportTable = {
+  name: "imports.runTable" as const,
+  summary:
+    "Imports this table through the Operation pipeline, one row at a time.",
+  input: importTableInput,
+  output: importTableOutput,
+  access: ACCESS_LEVELS.full,
+  safety: "write" as const,
+  runsThroughPipeline: true,
+  async handler(
+    context: ActionCallContext,
+    rawInput: unknown,
+  ): Promise<ImportTableOutput> {
+    return runFromTable(context, importTableInput.parse(rawInput), false);
+  },
+};
