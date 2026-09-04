@@ -1299,10 +1299,40 @@ Deliverables: `indicator_types` to KPI categories, `indicators` to KPIs with par
 Test plan: a documented calculated KPI recomputes to the source value; an unparseable formula is dropped with a report row and its KPI still imports; `direction=down` is recomputed correctly and rows whose value changes are flagged; a re-run changes nothing.
 Acceptance: Given one company, when the KPI import runs twice, then a calculated KPI recomputes to the source value, every dropped formula is in the report, and the second run is a no-op.
 
-### P6-T04: FlowyTeam work and collaboration mappers [L]
+### P6-T04: FlowyTeam work and collaboration mappers
 Depends on: P6-T03, P5-T11
 Goal: the remaining domains.
-Deliverables: mappers for projects to initiatives, tasks to tasks with status from the board column, key result links, sub-tasks to checklists, accesses to subscriptions, comments with HTML converted and a two-phase reference rewrite, and files to blobs and attachments; every unmapped construct recorded in the report rather than dropped; the consolidated report and human-readable summary; the full orchestrated pipeline in dependency order with the selective and dry-run flags verified; a mixed test importing a spreadsheet and a company into one workspace.
+
+**Cut into three before any code, on 4 September 2026, the same way P6-T03 was.** The row held four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report, the selective flag and a mixed spreadsheet-plus-company test. That is three working sessions and they fail differently: a graph, a content converter, an orchestration.
+
+The whole row's acceptance criterion is unchanged and belongs to the last part: given a seeded company, when the full import runs end to end, counts reconcile, every skip is explained, derived values are engine-computed and a re-run is a no-op.
+
+**One correction the source made necessary before any of it.** §7.2 maps `initiatives` from Projects, and `projects` is a real FlowyTeam table with its own name, summary, admin, dates and status. The importer's legacy map had `task_boards` there, which is a different thing: a board is a column layout, and on the instance this reads **17724 tasks carry a project and 3668 carry a board**. Corrected in P6-T04a.
+
+### P6-T04a: Initiatives and tasks [L]
+Depends on: P6-T03d
+Goal: the work graph, which is what the OKRs point at.
+
+Deliverables: `projects` to initiatives with their status, owner and dates, `capacity` left null because METHOD.md §5.5's verdict is a judgement a room makes; `tasks` to tasks with the status taken from the board column and `tasks.status` as the fallback; `keyresult_indicator` and `tasks.key_results_id` as the links from work to measures; `sub_tasks` to checklist items; `position` renumbered on load rather than carried; `progress_pct` recomputed from the imported tasks; a two-pass write for `dependent_task_id` and `recurring_task_id`, recorded in the report rather than modelled.
+Test plan: a task in a board column named in another language still gets a status; a task whose project did not import is a skip by name; the initiative's progress is the engine's and not the source's `completion_percent`; a re-run changes nothing.
+Acceptance: Given one company, when the work import runs twice, then every task sits in the right initiative with the right status, and the second run is a no-op.
+
+### P6-T04b: Comments, files and subscriptions [M]
+Depends on: P6-T04a
+Goal: what people wrote on the work, and what they attached to it.
+
+**Imported content is untrusted and the rich-text rule says so.** A task comment is HTML written by somebody in another system, and it goes through the one shared parser and its sanitising allow-list before it is stored as editor JSON. The second pass rewrites references once every row exists, because a comment can mention a task the first pass had not written yet.
+
+Deliverables: `task_comments` to comments with HTML converted through `packages/core`'s rich-text module and a two-phase reference rewrite; `task_files` to blobs and attachments, with Google Drive, Dropbox and other external addresses becoming links in the body rather than copied bytes; `tasks_accesses` to subscriptions; a reply chain preserved through `parent_id`; every unmapped construct in the report.
+Test plan: a comment carrying a script tag imports with the script gone and the text kept; an external file link becomes a link and not a failed download; a reply keeps its parent; a re-run writes no second copy.
+Acceptance: Given one company, when the collaboration import runs twice, then every comment renders as its author wrote it, every attachment resolves, and the second run is a no-op.
+
+### P6-T04c: The whole pipeline [M]
+Depends on: P6-T04b
+Goal: one command that runs the lot, and one report a person can act on.
+
+Deliverables: `--only` selecting domains, with the dependency order enforced rather than assumed; the consolidated report and a human-readable summary; every unmapped construct across every domain gathered in one place; the mixed test importing a spreadsheet and a company into one workspace and proving the two legacy types coexist; the full orchestrated run proven twice over.
+Test plan: `--only objectives` refuses without the organisation, or runs it first and says so; a spreadsheet import and a company import into one workspace leave both sets of rows intact and distinguishable by `legacy_type`; the summary names every skip and every flag.
 Acceptance: Given a seeded company, when the full import runs end to end, then counts reconcile, every skip is explained, derived values are engine-computed and a re-run is a no-op.
 
 ### P6-T05: Workspace export and import [L]
@@ -1463,7 +1493,7 @@ Acceptance: Given the end-to-end suite run ten times, when the reports are merge
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (12: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **132 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (14: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are three sessions, and they fail as a graph, a content converter and an orchestration). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **134 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 
