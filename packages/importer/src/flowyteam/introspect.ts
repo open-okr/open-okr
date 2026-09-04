@@ -69,6 +69,8 @@ export const EXPECTED_TABLES: Readonly<Record<string, readonly string[]>> = {
     "key_result_files",
   ],
   work: [
+    "projects",
+    "project_members",
     "task_boards",
     "taskboard_columns",
     "task_category",

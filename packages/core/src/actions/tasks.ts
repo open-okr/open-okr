@@ -40,6 +40,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
@@ -690,6 +691,15 @@ export const createTask = defineWriteAction({
         ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
+      // An import can finish writing the row it started: without this it
+      // creates a task and then cannot add its checklist. See
+      // .
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? actor.memberId : null,
+        contextId: created.contextId,
+      });
+
       const notified: string[] = [];
       for (const memberId of input.assigneeIds ?? []) {
         const outcome = await assignTaskInTx(tx, {
@@ -1016,6 +1026,8 @@ export const addChecklistItem = defineWriteAction({
   input: z.object({
     id: z.uuid(),
     title: z.string().trim().min(1).max(300),
+    /** The source-system identity, when an import is creating this (P6-T04a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1030,10 +1042,18 @@ export const addChecklistItem = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        checklistItems,
+        input.legacy,
+        "checklist item",
+      );
       const created = await addChecklistItemInTx(tx, {
         workspaceId,
         taskId: input.id,
         title: input.title,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
       return {
         result: created,

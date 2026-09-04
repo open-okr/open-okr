@@ -66,7 +66,7 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   {
     name: "employee_details",
     columns:
-      "id int primary key, company_id int, user_id int, designation_id bigint, reports_to int, deleted_at timestamp null",
+      "id int primary key, company_id int, user_id int, designation_id bigint, reports_to int, department_id int, deleted_at timestamp null",
   },
   {
     name: "performance_cycles",
@@ -186,13 +186,25 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
     optional: true,
   },
   {
+    name: "projects",
+    columns:
+      "id int primary key, company_id int, project_name varchar(191), project_summary mediumtext, project_admin int, start_date date, deadline date, status varchar(32), deleted_at timestamp null",
+    optional: true,
+  },
+  {
+    name: "project_members",
+    columns: "id int primary key, company_id int, user_id int, project_id int",
+    optional: true,
+  },
+  {
     name: "task_boards",
     columns: "id int primary key, company_id int",
     optional: true,
   },
   {
     name: "taskboard_columns",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, taskboard_id int, column_name varchar(191), slug varchar(64)",
     optional: true,
   },
   {
@@ -202,12 +214,13 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "tasks",
-    columns: "id int primary key, company_id int, heading varchar(191)",
+    columns:
+      "id int primary key, company_id int, heading varchar(191), description mediumtext, due_date date, user_id int, project_id int, key_results_id int, status varchar(32), board_column_id int, dependent_task_id int, recurring_task_id int, deleted_at timestamp null",
     optional: true,
   },
   {
     name: "sub_tasks",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, task_id int, title text, status varchar(32)",
     optional: true,
   },
   {
@@ -416,7 +429,9 @@ export async function seedSource(
     // Employee 1 reports to user 2, so an objective they lead gets a reviewer
     // who is not themselves. Employee 2 reports to nobody, which is the case
     // §7.2 says to flag rather than invent.
-    "insert into employee_details (id, company_id, user_id, designation_id, reports_to) values (1, ?, 1, 1, 2), (2, ?, 2, null, null)",
+    // Employee 2 belongs to the Commercial team, employee 1 to none. That is
+    // the shape a live company has, and it is what decides where a project goes.
+    "insert into employee_details (id, company_id, user_id, designation_id, reports_to, department_id) values (1, ?, 1, 1, 2, null), (2, ?, 2, null, null, 1)",
     [SEEDED.first.id, SEEDED.first.id],
   );
 
@@ -489,10 +504,51 @@ export async function seedSource(
          (4, 7, 2, '2026-02-14', 42000, 40000)`,
     );
   }
-  if (!dropped.has("tasks")) {
+  if (!dropped.has("projects")) {
+    // **Two projects that place and one that cannot.** Project 1's admin has no
+    // team and a member does, which is the shape a live company has: none of
+    // its 128 projects has an admin with a team and 125 have a member with one.
     await source.query(
-      "insert into tasks (id, company_id, heading) values (1, ?, 'Call back')",
-      [SEEDED.first.id],
+      `insert into projects
+         (id, company_id, project_name, project_summary, project_admin,
+          start_date, deadline, status) values
+         (1, 7, 'Onboarding rebuild', 'Everything a new customer touches', 1, '2026-01-05', '2026-03-31', 'in progress'),
+         (2, 7, 'Nobody is on it',    null,                                 1, null,         null,         'not started'),
+         (3, 7, 'Unknown status',     null,                                 1, null,         null,         'archived')`,
+    );
+    await source.query(
+      `insert into project_members (id, company_id, user_id, project_id) values
+         (1, 7, 2, 1),
+         (2, 7, 2, 3)`,
+    );
+  }
+  if (!dropped.has("taskboard_columns")) {
+    await source.query(
+      `insert into taskboard_columns (id, company_id, taskboard_id, column_name, slug) values
+         (1, 7, 1, 'In progress', 'in_progress'),
+         (2, 7, 1, 'En proceso',  'en_proceso')`,
+    );
+  }
+  if (!dropped.has("tasks")) {
+    // One task per decision: a recognised column, a column in another language
+    // where the task's own status decides, a completed task with no column, and
+    // one whose project did not import.
+    await source.query(
+      `insert into tasks
+         (id, company_id, heading, description, due_date, user_id, project_id,
+          key_results_id, status, board_column_id, dependent_task_id) values
+         (1, 7, 'Call back',        'Ring them on Monday', '2026-02-10', 1, 1,    1,    'incomplete', 1,    null),
+         (2, 7, 'Rewrite the page', null,                  null,         2, 1,    null, 'completed',  2,    1),
+         (3, 7, 'Ship it',          null,                  null,         1, 1,    null, 'completed',  null, null),
+         (4, 7, 'Orphan',           null,                  null,         1, 99,   null, 'incomplete', null, null)`,
+    );
+  }
+  if (!dropped.has("sub_tasks")) {
+    await source.query(
+      `insert into sub_tasks (id, task_id, title, status) values
+         (1, 1, 'Find the number', 'complete'),
+         (2, 1, 'Write it down',   'incomplete'),
+         (3, 4, 'Never imported',  'incomplete')`,
     );
   }
   await source.end();

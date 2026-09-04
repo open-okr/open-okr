@@ -116,6 +116,7 @@ const LEGACY_TABLE_NAMES = [
   "cycles",
   "workspaceMembers",
   "kpiCategories",
+  "checklistItems",
 ] as const;
 
 export type LegacyTableName = (typeof LEGACY_TABLE_NAMES)[number];

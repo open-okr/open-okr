@@ -26,8 +26,9 @@ const TARGET_TABLE: Partial<Record<SourceTable, LegacyTableName>> = {
   key_results: "keyResults",
   indicator_types: "kpiCategories",
   indicators: "kpis",
-  task_boards: "initiatives",
+  projects: "initiatives",
   tasks: "tasks",
+  sub_tasks: "checklistItems",
 };
 
 export interface Resolver {

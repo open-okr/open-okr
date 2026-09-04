@@ -12,6 +12,7 @@
  */
 
 import {
+  checklistItems,
   cycles,
   goals,
   initiatives,
@@ -38,6 +39,7 @@ const TABLES = {
   cycles,
   workspaceMembers,
   kpiCategories,
+  checklistItems,
 } as const;
 
 export async function findExisting(

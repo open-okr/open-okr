@@ -106,13 +106,15 @@ async function requireHumanMember<
   if (!row) {
     throw new OperationError("not_found", "No such member.");
   }
-  if (row.kind !== "human") {
+  if (row.kind !== "human" && row.kind !== "placeholder") {
     // The same rule initiatives follow, for the same reason: an agent proposes
     // work and does not carry it (AI-NATIVE-PLAN.md §1.3), and assignment is an
-    // access grant.
+    // access grant. A placeholder is a person who has not signed in, not an
+    // agent, and work imported from another system was already theirs
+    // (P6-T04a).
     throw new OperationError(
       "forbidden",
-      "A task is assigned to a person. An agent proposes work; it does not carry it.",
+      "A task is assigned to a person. An agent proposes work; it does not carry it, and nor does a guest.",
     );
   }
 }
@@ -582,7 +584,13 @@ export async function addChecklistItemInTx<
   TSchema extends Record<string, unknown> = Record<string, never>,
 >(
   tx: AnyTx<TSchema>,
-  input: { workspaceId: string; taskId: string; title: string },
+  input: {
+    workspaceId: string;
+    taskId: string;
+    title: string;
+    /** The source system's identity, when an import made this line (P6-T04a). */
+    legacy?: LegacyKey;
+  },
 ): Promise<{ readonly id: string }> {
   const [last] = await tx
     .select({ highest: sql<number | null>`max(${checklistItems.position})` })
@@ -601,6 +609,9 @@ export async function addChecklistItemInTx<
     id,
     workspaceId: input.workspaceId,
     taskId: input.taskId,
+    ...(input.legacy
+      ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+      : {}),
     title: input.title.trim(),
     position: (last?.highest ?? 0) + 1,
   });

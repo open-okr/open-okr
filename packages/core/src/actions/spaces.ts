@@ -32,6 +32,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { accessScopeFilter, getAccessScoped } from "../access/reads.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { resolveCoordinator, wouldStrandSpace } from "../spaces/roles.ts";
@@ -366,6 +367,16 @@ export const createSpace = defineWriteAction({
         managerMemberId: input.managerMemberId ?? actor.memberId ?? undefined,
         ...(input.legacy ? { legacy: input.legacy } : {}),
       });
+
+      // An import can finish writing into the space it just created. The
+      // reasoning is in `packages/core/src/imports/binding.ts`.
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? actor.memberId : null,
+        contextId: created.contextId,
+        alreadyBound: input.managerMemberId ?? actor.memberId,
+      });
+
       return {
         result: { id: created.id, name: created.name },
         activity: {

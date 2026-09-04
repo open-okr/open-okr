@@ -39,6 +39,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { refreshGateStateFor } from "../cycles/workflow.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import {
   asNumber,
@@ -484,7 +485,7 @@ export const createInitiative = defineWriteAction({
       });
       return undefined;
     },
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       await assertLegacyKeyFree(
         tx,
         workspaceId,
@@ -505,6 +506,14 @@ export const createInitiative = defineWriteAction({
         confidence: input.confidence ?? null,
         capacity: input.capacity ?? null,
         ...(input.legacy ? { legacy: input.legacy } : {}),
+      });
+
+      // An import can finish writing the row it started. See
+      // .
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? actor.memberId : null,
+        contextId: created.contextId,
       });
 
       for (const keyResultId of input.keyResultIds ?? []) {

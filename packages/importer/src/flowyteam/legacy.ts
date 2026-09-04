@@ -46,7 +46,11 @@ export const LEGACY_TABLES = {
   indicator_types: "kpi_categories",
   indicators: "kpis",
   indicator_records: "kpi_records",
-  task_boards: "initiatives",
+  // **Projects, not boards.** §7.2 maps initiatives from Projects, and a board
+  // is a column layout rather than a piece of work. On the instance this reads,
+  // 17724 tasks carry a project and 3668 carry a board, so the wrong one here
+  // would have put a fifth of the work under the wrong parent (P6-T04a).
+  projects: "initiatives",
   tasks: "tasks",
   sub_tasks: "checklist_items",
   task_comments: "comments",

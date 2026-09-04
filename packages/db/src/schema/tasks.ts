@@ -106,6 +106,9 @@ export const checklistItems = pgTable("checklist_items", {
   title: text("title").notNull(),
   done: boolean("done").notNull().default(false),
   position: integer("position").notNull().default(0),
+  /** Where this line came from, when an import made it (P6-T04a). */
+  legacyId: text("legacy_id"),
+  legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

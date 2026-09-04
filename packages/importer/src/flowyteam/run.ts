@@ -24,6 +24,7 @@ import { importKpis } from "./mappers/kpis.ts";
 import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
 import { resolverFor } from "./mappers/resolve.ts";
+import { importWork } from "./mappers/work.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
 import { openSource, type Source, SourceError } from "./source.ts";
 
@@ -112,6 +113,7 @@ export async function runFlowyteamImport(
     // would overwrite a dated movement with an undated one.
     const values = await importKeyResultValues(mapper);
     const kpis = await importKpis(mapper);
+    const work = await importWork(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -125,6 +127,7 @@ export async function runFlowyteamImport(
         ...checkIns.domains,
         values,
         ...kpis.domains,
+        ...work.domains,
       ],
       extraNotes: [
         organisation.teamTreeDepth > 1
@@ -143,6 +146,8 @@ export async function runFlowyteamImport(
           : []),
         "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
         "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
+        ...work.unmodelled,
+        "Task comments, files and access lists are not imported yet. They arrive at P6-T04b.",
       ],
     });
 

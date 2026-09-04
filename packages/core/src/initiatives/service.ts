@@ -127,10 +127,16 @@ async function requireMember<
   if (!row) {
     throw new OperationError("not_found", "No such member.");
   }
-  if (row.kind !== "human") {
+  // **A placeholder is a person, and an agent is not (P6-T04a).** The rule
+  // this enforces is AI-NATIVE-PLAN §1.3's: an agent proposes work and does
+  // not carry it. Reading it as "human only" also excluded the imported
+  // placeholder, which stands for somebody who owned this very work in the
+  // system being replaced and has simply not signed in yet. A guest stays
+  // excluded: they are outside the workspace by definition.
+  if (row.kind !== "human" && row.kind !== "placeholder") {
     throw new OperationError(
       "forbidden",
-      "An initiative is owned by a person. An agent proposes work; it does not carry it.",
+      "An initiative is owned by a person. An agent proposes work; it does not carry it, and nor does a guest.",
     );
   }
 }

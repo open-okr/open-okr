@@ -425,8 +425,10 @@ Each task owns an access context (`resourceType: "task"`): `workspace_standard` 
 ### task_assignees *(built at P5-T11)*
 `task_id` to tasks, `member_id` to workspace_members. Unique on `(workspace_id, task_id, member_id)` while live; an unassigned member is revived rather than inserted beside. Assigning grants the edit binding, subscribes the member as `role`, and notifies everybody on the list except the actor. Unassigning takes the binding back. An agent is refused: an agent proposes work and does not carry it (AI-NATIVE-PLAN.md §1.3).
 
-### checklist_items *(built at P5-T11)*
-`task_id` to tasks, `title`, `done bool`, `position`. Appended at the end of its task's list; the count on a card is ticked over total.
+### checklist_items *(built at P5-T11, importable)*
+`task_id` to tasks, `title`, `done bool`, `position`, `legacy_id?`, `legacy_type?`. Appended at the end of its task's list; the count on a card is ticked over total.
+
+The two legacy columns and their unique partial index arrived at P6-T04a, the third and last importable table written before there was an importer to write them. A line of text is not a natural key: two sub-tasks on one task can read "Call the supplier" and mean different calls, so matching on the title would silently collapse them.
 
 ### documents *(built at P5-T12)*
 `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich) with `body_version`, `state` (`draft` / `published`, default `draft`), `published_at?`, `author_member_id` to workspace_members.

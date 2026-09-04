@@ -50,7 +50,6 @@ import {
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
-import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import {
@@ -74,6 +73,7 @@ import {
   unlinkKpiInTx,
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
@@ -1024,38 +1024,15 @@ export const createGoal = defineWriteAction({
         ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
-      // **An import can finish writing the row it started (P6-T03b).**
-      //
-      // A goal binds `workspace_standard` at view, the owning space at edit,
-      // and its champion and reviewer by role. Nothing binds whoever created
-      // it, because in the product the creator is normally one of those three.
-      // An import is the case where they are none of them: it writes an
-      // objective championed by somebody who has never signed in, and then
-      // cannot add that objective's key results, because `goals.addKeyResult`
-      // asks for edit on the goal and the importer holds view.
-      //
-      // The narrow fix is here rather than a second path in every goal action:
-      // only a create carrying a legacy key binds its actor, only at edit
-      // rather than full, and the binding is an ordinary row somebody can see
-      // and remove. Widening `requireGoalAccess` to let any workspace admin
-      // edit any objective would be a much larger grant, made permanently, for
-      // one command's benefit.
-      //
-      // This is a real gap the spreadsheet importer has too: it was never hit
-      // because P6-T01a's own file named the person running it as the champion
-      // of every row.
-      if (input.legacy) {
-        const importerGroupId = await ensureMemberGroup(tx, {
-          workspaceId,
-          memberId,
-        });
-        await bindGroup(tx, {
-          workspaceId,
-          groupId: importerGroupId,
-          contextId: created.contextId,
-          level: ACCESS_LEVELS.edit,
-        });
-      }
+      // An import can finish writing the row it started. The reasoning is in
+      // `packages/core/src/imports/binding.ts`, and this is the case that found
+      // it: an objective championed by somebody who has never signed in could
+      // be created and then could not be given its key results.
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? memberId : null,
+        contextId: created.contextId,
+      });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
       // recompute below reads the due date this stamps.

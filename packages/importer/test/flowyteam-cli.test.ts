@@ -180,7 +180,9 @@ describe("the legacy identifier map", () => {
   it("sends each source table to the target table §7.2 names", () => {
     expect(LEGACY_TABLES.objectives).toBe("goals");
     expect(LEGACY_TABLES.indicators).toBe("kpis");
-    expect(LEGACY_TABLES.task_boards).toBe("initiatives");
+    // Projects, not boards: a board is a column layout, and 17724 tasks on a
+    // live instance carry a project against 3668 that carry a board.
+    expect(LEGACY_TABLES.projects).toBe("initiatives");
     expect(LEGACY_TABLES.sub_tasks).toBe("checklist_items");
     // Every target is distinct except where §7.2 says two source tables land in
     // one, which today is nowhere: a duplicate here would mean two source
