@@ -406,6 +406,12 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   await cell.fill("60");
   await cell.press("Enter");
 
+  // Enter starts a transition, and the row's own figure is the only proof it
+  // finished. Navigating while it is still in flight cancels the server action,
+  // so nothing is recorded and the board reads a KPI that has no value.
+  const row = page.getByRole("row").filter({ hasText: "Operating margin" });
+  await expect(row).toContainText("60%");
+
   await page.goto("/kpis/recovery");
   await expect(
     page.getByRole("heading", { level: 2, name: "Operating margin" }),
