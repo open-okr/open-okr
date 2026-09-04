@@ -141,12 +141,14 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "objective_checkins",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, objective_id int, user_id int, checkin_id bigint, start_date date, end_date date, confidence tinyint, current_percentage double, remarks text, created_at timestamp null",
     optional: true,
   },
   {
     name: "key_result_checkins",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, key_result_id int, user_id int, checkin_id bigint, start_date date, end_date date, confidence tinyint, current_value double, remarks text, created_at timestamp null",
     optional: true,
   },
   {
@@ -156,7 +158,8 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "checkin_reviews",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, user_id int, checkin_id bigint, question text, review text, created_at timestamp null",
     optional: true,
   },
   {
@@ -358,9 +361,38 @@ export async function seedSource(
        (4, 7, 6, 'Orphan',          null,    0,  1,  0,  1, null)`,
   );
   await source.query(
+    // Key result 1 has records **and** a check-in, which is the case the
+    // mapper has to choose between. Key result 3 has records only, which is the
+    // ordinary older-instance shape.
     `insert into key_result_records (id, company_id, key_results_id, history_value, created_at) values
        (1, 7, 1, 5,  '2026-01-20 09:00:00'),
-       (2, 7, 1, 12, '2026-02-20 09:00:00')`,
+       (2, 7, 1, 12, '2026-02-20 09:00:00'),
+       (3, 7, 3, 4,  '2026-01-20 09:00:00')`,
+  );
+
+  // **Check-ins, and the four shapes the mapper decides between.** One that
+  // imports with its measures and a review, one written by somebody who did
+  // not import, one with no narrative, and one on an objective that did not
+  // import. Confidence is FlowyTeam's 0 to 10.
+  await source.query(
+    `insert into objective_checkins
+       (id, company_id, objective_id, user_id, checkin_id, start_date, end_date,
+        confidence, remarks, created_at) values
+       (1, 7, 1, 1, 100, '2026-01-01', '2026-01-31', 8, 'Two of the three moved. The third is blocked on legal.', '2026-02-01 09:00:00'),
+       (2, 7, 1, 3, 101, '2026-02-01', '2026-02-28', 3, 'Slipping.', '2026-03-01 09:00:00'),
+       (3, 7, 2, 1, 102, '2026-02-01', '2026-02-28', 5, '',          '2026-03-01 09:00:00'),
+       (4, 7, 6, 1, 103, '2026-02-01', '2026-02-28', 5, 'Orphan.',   '2026-03-01 09:00:00')`,
+  );
+  await source.query(
+    `insert into key_result_checkins
+       (id, company_id, key_result_id, user_id, checkin_id, start_date, end_date,
+        confidence, current_value, remarks, created_at) values
+       (1, 7, 1, 1, 100, '2026-01-01', '2026-01-31', 8, 18, null, '2026-02-01 09:00:00'),
+       (2, 7, 2, 1, 100, '2026-01-01', '2026-01-31', 6, 7,  null, '2026-02-01 09:00:00')`,
+  );
+  await source.query(
+    `insert into checkin_reviews (id, company_id, user_id, checkin_id, review, created_at) values
+       (1, 7, 2, 100, 'Read, thank you.', '2026-02-02 10:00:00')`,
   );
   // **People, and every shape the mapper has to answer for.** One ordinary
   // person, one with a job title, one with no address at all, one belonging to

@@ -35,6 +35,7 @@ import {
 } from "../check-ins/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
@@ -1066,4 +1067,146 @@ export const readConfidenceVotes = defineReadAction({
       },
     );
   },
+});
+
+/**
+ * A check-in somebody else wrote, in a system this instance is replacing
+ * (TECHNICAL-PLAN §7.2, P6-T03c).
+ *
+ * **Why an action of its own rather than `goals.publishCheckIn`.** That action
+ * is a person publishing their own check-in now: it takes the author from the
+ * signed-in member and stamps the publication at the current time. An import
+ * has neither. Every check-in it carries was written by somebody else, months
+ * ago, and both facts have to survive or the imported history is a wall of
+ * entries by whoever ran the migration, all dated the day they ran it.
+ *
+ * Adding an author and a publication time to the ordinary publish action would
+ * be worse than a second action: it would let any member publish a check-in
+ * under somebody else's name at any date they chose. That is an impersonation
+ * hole opened for a migration's benefit, which is the same trade `people
+ * .importMember` refused at P6-T03a and refuses here for the same reason.
+ *
+ * **`full`, and a legacy key is required.** There is no call to this that is
+ * not part of a recorded import run.
+ */
+export const importCheckIn = defineWriteAction({
+  name: "goals.importCheckIn",
+  summary:
+    "Publishes a check-in an import found, keeping its own author and its own date.",
+  input: z.object({
+    goalId: z.uuid(),
+    /** The member who wrote it in the source, not the one running the import. */
+    authorMemberId: z.uuid(),
+    status: z.enum(CHECK_IN_STATUSES),
+    confidence: z.number().min(0).max(1),
+    narrative: richText,
+    values: z.array(composerValue).default([]),
+    /** When the source says it was published. */
+    publishedAt: z.string(),
+    /** Set when the source records that somebody reviewed it. */
+    acknowledgedById: z.uuid().optional(),
+    acknowledgedAt: z.string().optional(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({ id: z.uuid(), valuesWritten: z.number().int() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        checkIns,
+        input.legacy,
+        "check-in",
+      );
+
+      const publishedAt = new Date(input.publishedAt);
+      if (Number.isNaN(publishedAt.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.publishedAt}" is not a date this check-in could have been published on.`,
+        );
+      }
+
+      const { checkInId } = await startDraftInTx(tx, {
+        workspaceId,
+        goalId: input.goalId,
+        authorMemberId: input.authorMemberId,
+      });
+      // The legacy key goes on before the publish, so a run that dies between
+      // the two leaves a row the next run finds rather than one it duplicates.
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      await tx
+        .update(checkIns)
+        .set({
+          legacyType: input.legacy.type,
+          legacyId: input.legacy.id,
+          createdAt: publishedAt,
+        })
+        .where(activeOnly(checkIns, eq(checkIns.id, checkInId)));
+
+      const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));
+      const published = await publishCheckInInTx(tx, {
+        workspaceId,
+        checkInId,
+        authorMemberId: input.authorMemberId,
+        status: input.status,
+        confidence: input.confidence,
+        narrative: input.narrative,
+        values: input.values,
+        thresholds: rhythm.thresholds,
+        // The source's own date, which is the whole point of this action. The
+        // snapshot, the value history and the cadence all read it.
+        now: publishedAt,
+      });
+
+      if (input.acknowledgedById) {
+        const acknowledgedAt = input.acknowledgedAt
+          ? new Date(input.acknowledgedAt)
+          : publishedAt;
+        // openokr:allow-mutation: the calling Operation's own transaction.
+        await tx
+          .update(checkIns)
+          .set({
+            acknowledgedById: input.acknowledgedById,
+            acknowledgedAt: Number.isNaN(acknowledgedAt.getTime())
+              ? publishedAt
+              : acknowledgedAt,
+          })
+          .where(activeOnly(checkIns, eq(checkIns.id, checkInId)));
+      }
+
+      await recomputeForGoal(
+        tx,
+        workspaceId,
+        published.goalId,
+        rhythm.thresholds,
+        publishedAt,
+      );
+
+      return {
+        result: { id: checkInId, valuesWritten: published.valuesWritten },
+        activity: {
+          kind: "check_in.published" as const,
+          subjectType: "goal" as const,
+          subjectId: published.goalId,
+          payload: {
+            status: input.status,
+            valuesWritten: published.valuesWritten,
+          },
+        },
+        audit: {
+          action: "goals.importCheckIn",
+          targetType: "check_in",
+          targetId: checkInId,
+          payload: {
+            status: input.status,
+            legacyId: input.legacy.id,
+            publishedAt: input.publishedAt,
+          },
+        },
+      };
+    },
+  }),
 });

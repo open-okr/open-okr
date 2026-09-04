@@ -19,7 +19,8 @@ import {
 import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
-import { importOkrs } from "./mappers/okrs.ts";
+import { importCheckIns } from "./mappers/check-ins.ts";
+import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
 import { resolverFor } from "./mappers/resolve.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
@@ -105,6 +106,10 @@ export async function runFlowyteamImport(
     };
     const organisation = await importOrganisation(mapper);
     const okrs = await importOkrs(mapper);
+    const checkIns = await importCheckIns(mapper);
+    // Last, because it defers to the check-ins: a record replayed after one
+    // would overwrite a dated movement with an undated one.
+    const values = await importKeyResultValues(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -112,7 +117,12 @@ export async function runFlowyteamImport(
       company,
       counts,
       mode: write ? "real" : "dry_run",
-      reconciliation: [...organisation.domains, ...okrs.domains],
+      reconciliation: [
+        ...organisation.domains,
+        ...okrs.domains,
+        ...checkIns.domains,
+        values,
+      ],
       extraNotes: [
         organisation.teamTreeDepth > 1
           ? `The source's team tree was ${organisation.teamTreeDepth} deep and imported flat. OpenOKR spaces do not nest: a space is a team that runs a rhythm, and a department containing four of them is an org-chart fact rather than a place where check-ins happen.`
@@ -128,7 +138,7 @@ export async function runFlowyteamImport(
               "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
             ]
           : []),
-        "Check-ins and KPIs are not imported yet. They arrive at P6-T03c and P6-T03d.",
+        "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in. KPIs arrive at P6-T03d.",
       ],
     });
 

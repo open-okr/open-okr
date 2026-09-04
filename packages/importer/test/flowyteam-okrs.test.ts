@@ -233,19 +233,37 @@ describe.skipIf(!runnable)("importing one company's OKRs", () => {
     expect(one?.same).toBe(false);
   });
 
-  it("replays the value history and leaves the key result where the source did", async () => {
+  it("replays the value history where the source keeps one as plain records", async () => {
     await run(true);
+    // Key result 3 has records and no check-in, which is the older instance's
+    // shape: the baseline the create writes, plus the one source record.
     const history = await count(
       `select count(*)::int as n from key_result_values v
          join key_results k on k.id = v.key_result_id
-        where k.legacy_id = 'key_results:1'`,
+        where k.legacy_id = 'key_results:3'`,
     );
-    // The baseline the create records, plus the two source records.
-    expect(history).toBeGreaterThanOrEqual(3);
+    expect(history).toBeGreaterThanOrEqual(2);
+    const [current] = await rows<{ current_value: string }>(
+      `select current_value from key_results where legacy_id = 'key_results:3'`,
+    );
+    expect(Number(current?.current_value)).toBe(4);
+  });
+
+  it("defers to a check-in where the key result has both, and says so", async () => {
+    // Key result 1 has two records and a check-in. The check-in carries its own
+    // date and `goals.recordValue` cannot, so replaying the records afterwards
+    // would overwrite a dated movement with an undated one.
+    const { report } = await run(true);
+
     const [current] = await rows<{ current_value: string }>(
       `select current_value from key_results where legacy_id = 'key_results:1'`,
     );
-    expect(Number(current?.current_value)).toBe(12);
+    expect(Number(current?.current_value)).toBe(18);
+    expect(
+      domain(report, "key result history")
+        ?.flags.map((row) => row.reason)
+        .join(" | "),
+    ).toContain("already carries a check-in");
   });
 
   it("recomputes the score rather than carrying the source's own", async () => {
@@ -260,6 +278,10 @@ describe.skipIf(!runnable)("importing one company's OKRs", () => {
 
   it("acceptance: a second run writes nothing new", async () => {
     await run(true);
+    const historyQuery = `select count(*)::int as n from key_result_values v
+           join key_results k on k.id = v.key_result_id
+          where k.legacy_id = 'key_results:1'`;
+    const afterFirstRun = await count(historyQuery);
     const { report } = await run(true);
 
     for (const name of ["objectives", "key results", "key result history"]) {
@@ -278,14 +300,11 @@ describe.skipIf(!runnable)("importing one company's OKRs", () => {
       ),
     ).toBe(3);
     // The history is not replayed a second time, which is the one domain with
-    // no legacy key of its own to protect it.
-    expect(
-      await count(
-        `select count(*)::int as n from key_result_values v
-           join key_results k on k.id = v.key_result_id
-          where k.legacy_id = 'key_results:1'`,
-      ),
-    ).toBeLessThanOrEqual(3);
+    // no legacy key of its own to protect it. Compared against the first run
+    // rather than a fixed number, because the check-in mapper writes into the
+    // same history and a number here would only measure how many mappers there
+    // are today.
+    expect(await count(historyQuery)).toBe(afterFirstRun);
   });
 
   it("writes nothing on a dry run", async () => {

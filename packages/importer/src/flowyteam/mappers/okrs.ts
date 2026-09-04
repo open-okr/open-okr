@@ -60,10 +60,9 @@ export async function importOkrs(options: MapperOptions): Promise<OkrResult> {
   // was found: the seeded source only used the objective pointer.
   const keyResults = await importKeyResults(options);
   const alignment = await alignGoals(options, objectives);
-  const values = await importKeyResultValues(options);
 
   return {
-    domains: [goals.tally, keyResults.tally, alignment, values],
+    domains: [goals.tally, keyResults.tally, alignment],
     rescored: goals.rescored,
     truncatedValues: keyResults.truncated,
   };
@@ -448,14 +447,25 @@ async function importKeyResults(
 }
 
 /**
- * The value history behind each key result.
+ * The value history behind each key result, where the source keeps one as
+ * plain records.
  *
  * Written through `goals.recordValue`, which moves the value and records the
  * movement, so the history and the current figure cannot disagree. Records are
  * replayed oldest first, and the last one leaves the key result where the
  * source left it.
+ *
+ * **Runs after the check-ins, and defers to them.** FlowyTeam has two ways of
+ * recording a movement and a company has one or the other: on the instance this
+ * was written against, the company with 3970 key-result check-ins has zero
+ * records, and the ones with records have no check-ins. Where a key result has
+ * both, the check-in wins, because a check-in carries its own date and this
+ * path cannot: `goals.recordValue` stamps the value at the moment it is called,
+ * so replaying a record after a check-in would overwrite a dated movement with
+ * an undated one and leave the key result on the older number. The key results
+ * that happens to are flagged rather than silently resolved.
  */
-async function importKeyResultValues(
+export async function importKeyResultValues(
   options: MapperOptions,
 ): Promise<DomainReconciliation> {
   const tally = new DomainTally("key result history");
@@ -476,6 +486,7 @@ async function importKeyResultValues(
   // `goals.recordValue` and the value is the row. Re-running would replay the
   // same movements, so the count already there is what makes it idempotent.
   const replayed = new Map<string, number>();
+  const fromCheckIns = new Map<string, boolean>();
 
   for (const row of rows) {
     tally.sawRow();
@@ -502,6 +513,14 @@ async function importKeyResultValues(
       continue;
     }
 
+    if (await hasCheckInHistory(options, keyResultId, fromCheckIns)) {
+      tally.flag(
+        source,
+        `Key result ${row.key_results_id} already carries a check-in from the source, which is dated where this record is not. The check-in's value stands.`,
+      );
+      continue;
+    }
+
     const already = await historyCount(options, keyResultId, replayed);
     if (already > 0) {
       // The history is already here from an earlier run. Replaying it would
@@ -524,6 +543,25 @@ async function importKeyResultValues(
   }
 
   return tally.finish();
+}
+
+/** Whether a check-in already wrote into this key result's history. */
+async function hasCheckInHistory(
+  options: MapperOptions,
+  keyResultId: string,
+  answers: Map<string, boolean>,
+): Promise<boolean> {
+  const cached = answers.get(keyResultId);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const history = await callAction(options.context, "goals.keyResultHistory", {
+    keyResultId,
+    limit: 500,
+  });
+  const found = history.values.some((value) => value.source === "check_in");
+  answers.set(keyResultId, found);
+  return found;
 }
 
 /**

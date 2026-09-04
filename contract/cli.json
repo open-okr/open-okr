@@ -5580,6 +5580,82 @@
       "pages": false
     },
     {
+      "name": "goals importCheckIn",
+      "action": "goals.importCheckIn",
+      "method": "POST",
+      "path": "/goals/importCheckIn",
+      "scope": "write",
+      "summary": "Publishes a check-in an import found, keeping its own author and its own date.",
+      "flags": [
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "author-member-id",
+          "field": "authorMemberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "field": "status",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "on_track",
+            "caution",
+            "off_track"
+          ]
+        },
+        {
+          "name": "confidence",
+          "field": "confidence",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "narrative",
+          "field": "narrative",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "values",
+          "field": "values",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "published-at",
+          "field": "publishedAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "acknowledged-by-id",
+          "field": "acknowledgedById",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "acknowledged-at",
+          "field": "acknowledgedAt",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals publishDraftedCheckIn",
       "action": "goals.publishDraftedCheckIn",
       "method": "POST",
