@@ -1253,12 +1253,51 @@ Goal: the read-only source (TECHNICAL-PLAN.md §7.1).
 Deliverables: the import command with a required company selector; a read-only session where an attempted write must fail; introspection, required-table assertions and version inference; the multi-company guard; the report writer; the legacy identifier map.
 Acceptance: Given a source database, when the dry run executes for one company, then it prints that company's schema summary, writes an empty report, and provably cannot write to the source.
 
-### P6-T03: FlowyTeam strategy mappers [L]
+### P6-T03: FlowyTeam strategy mappers
 Depends on: P6-T02, P3-T15
 Goal: the OKR and KPI import (TECHNICAL-PLAN.md §7.2).
-Deliverables: mappers for teams to spaces with members and managers, cycles and settings, objectives to goals with owner, champion and reviewer resolution and two-pass alignment, key results with values, check-ins into narrative rows with snapshots and acknowledgements, KPI categories, KPIs and records, formula token translation into the expression tree with unparseable formulas dropped and logged, and KPI sharing; derived values recomputed through the engines; per-domain reconciliation; dispatch suppressed; proven idempotency.
-Test plan: against a seeded multi-company source, counts match, alignment is correct, a documented calculated KPI recomputes to the source value, a re-run changes nothing, and a second company imports alongside without collision.
-Acceptance: Given one company, when the full strategy import runs twice, then the report and reconciliation are clean and the second run is a no-op.
+
+**Cut into four before any code, on 4 September 2026, the same way P6-T01 was and for the same reason.** The row held nine mapper groups, a formula parser, a reconciliation report and an idempotency proof. That is four working sessions, and the four fail differently: the first is identity resolution, the second is a graph, the third is history, the fourth is a parser. The seam follows the source's own dependency order (`reference/flowyteam-okr-kpi-tasks-model.md` §11), so each part imports on top of what the one before it resolved rather than stubbing it.
+
+The acceptance criterion for the whole is unchanged and belongs to the last part: given one company, when the full strategy import runs twice, the report and reconciliation are clean and the second run is a no-op. Each part proves that for its own domain.
+
+### P6-T03a: The organisation and the rhythm [M]
+Depends on: P6-T02, P3-T15
+Goal: the rows every later mapper resolves against, and the reconciliation the report is built on.
+
+**Nothing else can be imported until a source id resolves to a member, a space and a cycle.** Objectives name a champion and a reviewer, key results hang off a cycle, and tasks name assignees. This part builds that resolution once, out of the legacy keys the rows carry, so no later mapper invents a second way to answer the same question.
+
+Deliverables: teams to spaces with their members and managers, the tree flattened to siblings with the depth recorded; employees to workspace members, with placeholder members for email addresses nobody has claimed; performance cycles and settings; a `legacy` input on `spaces.create`, `cycles.create` and whatever creates a member, since only the five actions P6-T01a touched can write a legacy key today; a resolver that turns a source id into a target id through those keys, cached per run; the per-domain reconciliation shape the report carries from here on; dispatch suppressed.
+Test plan: against a seeded source, the space tree flattens and the depth is in the report; an unclaimed email becomes a placeholder member rather than an invitation; a re-run writes nothing and the reconciliation is clean; a second company in the same source is untouched.
+Acceptance: Given one company, when the organisation import runs twice, then the members, spaces and cycles match the source, the second run is a no-op, and every later mapper can resolve a source id.
+
+### P6-T03b: Objectives and key results [L]
+Depends on: P6-T03a
+Goal: the OKR graph, with its alignment and its measures.
+
+**The owner comes from `model_type`, never from `objective_type`.** The reference records that the enum was never widened and that services write a value MySQL stores as the empty string, so the level has to be derived from the polymorphic owner. Alignment is two passes because a parent can appear after its child in id order.
+
+Deliverables: objectives to goals with owner, champion and reviewer resolution and a report row wherever a reviewer is unmapped; the level derived from `model_type`; two-pass alignment over `objective_parent_id` and `key_result_parent_id`; key results with their values, direction inferred, indicator type defaulted to lagging and flagged for review; `key_result_records` into `key_result_values`; progress, health and alignment recomputed through the engines rather than carried; the precision loss from the 2023 `bigint` change recorded.
+Test plan: counts match; a child imported before its parent still aligns; a stored `result_percentage` that disagrees with the recomputed one is recomputed and the difference is reported; a re-run changes nothing.
+Acceptance: Given one company, when the OKR import runs twice, then the alignment matches the source, every derived value is the engine's own, and the second run is a no-op.
+
+### P6-T03c: Check-ins [M]
+Depends on: P6-T03b
+Goal: the history behind the numbers.
+
+Deliverables: `objective_checkins` and `key_result_checkins` into one narrative check-in per objective per period, with the snapshot rebuilt from the key-result rows that came with it; `checkins` and `checkin_reviews` into acknowledgements wherever a reviewer is known; votes deliberately not imported, because a private vote with a synchronised reveal is an OpenOKR concept with no source; the report naming every check-in whose period could not be resolved.
+Test plan: one snapshot per imported check-in, stamped from its own values; a review with no resolvable reviewer is a report row rather than a dropped check-in; a re-run changes nothing.
+Acceptance: Given one company, when the check-in import runs twice, then each objective's history matches the source period for period and the second run is a no-op.
+
+### P6-T03d: KPIs and their formulas [L]
+Depends on: P6-T03b
+Goal: the indicator domain, including the one part of the source that is a language.
+
+**`indicator_calculates` holds a token string the source evaluates with `eval()`.** It is translated into this product's expression tree, and anything that will not parse is dropped and logged rather than guessed at.
+
+Deliverables: `indicator_types` to KPI categories, `indicators` to KPIs with parents before children, `indicator_records` to KPI records with the period key normalised and unique per period; occurrence mapped to frequency; tier and indicator type defaulted and flagged; formula token translation into the expression tree with unparseable formulas dropped and logged; `indicator_accesses` to bindings or shares; `kpi_trees` deliberately left null, because guessing a tree from the parent chain would name something nobody chose; achievement recomputed.
+Test plan: a documented calculated KPI recomputes to the source value; an unparseable formula is dropped with a report row and its KPI still imports; `direction=down` is recomputed correctly and rows whose value changes are flagged; a re-run changes nothing.
+Acceptance: Given one company, when the KPI import runs twice, then a calculated KPI recomputes to the source value, every dropped formula is in the report, and the second run is a no-op.
 
 ### P6-T04: FlowyTeam work and collaboration mappers [L]
 Depends on: P6-T03, P5-T11
@@ -1424,7 +1463,7 @@ Acceptance: Given the end-to-end suite run ten times, when the reports are merge
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (9: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **129 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (12: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **132 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 
