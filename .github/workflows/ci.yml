@@ -120,7 +120,11 @@ jobs:
 
       - name: Start the test database stack
         # Postgres plus PgBouncer in transaction mode; the P1-T03 isolation
-        # and pooling-spike suites run against it on every shard.
+        # and pooling-spike suites run against it on every shard. MySQL joined
+        # it at P6-T02: the FlowyTeam connector's one acceptance criterion is
+        # that it provably cannot write to a source, and only a real server can
+        # answer that. Without it those suites skip themselves, which is the
+        # one thing a gate must not do quietly.
         #
         # **Nothing here picks a port.** A fixed 55432 collided; a pair per
         # shard collided too, on a number nothing in this repository uses. Port
@@ -130,6 +134,7 @@ jobs:
         env:
           TEST_DB_PORT: 0
           TEST_PGBOUNCER_PORT: 0
+          TEST_MYSQL_PORT: 0
         run: |
           pnpm db:up
           pnpm db:ports >> "$GITHUB_ENV"

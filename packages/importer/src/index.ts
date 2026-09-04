@@ -25,3 +25,58 @@ export const PACKAGE_NAME = "@openokr/importer";
 export const DEPENDS_ON = [CORE] as const;
 
 export { type Args, parseArgs, render, USAGE, UsageError } from "./cli.ts";
+export {
+  FLOWYTEAM_USAGE,
+  type FlowyteamArgs,
+  parseFlowyteamArgs,
+} from "./flowyteam/cli.ts";
+export {
+  type Company,
+  type CompanyCounts,
+  countCompanies,
+  countFor,
+  listCompanies,
+  requireCompany,
+  SUMMARY_TABLES,
+} from "./flowyteam/companies.ts";
+export {
+  CORE_TABLES,
+  EXPECTED_TABLES,
+  type Introspection,
+  inferVersion,
+  introspect,
+  type SourceVersion,
+} from "./flowyteam/introspect.ts";
+export {
+  LEGACY_TABLES,
+  LEGACY_TYPE,
+  legacyIdFor,
+  legacyKeyFor,
+  parseLegacyId,
+  type SourceTable,
+} from "./flowyteam/legacy.ts";
+export {
+  buildReport,
+  type FlowyteamReport,
+  NOT_IMPORTED,
+  render as renderFlowyteamReport,
+} from "./flowyteam/report.ts";
+export {
+  companyAlreadyImported,
+  type FlowyteamRunOptions,
+  type FlowyteamRunResult,
+  guardCompany,
+  type PriorRun,
+  runFlowyteamImport,
+} from "./flowyteam/run.ts";
+export {
+  type Address,
+  assertRead,
+  type OpenOptions,
+  openReadOnlySession,
+  openSource,
+  parseUrl,
+  READ_ONLY_ERROR,
+  type Source,
+  SourceError,
+} from "./flowyteam/source.ts";

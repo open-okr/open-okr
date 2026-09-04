@@ -6,6 +6,11 @@ import { defineConfig } from "vitest/config";
 // Postgres.
 export default defineConfig({
   test: {
-    testTimeout: 10_000,
+    testTimeout: 20_000,
+    // The FlowyTeam connector's tests build a throwaway MySQL database with
+    // forty tables in it before they run (P6-T02). That is a setup step, not a
+    // slow test, and the default ten seconds is not enough for it on a cold
+    // server.
+    hookTimeout: 60_000,
   },
 });

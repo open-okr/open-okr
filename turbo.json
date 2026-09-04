@@ -7,6 +7,10 @@
       "passThroughEnv": [
         "TEST_DB_PORT",
         "TEST_PGBOUNCER_PORT",
+        "TEST_MYSQL_PORT",
+        "TEST_MYSQL_HOST",
+        "TEST_MYSQL_USER",
+        "TEST_MYSQL_PASSWORD",
         "TEST_DB_HOST",
         "DATABASE_URL"
       ]
@@ -19,6 +23,10 @@
       "passThroughEnv": [
         "TEST_DB_PORT",
         "TEST_PGBOUNCER_PORT",
+        "TEST_MYSQL_PORT",
+        "TEST_MYSQL_HOST",
+        "TEST_MYSQL_USER",
+        "TEST_MYSQL_PASSWORD",
         "TEST_DB_HOST",
         "DATABASE_URL"
       ]

@@ -99,6 +99,18 @@ const VENDOR_SDKS: readonly string[] = [
   // Payments and analytics
   "stripe",
   "posthog-node",
+  // Databases this product does not run on. Postgres is the only required
+  // service, so a client for anything else is a vendor SDK like any other.
+  // `mysql2` is here rather than absent because the FlowyTeam importer does
+  // import it, with an `allow-vendor-sdk` marker giving the reason
+  // (TECHNICAL-PLAN §1, P6-T02): listing it is what makes that one exception
+  // deliberate instead of an omission, and what makes the second one fail.
+  "mysql2",
+  "mysql",
+  "mariadb",
+  "mongodb",
+  "sqlite3",
+  "better-sqlite3",
 ];
 
 /** Where vendor SDKs and driver modules are allowed to live. */

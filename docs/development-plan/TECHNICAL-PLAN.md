@@ -370,8 +370,18 @@ pnpm import:csv --entity goals|key-results|kpis|kpi-records|initiatives|tasks \
   --file <path> --workspace <slug> --as <email> [--map <mapping.json>] [--write]
 
 pnpm import:flowyteam --source <MYSQL_URL> --company <id> --workspace <slug> \
-  [--dry-run] [--only objectives,indicators,tasks]
+  --as <email> [--dry-run] [--only objectives,indicators,tasks]
 ```
+
+`--as` was added to the FlowyTeam line at P6-T02, to match the spreadsheet
+command above it. Every write goes through the Operation pipeline, which
+resolves an acting member and authorises against their bindings, so a command
+with an ambient importer identity would be the service account with no owner
+that §8 forbids. The audit rows name whoever ran it.
+
+`--only` and `--write` are refused by name until the mappers land at P6-T03 and
+P6-T04. The connector reads the source, reports which FlowyTeam it is and what
+the one company holds, and writes nothing but its own `import_runs` row.
 
 ### 7.1 Pipeline
 

@@ -47,6 +47,31 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
 
+  # The FlowyTeam source the importer's connector reads (P6-T02). Test-only,
+  # like everything else here: the product needs Postgres and nothing else, and
+  # this exists because the one source system this importer migrates from runs
+  # on MySQL. The connector's acceptance criterion is that it provably cannot
+  # write to a real source, and only a real server can answer that.
+  #
+  # 8.4 rather than latest: it is the version the instances this connector was
+  # written against run, and a source database is not a thing a customer
+  # upgrades because a test suite prefers it.
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+    command:
+      - --skip-mysqlx
+    ports:
+      - "${TEST_MYSQL_PORT:-53306}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/mysql
+
   pgbouncer:
     image: edoburu/pgbouncer:v1.24.1-p1
     volumes:

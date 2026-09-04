@@ -20,7 +20,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { connectionOptions, testDbEnv } from "./db-env.ts";
 
-export { connectionOptions, testDbEnv } from "./db-env.ts";
+export {
+  connectionOptions,
+  mysqlUrl,
+  testDbEnv,
+  testMysqlEnv,
+} from "./db-env.ts";
 
 const MIGRATION_DIRS = [
   // Shipped migrations first, then the test fixtures on top.

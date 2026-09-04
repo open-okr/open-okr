@@ -48,3 +48,4 @@ function published(service: string, containerPort: number): string {
 
 console.log(`TEST_DB_PORT=${published("postgres", 5432)}`);
 console.log(`TEST_PGBOUNCER_PORT=${published("pgbouncer", 6432)}`);
+console.log(`TEST_MYSQL_PORT=${published("mysql", 3306)}`);

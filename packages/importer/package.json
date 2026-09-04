@@ -9,14 +9,17 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "import:csv": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/import-csv.ts"
+    "import:csv": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/import-csv.ts",
+    "import:flowyteam": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/import-flowyteam.ts"
   },
   "dependencies": {
     "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
+    "mysql2": "^3.24.3",
     "pg": "catalog:"
   },
   "devDependencies": {
+    "@openokr/test-support": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
