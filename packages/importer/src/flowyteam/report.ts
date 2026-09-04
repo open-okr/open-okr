@@ -47,6 +47,10 @@ export interface FlowyteamReport {
   readonly flagged: number;
   /** One row per domain this run touched (P6-T03a). Empty for a run that read only. */
   readonly reconciliation: readonly DomainReconciliation[];
+  /** The domains this run covered, in the order they ran (P6-T04d). */
+  readonly selected: readonly string[];
+  /** Of those, the ones `--only` did not name and a dependency required. */
+  readonly addedForDependencies: readonly string[];
   readonly notImported: readonly string[];
   /** Anything a person has to know, in the words they should read. */
   readonly notes: readonly string[];
@@ -60,6 +64,10 @@ export function buildReport(input: {
   readonly mode: "dry_run" | "real";
   readonly reconciliation?: readonly DomainReconciliation[];
   readonly extraNotes?: readonly string[];
+  /** The domains this run actually covered, in the order they ran. */
+  readonly selected?: readonly string[];
+  /** Of those, the ones nobody asked for and a dependency required. */
+  readonly addedForDependencies?: readonly string[];
 }): FlowyteamReport {
   const missing = Object.entries(input.introspection.domains).filter(
     ([, tables]) => tables.length > 0,
@@ -94,6 +102,8 @@ export function buildReport(input: {
     skipped,
     flagged,
     reconciliation,
+    selected: input.selected ?? [],
+    addedForDependencies: input.addedForDependencies ?? [],
     notImported: NOT_IMPORTED,
     notes: [
       ...missing.map(
@@ -103,6 +113,11 @@ export function buildReport(input: {
       ...(reconciliation.length === 0
         ? [
             "Nothing was written. The mappers that load a company's history arrive at P6-T03 and P6-T04; this run proves the source can be read and names what is in it.",
+          ]
+        : []),
+      ...(input.addedForDependencies && input.addedForDependencies.length > 0
+        ? [
+            `--only did not name ${input.addedForDependencies.join(", ")}, and this run imported ${input.addedForDependencies.length === 1 ? "it" : "them"} anyway, because what you asked for depends on ${input.addedForDependencies.length === 1 ? "it" : "them"}. A domain already imported is a no-op, so the cost is one pass over rows that were already there.`,
           ]
         : []),
       ...(input.extraNotes ?? []),
@@ -121,6 +136,8 @@ export function render(report: FlowyteamReport, runId: string): string {
     `FlowyTeam ${report.mode === "dry_run" ? "dry run" : "import"}: ${report.connectedTo}`,
     `Company ${report.companyId}, ${report.companyName}`,
     `Schema: ${report.tableCount} tables, ${report.version.migrationCount} migrations applied, the last on ${report.version.appliedOn ?? "an undated migration"} (${report.version.latestMigration})`,
+    "",
+    ...summarise(report),
     "",
     "In this company:",
   ];
@@ -185,4 +202,42 @@ export function render(report: FlowyteamReport, runId: string): string {
     `Run ${runId}`,
   );
   return lines.join("\n");
+}
+
+/**
+ * The verdict, first (P6-T04d).
+ *
+ * A full report runs to a hundred lines and the figures that decide what
+ * somebody does next were at the bottom of it. These are read off the same
+ * object the body is, so the two cannot disagree.
+ */
+function summarise(report: FlowyteamReport): readonly string[] {
+  const verb = report.mode === "dry_run" ? "would write" : "wrote";
+  const read = report.reconciliation.reduce(
+    (sum, domain) => sum + domain.read,
+    0,
+  );
+  const matched = report.reconciliation.reduce(
+    (sum, domain) => sum + domain.matched,
+    0,
+  );
+  const unclean = report.reconciliation.filter((domain) => !domain.clean);
+
+  const lines = [
+    `Summary: ${report.selected.length} domain(s), ${read} row(s) read, ${verb} ${report.written}, ${matched} already here, ${report.skipped} skipped, ${report.flagged} flagged.`,
+  ];
+  if (report.selected.length > 0) {
+    lines.push(`Domains: ${report.selected.join(" then ")}.`);
+  }
+  if (report.addedForDependencies.length > 0) {
+    lines.push(
+      `Added because what you asked for needs them: ${report.addedForDependencies.join(", ")}.`,
+    );
+  }
+  lines.push(
+    unclean.length === 0
+      ? "Every domain reconciles: every row read is accounted for."
+      : `Not reconciled: ${unclean.map((domain) => domain.domain).join(", ")}. Every skipped row is named below.`,
+  );
+  return lines;
 }

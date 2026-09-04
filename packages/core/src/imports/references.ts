@@ -161,6 +161,16 @@ export function referencesFor(host: ReferenceHost): References {
           // The email address is on the global identity row and the name is on
           // the membership, so both are one join. A placeholder member has no
           // user row at all, which is why the name is a way in too.
+          //
+          // **And why `placeholder_email` is a third** (P6-T04d). A workspace
+          // that has just imported a company is full of placeholders, and the
+          // address each of them had in the source is on the membership rather
+          // than on a user row that does not exist. A spreadsheet exported
+          // from that same source names people by exactly that address, so
+          // without this the two importers cannot name the same person and one
+          // workspace holding both is unusable. Found by the mixed test: every
+          // row of a goals file naming an imported champion was skipped with
+          // "no member matches".
           return tx
             .select({ id: workspaceMembers.id })
             .from(workspaceMembers)
@@ -172,6 +182,7 @@ export function referencesFor(host: ReferenceHost): References {
                 eq(workspaceMembers.status, "active"),
                 or(
                   sql`lower(${users.email}) = lower(${wanted})`,
+                  sql`lower(${workspaceMembers.placeholderEmail}) = lower(${wanted})`,
                   sql`lower(${workspaceMembers.name}) = lower(${wanted})`,
                 ),
               ),

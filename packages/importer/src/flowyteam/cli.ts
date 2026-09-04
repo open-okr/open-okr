@@ -6,6 +6,7 @@
  * served both would spend most of itself deciding which command it was in.
  */
 import { UsageError } from "../cli.ts";
+import { DOMAIN_KEYS, selectDomains, UnknownDomainError } from "./domains.ts";
 
 export interface FlowyteamArgs {
   readonly source: string;
@@ -22,9 +23,17 @@ export interface FlowyteamArgs {
    * is a named line in the report rather than a blob with nothing behind it.
    */
   readonly filesRoot: string | undefined;
+  /**
+   * Which domains to import (P6-T04d). Absent means all of them.
+   *
+   * A domain named here brings its own prerequisites and the report says so,
+   * because naming `objectives` has not said "skip the people the objectives
+   * are championed by".
+   */
+  readonly only: readonly string[] | undefined;
 }
 
-export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--files-root <path>] [--dry-run]
+export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--only <domains>] [--files-root <path>] [--dry-run]
 
 Reads a FlowyTeam MySQL database and never writes to it. A dry run unless
 --write is given: it reports which FlowyTeam the source is, which company was
@@ -33,6 +42,12 @@ selected, and what a real run would create in the workspace.
 It imports people, spaces, space membership, cycles, objectives, key results,
 key result history, check-ins, KPI categories, KPIs and their records,
 initiatives, tasks, checklists, task comments and watchers.
+
+--only <domains> is a comma-separated list, and the default is all of them:
+${DOMAIN_KEYS.join(", ")}.
+A domain brings whatever it depends on: --only objectives runs the organisation
+first and says so, because an objective names a champion, a reviewer, a cycle
+and a space.
 
 --files-root <path> points at the FlowyTeam server's storage directory. Task
 files live on that server's own disk rather than in MySQL, so without it every
@@ -76,12 +91,6 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     }
   }
 
-  if (values.only !== undefined) {
-    throw new UsageError(
-      "--only selects which domains to import, and there are no mappers to select between yet. It arrives with them at P6-T03.",
-    );
-  }
-
   for (const required of ["source", "workspace", "as"] as const) {
     if (!values[required]) {
       throw new UsageError(`--${required} is required.\n\n${FLOWYTEAM_USAGE}`);
@@ -102,5 +111,35 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     as: values.as as string,
     write,
     filesRoot: values["files-root"],
+    only: onlyFrom(values.only),
   };
+}
+
+/**
+ * The `--only` list, checked before anything connects.
+ *
+ * A typo here is a usage error and not a quiet smaller import: somebody who
+ * types `--only objetives` has asked for objectives, and importing nothing
+ * while reporting success is the worst answer available.
+ */
+function onlyFrom(value: string | undefined): readonly string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const keys = value
+    .split(",")
+    .map((key) => key.trim().toLowerCase())
+    .filter((key) => key !== "");
+  if (keys.length === 0) {
+    throw new UsageError("--only needs at least one domain.");
+  }
+  try {
+    selectDomains(keys);
+  } catch (error) {
+    if (error instanceof UnknownDomainError) {
+      throw new UsageError(error.message);
+    }
+    throw error;
+  }
+  return keys;
 }

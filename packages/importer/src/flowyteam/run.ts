@@ -19,15 +19,10 @@ import {
 } from "@openokr/core";
 import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
+import { selectDomains } from "./domains.ts";
 import { introspect } from "./introspect.ts";
-import { importCheckIns } from "./mappers/check-ins.ts";
-import { importCollaboration } from "./mappers/collaboration.ts";
-import { importFiles } from "./mappers/files.ts";
-import { importKpis } from "./mappers/kpis.ts";
-import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
-import { importOrganisation } from "./mappers/organisation.ts";
+import type { DomainReconciliation } from "./mappers/reconcile.ts";
 import { resolverFor } from "./mappers/resolve.ts";
-import { importWork } from "./mappers/work.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
 import { openSource, type Source, SourceError } from "./source.ts";
 
@@ -57,6 +52,15 @@ export interface FlowyteamRunOptions {
   readonly storage?: FileStorage;
   /** The FlowyTeam server's storage directory, from `--files-root`. */
   readonly filesRoot?: string;
+  /**
+   * Which domains to import, from `--only` (P6-T04d).
+   *
+   * Absent means all of them. A domain named here brings its own
+   * prerequisites, because `objectives` on its own has not said "skip the
+   * people the objectives are championed by"; `domains.ts` holds the order
+   * and the reasons.
+   */
+  readonly only?: readonly string[];
 }
 
 export interface FlowyteamRunResult {
@@ -119,19 +123,17 @@ export async function runFlowyteamImport(
       ...(options.storage && write ? { storage: options.storage } : {}),
       ...(options.filesRoot ? { filesRoot: options.filesRoot } : {}),
     };
-    const organisation = await importOrganisation(mapper);
-    const okrs = await importOkrs(mapper);
-    const checkIns = await importCheckIns(mapper);
-    // Last, because it defers to the check-ins: a record replayed after one
-    // would overwrite a dated movement with an undated one.
-    const values = await importKeyResultValues(mapper);
-    const kpis = await importKpis(mapper);
-    const work = await importWork(mapper);
-    // Last: a comment hangs on a task and a watcher watches one.
-    const collaboration = await importCollaboration(mapper);
-    // Last of all: an attachment hangs on a task and an inline image rewrites
-    // a comment, so both need their subject written first.
-    const files = await importFiles(mapper);
+    // Which domains, in which order, and why each one needs the last: all of
+    // that lives in `domains.ts` now, so `--only` reads the same rules a full
+    // run does rather than a second copy of them.
+    const selection = selectDomains(options.only);
+    const reconciliation: DomainReconciliation[] = [];
+    const notes: string[] = [];
+    for (const domain of selection.domains) {
+      const outcome = await domain.run(mapper);
+      reconciliation.push(...outcome.domains);
+      notes.push(...outcome.notes);
+    }
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -139,37 +141,10 @@ export async function runFlowyteamImport(
       company,
       counts,
       mode: write ? "real" : "dry_run",
-      reconciliation: [
-        ...organisation.domains,
-        ...okrs.domains,
-        ...checkIns.domains,
-        values,
-        ...kpis.domains,
-        ...work.domains,
-        ...collaboration.domains,
-        ...files.domains,
-      ],
-      extraNotes: [
-        organisation.teamTreeDepth > 1
-          ? `The source's team tree was ${organisation.teamTreeDepth} deep and imported flat. OpenOKR spaces do not nest: a space is a team that runs a rhythm, and a department containing four of them is an org-chart fact rather than a place where check-ins happen.`
-          : "The source's teams were already flat.",
-        "Every objective's score, health and alignment is recomputed by the engines after load. The source's own stored figures are not carried, because they are a fact about the old system rather than about this one.",
-        ...(okrs.rescored > 0
-          ? [
-              `${okrs.rescored} objectives carried a stored score in the source. Every one is recomputed here from the key results that imported, so a figure that has moved is the engine correcting the old one rather than data lost.`,
-            ]
-          : []),
-        ...(okrs.truncatedValues
-          ? [
-              "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
-            ]
-          : []),
-        "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
-        "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
-        ...work.unmodelled,
-        ...collaboration.unmodelled,
-        ...files.unmodelled,
-      ],
+      reconciliation,
+      selected: selection.domains.map((domain) => domain.key),
+      addedForDependencies: selection.added,
+      extraNotes: notes,
     });
 
     await callAction(context, "imports.finishRun", {

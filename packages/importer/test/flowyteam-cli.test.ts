@@ -82,15 +82,46 @@ describe("pnpm import:flowyteam's arguments", () => {
     expect(parseFlowyteamArgs([...REQUIRED, "--write"]).write).toBe(true);
   });
 
-  it("refuses --only by name rather than ignoring it", () => {
-    // It is in TECHNICAL-PLAN §7's usage line, so a person who read it will
-    // type it. Silently ignoring it would look like the command running.
+  it("reads --only as a comma-separated list", () => {
+    expect(parseFlowyteamArgs(REQUIRED).only).toBeUndefined();
+    expect(
+      parseFlowyteamArgs([...REQUIRED, "--only", "objectives"]).only,
+    ).toEqual(["objectives"]);
+    expect(
+      parseFlowyteamArgs([...REQUIRED, "--only", "work, Files ,collaboration"])
+        .only,
+    ).toEqual(["work", "files", "collaboration"]);
+  });
+
+  /**
+   * A typo has to be a usage error rather than a smaller import. Somebody who
+   * types `--only objetives` has asked for objectives, and a run that imports
+   * nothing while reporting success is the worst answer available.
+   */
+  it("refuses a domain it does not have, and names the ones it does", () => {
     expect(() =>
-      parseFlowyteamArgs([...REQUIRED, "--only", "objectives"]),
-    ).toThrow(/arrives with them at P6-T03/);
-    expect(() =>
-      parseFlowyteamArgs([...REQUIRED, "--only", "objectives"]),
+      parseFlowyteamArgs([...REQUIRED, "--only", "objetives"]),
     ).toThrow(UsageError);
+    expect(() =>
+      parseFlowyteamArgs([...REQUIRED, "--only", "objetives"]),
+    ).toThrow(/is not a domain this imports/);
+    expect(() =>
+      parseFlowyteamArgs([...REQUIRED, "--only", "objetives"]),
+    ).toThrow(/organisation, objectives, checkins, kpis, work/);
+  });
+
+  it("refuses an empty --only rather than reading it as all of them", () => {
+    expect(() => parseFlowyteamArgs([...REQUIRED, "--only", ","])).toThrow(
+      /needs at least one domain/,
+    );
+  });
+
+  it("reads --files-root, and leaves it absent when nobody gave one", () => {
+    expect(parseFlowyteamArgs(REQUIRED).filesRoot).toBeUndefined();
+    expect(
+      parseFlowyteamArgs([...REQUIRED, "--files-root", "/srv/flowy/storage"])
+        .filesRoot,
+    ).toBe("/srv/flowy/storage");
   });
 });
 

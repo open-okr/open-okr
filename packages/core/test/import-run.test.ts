@@ -359,4 +359,59 @@ describe("a second entity, against the rows the first one wrote", () => {
     expect(result.report.rows[1]?.reason).toContain("obj-9");
     expect(await count("key_results")).toBe(1);
   });
+
+  /**
+   * Found by the mixed spreadsheet-plus-company test at P6-T04d.
+   *
+   * A workspace that has just imported a company is full of placeholder
+   * members: each stands for somebody in the source who has never signed in,
+   * and the address they had there is on the membership rather than on a user
+   * row, because there is no user row. A spreadsheet exported from that same
+   * source names people by exactly that address, so a resolver reading only
+   * `users.email` skipped every row of a goals file naming an imported
+   * champion, and one workspace holding both importers was unusable.
+   */
+  it("finds a placeholder member by the address they had in the source", async () => {
+    const wb = await workerDb();
+    const [member] = (
+      await wb.admin.query<{ id: string }>(
+        `insert into workspace_members
+           (id, workspace_id, name, kind, status, placeholder_email)
+         values (gen_random_uuid(), $1, 'Ada Lovelace', 'placeholder', 'active', $2)
+         returning id`,
+        [workspaceId, "ada@example.com"],
+      )
+    ).rows;
+    expect(member?.id).toBeTruthy();
+
+    const result = await runImport({
+      pool,
+      workspaceId,
+      userId: OWNER,
+      entity: "goals",
+      file: await fileWith(
+        "placeholder-champion.csv",
+        [
+          "Objective ID,Objective,LEVEL,Start,End,Champion,Reviewer",
+          "obj-p,Championed by somebody who has not signed in,company,2026-01-01,2026-03-31,ada@example.com,ada@example.com",
+        ].join("\n"),
+      ),
+      dryRun: false,
+    });
+
+    expect(
+      result.report.rows
+        .filter((row) => row.outcome === "skipped")
+        .map((row) => row.reason),
+    ).toEqual([]);
+    expect(result.report.created).toBe(1);
+
+    const [goal] = (
+      await wb.admin.query<{ champion: string }>(
+        "select champion_id as champion from goals where legacy_id = $1",
+        ["obj-p"],
+      )
+    ).rows;
+    expect(goal?.champion).toBe(member?.id);
+  });
 });

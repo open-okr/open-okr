@@ -69,6 +69,7 @@ async function main(): Promise<void> {
         signingSecret: env.BETTER_AUTH_SECRET,
       }),
       ...(args.filesRoot ? { filesRoot: args.filesRoot } : {}),
+      ...(args.only ? { only: args.only } : {}),
     });
 
     process.stdout.write(`${render(report, runId)}\n`);
