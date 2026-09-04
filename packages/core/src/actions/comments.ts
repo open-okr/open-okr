@@ -388,6 +388,102 @@ export const importCommentAction = defineWriteAction({
     },
   }),
 });
+
+/**
+ * Replaces the body of a comment an import wrote (P6-T04c).
+ *
+ * The second phase of the reference rewrite, and the only thing that needs a
+ * write to a comment that already exists. When comments import, an inline
+ * base64 image has nowhere to go: a picture in this product is an `attachment`
+ * pointing at a blob, and the file domain has not run yet. When it does, the
+ * bytes are decoded, a blob is made, and the body is rebuilt with the
+ * attachment in the image's place.
+ *
+ * `comments.update` cannot do it: it is author-only, and the author is a
+ * placeholder who has never signed in. It also stamps `edited_at`, which would
+ * claim somebody edited their own comment years after writing it.
+ *
+ * **Only a comment carrying a legacy key**, so this can never touch something
+ * a person wrote. `full`, like every other import action.
+ */
+export const replaceImportedBodyAction = defineWriteAction({
+  name: "comments.replaceImportedBody",
+  summary:
+    "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
+  input: z.object({
+    commentId: z.uuid(),
+    body: richText,
+    /** How many files the rewrite put into the body, for the feed line. */
+    attachments: z.number().int().nonnegative().default(0),
+  }),
+  output: z.object({ replaced: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [comment] = await tx
+        .select({
+          id: comments.id,
+          legacyId: comments.legacyId,
+          subjectType: comments.subjectType,
+          subjectId: comments.subjectId,
+        })
+        .from(comments)
+        .where(
+          activeOnly(
+            comments,
+            eq(comments.id, input.commentId),
+            eq(comments.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!comment) {
+        throw new OperationError("not_found", "No such comment.");
+      }
+      if (!comment.legacyId) {
+        // A comment somebody wrote in the product. Not this action's business,
+        // and the refusal says which rule it broke rather than "forbidden".
+        throw new OperationError(
+          "forbidden",
+          "This comment was written here, not imported, so an import may not rewrite it.",
+        );
+      }
+
+      // openokr:allow-mutation: inside an Operation's execute.
+      await tx
+        .update(comments)
+        // `edited_at` is deliberately untouched: nobody edited this comment.
+        // The rewrite finishes an import that was always going to take two
+        // passes, and saying otherwise would put a false fact on the screen.
+        .set({ body: input.body, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            comments,
+            eq(comments.id, input.commentId),
+            eq(comments.workspaceId, workspaceId),
+          ),
+        );
+
+      return {
+        result: { replaced: true },
+        activity: {
+          kind: "comment.filesResolved" as const,
+          subjectType: "comment",
+          subjectId: comment.id,
+          payload: {
+            subjectType: comment.subjectType,
+            attachments: input.attachments,
+          },
+        },
+        audit: {
+          action: "comments.replaceImportedBody",
+          targetType: "comment",
+          targetId: comment.id,
+          payload: { legacyId: comment.legacyId },
+        },
+      };
+    },
+  }),
+});
 export const updateCommentAction = defineWriteAction({
   name: "comments.update",
   summary: "Edit a comment (author only)",

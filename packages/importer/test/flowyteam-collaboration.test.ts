@@ -266,8 +266,11 @@ describe.skipIf(!runnable)("importing one company's conversation", () => {
     );
   });
 
-  it("says in the report that files are not here yet", async () => {
+  it("says an inline image waits for the file pass rather than that it was lost", async () => {
     const { report } = await run(false);
-    expect(report.notes.join(" ")).toContain("Task files are not imported yet");
+    expect(report.notes.join(" ")).toContain(
+      "inline images are in comment markup",
+    );
+    expect(report.notes.join(" ")).toContain("the pictures in the file pass");
   });
 });

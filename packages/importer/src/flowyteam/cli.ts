@@ -14,9 +14,17 @@ export interface FlowyteamArgs {
   readonly as: string;
   /** False is a dry run, which is the default. */
   readonly write: boolean;
+  /**
+   * The FlowyTeam server's storage directory (P6-T04c).
+   *
+   * `task_files` names a file on that server's own disk, and a read-only
+   * MySQL connection cannot reach the bytes, so without this every local file
+   * is a named line in the report rather than a blob with nothing behind it.
+   */
+  readonly filesRoot: string | undefined;
 }
 
-export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--dry-run]
+export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--files-root <path>] [--dry-run]
 
 Reads a FlowyTeam MySQL database and never writes to it. A dry run unless
 --write is given: it reports which FlowyTeam the source is, which company was
@@ -26,8 +34,9 @@ It imports people, spaces, space membership, cycles, objectives, key results,
 key result history, check-ins, KPI categories, KPIs and their records,
 initiatives, tasks, checklists, task comments and watchers.
 
-Task files arrive at P6-T04c: the bytes are on the FlowyTeam application's own
-disk and a read-only MySQL connection cannot reach them.
+--files-root <path> points at the FlowyTeam server's storage directory. Task
+files live on that server's own disk rather than in MySQL, so without it every
+local file is reported by name instead of copied.
 
 Run without --company to see the companies the source holds.`;
 
@@ -92,5 +101,6 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     workspace: values.workspace as string,
     as: values.as as string,
     write,
+    filesRoot: values["files-root"],
   };
 }

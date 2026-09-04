@@ -238,7 +238,8 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "task_files",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, user_id int, task_id int, filename varchar(191), description text, google_url varchar(191), hashname varchar(191), size varchar(191), dropbox_link varchar(191), external_link varchar(191), external_link_name varchar(191)",
     optional: true,
   },
   {
@@ -580,6 +581,23 @@ export async function seedSource(
          (3, 7, 2, 2),
          (4, 7, 1, 99),
          (5, 7, 4, 1)`,
+    );
+  }
+  if (!dropped.has("task_files")) {
+    // One file per decision: a local upload whose bytes a test writes under a
+    // root, a local upload whose bytes are missing, a Google Drive address, a
+    // Dropbox address, a type this product refuses, and one on the task whose
+    // project did not import.
+    await source.query(
+      `insert into task_files
+         (id, company_id, user_id, task_id, filename, hashname, size,
+          google_url, dropbox_link, external_link, external_link_name) values
+         (1, 7, 1, 1, 'brief.pdf',    'aaaa1111.pdf', '9',  null, null, null, null),
+         (2, 7, 1, 1, 'missing.pdf',  'bbbb2222.pdf', '9',  null, null, null, null),
+         (3, 7, 2, 1, 'Plan sheet',   null,           null, 'https://drive.google.com/file/d/abc/view', null, null, null),
+         (4, 7, 2, 2, 'Shared box',   null,           null, null, 'https://www.dropbox.com/s/xyz/f.pdf', null, null),
+         (5, 7, 1, 1, 'archive.zip',  'cccc3333.zip', '9',  null, null, null, null),
+         (6, 7, 1, 4, 'orphan.pdf',   'dddd4444.pdf', '9',  null, null, null, null)`,
     );
   }
   await source.end();

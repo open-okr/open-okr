@@ -16,10 +16,12 @@
  * now there. Ordering by id would usually be enough, and "usually" is what the
  * two-phase rule in §7.1 exists to refuse.
  *
- * **An inline image is flagged, not dropped quietly.** 64 comments hold a
- * base64 data URI, which the schema has nowhere to put: a picture here is an
- * `attachment` pointing at a blob, and a mapper cannot make one until the file
- * domain lands at P6-T04c. Each is named in the report with its comment.
+ * **An inline image is flagged here and written by the file pass.** 64
+ * comments hold a base64 data URI, which this domain has nowhere to put: a
+ * picture in this product is an `attachment` pointing at a blob, and the blob
+ * does not exist while the words are being written. Each is named in the
+ * report with its comment, and `mappers/files.ts` comes back for it and
+ * rewrites the body.
  *
  * **A watcher who is a placeholder is not subscribed, and that is most of
  * them.** §7.2 excludes a suspended, placeholder or agent member from every
@@ -178,7 +180,7 @@ async function importOneComment(
     tally.skip(
       source,
       converted.images > 0
-        ? "This comment is an image and nothing else. There is nowhere to put the bytes until the file domain lands at P6-T04c, and a comment with no body is not a comment."
+        ? "This comment is an image and nothing else, so there is no body to write. The image itself still becomes a file in the file pass; a comment with no words is not a comment."
         : "This comment is markup with no words in it.",
     );
     return;
@@ -256,7 +258,7 @@ function convert(
         state.images += 1;
         tally.flag(
           source,
-          "This comment holds an image inline as a data URI. The words imported and the picture did not: a picture here is an attachment pointing at a blob, and the file domain lands at P6-T04c.",
+          "This comment holds an image inline as a data URI. The words are written here and the picture in the file pass later in this same run, because a picture here is an attachment pointing at a blob and the blob does not exist yet.",
         );
       }
     },
@@ -268,7 +270,7 @@ function describe(state: ConversionState): readonly string[] {
   const notes: string[] = [];
   if (state.images > 0) {
     notes.push(
-      `${state.images} inline images are in comment markup as data URIs rather than as attachments. Each is named in the comments domain's flags. The words imported; the pictures arrive with the file domain at P6-T04c.`,
+      `${state.images} inline images are in comment markup as data URIs rather than as attachments. Each is named in the comments domain's flags. The words are written here and the pictures in the file pass, which is what the comment images domain below reports.`,
     );
   }
   for (const [kind, count] of [...state.dropped.entries()].sort(

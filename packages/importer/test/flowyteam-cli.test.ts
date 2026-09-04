@@ -184,11 +184,21 @@ describe("the legacy identifier map", () => {
     // live instance carry a project against 3668 that carry a board.
     expect(LEGACY_TABLES.projects).toBe("initiatives");
     expect(LEGACY_TABLES.sub_tasks).toBe("checklist_items");
-    // Every target is distinct except where §7.2 says two source tables land in
-    // one, which today is nowhere: a duplicate here would mean two source
-    // tables silently sharing an identifier space.
+    // A file becomes a blob and not an attachment: an attachment is already
+    // unique on its subject and its blob while live, so the blob is what needs
+    // an identity of its own (P6-T04c).
+    expect(LEGACY_TABLES.task_files).toBe("blobs");
+    expect(LEGACY_TABLES.task_files_inline).toBe("blobs");
+
+    // Two source tables may share a target, and exactly two do: an uploaded
+    // file and an image sitting inline in comment markup both become blobs.
+    // Anything else sharing one would mean two source tables silently sharing
+    // an identifier space, which is why this counts rather than only warning.
     const targets = Object.values(LEGACY_TABLES);
-    expect(new Set(targets).size).toBe(targets.length);
+    const shared = targets.filter(
+      (target, index) => targets.indexOf(target) !== index,
+    );
+    expect(shared).toEqual(["blobs"]);
   });
 });
 

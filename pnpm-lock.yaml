@@ -431,6 +431,9 @@ importers:
 
   packages/importer:
     dependencies:
+      '@openokr/adapters':
+        specifier: workspace:*
+        version: link:../adapters
       '@openokr/config':
         specifier: workspace:*
         version: link:../config

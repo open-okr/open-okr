@@ -30,6 +30,19 @@ That has cost this branch twice. The script also passes
 so an error past the cap is neither shown nor counted, and this repository is
 long past 20.
 
+**`pnpm lint` refuses a TypeScript parameter property, and that rule earns its
+place.** `noParameterProperties` is on because `constructor(readonly x: string)`
+is valid TypeScript that **every entry point in this repository refuses at
+runtime**: they all run under Node's `--experimental-strip-types`, which erases
+types without transpiling. Vitest transpiles, so a suite stays green while the
+real command dies on its first import. It has happened twice. `pnpm
+import:flowyteam` died on `mappers/reconcile.ts` at P6-T04a with 107 tests
+green, and again on `ports/realtime.ts` at P6-T04c with 153 green, that second
+time because the importer started importing the adapters barrel for one driver
+and the barrel loads every port. Turning the rule on found a third in
+`packages/agents/src/structured-extraction.ts` that nothing had run yet. Write
+the field out and assign it in the constructor body.
+
 If all of those pass locally, CI passes, with one exception named under
 **Sign-off** below that no local command checks unless you ask it to.
 

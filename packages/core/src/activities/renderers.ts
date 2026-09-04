@@ -293,6 +293,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Edited a comment on a ${asString(p.subjectType, "subject")}`,
   "comment.deleted": (p) =>
     `Deleted a comment on a ${asString(p.subjectType, "subject")}`,
+  "comment.filesResolved": (p) =>
+    `Attached ${Number(p.attachments ?? 0)} file(s) an imported comment held inline`,
   "reaction.added": (p) =>
     `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
   "reaction.removed": (p) =>

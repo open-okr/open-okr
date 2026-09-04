@@ -1166,6 +1166,47 @@
       "pages": false
     },
     {
+      "name": "blobs prepareImport",
+      "action": "blobs.prepareImport",
+      "method": "POST",
+      "path": "/blobs/prepareImport",
+      "scope": "write",
+      "summary": "Reserves a storage key for a file an import found, keeping its uploader.",
+      "flags": [
+        {
+          "name": "filename",
+          "field": "filename",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "content-type",
+          "field": "contentType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "declared-size",
+          "field": "declaredSize",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "author-member-id",
+          "field": "authorMemberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blobs claimUpload",
       "action": "blobs.claimUpload",
       "method": "POST",
@@ -6735,6 +6776,35 @@
           "field": "legacy",
           "type": "object",
           "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "comments replaceImportedBody",
+      "action": "comments.replaceImportedBody",
+      "method": "POST",
+      "path": "/comments/replaceImportedBody",
+      "scope": "write",
+      "summary": "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
+      "flags": [
+        {
+          "name": "comment-id",
+          "field": "commentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "field": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "attachments",
+          "field": "attachments",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false

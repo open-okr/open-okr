@@ -26,6 +26,7 @@
  * Exit codes follow `pnpm okr`: 2 for a usage error decided before anything is
  * sent, 1 for the source or the instance refusing.
  */
+import { LocalDiskStorage } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import { resolveImportTarget } from "@openokr/core";
 import { Pool } from "pg";
@@ -57,6 +58,17 @@ async function main(): Promise<void> {
       url: args.source,
       companyId: args.company,
       write: args.write,
+      // The instance's own byte store, which is where a copied file lands. Only
+      // the driver, not `createAdapters`: an importer has no use for a job
+      // queue or a realtime listener, and starting them would leave two
+      // processes listening on the same channels.
+      storage: new LocalDiskStorage({
+        root: env.OPENOKR_STORAGE_ROOT,
+        // Never used on this path: signing builds a download URL and nothing
+        // here downloads. Passed because the driver requires one.
+        signingSecret: env.BETTER_AUTH_SECRET,
+      }),
+      ...(args.filesRoot ? { filesRoot: args.filesRoot } : {}),
     });
 
     process.stdout.write(`${render(report, runId)}\n`);

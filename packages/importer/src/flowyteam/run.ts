@@ -11,6 +11,7 @@
  * spreadsheet run appear in one list and are audited the same way. There is no
  * ambient importer identity here either: `--as` names the person.
  */
+import type { FileStorage } from "@openokr/adapters";
 import {
   type ActionCallContext,
   callAction,
@@ -21,6 +22,7 @@ import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
 import { importCheckIns } from "./mappers/check-ins.ts";
 import { importCollaboration } from "./mappers/collaboration.ts";
+import { importFiles } from "./mappers/files.ts";
 import { importKpis } from "./mappers/kpis.ts";
 import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
@@ -47,6 +49,14 @@ export interface FlowyteamRunOptions {
    * That is the whole difference between a preview and a guess.
    */
   readonly write?: boolean;
+  /**
+   * Where this instance keeps its own bytes (P6-T04c). Built by the entry
+   * point from `OPENOKR_STORAGE_ROOT`, and supplied directly by the tests.
+   * Without it no blob is written, which is what a dry run wants.
+   */
+  readonly storage?: FileStorage;
+  /** The FlowyTeam server's storage directory, from `--files-root`. */
+  readonly filesRoot?: string;
 }
 
 export interface FlowyteamRunResult {
@@ -106,6 +116,8 @@ export async function runFlowyteamImport(
         options.userId,
       ),
       write,
+      ...(options.storage && write ? { storage: options.storage } : {}),
+      ...(options.filesRoot ? { filesRoot: options.filesRoot } : {}),
     };
     const organisation = await importOrganisation(mapper);
     const okrs = await importOkrs(mapper);
@@ -117,6 +129,9 @@ export async function runFlowyteamImport(
     const work = await importWork(mapper);
     // Last: a comment hangs on a task and a watcher watches one.
     const collaboration = await importCollaboration(mapper);
+    // Last of all: an attachment hangs on a task and an inline image rewrites
+    // a comment, so both need their subject written first.
+    const files = await importFiles(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -132,6 +147,7 @@ export async function runFlowyteamImport(
         ...kpis.domains,
         ...work.domains,
         ...collaboration.domains,
+        ...files.domains,
       ],
       extraNotes: [
         organisation.teamTreeDepth > 1
@@ -152,7 +168,7 @@ export async function runFlowyteamImport(
         "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
         ...work.unmodelled,
         ...collaboration.unmodelled,
-        "Task files are not imported yet. They arrive at P6-T04c, because the bytes are on the source server's own disk and a read-only MySQL connection cannot reach them.",
+        ...files.unmodelled,
       ],
     });
 

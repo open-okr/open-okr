@@ -340,6 +340,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     excerpt: z.string(),
   }),
   "comment.deleted": z.object({ subjectType: z.string() }),
+  // P6-T04c. Not `comment.updated`: nobody edited anything. An import writes a
+  // comment's words in one pass and the files it held inline in a later one,
+  // because a picture here points at a file that did not exist yet.
+  "comment.filesResolved": z.object({
+    subjectType: z.string(),
+    attachments: z.number().int(),
+  }),
   "reaction.added": z.object({
     emoji: z.string(),
     subjectType: z.string(),

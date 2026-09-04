@@ -25,6 +25,7 @@ import {
   QuotaExceededError,
   ValidationFailedError,
 } from "../blobs/provisioning.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -116,6 +117,104 @@ export const prepareUpload = defineWriteAction({
   }),
 });
 
+/**
+ * Reserves a blob for a file an import found (P6-T04c).
+ *
+ * The same trade `people.importMember`, `goals.importCheckIn` and
+ * `comments.importComment` made before it. `blobs.prepareUpload` attributes
+ * the file to the signed-in member, which is right for somebody dragging a
+ * file into a comment box and wrong for a migration: a file uploaded by a
+ * colleague in 2023 belongs to that colleague, not to whoever ran the import.
+ *
+ * A legacy key rather than a digest, because two files can share a name, a
+ * size and even a digest and still be two uploads. `blobs.prepareUpload` could
+ * have taken an optional legacy key instead, but it holds only `edit`, so any
+ * member could reserve a key an import later needs and the import would then
+ * skip a file for a reason nobody could act on.
+ *
+ * **The bytes still go through the storage port, and the claim is still
+ * separate.** The caller prepares, writes the bytes at the key this returns,
+ * then calls `blobs.claimUpload`. Doing all three here would mark a blob `ok`
+ * before its bytes existed, so a run that died in between would leave a row
+ * that says a file is there when it is not.
+ */
+export const prepareImport = defineWriteAction({
+  name: "blobs.prepareImport",
+  summary:
+    "Reserves a storage key for a file an import found, keeping its uploader.",
+  input: z.object({
+    filename: z.string().trim().min(1).max(255),
+    contentType: z.string().min(1),
+    declaredSize: z.number().int().positive(),
+    /** Whoever uploaded it in the source, not whoever is importing. */
+    authorMemberId: z.uuid(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({ blobId: z.uuid(), storageKey: z.string() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      await assertLegacyKeyFree(tx, workspaceId, blobs, input.legacy, "file");
+
+      const [author] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, input.authorMemberId),
+            eq(workspaceMembers.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!author) {
+        throw new OperationError(
+          "forbidden",
+          "No such member to attribute this file to.",
+        );
+      }
+
+      const quotaBytes = await readQuotaBytes(tx, workspaceId);
+      let prepared: Awaited<ReturnType<typeof prepareBlob>>;
+      try {
+        prepared = await prepareBlob(tx, {
+          workspaceId,
+          memberId: input.authorMemberId,
+          filename: input.filename,
+          contentType: input.contentType,
+          declaredSize: input.declaredSize,
+          quotaBytes,
+          legacy: input.legacy,
+          ...(actor.memberId ? { actingMemberId: actor.memberId } : {}),
+        });
+      } catch (error) {
+        throw asOperationError(error);
+      }
+
+      return {
+        result: prepared,
+        activity: {
+          kind: "blob.prepared",
+          subjectType: "blob",
+          subjectId: prepared.blobId,
+          payload: { imported: true },
+        },
+        audit: {
+          action: "blobs.prepareImport",
+          targetType: "blob",
+          targetId: prepared.blobId,
+          payload: {
+            filename: input.filename,
+            contentType: input.contentType,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+          },
+        },
+      };
+    },
+  }),
+});
 export const claimUpload = defineWriteAction({
   name: "blobs.claimUpload",
   summary: "Finalise an upload once the bytes are in storage.",

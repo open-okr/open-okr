@@ -54,7 +54,13 @@ export const LEGACY_TABLES = {
   tasks: "tasks",
   sub_tasks: "checklist_items",
   task_comments: "comments",
-  task_files: "attachments",
+  // **Blobs, not attachments.** A `task_files` row becomes one blob and one
+  // attachment, and the attachment is already unique on its subject and its
+  // blob while live, so the blob is what carries the identity (P6-T04c).
+  task_files: "blobs",
+  // An image sitting inline in comment markup. Its key is the comment id and
+  // the image's position in it, because a data URI has no id of its own.
+  task_files_inline: "blobs",
 } as const;
 
 export type SourceTable = keyof typeof LEGACY_TABLES;

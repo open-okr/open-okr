@@ -6388,6 +6388,135 @@
         }
       }
     },
+    "/blobs/prepareImport": {
+      "post": {
+        "operationId": "blobs.prepareImport",
+        "summary": "Reserves a storage key for a file an import found, keeping its uploader.",
+        "tags": [
+          "blobs"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "blobId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "storageKey": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "blobId",
+                        "storageKey"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filename": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "declaredSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "authorMemberId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "legacy": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "csv",
+                          "flowyteam"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  }
+                },
+                "required": [
+                  "filename",
+                  "contentType",
+                  "declaredSize",
+                  "authorMemberId",
+                  "legacy"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/blobs/claimUpload": {
       "post": {
         "operationId": "blobs.claimUpload",
@@ -32642,6 +32771,98 @@
                   "body",
                   "createdAt",
                   "legacy"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments/replaceImportedBody": {
+      "post": {
+        "operationId": "comments.replaceImportedBody",
+        "summary": "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
+        "tags": [
+          "comments"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "replaced": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "replaced"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commentId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "body": {},
+                  "attachments": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "commentId",
+                  "body"
                 ]
               }
             }

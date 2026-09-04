@@ -19,6 +19,7 @@ import {
   ensureMemberGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
 import { checkQuota, usedBytes } from "./quota.ts";
 import { validateUpload } from "./validation.ts";
 
@@ -61,6 +62,24 @@ export interface PrepareBlobInput {
   /** The browser's own report of the file's size. Re-checked at claim. */
   readonly declaredSize: number;
   readonly quotaBytes: number;
+  /**
+   * The source row this file came from, for an import (P6-T04c).
+   *
+   * Two files can share a name, a size and even a digest and still be two
+   * uploads, so the digest is not an identity: the source's own id is. Its
+   * presence is also what says "an import did this", which is what decides
+   * whether the actor gets a binding of its own below.
+   */
+  readonly legacy?: { readonly type: string; readonly id: string };
+  /**
+   * The member the run acts as, when it is not `memberId`.
+   *
+   * `memberId` is whoever uploaded the file in the source, and a placeholder
+   * cannot sign in, so binding only them leaves a blob nobody can read and an
+   * `attachments.attach` that refuses. The same narrow fix `bindImporterInTx`
+   * makes everywhere else.
+   */
+  readonly actingMemberId?: string;
 }
 
 export interface PreparedBlob {
@@ -107,6 +126,9 @@ export async function prepareBlob<
       storageKey,
       authorMemberId: input.memberId,
       status: "pending",
+      ...(input.legacy
+        ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+        : {}),
     })
     .returning({ id: blobs.id });
   const blobId = (row as { id: string }).id;
@@ -126,6 +148,15 @@ export async function prepareBlob<
     contextId,
     level: ACCESS_LEVELS.full,
   });
+
+  if (input.legacy) {
+    await bindImporterInTx(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.actingMemberId,
+      contextId,
+      alreadyBound: input.memberId,
+    });
+  }
 
   return { blobId, storageKey };
 }

@@ -41,13 +41,26 @@ export interface ExtractStructuredInput<T> {
 }
 
 export class StructuredExtractionError extends Error {
+  /**
+   * Declared, not parameter properties. See the `noParameterProperties` rule
+   * in `biome.json`: Node's `--experimental-strip-types` erases types without
+   * transpiling and refuses these outright, and Vitest transpiles, so a suite
+   * stays green while the real command dies on the first import. This one had
+   * not been caught yet only because nothing had run the file under a
+   * strip-only entry point.
+   */
+  readonly firstAttempt: string;
+  readonly repairAttempt: string | undefined;
+
   constructor(
     message: string,
-    readonly firstAttempt: string,
-    readonly repairAttempt: string | undefined,
+    firstAttempt: string,
+    repairAttempt: string | undefined,
   ) {
     super(message);
     this.name = "StructuredExtractionError";
+    this.firstAttempt = firstAttempt;
+    this.repairAttempt = repairAttempt;
   }
 }
 

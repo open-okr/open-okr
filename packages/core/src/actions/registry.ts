@@ -77,7 +77,12 @@ import {
   readPendingDevice,
   revokeApiToken,
 } from "./api-tokens.ts";
-import { claimUpload, getBlobForDownload, prepareUpload } from "./blobs.ts";
+import {
+  claimUpload,
+  getBlobForDownload,
+  prepareImport,
+  prepareUpload,
+} from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
   connect as connectChannel,
@@ -119,6 +124,7 @@ import {
   listReactionsAction,
   previewNotifyAction,
   removeReactionAction,
+  replaceImportedBodyAction,
   updateCommentAction,
 } from "./comments.ts";
 import {
@@ -437,6 +443,8 @@ export const ACTION_MAP = {
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
   "blobs.prepareUpload": prepareUpload,
+  // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.
+  "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
   "notifications.list": listNotifications,
@@ -625,6 +633,9 @@ export const ACTION_MAP = {
   "comments.create": createCommentAction,
   // P6-T04b. A comment an import found, kept as its author wrote it.
   "comments.importComment": importCommentAction,
+  // P6-T04c. The second phase of the reference rewrite: an imported body
+  // gains the attachments its inline images became.
+  "comments.replaceImportedBody": replaceImportedBodyAction,
   "comments.update": updateCommentAction,
   "comments.delete": deleteCommentAction,
   "comments.previewNotify": previewNotifyAction,

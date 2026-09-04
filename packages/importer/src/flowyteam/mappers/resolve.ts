@@ -30,6 +30,8 @@ const TARGET_TABLE: Partial<Record<SourceTable, LegacyTableName>> = {
   tasks: "tasks",
   sub_tasks: "checklistItems",
   task_comments: "comments",
+  task_files: "blobs",
+  task_files_inline: "blobs",
 };
 
 export interface Resolver {
