@@ -42,6 +42,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
   "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,
+  "member.imported": (p) =>
+    p.matched === undefined
+      ? `${asString(p.name, "A member")} was imported`
+      : `${asString(p.name, "A member")} was already here and was matched to the import`,
   "invitation.link_created": () => "An invitation link was created",
   "invitation.link_revoked": () => "An invitation link was revoked",
   "invitation.accepted": () => "An invitation was accepted",

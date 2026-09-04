@@ -43,6 +43,7 @@ import {
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { bindChampionToSpaceInTx } from "../agents/champion.ts";
 import { bindCoachToSpaceInTx } from "../agents/coach.ts";
+import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -56,6 +57,8 @@ export interface CreateSpaceInput {
   readonly managerMemberId?: string;
   /** Supplied by provisioning, which needs the id before the row exists. */
   readonly spaceId?: string;
+  /** The source system's identity for this space, when an import made it (P6-T03a). */
+  readonly legacy?: LegacyKey;
 }
 
 export interface CreatedSpace {
@@ -95,6 +98,9 @@ export async function createSpaceInTx<
       workspaceId: input.workspaceId,
       name,
       mission: input.mission?.trim() || null,
+      ...(input.legacy
+        ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+        : {}),
     })
     .returning({ id: spaces.id, name: spaces.name, mission: spaces.mission });
 

@@ -118,7 +118,9 @@ The workspace `language` default now resolves through the instance's own `instan
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
 ### workspace_members
-`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`.
+`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
+
+`placeholder_email` is the address an imported member is waiting to be claimed by (P6-T03a). Set only on a `placeholder` row, which has no `user_id` and so cannot be signed in as; unique per workspace among live rows, so two imported employees sharing an address cannot become two members waiting for one person. Every member with a real account has this null and their address on the user row.
 
 Unique on `(workspace_id, user_id)` for live rows, so one person has at most one membership per workspace while a rejoin does not collide with their own soft-deleted row.
 
@@ -169,8 +171,10 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 
 ## 5. Spaces (domain B)
 
-### spaces
-`name`, `mission?`, `settings jsonb`.
+### spaces *(importable)*
+`name`, `mission?`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+The two legacy columns and their unique partial index arrived at P6-T03a, seventeen migrations after the table: `spaces` was written before there was an importer to write them, and the FlowyTeam mapper is the first thing to map a source table onto it (§7.2, teams).
 
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
@@ -184,7 +188,9 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
 ### cycles *(short_id, importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`.
+`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.
 
 ### cycle_pack_items
 `cycle_id` to cycles, `item_key smallint` (1 to 7), `gathered bool`, `note?`.

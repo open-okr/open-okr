@@ -17,6 +17,10 @@ import {
   legacyKeyFor,
   parseLegacyId,
 } from "../src/flowyteam/legacy.ts";
+import {
+  DomainTally,
+  describeDomain,
+} from "../src/flowyteam/mappers/reconcile.ts";
 import { buildReport, render } from "../src/flowyteam/report.ts";
 
 const REQUIRED = [
@@ -35,6 +39,7 @@ describe("pnpm import:flowyteam's arguments", () => {
       workspace: "acme",
       as: "ada@example.com",
       company: 7,
+      write: false,
     });
     expect(
       parseFlowyteamArgs([
@@ -72,18 +77,20 @@ describe("pnpm import:flowyteam's arguments", () => {
     expect(() => parseFlowyteamArgs([...REQUIRED, "--dry-run"])).not.toThrow();
   });
 
-  it("refuses --write and --only by name rather than ignoring them", () => {
-    // Both are in TECHNICAL-PLAN §7's usage line, so a person who read it will
-    // type them. Silently ignoring either would look like the command running.
-    expect(() => parseFlowyteamArgs([...REQUIRED, "--write"])).toThrow(
-      /not available yet/,
-    );
+  it("is a dry run unless --write is given", () => {
+    expect(parseFlowyteamArgs(REQUIRED).write).toBe(false);
+    expect(parseFlowyteamArgs([...REQUIRED, "--write"]).write).toBe(true);
+  });
+
+  it("refuses --only by name rather than ignoring it", () => {
+    // It is in TECHNICAL-PLAN §7's usage line, so a person who read it will
+    // type it. Silently ignoring it would look like the command running.
     expect(() =>
       parseFlowyteamArgs([...REQUIRED, "--only", "objectives"]),
     ).toThrow(/arrives with them at P6-T03/);
-    expect(() => parseFlowyteamArgs([...REQUIRED, "--write"])).toThrow(
-      UsageError,
-    );
+    expect(() =>
+      parseFlowyteamArgs([...REQUIRED, "--only", "objectives"]),
+    ).toThrow(UsageError);
   });
 });
 
@@ -140,7 +147,9 @@ describe("the report a dry run produces", () => {
     expect(printed).toContain("812 migrations applied");
     // Padded to the widest table name, so the numbers line up in a column.
     expect(printed).toMatch(/objectives\s+2\n\s+key_results\s+3/);
-    expect(printed).toContain("Written: 0. Skipped: 0.");
+    expect(printed).toContain(
+      "Would write: 0. Would skip: 0. Nothing was written.",
+    );
     expect(printed).toContain("Run run-1");
   });
 });
@@ -178,5 +187,40 @@ describe("the legacy identifier map", () => {
     // tables silently sharing an identifier space.
     const targets = Object.values(LEGACY_TABLES);
     expect(new Set(targets).size).toBe(targets.length);
+  });
+});
+
+describe("one domain's reconciliation", () => {
+  it("is clean only when everything read is accounted for and nothing skipped", () => {
+    const tidy = new DomainTally("members");
+    tidy.sawRow();
+    tidy.sawRow();
+    tidy.wrote(true);
+    tidy.wrote(false);
+    expect(tidy.finish()).toMatchObject({
+      read: 2,
+      created: 1,
+      matched: 1,
+      clean: true,
+    });
+  });
+
+  it("is not clean when a row was skipped, even though the skip was reported", () => {
+    const messy = new DomainTally("cycles");
+    messy.sawRow();
+    messy.skip("performance_cycles:3", "This is a weekly cycle.");
+    const done = messy.finish();
+    expect(done.clean).toBe(false);
+    expect(describeDomain(done)).toContain("1 skipped");
+  });
+
+  it("is not clean when a row was read and never accounted for", () => {
+    // The shape a mapper bug makes: a row read, no write, no skip. The counts
+    // would look harmless and the flag is what catches it.
+    const lossy = new DomainTally("spaces");
+    lossy.sawRow();
+    lossy.sawRow();
+    lossy.wrote(true);
+    expect(lossy.finish().clean).toBe(false);
   });
 });

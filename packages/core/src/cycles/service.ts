@@ -19,6 +19,7 @@ import {
   workspaces,
 } from "@openokr/db";
 import { and, desc, eq } from "drizzle-orm";
+import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
   type CyclePeriod,
@@ -232,6 +233,17 @@ export interface CreateCycleInput {
   readonly publicationDeadline?: string | null;
   readonly frameId?: string | null;
   readonly previousCycleId?: string | null;
+  /**
+   * The name to use instead of the period's own (P6-T03a).
+   *
+   * An import keeps the name the source used, because that is the name the
+   * people being migrated recognise: "FY26 H1" rather than "2026 H1". The
+   * period still decides the dates and the mode, so nothing about the rhythm
+   * changes; only the label does.
+   */
+  readonly name?: string;
+  /** The source system's identity for this cycle, when an import made it. */
+  readonly legacy?: LegacyKey;
 }
 
 /** Creates one named period. Refuses a duplicate rather than silently reusing it. */
@@ -265,7 +277,7 @@ export async function createCycleInTx<
     .values({
       id: newId(),
       workspaceId: input.workspaceId,
-      name: input.period.name,
+      name: input.name?.trim() || input.period.name,
       mode: input.period.mode,
       cadence: input.cadence,
       startsOn: input.period.startsOn,
@@ -276,6 +288,9 @@ export async function createCycleInTx<
       sponsorId: input.sponsorId ?? null,
       facilitatorId: input.facilitatorId ?? null,
       publicationDeadline: input.publicationDeadline ?? null,
+      ...(input.legacy
+        ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+        : {}),
       frameId: input.frameId ?? null,
       previousCycleId: input.previousCycleId ?? null,
     })

@@ -12,19 +12,31 @@
  */
 
 import {
+  cycles,
   goals,
   initiatives,
   keyResults,
   kpis,
+  spaces,
   tasks,
   withWorkspace,
+  workspaceMembers,
 } from "@openokr/db";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { findLegacyRowInTx, type LegacyKey } from "./legacy.ts";
 import type { LegacyTableName } from "./templates/index.ts";
 
-const TABLES = { goals, keyResults, kpis, initiatives, tasks } as const;
+const TABLES = {
+  goals,
+  keyResults,
+  kpis,
+  initiatives,
+  tasks,
+  spaces,
+  cycles,
+  workspaceMembers,
+} as const;
 
 export async function findExisting(
   pool: Pool,

@@ -12,14 +12,18 @@ export interface FlowyteamArgs {
   readonly company: number | undefined;
   readonly workspace: string;
   readonly as: string;
+  /** False is a dry run, which is the default. */
+  readonly write: boolean;
 }
 
 export const FLOWYTEAM_USAGE = `pnpm import:flowyteam --source <mysql://user:password@host:3306/database> --company <id> --workspace <slug> --as <email> [--dry-run]
 
-Reads a FlowyTeam MySQL database and never writes to it. A dry run always, for
-now: this reports which FlowyTeam the source is, which company was selected and
-what that company holds. The mappers that load a company's history arrive at
-P6-T03 and P6-T04.
+Reads a FlowyTeam MySQL database and never writes to it. A dry run unless
+--write is given: it reports which FlowyTeam the source is, which company was
+selected, and what a real run would create in the workspace.
+
+Today it imports the organisation: people, spaces, space membership and cycles.
+Objectives, key results, check-ins and KPIs arrive at P6-T03b to P6-T03d.
 
 Run without --company to see the companies the source holds.`;
 
@@ -32,6 +36,7 @@ Run without --company to see the companies the source holds.`;
  */
 export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
   const values: Record<string, string> = {};
+  let write = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] as string;
@@ -41,9 +46,8 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
       continue;
     }
     if (arg === "--write") {
-      throw new UsageError(
-        "--write is not available yet. This command reads the source and reports what is in it; the mappers that write a company's history into a workspace arrive at P6-T03 and P6-T04.",
-      );
+      write = true;
+      continue;
     }
     if (!arg.startsWith("--")) {
       throw new UsageError(`I do not know what "${arg}" is.`);
@@ -83,5 +87,6 @@ export function parseFlowyteamArgs(argv: readonly string[]): FlowyteamArgs {
     company: company === undefined ? undefined : Number(company),
     workspace: values.workspace as string,
     as: values.as as string,
+    write,
   };
 }

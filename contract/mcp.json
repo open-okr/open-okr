@@ -192,6 +192,71 @@
       "example": {}
     },
     {
+      "name": "people.importMember",
+      "description": "Creates a placeholder member for somebody an import found, with the address to claim it by.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "legacy"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "name": "…",
+        "email": "…",
+        "legacy": {}
+      }
+    },
+    {
       "name": "people.updateMember",
       "description": "Update another member's name, title or manager (org fields).",
       "inputSchema": {
@@ -3455,6 +3520,27 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
           }
         },
         "required": [
@@ -3819,6 +3905,32 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
             ]
           }
         },

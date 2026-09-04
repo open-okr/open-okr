@@ -58,6 +58,19 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "member.restored": z.object({ name: z.string() }),
   "member.converted_to_guest": z.object({ name: z.string() }),
   "member.erased": z.object({ name: z.string() }),
+  /**
+   * A member an import created or claimed (P6-T03a).
+   *
+   * `matched` says which of the three it was: a placeholder written now, a row
+   * an earlier run already wrote, or a member who was already here under the
+   * same address. The feed shows the import as one act; the audit rows name
+   * each row it touched.
+   */
+  "member.imported": z.object({
+    name: z.string(),
+    legacyId: z.string().optional(),
+    matched: z.enum(["legacy", "email"]).optional(),
+  }),
   "invitation.link_created": z.object({}).catchall(z.unknown()),
   "invitation.link_revoked": z.object({}),
   "invitation.accepted": z.object({}).catchall(z.unknown()),
@@ -492,6 +505,9 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
 export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
   "member.profile_updated",
   "member.updated",
+  // An import writes one per person. A company of two hundred would otherwise
+  // be two hundred feed rows about one act somebody performed once.
+  "member.imported",
   "workspace.general_settings_updated",
   "workspace.branding_updated",
   // Every real AI call writes one of these; the feed would otherwise be

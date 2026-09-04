@@ -141,6 +141,9 @@ export const cycles = pgTable("cycles", {
     .default(["company", "department", "team"]),
   contributingUnits: text("contributing_units"),
   firstCycle: boolean("first_cycle").notNull().default(false),
+  /** Where this cycle came from, when an import made it (P6-T03a). */
+  legacyId: text("legacy_id"),
+  legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),
   settings: jsonb("settings")
     .$type<Record<string, unknown>>()
     .notNull()

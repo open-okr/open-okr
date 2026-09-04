@@ -15,6 +15,8 @@
  */
 import type { Company, CompanyCounts } from "./companies.ts";
 import type { Introspection } from "./introspect.ts";
+import type { DomainReconciliation } from "./mappers/reconcile.ts";
+import { describeDomain } from "./mappers/reconcile.ts";
 
 /** What §7.2 records as out of scope, so the report says it rather than a plan. */
 export const NOT_IMPORTED = [
@@ -41,6 +43,8 @@ export interface FlowyteamReport {
   /** Rows written into the target. Zero until the mappers land. */
   readonly written: number;
   readonly skipped: number;
+  /** One row per domain this run touched (P6-T03a). Empty for a run that read only. */
+  readonly reconciliation: readonly DomainReconciliation[];
   readonly notImported: readonly string[];
   /** Anything a person has to know, in the words they should read. */
   readonly notes: readonly string[];
@@ -52,9 +56,21 @@ export function buildReport(input: {
   readonly company: Company;
   readonly counts: CompanyCounts;
   readonly mode: "dry_run" | "real";
+  readonly reconciliation?: readonly DomainReconciliation[];
+  readonly extraNotes?: readonly string[];
 }): FlowyteamReport {
   const missing = Object.entries(input.introspection.domains).filter(
     ([, tables]) => tables.length > 0,
+  );
+
+  const reconciliation = input.reconciliation ?? [];
+  const written = reconciliation.reduce(
+    (sum, domain) => sum + domain.created,
+    0,
+  );
+  const skipped = reconciliation.reduce(
+    (sum, domain) => sum + domain.skipped.length,
+    0,
   );
 
   return {
@@ -68,15 +84,21 @@ export function buildReport(input: {
     tableCount: input.introspection.tableCount,
     missingByDomain: input.introspection.domains,
     counts: input.counts,
-    written: 0,
-    skipped: 0,
+    written,
+    skipped,
+    reconciliation,
     notImported: NOT_IMPORTED,
     notes: [
       ...missing.map(
         ([domain, tables]) =>
           `The ${domain} domain will import nothing: this instance has no ${tables.join(", ")}.`,
       ),
-      "Nothing was written. The mappers that load a company's history arrive at P6-T03 and P6-T04; this run proves the source can be read and names what is in it.",
+      ...(reconciliation.length === 0
+        ? [
+            "Nothing was written. The mappers that load a company's history arrive at P6-T03 and P6-T04; this run proves the source can be read and names what is in it.",
+          ]
+        : []),
+      ...(input.extraNotes ?? []),
       ...(input.company.timezone
         ? [
             `The company's timezone is ${input.company.timezone}. It is offered as an edit to the workspace and never applied silently (TECHNICAL-PLAN §7.2).`,
@@ -104,7 +126,31 @@ export function render(report: FlowyteamReport, runId: string): string {
     lines.push(`  ${table.padEnd(width)}  ${count}`);
   }
 
-  lines.push("", `Written: ${report.written}. Skipped: ${report.skipped}.`);
+  if (report.reconciliation.length > 0) {
+    lines.push("", "Reconciliation:");
+    for (const domain of report.reconciliation) {
+      lines.push(`  ${describeDomain(domain)}${domain.clean ? "" : "  *"}`);
+    }
+    const unclean = report.reconciliation.filter((domain) => !domain.clean);
+    if (unclean.length > 0) {
+      lines.push("", "Rows that did not import:");
+      for (const domain of unclean) {
+        for (const row of domain.skipped) {
+          lines.push(`  ${row.source}: ${row.reason}`);
+        }
+      }
+    }
+  }
+
+  lines.push(
+    "",
+    // A dry run has written nothing, and a line saying "Written: 50" under a
+    // heading saying "dry run" is the kind of thing somebody reads in a hurry
+    // and acts on.
+    report.mode === "dry_run"
+      ? `Would write: ${report.written}. Would skip: ${report.skipped}. Nothing was written.`
+      : `Written: ${report.written}. Skipped: ${report.skipped}.`,
+  );
 
   if (report.notes.length > 0) {
     lines.push("", "Worth knowing:");

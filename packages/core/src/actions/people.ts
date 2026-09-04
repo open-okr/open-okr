@@ -18,7 +18,10 @@ import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
+import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { resolveSubjectContext } from "../access/reads.ts";
+import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
   type ErasureExport,
@@ -33,7 +36,10 @@ import {
 } from "../people/manager-chain.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
-import { isKnownTimezone } from "../settings/registry.ts";
+import {
+  isKnownTimezone,
+  resolveMemberSettings,
+} from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** `null` clears the bio; anything else must be a valid rich text
@@ -577,4 +583,206 @@ export const possibleManagersFor = defineReadAction({
       possibleManagers(tx, context.workspaceId, input.memberId),
     );
   },
+});
+
+/**
+ * A member an import created, standing in for somebody who has not signed in
+ * (TECHNICAL-PLAN §7.2, P6-T03a).
+ *
+ * **Why an action of its own rather than the invitation path.** Every member in
+ * this product is born from an invitation somebody accepted, and that path
+ * verifies an address by delivering to it. An import has neither: it has a row
+ * in somebody else's database saying this person owned that objective. Widening
+ * `invitations.acceptLink` with a mode that skips the verification would put a
+ * branch in a security path for the benefit of a migration, which is the wrong
+ * trade. Agung chose this shape on 4 September 2026 over that and over importing
+ * with no members at all.
+ *
+ * **A placeholder is not an account and cannot become one by accident.** It has
+ * no `user_id`, so nobody can sign in as it, and it holds the address the source
+ * knew the person by so that a real account can be matched to it later. Claiming
+ * is not built here: the row is what makes it possible.
+ *
+ * **`full`, and a legacy key is required.** Creating people is an administrative
+ * act, and requiring the key is what keeps this an importer's action rather than
+ * a second way to add members: there is no call to it that is not part of a
+ * recorded import run.
+ */
+export const importMember = defineWriteAction({
+  name: "people.importMember",
+  summary:
+    "Creates a placeholder member for somebody an import found, with the address to claim it by.",
+  input: z.object({
+    name: z.string().trim().min(1).max(200),
+    /** The address the source system knew them by. */
+    email: z.email().max(320),
+    title: z.string().trim().max(200).optional(),
+    timezone: z.string().trim().max(64).optional(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({
+    memberId: z.uuid(),
+    /** False when a member already held this address or this key. */
+    created: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const email = input.email.trim().toLowerCase();
+
+      // Three ways this person may already be here, and each is a match rather
+      // than a refusal: a re-run of the same import, an earlier import that
+      // found them under a different source row, and a real member whose
+      // account already carries the address. An import is expected to run
+      // twice, so "already here" is the normal case and not an error.
+      const byLegacy = await findLegacyRowInTx(
+        tx,
+        workspaceId,
+        workspaceMembers,
+        input.legacy,
+      );
+      if (byLegacy) {
+        return {
+          result: { memberId: byLegacy.id, created: false },
+          activity: {
+            kind: "member.imported" as const,
+            subjectType: "workspace" as const,
+            subjectId: workspaceId,
+            payload: { name: input.name, matched: "legacy" },
+          },
+          audit: {
+            action: "people.importMember",
+            targetType: "workspace_member",
+            targetId: byLegacy.id,
+            payload: { legacyId: input.legacy.id, matched: "legacy" },
+          },
+        };
+      }
+
+      const [existing] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            sql`(
+              ${workspaceMembers.placeholderEmail} = ${email}
+              or exists (
+                select 1 from users u
+                 where u.id = ${workspaceMembers.userId}
+                   and lower(u.email) = ${email}
+              )
+            )`,
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        // Claim it for the import by writing the legacy key onto the member who
+        // is already here, so the next run resolves by key and every later
+        // mapper points at one member rather than two.
+        // openokr:allow-mutation: the calling Operation's own transaction.
+        await tx
+          .update(workspaceMembers)
+          .set({
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+            updatedAt: new Date(),
+          })
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.id, existing.id),
+            ),
+          );
+        return {
+          result: { memberId: existing.id, created: false },
+          activity: {
+            kind: "member.imported" as const,
+            subjectType: "workspace" as const,
+            subjectId: workspaceId,
+            payload: { name: input.name, matched: "email" },
+          },
+          audit: {
+            action: "people.importMember",
+            targetType: "workspace_member",
+            targetId: existing.id,
+            payload: { legacyId: input.legacy.id, matched: "email" },
+          },
+        };
+      }
+
+      const settings = resolveMemberSettings({});
+      // openokr:allow-mutation: the calling Operation's own transaction.
+      const [member] = await tx
+        .insert(workspaceMembers)
+        .values({
+          workspaceId,
+          userId: null,
+          name: input.name,
+          title: input.title ?? null,
+          timezone: input.timezone ?? null,
+          placeholderEmail: email,
+          kind: "placeholder",
+          // `invited`, not `active`: nobody has accepted anything. The status is
+          // what tells every count of "people in this workspace" that this is a
+          // row waiting for a person rather than a person.
+          status: "invited",
+          primaryChannel:
+            settings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
+          quietHours: settings.quietHours,
+          legacyType: input.legacy.type,
+          legacyId: input.legacy.id,
+        })
+        .returning({ id: workspaceMembers.id });
+      if (!member) {
+        throw new Error("The placeholder member insert returned no row.");
+      }
+
+      // The member's own group and its workspace binding, the same two rows
+      // `provisionMemberForInvite` writes. Without them the member exists and
+      // reaches nothing, and every later mapper naming them as a champion would
+      // write a goal nobody can see.
+      const groupId = await ensureMemberGroup(tx, {
+        workspaceId,
+        memberId: member.id,
+      });
+      const context = await resolveSubjectContext(
+        tx,
+        "workspace",
+        workspaceId,
+        workspaceId,
+      );
+      if (context) {
+        await bindGroup(tx, {
+          workspaceId,
+          groupId,
+          contextId: context.contextId,
+          level: ACCESS_LEVELS.edit,
+        });
+      }
+
+      return {
+        result: { memberId: member.id, created: true },
+        activity: {
+          kind: "member.imported" as const,
+          subjectType: "workspace" as const,
+          subjectId: workspaceId,
+          payload: { name: input.name, legacyId: input.legacy.id },
+        },
+        audit: {
+          action: "people.importMember",
+          targetType: "workspace_member",
+          targetId: member.id,
+          payload: {
+            name: input.name,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+          },
+        },
+      };
+    },
+  }),
 });

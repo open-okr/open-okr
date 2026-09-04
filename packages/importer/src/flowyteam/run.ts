@@ -15,6 +15,8 @@ import { type ActionCallContext, callAction } from "@openokr/core";
 import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
+import { importOrganisation } from "./mappers/organisation.ts";
+import { resolverFor } from "./mappers/resolve.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
 import { openSource, type Source, SourceError } from "./source.ts";
 
@@ -28,6 +30,14 @@ export interface FlowyteamRunOptions {
   readonly companyId: number | undefined;
   /** Opened for the caller when given, which is how the tests supply one. */
   readonly source?: Source;
+  /**
+   * False reports what a real run would do and writes nothing (P6-T03a).
+   *
+   * A dry run still resolves every source id against the target, so its counts
+   * are what a real run would actually write rather than what the source holds.
+   * That is the whole difference between a preview and a guess.
+   */
+  readonly write?: boolean;
 }
 
 export interface FlowyteamRunResult {
@@ -61,25 +71,50 @@ export async function runFlowyteamImport(
     );
     const counts = await countFor(source, company.id, present);
 
+    const write = options.write ?? false;
+    // Recorded before the first row, so a run that dies halfway leaves a row
+    // saying it was running rather than no row at all.
+    const { id: runId } = await callAction(context, "imports.startRun", {
+      source: "flowyteam",
+      mode: write ? "real" : "dry_run",
+      filename: source.describe,
+    });
+
+    const organisation = await importOrganisation({
+      source,
+      context,
+      companyId: company.id,
+      resolver: resolverFor({
+        pool: options.pool,
+        workspaceId: options.workspaceId,
+      }),
+      write,
+    });
+
     const report = buildReport({
       connectedTo: source.describe,
       introspection,
       company,
       counts,
-      mode: "dry_run",
+      mode: write ? "real" : "dry_run",
+      reconciliation: organisation.domains,
+      extraNotes: [
+        organisation.teamTreeDepth > 1
+          ? `The source's team tree was ${organisation.teamTreeDepth} deep and imported flat. OpenOKR spaces do not nest: a space is a team that runs a rhythm, and a department containing four of them is an org-chart fact rather than a place where check-ins happen.`
+          : "The source's teams were already flat.",
+        "Objectives, key results, check-ins and KPIs are not imported yet. They arrive at P6-T03b, P6-T03c and P6-T03d.",
+      ],
     });
 
-    const { id: runId } = await callAction(context, "imports.startRun", {
-      source: "flowyteam",
-      mode: "dry_run",
-      filename: source.describe,
-    });
     await callAction(context, "imports.finishRun", {
       id: runId,
       status: "completed",
-      rowsRead: Object.values(counts).reduce((sum, n) => sum + n, 0),
-      rowsWritten: 0,
-      rowsSkipped: 0,
+      rowsRead: organisation.domains.reduce(
+        (sum, domain) => sum + domain.read,
+        0,
+      ),
+      rowsWritten: report.written,
+      rowsSkipped: report.skipped,
       report: report as unknown as Record<string, unknown>,
     });
 

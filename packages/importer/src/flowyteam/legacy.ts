@@ -37,7 +37,7 @@ export const LEGACY_TYPE = "flowyteam" as const;
  */
 export const LEGACY_TABLES = {
   teams: "spaces",
-  employee_details: "workspace_members",
+  users: "workspace_members",
   performance_cycles: "cycles",
   objectives: "goals",
   key_results: "key_results",

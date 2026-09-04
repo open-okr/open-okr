@@ -55,20 +55,23 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "users",
-    columns: "id int primary key, company_id int, email varchar(191)",
+    columns:
+      "id int primary key, company_id int, email varchar(191), name varchar(191), timezone varchar(64), status varchar(32)",
   },
   {
     name: "teams",
     columns:
-      "id int primary key, company_id int, team_name varchar(191), parent_id int",
+      "id int primary key, company_id int, team_name varchar(191), parent_id int, leader_id int, description text, deleted_at timestamp null",
   },
   {
     name: "employee_details",
-    columns: "id int primary key, company_id int, user_id int",
+    columns:
+      "id int primary key, company_id int, user_id int, designation_id bigint, deleted_at timestamp null",
   },
   {
     name: "performance_cycles",
-    columns: "id int primary key, company_id int, name varchar(191)",
+    columns:
+      "id int primary key, company_id int, name varchar(191), cycle_type varchar(32), type varchar(32), started_at date, finished_at date, deleted_at timestamp null",
   },
   {
     name: "objectives",
@@ -82,12 +85,12 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "designations",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, company_id int, name varchar(191)",
     optional: true,
   },
   {
     name: "other_departments",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, user_id int, team_id int",
     optional: true,
   },
   {
@@ -319,17 +322,59 @@ export async function seedSource(
     "insert into key_results (id, company_id, objective_id, title) values (1, ?, 1, 'A'), (2, ?, 1, 'B'), (3, ?, 2, 'C')",
     [SEEDED.first.id, SEEDED.first.id, SEEDED.first.id],
   );
+  // **People, and every shape the mapper has to answer for.** One ordinary
+  // person, one with a job title, one with no address at all, one belonging to
+  // the other company, and one deleted employee row whose user still exists.
   await source.query(
-    "insert into teams (id, company_id, team_name) values (1, ?, 'Sales')",
+    `insert into users (id, company_id, email, name, timezone, status) values
+       (1, ?, 'ada@example.com',  'Ada Lovelace',  'Europe/London', 'active'),
+       (2, ?, 'grace@example.com','Grace Hopper',  'America/New_York', 'active'),
+       (3, ?, '',                 'Nobody',        null, 'active'),
+       (4, ?, 'other@example.com','Someone Else',  null, 'active')`,
+    [SEEDED.first.id, SEEDED.first.id, SEEDED.first.id, SEEDED.second.id],
+  );
+  await source.query(
+    "insert into designations (id, company_id, name) values (1, ?, 'Head of Sales')",
     [SEEDED.first.id],
   );
   await source.query(
-    "insert into employee_details (id, company_id, user_id) values (1, ?, 1)",
-    [SEEDED.first.id],
+    "insert into employee_details (id, company_id, user_id, designation_id) values (1, ?, 1, 1), (2, ?, 2, null)",
+    [SEEDED.first.id, SEEDED.first.id],
+  );
+
+  // **A two-deep tree, a leader who imports, a leader who does not, and a team
+  // with no name.** The depth is what §7.2 asks the report to record.
+  await source.query(
+    `insert into teams (id, company_id, team_name, parent_id, leader_id, description) values
+       (1, ?, 'Commercial', null, 1,    'Everything that touches a customer'),
+       (2, ?, 'Sales',      1,    2,    null),
+       (3, ?, 'Ghosts',     null, 4,    null),
+       (4, ?, '',           null, null, null)`,
+    [SEEDED.first.id, SEEDED.first.id, SEEDED.first.id, SEEDED.first.id],
   );
   await source.query(
-    "insert into performance_cycles (id, company_id, name) values (1, ?, 'Q1')",
-    [SEEDED.first.id],
+    `insert into other_departments (id, user_id, team_id) values
+       (1, 2, 1),
+       (2, 3, 2)`,
+  );
+
+  // **Every cycle shape the mapper decides about.** One that imports, one from
+  // the Planning module, one weekly, one that ends before it starts, and two
+  // that fall in the same quarter.
+  await source.query(
+    `insert into performance_cycles (id, company_id, name, cycle_type, type, started_at, finished_at) values
+       (1, ?, 'FY26 Q1',   'quarterly', 'org',     '2026-01-05', '2026-03-31'),
+       (2, ?, 'Mindmap',   'quarterly', 'mindmap', '2026-01-05', '2026-03-31'),
+       (3, ?, 'Week 2',    'weekly',    'org',     '2026-01-12', '2026-01-18'),
+       (4, ?, 'Backwards', 'quarterly', 'org',     '2026-06-30', '2026-04-01'),
+       (5, ?, 'FY26 Q1b',  'quarterly', 'org',     '2026-02-02', '2026-03-31')`,
+    [
+      SEEDED.first.id,
+      SEEDED.first.id,
+      SEEDED.first.id,
+      SEEDED.first.id,
+      SEEDED.first.id,
+    ],
   );
   if (!dropped.has("indicators")) {
     await source.query(

@@ -129,6 +129,47 @@
       "pages": false
     },
     {
+      "name": "people importMember",
+      "action": "people.importMember",
+      "method": "POST",
+      "path": "/people/importMember",
+      "scope": "write",
+      "summary": "Creates a placeholder member for somebody an import found, with the address to claim it by.",
+      "flags": [
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "email",
+          "field": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "timezone",
+          "field": "timezone",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "people updateMember",
       "action": "people.updateMember",
       "method": "POST",
@@ -2464,6 +2505,12 @@
           "field": "managerMemberId",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false
@@ -2728,6 +2775,18 @@
           "name": "publication-deadline",
           "field": "publicationDeadline",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
           "required": false
         }
       ],

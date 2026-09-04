@@ -10,10 +10,15 @@
  * attempting a real insert against a real MySQL and reading the server's own
  * refusal.
  *
- * **It cannot write to the target either, yet.** The mappers arrive at P6-T03
- * and P6-T04. What this command does today is connect, say which FlowyTeam the
- * source is, name the one company and count what it holds. `--write` is refused
- * by name rather than accepted and quietly ignored.
+ * **A dry run unless `--write` is given**, the same default the spreadsheet
+ * command has and the right one for a command that writes a company's history
+ * on one keystroke. The dry run resolves every source id against the target, so
+ * what it reports is what a real run would write rather than what the source
+ * holds.
+ *
+ * Today it imports the organisation: people, spaces, space membership and
+ * cycles (P6-T03a). Objectives, key results, check-ins and KPIs arrive at
+ * P6-T03b to P6-T03d.
  *
  * Exit codes follow `pnpm okr`: 2 for a usage error decided before anything is
  * sent, 1 for the source or the instance refusing.
@@ -48,6 +53,7 @@ async function main(): Promise<void> {
       userId: target.userId,
       url: args.source,
       companyId: args.company,
+      write: args.write,
     });
 
     process.stdout.write(`${render(report, runId)}\n`);

@@ -98,13 +98,23 @@ export interface EntityTemplate {
   plan(context: PlanContext): Promise<RowPlan>;
 }
 
-/** The tables a spreadsheet import can hold a legacy key in. */
+/**
+ * The tables an import can hold a legacy key in.
+ *
+ * Named here because the spreadsheet templates were the first to need it, and
+ * the FlowyTeam mappers read the same lookup (P6-T03a). The three added there
+ * carry no spreadsheet template: a person does not import a workspace member
+ * from a column, but a company import does create one.
+ */
 const LEGACY_TABLE_NAMES = [
   "goals",
   "keyResults",
   "kpis",
   "initiatives",
   "tasks",
+  "spaces",
+  "cycles",
+  "workspaceMembers",
 ] as const;
 
 export type LegacyTableName = (typeof LEGACY_TABLE_NAMES)[number];
