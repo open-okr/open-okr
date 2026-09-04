@@ -75,3 +75,41 @@ export async function resolveImportTarget(
     userId,
   };
 }
+
+/**
+ * The member row a user has in this workspace (P6-T03b).
+ *
+ * Every write an import makes is authorised as this member, and the FlowyTeam
+ * mapper needs the id itself: a company-level objective has no owner in the
+ * source, and the person running the migration is the only honest champion
+ * for it. Exported rather than repeated in the importer, which depends on
+ * `packages/core` alone and has no database layer of its own.
+ */
+export async function resolveActingMemberId(
+  pool: Pool,
+  workspaceId: string,
+  userId: string,
+): Promise<string> {
+  const db = drizzle(pool);
+  const memberId = await withWorkspace(db, workspaceId, async (tx) => {
+    const [row] = await tx
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+          eq(workspaceMembers.status, "active"),
+        ),
+      )
+      .limit(1);
+    return row?.id ?? undefined;
+  });
+  if (!memberId) {
+    throw new Error(
+      "The user this import runs as is not an active member of the workspace.",
+    );
+  }
+  return memberId;
+}

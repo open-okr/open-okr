@@ -75,7 +75,7 @@ describe.skipIf(!runnable)("choosing the one company", () => {
       "objectives",
       "key_results",
     ]);
-    expect(first).toEqual({ objectives: 2, key_results: 3 });
+    expect(first).toEqual({ objectives: 8, key_results: 4 });
     expect(second).toEqual({ objectives: 1, key_results: 0 });
   });
 

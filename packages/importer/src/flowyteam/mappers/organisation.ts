@@ -29,6 +29,8 @@ interface MapperOptions {
   readonly context: ActionCallContext;
   readonly companyId: number;
   readonly resolver: Resolver;
+  /** The member every write is authorised as. */
+  readonly actingMemberId: string;
   /** False writes nothing and reports what a real run would do. */
   readonly write: boolean;
 }
@@ -95,6 +97,9 @@ async function importMembers(
 
     if (!options.write) {
       const already = await options.resolver.resolve("users", row.id);
+      if (already === undefined) {
+        options.resolver.plan("users", row.id);
+      }
       tally.wrote(already === undefined);
       continue;
     }
@@ -159,6 +164,9 @@ async function importSpaces(
 
     if (!options.write) {
       const already = await options.resolver.resolve("teams", row.id);
+      if (already === undefined) {
+        options.resolver.plan("teams", row.id);
+      }
       tally.wrote(already === undefined);
       continue;
     }
@@ -176,7 +184,7 @@ async function importSpaces(
       ? await options.resolver.resolve("users", row.leader_id)
       : undefined;
     if (row.leader_id && !manager) {
-      tally.skip(
+      tally.flag(
         source,
         `Imported without a manager: the source names user ${row.leader_id} as its leader and that person did not import.`,
       );
@@ -248,6 +256,14 @@ async function importSpaceMembers(
       );
       continue;
     }
+    if (!options.write) {
+      // Nothing to compare against: in a dry run the space and the member are
+      // both rows a real run would have created, so "would add" is the only
+      // honest answer.
+      tally.wrote(true);
+      continue;
+    }
+
     // **Read the space's members once, then compare.** `spaces.addMember` is
     // an upsert: adding somebody who is already there succeeds and says
     // nothing, so calling it blind would report every second run as writing
@@ -259,10 +275,6 @@ async function importSpaceMembers(
       continue;
     }
 
-    if (!options.write) {
-      tally.wrote(true);
-      continue;
-    }
     try {
       await callAction(options.context, "spaces.addMember", {
         spaceId,
@@ -370,6 +382,9 @@ async function importCycles(
         "performance_cycles",
         row.id,
       );
+      if (already === undefined) {
+        options.resolver.plan("performance_cycles", row.id);
+      }
       tally.wrote(already === undefined);
       continue;
     }

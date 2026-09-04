@@ -50,7 +50,9 @@ describe.skipIf(!runnable)(
       const rows = await source.query<{ n: number }>(
         "select count(*) as n from objectives",
       );
-      expect(Number(rows[0]?.n)).toBe(3);
+      // Every seeded objective, both companies. The company filter is the
+      // companies suite's to prove.
+      expect(Number(rows[0]?.n)).toBe(9);
     });
 
     it("acceptance: the server itself refuses a write through this session", async () => {

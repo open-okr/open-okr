@@ -11,10 +11,15 @@
  * spreadsheet run appear in one list and are audited the same way. There is no
  * ambient importer identity here either: `--as` names the person.
  */
-import { type ActionCallContext, callAction } from "@openokr/core";
+import {
+  type ActionCallContext,
+  callAction,
+  resolveActingMemberId,
+} from "@openokr/core";
 import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
+import { importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
 import { resolverFor } from "./mappers/resolve.ts";
 import { buildReport, type FlowyteamReport } from "./report.ts";
@@ -80,16 +85,26 @@ export async function runFlowyteamImport(
       filename: source.describe,
     });
 
-    const organisation = await importOrganisation({
+    const mapper = {
       source,
       context,
       companyId: company.id,
+      // One resolver for the whole run: an objective names a champion, a
+      // reviewer, a cycle and a space, and every one of those was written by
+      // the mapper before it.
       resolver: resolverFor({
         pool: options.pool,
         workspaceId: options.workspaceId,
       }),
+      actingMemberId: await resolveActingMemberId(
+        options.pool,
+        options.workspaceId,
+        options.userId,
+      ),
       write,
-    });
+    };
+    const organisation = await importOrganisation(mapper);
+    const okrs = await importOkrs(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -97,19 +112,30 @@ export async function runFlowyteamImport(
       company,
       counts,
       mode: write ? "real" : "dry_run",
-      reconciliation: organisation.domains,
+      reconciliation: [...organisation.domains, ...okrs.domains],
       extraNotes: [
         organisation.teamTreeDepth > 1
           ? `The source's team tree was ${organisation.teamTreeDepth} deep and imported flat. OpenOKR spaces do not nest: a space is a team that runs a rhythm, and a department containing four of them is an org-chart fact rather than a place where check-ins happen.`
           : "The source's teams were already flat.",
-        "Objectives, key results, check-ins and KPIs are not imported yet. They arrive at P6-T03b, P6-T03c and P6-T03d.",
+        "Every objective's score, health and alignment is recomputed by the engines after load. The source's own stored figures are not carried, because they are a fact about the old system rather than about this one.",
+        ...(okrs.rescored > 0
+          ? [
+              `${okrs.rescored} objectives carried a stored score in the source. Every one is recomputed here from the key results that imported, so a figure that has moved is the engine correcting the old one rather than data lost.`,
+            ]
+          : []),
+        ...(okrs.truncatedValues
+          ? [
+              "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
+            ]
+          : []),
+        "Check-ins and KPIs are not imported yet. They arrive at P6-T03c and P6-T03d.",
       ],
     });
 
     await callAction(context, "imports.finishRun", {
       id: runId,
       status: "completed",
-      rowsRead: organisation.domains.reduce(
+      rowsRead: report.reconciliation.reduce(
         (sum, domain) => sum + domain.read,
         0,
       ),

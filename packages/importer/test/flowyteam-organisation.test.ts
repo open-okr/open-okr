@@ -142,10 +142,10 @@ describe.skipIf(!runnable)("importing one company's organisation", () => {
     expect(domain(report, "spaces")?.created).toBe(3);
     expect(report.notes.join(" ")).toContain("2 deep and imported flat");
     // A leader who did not import leaves the space without a manager, and says
-    // so rather than picking somebody.
+    // so rather than picking somebody. A flag, not a skip: the space is here.
     expect(
       domain(report, "spaces")
-        ?.skipped.map((row) => row.reason)
+        ?.flags.map((row) => row.reason)
         .join(" "),
     ).toContain("did not import");
   });

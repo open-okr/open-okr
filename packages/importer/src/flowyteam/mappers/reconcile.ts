@@ -29,8 +29,19 @@ export interface DomainReconciliation {
   readonly created: number;
   /** Rows an earlier run had already written, found by their legacy key. */
   readonly matched: number;
+  /** Rows that did not import, each with the reason. */
   readonly skipped: readonly SkippedRow[];
-  /** True when everything read is accounted for and nothing was skipped. */
+  /**
+   * Rows that did import and that somebody should look at.
+   *
+   * Separate from a skip, and the distinction matters more than it looks. A
+   * skip is data that is not here; a flag is data that is here and carries a
+   * decision the source could not answer, such as an objective championed by
+   * whoever ran the import. Recording flags as skips made one live run report
+   * "16 read, 16 created, 21 skipped", which is a sentence nobody can act on.
+   */
+  readonly flags: readonly SkippedRow[];
+  /** True when everything read is accounted for and nothing was lost. */
   readonly clean: boolean;
 }
 
@@ -49,6 +60,7 @@ export class DomainTally {
   private created = 0;
   private matched = 0;
   private readonly skipped: SkippedRow[] = [];
+  private readonly flags: SkippedRow[] = [];
 
   constructor(domain: string) {
     this.domain = domain;
@@ -70,6 +82,11 @@ export class DomainTally {
     this.skipped.push({ source, reason });
   }
 
+  /** The row imported, and carries a decision the source could not answer. */
+  flag(source: string, reason: string): void {
+    this.flags.push({ source, reason });
+  }
+
   finish(): DomainReconciliation {
     return {
       domain: this.domain,
@@ -77,9 +94,10 @@ export class DomainTally {
       created: this.created,
       matched: this.matched,
       skipped: this.skipped,
-      // Deliberately strict. A domain with one skipped row is not clean, even
-      // though the skip was reported: "clean" has to mean "nothing to look at"
-      // or nobody will look.
+      flags: this.flags,
+      // Clean means nothing was lost, not that nothing needs attention. A
+      // domain with flags is still clean: every row is here. A domain with one
+      // skip is not, however good the reason.
       clean:
         this.skipped.length === 0 && this.created + this.matched === this.read,
     };
@@ -95,6 +113,9 @@ export function describeDomain(domain: DomainReconciliation): string {
   ];
   if (domain.skipped.length > 0) {
     parts.push(`${domain.skipped.length} skipped`);
+  }
+  if (domain.flags.length > 0) {
+    parts.push(`${domain.flags.length} to look at`);
   }
   return `${domain.domain}: ${parts.join(", ")}`;
 }

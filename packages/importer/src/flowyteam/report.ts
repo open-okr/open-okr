@@ -43,6 +43,8 @@ export interface FlowyteamReport {
   /** Rows written into the target. Zero until the mappers land. */
   readonly written: number;
   readonly skipped: number;
+  /** Rows that imported and carry a decision somebody has to make. */
+  readonly flagged: number;
   /** One row per domain this run touched (P6-T03a). Empty for a run that read only. */
   readonly reconciliation: readonly DomainReconciliation[];
   readonly notImported: readonly string[];
@@ -72,6 +74,10 @@ export function buildReport(input: {
     (sum, domain) => sum + domain.skipped.length,
     0,
   );
+  const flagged = reconciliation.reduce(
+    (sum, domain) => sum + domain.flags.length,
+    0,
+  );
 
   return {
     source: "flowyteam",
@@ -86,6 +92,7 @@ export function buildReport(input: {
     counts: input.counts,
     written,
     skipped,
+    flagged,
     reconciliation,
     notImported: NOT_IMPORTED,
     notes: [
@@ -131,11 +138,24 @@ export function render(report: FlowyteamReport, runId: string): string {
     for (const domain of report.reconciliation) {
       lines.push(`  ${describeDomain(domain)}${domain.clean ? "" : "  *"}`);
     }
-    const unclean = report.reconciliation.filter((domain) => !domain.clean);
-    if (unclean.length > 0) {
+    const lost = report.reconciliation.filter((domain) => !domain.clean);
+    if (lost.length > 0) {
       lines.push("", "Rows that did not import:");
-      for (const domain of unclean) {
+      for (const domain of lost) {
         for (const row of domain.skipped) {
+          lines.push(`  ${row.source}: ${row.reason}`);
+        }
+      }
+    }
+    // Separate, and after, because these rows are here. Mixing them into the
+    // list above made one live run read "16 created, 21 skipped".
+    const flagged = report.reconciliation.filter(
+      (domain) => domain.flags.length > 0,
+    );
+    if (flagged.length > 0) {
+      lines.push("", "Imported, and worth a look:");
+      for (const domain of flagged) {
+        for (const row of domain.flags) {
           lines.push(`  ${row.source}: ${row.reason}`);
         }
       }

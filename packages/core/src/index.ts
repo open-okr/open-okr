@@ -621,6 +621,7 @@ export {
 } from "./imports/run.ts";
 export {
   type ImportTarget,
+  resolveActingMemberId,
   resolveImportTarget,
 } from "./imports/target.ts";
 export {

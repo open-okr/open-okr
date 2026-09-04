@@ -34,7 +34,23 @@ export interface Resolver {
   resolve(table: SourceTable, id: number | string): Promise<string | undefined>;
   /** Remembers a row this run just wrote, so the next lookup does not query. */
   remember(table: SourceTable, id: number | string, targetId: string): void;
+  /**
+   * Remembers a row a dry run *would* write (P6-T03b).
+   *
+   * Without this a dry run is useless past the first domain: an objective
+   * names a champion, and in a dry run that member was never written, so every
+   * objective would preview as "the champion did not import" and the preview
+   * would predict a failure a real run does not have.
+   *
+   * The id it remembers is a sentinel that no row carries. Nothing writes in a
+   * dry run, so it never reaches the database; if it ever did, it is not a
+   * uuid and the write would be refused rather than corrupt something.
+   */
+  plan(table: SourceTable, id: number | string): void;
 }
+
+/** What a dry run resolves to. Deliberately not a uuid. */
+const PLANNED = "planned-by-a-dry-run";
 
 export function resolverFor(options: {
   readonly pool: Pool;
@@ -68,6 +84,9 @@ export function resolverFor(options: {
     },
     remember(table, id, targetId) {
       cache.set(legacyIdFor(table, id), targetId);
+    },
+    plan(table, id) {
+      cache.set(legacyIdFor(table, id), PLANNED);
     },
   };
 }

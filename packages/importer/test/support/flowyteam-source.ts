@@ -66,7 +66,7 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   {
     name: "employee_details",
     columns:
-      "id int primary key, company_id int, user_id int, designation_id bigint, deleted_at timestamp null",
+      "id int primary key, company_id int, user_id int, designation_id bigint, reports_to int, deleted_at timestamp null",
   },
   {
     name: "performance_cycles",
@@ -76,12 +76,12 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   {
     name: "objectives",
     columns:
-      "id int primary key, company_id int, title varchar(191), deleted_at timestamp null",
+      "id int primary key, company_id int, title varchar(191), description text, model_id int, model_type varchar(191), leader_model_id int, performance_cycle_id int, started_at date, finished_at date, weight double, result_percentage double, objective_parent_id int, key_result_parent_id int, deleted_at timestamp null",
   },
   {
     name: "key_results",
     columns:
-      "id int primary key, company_id int, objective_id int, title varchar(191)",
+      "id int primary key, company_id int, objective_id int, title varchar(191), description text, unit_value varchar(32), initial_value bigint, target_value bigint, current_value bigint, weight double, leader_model_id int, deleted_at timestamp null",
   },
   {
     name: "designations",
@@ -135,7 +135,8 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "key_result_records",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, company_id int, key_results_id int, history_value double, created_at timestamp null",
     optional: true,
   },
   {
@@ -311,16 +312,55 @@ export async function seedSource(
       [company.id, company.name, `c${company.id}`, "Asia/Jakarta", "active"],
     );
   }
-  // Two objectives and three key results for the first company, one objective
-  // for the second, so a count that ignored `company_id` would be visibly wrong
-  // rather than plausibly wrong.
+  // **Objectives, one per owner class plus the shapes that cannot import.**
+  // Objective 2 aligns to objective 1, which is the ordinary case; objective 5
+  // aligns to objective 7, a parent with a *higher* id, which is what the
+  // second pass exists for. Objective 6 has an owner class FlowyTeam itself
+  // does not define, which a live instance holds fifteen of. Objective 8 sits
+  // in the weekly cycle that cannot import and carries its own dates instead.
+  //
+  // Company ids are written out rather than bound, because which company each
+  // row belongs to is the fact under test and a positional placeholder is the
+  // easiest place in this file to get that wrong.
   await source.query(
-    "insert into objectives (id, company_id, title) values (1, ?, 'Grow'), (2, ?, 'Retain'), (3, ?, 'Someone else')",
-    [SEEDED.first.id, SEEDED.first.id, SEEDED.second.id],
+    `insert into objectives
+       (id, company_id, title, description, model_id, model_type, leader_model_id,
+        performance_cycle_id, started_at, finished_at, weight, result_percentage,
+        objective_parent_id) values
+       (1, 7, 'Grow the book',      'Everything else hangs off this', 7, 'App\\\\Models\\\\Company',         1,    1, null,         null,         1, 62.5, null),
+       (2, 7, 'Retain what we won', null,                             1, 'App\\\\Models\\\\Team',            2,    1, null,         null,         2, 0,    1),
+       (3, 7, 'Learn the product',  null,                             2, 'App\\\\Models\\\\EmployeeDetails', 1,    1, null,         null,         1, 0,    null),
+       (4, 9, 'Someone else',       null,                             9, 'App\\\\Models\\\\Company',         null, 1, null,         null,         1, 0,    null),
+       (5, 7, 'Aligned to a later', null,                             7, 'App\\\\Models\\\\Company',         1,    1, null,         null,         1, 0,    7),
+       (6, 7, 'Owned by nothing',   null,                             1, 'App\\\\Models\\\\User',            1,    1, null,         null,         1, 0,    null),
+       (7, 7, 'The later parent',   null,                             7, 'App\\\\Models\\\\Company',         1,    1, null,         null,         1, 0,    null),
+       (8, 7, 'In a weekly cycle',  null,                             7, 'App\\\\Models\\\\Company',         1,    3, '2026-01-12', '2026-01-18', 1, 0,    null),
+       (9, 7, 'Rolls into a measure', null,                           7, 'App\\\\Models\\\\Company',         1,    1, null,         null,         1, 0,    null)`,
+  );
+  // **The pointer FlowyTeam actually uses.** `key_result_parent_id` is the
+  // primary cascade pointer, and an objective rolling up into a measure rather
+  // than into another objective is the ordinary case on a live instance. Set
+  // in its own statement so the column list above stays readable.
+  await source.query(
+    "update objectives set key_result_parent_id = 1 where id = 9",
+  );
+
+  // **One key result per direction, and one that cannot be read.** The third
+  // has a baseline equal to its target, which is a hold the source has no way
+  // to say. The fourth belongs to an objective that does not import.
+  await source.query(
+    `insert into key_results
+       (id, company_id, objective_id, title, unit_value, initial_value, target_value,
+        current_value, weight, leader_model_id) values
+       (1, 7, 1, 'New customers',   'count', 0,  40, 12, 1, 1),
+       (2, 7, 1, 'Churn',           '%',     12, 4,  9,  1, null),
+       (3, 7, 2, 'Keep the rating', 'stars', 5,  5,  5,  1, null),
+       (4, 7, 6, 'Orphan',          null,    0,  1,  0,  1, null)`,
   );
   await source.query(
-    "insert into key_results (id, company_id, objective_id, title) values (1, ?, 1, 'A'), (2, ?, 1, 'B'), (3, ?, 2, 'C')",
-    [SEEDED.first.id, SEEDED.first.id, SEEDED.first.id],
+    `insert into key_result_records (id, company_id, key_results_id, history_value, created_at) values
+       (1, 7, 1, 5,  '2026-01-20 09:00:00'),
+       (2, 7, 1, 12, '2026-02-20 09:00:00')`,
   );
   // **People, and every shape the mapper has to answer for.** One ordinary
   // person, one with a job title, one with no address at all, one belonging to
@@ -338,7 +378,10 @@ export async function seedSource(
     [SEEDED.first.id],
   );
   await source.query(
-    "insert into employee_details (id, company_id, user_id, designation_id) values (1, ?, 1, 1), (2, ?, 2, null)",
+    // Employee 1 reports to user 2, so an objective they lead gets a reviewer
+    // who is not themselves. Employee 2 reports to nobody, which is the case
+    // §7.2 says to flag rather than invent.
+    "insert into employee_details (id, company_id, user_id, designation_id, reports_to) values (1, ?, 1, 1, 2), (2, ?, 2, null, null)",
     [SEEDED.first.id, SEEDED.first.id],
   );
 

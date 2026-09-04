@@ -726,10 +726,16 @@ export const importMember = defineWriteAction({
           timezone: input.timezone ?? null,
           placeholderEmail: email,
           kind: "placeholder",
-          // `invited`, not `active`: nobody has accepted anything. The status is
-          // what tells every count of "people in this workspace" that this is a
-          // row waiting for a person rather than a person.
-          status: "invited",
+          // **`active`, with `placeholder` as the kind.** The two columns answer
+          // different questions and it is worth being precise about which. The
+          // kind says nobody has signed in as this row yet. The status says
+          // whether the membership is live, and an imported member's is: they
+          // champion objectives that came across, they belong to spaces, and
+          // work is assigned to them. `invited` was tried first and every
+          // imported objective was refused, because a champion has to be an
+          // active member. The fix is not to relax that rule but to stop
+          // describing a live membership as a pending one (P6-T03b).
+          status: "active",
           primaryChannel:
             settings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
           quietHours: settings.quietHours,

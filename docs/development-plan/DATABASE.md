@@ -120,7 +120,7 @@ The workspace `language` default now resolves through the instance's own `instan
 ### workspace_members
 `user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
 
-`placeholder_email` is the address an imported member is waiting to be claimed by (P6-T03a). Set only on a `placeholder` row, which has no `user_id` and so cannot be signed in as; unique per workspace among live rows, so two imported employees sharing an address cannot become two members waiting for one person. Every member with a real account has this null and their address on the user row.
+`placeholder_email` is the address an imported member is waiting to be claimed by (P6-T03a). Set only on a `placeholder` row, which has no `user_id` and so cannot be signed in as; unique per workspace among live rows, so two imported employees sharing an address cannot become two members waiting for one person. Every member with a real account has this null and their address on the user row. An imported placeholder is `active`, not `invited`: the kind says nobody has signed in as it, the status says the membership is live, and it is, because the row champions objectives (P6-T03b).
 
 Unique on `(workspace_id, user_id)` for live rows, so one person has at most one membership per workspace while a rejoin does not collide with their own soft-deleted row.
 
