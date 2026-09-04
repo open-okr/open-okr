@@ -25,27 +25,27 @@ catalog:
   drizzle-orm: ^0.45.2
   pg: ^8.23.0
   "@types/pg": ^8.20.4
-  pg-boss: ^12.27.0
+  pg-boss: ^12.29.0
   ws: ^8.21.3
   "@types/ws": ^8.18.1
-  better-auth: ^1.6.26
-  "@better-auth/passkey": ^1.6.26
+  better-auth: ^1.7.2
+  "@better-auth/passkey": ^1.7.2
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
-  nodemailer: ^9.0.5
+  nodemailer: ^9.1.0
   "@types/nodemailer": ^8.0.1
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
-  zod: 4.4.3
+  zod: 4.5.4
   # AIProvider drivers (P2-T13), approved by the human, confined to
   # packages/adapters like every vendor SDK. `openai`'s client also drives
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^0.116.0
-  openai: ^7.4.0
-  "@google/genai": ^2.17.1
+  "@anthropic-ai/sdk": ^0.122.0
+  openai: ^7.8.0
+  "@google/genai": ^2.20.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -58,17 +58,17 @@ catalog:
   "@tailwindcss/postcss": ^4.3.3
   postcss: ^8.5.26
   "@base-ui-components/react": 1.0.0-rc.0
-  motion: ^13.0.0
-  lucide-react: ^1.31.0
+  motion: ^13.1.1
+  lucide-react: ^1.38.0
   clsx: ^2.1.1
   tailwind-merge: ^3.6.0
   class-variance-authority: ^0.7.1
   # The persisted client cache (P2-T10 item 9), part of the locked stack's
   # "TanStack Query, Table and Virtual" line — its own persistence add-ons,
   # not a new stack decision.
-  "@tanstack/react-query": ^5.101.4
-  "@tanstack/react-query-persist-client": ^5.101.4
-  "@tanstack/query-sync-storage-persister": ^5.101.4
+  "@tanstack/react-query": ^5.102.8
+  "@tanstack/react-query-persist-client": ^5.102.8
+  "@tanstack/query-sync-storage-persister": ^5.102.8
   # Test tooling for P2-T10's own required "keyboard and focus component
   # tests" and accessibility checks (UIUX-PLAN.md §9) — inferred from the
   # human's UI-dependency approval rather than asked separately, because
@@ -81,13 +81,13 @@ catalog:
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
-  "@tiptap/core": 3.29.2
-  "@tiptap/pm": 3.30.1
-  "@tiptap/react": 3.29.2
-  "@tiptap/starter-kit": 3.29.2
-  "@tiptap/extension-table": 3.29.2
-  "@tiptap/extension-mention": 3.29.2
-  "@tiptap/suggestion": 3.29.2
+  "@tiptap/core": 3.30.6
+  "@tiptap/pm": 3.30.6
+  "@tiptap/react": 3.30.6
+  "@tiptap/starter-kit": 3.30.6
+  "@tiptap/extension-table": 3.30.6
+  "@tiptap/extension-mention": 3.30.6
+  "@tiptap/suggestion": 3.30.6
 
 minimumReleaseAgeExclude:
   - '@next/env@16.3.0'
