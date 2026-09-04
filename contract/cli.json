@@ -6058,6 +6058,12 @@
           "field": "name",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false

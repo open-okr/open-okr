@@ -20,6 +20,7 @@ import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
 import { importCheckIns } from "./mappers/check-ins.ts";
+import { importKpis } from "./mappers/kpis.ts";
 import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
 import { resolverFor } from "./mappers/resolve.ts";
@@ -110,6 +111,7 @@ export async function runFlowyteamImport(
     // Last, because it defers to the check-ins: a record replayed after one
     // would overwrite a dated movement with an undated one.
     const values = await importKeyResultValues(mapper);
+    const kpis = await importKpis(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -122,6 +124,7 @@ export async function runFlowyteamImport(
         ...okrs.domains,
         ...checkIns.domains,
         values,
+        ...kpis.domains,
       ],
       extraNotes: [
         organisation.teamTreeDepth > 1
@@ -138,7 +141,8 @@ export async function runFlowyteamImport(
               "Some key result values are not whole numbers. FlowyTeam changed these columns to bigint in 2023 and truncated whatever fractional targets were there at the time, so a target that looks wrong in the source will look the same here.",
             ]
           : []),
-        "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in. KPIs arrive at P6-T03d.",
+        "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
+        "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
       ],
     });
 

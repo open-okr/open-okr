@@ -93,18 +93,32 @@ function shortId(): string {
 export const createKpiCategory = defineWriteAction({
   name: "kpis.createCategory",
   summary: "Adds a KPI category, which is how the grid groups its rows.",
-  input: z.object({ name: z.string().trim().min(1).max(120) }),
+  input: z.object({
+    name: z.string().trim().min(1).max(120),
+    /** The source-system identity, when an import is creating this (P6-T03d). */
+    legacy: legacyKey.optional(),
+  }),
   output: z.object({ id: z.uuid(), name: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       await actingMember(tx, workspaceId, context.actor.userId);
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        kpiCategories,
+        input.legacy,
+        "KPI category",
+      );
       const id = newId();
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx.insert(kpiCategories).values({
         id,
         workspaceId,
         name: input.name,
+        ...(input.legacy
+          ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+          : {}),
       });
       return {
         result: { id, name: input.name },

@@ -105,17 +105,20 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "indicator_types",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, name varchar(191), deleted_at timestamp null",
     optional: true,
   },
   {
     name: "indicators",
-    columns: "id int primary key, company_id int, title varchar(191)",
+    columns:
+      "id bigint primary key, company_id int, indicator_type_id bigint, title varchar(191), description text, occurance varchar(32), direction varchar(16), aggregate varchar(16), unit_value varchar(32), indicator_parent_id bigint, target_value bigint, calculated tinyint default 0, calculated_value text, model_id int, model_type varchar(191), deleted_at timestamp null",
     optional: true,
   },
   {
     name: "indicator_records",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id bigint primary key, company_id int, indicator_id bigint, period_key date, current_value double, target_value double, remark varchar(191), deleted_at timestamp null",
     optional: true,
   },
   {
@@ -451,10 +454,39 @@ export async function seedSource(
       SEEDED.first.id,
     ],
   );
-  if (!dropped.has("indicators")) {
+  if (!dropped.has("indicator_types")) {
     await source.query(
-      "insert into indicators (id, company_id, title) values (1, ?, 'Revenue')",
-      [SEEDED.first.id],
+      `insert into indicator_types (id, company_id, name) values
+         (1, 7, 'Commercial'),
+         (2, 7, '')`,
+    );
+  }
+  if (!dropped.has("indicators")) {
+    // **One per shape the mapper decides between.** A plain monthly indicator,
+    // a child whose parent has a *higher* id (so depth order matters), one
+    // recorded on a frequency this product does not measure on, a calculated
+    // one whose formula parses, and one whose formula does not.
+    await source.query(
+      `insert into indicators
+         (id, company_id, indicator_type_id, title, occurance, direction,
+          aggregate, unit_value, indicator_parent_id, target_value, calculated,
+          calculated_value, model_id, model_type) values
+         (1, 7, 1, 'Revenue',        'monthly',   'up',   'sum', 'USD', null, 100000, 0, null, 7, 'App\\\\Models\\\\Company'),
+         (2, 7, 1, 'Cost',           'monthly',   'down', 'sum', 'USD', null, 40000,  0, null, 7, 'App\\\\Models\\\\Company'),
+         (3, 7, 1, 'Margin',         'monthly',   'up',   'sum', '%',   null, 60,     1, 'op_open,kpi_1,op_minus,kpi_2,op_close,op_divide,kpi_1,op_multiply,100', 7, 'App\\\\Models\\\\Company'),
+         (4, 7, 1, 'Broken formula', 'monthly',   'up',   'sum', null,  null, 1,      1, 'kpi_1,op_wobble,kpi_2', 7, 'App\\\\Models\\\\Company'),
+         (5, 7, 1, 'Every minute',   'minutely',  'up',   'sum', null,  null, 1,      0, null, 7, 'App\\\\Models\\\\Company'),
+         (6, 7, 1, 'A child',        'monthly',   'up',   'sum', null,  7,    1,      0, null, 7, 'App\\\\Models\\\\Company'),
+         (7, 7, 1, 'The parent',     'monthly',   'none', 'sum', null,  null, 1,      0, null, 7, 'App\\\\Models\\\\Company')`,
+    );
+  }
+  if (!dropped.has("indicator_records")) {
+    await source.query(
+      `insert into indicator_records (id, company_id, indicator_id, period_key, current_value, target_value) values
+         (1, 7, 1, '2026-01-14', 90000, 100000),
+         (2, 7, 1, '2026-02-14', 95000, 100000),
+         (3, 7, 2, '2026-01-14', 38000, 40000),
+         (4, 7, 2, '2026-02-14', 42000, 40000)`,
     );
   }
   if (!dropped.has("tasks")) {

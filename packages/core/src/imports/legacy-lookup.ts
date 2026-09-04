@@ -16,6 +16,7 @@ import {
   goals,
   initiatives,
   keyResults,
+  kpiCategories,
   kpis,
   spaces,
   tasks,
@@ -36,6 +37,7 @@ const TABLES = {
   spaces,
   cycles,
   workspaceMembers,
+  kpiCategories,
 } as const;
 
 export async function findExisting(

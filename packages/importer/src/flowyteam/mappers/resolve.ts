@@ -24,6 +24,7 @@ const TARGET_TABLE: Partial<Record<SourceTable, LegacyTableName>> = {
   performance_cycles: "cycles",
   objectives: "goals",
   key_results: "keyResults",
+  indicator_types: "kpiCategories",
   indicators: "kpis",
   task_boards: "initiatives",
   tasks: "tasks",
