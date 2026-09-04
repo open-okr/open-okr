@@ -225,12 +225,15 @@ const TABLES: readonly { name: string; columns: string; optional?: true }[] = [
   },
   {
     name: "tasks_accesses",
-    columns: "id int primary key, company_id int",
+    columns: "id int primary key, company_id int, task_id int, user_id int",
     optional: true,
   },
   {
+    // No `company_id` here: the real table has none and is scoped through its
+    // parent task, which is the whole reason the mapper joins.
     name: "task_comments",
-    columns: "id int primary key, company_id int",
+    columns:
+      "id int primary key, comment text, user_id int, task_id int, parent_id int, created_at timestamp null, edited_at timestamp null",
     optional: true,
   },
   {
@@ -549,6 +552,34 @@ export async function seedSource(
          (1, 1, 'Find the number', 'complete'),
          (2, 1, 'Write it down',   'incomplete'),
          (3, 4, 'Never imported',  'incomplete')`,
+    );
+  }
+  if (!dropped.has("task_comments")) {
+    // One comment per decision: plain HTML, a script tag, a refused href, an
+    // inline base64 image, a reply, a reply to a comment that never imported,
+    // an empty one, and one on the task whose project did not import.
+    await source.query(
+      `insert into task_comments (id, comment, user_id, task_id, parent_id, created_at, edited_at) values
+         (1, '<p>Ring them on <strong>Monday</strong></p>', 1, 1, null, '2026-02-01 09:00:00', null),
+         (2, '<p>Done<script>alert(1)</script> already</p>', 2, 1, null, '2026-02-02 10:00:00', '2026-02-02 11:00:00'),
+         (3, '<p>See <a href="javascript:alert(1)">this</a> and <a href="https://example.com/a">that</a></p>', 2, 1, null, '2026-02-03 10:00:00', null),
+         (4, '<p>Look</p><img src="data:image/png;base64,iVBORw0KGgo=">', 1, 2, null, '2026-02-04 10:00:00', null),
+         (5, '<p>Agreed</p>', 2, 1, 1, '2026-02-05 10:00:00', null),
+         (6, '<p>Answering nothing that is here</p>', 1, 1, 999, '2026-02-06 10:00:00', null),
+         (7, '   ', 1, 1, null, '2026-02-07 10:00:00', null),
+         (8, '<p>On the orphan</p>', 1, 4, null, '2026-02-08 10:00:00', null)`,
+    );
+  }
+  if (!dropped.has("tasks_accesses")) {
+    // The assignee, a colleague, the same pair twice over on another task, and
+    // one naming an employee who never imported.
+    await source.query(
+      `insert into tasks_accesses (id, company_id, task_id, user_id) values
+         (1, 7, 1, 1),
+         (2, 7, 1, 2),
+         (3, 7, 2, 2),
+         (4, 7, 1, 99),
+         (5, 7, 4, 1)`,
     );
   }
   await source.end();

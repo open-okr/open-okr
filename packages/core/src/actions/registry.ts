@@ -114,6 +114,7 @@ import {
   addReactionAction,
   createCommentAction,
   deleteCommentAction,
+  importCommentAction,
   listCommentsAction,
   listReactionsAction,
   previewNotifyAction,
@@ -244,6 +245,7 @@ import {
 } from "./kpis.ts";
 import {
   getNotificationSettings,
+  importWatcher,
   listNotifications,
   markNotificationRead,
   snoozeNotification,
@@ -443,6 +445,8 @@ export const ACTION_MAP = {
   "notifications.getSettings": getNotificationSettings,
   "notifications.updateSettings": updateOwnNotificationSettings,
   "subscriptions.toggle": toggleSubscription,
+  // P6-T04b. Restores a watcher an import found, by name.
+  "subscriptions.importWatcher": importWatcher,
   "activities.workspaceFeed": workspaceFeed,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
@@ -619,6 +623,8 @@ export const ACTION_MAP = {
   // Comments and reactions (P3-T16)
   "comments.list": listCommentsAction,
   "comments.create": createCommentAction,
+  // P6-T04b. A comment an import found, kept as its author wrote it.
+  "comments.importComment": importCommentAction,
   "comments.update": updateCommentAction,
   "comments.delete": deleteCommentAction,
   "comments.previewNotify": previewNotifyAction,

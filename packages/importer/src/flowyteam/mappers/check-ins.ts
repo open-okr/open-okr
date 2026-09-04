@@ -25,6 +25,7 @@ import {
 } from "@openokr/core";
 import { legacyKeyFor } from "../legacy.ts";
 import type { Source } from "../source.ts";
+import { sourceInstant } from "../time.ts";
 import { type DomainReconciliation, DomainTally } from "./reconcile.ts";
 import type { Resolver } from "./resolve.ts";
 
@@ -183,7 +184,8 @@ async function importObjectiveCheckIns(
         confidence: confidenceOf(row.confidence),
         narrative: richTextFromPlainText(remarks),
         values,
-        publishedAt: String(publishedAt),
+        // Read as UTC, not as this machine's local time: see `sourceInstant`.
+        publishedAt: sourceInstant(publishedAt) as string,
         legacy: legacyKeyFor("objective_checkins", row.id),
         ...(await acknowledgementFor(options, row)),
       });
@@ -267,7 +269,9 @@ async function acknowledgementFor(
   }
   return {
     acknowledgedById: reviewer,
-    ...(review.created_at ? { acknowledgedAt: String(review.created_at) } : {}),
+    ...(sourceInstant(review.created_at)
+      ? { acknowledgedAt: sourceInstant(review.created_at) as string }
+      : {}),
   };
 }
 

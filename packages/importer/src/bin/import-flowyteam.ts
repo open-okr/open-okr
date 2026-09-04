@@ -16,9 +16,12 @@
  * what it reports is what a real run would write rather than what the source
  * holds.
  *
- * Today it imports the organisation: people, spaces, space membership and
- * cycles (P6-T03a). Objectives, key results, check-ins and KPIs arrive at
- * P6-T03b to P6-T03d.
+ * Today it imports the organisation, the OKRs, check-ins, KPIs, the work graph
+ * and the conversation on it: people, spaces, membership, cycles, objectives,
+ * key results, key result history, KPI categories and records, initiatives,
+ * tasks, checklists, task comments and watchers. Task files arrive at P6-T04c,
+ * because the bytes are on the source application's own disk and a read-only
+ * MySQL connection cannot reach them.
  *
  * Exit codes follow `pnpm okr`: 2 for a usage error decided before anything is
  * sent, 1 for the source or the instance refusing.

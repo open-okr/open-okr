@@ -1974,6 +1974,57 @@
       }
     },
     {
+      "name": "subscriptions.importWatcher",
+      "description": "Subscribes a member an import found watching something.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "default": "role",
+            "type": "string",
+            "enum": [
+              "invited",
+              "joined",
+              "mentioned",
+              "role",
+              "review",
+              "check_in"
+            ]
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId",
+          "memberId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "subjectType": "…",
+        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "memberId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "activities.workspaceFeed",
       "description": "The workspace-scoped activity feed, newest first.",
       "inputSchema": {
@@ -8990,7 +9041,8 @@
               "key_result",
               "check_in",
               "cycle",
-              "document"
+              "document",
+              "task"
             ]
           },
           "subjectId": {
@@ -9028,7 +9080,8 @@
               "key_result",
               "check_in",
               "cycle",
-              "document"
+              "document",
+              "task"
             ]
           },
           "subjectId": {
@@ -9054,6 +9107,91 @@
         "subjectType": "goal",
         "subjectId": "00000000-0000-4000-8000-000000000000",
         "body": {}
+      }
+    },
+    {
+      "name": "comments.importComment",
+      "description": "Records a comment an import found, keeping its author and its date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "goal",
+              "key_result",
+              "check_in",
+              "cycle",
+              "document",
+              "task"
+            ]
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "authorMemberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "body": {},
+          "createdAt": {
+            "type": "string"
+          },
+          "editedAt": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "flowyteam"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId",
+          "authorMemberId",
+          "body",
+          "createdAt",
+          "legacy"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "subjectType": "goal",
+        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "authorMemberId": "00000000-0000-4000-8000-000000000000",
+        "body": {},
+        "createdAt": "…",
+        "legacy": {}
       }
     },
     {
@@ -9124,7 +9262,8 @@
               "key_result",
               "check_in",
               "cycle",
-              "document"
+              "document",
+              "task"
             ]
           },
           "subjectId": {

@@ -22,8 +22,12 @@ Reads a FlowyTeam MySQL database and never writes to it. A dry run unless
 --write is given: it reports which FlowyTeam the source is, which company was
 selected, and what a real run would create in the workspace.
 
-Today it imports the organisation: people, spaces, space membership and cycles.
-Objectives, key results, check-ins and KPIs arrive at P6-T03b to P6-T03d.
+It imports people, spaces, space membership, cycles, objectives, key results,
+key result history, check-ins, KPI categories, KPIs and their records,
+initiatives, tasks, checklists, task comments and watchers.
+
+Task files arrive at P6-T04c: the bytes are on the FlowyTeam application's own
+disk and a read-only MySQL connection cannot reach them.
 
 Run without --company to see the companies the source holds.`;
 

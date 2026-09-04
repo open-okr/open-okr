@@ -12,7 +12,9 @@
  */
 
 import {
+  blobs,
   checklistItems,
+  comments,
   cycles,
   goals,
   initiatives,
@@ -40,6 +42,8 @@ const TABLES = {
   workspaceMembers,
   kpiCategories,
   checklistItems,
+  comments,
+  blobs,
 } as const;
 
 export async function findExisting(

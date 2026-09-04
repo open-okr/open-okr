@@ -1355,6 +1355,49 @@
       "pages": false
     },
     {
+      "name": "subscriptions importWatcher",
+      "action": "subscriptions.importWatcher",
+      "method": "POST",
+      "path": "/subscriptions/importWatcher",
+      "scope": "write",
+      "summary": "Subscribes a member an import found watching something.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "invited",
+            "joined",
+            "mentioned",
+            "role",
+            "review",
+            "check_in"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "activities workspaceFeed",
       "action": "activities.workspaceFeed",
       "method": "GET",
@@ -6579,7 +6622,8 @@
             "key_result",
             "check_in",
             "cycle",
-            "document"
+            "document",
+            "task"
           ]
         },
         {
@@ -6609,7 +6653,8 @@
             "key_result",
             "check_in",
             "cycle",
-            "document"
+            "document",
+            "task"
           ]
         },
         {
@@ -6622,6 +6667,73 @@
           "name": "body",
           "field": "body",
           "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "comments importComment",
+      "action": "comments.importComment",
+      "method": "POST",
+      "path": "/comments/importComment",
+      "scope": "write",
+      "summary": "Records a comment an import found, keeping its author and its date.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "goal",
+            "key_result",
+            "check_in",
+            "cycle",
+            "document",
+            "task"
+          ]
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "author-member-id",
+          "field": "authorMemberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "body",
+          "field": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "created-at",
+          "field": "createdAt",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "edited-at",
+          "field": "editedAt",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "parent-id",
+          "field": "parentId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "legacy",
+          "field": "legacy",
+          "type": "object",
           "required": true
         }
       ],
@@ -6685,7 +6797,8 @@
             "key_result",
             "check_in",
             "cycle",
-            "document"
+            "document",
+            "task"
           ]
         },
         {

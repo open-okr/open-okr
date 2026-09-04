@@ -20,6 +20,7 @@ import type { Pool } from "pg";
 import { countFor, requireCompany, SUMMARY_TABLES } from "./companies.ts";
 import { introspect } from "./introspect.ts";
 import { importCheckIns } from "./mappers/check-ins.ts";
+import { importCollaboration } from "./mappers/collaboration.ts";
 import { importKpis } from "./mappers/kpis.ts";
 import { importKeyResultValues, importOkrs } from "./mappers/okrs.ts";
 import { importOrganisation } from "./mappers/organisation.ts";
@@ -114,6 +115,8 @@ export async function runFlowyteamImport(
     const values = await importKeyResultValues(mapper);
     const kpis = await importKpis(mapper);
     const work = await importWork(mapper);
+    // Last: a comment hangs on a task and a watcher watches one.
+    const collaboration = await importCollaboration(mapper);
 
     const report = buildReport({
       connectedTo: source.describe,
@@ -128,6 +131,7 @@ export async function runFlowyteamImport(
         values,
         ...kpis.domains,
         ...work.domains,
+        ...collaboration.domains,
       ],
       extraNotes: [
         organisation.teamTreeDepth > 1
@@ -147,7 +151,8 @@ export async function runFlowyteamImport(
         "Confidence votes are not imported: a private vote with a synchronised reveal is an OpenOKR concept and the source records one confidence per check-in.",
         "Every KPI arrives with no tree. FlowyTeam has no named driver tree, and building one from the parent chain would name something nobody chose.",
         ...work.unmodelled,
-        "Task comments, files and access lists are not imported yet. They arrive at P6-T04b.",
+        ...collaboration.unmodelled,
+        "Task files are not imported yet. They arrive at P6-T04c, because the bytes are on the source server's own disk and a read-only MySQL connection cannot reach them.",
       ],
     });
 

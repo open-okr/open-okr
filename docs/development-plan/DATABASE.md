@@ -454,7 +454,7 @@ One row per publish and nothing else writes one. A draft edited forty times is o
 The subject list is wider than the document one, because §4.9 says files go on any subject: a task, a document and a check-in are all in it. Detaching says "not here", never "gone": the blob is untouched and its own orphan cleanup decides its fate.
 
 ### blobs *(built at P2-T05, ahead of `initiatives`/`tasks`/`attachments` above, which are still Phase 3)*
-`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`.
+`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live: a legacy key arrived at migration 0073 because two files can share a name, a size and even a digest and still be two uploads, so the digest is not the identity and the source's own id is (P6-T04b).
 
 `status` carries a fourth value beyond the three TECHNICAL-PLAN names: `pending`, the gap between prepare and claim that "prepare, upload, claim" needs somewhere to sit, and that the orphan cleanup job's own query targets. `filesize` and `digest` are null until claim fills them in.
 
@@ -467,7 +467,9 @@ No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: a
 ## 13. Collaboration (domain J)
 
 ### comments
-`subject_type`, `subject_id`, `author_member_id` to workspace_members, `body` (rich), `edited_at?`.
+`subject_type` (`goal` / `key_result` / `check_in` / `cycle` / `document` / `task`), `subject_id`, `author_member_id` to workspace_members, `body` (rich), `body_version`, `edited_at?`, `parent_id?` to comments, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live.
+
+`task` and `parent_id` arrived at migration 0073 for the FlowyTeam importer (P6-T04b). Every one of the 7223 comments on the instance it reads is on a task, which the subject list this table was created with did not allow, and 8 of them answer another comment. `parent_id` is `on delete set null` rather than cascade: a deleted parent must not take the answers with it, because the answer is somebody else's words. Nothing renders a thread yet; `comments.list` returns the column so the relationship is addressable rather than only stored.
 
 ### reactions
 `subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`.
@@ -476,7 +478,7 @@ No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: a
 `subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact; built before anything creates one, the same way access contexts existed before spaces did.
 
 ### subscriptions *(built at P2-T06)*
-`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring.
+`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring, and `subscriptions.importWatcher` (P6-T04b) is one of those paths: an import restores a watch only for somebody who can hold one. Since every member an import creates is a placeholder, a first company import restores none, and the report names each rather than counting a row that is not there.
 
 ## 14. Feed, notifications and channels (domain K)
 

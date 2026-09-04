@@ -757,6 +757,12 @@ export {
   extractMentionIds,
 } from "./rich-text/extract.ts";
 export {
+  asBlocks,
+  type FromHtmlOptions,
+  type ImageHandler,
+  richTextFromHtml,
+} from "./rich-text/from-html.ts";
+export {
   isBlankText,
   richTextFromPlainText,
 } from "./rich-text/from-text.ts";

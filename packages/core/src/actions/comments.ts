@@ -29,9 +29,20 @@ import {
   removeReaction,
   updateComment,
 } from "../comments/service.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/** The same validator every other rich-text write uses: an imported body is
+ * held to the schema exactly as a typed one is. */
+const richText = z
+  .unknown()
+  .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
+    message: "not valid editor JSON for the current rich text schema",
+  });
 
 function requireMemberId(memberId: string | null | undefined): string {
   if (!memberId) {
@@ -111,6 +122,10 @@ export const listCommentsAction = defineReadAction({
        */
       editedAt: z.string().nullable(),
       createdAt: z.string(),
+      /** The comment this one answers, or null. Returned so the relationship
+       * an import preserved is addressable; no surface renders a thread yet
+       * (P6-T04b). */
+      parentId: z.string().uuid().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -240,6 +255,139 @@ export const createCommentAction = defineWriteAction({
   }),
 });
 
+/**
+ * A comment an import found, kept as its author wrote it (P6-T04b).
+ *
+ * The same trade `goals.importCheckIn` made at P6-T03c and `people
+ * .importMember` made at P6-T03a. A task comment from 2023 was written by
+ * somebody who may have left, on a day that is not today, sometimes in answer
+ * to another comment. `comments.create` posts as the signed-in member, now,
+ * answering nothing, which is correct for the product and useless for a
+ * migration: the imported conversation would be a wall of remarks by whoever
+ * ran the import, all dated the day they ran it.
+ *
+ * Adding an author and a date to `comments.create` would be worse than a
+ * second action: it would let any member post under somebody else's name on
+ * any date they chose, which is an impersonation hole opened for a migration's
+ * benefit.
+ *
+ * **`full`, and a legacy key is required.** There is no call to this that is
+ * not part of a recorded import run. The body is validated and sanitised the
+ * same as any other: `richText` here is the same schema the ordinary write
+ * boundary uses, and the HTML the source held was converted before it arrived.
+ */
+export const importCommentAction = defineWriteAction({
+  name: "comments.importComment",
+  summary:
+    "Records a comment an import found, keeping its author and its date.",
+  input: z.object({
+    subjectType: subjectTypeSchema,
+    subjectId: z.uuid(),
+    /** The member who wrote it in the source, not the one running the import. */
+    authorMemberId: z.uuid(),
+    body: richText,
+    /** When the source says it was written. */
+    createdAt: z.string(),
+    /** Set when the source records that it was edited afterwards. */
+    editedAt: z.string().optional(),
+    /**
+     * The comment this one answers, already imported. The source threads one
+     * level deep and so does this: a parent that is itself a reply is the
+     * caller's problem, not this action's.
+     */
+    parentId: z.uuid().optional(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        comments,
+        input.legacy,
+        "comment",
+      );
+
+      const createdAt = new Date(input.createdAt);
+      if (Number.isNaN(createdAt.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.createdAt}" is not a date this comment could have been written on.`,
+        );
+      }
+      const editedAt = input.editedAt ? new Date(input.editedAt) : undefined;
+      if (editedAt && Number.isNaN(editedAt.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.editedAt}" is not a date this comment could have been edited on.`,
+        );
+      }
+
+      // The author has to be a member of this workspace. Without the check a
+      // mistyped id would write a comment nobody can attribute, and the
+      // foreign key's error says nothing a person could act on.
+      const [author] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, input.authorMemberId),
+            eq(workspaceMembers.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!author) {
+        throw new OperationError(
+          "forbidden",
+          "No such member to attribute this to.",
+        );
+      }
+
+      const result = await createComment(tx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        authorMemberId: input.authorMemberId,
+        body: input.body,
+        parentId: input.parentId,
+        createdAt,
+        editedAt,
+        legacy: { type: input.legacy.type, id: input.legacy.id },
+      });
+
+      return {
+        result: { id: result.id },
+        activity: {
+          kind: "comment.created" as const,
+          subjectType: "comment",
+          subjectId: result.id,
+          payload: {
+            subjectType: input.subjectType,
+            imported: true,
+            excerpt: excerptRichText(
+              input.body as Parameters<typeof excerptRichText>[0],
+              120,
+            ),
+          },
+        },
+        audit: {
+          action: "comments.importComment",
+          targetType: "comment",
+          targetId: result.id,
+          payload: {
+            subjectType: input.subjectType,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+          },
+        },
+      };
+    },
+  }),
+});
 export const updateCommentAction = defineWriteAction({
   name: "comments.update",
   summary: "Edit a comment (author only)",
