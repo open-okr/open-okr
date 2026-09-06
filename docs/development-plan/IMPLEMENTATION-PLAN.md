@@ -1399,6 +1399,238 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 ---
 
+# Gap closure: between Phase 6 and Phase 7
+
+Not a phase. Twenty-nine tasks closing `GAP-AUDIT.md`, which audited all 47
+routes and all 10 packages against the scope whose task was already `done` or
+`in_review` on 7 September 2026. Every row below cites the audit finding it
+closes, so the evidence for why the task exists is one file away.
+
+**Why these are numbered tasks rather than one sweep.** The audit found six
+specified screens with no route at all and a scheduler that nothing starts.
+That is not a tidy-up. Cutting each into a row the size of one working session
+is what makes it reviewable, and it is what makes a mis-cut row visible before
+the code is written rather than after four commits.
+
+**Ordering.** G01 to G05 come first because they change what every other row
+means: without the scheduler nothing in the coaching layer has ever run in the
+shape a user meets it. G06 to G13 are the missing screens. G14 to G19 finish
+the cycle and the session. G20 onwards is configuration and polish.
+
+### P6-G01: The scheduler host [L]
+Depends on: P5-T01a
+Goal: the product acts on a clock, not only on a write (GAP-AUDIT B-01).
+Deliverables: a job-queue host in `apps/web` beside the outbox relay, constructing the pg-boss driver from `DATABASE_URL` and calling `registerAgentSchedules` once at boot; an `OPENOKR_SCHEDULER` toggle with the same shape `OPENOKR_RELAY` already has, so an operator can leave one replica scheduling and turn it off on the rest; the notification batch drain, the daily summary, the staleness sweep and the orphan-blob reap registered as recurring jobs beside the four Champion cadences; a single boot log line naming what was registered; the stale comment at `packages/agents/src/schedule.ts:7` corrected, since the relay host it says does not exist has existed since P5-T01a.
+Test plan: a host with the toggle off registers nothing; a host with it on registers every declared schedule exactly once, and registering twice is idempotent; a restart resumes rather than duplicating; the daily summary fires at the member's local time across a daylight-saving boundary through the scheduled path rather than a direct call.
+Acceptance: Given a fresh instance with no AI provider, when a check-in passes its due date and an hour elapses, then the Champion has run, a nudge row exists with its rule key, and no human pressed anything.
+
+### P6-G02: The review inbox's four remaining sources [L]
+Depends on: P3-T08, P4-T05, P4-T07, P4-T08
+Goal: S-02 tells a member everything they owe (GAP-AUDIT B-02).
+Deliverables: the blocker, commitment, session and proposal obligations computed and merged into the existing overdue-first grouping; `PENDING_SOURCES` emptied, and the mechanism kept so a future source still declares itself rather than being silently absent; each row's one-click action; the live sidebar badge counting all six sources; cache invalidation from the Operations that change any of them.
+Test plan: a member owning an open blocker sees it grouped by its age; a commitment due this week appears and closing it removes it; a session a member must run appears once and not per participant; an agent proposal appears for the member whose decision it needs and for nobody else; the badge count equals the row count across all six sources.
+Acceptance: Given a member who champions an overdue goal, owns a blocker, has a commitment due, must run a session and has one proposal waiting, when they open `/review`, then five obligations are listed in the right groups and the badge reads five.
+
+### P6-G03: Reachability and stale copy [S]
+Depends on: none
+Goal: nothing on screen lies about the state of the product (GAP-AUDIT B-12 and the seven stale strings).
+Deliverables: `/account/connections` linked from the avatar menu, closing the same defect P5-T08 already fixed twice; `notFound()` on `kpis/[id]`, so an unknown or forbidden id is a 404 rather than the root error boundary; the seven stale on-screen strings removed or corrected where the task they name has landed; the four unused `shell.mobile.*` catalogue keys removed; the e2e specs whose `sNN` prefix names the wrong screen renamed; CLAUDE.md's repo layout reconciled with the Coach and the Champion living in `packages/core/src/agents/`.
+Test plan: a test asserts every account page in the module registry is in the avatar menu, so the next page added cannot repeat this; an unknown KPI id renders not-found; a gate refuses a new user-facing string naming a task id.
+Acceptance: Given a signed-in member, when they open the avatar menu, then every account page they may reach is listed; and given a KPI id that does not exist, then the page is a 404.
+
+### P6-G04: Storage: the chart's defaults corrected [S]
+Depends on: P1-T10
+Goal: a default Helm install does not lose uploads (GAP-AUDIT B-11).
+Deliverables: `replicaCount` defaulted to 1 with `persistence.enabled` defaulted to true, so the shipped values are a combination that keeps files; the validation message's third remedy corrected, since it currently points at an S3 driver that does not exist; a refusal when several replicas are asked for with no shared storage, rather than an `emptyDir` that silently diverges; NOTES.txt saying where files land and what to change to scale out.
+Test plan: the chart's own behaviour checks cover the new default combination, a multi-replica install with no shared storage refused by name, and a multi-replica install with `ReadWriteMany` accepted.
+Acceptance: Given the chart installed with no values overridden, when a file is uploaded and the pod restarts, then the file is still there.
+
+### P6-G05: Storage: the S3-compatible driver [M]
+Depends on: P6-G04
+Goal: the storage claim in PLAN.md becomes true (GAP-AUDIT B-11).
+Deliverables: an S3-compatible `FileStorage` driver in `packages/adapters`, using the two AWS SDK entries already on the boundary allow-list, with signed put and get URLs, a configurable endpoint so MinIO and every compatible service work, and `stop()` releasing its HTTP client; environment variables in the `packages/config` schema with local disk staying the default when none is set; the driver selected by a factory in `apps/web/lib/storage.ts` the way the mailer already is; the first-run wizard reporting which storage is in use; the chart offering it and dropping the persistence requirement when it is set.
+Test plan: prepare, upload, claim and download against a local MinIO, skipped with a stated reason when none is reachable, the way the MySQL connector suites already skip; an unset endpoint falls back to local disk; a signed URL expires; the boundary gate still refuses the SDK outside `packages/adapters`.
+Acceptance: Given two replicas with the S3 driver configured, when one uploads a file, then the other serves it.
+
+### P6-G06: Invitations [M]
+Depends on: P2-T04
+Goal: a second person can join from the browser (GAP-AUDIT B-07).
+Deliverables: an invitation card in workspace admin: invite by email, a reusable workspace link with its use count, maximum uses, expiry and allowed domains, a single-use personal link, revoke, and the pending list with what each invitation is for; the accept surface a link lands on, for a signed-out and a signed-in visitor; loading, empty, error and permission-denied states.
+Test plan: an invitation by email sends through the outbox and the invitee joins with the right defaults; a revoked link is refused with a reason rather than a stack trace; a link at its maximum uses is refused; a trusted-domain address joins without an invitation when the setting allows it; a member below the level sees neither the card nor the route.
+Acceptance: Given an admin on the invitation card, when they invite an address and that person follows the link, then they are a member of the workspace with the provisioning defaults, and the audit names who invited them.
+
+### P6-G07: The in-app inbox, S-03 [L]
+Depends on: P2-T06
+Goal: the notification spine gets its screen (GAP-AUDIT B-06).
+Deliverables: the inbox route with the live badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block, grouped and deep-linked rows, mark-read, mute and snooze, and the subscription toggle on every subject that has one; loading, empty, error and permission-denied states.
+Test plan: a notification a member may not see never appears; snoozing hides the row and never hides a review-inbox obligation; the badge is live and clears on read; muting a subject stops new rows without deleting old ones.
+Acceptance: Given a member mentioned in a comment, when they open the inbox, then the notification is listed, deep-links to the comment, and the badge clears.
+
+### P6-G08: Member notification settings [M]
+Depends on: P6-G07
+Goal: the member half of the settings map is reachable (GAP-AUDIT B-06).
+Deliverables: per-reason routing, the batching window, the daily summary time and the language, theme and density preferences on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks.
+Test plan: every setting in the member scope resolves to its documented default on a member who has never opened the screen, enumerated from the registry rather than a fixed list; changing the summary time moves when it fires; a per-reason routing change takes effect on the next notification.
+Acceptance: Given a member who changes their batch window to ten minutes, when four notifications arrive inside it, then they receive one digest listing four items.
+
+### P6-G09: The people directory and org chart, S-33 [L]
+Depends on: P2-T03
+Goal: members are visible as people (GAP-AUDIT B-08).
+Deliverables: the directory with search and filters, the profile screen with the self-versus-others editable field sets, and the org chart from the manager chain; loading, empty, error and permission-denied states.
+Test plan: a suspended member is excluded from the directory for everybody but an administrator; a manager cycle cannot be created from the profile editor; a guest sees the directory at their own level; the chart renders a chain several levels deep without a cycle.
+Acceptance: Given a workspace with a manager chain, when a member opens the directory, then every member they may see is listed and the chart draws the chain.
+
+### P6-G10: The people lifecycle controls [M]
+Depends on: P6-G09
+Goal: a leaver can be handled without the command line (GAP-AUDIT B-08).
+Deliverables: suspend, restore, convert-to-guest and erasure on the profile screen behind their access level, each with a confirmation naming exactly what will happen and what will survive; the last-owner invariant surfaced as a refusal with its reason; the erasure export offered as a download.
+Test plan: suspending removes every access and restoring returns it; converting to guest leaves no stale binding; erasure keeps authorship readable under the placeholder identity and produces the export; removing the last owner is refused by name.
+Acceptance: Given an administrator erasing a member, when it completes, then that member's comments still read with an anonymised author, an export is produced, and the audit names who ran it.
+
+### P6-G11: The activity feed, S-31 [M]
+Depends on: P2-T07
+Goal: the typed event log gets its screen (GAP-AUDIT G-01).
+Deliverables: the per-kind renderer registry rendered at workspace, space, goal and profile scope; the feed on each of those surfaces; live inserts; key-based pagination; the aggregation rules already in the engine respected on screen.
+Test plan: a private-space activity never appears in a non-member's workspace feed; five consecutive field edits collapse into one row and a check-in never does; a soft-deleted subject drops out; a live insert appears without a reload.
+Acceptance: Given a member without access to a space, when they read the workspace feed, then no activity from it appears, while a member of that space sees typed, readable entries.
+
+### P6-G12a: The AI console: provider, keys and models [L]
+Depends on: P2-T13, P2-T14
+Goal: AI can be turned on from the product (GAP-AUDIT B-05).
+Deliverables: screen S-37's first cards: the provider and its state, the workspace and personal credential flows with the key written once and never read back, rotation, and the model catalogue with add and edit for custom models carrying their own context window and cost; the tier routing card; every affordance hidden or disabled with the provider off.
+Test plan: a key is stored envelope-encrypted and never returned; rotation re-wraps without losing access; a custom model meters cost from its own figures; a workspace that has supplied only a key resolves every tier through the driver's seeded map; the screen is refused below `manage_ai`.
+Acceptance: Given an administrator with no AI configured, when they paste a provider key, then AI features become available in the same session and no key is ever rendered back.
+
+### P6-G12b: The AI console: features, prompts, budgets and usage [L]
+Depends on: P6-G12a, P2-T16
+Goal: cost and behaviour are visible and bounded from the product (GAP-AUDIT B-05).
+Deliverables: the feature switches, the versioned prompt editor with restore, the budget and hard-cap cards per user, per agent and per workspace, the usage summary with its anomaly flags, and the privacy and egress card.
+Test plan: crossing a quota disables the feature with a clear message and every manual path still works; a prompt version change is recorded and reversible; a hard cap halts a running agent with the reason in its log; the usage figures match the metered events.
+Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then the console shows it halted with the reason, and every deterministic path is unaffected.
+
+### P6-G13: Agent configuration and the proposal review queue [L]
+Depends on: P2-T17, P4-T05a, P4-T06a
+Goal: the propose-and-approve default has a surface (GAP-AUDIT G-05).
+Deliverables: agent detail on S-38 gaining enable and disable, the write policy of sandbox, propose or scoped direct, and least-privilege binding on named spaces, goals and KPI trees; run cancellation; the proposal review queue with the envelope rendered as what would change, bulk apply and bulk dismiss, and the same queue reachable from the review inbox.
+Test plan: an agent in propose mode commits nothing until a proposal is applied, and applying goes through the Operation pipeline with audit; a binding cannot be widened to the workspace; cancelling a run stops it and says so in its log; a dismissed proposal cannot be applied afterwards.
+Acceptance: Given an agent proposal, when a member applies it from the queue, then the change lands through the pipeline, the audit names both the agent and the member, and the proposal cannot be applied twice.
+
+### P6-G14: Cycle phase 0, the annual frame, S-05 [M]
+Depends on: P3-T03, P4-T02
+Goal: the annual strategy has a surface (GAP-AUDIT B-03).
+Deliverables: the frame editor for mission, vision, mid-term strategy, year and horizon; the two to five annual strategies with what each means in practice; the annual OKRs with their serving strategy; the year's not-doing list; sending an annual objective forward into drafting; the Coach's flag on a frame with unresolved disagreement.
+Test plan: a quarterly cycle marks the phase not-applicable rather than to-do; the strategy count is bounded at both ends with the reason stated; an annual objective sent forward appears in drafting; the frame reads back exactly as written.
+Acceptance: Given an annual cycle with no frame, when a facilitator opens phase 0 and writes one, then the phase mark computes as complete and the drafting surface offers the annual objectives.
+
+### P6-G15: Cycle phase 6, run the cadence, S-11 [M]
+Depends on: P3-T07, P4-T04, P4-T08
+Goal: the running cycle has a surface (GAP-AUDIT B-03).
+Deliverables: sessions held and upcoming, the streak, confidence per key result with its trend, open blockers by age, the decision log and the mid-cycle calibration record, all read-only aggregations of tables that already exist.
+Test plan: the phase shows only what the reader may see, scoped by the same access filter the space list uses; a cycle with no sessions renders an empty state rather than zeroes; the calibration record appears once run.
+Acceptance: Given a running cycle with two sessions held, when a member opens phase 6, then both are listed with the streak and every open blocker with its age.
+
+### P6-G16: Cycle phase 7, review and learn, S-12 [M]
+Depends on: P3-T15, P4-T12
+Goal: the close has a surface (GAP-AUDIT B-03).
+Deliverables: scoring every key result with the band table highlighted at the portfolio average, carry-forward flags, the retrospective split into business and process questions, and the feed-forward action opening the next cycle with scores and carry-forward items already placed.
+Test plan: the highlighted band matches the computed portfolio average; carry-forward arrives unticked, per METHOD.md §8.9; the feed-forward action is idempotent; the arithmetic matches `packages/method` exactly.
+Acceptance: Given a cycle at its close, when a facilitator scores every key result and runs feed-forward, then the next cycle opens carrying the scores and the flagged items, and running it twice changes nothing.
+
+### P6-G17: The dependency register on phase 5, S-10 [M]
+Depends on: P3-T09, P4-T03
+Goal: publish gate 4 can be satisfied from the browser (GAP-AUDIT B-04).
+Deliverables: the dependency register block on phase 5 with key result, providing team, confirmed and risk owner per row; confirm, remove and name-a-risk-owner controls; the alignment mapping block S-10 also asks for, or a link to S-16 where it already lives, decided in the design note; gate 4's remediation link pointed at the register rather than at the page it is already on.
+Test plan: a cycle carrying an unconfirmed dependency fails gate 4 and passes once confirmed; a dependency logged with a named risk owner also passes; removing a dependency updates the gate without a reload; a reader below edit sees the register and no controls.
+Acceptance: Given a cycle with one unconfirmed dependency, when a facilitator confirms it from phase 5, then gate 4 turns green and the publish control becomes available.
+
+### P6-G18: Spaces: create, settings and membership [M]
+Depends on: P3-T01
+Goal: a workspace is not stuck with the one space provisioning made (GAP-AUDIT B-09).
+Deliverables: space creation, rename and archive; the space settings surface TECHNICAL-PLAN §4.14 names, with team voting opt-in, the strictness override and the space defaults; membership management with the manager role, add and remove, beside the join and leave already there; loading, empty, error and permission-denied states.
+Test plan: archiving a space hides it without deleting its goals; a space manager may manage membership and a member may not; the last manager cannot be removed; every space setting resolves to its default on a space where nothing was configured.
+Acceptance: Given an administrator, when they create a space and name a manager, then that manager can manage its membership and nobody else can.
+
+### P6-G19: The weekly session's trend, blockers, streak and commitments [L]
+Depends on: P4-T07b, P4-T07c, P4-T08
+Goal: S-22 shows the data its tables already hold (GAP-AUDIT B-10).
+Deliverables: the twelve-week confidence trend, the streak ribbon, the open blockers with ages and last week's scores on the space home; the commitment stage with the previous week closed as delivered or not and the new week set with owner and linked key result; the commitment rollover at session open that P4-T08 deferred; the coordinator note rendered in the digest; the blocker controls of raise, resolve and reassign; the placeholder card removed.
+Test plan: closing a session rolls this week's commitments into next week's list to close; a skipped week breaks the streak and a held one extends it; the digest content matches the session record exactly; the stage gate refusing fewer than two commitments is reachable and its message is readable.
+Acceptance: Given a completed session, when it closes, then the digest is generated with correct figures, the streak advances, last week's commitments are closed, this week's are open, and the space home shows all of it.
+
+### P6-G20: Rhythm and threshold cards [M]
+Depends on: P2-T08, P4-T01
+Goal: the METHOD §11 registry is configurable (GAP-AUDIT G-03).
+Deliverables: the rhythm and thresholds cards covering the §11 registry rather than three of its rows: frequency, anchor day, grace, clocks, ladders, bands, corridors, caps, boundaries and timings, plus the terminology labels `packages/method` already implements; per-card reset to default; every value read from the registry so no threshold is restated here.
+Test plan: a card enumerates the registry rather than a fixed list, so a threshold added later appears without a code change here; resetting a card restores the canon defaults exactly; an out-of-range value is refused with the bound stated; a renamed term propagates to every surface that shows it.
+Acceptance: Given a workspace that changes its check-in grace, when a goal passes the new grace, then it flips to outdated on the new boundary and no other threshold moved.
+
+### P6-G21: Nudge rule cards [M]
+Depends on: P4-T04c, P5-T02c
+Goal: a workspace can turn a rule down (GAP-AUDIT G-04).
+Deliverables: per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode; strictness with per-space overrides; each row linking to the rule in METHOD.md and showing its recent volume from the card already there.
+Test plan: a disabled rule stops producing nudge rows and produces a suppression reason instead of silence; a channel override routes the next nudge; a quiet-mode exemption still respects the escalation ladder; every rule resolves to its provisioning default on a workspace that configured nothing.
+Acceptance: Given an administrator who disables the noisiest rule, when its trigger next fires, then no nudge is sent, a suppressed row records why, and every other rule is unaffected.
+
+### P6-G22: The string catalogue and the locale [L]
+Depends on: P2-T10
+Goal: UIUX-PLAN §9's catalogue line is true (GAP-AUDIT G-08).
+Deliverables: every user-facing string in the 47 routes moved into the catalogue, with the Bahasa Melayu keys stubbed; the locale wired from the member and workspace language settings rather than pinned to `en` in the root layout; the pseudo-locale check extended from the shell components to every route, so a hardcoded string fails the build.
+Test plan: the pseudo-locale check runs over every route and fails on a deliberately hardcoded string; a member whose language is `ms` sees the stubbed catalogue; a key missing from `ms` falls back to `en` rather than rendering the key.
+Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language, and a new hardcoded string anywhere fails the build.
+
+### P6-G23: Theme and density control [S]
+Depends on: P2-T10
+Goal: the two states every UI task must verify are reachable (GAP-AUDIT G-09).
+Deliverables: a theme and density control on the member's settings surface and in the avatar menu, calling the `setTheme` and `setDensity` the provider has always exposed and nothing has ever called; the preference persisted per member rather than only in the browser, so it follows them; the pre-hydration script reading what the control writes.
+Test plan: switching theme survives a reload and a second device; compact density changes row heights on a virtualised table; reduced motion is still honoured in both themes.
+Acceptance: Given a member who chooses dark and compact, when they sign in on another browser, then the product renders dark and compact with no flash of the other.
+
+### P6-G24: Loading and error boundaries [M]
+Depends on: none
+Goal: a slow read and a failed read both look like themselves (GAP-AUDIT G-06, G-07).
+Deliverables: a loading state on every route whose reads are not instant, through `loading.tsx` or a Suspense boundary around the slow region rather than the whole page; section-level error boundaries so a failure in one card does not replace the shell; a `global-error.tsx`; a not-found path on every dynamic route.
+Test plan: a deliberately slow read renders the loading state and then the content; a thrown read inside one card leaves the sidebar standing; every dynamic route returns not-found for an id that does not exist; the permission-denied state is distinct from not-found only where an existence oracle is acceptable.
+Acceptance: Given a route whose read takes two seconds, when a member navigates to it, then they see a loading state immediately and the content when it arrives.
+
+### P6-G25: Workspace state and the freeze overlay [M]
+Depends on: P2-T09
+Goal: the control P6-T07's rehearsal depends on exists (GAP-AUDIT, the admin table).
+Deliverables: the workspace state of active, suspended and frozen on the general card; the freeze overlay every screen shows when the workspace is frozen, with the admin recovery list still reachable; `workspace.setState` bound to it with its audit event.
+Test plan: a frozen workspace refuses every write with a readable reason and still serves reads; an administrator reaches the recovery list from inside the overlay; unfreezing restores writes; the state change is audited with the acting principal.
+Acceptance: Given a frozen workspace, when a member tries to write, then the overlay explains why and the administrator can lift it.
+
+### P6-G26: Onboarding, S-34 [L]
+Depends on: P3-T17
+Goal: a first sign-in as owner leads somewhere (GAP-AUDIT G-02).
+Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice P3-T17 built the action for and the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
+Test plan: skipping every step leaves a working workspace practising the full method; choosing demo data seeds it idempotently; onboarding does not reappear once finished; a second owner does not see it.
+Acceptance: Given a first sign-in as owner, when they skip every step, then they land on a working workspace with every setting at its documented default.
+
+### P6-G27: Detail-page write paths [M]
+Depends on: none
+Goal: the registered actions with no browser caller either get one or get a reason (GAP-AUDIT §5).
+Deliverables: delete on goals, initiatives, tasks and documents with the soft-delete semantics stated on the confirmation; checklist item removal; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction can be taken back; `cycles.create`, `update` and `archive`, so a workspace reaches next quarter; the attachment flow on documents and initiatives, wiring the four `blobs.*` and three `attachments.*` actions that have no caller; `workspace.rename` and `workspace.overview` on the general card; a note in the audit for any action deliberately left without a browser path.
+Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a cycle created from the browser gets the §4.14 defaults; an attachment survives a page reload and respects the workspace byte quota.
+Acceptance: Given a member with edit access on a goal, when they move it to the next cycle, then the move is audited and both cycles read correctly.
+
+### P6-G28: The initiative's tasks and documents, S-26 [S]
+Depends on: P5-T11, P5-T12
+Goal: the two panels the initiative page still says are coming (GAP-AUDIT, the initiatives row).
+Deliverables: the tasks panel driven by `tasks.linkedWork`, so initiative progress reads as the share of its own tasks that are done rather than zero for everybody; the documents and attachments panel; the "What is not here yet" card removed.
+Test plan: an initiative with three tasks, one done, reads 33 per cent; an initiative with no tasks renders an empty state rather than a zero bar; a document attached to the initiative appears and survives a reload.
+Acceptance: Given an initiative with tasks, when a member opens it, then the tasks are listed and the progress figure matches them.
+
+### P6-G29: The missing end-to-end paths [M]
+Depends on: every row above that adds a screen
+Goal: the Definition of Done's one-happy-path-per-screen line is true (GAP-AUDIT G-10).
+Deliverables: an end-to-end path for each of the 16 routes that has none, plus one for every screen G06 to G26 adds; the spec naming convention fixed so a file's prefix names the screen it covers.
+Test plan: the suite is the test plan. Each spec drives the screen's happy path through the real standalone server against a seeded database.
+Acceptance: every route in the module registry has at least one end-to-end path, asserted by a test that enumerates the registry rather than a fixed list.
+
+**Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
+
+---
+
 # Phase 7: Hardening
 
 ### P7-T01: Performance budgets and indexing at scale [L]

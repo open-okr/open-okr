@@ -4,7 +4,7 @@ The single source of truth for execution progress against IMPLEMENTATION-PLAN.md
 
 Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skipping requires a note and human sign-off. The rules are in EXECUTION-GUIDE.md §5.
 
-**134 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, and 132 until P6-T04 was cut in three.
+**163 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, 132 until P6-T04 was cut in three, and 134 until the gap audit added twenty-nine rows between Phase 6 and Phase 7.
 
 ## Phase 1: Foundation
 
@@ -447,6 +447,45 @@ need the space filter the explorer already has. KPI tiles are P3-T12.
 | P6-T05c | The admin cards | todo |  |  |  |
 | P6-T06 | Backups and restore drills | todo |  |  |  |
 | P6-T07 | Migration cutover rehearsal | todo |  |  |  |
+
+## Gap closure: between Phase 6 and Phase 7
+
+Twenty-nine tasks closing `GAP-AUDIT.md`, the per page and per module audit of
+7 September 2026. Not a phase. The audit is the evidence for every row; each
+task's entry in IMPLEMENTATION-PLAN.md names the finding it closes.
+
+| Task | Title | Status | Branch / PR | Updated | Notes |
+|---|---|---|---|---|---|
+| P6-G01 | The scheduler host | todo |  |  | GAP-AUDIT B-01. `registerAgentSchedules` has never been called and `apps/web` constructs no `JobQueue`, so no agent, daily summary, notification batch, staleness sweep or blob reap has ever run on a clock in a real instance |
+| P6-G02 | The review inbox's four remaining sources | todo |  |  | GAP-AUDIT B-02. `PENDING_SOURCES` still declares blockers, commitments, sessions and proposals as unbuilt, naming four tasks that are all done |
+| P6-G03 | Reachability and stale copy | todo |  |  | GAP-AUDIT B-12 and the seven stale strings. Cheapest row here and it closes a blocker with one line |
+| P6-G04 | Storage: the chart's defaults corrected | todo |  |  | GAP-AUDIT B-11. Default values are two replicas with persistence off, so uploads land in an `emptyDir` |
+| P6-G05 | Storage: the S3-compatible driver | todo |  |  | GAP-AUDIT B-11. Agung approved both halves on 7 September 2026: fix the chart first, then build the driver. The two AWS SDK entries are already on the boundary allow-list |
+| P6-G06 | Invitations | todo |  |  | GAP-AUDIT B-07. No UI, so a self-hosted instance is a one-person instance once registration closes |
+| P6-G07 | The in-app inbox, S-03 | todo |  |  | GAP-AUDIT B-06 |
+| P6-G08 | Member notification settings | todo |  |  | GAP-AUDIT B-06, second half |
+| P6-G09 | The people directory and org chart, S-33 | todo |  |  | GAP-AUDIT B-08 |
+| P6-G10 | The people lifecycle controls | todo |  |  | GAP-AUDIT B-08. Suspend, restore, guest conversion and erasure have no browser path |
+| P6-G11 | The activity feed, S-31 | todo |  |  | GAP-AUDIT G-01. Nineteen catalogued kinds written on every operation and shown to nobody |
+| P6-G12a | The AI console: provider, keys and models | todo |  |  | GAP-AUDIT B-05. Nineteen of twenty-four `ai.*` actions have no caller |
+| P6-G12b | The AI console: features, prompts, budgets and usage | todo |  |  | GAP-AUDIT B-05 |
+| P6-G13 | Agent configuration and the proposal review queue | todo |  |  | GAP-AUDIT G-05. The propose-and-approve default has no surface, so a proposal can be made and never seen |
+| P6-G14 | Cycle phase 0, the annual frame, S-05 | todo |  |  | GAP-AUDIT B-03. `frame.read` and `frame.set` have no caller |
+| P6-G15 | Cycle phase 6, run the cadence, S-11 | todo |  |  | GAP-AUDIT B-03 |
+| P6-G16 | Cycle phase 7, review and learn, S-12 | todo |  |  | GAP-AUDIT B-03 |
+| P6-G17 | The dependency register on phase 5, S-10 | todo |  |  | GAP-AUDIT B-04. Publish gate 4 cannot be satisfied from the browser, and its remediation link points at the page it is already on |
+| P6-G18 | Spaces: create, settings and membership | todo |  |  | GAP-AUDIT B-09. Six space write actions have no caller |
+| P6-G19 | The weekly session's trend, blockers, streak and commitments | todo |  |  | GAP-AUDIT B-10. The session screen still tells users the tables do not exist. P4-T08 already recorded the rollover, the trend chart and the coordinator note as not done |
+| P6-G20 | Rhythm and threshold cards | todo |  |  | GAP-AUDIT G-03. Three of about sixty-five §11 registry rows are editable, and the terminology labels have no surface |
+| P6-G21 | Nudge rule cards | todo |  |  | GAP-AUDIT G-04. Nothing writes a `nudge_rules` row from the browser |
+| P6-G22 | The string catalogue and the locale | todo |  |  | GAP-AUDIT G-08. Eleven catalogue keys, all shell. The locale is pinned to `en` in the root layout, so the `ms` catalogue and the language setting do nothing |
+| P6-G23 | Theme and density control | todo |  |  | GAP-AUDIT G-09. `setTheme` and `setDensity` have never been called, so neither dark mode nor compact density is reachable |
+| P6-G24 | Loading and error boundaries | todo |  |  | GAP-AUDIT G-06 and G-07. Zero `loading.tsx`, one error boundary for the whole application, no `global-error.tsx` |
+| P6-G25 | Workspace state and the freeze overlay | todo |  |  | GAP-AUDIT, the admin table. P6-T07's rehearsal runbook depends on a control that does not exist |
+| P6-G26 | Onboarding, S-34 | todo |  |  | GAP-AUDIT G-02. Agung decided on 7 September 2026 that S-34 belongs to P3-T17 and is built now, so the P8-T02 citation is the one to correct |
+| P6-G27 | Detail-page write paths | todo |  |  | GAP-AUDIT §5. Delete, move-to-cycle, review decision, reaction removal, cycle creation and the whole attachment flow have no browser path |
+| P6-G28 | The initiative's tasks and documents, S-26 | todo |  |  | GAP-AUDIT, the initiatives row. Progress reads zero for everybody because the tasks panel was never built |
+| P6-G29 | The missing end-to-end paths | todo |  |  | GAP-AUDIT G-10. Sixteen of forty-seven routes have none, plus every screen the rows above add |
 
 ## Phase 7: Hardening
 
