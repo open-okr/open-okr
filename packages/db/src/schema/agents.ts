@@ -11,6 +11,7 @@ import {
 import { newId } from "../id.ts";
 import { AI_PROVIDER_KINDS } from "./ai.ts";
 import { MODEL_TIERS } from "./ai-models.ts";
+import { aiThreads } from "./ai-threads.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
 /**
@@ -18,7 +19,21 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
  * 0018 for why `agent_runs` and `proposed_changes` carry no `deleted_at`.
  */
 export const AGENT_KINDS = ["coach", "champion", "custom"] as const;
-export const AGENT_SCHEDULES = ["manual", "continuous", "nightly"] as const;
+/**
+ * When an agent runs.
+ *
+ * `hourly` arrived at P4-T05a with the Champion's nudge queue. The daily and
+ * weekly cadences AI-NATIVE-PLAN.md §6.2 also names land with P4-T05b, which
+ * is the task that has something to run on them.
+ */
+export const AGENT_SCHEDULES = [
+  "manual",
+  "continuous",
+  "nightly",
+  "hourly",
+  "daily",
+  "weekly",
+] as const;
 export const AGENT_AUTONOMIES = [
   "sandbox",
   "propose",
@@ -128,9 +143,21 @@ export const proposedChanges = pgTable("proposed_changes", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
-  runId: uuid("run_id")
-    .notNull()
-    .references(() => agentRuns.id, { onDelete: "cascade" }),
+  /**
+   * The agent run that produced it, or null for a copilot proposal
+   * (P4-T14b-a).
+   *
+   * A proposal names its origin, a run or a thread, exactly one, and the table's
+   * own check constraint enforces that. Inventing an agent run for a question
+   * somebody typed would put a run in the run log that nobody scheduled.
+   */
+  runId: uuid("run_id").references(() => agentRuns.id, {
+    onDelete: "cascade",
+  }),
+  /** The copilot conversation it was proposed in, or null for an agent run. */
+  threadId: uuid("thread_id").references(() => aiThreads.id, {
+    onDelete: "cascade",
+  }),
   action: text("action").notNull(),
   payload: jsonb("payload").notNull().default({}),
   subjectType: text("subject_type"),
@@ -138,10 +165,33 @@ export const proposedChanges = pgTable("proposed_changes", {
   status: text("status", { enum: PROPOSED_CHANGE_STATUSES })
     .notNull()
     .default("pending"),
+  /**
+   * Whether a model wrote this proposal's content (P4-T05c-a).
+   *
+   * `run_id` already says a proposal came from an agent. This answers the
+   * different question a reviewer actually has: who chose the words. METHOD.md
+   * §6.5's recovery draft is a template and works with the provider off, so not
+   * every agent proposal is AI-generated, and describing one as though it were
+   * would overstate what the product did.
+   */
+  aiGenerated: boolean("ai_generated").notNull().default(false),
   decidedByMemberId: uuid("decided_by_member_id").references(
     () => workspaceMembers.id,
   ),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
+  /**
+   * What applying it returned, as the action's own result.
+   *
+   * Undo needs it. Reversing a creation means naming the thing that was created,
+   * and the applied action's result is the only place that identifier exists.
+   */
+  result: jsonb("result").$type<Record<string, unknown>>(),
+  /**
+   * When the member reversed an applied proposal.
+   *
+   * Not a status. It was applied, and then it was undone, and both are true.
+   */
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

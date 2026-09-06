@@ -42,6 +42,8 @@ import {
   ensureWorkspaceStandardGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { seedChampionInTx } from "../agents/champion.ts";
+import { seedCoachInTx } from "../agents/coach.ts";
 import {
   ensureCurrentCycleInTx,
   ensureRhythmSettingsInTx,
@@ -355,6 +357,16 @@ async function insertWorkspaceAndMember(
           contextId,
           level: ACCESS_LEVELS.full,
         });
+
+        // The Champion, before the first space rather than after it: a space
+        // binds the agent as it is created, and an agent that did not exist yet
+        // would silently miss the workspace's own first space (P4-T05a).
+        await seedChampionInTx(savepoint, { workspaceId });
+        // Both agents before the first space, for the reason P4-T05a records:
+        // a space binds every seeded agent as it is created, so an agent
+        // created after the workspace's own space would silently have missed
+        // it.
+        await seedCoachInTx(savepoint, { workspaceId });
 
         // TECHNICAL-PLAN §4.14: "One space named after the workspace, with the
         // first member as its manager, who covers the coordinator's duties

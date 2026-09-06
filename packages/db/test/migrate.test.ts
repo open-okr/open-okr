@@ -37,7 +37,14 @@ beforeEach(async () => {
   const wb = await workerDb();
   scratchDb = `${wb.databaseName}_migrate`;
   await wb.admin.query(`drop database if exists ${scratchDb} with (force)`);
-  await wb.admin.query(`create database ${scratchDb}`);
+  // Explicit UTF8, for the same reason as every other scratch database here:
+  // a bare `create database` inherits the cluster's encoding, and a Windows
+  // cluster is WIN1252. These fixtures are ASCII today, so this is the rule
+  // holding rather than a failure being fixed.
+  await wb.admin.query(
+    `create database ${scratchDb} ` +
+      `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+  );
   client = await connectScratch();
 });
 

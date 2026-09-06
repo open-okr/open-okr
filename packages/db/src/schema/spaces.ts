@@ -30,6 +30,9 @@ export const spaces = pgTable("spaces", {
   /** One line, not editor JSON. §4.2 lists it without a rich-text marker. */
   mission: text("mission"),
   settings: jsonb("settings").$type<SpaceSettings>().notNull().default({}),
+  /** Where this space came from, when an import made it (P6-T03a). */
+  legacyId: text("legacy_id"),
+  legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

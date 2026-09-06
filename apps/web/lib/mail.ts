@@ -1,6 +1,6 @@
 import { createMailer, type Mailer } from "@openokr/adapters";
 import { type ResolvedMailSettings, resolveMailSettings } from "@openokr/core";
-import { getPool } from "./auth";
+import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
 
 /**

@@ -32,11 +32,13 @@ export {
   resolveSubjectContext,
   type SubjectContext,
 } from "./access/reads.ts";
+export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
 export {
   type ActionCallContext,
   type ActionDefinition,
   defineReadAction,
   defineWriteAction,
+  type PageContract,
   type SafetyClass,
 } from "./actions/define.ts";
 export {
@@ -59,6 +61,7 @@ export {
   AGGREGATABLE_KINDS,
   InvalidActivityPayloadError,
   isTestScaffoldKind,
+  PRIVATE_ACTIVITY_KINDS,
   UnregisteredActivityKindError,
   validateActivityPayload,
 } from "./activities/catalogue.ts";
@@ -84,6 +87,48 @@ export {
   type ActivityRenderer,
   renderActivity,
 } from "./activities/renderers.ts";
+export type {
+  AgentDrafter,
+  AmbitionContext,
+  CheckInDraftContext,
+  ClusterableNote,
+  DiagnosticContext,
+  DraftedCheckIn,
+  DraftedKeyResult,
+  DraftedObjective,
+  FilterContext,
+  GroundedAnswer,
+  GroundedChunk,
+  GroundedQuestionContext,
+  GroundingSource,
+  ImportMappingContext,
+  KpiRequestContext,
+  MeasureContext,
+  NarratedTrend,
+  NoteThemes,
+  ParentContext,
+  ParsedFilter,
+  ProposalOption,
+  ProposalRequestContext,
+  ProposedAction,
+  ProposedImportMapping,
+  ProposedObjective,
+  RecoveryTitleContext,
+  RetrospectiveCheckIn,
+  ReviewableGoal,
+  RewriteContext,
+  SemanticFinding,
+  SuggestedKpi,
+  SuggestedParent,
+  SummarisableBlocker,
+  TrendContext,
+  TrendPoint,
+} from "./agents/drafter.ts";
+export {
+  ASSIST_FEATURE_KEYS,
+  REVIEW_ASSIST_KEYS,
+  RHYTHM_ASSIST_KEYS,
+} from "./ai/assist-keys.ts";
 export {
   type BudgetCheckResult,
   checkBudget,
@@ -128,6 +173,207 @@ export {
   summariseUsage,
   type UsageSummaryRow,
 } from "./ai/usage.ts";
+export {
+  buildCliContract,
+  type CliCommand,
+  type CliContract,
+  type CliDifference,
+  type CliFlag,
+  diffCliContract,
+  type FlagType,
+  flagName,
+} from "./api/cli-contract.ts";
+export {
+  DEVICE_CODE_TTL_SECONDS,
+  DEVICE_POLL_INTERVAL_SECONDS,
+  type DeviceGrant,
+  generateDeviceCode,
+  generateUserCode,
+  hashDeviceCode,
+  type PendingDevice,
+  pendingDevice,
+  pollDeviceAuthorisation,
+  type StartedDevice,
+  startDeviceAuthorisation,
+} from "./api/device.ts";
+export {
+  API_ERROR_CODES,
+  type ApiError,
+  type ApiErrorCode,
+  apiError,
+  errorFor,
+  statusFor,
+} from "./api/errors.ts";
+export {
+  buildCatalogue,
+  CATALOGUE_VERSION,
+  type CatalogueDifference,
+  diffCatalogue,
+  MCP_PROMPTS,
+  MCP_RESOURCES,
+  MCP_TOOLS,
+  type McpCatalogue,
+  type McpPrompt,
+  type McpResource,
+  type McpTool,
+  RESEARCH_TOOLS,
+  toolNamed,
+} from "./api/mcp/catalogue.ts";
+export {
+  type DispatchPrincipal,
+  type DispatchResult,
+  dispatchResource,
+  dispatchTool,
+  matchTemplate,
+} from "./api/mcp/dispatch.ts";
+export {
+  canonicalAddress,
+  type FetchResult,
+  isResearchTool,
+  parseAddress,
+  RESEARCH_TOOL_SPECS,
+  type ResearchCaller,
+  type ResearchToolSpec,
+  type ResolvedAddress,
+  runFetch,
+  runResearchTool,
+  runSearch,
+  type SearchResult,
+} from "./api/mcp/research.ts";
+export {
+  closeSession,
+  closeSessionFor,
+  negotiateVersion,
+  newSessionId,
+  originAllowed,
+  recordSession,
+  recordSessionFor,
+  type SessionRecord,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  sessionFor,
+  stampSessionUse,
+} from "./api/mcp/sessions.ts";
+export {
+  ALLOW_LISTED_CLIENTS,
+  type ClientRejection,
+  type ClientResolution,
+  redirectAllowed,
+  resolveClient,
+} from "./api/oauth/clients.ts";
+export {
+  type ApprovalOutcome,
+  type AuthoriseCheck,
+  type AuthoriseRefusal,
+  type AuthoriseRequest,
+  approveAuthorisation,
+  approveAuthorisationForMember,
+  checkAuthoriseRequest,
+  checkAuthoriseRequestFor,
+  redirectWith,
+  SCOPE_DESCRIPTIONS,
+  scopesFrom,
+} from "./api/oauth/consent.ts";
+export {
+  authorisationServerMetadata,
+  challengeHeader,
+  DISCOVERY_ROUTES,
+  discoveryDocumentAt,
+  OAUTH_PATHS,
+  openIdConfiguration,
+  protectedResourceMetadata,
+  resourceIdentifier,
+  SUPPORTED_SCOPES,
+} from "./api/oauth/discovery.ts";
+export {
+  digest,
+  type GrantRefusal,
+  type IssuedTokens,
+  issueAuthorisationCode,
+  redeemAuthorisationCode,
+  rotateRefreshToken,
+  type TokenOutcome,
+} from "./api/oauth/flow.ts";
+export {
+  createGrant,
+  type GrantInput,
+  type GrantRejection,
+  type LiveGrant,
+  liveGrant,
+  REVOCATION_REASONS,
+  type RevocationReason,
+  revokeGrant,
+  stampGrantUse,
+} from "./api/oauth/grants.ts";
+export {
+  CHALLENGE_METHOD,
+  challengeFor,
+  isValidVerifier,
+  verifierMatches,
+} from "./api/oauth/pkce.ts";
+export {
+  type FetchedMetadata,
+  parseClientMetadata,
+  type RegistrationInput,
+  type RegistrationOutcome,
+  type RegistrationRefusal,
+  redirectRegistrable,
+  registerClient,
+  registerClientForInstance,
+  registrationResponse,
+} from "./api/oauth/registration.ts";
+export {
+  type AccessRejection,
+  type AccessResolution,
+  redeemCodeForTokens,
+  refreshForTokens,
+  resolveAccessToken,
+  workspaceForCode,
+  workspaceForRefreshToken,
+} from "./api/oauth/resolve.ts";
+export {
+  ACCESS_TOKEN_TTL_SECONDS,
+  CODE_TTL_SECONDS,
+  hashSecret,
+  kindFromText,
+  type MintedSecret,
+  mintSecret,
+  type OAuthSecretKind,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from "./api/oauth/secrets.ts";
+export {
+  buildOpenApiDocument,
+  type ContractDifference,
+  diffContract,
+  type JsonObject,
+  serialiseContract,
+} from "./api/openapi.ts";
+export {
+  API_BASE,
+  API_VERSION,
+  type ApiMethod,
+  decodeCursor,
+  decodeParam,
+  encodeCursor,
+  inputFrom,
+  nextCursorFor,
+  REST_ROUTES,
+  type RestRoute,
+  routeAt,
+} from "./api/surface.ts";
+export {
+  API_RATE_LIMIT,
+  API_RATE_WINDOW_SECONDS,
+  audienceFromText,
+  bearerFrom,
+  hashApiToken,
+  type MintedToken,
+  mintApiToken,
+  resolveApiToken,
+  scopeFor,
+  stampTokenUse,
+  type TokenRejection,
+  type TokenResolution,
+} from "./api/tokens.ts";
 export {
   type AuditRow,
   auditRowHash,
@@ -182,6 +428,222 @@ export {
   validateUpload,
 } from "./blobs/validation.ts";
 export {
+  type BuildOptions,
+  type BuiltMessage,
+  buildMessage,
+  type MessageButton,
+  type MessageDraft,
+  withLinkedButtons,
+} from "./channels/builder.ts";
+export {
+  CHANNEL_CAPABILITIES,
+  type ChannelCapabilityRow,
+  type ChannelConnectionKey,
+  type ChannelProviderKey,
+  capabilitiesFor,
+} from "./channels/capabilities.ts";
+export {
+  beginCheckIn,
+  CHECK_IN_COMMAND,
+  continueCheckIn,
+  type FlowOutcome,
+  type FlowRequest,
+  submitCheckIn,
+} from "./channels/check-in-flow.ts";
+export {
+  CHAT_COMMANDS,
+  type ChatCommand,
+  helpText,
+  incompleteText,
+  type ParsedCommand,
+  parseCommand,
+} from "./channels/commands.ts";
+export {
+  memberExternalId,
+  type OpenedConnection,
+  openConnection,
+  parseSlackSecret,
+  parseTeamsSecret,
+  parseTelegramSecret,
+  parseWhatsAppSecret,
+  rememberConnectionConfig,
+  type SlackSecret,
+  type TeamsSecret,
+  type TelegramSecret,
+  type WhatsAppSecret,
+} from "./channels/connections.ts";
+export {
+  type Conversation,
+  type ConversationField,
+  findConversation,
+} from "./channels/conversation.ts";
+export {
+  type DueCheckIn,
+  dueCheckInFor,
+} from "./channels/due-check-in.ts";
+export {
+  generateLinkCode,
+  handleInbound,
+  hashLinkCode,
+  INBOUND_RATE_LIMIT,
+  INBOUND_RATE_WINDOW_SECONDS,
+  type InboundOutcome,
+  type InboundRequestFacts,
+  LINK_CODE_TTL_SECONDS,
+  resolveInbound,
+  workspaceForProviderTeam,
+} from "./channels/inbound.ts";
+export {
+  connectedProviders,
+  loadRoutingMembers,
+} from "./channels/members.ts";
+export {
+  type RouterReply,
+  type RouterRequest,
+  routeCommand,
+} from "./channels/router.ts";
+export {
+  type Delivery,
+  type DeliveryChannel,
+  fallbackAfterFailure,
+  type PrimaryChannel,
+  type RoutingInput,
+  type RoutingMember,
+  resolveDelivery,
+} from "./channels/routing.ts";
+export {
+  parseBlockerType,
+  runningSessionFor,
+  type SessionLookup,
+} from "./channels/sessions.ts";
+export {
+  BINDING_LABELS,
+  BINDING_SOURCES,
+  type BindingFacts,
+  type BindingSource,
+  isBindingSource,
+  loadBindingFacts,
+  replyCommandFor,
+  resolveBinding,
+  resolveBindings,
+} from "./channels/template-bindings.ts";
+export {
+  listMappings,
+  mappingFor,
+  type ResolvedMapping,
+  removeMapping,
+  type SaveOutcome,
+  saveMapping,
+  type TemplateMapping,
+} from "./channels/template-mappings.ts";
+export {
+  listTemplates,
+  recordTemplates,
+  type StoredTemplate,
+  type SyncedTemplate,
+  type SyncOutcome,
+  usableTemplates,
+} from "./channels/templates.ts";
+export {
+  CONVERSATION_WINDOW_MS,
+  insideConversationWindow,
+  type WhatsAppEnvelope,
+  whatsAppEnvelope,
+} from "./channels/whatsapp-window.ts";
+export {
+  type AnswerQuestionInput,
+  type AnswerQuestionResult,
+  type AnswerSource,
+  answerQuestion,
+  type CopilotEvent,
+  GROUNDING_LIMIT,
+  streamAnswer,
+} from "./copilot/answer.ts";
+export {
+  citationLabel,
+  type ResolvedCitation,
+  readableCitations,
+} from "./copilot/citations.ts";
+export {
+  type AuthoredProposal,
+  type BuiltProposal,
+  buildProposal,
+  type NumberedChoice,
+  PROPOSABLE_ACTIONS,
+  type ProposalOffer,
+  proposalOffers,
+  proposeFromRequest,
+  type Reversal,
+  reversalFor,
+} from "./copilot/proposals.ts";
+export { myExportBlob } from "./exports/collect.ts";
+// The shape the relay host fills in. A type, so nothing of the worker itself
+// reaches a caller that only needs to describe its own storage function.
+export type { PutFile } from "./exports/worker.ts";
+export {
+  assertLegacyKeyFree,
+  findLegacyRowInTx,
+  LEGACY_SOURCES,
+  type LegacyKey,
+  type LegacyTable,
+  legacyColumns,
+  legacyKey,
+} from "./imports/legacy.ts";
+export { findExisting } from "./imports/legacy-lookup.ts";
+export {
+  type Mapping,
+  type MappingFile,
+  matchHeadersByAlias,
+  parseMappingFile,
+  resolveMapping,
+  valuesFor,
+} from "./imports/mapping.ts";
+export {
+  cellToText,
+  parseCsv,
+  parseCsvLines,
+  READABLE_EXTENSIONS,
+  readBuffer,
+  readTable,
+  readXlsx,
+  sheetToTable,
+  type Table,
+} from "./imports/readers/index.ts";
+export { type ReferenceHost, referencesFor } from "./imports/references.ts";
+export {
+  type RowOutcome,
+  type RunOptions,
+  type RunReport,
+  type RunResult,
+  runImport,
+  runTable,
+  type TableRunOptions,
+} from "./imports/run.ts";
+export {
+  type ImportTarget,
+  resolveActingMemberId,
+  resolveImportTarget,
+} from "./imports/target.ts";
+export {
+  asBoolean,
+  asDay,
+  asEnum,
+  asNumber,
+  asText,
+  normalise,
+} from "./imports/templates/coerce.ts";
+export {
+  type ColumnSpec,
+  ENTITIES,
+  type EntityTemplate,
+  type LegacyTableName,
+  type PlanContext,
+  type References,
+  type RowPlan,
+  TEMPLATES,
+  templateFor,
+} from "./imports/templates/index.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,
@@ -196,6 +658,8 @@ export {
   isRouteAllowed,
   MODULE_REGISTRY,
   type ModuleDefinition,
+  NAVIGATION_GROUPS,
+  type NavigationGroup,
   type NavigationItem,
   type NavigationSection,
   navigationFor,
@@ -243,6 +707,12 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export {
+  ageInWords,
+  blockerDraft,
+  isBlockerRule,
+} from "./nudges/blocker-card.ts";
+export { deliverDueNudges, unreachableRecipients } from "./nudges/deliver.ts";
 export { isRecoveryAction } from "./operations/freeze.ts";
 export {
   type ActivityInput,
@@ -256,6 +726,15 @@ export {
   type ResolvedActor,
   runOperation,
 } from "./operations/operation.ts";
+export {
+  dispatchOutbox,
+  memberEmail,
+  OUTBOX_HANDLERS,
+  type OutboxDelivery,
+  type OutboxHandler,
+  type OutboxHandlerDeps,
+} from "./outbox/handlers.ts";
+export { PermanentDispatchError } from "./outbox/permanent.ts";
 export {
   type ErasureExport,
   isLastFullAccessHolder,
@@ -277,6 +756,12 @@ export {
   extractAttachments,
   extractMentionIds,
 } from "./rich-text/extract.ts";
+export {
+  asBlocks,
+  type FromHtmlOptions,
+  type ImageHandler,
+  richTextFromHtml,
+} from "./rich-text/from-html.ts";
 export {
   isBlankText,
   richTextFromPlainText,
@@ -335,7 +820,13 @@ export {
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
 export {
+  type SessionScoresRevealedEvent,
+  type SessionStageChangedEvent,
+  sessionChannel,
+} from "./sessions/live.ts";
+export {
   brandingSchema,
+  DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,
   findSetting,
   INSTANCE_DEFAULT_LANGUAGE,
@@ -369,12 +860,27 @@ export {
   type MailProbeOptions,
   mailProbe,
   notInThisBuild,
+  type StorageProbeOptions,
+  storageProbe,
 } from "./setup/probes.ts";
 export {
   readSetupState,
   type SetupState,
   setupRefusal,
 } from "./setup/state.ts";
+export {
+  type BoardChangedEvent,
+  boardChannel,
+} from "./tasks/live.ts";
+export {
+  assignTaskInTx,
+  createTaskInTx,
+  linkedWorkForKeyResults,
+  moveTaskInTx,
+  TASK_POSITION_SPACING,
+  unassignTaskInTx,
+} from "./tasks/service.ts";
+export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,
   type Membership,

@@ -16,6 +16,7 @@ import {
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { drafterFor } from "../../../lib/drafter";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
 
@@ -265,4 +266,52 @@ export async function toggleReaction(
           : "Failed to add reaction.",
     };
   }
+}
+
+/**
+ * The rewrite assist (P4-T06c).
+ *
+ * Reads and returns; it saves nothing, which is the whole point of an assist.
+ * `drafterFor` is shared with the admin run controls so a workspace resolves
+ * one provider, one model and one cap wherever an agent speaks.
+ *
+ * Null means no suggestion: the provider is off, the host has no rewrite
+ * capability, or the model produced nothing the schema accepted. The strip
+ * explains that state rather than showing an error.
+ */
+export async function rewriteKeyResultAction(
+  keyResultId: string,
+  ruleId: string,
+) {
+  const { session, workspace } = await requireWorkspace();
+  const drafter = await drafterFor(workspace.workspaceId);
+  return callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+      ...(drafter ? { drafter } : {}),
+    },
+    "goals.rewriteKeyResult",
+    { keyResultId, ruleId },
+  );
+}
+
+/**
+ * Applying a suggested rewrite (P4-T06c).
+ *
+ * A separate call from the suggestion on purpose: the assist reads, this
+ * writes, and nothing reaches the key result until a champion has seen the
+ * words and pressed the button. The write is the ordinary edit path, so
+ * P4-T02a re-evaluates the goal in the same transaction and the verdict on the
+ * screen updates itself. No second quality write exists here to disagree with.
+ */
+export async function applyRewrite(
+  goalId: string,
+  keyResultId: string,
+  title: string,
+): Promise<WriteState> {
+  return run(goalId, (context) =>
+    callAction(context, "goals.updateKeyResult", { id: keyResultId, title }),
+  );
 }

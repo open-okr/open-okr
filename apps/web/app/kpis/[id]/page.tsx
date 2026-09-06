@@ -1,6 +1,7 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
@@ -74,10 +75,23 @@ export default async function KpiDetailPage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
-  const detail = await callAction(context, "kpis.detail", {
-    kpiId: id,
-    periods: 24,
-  });
+
+  // A KPI somebody may not see is indistinguishable from one that does not
+  // exist (§8.1 layer 2), and both are a 404 rather than the root error
+  // boundary. Until the gap audit of 7 September 2026 this was the only detail
+  // route without the guard, so a mistyped id read "something went wrong".
+  let detail: Awaited<ReturnType<typeof callAction<"kpis.detail">>>;
+  try {
+    detail = await callAction(context, "kpis.detail", {
+      kpiId: id,
+      periods: 24,
+    });
+  } catch (error) {
+    if (error instanceof OperationError && error.code === "not_found") {
+      notFound();
+    }
+    throw error;
+  }
   const settings = await callAction(
     context,
     "settings.readWorkspaceSettings",
@@ -110,7 +124,7 @@ export default async function KpiDetailPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

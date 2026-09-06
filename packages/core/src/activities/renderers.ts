@@ -22,12 +22,30 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
+  "channel.templatesSynced": (p) =>
+    `Synced ${asString(p.recorded, "0")} WhatsApp templates, withdrawing ${asString(p.withdrawn, "0")}`,
+  "channel.templateMapped": (p) =>
+    `The "${asString(p.ruleKey, "unnamed")}" reminder was pointed at a WhatsApp template`,
+  "channel.templateUnmapped": (p) =>
+    `The "${asString(p.ruleKey, "unnamed")}" reminder no longer uses a WhatsApp template`,
+  "connection.revoked": () => "A connection to an external agent was ended",
+  "api_token.created": (p) =>
+    `An API token "${asString(p.name, "unnamed")}" was created for the ${asString(p.audience, "rest")} surface`,
+  "api_token.revoked": (p) =>
+    `The API token "${asString(p.name, "unnamed")}" was revoked`,
+  "device.approved": (p) =>
+    `${asString(p.clientName, "A terminal")} was authorised to sign in`,
+  "device.denied": (p) => `${asString(p.clientName, "A terminal")} was refused`,
   "member.updated": (p) => `${asString(p.name, "A member")} was updated`,
   "member.suspended": (p) => `${asString(p.name, "A member")} was suspended`,
   "member.restored": (p) => `${asString(p.name, "A member")} was restored`,
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
   "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,
+  "member.imported": (p) =>
+    p.matched === undefined
+      ? `${asString(p.name, "A member")} was imported`
+      : `${asString(p.name, "A member")} was already here and was matched to the import`,
   "invitation.link_created": () => "An invitation link was created",
   "invitation.link_revoked": () => "An invitation link was revoked",
   "invitation.accepted": () => "An invitation was accepted",
@@ -138,6 +156,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was published`,
+  // One line per run, not per nudge. A feed with an entry for every message
+  // the product sent would bury everything a person actually did.
+  "nudges.run": (p) =>
+    `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
+  "nudge.snoozed": (p) => `snoozed a nudge until ${asString(p.until, "later")}`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>
@@ -146,10 +169,56 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "goal.closed": (p) =>
     `The goal was closed as ${asString(p.successStatus, "closed")}, with a decision to ${asString(p.closeDecision, "keep")} it`,
   "goal.reopened": () => "The goal was reopened",
+  "goal.deleted": (p) => `Removed the goal "${p.title}"`,
   "goal.role_reassigned": (p) =>
     `The goal's ${asString(p.role, "role")} was reassigned`,
   "goal.moved_to_cycle": (p) =>
     `Goal "${asString(p.title, "a goal")}" was moved to another cycle`,
+  // Initiatives (P5-T10a). "Work" rather than "an initiative" where the title
+  // is missing, because a feed line has to read as a sentence either way.
+  "initiative.created": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was created`,
+  "initiative.updated": () => "An initiative was edited",
+  "initiative.deleted": (p) =>
+    `Initiative "${asString(p.title, "some work")}" was removed`,
+  "initiative.linked": () =>
+    "An initiative was recorded as work that will move a key result",
+  "initiative.unlinked": () =>
+    "An initiative is no longer recorded against a key result",
+  // Exports (P5-T13).
+  "export.taken": (p) =>
+    `${Number(p.rowCount ?? 0)} ${asString(p.list, "rows")} were exported`,
+  // Imports (P6-T01a).
+  "import.started": (p) =>
+    `An import from ${asString(p.source, "a file")} started${
+      p.mode === "dry_run" ? " as a dry run" : ""
+    }`,
+  "import.finished": (p) =>
+    p.status === "completed"
+      ? `An import wrote ${Number(p.rowsWritten ?? 0)} rows and skipped ${Number(
+          p.rowsSkipped ?? 0,
+        )}`
+      : "An import failed",
+  // Documents and attachments (P5-T12).
+  "document.drafted": (p) =>
+    `A document "${asString(p.title, "untitled")}" was started`,
+  "document.edited": () => "A document was edited",
+  "document.published": (p) =>
+    `Document "${asString(p.title, "untitled")}" was published as version ${Number(p.version ?? 1)}`,
+  "document.deleted": (p) =>
+    `Document "${asString(p.title, "untitled")}" was removed`,
+  "attachment.added": () => "A file was attached",
+  "attachment.removed": () => "A file was detached",
+  // Tasks (P5-T11).
+  "task.created": (p) => `Task "${asString(p.title, "a task")}" was created`,
+  "task.updated": () => "A task was edited",
+  "task.moved": (p) =>
+    `A task moved to ${asString(p.status, "another column")}`,
+  "task.assigned": () => "A task was assigned",
+  "task.unassigned": () => "An assignment was removed from a task",
+  "task.checklist_changed": (p) =>
+    `A checklist line was ${asString(p.change, "changed")}`,
+  "task.deleted": (p) => `Task "${asString(p.title, "a task")}" was removed`,
   "key_result.created": (p) =>
     `Key result "${asString(p.title, "a key result")}" was added`,
   "key_result.updated": () => "A key result was edited",
@@ -188,6 +257,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
     `An alignment finding was dismissed (${String(p.ruleKey ?? "no rule")})`,
+  "alignment.finding_applied": () =>
+    "A relink finding was applied and the goal was re-parented",
   "kpi.category_created": (p) =>
     `A KPI category "${String(p.name ?? "")}" was added`,
   "kpi.created": (p) =>
@@ -222,10 +293,89 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Edited a comment on a ${asString(p.subjectType, "subject")}`,
   "comment.deleted": (p) =>
     `Deleted a comment on a ${asString(p.subjectType, "subject")}`,
+  "comment.filesResolved": (p) =>
+    `Attached ${Number(p.attachments ?? 0)} file(s) an imported comment held inline`,
   "reaction.added": (p) =>
     `Reacted ${asString(p.emoji)} on a ${asString(p.subjectType, "subject")}`,
   "reaction.removed": (p) =>
     `Removed ${asString(p.emoji)} reaction from a ${asString(p.subjectType, "subject")}`,
+  // Sessions (P4-T07a)
+  "session.created": (p) =>
+    `Created a ${asString(p.kind)} session: ${asString(p.title)}`,
+  "session.opened": (p) => `Opened the ${asString(p.kind)} session`,
+  "session.stageAdvanced": (p) =>
+    `Advanced to the ${asString(p.to, "next")} stage`,
+  "session.skipped": (p) => `Skipped the ${asString(p.kind)} session`,
+  "session.closed": (p) => `Closed the ${asString(p.kind)} session`,
+  // Confidence round (P4-T07b)
+  "session.voteCast": () => "Cast a confidence vote",
+  "session.votesRevealed": (p) =>
+    `Revealed ${asString(p.count, "0")} votes on a key result`,
+  "session.confidenceConfirmed": (p) =>
+    `Confirmed confidence at ${asString(p.confidence)}`,
+  // Blockers (P4-T07c)
+  "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
+  "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
+  "session.blockerReassigned": (p) =>
+    `A ${asString(p.type, "blocker")} blocker was handed to ${asString(p.ownerName, "somebody else")}`,
+  // Commitments, digest, streaks (P4-T08)
+  "session.commitmentsSet": (p) =>
+    `Set ${asString(p.count, "0")} commitments for this week`,
+  "session.commitmentsClosed": (p) =>
+    `Closed ${asString(p.count, "0")} commitments from last week`,
+  "session.coordinatorNoteSet": () => "Added a coordinator note to the digest",
+  "session.trendRecorded": (p) =>
+    `Recorded the trend for this objective as ${asString(p.trend, "unknown")}`,
+  "session.shiftsRecorded": () =>
+    "Noted the resource or priority shifts for this review",
+  "session.decisionRecorded": () => "Recorded a decision in the monthly review",
+  "session.minuteAdded": (p) =>
+    `Gave the ${asString(p.stageKey, "current")} stage another minute`,
+  "session.stageNoteSet": (p) =>
+    `Made a private note on the ${asString(p.stageKey, "current")} stage`,
+  "session.pulseGiven": () => "Gave their pulse for the cycle",
+  "session.keyResultScored": () => "Graded a key result in the review",
+  "session.objectiveScoreRevealed": () =>
+    "Revealed this objective's score in the review",
+  "session.micPassed": () => "Passed the mic in the review",
+  "session.narrativeWritten": () => "Wrote this objective's review narrative",
+  "session.kudosGiven": () => "Named somebody's effort in the review",
+  "session.retroNoteAdded": () => "Added a note to the review retro",
+  "session.retroNoteRemoved": () => "Removed a note from the review retro",
+  "session.retroVoteCast": () => "Voted in the review retro",
+  "session.managementAnswerRecorded": () =>
+    "Recorded a management retro answer",
+  "session.rootCauseNamed": () => "Named a root cause in the review",
+  "session.processHealthSubmitted": () =>
+    "Answered the review's process-health survey",
+  "session.diagnosticRead": () => "Read the review's rhythm diagnostic",
+  "session.objectiveDecided": () => "Closed this objective in the review",
+  "session.learningCaptured": () => "Captured a learning in the review",
+  "session.nextCycleDrafted": () => "Drafted an objective for the next cycle",
+  "session.actionAgreed": () => "Agreed an action in the review",
+  "session.actionCompleted": () => "Updated a review action",
+  // Written because the map is exhaustive over the catalogue, and never read:
+  // both kinds are in PRIVATE_ACTIVITY_KINDS, so no feed reaches them. Left as
+  // real sentences rather than empty strings, in case a member's own history
+  // screen ever wants them (P4-T14a-a).
+  "copilot.asked": () => "Asked the copilot a question",
+  "copilot.answered": () => "The copilot answered",
+  "copilot.proposed": () => "The copilot proposed a change",
+  "copilot.proposalApplied": () => "Applied a copilot proposal",
+  "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
+  "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "channel.connected": (p) => `Connected ${p.provider}`,
+  "channel.disconnected": (p) => `Disconnected ${p.provider}`,
+  "channel.identity_linked": (p) => `Linked their ${p.provider} account`,
+  "channel.identity_unlinked": (p) => `Unlinked their ${p.provider} account`,
+  "channel.link_started": (p) => `Asked for a ${p.provider} linking code`,
+  // Named by what it is rather than by what it says. The body is not in the
+  // payload and this line is read by people who may be entitled to know a
+  // message went out without being entitled to read it.
+  "channel.message_queued": (p) =>
+    p.duplicate
+      ? `A ${p.provider} message was already queued`
+      : `Queued a ${p.provider} message`,
 };
 
 /** Renders any registered kind; a kind without one is a build-time bug, not a runtime one, since the catalogue is exhaustive. */

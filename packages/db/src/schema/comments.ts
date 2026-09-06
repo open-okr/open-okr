@@ -27,6 +27,9 @@ export const COMMENT_SUBJECT_TYPES = [
   "check_in",
   "cycle",
   "document",
+  // P6-T04b. §7.2 maps FlowyTeam's task comments onto this table, and a
+  // comment on a task resolves through the task's own access context.
+  "task",
 ] as const;
 export type CommentSubjectType = (typeof COMMENT_SUBJECT_TYPES)[number];
 
@@ -43,6 +46,10 @@ export const comments = pgTable("comments", {
   body: jsonb("body").notNull(),
   bodyVersion: integer("body_version").notNull().default(1),
   editedAt: timestamp("edited_at", { withTimezone: true }),
+  // P6-T04b. One level of threading, which is what the source that needed it
+  // has. Nothing renders a thread yet; the pointer is kept because an answer
+  // to a colleague is not the same as a remark after one.
+  parentId: uuid("parent_id"),
   legacyType: text("legacy_type"),
   legacyId: text("legacy_id"),
   createdAt: timestamp("created_at", { withTimezone: true })

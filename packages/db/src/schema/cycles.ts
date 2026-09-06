@@ -141,6 +141,9 @@ export const cycles = pgTable("cycles", {
     .default(["company", "department", "team"]),
   contributingUnits: text("contributing_units"),
   firstCycle: boolean("first_cycle").notNull().default(false),
+  /** Where this cycle came from, when an import made it (P6-T03a). */
+  legacyId: text("legacy_id"),
+  legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),
   settings: jsonb("settings")
     .$type<Record<string, unknown>>()
     .notNull()
@@ -184,6 +187,15 @@ export const rhythmSettings = pgTable("rhythm_settings", {
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
+  /**
+   * Workspace quiet mode (P4-T04b): everything silent except escalations and
+   * whatever a rule is explicitly exempted for.
+   *
+   * Here rather than in a table of its own, because it is one boolean about the
+   * workspace's rhythm and it is read on the same query that resolves the
+   * thresholds.
+   */
+  quietMode: boolean("quiet_mode").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

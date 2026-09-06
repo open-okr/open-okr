@@ -18,7 +18,16 @@ image:
 # How many application pods. Migrations run in a hook rather than on pod boot,
 # and the migration runner takes a Postgres advisory lock, so more than one is
 # safe from the first install.
-replicaCount: 2
+#
+# One by default, and that changed on 7 September 2026. It was two, with
+# persistence off, which is the one combination that loses data quietly: the
+# storage mount falls back to an emptyDir, so an uploaded file lands on
+# whichever pod served the request, is missing from the other, and is gone when
+# either restarts. Nobody sees an error. The gap audit recorded it as B-11.
+#
+# Scaling out is one flag once storage is shared: a ReadWriteMany class, or
+# S3-compatible object storage. See the storage section below.
+replicaCount: 1
 
 database:
   # Required. postgres:// or postgresql://, reachable from the cluster.
@@ -96,14 +105,54 @@ migrationResources:
   limits:
     memory: 512Mi
 
-# File storage for the local-disk driver. A single ReadWriteOnce volume cannot
-# be shared by several pods, so this is off by default and the chart refuses
-# the unsafe combination rather than corrupting uploads quietly.
+# File storage for the local-disk driver, which is the only storage driver
+# this build has.
+#
+# On by default since 7 September 2026. Off was the previous default and it
+# meant every upload went to an emptyDir: lost on restart, invisible to a
+# sibling pod, with nothing anywhere saying so. A volume that keeps files is
+# the only defensible shipped default for a driver that writes to disk.
+#
+# A ReadWriteOnce volume cannot be shared across nodes, so it pins the release
+# to one replica and the chart refuses the combination rather than corrupting
+# uploads quietly. To scale out, give it a ReadWriteMany storage class.
+#
+# Turning this off is a real choice for an instance that accepts no uploads or
+# treats them as disposable. It is not refused, and NOTES.txt says plainly what
+# it costs.
 persistence:
-  enabled: false
+  enabled: true
   size: 10Gi
   storageClass: ""
   accessMode: ReadWriteOnce
+
+# S3-compatible object storage (P6-G05). The way to run several replicas
+# without a ReadWriteMany class: object storage is shared by definition.
+#
+# Naming a bucket is the whole switch. Leave it empty and the local-disk volume
+# above is used, which is the default and all a self-hosted install needs.
+# Works with AWS S3, MinIO, Ceph, Garage, Cloudflare R2, Backblaze B2 and
+# DigitalOcean Spaces: set `endpoint` for anything that is not AWS.
+storage:
+  s3:
+    bucket: ""
+    # Required by the AWS SDK even for services that ignore it.
+    region: "us-east-1"
+    # A compatible service's own endpoint. Empty means AWS S3 itself.
+    endpoint: ""
+    # Path-style addressing, "on" or "off". Empty lets the driver decide: on
+    # when an endpoint is set, off for AWS. Almost every compatible service
+    # wants it on, and a virtual-host request to one resolves to a hostname
+    # that does not exist.
+    forcePathStyle: ""
+    # Prefix every object key, so one bucket can hold several instances.
+    keyPrefix: ""
+    # A Secret holding the credentials. Required when a bucket is named:
+    # putting a key in values would store it in the release, where anyone with
+    # `helm get values` can read it. Same rule as database.existingSecret.
+    existingSecret: ""
+    accessKeyIdKey: "access-key-id"
+    secretAccessKeyKey: "secret-access-key"
 
 serviceAccount:
   create: true

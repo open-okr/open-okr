@@ -91,6 +91,15 @@ export {
   type ModelTier,
 } from "./schema/ai-models.ts";
 export {
+  AI_MESSAGE_ROLES,
+  type AiCitation,
+  type AiMessage,
+  type AiMessageRole,
+  type AiThread,
+  aiMessages,
+  aiThreads,
+} from "./schema/ai-threads.ts";
+export {
   type AIBudget,
   type AIUsageEvent,
   aiBudgets,
@@ -124,6 +133,14 @@ export {
   keyResultDependencies,
 } from "./schema/alignment.ts";
 export {
+  type ApiToken,
+  apiTokens,
+  TOKEN_AUDIENCES,
+  TOKEN_SCOPES,
+  type TokenAudience,
+  type TokenScope,
+} from "./schema/api-tokens.ts";
+export {
   type Activity,
   type ActorKind,
   type AuditEvent,
@@ -140,6 +157,31 @@ export {
   verifications,
 } from "./schema/auth.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
+export {
+  BLOCKER_SOURCES,
+  BLOCKER_TYPES,
+  type Blocker,
+  type BlockerSource,
+  type BlockerType,
+  blockers,
+} from "./schema/blockers.ts";
+export {
+  CHANNEL_CONNECTION_PROVIDERS,
+  CHANNEL_MESSAGE_PROVIDERS,
+  type ChannelConnection,
+  type ChannelConnectionProvider,
+  type ChannelConversation,
+  type ChannelIdentity,
+  type ChannelInstallation,
+  type ChannelLinkCode,
+  type ChannelMessage,
+  channelConnections,
+  channelConversations,
+  channelIdentities,
+  channelInstallations,
+  channelLinkCodes,
+  channelMessages,
+} from "./schema/channels.ts";
 export {
   CHECK_IN_STATES,
   CHECK_IN_STATUSES,
@@ -161,6 +203,10 @@ export {
   type Reaction,
   reactions,
 } from "./schema/comments.ts";
+export {
+  type Commitment,
+  commitments,
+} from "./schema/commitments.ts";
 export {
   type CycleBaselineHealth,
   type CycleCalibration,
@@ -205,11 +251,52 @@ export {
   rhythmSettings,
 } from "./schema/cycles.ts";
 export {
+  type Decision,
+  decisions,
+  OBJECTIVE_TRENDS,
+  type ObjectiveTrend,
+  type ObjectiveTrendRow,
+  objectiveTrends,
+} from "./schema/decisions.ts";
+export {
+  type DeviceAuthorisation,
+  deviceAuthorisations,
+} from "./schema/device-authorisations.ts";
+export {
+  DIGEST_PERIODS,
+  DIGEST_SCOPES,
+  type Digest,
+  type DigestBody,
+  type DigestPeriod,
+  type DigestScope,
+  digests,
+} from "./schema/digests.ts";
+export {
+  ATTACHMENT_SUBJECT_TYPES,
+  type Attachment,
+  type AttachmentSubjectType,
+  attachments,
+  DOCUMENT_STATES,
+  DOCUMENT_SUBJECT_TYPES,
+  type Document,
+  type DocumentState,
+  type DocumentSubjectType,
+  type DocumentVersion,
+  documents,
+  documentVersions,
+} from "./schema/documents.ts";
+export {
   EMBEDDABLE_ENTITY_TYPES,
   type EmbeddableEntityType,
   type Embedding,
   embeddings,
 } from "./schema/embeddings.ts";
+export {
+  type ExportFormat,
+  type ExportRun,
+  type ExportRunState,
+  exportRuns,
+} from "./schema/exports.ts";
 export {
   CAPACITY_VERDICTS,
   type CapacityVerdict,
@@ -237,6 +324,21 @@ export {
   VALUE_SOURCES,
   type ValueSource,
 } from "./schema/goals.ts";
+export {
+  type ImportRun,
+  type ImportRunMode,
+  type ImportRunSource,
+  type ImportRunStatus,
+  importRuns,
+} from "./schema/imports.ts";
+export {
+  INITIATIVE_STATUSES,
+  type Initiative,
+  type InitiativeKeyResult,
+  type InitiativeStatus,
+  initiativeKeyResults,
+  initiatives,
+} from "./schema/initiatives.ts";
 export {
   type InstanceAuditEvent,
   instanceAuditEvents,
@@ -274,6 +376,8 @@ export {
   kpis,
   kpiTrees,
 } from "./schema/kpis.ts";
+export { type Kudo, kudos } from "./schema/kudos.ts";
+export { type McpSession, mcpSessions } from "./schema/mcp.ts";
 export {
   NOTIFICATION_REASONS,
   type Notification,
@@ -291,7 +395,70 @@ export {
   subscriptionLists,
   subscriptions,
 } from "./schema/notifications.ts";
+export { type NudgeRule, nudgeRules } from "./schema/nudge-rules.ts";
+export {
+  NUDGE_KINDS,
+  NUDGE_SUBJECT_TYPES,
+  NUDGE_SUPPRESSION_REASONS,
+  type Nudge,
+  type NudgeKind,
+  type NudgeSubjectType,
+  type NudgeSuppressionReason,
+  nudges,
+} from "./schema/nudges.ts";
+export {
+  OAUTH_CLIENT_SOURCES,
+  type OAuthAccessToken,
+  type OAuthClient,
+  type OAuthCode,
+  type OAuthGrant,
+  type OAuthRefreshToken,
+  oauthAccessTokens,
+  oauthClients,
+  oauthCodes,
+  oauthGrants,
+  oauthRefreshTokens,
+} from "./schema/oauth.ts";
 export { outbox } from "./schema/outbox.ts";
+export {
+  type ManagementAnswer,
+  managementAnswers,
+  RETRO_COLUMNS,
+  type RetroColumn,
+  type RetroNote,
+  type RetroVote,
+  retroNotes,
+  retroVotes,
+} from "./schema/retros.ts";
+export {
+  type ProcessHealthResponse,
+  processHealthResponses,
+  type RootCause,
+  rootCauses,
+} from "./schema/review-diagnosis.ts";
+export {
+  LEARNING_SOURCES,
+  type Learning,
+  type LearningSource,
+  learnings,
+  type NextCycleDraft,
+  nextCycleDrafts,
+  type ReviewAction,
+  reviewActions,
+} from "./schema/review-forward.ts";
+export {
+  type ReviewNarrative,
+  reviewNarratives,
+} from "./schema/review-narratives.ts";
+export {
+  DIAGNOSIS_VERDICTS,
+  type DiagnosisVerdict,
+  type ReviewDecision,
+  type ReviewDiagnostic,
+  reviewDecisions,
+  reviewDiagnostics,
+} from "./schema/review-reset.ts";
+export { type ReviewScore, reviewScores } from "./schema/review-scores.ts";
 export {
   type PerformanceSnapshotRow,
   PORTFOLIO_VERDICTS,
@@ -305,6 +472,26 @@ export {
   scoreEntries,
 } from "./schema/scorecard.ts";
 export {
+  type SearchDocumentRow,
+  searchDocuments,
+} from "./schema/search.ts";
+export {
+  type SessionConfidence,
+  sessionConfidences,
+} from "./schema/session-confidences.ts";
+export {
+  type SessionParticipant,
+  sessionParticipants,
+} from "./schema/session-participants.ts";
+export {
+  SESSION_KINDS,
+  SESSION_STATES,
+  type Session,
+  type SessionKind,
+  type SessionState,
+  sessions as okrSessions,
+} from "./schema/sessions.ts";
+export {
   SPACE_ROLES,
   type Space,
   type SpaceMember,
@@ -313,7 +500,30 @@ export {
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";
+export {
+  type Streak,
+  streaks,
+} from "./schema/streaks.ts";
 export { systemSettings } from "./schema/system-settings.ts";
+export {
+  type ChecklistItem,
+  checklistItems,
+  TASK_STATUSES,
+  type Task,
+  type TaskAssignee,
+  type TaskOrderingState,
+  type TaskStatus,
+  taskAssignees,
+  tasks,
+} from "./schema/tasks.ts";
+export {
+  type WhatsAppTemplateMapping,
+  whatsappTemplateMappings,
+} from "./schema/whatsapp-mappings.ts";
+export {
+  type WhatsAppTemplate,
+  whatsappTemplates,
+} from "./schema/whatsapp-templates.ts";
 export {
   type QuietHours,
   type Workspace,
@@ -340,8 +550,12 @@ export {
   USER_SETTING,
   WORKSPACE_SETTING,
   type WorkspaceTx,
+  withApiToken,
   withContext,
+  withDeviceCode,
   withInstanceAdmin,
+  withOAuthSecret,
+  withProviderTeam,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

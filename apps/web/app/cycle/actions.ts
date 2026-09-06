@@ -154,5 +154,82 @@ export async function publishCycle(
   formData: FormData,
 ): Promise<WriteState> {
   const cycleId = String(formData.get("cycleId") ?? "");
-  return run((context) => callAction(context, "workflow.publish", { cycleId }));
+  // The override arrives only from the form that asks for a reason. Absent
+  // means a plain publish, and the action refuses a red gate on its own; this
+  // never decides whether the gates are met.
+  const reason = String(formData.get("override.reason") ?? "").trim();
+  return run((context) =>
+    callAction(context, "workflow.publish", {
+      cycleId,
+      ...(reason === "" ? {} : { override: { reason } }),
+    }),
+  );
+}
+
+/**
+ * The §5.4 dependency register (P6-G17).
+ *
+ * Publish gate 4 is "every dependency is confirmed, or logged with a named risk
+ * owner", and until now no control anywhere could do either: all four writes
+ * were registered actions with no caller, and the gate's own remediation link
+ * pointed at the page it was already on. A cycle carrying one dependency could
+ * not be published from the browser at all.
+ */
+export async function addDependency(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const keyResultId = String(formData.get("keyResultId") ?? "");
+  const providerSpaceId = String(formData.get("providerSpaceId") ?? "");
+  const providerText = String(formData.get("providerText") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  // The action refuses a register entry with no provider, and says why. The
+  // form asks for one of the two rather than both, so this passes on whichever
+  // was filled and lets the action be the one place that decides.
+  return run((context) =>
+    callAction(context, "goals.addKeyResultDependency", {
+      keyResultId,
+      ...(providerSpaceId ? { providerSpaceId } : {}),
+      ...(providerText ? { providerText } : {}),
+      ...(note ? { note } : {}),
+    }),
+  );
+}
+
+export async function confirmDependency(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  return run((context) =>
+    callAction(context, "goals.confirmDependency", { id }),
+  );
+}
+
+export async function setDependencyRiskOwner(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  // An empty choice means "nobody", which is a real answer: naming a risk owner and
+  // then taking the name away is how a register entry goes back to needing a
+  // confirmation.
+  return run((context) =>
+    callAction(context, "goals.setDependencyRiskOwner", {
+      id,
+      memberId: memberId === "" ? null : memberId,
+    }),
+  );
+}
+
+export async function removeDependency(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  return run((context) =>
+    callAction(context, "goals.removeKeyResultDependency", { id }),
+  );
 }

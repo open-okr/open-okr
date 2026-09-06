@@ -28,6 +28,43 @@ export const testDbEnv = {
   appRole: "openokr_app",
 } as const;
 
+/**
+ * The FlowyTeam source the importer's connector tests read (P6-T02).
+ *
+ * **A second server, and test-only like the first.** The product needs Postgres
+ * and nothing else; MySQL is here because the one source system this importer
+ * reads runs on it, and the acceptance criterion is that the connector
+ * provably cannot write to a real one. A fake connection cannot prove that: it
+ * would be this repository asserting its own belief about what MySQL does with
+ * `SET SESSION TRANSACTION READ ONLY`.
+ *
+ * `TEST_MYSQL_PORT` points the suite at a MySQL you already run, exactly as
+ * `TEST_DB_PORT` does for Postgres. The connector's tests skip themselves with
+ * a sentence when nothing answers, so a checkout without the stack still runs
+ * every other suite.
+ */
+export const testMysqlEnv = {
+  host: env("TEST_MYSQL_HOST", "localhost"),
+  port: Number(env("TEST_MYSQL_PORT", "53306")),
+  user: env("TEST_MYSQL_USER", "root"),
+  /**
+   * Read directly rather than through `env`, because an empty password is a
+   * real answer here and `env` treats empty as unset. A locally installed MySQL
+   * very often has a root account with no password at all, and
+   * `TEST_MYSQL_PASSWORD=` is how somebody says so.
+   */
+  password: process.env.TEST_MYSQL_PASSWORD ?? "mysql",
+} as const;
+
+/** A `mysql://` address for a database on the test MySQL. */
+export const mysqlUrl = (database: string): string => {
+  const auth =
+    testMysqlEnv.password === ""
+      ? encodeURIComponent(testMysqlEnv.user)
+      : `${encodeURIComponent(testMysqlEnv.user)}:${encodeURIComponent(testMysqlEnv.password)}`;
+  return `mysql://${auth}@${testMysqlEnv.host}:${testMysqlEnv.port}/${database}`;
+};
+
 export const connectionOptions = (
   database: string,
   user: string,

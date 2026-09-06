@@ -7,6 +7,10 @@
     "better-icons": {
       "command": "npx",
       "args": ["-y", "better-icons@latest"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }

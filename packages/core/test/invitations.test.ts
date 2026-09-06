@@ -311,4 +311,125 @@ describe("only a member with full access may invite", () => {
       ),
     ).rejects.toMatchObject({ code: "forbidden" });
   });
+
+  it("refuses to list them either, because the list names addresses", async () => {
+    // Added at P6-G06a. Reading who has been invited is reading email
+    // addresses and who invited them, which is the same fact the create path
+    // guards, so it takes the same level.
+    const wb = await workerDb();
+    await createUser("low-reader", "reader@example.com", "Low Reader");
+    const link = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      {},
+    );
+    await callAction(
+      { pool: wb.appPool, ...actingAs("low-reader") },
+      "invitations.acceptLink",
+      { token: link.token },
+    );
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...actingAs("low-reader") },
+        "invitations.list",
+        {},
+      ),
+    ).rejects.toMatchObject({ code: "forbidden" });
+  });
+});
+
+/**
+ * Listing what has been issued (P6-G06a).
+ *
+ * P2-T04 built five write actions and no read, so an administrator could issue
+ * an invitation and then had no way to see it. `revokeLink` takes an id, which
+ * made revoke unreachable in practice as well as in the interface.
+ */
+describe("listing invitations", () => {
+  it("returns nothing on a workspace that has issued nothing", async () => {
+    const wb = await workerDb();
+    const links = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.list",
+      {},
+    );
+    expect(links).toEqual([]);
+  });
+
+  it("never returns a token, because the table holds only its digest", async () => {
+    // The whole reason a leaked list of invitations is harmless. A read that
+    // could hand back a working token would undo that, and no screen needs one.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      { maxUses: 5 },
+    );
+    const links = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.list",
+      {},
+    );
+    expect(links).toHaveLength(1);
+    expect(JSON.stringify(links)).not.toContain("token");
+  });
+
+  it("carries what the screen needs to say what a link is doing", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createPersonalLink",
+      { email: "Newcomer@Example.com", expiresInDays: 7 },
+    );
+    const [link] = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.list",
+      {},
+    );
+    expect(link?.mode).toBe("personal");
+    expect(link?.email).toBe("newcomer@example.com");
+    expect(link?.maxUses).toBe(1);
+    expect(link?.useCount).toBe(0);
+    expect(link?.expiresAt).not.toBeNull();
+    expect(link?.revokedAt).toBeNull();
+  });
+
+  it("keeps a revoked link in the list", async () => {
+    // "Did I already invite this person" is a question about history. A list
+    // that hid the answer would send an administrator to issue a second link.
+    const wb = await workerDb();
+    const created = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      {},
+    );
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.revokeLink",
+      { linkId: created.id },
+    );
+    const [link] = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.list",
+      {},
+    );
+    expect(link?.id).toBe(created.id);
+    expect(link?.revokedAt).not.toBeNull();
+  });
+
+  it("carries the allowed domains a workspace link was bounded with", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      { allowedDomains: ["example.com"] },
+    );
+    const [link] = await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.list",
+      {},
+    );
+    expect(link?.allowedDomains).toEqual(["example.com"]);
+  });
 });

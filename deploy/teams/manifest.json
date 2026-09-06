@@ -1,0 +1,50 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "REPLACE_WITH_YOUR_APPLICATION_ID",
+  "developer": {
+    "name": "Your organisation",
+    "websiteUrl": "https://REPLACE_WITH_YOUR_INSTANCE",
+    "privacyUrl": "https://REPLACE_WITH_YOUR_INSTANCE/privacy",
+    "termsOfUseUrl": "https://REPLACE_WITH_YOUR_INSTANCE/terms"
+  },
+  "name": {
+    "short": "OpenOKR",
+    "full": "OpenOKR"
+  },
+  "description": {
+    "short": "Check in, raise blockers and answer nudges without leaving Teams.",
+    "full": "OpenOKR runs the OKR practice. This app lets a member check in on a goal, raise a blocker during a session, and act on the reminders the Coach and the Champion send, all from Teams. Every command is the same one the browser offers and is checked the same way."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#2B5CE6",
+  "bots": [
+    {
+      "botId": "REPLACE_WITH_YOUR_APPLICATION_ID",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            { "title": "help", "description": "What OpenOKR can do here" },
+            { "title": "checkin", "description": "Check in on a goal you champion" },
+            { "title": "status", "description": "The health and progress of one goal" },
+            { "title": "blocker", "description": "Raise a blocker in the running session" },
+            { "title": "commit", "description": "Add a commitment to the running session" },
+            { "title": "ask", "description": "Ask a question about this workspace" },
+            { "title": "ack", "description": "Acknowledge a check-in you review" },
+            { "title": "snooze", "description": "Stop being messaged about one thing" }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["REPLACE_WITH_YOUR_INSTANCE"]
+}

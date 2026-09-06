@@ -62,6 +62,115 @@ else
   fail "allowed several replicas to share a ReadWriteOnce volume"
 fi
 
+# Rendered once with nothing overridden. Several checks below read it, and
+# reading the manifest rather than values.yaml is the point: a template that
+# ignored a value would still fail here.
+defaults=$(render)
+
+# --- S3-compatible object storage (P6-G05) --------------------------------
+if render --set storage.s3.bucket=openokr-files 2>&1 \
+  | grep -q "storage.s3.existingSecret is empty"; then
+  pass "refuses a bucket with no credential Secret"
+else
+  fail "accepted a bucket with credentials that could only come from values"
+fi
+
+if render --set storage.s3.forcePathStyle=yes 2>&1 \
+  | grep -q "must be"; then
+  pass "refuses a forcePathStyle that is not on or off"
+else
+  fail "accepted an unrecognised forcePathStyle"
+fi
+
+s3=$(render --set storage.s3.bucket=openokr-files \
+  --set storage.s3.existingSecret=openokr-s3 \
+  --set storage.s3.endpoint=http://minio:9000 \
+  --set replicaCount=3)
+
+if printf '%s' "$s3" | grep -q "OPENOKR_STORAGE_S3_BUCKET"; then
+  pass "a named bucket reaches the pod"
+else
+  fail "a named bucket never reached the pod"
+fi
+
+if printf '%s' "$s3" | grep -q "OPENOKR_STORAGE_S3_ACCESS_KEY_ID"; then
+  if printf '%s' "$s3" | grep -A 3 "OPENOKR_STORAGE_S3_ACCESS_KEY_ID" \
+    | grep -q "secretKeyRef"; then
+    pass "S3 credentials come from a Secret, not from the pod spec"
+  else
+    fail "an S3 credential is in the pod spec"
+  fi
+else
+  fail "no S3 credentials reached the pod"
+fi
+
+# Object storage is shared by definition, so the replica count stops mattering.
+# Rendering above with replicaCount=3 and the default ReadWriteOnce mode is the
+# assertion: it would have been refused without a bucket.
+if printf '%s' "$s3" | grep -q "replicas: 3"; then
+  pass "object storage lifts the single-replica limit"
+else
+  fail "a bucket did not lift the single-replica limit"
+fi
+
+# --- the storage root the application actually reads ----------------------
+# The chart set OPENOKR_STORAGE_DIR from P1-T10 until P6-G05 and nothing has
+# ever read it: the schema declares OPENOKR_STORAGE_ROOT. It happened to work,
+# because ROOT defaults to a relative path and the image runs from /app.
+if printf '%s' "$defaults" | grep -q "OPENOKR_STORAGE_ROOT"; then
+  pass "sets the storage root variable the application reads"
+else
+  fail "sets a storage variable the application does not read"
+fi
+
+if printf '%s' "$defaults" | grep -q "OPENOKR_STORAGE_DIR"; then
+  fail "still sets OPENOKR_STORAGE_DIR, which nothing reads"
+else
+  pass "no longer sets a variable nothing reads"
+fi
+
+# --- the shipped defaults keep files --------------------------------------
+# The combination the previous defaults produced, two replicas with persistence
+# off, is the one that loses uploads silently (GAP-AUDIT B-11).
+if printf '%s' "$defaults" | grep -q "persistentVolumeClaim"; then
+  pass "the default install mounts a volume for uploads"
+else
+  fail "the default install sends uploads to an emptyDir"
+fi
+
+if printf '%s' "$defaults" | grep -A 3 "name: storage" | grep -q "emptyDir"; then
+  fail "storage is an emptyDir with the shipped values"
+else
+  pass "storage is not an emptyDir with the shipped values"
+fi
+
+if [ "$(printf '%s' "$defaults" | grep -c '^  replicas: 1$')" -ge 1 ]; then
+  pass "the default install is one replica, which ReadWriteOnce requires"
+else
+  fail "the default replica count does not match the default storage mode"
+fi
+
+# --- turning it off is allowed, and says what it costs --------------------
+if render --set persistence.enabled=false --set replicaCount=3 >/dev/null 2>&1; then
+  pass "several replicas with no shared storage is allowed, not refused"
+else
+  fail "refused a configuration an upgrade could already be running"
+fi
+
+if helm template openokr . --set "database.url=$DB" \
+  --set persistence.enabled=false --show-only templates/NOTES.txt 2>/dev/null \
+  | grep -q "WARNING: persistence is off"; then
+  pass "warns when uploads are going to an emptyDir"
+else
+  # NOTES.txt is not a template helm can --show-only, on some versions. Fall
+  # back to reading the file itself, which is what the warning lives in.
+  if grep -q "WARNING: persistence is off" templates/NOTES.txt; then
+    pass "warns when uploads are going to an emptyDir"
+  else
+    fail "says nothing when uploads are going to an emptyDir"
+  fi
+fi
+
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
   pass "refuses the smtp transport with no host"
 else

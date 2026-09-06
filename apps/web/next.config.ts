@@ -31,6 +31,21 @@ const nextConfig: NextConfig = {
     "@openokr/method",
     "@openokr/ui",
   ],
+  experimental: {
+    serverActions: {
+      /**
+       * The import wizard posts a spreadsheet, and then posts the table it
+       * became back for the preview and again for the run (P6-T01b-b).
+       *
+       * Next's default is 1 MB, which a workspace that raises
+       * `importRowLimit` above the default thousand rows would hit as an
+       * unexplained failure rather than as the wizard's own refusal naming the
+       * bound. The row limit is the control; this only has to be comfortably
+       * above what that limit can produce.
+       */
+      bodySizeLimit: "8mb",
+    },
+  },
   // Next's own dev-only overlay (route/bundler info, preferences), never
   // shipped to production. Off by explicit request: its own UI is not
   // OpenOKR's design system and is not this codebase's to fix.

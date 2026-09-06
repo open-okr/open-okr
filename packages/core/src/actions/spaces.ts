@@ -32,6 +32,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { accessScopeFilter, getAccessScoped } from "../access/reads.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { resolveCoordinator, wouldStrandSpace } from "../spaces/roles.ts";
 import {
@@ -339,6 +341,15 @@ export const createSpace = defineWriteAction({
     name: z.string().trim().min(1).max(80),
     mission: z.string().trim().max(280).optional(),
     managerMemberId: z.uuid().optional(),
+    /**
+     * The source system's identifier for this space, when an import made it
+     * (P6-T03a).
+     *
+     * Set only by the importer. A second create carrying a key something
+     * already holds is refused rather than quietly turned into an update: the
+     * importer looks the key up first and updates the row it finds instead.
+     */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid(), name: z.string() }),
   // Creating org structure is a workspace-admin act. Nothing in §4.2 says an
@@ -347,12 +358,25 @@ export const createSpace = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      await assertLegacyKeyFree(tx, workspaceId, spaces, input.legacy, "space");
+
       const created = await createSpaceInTx(tx, {
         workspaceId,
         name: input.name,
         mission: input.mission ?? null,
         managerMemberId: input.managerMemberId ?? actor.memberId ?? undefined,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
+
+      // An import can finish writing into the space it just created. The
+      // reasoning is in `packages/core/src/imports/binding.ts`.
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? actor.memberId : null,
+        contextId: created.contextId,
+        alreadyBound: input.managerMemberId ?? actor.memberId,
+      });
+
       return {
         result: { id: created.id, name: created.name },
         activity: {

@@ -88,8 +88,48 @@ spec:
                   key: {{ .Values.mail.existingSecretKey }}
             {{- end }}
             {{- end }}
-            - name: OPENOKR_STORAGE_DIR
+            # OPENOKR_STORAGE_ROOT, not OPENOKR_STORAGE_DIR. The chart set the
+            # second name from P1-T10 until P6-G05 and nothing in the product
+            # has ever read it: the schema declares ROOT. It happened to work,
+            # because ROOT defaults to the relative path `storage` and the image
+            # runs from /app, so it resolved to the mount by coincidence. A
+            # variable nobody reads plus a coincidence is not a configuration.
+            - name: OPENOKR_STORAGE_ROOT
               value: /app/storage
+            {{- if .Values.storage.s3.bucket }}
+            # Naming a bucket switches the driver (P6-G05). The local-disk
+            # volume above stays mounted and unused, which costs nothing and
+            # means turning S3 off again does not need a new claim.
+            - name: OPENOKR_STORAGE_S3_BUCKET
+              value: {{ .Values.storage.s3.bucket | quote }}
+            - name: OPENOKR_STORAGE_S3_REGION
+              value: {{ .Values.storage.s3.region | quote }}
+            {{- with .Values.storage.s3.endpoint }}
+            - name: OPENOKR_STORAGE_S3_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.storage.s3.keyPrefix }}
+            - name: OPENOKR_STORAGE_S3_KEY_PREFIX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.storage.s3.forcePathStyle }}
+            - name: OPENOKR_STORAGE_S3_FORCE_PATH_STYLE
+              value: {{ .Values.storage.s3.forcePathStyle | quote }}
+            {{- end }}
+            # Credentials come from a Secret and never from values, so they do
+            # not land in the release's stored values where `helm get values`
+            # would read them back. Same rule as database.existingSecret.
+            - name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.existingSecret }}
+                  key: {{ .Values.storage.s3.accessKeyIdKey }}
+            - name: OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.existingSecret }}
+                  key: {{ .Values.storage.s3.secretAccessKeyKey }}
+            {{- end }}
           # Ready means the database answers, not merely that the port is open.
           # A pod that is listening but cannot reach Postgres must not receive
           # traffic during a rollout.

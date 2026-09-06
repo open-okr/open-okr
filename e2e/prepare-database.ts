@@ -72,8 +72,14 @@ export async function prepareDatabase(): Promise<void> {
     // the previous run's database alive and the next run would inherit its
     // registered user.
     await admin.query(`drop database if exists ${E2E_DATABASE} with (force)`);
+    // Explicit UTF8, the same as the unit-test template. A bare `create
+    // database` inherits the cluster's encoding, which the Windows installer
+    // sets to WIN1252, and the first migration carrying a character it cannot
+    // represent then refuses. `template0` holds no locale-specific data, so it
+    // accepts an encoding different from its own.
     await admin.query(
-      `create database ${E2E_DATABASE} owner ${testDbEnv.ownerRole}`,
+      `create database ${E2E_DATABASE} owner ${testDbEnv.ownerRole} ` +
+        `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
     );
   } finally {
     await admin.end();

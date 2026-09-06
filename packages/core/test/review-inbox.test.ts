@@ -429,17 +429,14 @@ describe("the whole inbox", () => {
     expect(owed.counts.actionable).toBe(0);
   });
 
-  it("declares the sources later phases fill, rather than hiding them", async () => {
+  it("has no source left to declare, and still declares the ones it has", async () => {
     const owed = await inbox(CHAMPION);
-    // Blockers, commitments, sessions and agent proposals are P3-T09, P4-T04,
-    // P4-T07 and P4-T05. They must be named and empty, not absent, so the screen
-    // cannot silently claim to cover everything S-02 lists.
-    expect(owed.pending.map((source) => source.kind).sort()).toEqual([
-      "blocker",
-      "commitment",
-      "proposal",
-      "session",
-    ]);
+    // Empty since P6-G02. It held blockers, commitments, sessions and agent
+    // proposals, naming P3-T09, P4-T07, P4-T04 and P4-T05, and all four of
+    // those tasks had been done for weeks by the time the gap audit read the
+    // file. The mechanism stays: a source that arrives ahead of its reader
+    // declares itself here rather than being invisible.
+    expect(owed.pending).toEqual([]);
     for (const source of owed.pending) {
       expect(source.task.length).toBeGreaterThan(0);
     }

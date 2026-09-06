@@ -23,6 +23,7 @@ export {
   defaultTierModelsFor,
 } from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
+export { McpAgentServer } from "./drivers/agent/mcp.ts";
 // The mock driver is exported by name, the same way the socket server is:
 // infrastructure another package's own test suite constructs directly,
 // not something resolved through createAIProvider.
@@ -35,13 +36,100 @@ export type {
   ModelTier,
   TierModelMap,
 } from "./drivers/ai/tier-map.ts";
+export { PostgresCache } from "./drivers/cache/postgres.ts";
+export {
+  type AddressLookup,
+  EmailChannel,
+  type EmailChannelOptions,
+  renderEmailBody,
+} from "./drivers/channel/email.ts";
+export {
+  checkInView,
+  parseViewSubmission,
+  SlackChannel,
+  type SlackChannelOptions,
+  SlackPermanentError,
+  slackDeliveryId,
+  toBlocks,
+} from "./drivers/channel/slack.ts";
+export {
+  decodeToken,
+  stripMentions,
+  TeamsChannel,
+  type TeamsChannelOptions,
+  TeamsPermanentError,
+  teamsDeliveryId,
+  teamsServiceUrl,
+  teamsTenantId,
+  toActivity,
+  toAdaptiveCard,
+} from "./drivers/channel/teams.ts";
+export {
+  TelegramChannel,
+  type TelegramChannelOptions,
+  TelegramPermanentError,
+  telegramDeliveryId,
+  toInlineKeyboard,
+} from "./drivers/channel/telegram.ts";
+export {
+  countVariables,
+  type MetaTemplate,
+  templateBody,
+  verifySubscription,
+  WhatsAppChannel,
+  type WhatsAppChannelOptions,
+  WhatsAppPermanentError,
+  whatsAppBusinessAccountId,
+  whatsAppDeliveryId,
+  whatsAppPhoneNumberId,
+} from "./drivers/channel/whatsapp.ts";
+// Exported for the scheduler host (P6-G01a), which needs a queue on its own
+// rather than the whole adapter set `createAdapters` builds. Same shape as the
+// channel drivers above: the host constructs the driver, the port is what
+// everything else sees.
+export {
+  PgBossJobQueue,
+  type PgBossJobQueueOptions,
+} from "./drivers/jobs/pg-boss.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
+export {
+  PostgresRealtime,
+  type PostgresRealtimeOptions,
+} from "./drivers/realtime/postgres.ts";
 export {
   RealtimeSocketServer,
   type RealtimeSocketServerOptions,
   type SocketPrincipal,
 } from "./drivers/realtime/socket-server.ts";
+export {
+  LocalDiskStorage,
+  type LocalDiskStorageOptions,
+} from "./drivers/storage/local-disk.ts";
+export {
+  refuseUnsafeKey,
+  S3Storage,
+  type S3StorageOptions,
+} from "./drivers/storage/s3.ts";
+export {
+  type CheckedUrl,
+  checkUrl,
+  isBlockedAddress,
+  type OutboundOptions,
+  type OutboundRefusal,
+  type OutboundResult,
+  outboundFetch,
+} from "./outbound/guard.ts";
+export type {
+  AgentDispatch,
+  AgentPrompt,
+  AgentResource,
+  AgentResourceReader,
+  AgentServerConfig,
+  AgentServerPort,
+  AgentTool,
+  AgentToolResult,
+} from "./ports/agent.ts";
 export type {
   AIProvider,
   ChatMessage,
@@ -67,6 +155,7 @@ export type {
   DeliveryResult,
   InboundMessage,
   InboundRequest,
+  InboundSubmission,
 } from "./ports/channel.ts";
 export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
 export type {
@@ -94,6 +183,7 @@ export {
   type OutboxRecord,
   OutboxRelay,
   type OutboxRelayOptions,
+  PermanentDispatchError,
   type RelayClient,
   type RelayPool,
 } from "./relay.ts";

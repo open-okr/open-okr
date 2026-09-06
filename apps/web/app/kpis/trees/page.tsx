@@ -116,7 +116,7 @@ export default async function KpiTreesPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <SectionTabs items={KPI_TABS} active="/kpis/trees" />
         <Card>
           <CardHeader>

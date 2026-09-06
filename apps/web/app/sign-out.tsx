@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "../lib/auth";
+import { menuRowClass } from "./avatar-menu.tsx";
 
 /**
  * Signing out.
@@ -26,7 +27,12 @@ async function signOut(): Promise<void> {
 export function SignOut() {
   return (
     <form action={signOut}>
-      <button type="submit">Sign out</button>
+      {/* `menuRowClass` rather than a class list of its own: this button sits
+       * directly under three menu rows, and an unstyled one inherited the
+       * body's 16px next to their 13px. */}
+      <button type="submit" className={menuRowClass}>
+        Sign out
+      </button>
     </form>
   );
 }

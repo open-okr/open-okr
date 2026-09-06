@@ -80,6 +80,13 @@ export const workspaceMembers = pgTable("workspace_members", {
     .notNull()
     .default("email"),
   quietHours: jsonb("quiet_hours").$type<QuietHours>(),
+  /**
+   * The address a placeholder is waiting to be claimed by (P6-T03a).
+   *
+   * Set only on an imported member nobody has signed in as. Null on every
+   * member with a real account, whose address lives on the user row.
+   */
+  placeholderEmail: text("placeholder_email"),
   legacyId: text("legacy_id"),
   legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),
   createdAt: timestamp("created_at", { withTimezone: true })

@@ -32,8 +32,14 @@ export default async function AdminLayout({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex max-w-3xl gap-8">
-        <nav aria-label="Admin sections" className="w-40 flex-none">
+      {/* The mockups' own composition: a fixed side column and a flexible
+       * pane (`02-cycle-workspace` is `250px 1fr`), filling the body rather
+       * than centred inside it. This nav plus content was already the right
+       * shape; the `mx-auto max-w-3xl` around it made admin the narrowest
+       * screen in the product, a 160px nav and 580px of content on a 1920px
+       * display. */}
+      <div className="flex gap-8">
+        <nav aria-label="Admin sections" className="w-52 flex-none">
           <h2 className="mb-2 text-xs font-bold tracking-wider text-ink-4 uppercase">
             Admin
           </h2>

@@ -1,4 +1,10 @@
-import { canonThresholds, escalation } from "@openokr/method";
+import {
+  acknowledgementEscalation,
+  blockerEscalation,
+  canonThresholds,
+  escalation,
+} from "@openokr/method";
+import type { GoldenRow } from "@openokr/test-support/golden-table";
 import {
   cellNumber,
   loadGoldenTables,
@@ -141,6 +147,41 @@ describe("the due instant", () => {
     expect(local(before)).toBe("23:59");
     expect(local(after)).toBe("23:59");
   });
+});
+
+/** The three ladders read the same way, so they are asserted the same way. */
+const ladderCase = (
+  row: GoldenRow,
+  result: { step: number | null; targets: readonly string[] },
+) => {
+  expect(result.step).toBe(cellNumber(row, "expected_step"));
+  const expected = (row.expected_targets ?? "").trim();
+  expect(result.targets).toEqual(expected === "" ? [] : expected.split(","));
+};
+
+describe("the acknowledgement ladder", () => {
+  for (const row of table("cadence.acknowledgement").rows) {
+    it(`${row.case}`, () => {
+      ladderCase(
+        row,
+        acknowledgementEscalation(
+          num(row, "days_since_publication"),
+          thresholds,
+        ),
+      );
+    });
+  }
+});
+
+describe("the blocker ladder", () => {
+  for (const row of table("cadence.blocker").rows) {
+    it(`${row.case}`, () => {
+      ladderCase(
+        row,
+        blockerEscalation(num(row, "hours_since_opened"), thresholds),
+      );
+    });
+  }
 });
 
 describe("the escalation ladder", () => {

@@ -54,6 +54,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 
@@ -96,7 +97,16 @@ export interface CreateGoalInput {
   readonly parentKeyResultId?: string | null;
   readonly weight?: number;
   readonly contributionStatement?: string | null;
+  /** True when a model wrote the words (P4-T15a). */
+  readonly aiGenerated?: boolean;
   readonly position?: number;
+  /**
+   * The source-system identity, when an import created this row (P6-T01a).
+   *
+   * Absent for everything created in the product. Present, it is what makes
+   * a re-run of the same file write the row once.
+   */
+  readonly legacy?: LegacyKey;
 }
 
 export interface CreatedGoal {
@@ -258,7 +268,12 @@ export async function createGoalInTx<
       parentKeyResultId: input.parentKeyResultId ?? null,
       weight: String(clampWeight(input.weight ?? 1)),
       contributionStatement: input.contributionStatement?.trim() || null,
+      // Provenance (P4-T15a). False unless the caller says a model wrote the
+      // words. The column has been here since 0022 and nothing wrote it, which
+      // meant an assisted objective read exactly like a typed one.
+      aiGenerated: input.aiGenerated ?? false,
       position: input.position ?? 0,
+      ...legacyColumns(input.legacy),
     })
     .returning({ id: goals.id, title: goals.title });
 
@@ -586,6 +601,8 @@ export interface CreateKeyResultInput {
   readonly kpiId?: string | null;
   readonly capacity?: CapacityVerdict | null;
   readonly authorMemberId?: string | null;
+  /** The source-system identity, when an import created this row (P6-T01a). */
+  readonly legacy?: LegacyKey;
 }
 
 /**
@@ -637,6 +654,7 @@ export async function createKeyResultInTx<
       kpiId: input.kpiId ?? null,
       capacity: input.capacity ?? null,
       position: (next?.position ?? -1) + 1,
+      ...legacyColumns(input.legacy),
     })
     .returning({ id: keyResults.id });
 

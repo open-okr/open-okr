@@ -48,7 +48,7 @@ export default async function KpisPage() {
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <SectionTabs items={KPI_TABS} active="/kpis" />
         <Card>
           <CardHeader className="justify-between">
@@ -145,9 +145,10 @@ export default async function KpisPage() {
                   </Button>
                   <p className="text-xs text-ink-4">
                     The corridor defaults to the §11 registry, 90 and 70. A
-                    calculated KPI cannot be added here: nothing evaluates a
-                    formula until P3-T13, and one that read no_data forever
-                    would be worse than none.
+                    calculated KPI is added from its own detail screen, where
+                    the formula builder is: this form has no way to ask for a
+                    formula, and one that read no_data forever would be worse
+                    than none.
                   </p>
                 </ActionForm>
               </CardBody>
@@ -192,14 +193,14 @@ export default async function KpisPage() {
           <CardBody>
             <ul className="flex flex-col gap-1 text-xs text-ink-3">
               <li>
-                Row sparklines and category subtotals. Both need the aggregate
-                rules in §6 of the KPI design, which land with the formula
-                engine at P3-T13.
+                Row sparklines and category subtotals, at P6-G30. The aggregate
+                rules in §6 of the KPI design they need are already in
+                <code>packages/method</code>.
               </li>
               <li>
-                Filters by frequency, owner, category and state. The grid is one
-                URL today; the filters follow the explorer's pattern and are
-                worth doing once, beside them.
+                Filters by frequency, owner, category and state, at P6-G30. The
+                grid is one URL today; the filters follow the explorer's pattern
+                and are worth doing once, beside it.
               </li>
               <li>
                 The formula chip on a calculated cell. Calculated KPIs are

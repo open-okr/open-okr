@@ -1,0 +1,489 @@
+# P5-T00: the channel design
+
+Part one of the Phase 5 design gate. Authority: AI-NATIVE-PLAN.md §5,
+TECHNICAL-PLAN.md §4.11 and §5, METHOD.md §11. Implemented at P5-T01 (port,
+email, routing), P5-T02 to P5-T05 (the four providers), P5-T06a and P5-T06b (the command
+surface, cut into the one-line commands and the conversational check-in).
+
+## 0. What already exists
+
+| Component | Package | Ships at | What it holds |
+|---|---|---|---|
+| `Channel` port | `packages/adapters` | P2-T05 | `send`, `sendToChannel`, `verifyInbound`, `parseInbound`, `capabilities`, `stop` |
+| `NoneChannel` driver | `packages/adapters` | P2-T05 | The off driver. Suppresses every send with a reason, never throws |
+| `notification_settings` | `packages/db` | P2-T06 | Per-reason routing, `batch_window_minutes`, `daily_summary_time`, `quiet_hours jsonb` |
+| `notification_batches` | `packages/db` | P2-T06 | Per-member coalescing under a row lock |
+| `notifications` | `packages/db` | P2-T06 | One row per recipient, with `channel` and `sent_at` |
+| `nudges`, `nudge_rules` | `packages/db` | P4-T04a | Every proactive message, with `rule_key`, `channel`, `escalation_step`, `suppressed_reason` |
+| Nudge engine | `packages/core` | P4-T04a to c | Deduplication, quiet hours, the escalation ladder, the volume ceiling |
+| Mail port and driver | `packages/adapters` | P1-T06 | SMTP send. Used today for invitations only |
+
+**What does not exist.** No `channel_connections`, `channel_identities` or
+`channel_messages` table. No driver but `none`. Every nudge is written with
+`channel: "in_app"`, and `nudges/service.ts` already carries the comment saying
+the member's own channel is resolved at delivery. Phase 5 is where delivery
+arrives.
+
+## 1. The decision this document exists to make
+
+The port is built and the engine is built. What is missing is the layer between
+them, and it has one hard question in it: **a nudge is written in a transaction,
+and a provider call is a network round trip that can fail, retry and duplicate.**
+
+The answer is the same one the rest of the product already uses. A nudge write
+enqueues an outbox row. A relay picks it up, resolves the channel, calls the
+driver and records the outcome in `channel_messages`. Nothing about delivery
+happens inside the transaction that decided to nudge.
+
+That had a consequence worth stating plainly: **Phase 5's channel work delivers
+nothing until a host consumes the outbox** (PLAN.md §12, R10). It was answered
+before the channel row rather than around it: P5-T01a, cut out of P5-T01 on
+27 August 2026, starts the relay with the web process and maps every enqueued
+topic to a handler. A channel driver added by P5-T01b inherits a queue that is
+actually drained.
+
+## 2. Tables
+
+Three, exactly as TECHNICAL-PLAN §4.11 lists them. Every one carries
+`workspace_id` and a row-level security policy in the same migration.
+
+### 2.1 `channel_connections`
+
+| Column | Type | Notes |
+|---|---|---|
+| `provider` | `slack` / `teams` / `whatsapp` / `telegram` | Email needs no connection: it is the instance's mail settings |
+| `state` | `connected` / `error` / `disabled` | `error` is a connection that verified once and stopped working |
+| `credentials_ciphertext`, `data_key`, `key_id` | text | Envelope-encrypted, the same shape `ai_credentials` uses |
+| `config` | `jsonb` | Provider-specific: team id, tenant id, phone number id, bot username |
+| `installed_by_id` | member | Who connected it, for the audit trail |
+| `last_verified_at` | timestamptz | Set by the verify call, not by the install |
+
+Unique on `(workspace_id, provider)`. One connection per provider per
+workspace, which is what §5.1 says and what makes routing a lookup rather than
+a choice.
+
+### 2.2 `channel_identities`
+
+| Column | Type | Notes |
+|---|---|---|
+| `member_id` | member | Whose identity it is |
+| `provider` | the four | |
+| `external_id` | text | The provider's own identifier for that person |
+| `external_handle` | text? | For display. Never used for resolution |
+| `verified_at` | timestamptz? | Null until the member proved it |
+
+Unique on `(workspace_id, provider, external_id)` **and** on
+`(workspace_id, provider, member_id)`. Both directions: one person is one
+identity per provider, and one provider identity is one person.
+
+**Resolution is by `external_id` and never by handle.** A handle is
+changeable, reusable and sometimes shared. An inbound message from an
+unverified or unknown identity is discarded before it is parsed.
+
+### 2.3 `channel_messages`
+
+| Column | Type | Notes |
+|---|---|---|
+| `provider`, `direction` | text | `out` or `in` |
+| `member_id` | member? | Null for a channel post with no single recipient |
+| `external_thread_id` | text? | For threading a reply onto its own conversation |
+| `payload` | `jsonb` | What was sent or received, after verification |
+| `idempotency_key` | text | Unique per workspace. The relay's safety net |
+| `status` | `queued` / `sent` / `failed` / `suppressed` | |
+| `error` | text? | The provider's own message, for the connection health card |
+
+Unique on `(workspace_id, idempotency_key)`. **This is what makes a relay retry
+safe**: the second attempt finds the row and stops.
+
+## 3. Routing
+
+One function, `resolveDelivery`, in `packages/core`. Pure apart from the reads
+it needs, so the decision is testable without a provider.
+
+```
+member + nudge kind + now
+  -> { channel, sendAt, suppressedReason? }
+```
+
+The order it decides in, which is §5.4's own order:
+
+| Step | Rule | Outcome when it applies |
+|---|---|---|
+| 1 | The workspace is in quiet mode and the nudge is not an escalation | Suppressed, reason `workspace_quiet_mode` |
+| 2 | The member has a verified identity on their primary channel | That channel |
+| 3 | No verified identity, or the provider is disconnected | Email, plus in-app |
+| 4 | The chosen channel is inside the member's quiet hours | Queued to the next open window. **Built at P5-T01b-b, and it found the opposite shipped**: `suppressionFor` returned `quiet_hours` and the row was written with a reason and never sent, so a member whose night covered the sweep never heard about their overdue check-in at all. Member quiet hours now defer; workspace quiet mode still suppresses, because an organisation that switched the product off for a week is not asking to be told everything at once when it comes back |
+| 5 | The nudge is an escalation the workspace marked urgent | Sent inside quiet hours anyway |
+
+**In-app is never routed away.** A notification row is written whatever the
+channel decides, because §5.4's last line is that snoozing never silences the
+review inbox. The channel is where the product goes to find them; the product
+is where the obligation lives.
+
+### 3.1 Failure and the one-time notice
+
+A send that fails writes `channel_messages.status = 'failed'` with the
+provider's error, and the relay retries the delivery through email. The member
+is told **once** that their channel needs reconnecting, using the nudge
+engine's own deduplication: the notice is a nudge with its own rule key, so it
+deduplicates per member per day like everything else rather than arriving with
+every failed send.
+
+**Given** a member whose Slack identity has been deactivated,
+**when** their check-in nudge is delivered,
+**then** it arrives by email, `channel_messages` holds one failed row with
+Slack's own error, and they receive exactly one notice that their channel needs
+reconnecting however many nudges fail that day.
+
+## 4. The capability matrix
+
+§5.2's table, as `capabilities()` returns it. The message builder reads this
+and degrades; no driver refuses a message it cannot render.
+
+| Provider | outbound | inbound | richCards | buttons | threads | templateOnlyOutbound | Notes |
+|---|---|---|---|---|---|---|---|
+| Email | yes | no | no | yes, as links | no | no | Built at P5-T01b-a |
+| Slack | yes | yes | yes | yes | yes | no | Built at P5-T02a and P5-T02b |
+| Teams | yes | yes | yes | yes | no | no | |
+| WhatsApp | yes | yes | no | no | no | **yes, outside the window** | |
+| Telegram | yes | yes | no | yes, inline | no | no | Built at P5-T05. `callback_data` is capped at 64 bytes, so a button carrying a command too long to fit is dropped rather than truncated: half a command is a command that would run the wrong thing |
+
+**Degradation is one direction and it is always the same.** A message is built
+once, as text plus optional blocks plus optional buttons. A provider without
+`richCards` gets the text. A provider without `buttons` gets the text with the
+links appended. A provider with `templateOnlyOutbound` outside its window gets
+the registered template for that nudge kind, and the free-form body is dropped
+rather than sent as a second message.
+
+**Given** a nudge with three action buttons,
+**when** it is delivered to Telegram and to WhatsApp outside the window,
+**then** Telegram shows an inline keyboard with three buttons, WhatsApp shows
+the approved template for that nudge kind, and neither driver raises an error.
+
+## 5. Identity linking
+
+One flow, four providers, and it is deliberately dull.
+
+1. The member opens their own settings and picks a provider.
+2. The product issues a short code, valid for ten minutes, single use, stored
+   hashed.
+3. The member sends that code to the bot, or clicks the provider's own
+   authorise link where the provider has one.
+4. The inbound handler verifies the signature, finds the code, writes
+   `channel_identities` with `verified_at`, and discards the code.
+
+**An unlinked sender receives nothing at all.** §5.3 says so and the reason is
+in the sentence: a helpful error confirms the workspace exists. The inbound
+handler's first branch is "is this identity known and verified", and the
+answer no ends the request with a 200 and no reply.
+
+## 6. Inbound security
+
+Every inbound request, in this order, before anything reads the body as data:
+
+| Step | Check | On failure |
+|---|---|---|
+| 0 | *Which workspace is this?* Added at P5-T02a, because the eight steps below all presume a tenant and an inbound request has not named one. `channel_installations` answers it through a second policy key; §2 was silent on where that mapping lives, and the first implementation put it on `channel_connections`, where forced row-level security answered every lookup with nothing | Silence |
+| 1 | Signature over the raw bytes, per provider | 401, nothing parsed. **One provider cannot do this, found at P5-T05:** Telegram does not sign the body at all. It echoes a shared secret, chosen when the webhook is registered, and that is the strongest claim it makes available. The comparison is still timing-safe and the endpoint still refuses before parsing, but a tampered body under a valid secret passes on Telegram and fails on Slack. The difference is structural rather than an oversight, and there is a test that states it |
+| 2 | Timestamp inside the replay window | 401 |
+| 3 | The delivery id has not been seen | 200, ignored as a duplicate |
+| 4 | The sender resolves to a verified identity | 200, no reply |
+| 5 | The member is active and not suspended | 200, no reply |
+| 6 | Rate limit for that member and provider | A plain message, because they are linked |
+| 7 | The command resolves to a registry action | A plain message naming what is available |
+| 8 | `can()` on that action | The same refusal the browser shows |
+
+Steps 1 and 2 read the raw body. **The parsed object is never trusted before
+its bytes are verified**, which is why `verifyInbound` takes `rawBody` and
+`parseInbound` is a separate call.
+
+Retrieved and inbound content is untrusted throughout. A chat message that
+contains something that looks like an instruction is a string in a payload,
+never a prompt.
+
+**Given** a Slack payload with a valid body and a tampered signature,
+**when** it arrives,
+**then** it is refused before parsing, nothing is written, and the response
+carries no detail about why.
+
+## 7. The command surface
+
+One router, generated from the action registry, in `packages/core`. §5.3's
+seven commands, each mapping to exactly one registry action:
+
+| Command | Registry action | Access it needs | Built |
+|---|---|---|---|
+| check in | `goals.startCheckIn` then `goals.publishCheckIn` | edit on the goal | P5-T06b |
+| blocker | `sessions.createBlocker` | edit | Built at P5-T06c |
+| status | `goals.read` | view | Built at P5-T06a |
+| ack | `goals.acknowledgeCheckIn` | edit | Built at P5-T06a |
+| commit | `sessions.setCommitments` | edit | Built at P5-T06c |
+| ask | `copilot.ask` | comment | Built at P5-T06a |
+| snooze | `nudges.snooze` | comment | Built at P5-T06a |
+
+**Two corrections to this table, made at P5-T06a.** The access column is not
+where access lives: the registry action declares its own level and `can()`
+enforces it, and a second number here would be a second answer to "who may do
+this". The column is kept as documentation of what each command needs and is
+asserted by nothing. And `status` and `ask` listed several actions each; a
+command names exactly one, which is the invariant a test now walks the
+catalogue for. `kpis.detail` and `notifications.list` are commands of their own
+whenever they are wanted.
+
+**The seam the build followed, and what it turned out to be.** The split was
+meant to be "one line" against "collects fields", and only `checkin` ended up
+on the second side. `blocker` and `commit` were built as one line each at
+P5-T06c: a blocker's type is one word out of five and its next action is a
+sentence, and somebody raising a blocker is doing it during a session, on a
+phone, while a room waits. Three exchanges to say one thing is worse there than
+one line that needs its words in order. The state machine exists if that turns
+out to be the wrong call.
+
+**§7 said nothing about how a chat message finds a session, and both of those
+commands need one.** The rule is now in `packages/core/src/channels/sessions.ts`
+and it is this: a sender who names a key result gets the running session in that
+key result's goal's space; a sender who names nothing gets the running session
+in the one space they are in that has one. Only a *running* session, because a
+blocker raised into a scheduled one is a blocker nobody is in the room for.
+Two running sessions refuse rather than pick, because putting somebody's blocker
+on the wrong team's board is worse than asking them which.
+
+**One definition, four renderings.** A command is declared once with its
+arguments; each driver renders it as that provider's own idiom, a slash command
+on Slack, a bot command on Telegram, a free-form intent on WhatsApp. The router
+never branches on provider to decide what an action does, only on how to ask
+for what is missing.
+
+Every inbound action writes an audit event with the channel named, which is
+what makes "she checked in from Slack" answerable a quarter later.
+
+**Given** a member without edit access on a goal,
+**when** they attempt a check-in from any of the four providers,
+**then** the refusal is the same sentence the browser shows, and the attempt is
+audited with the channel on it.
+
+## 8. Conversational flows
+
+Slack and Teams have modals. WhatsApp and Telegram do not, so the check-in and
+the blocker are collected across turns.
+
+### 8.1 The state machine
+
+A conversation is a row: member, provider, thread, the command it is running,
+the fields collected so far, and when it expires.
+
+| Aspect | Decision |
+|---|---|
+| Where the state lives | A `channel_conversations` row, not memory. The relay is stateless and a process restart must not lose somebody's half-finished check-in |
+| How long it lives | Thirty minutes, and the clock restarts on every answer rather than running for the whole conversation: somebody answering slowly is still answering. **Corrected at P5-T06b:** this said the §11 registry, and §11 is METHOD.md, the OKR practice canon. How long a chat window stays open is an interaction timeout rather than a practice rule, so it is `chatConversationMinutes` in the TECHNICAL-PLAN §4.14 settings map, where a workspace can still change it |
+| Abandoning | Any message that is not an answer, or the expiry, ends it. Nothing is written. **One refinement at P5-T06b:** a message that parses as a *known command* ends the conversation and then runs, rather than ending it and doing nothing. The first build read replies before commands, so somebody who typed `checkin` while one was half finished lost it and started nothing, which is the worst of both |
+| Resuming | The next message on the same thread continues it |
+| What is written | Nothing until every required field is collected. Then one registry action, one transaction |
+
+**Nothing partial is ever stored as a check-in.** A conversation that collects
+status and confidence and then stops leaves no draft, because a draft check-in
+somebody did not know they had created is worse than starting again.
+
+**Given** a member part way through a WhatsApp check-in,
+**when** they stop replying and the conversation expires,
+**then** no check-in exists, the goal is still due, and the next nudge starts
+the conversation again from the beginning.
+
+### 8.2 The order of questions
+
+The same order as the browser's composer, which is METHOD.md §3.2's own order:
+status, then confidence, then one line of narrative, then each key result's
+value. A member who answers the first two and nothing else has told the product
+what it most needs, so the narrative and the values are asked last.
+
+## 9. Open questions for the human
+
+| # | Question | My position |
+|---|---|---|
+| C1 | ~~Does the channel work land before a relay host exists?~~ Answered 27 August 2026 | No. The relay was cut out as P5-T01a and built first, because routing nudges into a queue nobody drains would have stacked a second layer of undelivered work on the first |
+| C2 | Is a member allowed more than one verified identity per provider? | No. Two identities is two people or one person confusing the audit trail. **Built at P5-T02a**, and enforced by the database rather than by a check: two unique indexes, one each way |
+| C3 | ~~Where do WhatsApp templates live?~~ **Answered 29 August 2026, and my position was wrong** | Not in `packages/method`. §11 is the *threshold* registry, which holds numbers rather than words, and a template is not canon at all: it is registered and approved inside one customer's own Meta Business account, so two workspaces cannot share one and no document could name them for everybody. Agung's answer: synchronise them from Meta, let an administrator choose which a nudge uses, and fill their variables from the product's own data. **Built at P5-T04b-a** (the sync) and P5-T04b-b (the mapping and the variables) |
+| C4 | Does a space channel post need its own subscription model? | Not in v1. A space channel is configured on the connection and posts what the space's own feed would show |
+
+## Teams, and what a third provider proved (P5-T03a)
+
+Nothing in `packages/core` changed to add Teams. The command catalogue, the
+router, §6's inbound steps three to six, the identity linking and the
+conversational check-in are the same code Slack and Telegram reach. What is
+Teams' own is three things, and each is different in a way worth naming.
+
+| | Slack | Telegram | Teams |
+|---|---|---|---|
+| Outbound authentication | a bot token in a header | a bot token in the URL | an OAuth2 token fetched per hour |
+| Inbound verification | HMAC over the raw body | a shared secret echoed back | a token Microsoft signed, verified against its published keys |
+| Where to send | any channel id | any chat id | only a service URL learned from an inbound activity |
+
+**The service URL is the one genuinely new problem.** Slack and Telegram will
+accept an outbound call at a fixed address. Teams will not: every inbound
+activity carries the `serviceUrl` for its own region, and outbound has to go
+back to that one. There is no way to look it up. So a workspace whose bot has
+never been messaged cannot be messaged, and the driver suppresses with exactly
+that reason rather than failing. The inbound door records the URL on the
+connection, which is what `rememberConnectionConfig` exists for, and the runbook
+in `deploy/teams/README.md` makes "say something to it" a numbered step rather
+than a footnote.
+
+**The token binds the service URL, and checking that is load-bearing.** Microsoft
+signs a `serviceUrl` claim into every inbound token. Comparing it with the
+activity's own is what stops a caller holding a valid token for some other bot
+from pointing this instance's replies at a host they control. It would be the
+easiest of the five checks to leave out and it is the one whose absence is worst.
+
+**A card action arrives as an activity with no text and a `value`.** The driver
+reads `value.command` as the text when there is none, which is what lets a card
+button reach the same router a typed command does.
+
+**The cards themselves landed at P5-T03b**, and with them the answer to a
+question the other two providers had already half-answered: a button is either
+somewhere to go or something to run. A link becomes `Action.OpenUrl` on Teams, a
+URL button on Slack and a URL keyboard button on Telegram. A command carries the
+`okr:` scheme and becomes `Action.Submit` with the command in its `data`, a
+Block Kit action, or `callback_data`. A provider with no buttons at all gets the
+words to type, which is the degradation the builder was missing: it printed
+`okr:resolve abc` as a link, and a command button is not a link.
+
+## WhatsApp, and the provider that limits what may be said (P5-T04a)
+
+The fourth provider, and again nothing in `packages/core` changed to add it. What
+is new is a kind of constraint the other three do not have.
+
+| | Slack | Teams | Telegram | WhatsApp |
+|---|---|---|---|---|
+| Inbound verification | HMAC over the body | a signed token | a shared secret | HMAC over the body |
+| Buttons | Block Kit | card actions | inline keyboard | none |
+| May speak first | always | always | always | only with an approved template, outside a window |
+
+**The other three limit how a message looks. This one limits whether it may be
+sent at all.** Outside a twenty-four hour window opened by the member's own last
+message, Meta will carry only templates it approved in advance. The builder has
+known how to answer that since P5-T01b-b and the matrix has carried
+`templateOnlyOutbound` since then; what is missing is the fact of which side of
+the window a given member is on, which needs their last inbound moment recorded.
+That is P5-T04b, and it carries this task's acceptance criterion because a
+template is what the criterion is about.
+
+**The verification handshake is a GET, and it is the first inbound path in this
+product that is not a message.** Meta proves the endpoint belongs to whoever
+configured it by asking it to echo a challenge, with no body and no signature to
+verify. It cannot go through §6's order, so it is answered by the endpoint
+itself, against a token the administrator chose, compared in constant time. A
+wrong token and a number this instance does not know get the same refusal.
+
+**No buttons, and the degradation built at P5-T03b turns out to be this
+provider's native shape.** A command button folds into the text as `Resolve:
+reply "resolve abc"`, which on WhatsApp is the literal instruction. What was
+written to stop a broken link is what this provider wanted all along.
+
+## Templates are synchronised, not declared (P5-T04b-a)
+
+The one thing about WhatsApp that no other provider has is that the product may
+not always speak first. Outside a twenty-four hour window, Meta carries only
+templates it approved in advance.
+
+**C3 answered that wrongly and is corrected above.** A template looked like
+coaching copy, and coaching copy belongs to METHOD.md. It is not. The words are
+written by the customer, submitted to Meta, and approved or refused by Meta,
+inside one Business account. Two workspaces cannot share one, so nothing in this
+repository could name them.
+
+So the product asks Meta what this workspace has and records the answer:
+
+| | Where it lives | Who decides it |
+|---|---|---|
+| The template's words | Meta | the customer, approved by Meta |
+| Which templates exist here | `whatsapp_templates`, synced | Meta |
+| Which template a nudge uses | a mapping, P5-T04b-b | the administrator |
+| What fills its variables | a binding, P5-T04b-b | the administrator |
+
+**A sync is a replacement, not a merge.** There is no local edit to conflict
+with, so what Meta no longer lists is withdrawn. Withdrawn rather than deleted,
+and one row per template for the life of the workspace, so a mapping can still
+say which template it meant after Meta has removed it.
+
+**The business account id is learned from a webhook**, the way the Teams service
+URL is: Meta names it on every inbound body, and asking an administrator to find
+it in a console would be a form field for a fact the product is already told.
+
+## The window, the mapping and the variables (P5-T04b-b)
+
+The other half of C3's answer. The sync says which templates exist; this says
+which one answers which reminder, what fills its placeholders, and when a
+template is needed at all.
+
+### When a template is needed
+
+| The member last wrote | What is sent |
+|---|---|
+| Under 24 hours ago | The ordinary body. No template is looked up |
+| Over 24 hours ago, or never | The mapped template and its filled-in parameters |
+| Over 24 hours ago, nothing mapped | Nothing is queued. The inbox row still stands, and the recipient counts as unreachable |
+
+`channel_identities.last_inbound_at` is the only thing the window is measured
+from, stamped on the inbound path for every provider. Never written in means
+never inside: a member who has only ever received messages has not opened a
+session, whatever the identity row's creation date says.
+
+### What fills a placeholder
+
+A closed vocabulary of five, not an expression language. An administrator picks
+one per placeholder from a select, and the screen renders exactly as many
+selects as the template has placeholders.
+
+| Source | Value | Falls back to |
+|---|---|---|
+| `member.name` | The recipient's name | "you" |
+| `workspace.name` | The workspace's name | "your workspace" |
+| `subject.title` | The goal's title, or the blocker's key result | "your goal" |
+| `rule.key` | The rule that fired | never empty |
+| `reply.command` | The command that answers this nudge | "help" |
+
+Every source resolves to a non-empty string, because Meta refuses a blank
+parameter and a whole reminder bouncing over an unnamed member is a worse
+answer than a plain word.
+
+`reply.command` is the one that makes the flow work. WhatsApp has no buttons, so
+a template that wants an answer has to say what to type, and it carries the
+identifier because a person reading a message on a phone has no other way to
+know it. `checkin.*` on a goal resolves to `checkin <goal id>`; `blocker.*` on a
+blocker to `resolve <blocker id>`.
+
+### `checkin` on its own
+
+The command's goal argument became optional in this task, and that is a product
+change rather than a WhatsApp accommodation: nobody in Slack should paste a uuid
+either.
+
+| What is due | What happens |
+|---|---|
+| One | It starts, no argument needed |
+| None | "You have no check-in due right now. Name a goal to check in early." |
+| Two or more | The titles, and a request to say which |
+
+Never a guess. Picking the older one would be the product deciding what somebody
+meant about the thing it is asking them to be honest about.
+
+### Where each check happens
+
+| Check | When | Why there |
+|---|---|---|
+| The template is approved | Saving the mapping | Meta would refuse the send, which nobody sees |
+| The source count matches the placeholders | Saving the mapping | The alternative is finding out at seven in the morning |
+| Every source is one this product can fill | Saving the mapping | Same |
+| Which side of the window | Sending | It is a fact about a moment, not about a setting |
+
+The screen makes all three refusals unreachable in the ordinary case: it offers
+only approved templates, renders one select per placeholder, and offers only
+sources from the vocabulary. A refusal therefore means the form is stale, which
+is why it comes back as `not_found` carrying the sentence that says which.
+
+### Acceptance
+
+**Given** a member whose primary channel is WhatsApp and whose check-in is due,
+**when** they have not written in for a day, **then** they receive the approved
+template with their name and the words to reply, **and** sending exactly those
+words back starts the check-in conversation.

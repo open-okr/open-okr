@@ -45,7 +45,7 @@ created at provisioning.
 | Gate enforcement | Yes | Yes |
 | Divergence detection (health vs data) | Yes | Yes |
 | Trend-off-track detection | Yes | Yes |
-| Rewrite assist | Yes | Hidden |
+| Rewrite assist | Yes | Explained, not hidden (P4-T06c) |
 | Phase-moment messages (SS10 items 8, 14) | Yes (natural language) | Yes (rule citation only) |
 
 ### 1.3 Scope and access
@@ -66,6 +66,21 @@ Applying commits through the normal Operation pipeline with audit.
 
 `scoped_direct`: opt-in per workspace. Writes quality flags directly.
 Still fully audited. Structural findings are still proposals.
+
+**A human-invoked assist is not an agent proposal (P4-T06c).** The rewrite
+assist is a read the champion asks for, in their own session, and applying it
+writes as them. There is no agent initiative to hold back and no run to bind it
+to, so a `proposed_changes` row would record the champion proposing a change to
+themselves. Propose-by-default governs what an agent writes unasked. The
+protections that matter here are the ones a preview gives: nothing is stored
+until the champion presses the button, and the button carries their identity
+into the audit row.
+
+**Hidden was the wrong word for AI off, and P4-T06c's test plan is why.** The
+matrix above said the assist is hidden with no provider. A control that vanishes
+leaves a writer unable to tell whether the product has one, and unable to tell
+whether the rules still apply. Both surfaces now say the rules are checked
+either way and only the suggested wording needs a provider.
 
 ### 1.5 Findings table
 
@@ -124,6 +139,15 @@ Same least-privilege model as the Coach. Bindings on:
 - Goals within those spaces (check-in and blocker reads)
 - KPI trees within those spaces (corridor reads)
 
+**As implemented at P4-T05a:** one binding per space, at `view`, added by
+`createSpaceInTx` as each space is created. Goals and KPI trees are reached
+through the space's own access context rather than bound one by one, which is
+how every other principal reaches them; a per-goal binding would be a second
+access model beside the one `can()` already resolves. `view` rather than `edit`
+because everything the agent changes goes through a proposal, and a proposal
+needs no write grant. There is no binding on the workspace context, and a test
+reads `access_bindings` back to assert the absence.
+
 ### 2.4 Write policy
 
 Default: `propose` for recovery OKRs, check-in drafts, and any data write.
@@ -167,6 +191,7 @@ the build.
 | `cycle.starts` | Day one | Everyone | No | Yes |
 | `cycle.review_due` | 2 weeks before cycle ends | Facilitator | No | Yes |
 | `cycle.closing` | Cycle ends unscored | Facilitator + sponsor | No | Yes |
+| `channel.reconnect_needed` | A send to the member’s primary channel fails | The member | No | Yes | Added at P5-T01b-b, approved 27 August 2026. Operational rather than a practice rule: it is a trigger key because every proactive message is a nudge row and every nudge row cites a key the package defines |
 
 ### 3.2 Quality triggers (owned by the Coach)
 
@@ -270,21 +295,34 @@ From SS11 `cadence.nudgeDeduplicationHours` (24h) and the trigger catalogue.
 
 Every proactive message is a recorded row, per CLAUDE.md hard rule.
 
+**Corrected on 2026-08-18.** This table originally listed a shorter row with
+the recipient as `member_id`, no `kind`, no `agent_id`, no `scheduled_for`, no
+`acted_at`, and suppression split across a boolean and a reason.
+TECHNICAL-PLAN.md §4 already specified the table and it outranks a design
+document, so the columns below are its. Whoever reads only this section now
+reads what actually shipped.
+
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid | |
 | `workspace_id` | uuid | RLS |
-| `rule_key` | string | Resolves to trigger catalogue |
+| `kind` | string | `rhythm` or `quality`: which agent's remit, as §6.4's two tables split them. The volume dashboard reads by it, because "the Champion is noisy" is a different finding from "the Coach is" |
 | `subject_type` | string | `goal`, `check_in`, `blocker`, `kpi`, `session`, `cycle` |
 | `subject_id` | uuid | |
-| `member_id` | uuid | The recipient |
+| `recipient_member_id` | uuid | The recipient |
+| `agent_id` | uuid, nullable | Null when the product produced it rather than a seeded agent. The due engine runs before either agent exists, and a fabricated id would misattribute it forever |
+| `rule_key` | string | Resolves to the §6.4 trigger catalogue. Text rather than an enum: the catalogue is data in `packages/method` and the conformance suite keeps the two in step |
 | `channel` | string | `in_app`, `email`, `slack`, `teams`, etc. |
-| `escalation_step` | integer | 0 for non-escalating, 1+ for ladder |
-| `suppressed` | boolean | |
-| `suppression_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling` |
-| `delivered_at` | timestamp, nullable | |
+| `scheduled_for` | timestamp | When it should go out |
+| `sent_at` | timestamp, nullable | When it did. Two columns because quiet hours and batching move delivery without changing the decision, and one timestamp could not tell "held until morning" from "never sent" |
+| `acted_at` | timestamp, nullable | When the recipient did the thing it asked for. This is what makes a nudge measurable rather than merely countable |
+| `escalation_step` | smallint | 0 for non-escalating, 1+ for ladder |
+| `suppressed_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling`. Null when it was sent. Four of the five are decisions the product made rather than accidents, which is why they are recorded |
 | `snoozed_until` | timestamp, nullable | |
 | `created_at` | timestamp | |
+
+A suppressed nudge is never also sent, enforced as a check constraint: both
+halves of the record are meaningless without the other.
 
 ## 8. Prompt design per cycle phase
 
@@ -324,3 +362,217 @@ with a specific reason, and dismissing it on one side dismisses it everywhere.
 
 Given a simulated month against the demo workspace, when the nudge engine runs
 daily, then the total nudge count per member stays under the SS11 volume ceiling.
+
+## 10. What P4-T05b built, and where it departs from §2.1
+
+Written when the daily, weekly and per-cycle runs landed. §2.1's table stands;
+this records what is behind each row today so nobody reads the table as a claim
+about what runs.
+
+| §2.1 row | Built | Not built, and why |
+|---|---|---|
+| Hourly: the nudge queue | P4-T05a, whole | |
+| Daily: morning summary | Yes, at the member's own local hour | |
+| Daily: staleness sweep | Yes, calling P3-T06's `sweepStaleness` on the run's transaction | |
+| Daily: blocker aging | Yes, over P4-T07c's `blockers` table | Nothing stamps `escalated_at`: a nudge reader writing it would record an escalation as though somebody had acted |
+| Daily: KPI corridor checks | Yes, all four §6.4 triggers | |
+| Weekly: open and close the session | The three lifecycle messages | The digest and the streak are P4-T08's, which is the task that builds a digest table and a streak engine |
+| Per cycle: planning countdown | Yes, five rules | `cycle.phase_blocked` needs gate state rather than a date, and belongs to the Coach at P4-T06a |
+| Per cycle: review preparation pack | The `cycle.review_due` message | The pack itself is P4-T11's content. This says it is time; it assembles nothing |
+
+**Three decisions worth carrying forward.**
+
+**The morning summary's preference is `notification_settings`.**
+`daily_summary` and `daily_summary_time` have been there since P2-T06,
+defaulting to on at 08:00 in the member's own timezone, which is what
+TECHNICAL-PLAN §4.14 specifies. §6.4's "opted-in members" therefore reads as
+opt-out. The row is created lazily, so the reader left joins and falls back to
+the table's own defaults.
+
+**`session.missed` is one day wide.** §6.4 says "1 day after missed session" and
+§11 has no parameter for it. The condition is the plain fact that the scheduled
+day passed with the session never opened, and the window closes at forty-eight
+hours. A permanent `missed` state would nudge about a session from March every
+day until somebody deleted the row.
+
+**Urgency is read from the trigger catalogue, never chosen per call site.**
+`urgent` bypasses quiet mode, the member's quiet hours *and* the weekly ceiling,
+so a message that repeats daily and is also urgent is unbounded noise. Only a
+trigger the catalogue marks as escalating earns the bypass, and never on the
+owner's own copy of it. `kpi.unhealthy` and `cycle.closing` both repeat for as
+long as their condition holds and are both non-urgent for that reason.
+
+### 10.1 Acceptance criteria
+
+Given a goal three days past its staleness grace, when the daily run executes,
+then that goal reads `outdated`, a second run changes nothing, and no check-in
+nudge is produced by that run.
+
+Given a blocker opened twenty-five hours ago, when the daily run executes, then
+`blocker.overdue` reaches its named owner and at least one member other than the
+owner, at escalation step 2.
+
+Given a blocker that has been resolved, when the daily run executes at any point
+on its clock, then no blocker nudge is produced.
+
+Given a member whose local time is their configured summary hour, when the daily
+run executes, then they receive one `digest.daily` nudge whose subject is
+themselves; at any other local hour they receive none.
+
+Given a weekly session nobody opened, when the weekly run executes on the
+following day, then its facilitator is told once; two days later, nothing.
+
+Given a publication deadline fourteen days away, when the per-cycle run
+executes, then the sponsor and the facilitator are each told once, and on the
+following day neither is told again.
+
+Given a cycle past its end date with status `active`, when the per-cycle run
+executes, then the close is chased; once the cycle reads `closed`, it is not.
+
+## 11. What P4-T05c-a built: the proposal path
+
+**A proposal is a deferred action call and nothing more.** `proposed_changes`
+stores an action registry key and its payload, and `proposals.bulkApply` calls
+that action verbatim with the deciding member as the actor. That is what keeps
+"propose by default" honest: there is no second write path an agent could take,
+only an action a human runs later under their own name. §2.3's least-privilege
+model needs no exception for it, because the agent never writes.
+
+| Piece | Where | Why it is shaped that way |
+|---|---|---|
+| `startDraftInTx` | `packages/core/src/check-ins/service.ts` | One draft per author per goal, extracted from `goals.startCheckIn` once a second caller needed it |
+| `goals.publishDraftedCheckIn` | the action registry | `goals.publishCheckIn` takes a draft id and the Champion holds `view`, so it cannot open one. A proposal holds one action, so opening the draft and publishing it has to be a single Operation, run as the applying member |
+| `proposed_changes.ai_generated` | migration 0040 | `run_id` says a proposal came from an agent; this says whether a model wrote its content |
+| `nudges.proposal_id` | migration 0040 | Without it, a nudge and its proposal are two rows a reader correlates by hope |
+| The recovery proposal | `packages/core/src/nudges/sweep.ts` | Raised on `kpi.recovery_proposed`, deterministic, from §6.5's template |
+
+**The recovery proposal's payload carries ids, not drafted text.**
+`kpis.launchRecovery` already calls §6.5's drafter, so the objective and its key
+results are produced when a human applies it, from the KPI tree as it stands
+then. A payload carrying drafted titles would go stale the moment somebody added
+a driver under the KPI.
+
+**One pending proposal per subject per action.** A run happens every hour and
+the condition that raised it holds until somebody acts, so an unguarded insert
+would grow the review queue by one row an hour. Today's nudge links to the
+proposal already waiting rather than skipping, so it still points at something
+the recipient can act on. Only `pending` blocks a new one: a dismissal was a
+decision about that proposal, and a KPI still unhealthy a week later is entitled
+to be offered again.
+
+**A suppressed nudge still gets its proposal.** The suppression decided that the
+*message* was noise, not that the change was unwanted. It is the same rule as
+"a snooze never hides a review-inbox obligation", seen from the other side.
+
+**The run row is written before the work.** A proposal's `run_id` is not null, so
+a run inserting its own row last could not attach one. It is also more honest: a
+run that crashes now leaves a `running` row rather than nothing at all.
+
+`nudges.run`, the hourly queue an administrator can call by hand, passes no run
+id and therefore proposes nothing. It is not an agent run and does not invent one
+to look as though it proposed something.
+
+### 11.1 Acceptance criteria
+
+Given a KPI unhealthy for the §11 delay and no AI provider, when the daily run
+executes, then exactly one pending proposal exists, marked not AI-generated, and
+the KPI's own state and recovery link are unchanged.
+
+Given the same KPI after one unhealthy period only, when the daily run executes,
+then no proposal exists.
+
+Given a pending recovery proposal, when the daily run executes again, then there
+is still exactly one.
+
+Given a pending recovery proposal, when a member applies it, then the recovery
+objective is created, the KPI reads `recovering`, the audit row names
+`kpis.launchRecovery`, and the proposal records that member as its decider.
+
+Given a pending recovery proposal, when a member dismisses it, then the KPI is
+unchanged and the proposal reads `dismissed`.
+
+Given a nudge carrying a proposal, when its recipient reads their nudge list,
+then the proposal's id, action and AI-generated flag are returned with it, and
+every nudge carrying none returns null.
+
+Given a suspended member, when they call `goals.publishDraftedCheckIn`, then it
+is refused with the same message `goals.startCheckIn` refuses them with, and no
+check-in row exists.
+
+## 12. What P4-T06a built: the Coach, and two deviations from §1
+
+The Coach is seeded at provisioning beside the Champion, `kind = 'coach'`,
+schedule `continuous`, autonomy `propose`, bound to spaces at `view` and to
+nothing workspace-wide. Data change `0007_seed_coach_agent` gives every
+workspace made before this the same agent, separately from 0006 because a data
+change that has already run is never edited.
+
+**Deviation from §1.3: the binding is `view`, not "read + quality flags
+write".** The Coach writes nothing. Its autonomy is `propose`, and P4-T02a
+already recomputes the flags inside the transaction of whoever edited the goal,
+so a write grant would be a standing permission with no caller, which is the
+shape a privilege escalation hides in. A workspace opting into `scoped_direct`
+raises it deliberately, in one place. §1.3 above is corrected by this paragraph.
+
+**Deviation from §1.1: `continuous` describes the evaluation, not the
+messages.** The evaluation genuinely is continuous and has been since P4-T02a.
+What P4-T06a adds is `agents.runCoach`, one run that turns the standing verdicts
+into nudges, under its own trigger `schedule.quality`. A message emitted inside
+every goal write would nudge a champion on each keystroke-sized save.
+
+### 12.1 Which of §6.4's quality triggers fire, and which do not
+
+| Trigger | Fires | Source |
+|---|---|---|
+| `quality.all_lagging` | Yes | KR-4, condition "All lagging" |
+| `quality.no_baseline` | Yes | KR-3, condition "Baseline, target, date or owner missing" |
+| `quality.orphan_goal` | Yes | `alignment_findings` AL-1 |
+| `quality.level_skip` | Yes | `alignment_findings` AL-3 |
+| `quality.silo` | Yes, to the space manager | `alignment_findings` AL-6 |
+| `quality.dependency_unowned` | Yes | §5.4 register: unconfirmed and no risk owner |
+| `quality.draft_failing` | No: it is inline as the author types, which P4-T02b built. §6.4's own recipient is "Author, inline" | |
+| `quality.gate_blocked` | No: it is the publish attempt's own refusal, which P4-T03 built | |
+| `quality.no_not_doing`, `quality.no_cuts` | No: both fire at a phase transition, and no phase-transition hook exists | |
+| `quality.too_many_objectives` | No: OBJ-5 is evaluated and stored, but §6.4 addresses it to the facilitator and a cycle-level recipient is P4-T09's | |
+| `quality.sandbagging_draft`, `quality.sandbagging_close` | No: scoring at draft and at close, P4-T10b | |
+| `quality.divergence`, `quality.trending_off` | No: both are the nightly sweep's, P4-T06b | |
+| `quality.process_health_low` | No: needs the process-health survey, P4-T11b | |
+| `quality.conflict` | No: the one trigger in the catalogue that needs a provider, P4-T06b | |
+
+**The mapping is keyed on the condition, not on the check id.** KR-4 trips on
+"All lagging" and on "All leading", and only the first is
+`quality.all_lagging`. Choosing a trigger from a stored flag id would have told
+a champion their key results are all lagging when they are all leading, which is
+why `evaluateGoalInTx` was split out of `recomputeGoalQualityInTx`: the Coach
+needs the verdict, which carries the matched condition, rather than the flag.
+
+**Two finding rule keys map to nothing, deliberately.** `AL-4`, the missing
+company anchor, is a property of the whole tree that no goal caused (decision
+D-16 gave it a null subject), and `KR-1`, the key result count, is already the
+Draft Coach's inline message. §6.4 names no trigger for either, and inventing
+one would be adding a proactive message, which CLAUDE.md puts on the
+ask-a-human list.
+
+### 12.2 Acceptance criteria
+
+Given a goal whose key results are all lagging, when the Coach runs, then its
+champion receives one `quality.all_lagging` nudge of kind `quality` at
+escalation step 0, and the goal's stored flags contain `KR-4`.
+
+Given a goal whose key results are all leading, when the Coach runs, then no
+`quality.all_lagging` nudge exists, though `KR-4` is still flagged.
+
+Given a mixed set, when the Coach runs, then neither fires.
+
+Given a closed goal, when the Coach runs, then it is not coached.
+
+Given a workspace with no goals, when the Coach runs, then it records nothing
+and reports no rule keys.
+
+Given a second run inside the deduplication window, when the Coach runs, then
+nothing is delivered and the held nudges carry their reason.
+
+Given the Coach turned off, when the run is called, then it is refused.
+
+Given any Coach run with no provider configured, then its cost is zero and it
+writes no proposal.

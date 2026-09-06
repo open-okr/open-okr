@@ -48,6 +48,36 @@ const ALLOWED = new Set([
 const EXCEPTIONS = new Map<string, string>();
 
 /**
+ * Whole packages a human read and cleared, mirroring the workflow's
+ * `allow-dependencies-licenses`.
+ *
+ * **Not the same list as `EXCEPTIONS`.** That one is for a package whose own
+ * `license` field this script cannot recognise. This one is for a package whose
+ * field is fine and which GitHub's classifier reports differently, because it
+ * scans files rather than reading the field. Both are decisions a person made
+ * after reading the licence text; they fail in different gates.
+ *
+ * Every entry needs the reason, the version read, and the date. A cleared
+ * package with no reason is a hole nobody can audit.
+ */
+const CLEARED_PACKAGES = new Map<string, string>([
+  [
+    "pkg:npm/rou3",
+    "Reported as MIT AND MS-PL because GitHub scans the source repository, " +
+      "which carries an unrelated second licence file. The published tarball " +
+      "is MIT only. Verified on 0.7.12, 2026-08-06.",
+  ],
+  [
+    "pkg:npm/json-schema-typed",
+    "Reported as BSD-2-Clause AND JSON because its LICENSE.md carries IETF " +
+      "copyright notices for the JSON Schema wording it embeds, and the " +
+      "classifier reads JSON as a licence identifier. The file is BSD " +
+      "2-Clause throughout, with no Good-not-Evil clause. Read in full on " +
+      "8.0.2, 2026-08-31.",
+  ],
+]);
+
+/**
  * Identifiers this gate accepts that GitHub's dependency-review action does
  * not. `AGPL-3.0` is deprecated in SPDX in favour of the `-only` and
  * `-or-later` forms, which the action lists instead. Both spellings mean the
@@ -131,6 +161,61 @@ async function checkWorkflowAgrees(): Promise<string[]> {
     }
   }
 
+  problems.push(...checkClearedPackagesAgree(yaml));
+  return problems;
+}
+
+/**
+ * The second half of the policy, which was not being compared (P5-T09b).
+ *
+ * `allow-dependencies-licenses` clears whole *packages* rather than licences,
+ * and this script had two lists to keep in step but only ever checked one. The
+ * file's own reasoning applies to both: two copies of a security policy is a
+ * policy nobody has. Found when the MCP SDK's transitive `json-schema-typed`
+ * failed the action while passing here, which is exactly the drift the check
+ * above exists to prevent, on the field it did not cover.
+ */
+function checkClearedPackagesAgree(yaml: string): string[] {
+  const line = yaml
+    .split("\n")
+    .find((candidate) =>
+      /^\s*allow-dependencies-licenses:/.test(candidate),
+    );
+  if (!line) {
+    return CLEARED_PACKAGES.size === 0
+      ? []
+      : [
+          "This script clears packages that the workflow does not list at all. " +
+            "Add allow-dependencies-licenses to " +
+            ".github/workflows/dependency-review.yml.",
+        ];
+  }
+
+  const workflow = new Set(
+    (line.split(":").slice(1).join(":") ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== ""),
+  );
+
+  const problems: string[] = [];
+  for (const entry of workflow) {
+    if (!CLEARED_PACKAGES.has(entry)) {
+      problems.push(
+        `${entry} is cleared by the workflow but not by this script. ` +
+          "Add it to CLEARED_PACKAGES with the reason it was read and cleared.",
+      );
+    }
+  }
+  for (const [entry] of CLEARED_PACKAGES) {
+    if (!workflow.has(entry)) {
+      problems.push(
+        `${entry} is cleared by this script but not by the workflow. ` +
+          "Add it to allow-dependencies-licenses in " +
+          ".github/workflows/dependency-review.yml.",
+      );
+    }
+  }
   return problems;
 }
 

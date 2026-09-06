@@ -210,6 +210,71 @@ async function applyValues<
   return written;
 }
 
+export interface StartDraftInput {
+  readonly workspaceId: string;
+  readonly goalId: string;
+  readonly authorMemberId: string;
+}
+
+export interface StartDraftResult {
+  readonly checkInId: string;
+  /** True when an open draft already existed and was continued. */
+  readonly reopened: boolean;
+}
+
+/**
+ * Opens or continues this author's draft check-in on a goal (P4-T05c-a).
+ *
+ * Extracted from `goals.startCheckIn`, which was the only caller until an agent
+ * proposal needed the same three lines. **One draft per author per goal** is the
+ * rule, and the unique index enforces it too: opening a second would fail rather
+ * than duplicate, so continuing the existing one is the only correct behaviour
+ * rather than a convenience.
+ *
+ * Silent by design. A draft emits no notification and changes nothing anybody
+ * else can see, which is why an action that opens one and publishes it in the
+ * same Operation is a publish rather than two events.
+ *
+ * Access is the caller's to check. This writes on the transaction it is given
+ * and asks no questions about who is allowed to.
+ */
+export async function startDraftInTx<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: StartDraftInput): Promise<StartDraftResult> {
+  const [existing] = await tx
+    .select({ id: checkIns.id })
+    .from(checkIns)
+    .where(
+      activeOnly(
+        checkIns,
+        eq(checkIns.workspaceId, input.workspaceId),
+        eq(checkIns.subjectId, input.goalId),
+        eq(checkIns.authorMemberId, input.authorMemberId),
+        eq(checkIns.state, "draft"),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    return { checkInId: existing.id, reopened: true };
+  }
+
+  // openokr:allow-mutation: writes on the transaction the calling Operation
+  // opened, so the draft and that Operation's audit row commit together.
+  const [created] = await tx
+    .insert(checkIns)
+    .values({
+      workspaceId: input.workspaceId,
+      subjectId: input.goalId,
+      authorMemberId: input.authorMemberId,
+      state: "draft",
+    })
+    .returning({ id: checkIns.id });
+  if (!created) {
+    throw new Error("The check-in insert returned no row.");
+  }
+  return { checkInId: created.id, reopened: false };
+}
+
 export interface PublishResult {
   readonly goalId: string;
   readonly snapshotId: string;
