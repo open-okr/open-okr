@@ -17,15 +17,19 @@
  */
 import {
   activeOnly,
+  blockers,
   checkIns,
+  commitments,
   goals,
+  okrSessions,
+  proposedChanges,
   spaces,
   taskAssignees,
   tasks,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, asc, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -94,6 +98,48 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
+}
+
+/**
+ * Whether this member reaches this resource at this level (P6-G02).
+ *
+ * The general form of `canSeeGoal` below, which stays as it is because three
+ * sources read it and its name says what it asks. Four sources landed at
+ * P6-G02 asking about spaces, subjects of a proposal and the workspace itself,
+ * and each writing its own try-catch would have been four chances to get the
+ * fail-closed direction wrong.
+ *
+ * A resource type the subject resolver does not know raises, and raising is
+ * caught here as "no". Fail-closed is the only safe direction: the alternative
+ * lists somebody else's obligation on this member's screen.
+ */
+async function canReach(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  resourceType: string,
+  resourceId: string,
+  requires: number = ACCESS_LEVELS.view,
+): Promise<boolean> {
+  try {
+    await getAccessScoped(tx, {
+      workspaceId,
+      memberId,
+      resourceType,
+      resourceId,
+      requires: requires as never,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The Sunday-to-Saturday week a commitment's `week_start` opens. */
+function endOfWeek(weekStart: string): string {
+  const start = new Date(`${weekStart}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() + 6);
+  return start.toISOString().slice(0, 10);
 }
 
 /** True when this member may see this goal at all. Not-found means no. */
@@ -335,6 +381,278 @@ export const reviewInbox = defineReadAction({
             href: `/tasks/${row.id}`,
             actionLabel: "Open the task",
             subjectId: row.id,
+            checkInId: null,
+          });
+        }
+
+        // Source 4: the blockers this member owns, or had one escalated to
+        // them (P3-T09, P4-T07c). Both, because an escalation is precisely an
+        // obligation moving to somebody else, and a coordinator who is never
+        // told is the failure this screen exists to prevent. `due_at` is not
+        // null on the table, so a blocker always has a clock.
+        const owned = await tx
+          .select({
+            id: blockers.id,
+            type: blockers.type,
+            description: blockers.description,
+            dueAt: blockers.dueAt,
+            goalId: blockers.goalId,
+            goalTitle: goals.title,
+            escalatedToId: blockers.escalatedToId,
+          })
+          .from(blockers)
+          .leftJoin(goals, eq(goals.id, blockers.goalId))
+          .where(
+            and(
+              activeOnly(
+                blockers,
+                eq(blockers.workspaceId, context.workspaceId),
+                isNull(blockers.resolvedAt),
+              ),
+              or(
+                eq(blockers.ownerId, memberId),
+                eq(blockers.escalatedToId, memberId),
+              ),
+            ),
+          )
+          .orderBy(asc(blockers.dueAt));
+
+        for (const row of owned) {
+          const days = daysPastDue(row.dueAt, now, timeZone);
+          if (days === null) {
+            continue;
+          }
+          // A blocker hangs off a goal, so the goal decides who may see it. A
+          // blocker with no goal is one raised against a key result whose goal
+          // link was not set, and it is skipped rather than shown to somebody
+          // the access model never approved.
+          if (
+            !row.goalId ||
+            !(await canSeeGoal(tx, context.workspaceId, memberId, row.goalId))
+          ) {
+            continue;
+          }
+          const escalated = row.escalatedToId === memberId;
+          obligations.push({
+            id: `blocker:${row.id}`,
+            kind: "blocker",
+            group: groupFor(days),
+            title: `Clear the blocker on "${row.goalTitle ?? "a key result"}"`,
+            meta: `${escalated ? "Escalated to you" : "Owner"} · ${row.type.replace(/_/g, " ")}${
+              row.description ? ` · ${row.description}` : ""
+            }`,
+            dueLabel: dueLabelFor(days, dueLocalDate(row.dueAt, timeZone)),
+            dueOn: dueLocalDate(row.dueAt, timeZone),
+            daysPastDue: days,
+            href: `/goals/${row.goalId}`,
+            actionLabel: "Open the blocker",
+            subjectId: row.goalId,
+            checkInId: null,
+          });
+        }
+
+        // Source 5: this week's commitments (P4-T08). A commitment is due at
+        // the end of the week it was set in, which is what `week_start` plus
+        // six days means; the session that closes it is what sets `closed_at`.
+        const promised = await tx
+          .select({
+            id: commitments.id,
+            text: commitments.text,
+            weekStart: commitments.weekStart,
+            spaceId: commitments.spaceId,
+            spaceName: spaces.name,
+            sessionId: commitments.sessionId,
+          })
+          .from(commitments)
+          .innerJoin(spaces, eq(spaces.id, commitments.spaceId))
+          .where(
+            and(
+              activeOnly(
+                commitments,
+                eq(commitments.workspaceId, context.workspaceId),
+                eq(commitments.ownerId, memberId),
+                isNull(commitments.closedAt),
+              ),
+            ),
+          )
+          .orderBy(asc(commitments.weekStart));
+
+        for (const row of promised) {
+          const dueOn = endOfWeek(row.weekStart);
+          const days = daysPastDue(
+            new Date(`${dueOn}T00:00:00Z`),
+            now,
+            timeZone,
+          );
+          if (days === null) {
+            continue;
+          }
+          if (
+            !(await canReach(
+              tx,
+              context.workspaceId,
+              memberId,
+              "space",
+              row.spaceId,
+            ))
+          ) {
+            continue;
+          }
+          obligations.push({
+            id: `commitment:${row.id}`,
+            kind: "commitment",
+            group: groupFor(days),
+            title: row.text,
+            meta: `Committed · ${row.spaceName} · week of ${row.weekStart}`,
+            dueLabel: dueLabelFor(days, dueOn),
+            dueOn,
+            daysPastDue: days,
+            href: row.sessionId
+              ? `/session/${row.sessionId}`
+              : `/spaces/${row.spaceId}`,
+            actionLabel: "Open the session",
+            subjectId: row.spaceId,
+            checkInId: null,
+          });
+        }
+
+        // Source 6: the sessions this member is down to facilitate (P4-T04).
+        // Scheduled only: a running session is already being run, and a closed
+        // or skipped one is nobody's obligation.
+        const toRun = await tx
+          .select({
+            id: okrSessions.id,
+            kind: okrSessions.kind,
+            title: okrSessions.title,
+            scheduledFor: okrSessions.scheduledFor,
+            spaceId: okrSessions.spaceId,
+            spaceName: spaces.name,
+          })
+          .from(okrSessions)
+          .innerJoin(spaces, eq(spaces.id, okrSessions.spaceId))
+          .where(
+            and(
+              activeOnly(
+                okrSessions,
+                eq(okrSessions.workspaceId, context.workspaceId),
+                eq(okrSessions.facilitatorId, memberId),
+                eq(okrSessions.state, "scheduled"),
+                isNotNull(okrSessions.scheduledFor),
+              ),
+            ),
+          )
+          .orderBy(asc(okrSessions.scheduledFor));
+
+        for (const row of toRun) {
+          const days = daysPastDue(row.scheduledFor, now, timeZone);
+          // `space_id` is nullable on the table, and the inner join above
+          // already excludes a session without one. The check is here so the
+          // types agree with what the query guarantees.
+          if (days === null || !row.spaceId) {
+            continue;
+          }
+          if (
+            !(await canReach(
+              tx,
+              context.workspaceId,
+              memberId,
+              "space",
+              row.spaceId,
+            ))
+          ) {
+            continue;
+          }
+          obligations.push({
+            id: `session:${row.id}`,
+            kind: "session",
+            group: groupFor(days),
+            title: `Run the ${row.kind} session${row.title ? `: ${row.title}` : ""}`,
+            meta: `Facilitator · ${row.spaceName}`,
+            dueLabel: dueLabelFor(
+              days,
+              dueLocalDate(row.scheduledFor, timeZone),
+            ),
+            dueOn: dueLocalDate(row.scheduledFor, timeZone),
+            daysPastDue: days,
+            href: `/session/${row.id}`,
+            actionLabel: "Open the session",
+            subjectId: row.spaceId,
+            checkInId: null,
+          });
+        }
+
+        // Source 7: agent proposals waiting on a decision (P2-T17, P4-T05).
+        // "Propose by default" is a hard rule and a proposal nobody is told
+        // about is the same as an agent that never spoke.
+        //
+        // **Who owes the decision is answered by access, because the table has
+        // no assignee.** A proposal is listed for a member who can reach its
+        // subject at edit level, which is the same access applying it will
+        // need. A proposal with no subject, or one whose subject type the
+        // resolver does not know, falls back to workspace administration:
+        // fail-closed for an ordinary member, and the queue still has an owner.
+        //
+        // Copilot proposals are excluded. They belong to the thread that asked
+        // for them and the panel that shows them, not to a shared queue.
+        const waiting = await tx
+          .select({
+            id: proposedChanges.id,
+            action: proposedChanges.action,
+            subjectType: proposedChanges.subjectType,
+            subjectId: proposedChanges.subjectId,
+            createdAt: proposedChanges.createdAt,
+          })
+          .from(proposedChanges)
+          .where(
+            // No `activeOnly` here: `proposed_changes` carries no
+            // `deleted_at`. A proposal is applied or dismissed rather than
+            // deleted, which is what `status` already says.
+            and(
+              eq(proposedChanges.workspaceId, context.workspaceId),
+              eq(proposedChanges.status, "pending"),
+              isNotNull(proposedChanges.runId),
+            ),
+          )
+          .orderBy(asc(proposedChanges.createdAt));
+
+        for (const row of waiting) {
+          const reachable =
+            row.subjectType && row.subjectId
+              ? await canReach(
+                  tx,
+                  context.workspaceId,
+                  memberId,
+                  row.subjectType,
+                  row.subjectId,
+                  ACCESS_LEVELS.edit,
+                )
+              : await canReach(
+                  tx,
+                  context.workspaceId,
+                  memberId,
+                  "workspace",
+                  context.workspaceId,
+                  ACCESS_LEVELS.full,
+                );
+          if (!reachable) {
+            continue;
+          }
+          const age = daysPastDue(row.createdAt, now, timeZone) ?? 0;
+          obligations.push({
+            id: `proposal:${row.id}`,
+            kind: "proposal",
+            // A proposal has no due date. It is owed from the moment it exists,
+            // which is what the acknowledgement grouping already expresses, so
+            // the same escalation threshold decides when it stops being new.
+            group: acknowledgementGroup(age, escalateAfter),
+            title: `Decide on the proposed ${row.action.replace(/\./g, " ")}`,
+            meta: `Agent proposal · ${publishedAgo(age)}`,
+            dueLabel: acknowledgementDueLabel(age, escalateAfter),
+            dueOn: dueLocalDate(row.createdAt, timeZone),
+            daysPastDue: age,
+            href: "/admin/agents",
+            actionLabel: "Review the proposal",
+            subjectId: row.subjectId ?? context.workspaceId,
             checkInId: null,
           });
         }

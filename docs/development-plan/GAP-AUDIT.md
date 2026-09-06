@@ -60,9 +60,11 @@ The outbox relay does run, so a side effect that a write enqueues is delivered. 
 
 `schedule.ts:7` states the reason as "The repository has no relay host and no worker process". The relay host now exists ([relay.ts](../../apps/web/lib/relay.ts)); the worker process still does not, and the comment is stale.
 
-## B-02: The review inbox shows two of six obligation sources
+## B-02: The review inbox shows three of seven obligation sources
 
-- [ ] Fill the four `PENDING_SOURCES` entries whose tasks are done
+- [x] Fill the four `PENDING_SOURCES` entries whose tasks are done. **Closed at P6-G02.** All seven sources now compute: check-ins as champion, acknowledgements as reviewer of record, assigned tasks, blockers owned or escalated, open commitments, sessions to facilitate, and agent proposals waiting on a decision. `PENDING_SOURCES` is empty and kept, because the mechanism is what made this gap legible in the first place.
+
+**A correction to the count.** The audit said two of six. It is three of seven: `task` was already built at P5-T11 and is not in `PENDING_SOURCES`, so the array's four entries sat beside three working sources rather than two. The finding is unchanged; the arithmetic was wrong.
 
 [obligations.ts:79-88](../../packages/core/src/review/obligations.ts#L79-L88) declares four sources as unbuilt, each naming the task that fills it:
 
@@ -203,7 +205,7 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 | Route | Screen | Reach | E2E | Findings |
 |---|---|---|---|---|
 | [/](../../apps/web/app/page.tsx) | S-01 | nav | yes | |
-| [/review](../../apps/web/app/review/page.tsx) | S-02 | nav | yes | **B-02** four of six sources missing. **G** "Your week" absent ([page.tsx:35](../../apps/web/app/review/page.tsx#L35)) |
+| [/review](../../apps/web/app/review/page.tsx) | S-02 | nav | yes | **B-02** four of seven sources missing (closed at P6-G02). **G** "Your week" absent ([page.tsx:35](../../apps/web/app/review/page.tsx#L35)) |
 | [/search](../../apps/web/app/search/page.tsx) | S-32 | nav | yes | |
 | *missing* | S-03 Inbox | none | none | **B-06** |
 | *missing* | S-31 Activity feed | none | none | **G-01**, below |
@@ -403,9 +405,9 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 
 ## First, because they change what everything else means
 
-- [ ] **B-01** the scheduler host. Without it no agent, summary, batch or sweep runs, and the product's central claim is untrue. Everything in the coaching layer is untested in the shape a user meets it.
-- [ ] **B-02** the four review-inbox sources. The obligations are all computable today and the file already names what is missing.
-- [ ] **B-11** storage. Decide the driver question before anybody runs the Helm chart in earnest.
+- [x] **B-01** the scheduler host. Closed at P6-G01a; the batch drain and the blob reap are P6-G01b and P6-G01c. Without it no agent, summary, batch or sweep runs, and the product's central claim is untrue. Everything in the coaching layer is untested in the shape a user meets it.
+- [x] **B-02** the four review-inbox sources. Closed at P6-G02.
+- [x] **B-11** storage. Closed at P6-G04 (defaults) and P6-G05 (the driver).
 
 ## Then, the screens that do not exist
 

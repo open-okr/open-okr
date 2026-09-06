@@ -32,9 +32,16 @@ import { NudgeProvenance } from "./nudge-provenance.tsx";
  * says so: choosing not to be messaged about a thing is not the same as no
  * longer owing it.
  *
- * "Your week" is still absent. It needs the blocker clock and the session
- * streak, which are P4-T07c and P4-T08, and drawing it with invented numbers
- * would make the screen look finished while telling somebody something untrue.
+ * **All seven sources are here since P6-G02**: check-ins as champion,
+ * acknowledgements as reviewer of record, assigned tasks, blockers owned or
+ * escalated, commitments still open, sessions to facilitate, and agent
+ * proposals waiting on a decision. Four of those were declared and empty for
+ * weeks after the tasks that were supposed to fill them had landed, which is
+ * what the gap audit of 7 September 2026 recorded as B-02.
+ *
+ * "Your week" is still absent. It is the summary strip S-02 also asks for, and
+ * it belongs with the confidence trend and the streak ribbon at P6-G19 rather
+ * than being drawn here from a second read of the same tables.
  */
 
 const GROUPS = [
@@ -129,30 +136,37 @@ export default async function ReviewPage() {
           })
         )}
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Not here yet</h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-1.5">
-            <p className="text-xs text-ink-3">
-              S-02 lists six sources of obligation. Two of them work. The rest
-              are named here rather than left out, so this page cannot look
-              complete while quietly failing to tell you about something you
-              own.
-            </p>
-            <ul className="flex flex-col gap-1">
-              {inbox.pending.map((source) => (
-                <li
-                  key={source.kind}
-                  className="flex items-center justify-between gap-2.5 text-xs"
-                >
-                  <span className="text-ink-2">{source.label}</span>
-                  <Chip tone="neutral">{source.task}</Chip>
-                </li>
-              ))}
-            </ul>
-          </CardBody>
-        </Card>
+        {/* Empty since P6-G02, and the card is kept rather than deleted. It
+            listed four sources naming P3-T09, P4-T07, P4-T04 and P4-T05, and
+            all four of those tasks had been done for weeks by the time the gap
+            audit read it. The mechanism is what makes the next source that
+            arrives ahead of its reader legible; the card renders nothing when
+            there is nothing to say. */}
+        {inbox.pending.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">Not here yet</h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1.5">
+              <p className="text-xs text-ink-3">
+                These sources of obligation are named here rather than left out,
+                so this page cannot look complete while quietly failing to tell
+                you about something you own.
+              </p>
+              <ul className="flex flex-col gap-1">
+                {inbox.pending.map((source) => (
+                  <li
+                    key={source.kind}
+                    className="flex items-center justify-between gap-2.5 text-xs"
+                  >
+                    <span className="text-ink-2">{source.label}</span>
+                    <Chip tone="neutral">{source.task}</Chip>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
