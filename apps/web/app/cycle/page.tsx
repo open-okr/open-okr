@@ -293,10 +293,10 @@ export default async function CyclePage({
               <CardBody>
                 <p className="text-sm text-ink-3">
                   {viewing === 0
-                    ? "The annual strategy surface arrives with the frame editor at P4-T02."
+                    ? "The annual strategy surface arrives at P6-G14: the frame, the annual strategies and the year's not-doing list."
                     : viewing === 6
-                      ? "The running cadence arrives with check-ins at P3-T07 and sessions at P4-T04."
-                      : "Scoring every key result and writing the cycle retrospective arrive with the review at P4-T08. The arithmetic behind the scores is already here."}
+                      ? "The running cadence view arrives at P6-G15: sessions held and upcoming, the streak, confidence per key result and open blockers by age. The check-ins and sessions it reads already exist."
+                      : "Scoring every key result and writing the cycle retrospective arrive at P6-G16. The arithmetic behind the scores is already here."}
                 </p>
               </CardBody>
             </Card>

@@ -123,8 +123,14 @@ packages/db         Drizzle schema, migrations, row-level security, seed,
                     data-change runner, soft-delete scope
 packages/adapters   Ports and drivers (the only place vendor SDKs live) plus
                     the outbox relay
-packages/agents     The Coach and Champion runtimes, the trigger catalogue and
-                    scheduler, run state machines, proposal envelopes
+packages/agents     Run state machines, the schedule the runs are registered
+                    under, structured extraction, and the AI capabilities the
+                    runs call. The Coach's and the Champion's own seeding and
+                    scope are in packages/core/src/agents/ instead, because
+                    both are created inside the workspace-provisioning
+                    transaction and so need packages/db, which this package
+                    sits above rather than beside. Corrected 7 September 2026:
+                    this line said the runtimes lived here and they never did
 packages/importer   The import command line, and the FlowyTeam connector
 packages/cli        The `okr` command line. Reads contract/cli.json and calls
                     the REST surface. No runtime dependency on anything

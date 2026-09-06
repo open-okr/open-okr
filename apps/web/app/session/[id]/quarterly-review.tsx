@@ -342,15 +342,15 @@ export function QuarterlyReview({
                   <p className="text-sm text-ink-2">{current.purpose}</p>
                   {stageHasPanel ? null : (
                     <p className="text-xs text-ink-4">
-                      {/* Named rather than left blank. A stage that renders
-                          nothing reads as a broken screen; a stage that says
-                          which task fills it reads as a product being built.
-                          Stages one to four have their panels now, so this line
-                          is only for the ones that do not. */}
-                      This stage's own panel arrives with its task: the retros
-                      and the diagnostic at P4-T11, the reset at P4-T11c, the
-                      minutes at P4-T12. The rail, the pacing and the notes work
-                      now.
+                      {/* Every one of the eleven stages has a panel since
+                          P4-T12, so `stageHasPanel` is true in practice and
+                          this is the floor rather than a state anybody meets.
+                          It named three tasks that had all landed until the gap
+                          audit of 7 September 2026; a fallback that lies is
+                          worse than one that admits it does not know. */}
+                      This stage has no panel on this screen. The rail, the
+                      pacing and the notes work, and the stage can still be
+                      advanced.
                     </p>
                   )}
                 </>

@@ -96,6 +96,7 @@ export async function AppShellLayout({
   );
   const sidebarItems = navigationFor("sidebar", level);
   const adminItems = navigationFor("admin", level);
+  const accountItems = sidebarItems.filter((item) => item.group === "account");
   const strip = await loadCycleStrip(
     workspace.workspaceId,
     session.user.id,
@@ -170,11 +171,16 @@ export async function AppShellLayout({
             avatarMenu={
               <AvatarMenu
                 name={workspace.name}
-                items={[
-                  { href: "/account/security", label: "Security settings" },
-                  { href: "/account/channels", label: "Where to reach you" },
-                  { href: "/account/api-tokens", label: "API tokens" },
-                ]}
+                // From the registry rather than a literal list. A literal one
+                // is how /account/channels shipped unlinked at P5-T02c and how
+                // /account/connections was still unlinked four tasks later:
+                // the page and the menu were two places to remember, and only
+                // one of them ever got opened. reachability.test.ts asserts
+                // the two agree.
+                items={accountItems.map((item) => ({
+                  href: item.href,
+                  label: item.label,
+                }))}
                 signOut={<SignOut />}
               />
             }

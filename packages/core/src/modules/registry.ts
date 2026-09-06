@@ -277,6 +277,30 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         group: "account",
         minLevel: ACCESS_LEVELS.view,
       },
+      {
+        id: "account-api-tokens",
+        label: "API tokens",
+        href: "/account/api-tokens",
+        section: "sidebar",
+        group: "account",
+        // A member's own tokens carry their own access and nobody else's, so
+        // there is nothing here to withhold from anybody (P5-T08a).
+        minLevel: ACCESS_LEVELS.view,
+      },
+      {
+        id: "account-connections",
+        label: "Connected apps",
+        href: "/account/connections",
+        section: "sidebar",
+        group: "account",
+        // P5-T08c's goal is "the place a person sees and ends what they
+        // granted", and until the gap audit of 7 September 2026 nothing linked
+        // to it: the only mention of the route anywhere in the application was
+        // the revalidation call in its own directory. The registry is the one
+        // list the sidebar, the avatar menu and the reachability test all read,
+        // so a page added here cannot go missing the way this one did.
+        minLevel: ACCESS_LEVELS.view,
+      },
     ],
   },
   {

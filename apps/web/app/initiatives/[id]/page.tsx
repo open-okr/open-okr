@@ -27,10 +27,10 @@ import { UnlinkButton } from "./unlink-button.tsx";
  * One initiative (UIUX-PLAN.md §6 S-26, P5-T10b).
  *
  * S-26 asks for "description, linked key results, tasks and documents". Two of
- * those four do not exist yet, and each says so here rather than being quietly
- * absent: tasks arrive at P5-T11 and documents at P5-T12. Drawing an empty
- * panel labelled "Tasks" would read as a team with no work rather than as a
- * product with no table.
+ * those four are not on this page yet, and each says so here rather than being
+ * quietly absent. Their tables landed at P5-T11 and P5-T12 and the panels are
+ * P6-G28's; until then, drawing an empty panel labelled "Tasks" would read as a
+ * team with no work rather than as a page that cannot see the work.
  *
  * **The linked key results are the point of the screen.** METHOD.md §5.5 asks a
  * facilitator to record the main initiatives that will move each measure, and
@@ -249,12 +249,13 @@ export default async function InitiativePage({
           <CardBody>
             <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-ink-3">
               <li>
-                Tasks and the board arrive at P5-T11. Until then this
-                initiative's progress reads zero for everybody, which is honest
-                rather than empty: progress is the share of its own tasks that
-                are done, and there are no tasks.
+                The tasks panel arrives at P6-G28. Until then this initiative's
+                progress reads zero for everybody, which is honest rather than
+                empty: progress is the share of its own tasks that are done, and
+                this page cannot yet read them. The tasks themselves exist, and
+                the board at <code>/board</code> shows them.
               </li>
-              <li>Documents and attachments arrive at P5-T12.</li>
+              <li>Documents and attachments arrive at P6-G28 beside them.</li>
             </ul>
           </CardBody>
         </Card>

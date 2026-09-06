@@ -699,11 +699,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
         </Card>
       )}
 
-      {/* Placeholders for data that arrives with later tasks */}
+      {/* The tables exist; the panels that read them do not yet. The line said
+          "appear once their tables exist" from P4-T07 until the gap audit of
+          7 September 2026 found all three tables shipped and the sentence still
+          standing, which is the kind of claim that stops anybody looking. */}
       {isRunning && !isMonthly && !isQuarterly && (
         <p className="text-xs text-ink-3">
-          Confidence trend (P4-T07b), blockers (P4-T07c) and streak (P4-T08)
-          appear once their tables exist.
+          The confidence trend, the open blockers with their ages, the streak
+          ribbon and this week's commitments arrive at P6-G19. Their tables are
+          already here.
         </p>
       )}
     </div>

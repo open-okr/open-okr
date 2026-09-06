@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Twenty-nine tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1626,6 +1626,13 @@ Goal: the Definition of Done's one-happy-path-per-screen line is true (GAP-AUDIT
 Deliverables: an end-to-end path for each of the 16 routes that has none, plus one for every screen G06 to G26 adds; the spec naming convention fixed so a file's prefix names the screen it covers.
 Test plan: the suite is the test plan. Each spec drives the screen's happy path through the real standalone server against a seeded database.
 Acceptance: every route in the module registry has at least one end-to-end path, asserted by a test that enumerates the registry rather than a fixed list.
+
+### P6-G30: The KPI grid's sparklines, subtotals and filters [M]
+Depends on: P3-T12, P3-T13
+Goal: finish S-20 (GAP-AUDIT, the `/kpis` row).
+Deliverables: the row sparkline and the category subtotal, both computed with the aggregate rules already in `packages/method`; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
+Test plan: a subtotal matches the method function exactly rather than being summed here; a sparkline on a KPI with one record renders without a line and says so; a filter combination survives a reload through the URL; a calculated cell shows its formula and stays read-only.
+Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal matches `packages/method` and each row draws its own twelve-period sparkline.
 
 **Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
 

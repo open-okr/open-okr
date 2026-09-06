@@ -280,10 +280,10 @@ export default async function ScorecardPage() {
               </ActionForm>
 
               <p className="text-xs text-ink-4">
-                Both are part of the quarterly review's own close at P4-T12.
-                They sit here until that session exists, because an action
-                nobody can reach is an action nobody can check. Running either
-                twice changes nothing.
+                Both belong to the quarterly review's own close, which exists
+                now, and to cycle phase 7, which arrives at P6-G16. They stay
+                here as well, because an action nobody can reach is an action
+                nobody can check. Running either twice changes nothing.
               </p>
             </CardBody>
           </Card>

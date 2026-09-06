@@ -7,8 +7,10 @@ import {
   Columns3,
   Hammer,
   Home,
+  KeyRound,
   Layers,
   MessageSquare,
+  Plug,
   RefreshCw,
   Search,
   Shield,
@@ -51,6 +53,8 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   spaces: <Layers className="size-full" />,
   "account-channels": <MessageSquare className="size-full" />,
   "account-security": <Shield className="size-full" />,
+  "account-api-tokens": <KeyRound className="size-full" />,
+  "account-connections": <Plug className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */

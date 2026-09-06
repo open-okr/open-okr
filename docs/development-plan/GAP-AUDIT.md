@@ -349,7 +349,9 @@ UIUX-PLAN §9 asks every UI task to verify "Dark mode and compact density". A re
 
 24 spec files reach 31 of the 47 routes. The 16 with no path: `/backup-code`, `/forgot-password`, `/reset-password`, `/account/security`, `/admin`, `/admin/branding`, `/admin/nudges`, `/admin/rhythm`, `/goals/studio`, `/initiatives/[id]`, `/kpis/[id]`, `/scorecard`, `/session/[id]/minutes` (the page itself; its export and pdf routes are covered), `/tasks/[id]`, `/dev/components`, `/dev/rich-text`. The last three of those are arguably exempt: two are development-only and one is a redirect.
 
-Spec file names have drifted from the screen numbers: `s37-api-tokens.spec.ts` covers `/account/api-tokens` while S-37 is the AI console, `s38-device-login.spec.ts` covers the device flow while S-38 is agent detail, and `s41-mcp-transport.spec.ts` names a screen that does not exist. Rename or drop the prefix.
+Spec file names have drifted from the screen numbers: `s37-api-tokens.spec.ts` covers `/account/api-tokens` while S-37 is the AI console, `s38-device-login.spec.ts` covers the device flow while S-38 is agent detail, and `s41-mcp-transport.spec.ts` names a screen that does not exist.
+
+**Closed at P6-G03 by documenting rather than renaming.** Six documents cite these paths, including two design documents and STATUS.md rows that are the audit trail for reviewed work, so a rename would point a historical record at a file that does not exist. `e2e/README.md` now carries the table of which five prefixes are task-era labels, and states that a new spec takes the screen number it drives or no prefix at all.
 
 ---
 
@@ -427,13 +429,20 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 
 ## Housekeeping, cheap and worth doing in one pass
 
-- [ ] Remove or correct the eight stale on-screen strings: `cycle/page.tsx:296-299`, `session/[id]/page.tsx:706`, `initiatives/[id]/page.tsx:252,257`, `kpis/page.tsx:148,197`, `scorecard/page.tsx:283`, `quarterly-review.tsx:350-353`, and `check-in/timeline.tsx:228` once P3-T16 lands.
-- [ ] **B-12** link `/account/connections` from the avatar menu. One line, and it closes a blocker.
-- [ ] Add `notFound()` to `kpis/[id]`.
-- [ ] Correct the stale comment at `packages/agents/src/schedule.ts:7`, which says no relay host exists.
-- [ ] Reconcile CLAUDE.md's repo layout with the Coach and Champion living in `packages/core/src/agents/`.
-- [ ] Rename the e2e specs whose `sNN` prefix no longer matches a screen number.
-- [ ] Delete the four unused `shell.mobile.*` catalogue keys, or use them.
+Closed at **P6-G03** on 7 September 2026, except where noted.
+
+- [x] Correct the stale on-screen strings: `cycle/page.tsx`, `session/[id]/page.tsx`, `initiatives/[id]/page.tsx`, `kpis/page.tsx` (twice), `scorecard/page.tsx` and `quarterly-review.tsx`. Each now names the gap-closure row that fills it. `check-in/timeline.tsx:228` is left as it stands, because P3-T16 is genuinely `in_progress`.
+- [x] **B-12** `/account/connections` linked. Both it and `/account/api-tokens` are module-registry rows now, and the avatar menu is built from the registry rather than a literal list, which is what made this recur four times.
+- [x] `notFound()` added to `kpis/[id]`.
+- [x] CLAUDE.md's repo layout reconciled. The split is intentional: the Coach and Champion are seeded inside the workspace-provisioning transaction, so they need `packages/db` and cannot live above it.
+- [x] The four unused `shell.mobile.*` catalogue keys deleted.
+- [x] The e2e spec-name drift documented in `e2e/README.md` rather than renamed, because six documents cite the current paths. See G-10.
+- [ ] Correct the stale comment at `packages/agents/src/schedule.ts:7`, which says no relay host exists. Left for **P6-G01**, which is the row that makes the rest of that comment wrong too.
+
+## What P6-G03 added that the audit did not ask for
+
+- `apps/web/test/reachability.test.ts`. The audit found the fourth instance of one defect, so the fix is a test rather than a link: every `page.tsx` must be in the module registry or named by a source file **outside its own directory**. The directory exclusion is the part that matters, because the only mention of `/account/connections` in the whole application was the `revalidatePath` in its own action file.
+- **P6-G30**, for the KPI grid's sparklines, subtotals and filters. The grid's own card named P3-T13 as the blocker, P3-T13 had landed, and no task anywhere owned the three items, so correcting the string honestly meant creating the row it points at.
 
 ---
 
