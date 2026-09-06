@@ -860,6 +860,8 @@ export {
   type MailProbeOptions,
   mailProbe,
   notInThisBuild,
+  type StorageProbeOptions,
+  storageProbe,
 } from "./setup/probes.ts";
 export {
   readSetupState,

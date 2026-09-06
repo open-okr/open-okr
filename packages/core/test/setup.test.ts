@@ -12,6 +12,7 @@ import {
   databaseProbe,
   mailProbe,
   notInThisBuild,
+  storageProbe,
 } from "../src/setup/probes.ts";
 import { readSetupState } from "../src/setup/state.ts";
 import { isRegistrationOpen } from "../src/workspaces/registration.ts";
@@ -100,6 +101,39 @@ describe("connection tests", () => {
       }),
     ]);
     expect(result?.outcome).toBe("failed");
+  });
+  it("proves files can be stored by writing one, not by reading", async () => {
+    // The failures worth catching here are an unwritable directory, a bucket
+    // that does not exist and a key pair that cannot put. A read proves none
+    // of the three, and all three otherwise surface as a broken upload weeks
+    // later, which reads as a product fault rather than a setup one.
+    const written: string[] = [];
+    const [result] = await runConnectionTests([
+      storageProbe({
+        describe: () => "local disk at storage",
+        verify: async () => {
+          written.push("probe");
+        },
+      }),
+    ]);
+    expect(written).toEqual(["probe"]);
+    expect(result?.port).toBe("storage");
+    expect(result?.outcome).toBe("ok");
+    expect(result?.detail).toMatch(/local disk at storage/);
+  });
+
+  it("reports storage that cannot be written to, naming where", async () => {
+    const [result] = await runConnectionTests([
+      storageProbe({
+        describe: () => "S3-compatible bucket openokr-files at AWS S3",
+        verify: async () => {
+          throw new Error("The specified bucket does not exist");
+        },
+      }),
+    ]);
+    expect(result?.outcome).toBe("failed");
+    expect(result?.detail).toMatch(/openokr-files/);
+    expect(result?.detail).toMatch(/does not exist/);
   });
 });
 

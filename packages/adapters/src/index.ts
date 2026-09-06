@@ -107,6 +107,11 @@ export {
   type LocalDiskStorageOptions,
 } from "./drivers/storage/local-disk.ts";
 export {
+  refuseUnsafeKey,
+  S3Storage,
+  type S3StorageOptions,
+} from "./drivers/storage/s3.ts";
+export {
   type CheckedUrl,
   checkUrl,
   isBlockedAddress,

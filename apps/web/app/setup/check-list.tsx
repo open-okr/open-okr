@@ -24,6 +24,7 @@ const VERDICT_STATES: Record<ConnectionTest["outcome"], VerdictState> = {
 const PORT_NAMES: Record<string, string> = {
   database: "Database",
   mail: "Mail",
+  storage: "File storage",
   channel: "Chat channels",
   ai: "AI provider",
 };

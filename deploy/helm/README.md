@@ -66,18 +66,49 @@ either restarts. The gap audit recorded it as B-11.
 refused at template time, with an explanation, because such a volume cannot be
 mounted by pods on more than one node.
 
-To run more than one replica:
+To run more than one replica, pick one:
 
-- give storage a `ReadWriteMany` class: `--set persistence.accessMode=ReadWriteMany`
+- a `ReadWriteMany` class: `--set persistence.accessMode=ReadWriteMany`
+- S3-compatible object storage, which is shared by definition
 
 Turning persistence off is allowed and not refused. An instance that accepts no
 uploads is entitled to run that way, and refusing it would break a release that
 is already running. `helm install` prints what it costs.
 
-S3-compatible object storage is the third option in the plan and there is no
-driver for it in this build. P6-G05 adds one. The refusal used to name it and
-does not any more, because advice an operator cannot follow costs them an
-afternoon.
+### S3-compatible object storage
+
+Naming a bucket is the whole switch. Works with AWS S3, MinIO, Ceph, Garage,
+Cloudflare R2, Backblaze B2 and DigitalOcean Spaces: set `storage.s3.endpoint`
+for anything that is not AWS.
+
+```sh
+kubectl create secret generic openokr-s3 \
+  --from-literal=access-key-id=... \
+  --from-literal=secret-access-key=...
+
+helm upgrade openokr . \
+  --set storage.s3.bucket=openokr-files \
+  --set storage.s3.existingSecret=openokr-s3 \
+  --set storage.s3.endpoint=https://s3.example.com \
+  --set replicaCount=3
+```
+
+Credentials come from a Secret and never from values, because a value lands in
+the release and `helm get values` reads it back. The chart refuses a bucket
+with no Secret named.
+
+A named bucket lifts the single-replica limit: object storage is shared, so the
+access mode of the local volume stops mattering. The volume stays mounted and
+unused, which costs nothing and means turning S3 off again needs no new claim.
+
+| Value | Default | Notes |
+|---|---|---|
+| `storage.s3.bucket` | none | Empty means local disk |
+| `storage.s3.region` | `us-east-1` | Required by the SDK even where it is ignored |
+| `storage.s3.endpoint` | none | Empty means AWS S3 itself |
+| `storage.s3.forcePathStyle` | none | `on`, `off`, or empty to let the driver decide |
+| `storage.s3.keyPrefix` | none | So one bucket can hold several instances |
+| `storage.s3.existingSecret` | none | Required when a bucket is named |
 
 ## Upgrading
 

@@ -51,84 +51,143 @@ const PROCESS_BUILD_ID = crypto.randomUUID();
 /** Secrets that must never reach production, whatever their source. */
 const PLACEHOLDER_SECRETS = new Set([DEVELOPMENT_AUTH_SECRET]);
 
-const envSchema = z.object({
-  /** The sole database connection. Postgres only: the schema, row-level security
-   * policies and the `pgvector` extension are all Postgres-specific. */
-  DATABASE_URL: required(
-    z
-      .string()
-      .refine(
-        (value) => /^postgres(ql)?:\/\//.test(value),
-        "must be a postgres:// or postgresql:// connection string",
-      ),
-  ),
+const envSchema = z
+  .object({
+    /** The sole database connection. Postgres only: the schema, row-level security
+     * policies and the `pgvector` extension are all Postgres-specific. */
+    DATABASE_URL: required(
+      z
+        .string()
+        .refine(
+          (value) => /^postgres(ql)?:\/\//.test(value),
+          "must be a postgres:// or postgresql:// connection string",
+        ),
+    ),
 
-  /** Optional owner-role connection for migrations. When unset, migrations
-   * run over DATABASE_URL, which suits single-role local setups. Production
-   * separates the two so the application role never owns the tables. */
-  DATABASE_ADMIN_URL: optional(
-    z
-      .string()
-      .refine(
-        (value) => /^postgres(ql)?:\/\//.test(value),
-        "must be a postgres:// or postgresql:// connection string",
-      )
-      .optional(),
-  ),
+    /** Optional owner-role connection for migrations. When unset, migrations
+     * run over DATABASE_URL, which suits single-role local setups. Production
+     * separates the two so the application role never owns the tables. */
+    DATABASE_ADMIN_URL: optional(
+      z
+        .string()
+        .refine(
+          (value) => /^postgres(ql)?:\/\//.test(value),
+          "must be a postgres:// or postgresql:// connection string",
+        )
+        .optional(),
+    ),
 
-  /** Signs session cookies and tokens. Development gets the placeholder below
-   * so a fresh checkout runs; production refuses it (see `assertProduction`),
-   * because a shared known secret is the same as no secret at all. The
-   * first-run wizard generates a real one. */
-  BETTER_AUTH_SECRET: optional(
-    z.string().min(16).default(DEVELOPMENT_AUTH_SECRET),
-  ),
+    /** Signs session cookies and tokens. Development gets the placeholder below
+     * so a fresh checkout runs; production refuses it (see `assertProduction`),
+     * because a shared known secret is the same as no secret at all. The
+     * first-run wizard generates a real one. */
+    BETTER_AUTH_SECRET: optional(
+      z.string().min(16).default(DEVELOPMENT_AUTH_SECRET),
+    ),
 
-  /** The instance's public origin, used to build callback and passkey origins. */
-  BETTER_AUTH_URL: optional(z.string().url().default("http://localhost:3000")),
+    /** The instance's public origin, used to build callback and passkey origins. */
+    BETTER_AUTH_URL: optional(
+      z.string().url().default("http://localhost:3000"),
+    ),
 
-  NODE_ENV: optional(
-    z.enum(["development", "test", "production"]).default("development"),
-  ),
+    NODE_ENV: optional(
+      z.enum(["development", "test", "production"]).default("development"),
+    ),
 
-  LOG_LEVEL: optional(
-    z.enum(["debug", "info", "warn", "error"]).default("info"),
-  ),
+    LOG_LEVEL: optional(
+      z.enum(["debug", "info", "warn", "error"]).default("info"),
+    ),
 
-  PORT: optional(z.coerce.number().int().positive().max(65535).default(3000)),
+    PORT: optional(z.coerce.number().int().positive().max(65535).default(3000)),
 
-  /** Names a deployment for the stale-tab reload (P2-T10). Set this to the
-   * release identifier (a git SHA, a build number) in any environment
-   * that deploys more than one process instance per release — the
-   * per-process fallback default only distinguishes "restarted", not "the
-   * same release on a different instance". */
-  APP_BUILD_ID: optional(z.string().min(1).default(PROCESS_BUILD_ID)),
+    /** Names a deployment for the stale-tab reload (P2-T10). Set this to the
+     * release identifier (a git SHA, a build number) in any environment
+     * that deploys more than one process instance per release — the
+     * per-process fallback default only distinguishes "restarted", not "the
+     * same release on a different instance". */
+    APP_BUILD_ID: optional(z.string().min(1).default(PROCESS_BUILD_ID)),
 
-  /** Whether this process drains the outbox (P5-T01a). On by default, because
-   * a deployment that drains nothing sends no invitation email and publishes
-   * no live event, and that was the state of every deployment until now
-   * (PLAN.md §12 R10). Concurrent relays are safe: rows are claimed with
-   * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
-   * when you want one dedicated drainer instead of all of them polling. */
-  OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
+    /** Whether this process drains the outbox (P5-T01a). On by default, because
+     * a deployment that drains nothing sends no invitation email and publishes
+     * no live event, and that was the state of every deployment until now
+     * (PLAN.md §12 R10). Concurrent relays are safe: rows are claimed with
+     * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
+     * when you want one dedicated drainer instead of all of them polling. */
+    OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
 
-  /** Whether this process runs the recurring work (P6-G01a). On by default,
-   * because a deployment that schedules nothing never chases a check-in, never
-   * sends a morning summary, never ages a blocker and never flips a neglected
-   * goal to outdated: the agents are the product's stated reason for existing
-   * and until now no instance had ever run one on its own clock. Unlike the
-   * relay, concurrent schedulers are wasteful rather than dangerous: pg-boss
-   * holds one schedule per name however many hosts declare it, and a job is
-   * handed to one worker. Set `off` on the replicas you do not want polling. */
-  OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
+    /** Whether this process runs the recurring work (P6-G01a). On by default,
+     * because a deployment that schedules nothing never chases a check-in, never
+     * sends a morning summary, never ages a blocker and never flips a neglected
+     * goal to outdated: the agents are the product's stated reason for existing
+     * and until now no instance had ever run one on its own clock. Unlike the
+     * relay, concurrent schedulers are wasteful rather than dangerous: pg-boss
+     * holds one schedule per name however many hosts declare it, and a job is
+     * handed to one worker. Set `off` on the replicas you do not want polling. */
+    OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
 
-  /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
-   * working directory, and `storage` is what the compose file already mounts a
-   * named volume at, so a container keeps its files across an upgrade with
-   * nothing set. An S3-compatible driver behind the same port is an
-   * alternative, never a requirement. */
-  OPENOKR_STORAGE_ROOT: optional(z.string().min(1).default("storage")),
-});
+    /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
+     * working directory, and `storage` is what the compose file already mounts a
+     * named volume at, so a container keeps its files across an upgrade with
+     * nothing set. An S3-compatible driver behind the same port is an
+     * alternative, never a requirement. */
+    OPENOKR_STORAGE_ROOT: optional(z.string().min(1).default("storage")),
+
+    /** Naming a bucket is what switches storage from local disk to S3 (P6-G05).
+     * Unset means local disk, which is the default and all a self-hosted install
+     * needs. Postgres stays the only required service either way. */
+    OPENOKR_STORAGE_S3_BUCKET: optional(z.string().min(1).optional()),
+    /** Required by the AWS SDK even for services that ignore it. */
+    OPENOKR_STORAGE_S3_REGION: optional(z.string().min(1).default("us-east-1")),
+    /** A compatible service's own endpoint: MinIO, Ceph, Garage, R2, B2,
+     * Spaces. Unset means AWS S3 itself, addressed virtual-host style. */
+    // `z.string().url()` is not enough: Zod 4 parses with the WHATWG rules, and
+    // `localhost:9000` is a valid URL under them, with `localhost:` as the
+    // scheme. That is exactly the value somebody copies out of a MinIO tutorial,
+    // and the SDK would build a request nobody could route. Same shape as the
+    // database refinement above.
+    OPENOKR_STORAGE_S3_ENDPOINT: optional(
+      z
+        .string()
+        .refine(
+          (value) => /^https?:\/\/.+/.test(value),
+          "must be an http:// or https:// URL",
+        )
+        .optional(),
+    ),
+    OPENOKR_STORAGE_S3_ACCESS_KEY_ID: optional(z.string().min(1).optional()),
+    OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY: optional(
+      z.string().min(1).optional(),
+    ),
+    /** Path-style addressing. Defaults to on when an endpoint is set, because
+     * nearly every compatible service wants it and a virtual-host request to one
+     * resolves to a hostname that does not exist. */
+    OPENOKR_STORAGE_S3_FORCE_PATH_STYLE: optional(
+      z.enum(["on", "off"]).optional(),
+    ),
+    /** Prefix every object key, so one bucket can hold several instances. */
+    OPENOKR_STORAGE_S3_KEY_PREFIX: optional(z.string().min(1).optional()),
+  })
+  .superRefine((env, ctx) => {
+    // A named bucket with no credentials is the failure worth catching at boot:
+    // the driver would build, every upload would fail at the first request, and
+    // the message a user saw would be about an upload rather than about a
+    // missing variable. Half-configured is the state to refuse, not "unset".
+    if (env.OPENOKR_STORAGE_S3_BUCKET === undefined) {
+      return;
+    }
+    for (const name of [
+      "OPENOKR_STORAGE_S3_ACCESS_KEY_ID",
+      "OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY",
+    ] as const) {
+      if (env[name] === undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: [name],
+          message: `${name} is required when OPENOKR_STORAGE_S3_BUCKET names a bucket. Unset the bucket to use local disk instead.`,
+        });
+      }
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

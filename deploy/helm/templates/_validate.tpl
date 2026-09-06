@@ -25,19 +25,35 @@ replicas against it means uploads land on whichever pod served the request and
 are missing from the other, which reads as random data loss rather than as a
 configuration error.
 
-The message named a third remedy until 7 September 2026, "point storage at
-S3-compatible object storage", and no such driver existed: the only driver in
-`packages/adapters/src/drivers/storage/` is local disk. Advice an operator
+The message named a third remedy from P1-T09 until P6-G04, "point storage at
+S3-compatible object storage", and no such driver existed. Advice an operator
 cannot follow is worse than no advice, because they spend the afternoon looking
-for the setting. P6-G05 builds the driver and puts the line back.
+for the setting. P6-G05 built the driver, so the line is back and true.
 
 Several replicas with persistence *off* is the other unsafe combination and it
 is deliberately not refused: an instance that accepts no uploads is entitled to
 run that way, and refusing it would break existing releases on upgrade. The
 defaults no longer produce it, and NOTES.txt says what it costs.
+
+A named S3 bucket exempts the whole check: object storage is shared by
+definition, so the replica count stops mattering.
 */}}
-{{- if and .Values.persistence.enabled (gt (int .Values.replicaCount) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
-{{- fail "\n\npersistence.accessMode is ReadWriteOnce but replicaCount is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - set replicaCount=1, which is the default\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n" -}}
+{{- if and (not .Values.storage.s3.bucket) .Values.persistence.enabled (gt (int .Values.replicaCount) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
+{{- fail "\n\npersistence.accessMode is ReadWriteOnce but replicaCount is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - set replicaCount=1, which is the default\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - use S3-compatible object storage: --set storage.s3.bucket=... --set storage.s3.existingSecret=...\n" -}}
+{{- end -}}
+
+{{/*
+S3 credentials come from a Secret, never from values, so a key cannot land in
+the release where `helm get values` reads it back. The application refuses a
+named bucket with no credentials at boot too, but a pod crash-looping on a
+missing variable is a worse way to learn this than a template that says so.
+*/}}
+{{- if and .Values.storage.s3.bucket (not .Values.storage.s3.existingSecret) -}}
+{{- fail "\n\nstorage.s3.bucket names a bucket but storage.s3.existingSecret is empty.\n\nCredentials are read from a Secret rather than from values, because a value lands in the release and `helm get values` reads it back.\n\n  kubectl create secret generic openokr-s3 \\\n    --from-literal=access-key-id=... \\\n    --from-literal=secret-access-key=...\n\n  --set storage.s3.existingSecret=openokr-s3\n" -}}
+{{- end -}}
+
+{{- if and .Values.storage.s3.forcePathStyle (not (has .Values.storage.s3.forcePathStyle (list "on" "off"))) -}}
+{{- fail "\n\nstorage.s3.forcePathStyle must be \"on\", \"off\" or empty.\n\nEmpty lets the driver decide: on when an endpoint is set, off for AWS S3.\n" -}}
 {{- end -}}
 
 {{- if and (eq .Values.mail.transport "smtp") (not .Values.mail.host) -}}

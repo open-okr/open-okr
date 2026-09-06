@@ -170,7 +170,9 @@ The weekly session stage gate refuses the move to digest below two commitments, 
 ## B-11: Helm's default install loses every uploaded file
 
 - [x] Change the chart defaults and correct its advice. **Closed at P6-G04.** The shipped values are one replica with persistence on, so a default install keeps files. The refusal no longer offers an S3 driver that does not exist, and `helm install` warns plainly when persistence is off. Several replicas with no shared storage is not refused, because an instance that accepts no uploads is entitled to run that way and refusing it would break a release already running.
-- [ ] **P6-G05** the S3-compatible driver, which is what makes the third remedy true. Agung approved both halves on 7 September 2026.
+- [x] **P6-G05** the S3-compatible driver, which is what makes the third remedy true. Agung approved both halves on 7 September 2026. `S3Storage` in `packages/adapters`, chosen by naming `OPENOKR_STORAGE_S3_BUCKET`, works against AWS and any compatible service through an endpoint, and lifts the chart's single-replica limit. The round-trip tests skip themselves here, because this machine has no Docker to run a MinIO against.
+
+**A second defect found while doing it.** The Helm chart set `OPENOKR_STORAGE_DIR`, and nothing in the product has ever read that name: the schema declares `OPENOKR_STORAGE_ROOT`. It worked by coincidence, because the root defaults to the relative path `storage` and the image runs from `/app`, so it resolved to the mount. A variable nobody reads plus a coincidence is not a configuration; the chart sets the real name now, and `check.sh` asserts both halves.
 
 `deploy/helm/values.yaml` sets `replicaCount: 2` and `persistence.enabled: false`. With persistence off, the storage path is an `emptyDir` ([deployment.yaml:142](../../deploy/helm/templates/deployment.yaml#L142)). Two consequences on a default install: a file uploaded through pod A is not readable from pod B, and every file is lost when a pod restarts.
 
