@@ -1,10 +1,12 @@
-import { callAction, OperationError } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
+import { SpaceManagement } from "./manage.tsx";
 import { SpaceMembership } from "./space-membership";
 
 /**
@@ -73,6 +75,33 @@ export default async function SpacePage({
     { spaceId: id },
   );
 
+  // Managing a space (P6-G18a). `spaces.update`, `addMember`, `setMemberRole`
+  // and `removeMember` all declare `edit`, which a space manager holds through
+  // their own binding; `archive` declares `full`, because a space is where a
+  // team's whole history lives. The controls are drawn to match, and each
+  // action refuses independently.
+  const level = await resolveAccessLevelFor(
+    workspace.workspaceId,
+    workspace.memberId,
+  );
+  const canManage = level >= ACCESS_LEVELS.full || space.ownRole === "manager";
+  const candidates = canManage
+    ? (
+        await callAction(
+          {
+            pool: getPool(),
+            workspaceId: workspace.workspaceId,
+            actor: { kind: "human", userId: session.user.id },
+          },
+          "people.directory",
+          {},
+        )
+      ).filter(
+        (member) =>
+          !space.members.some((inSpace) => inSpace.memberId === member.id),
+      )
+    : [];
+
   return (
     <AppShellLayout>
       <div className="stagger flex flex-col gap-4.5">
@@ -122,6 +151,19 @@ export default async function SpacePage({
             </div>
           </CardBody>
         </Card>
+
+        <SpaceManagement
+          spaceId={space.id}
+          name={space.name}
+          mission={space.mission}
+          members={space.members}
+          candidates={candidates.map((member) => ({
+            id: member.id,
+            name: member.name,
+          }))}
+          canManage={canManage}
+          canArchive={level >= ACCESS_LEVELS.full}
+        />
 
         {/* P5-T01c: the door to S-22 to S-25, which nothing linked to. */}
         <Card>

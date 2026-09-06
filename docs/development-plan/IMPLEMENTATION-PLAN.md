@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-four tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-five tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1583,12 +1583,26 @@ Deliverables: the dependency register block on phase 5 with key result, providin
 Test plan: a cycle carrying an unconfirmed dependency fails gate 4 and passes once confirmed; a dependency logged with a named risk owner also passes; removing a dependency updates the gate without a reload; a reader below edit sees the register and no controls.
 Acceptance: Given a cycle with one unconfirmed dependency, when a facilitator confirms it from phase 5, then gate 4 turns green and the publish control becomes available.
 
-### P6-G18: Spaces: create, settings and membership [M]
+**P6-G18 was cut in two.** The six writes P3-T01 shipped need surfaces and
+nothing else: they exist, they are tested, and wiring them is one session. The
+settings surface is not that. `spaces.settings` is a `jsonb` column nothing
+writes and the settings registry has no space-scope entry at all, so team
+voting, the strictness override and the space defaults have to be declared in
+the §4.14 map with defaults before a screen can show them.
+
+### P6-G18a: Spaces: create, rename, archive and membership [M]
 Depends on: P3-T01
 Goal: a workspace is not stuck with the one space provisioning made (GAP-AUDIT B-09).
-Deliverables: space creation, rename and archive; the space settings surface TECHNICAL-PLAN §4.14 names, with team voting opt-in, the strictness override and the space defaults; membership management with the manager role, add and remove, beside the join and leave already there; loading, empty, error and permission-denied states.
-Test plan: archiving a space hides it without deleting its goals; a space manager may manage membership and a member may not; the last manager cannot be removed; every space setting resolves to its default on a space where nothing was configured.
+Deliverables: space creation with an optional first manager; rename and rewrite the mission; archive, with what survives it stated on the control; membership management with all three §4.2 roles, add and remove, beside the join and leave already there; each control drawn at the level its action declares, and refusing independently.
+Test plan: archiving a space hides it without deleting its goals; a space manager may manage membership and a plain member may not; the last manager cannot be removed; a refusal renders as its sentence rather than an error boundary.
 Acceptance: Given an administrator, when they create a space and name a manager, then that manager can manage its membership and nobody else can.
+
+### P6-G18b: The space settings surface [M]
+Depends on: P6-G18a, P2-T08
+Goal: TECHNICAL-PLAN §4.14's space scope exists (GAP-AUDIT B-09).
+Deliverables: the three settings §4.14 names for a space declared in the settings registry with defaults a space resolves without configuration: team voting opt-in, the strictness override, and the space defaults; the action that writes them; the surface on the space page behind the space manager's level; the §4.14 map updated in the same change if any of the three turns out to need a different shape.
+Test plan: every space setting resolves to its documented default on a space where nothing was configured, enumerated from the registry rather than a fixed list; a strictness override changes what the Coach refuses in that space and nowhere else; resetting restores the defaults exactly.
+Acceptance: Given a space that has configured nothing, when every space setting is read, then each returns its documented default, and a space that turns team voting off stops offering it.
 
 ### P6-G19: The weekly session's trend, blockers, streak and commitments [L]
 Depends on: P4-T07b, P4-T07c, P4-T08

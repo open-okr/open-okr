@@ -156,7 +156,8 @@ Effect: an administrator cannot suspend a leaver, convert somebody to a guest, o
 
 ## B-09: Spaces cannot be created or managed
 
-- [ ] Build space creation, space settings and space membership management
+- [x] **P6-G18a** creation, rename, archive and membership. All six writes P3-T01 shipped have surfaces now; only `join` and `leave` had ever been wired.
+- [ ] **P6-G18b** the space settings surface. TECHNICAL-PLAN §4.14 names three settings for a space and the settings registry has no space scope at all, so they have to be declared with defaults before a screen can show them.
 
 Four space actions are called from the browser: `list`, `read`, `join`, `leave`. Six are not: `spaces.create`, `spaces.update`, `spaces.archive`, `spaces.addMember`, `spaces.setMemberRole`, `spaces.removeMember`.
 
@@ -429,7 +430,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 
 - [ ] **B-03** phases 0, 6 and 7.
 - [x] **B-04** the dependency register on phase 5. Closed at P6-G17, and gate 5 turned out to have the same self-referential remedy.
-- [ ] **B-09** space creation, settings and membership.
+- [x] **B-09** space creation, rename, archive and membership. Closed at P6-G18a; the settings surface is P6-G18b.
 - [ ] **B-10** the session screen's trend, blockers, streak and commitments.
 
 ## Then, configuration and polish
