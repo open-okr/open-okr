@@ -83,6 +83,14 @@ export {
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "./drivers/channel/whatsapp.ts";
+// Exported for the scheduler host (P6-G01a), which needs a queue on its own
+// rather than the whole adapter set `createAdapters` builds. Same shape as the
+// channel drivers above: the host constructs the driver, the port is what
+// everything else sees.
+export {
+  PgBossJobQueue,
+  type PgBossJobQueueOptions,
+} from "./drivers/jobs/pg-boss.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {

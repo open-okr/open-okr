@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-two tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1417,12 +1417,37 @@ means: without the scheduler nothing in the coaching layer has ever run in the
 shape a user meets it. G06 to G13 are the missing screens. G14 to G19 finish
 the cycle and the session. G20 onwards is configuration and polish.
 
-### P6-G01: The scheduler host [L]
-Depends on: P5-T01a
+**P6-G01 was cut in three before any code, and the audit is why.** The row asked
+for a host, four Champion cadences, the notification batch drain, the daily
+summary, the staleness sweep and the orphan-blob reap. Two of those turned out
+to be unbuilt engines rather than jobs to register: `renderDigest` has never had
+a caller outside the barrel, so nothing sends a batch, and
+`findOrphanedBlobs`/`discardOrphanedBlob` are scaffolding whose own comments say
+the job that would call them was never built and that it needs a storage delete
+the action context does not carry. The other two, the staleness sweep and the
+daily summary, are already inside the Champion's daily cadence and need no job
+of their own. So the host is one session and each engine is another.
+
+### P6-G01a: The scheduler host and the agent cadences [M]
+Depends on: P5-T01a, P4-T05b, P4-T06a
 Goal: the product acts on a clock, not only on a write (GAP-AUDIT B-01).
-Deliverables: a job-queue host in `apps/web` beside the outbox relay, constructing the pg-boss driver from `DATABASE_URL` and calling `registerAgentSchedules` once at boot; an `OPENOKR_SCHEDULER` toggle with the same shape `OPENOKR_RELAY` already has, so an operator can leave one replica scheduling and turn it off on the rest; the notification batch drain, the daily summary, the staleness sweep and the orphan-blob reap registered as recurring jobs beside the four Champion cadences; a single boot log line naming what was registered; the stale comment at `packages/agents/src/schedule.ts:7` corrected, since the relay host it says does not exist has existed since P5-T01a.
-Test plan: a host with the toggle off registers nothing; a host with it on registers every declared schedule exactly once, and registering twice is idempotent; a restart resumes rather than duplicating; the daily summary fires at the member's local time across a daylight-saving boundary through the scheduled path rather than a direct call.
+Deliverables: a job-queue host in `apps/web` beside the outbox relay, constructing the pg-boss driver from `DATABASE_URL`, subscribing a worker to every declared job and calling `registerAgentSchedules` once at boot; an `OPENOKR_SCHEDULER` toggle with the same shape `OPENOKR_RELAY` already has; the Coach's nightly semantic sweep added to the schedule, which is AI-NATIVE-PLAN §6.1's only cadence and has never had one, fired at each workspace's own local hour rather than the host's; a run that enumerates every workspace and acts as `system`, tolerating a workspace whose agent is turned off; a single boot log line naming what was registered; the four comments across the repository claiming no scheduler host exists corrected.
+Test plan: a host with the toggle off registers nothing and a misspelt toggle is a boot error; every declared schedule has exactly one worker, asserted from the declaration rather than a fixed list; registering twice leaves one schedule; a nightly run fires only for workspaces whose local hour matches, proven across three timezones; one workspace raising stops nothing and is counted.
 Acceptance: Given a fresh instance with no AI provider, when a check-in passes its due date and an hour elapses, then the Champion has run, a nudge row exists with its rule key, and no human pressed anything.
+
+### P6-G01b: The notification batch drain and the daily summary [M]
+Depends on: P6-G01a, P2-T06
+Goal: a batched notification is actually delivered (GAP-AUDIT B-01).
+Deliverables: the worker that finds batches whose `send_at` has arrived, renders them through `renderDigest`, which has had no caller since P2-T06, sends through the mail port and marks them sent; the member's daily summary at their own local time; idempotence under two hosts; the recurring job registered beside the agent cadences.
+Test plan: four notifications inside one window deliver as one digest listing four items, each deep-linked; a recipient who lost access after enqueue receives nothing; two hosts draining together send once; the summary fires at the member's local time across a daylight-saving boundary.
+Acceptance: Given a member with a ten-minute window, when four notifications arrive inside it, then they receive one digest listing four items and the batch is marked sent exactly once.
+
+### P6-G01c: The orphan-blob reap [S]
+Depends on: P6-G01a, P2-T05
+Goal: an abandoned upload does not stay forever (GAP-AUDIT B-01).
+Deliverables: the recurring job wiring `findOrphanedBlobs` and `discardOrphanedBlob`, which have been scaffolding since P2-T05, through an Operation so the removal gets its own activity and audit row; `delete` added to the action context's storage seam beside the `get` P6-T05a put there, so the bytes go with the row; the age threshold as a §4.14 setting with a default.
+Test plan: a pending blob older than the threshold is soft-deleted and its object removed; a claimed blob is never touched; a second run changes nothing; a storage delete that fails leaves the row alone rather than orphaning the bytes silently.
+Acceptance: Given a prepare that was never claimed, when the reap runs after the threshold, then the row is soft-deleted, the object is gone, and the audit names the removal.
 
 ### P6-G02: The review inbox's four remaining sources [L]
 Depends on: P3-T08, P4-T05, P4-T07, P4-T08

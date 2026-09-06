@@ -112,6 +112,16 @@ const envSchema = z.object({
    * when you want one dedicated drainer instead of all of them polling. */
   OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
 
+  /** Whether this process runs the recurring work (P6-G01a). On by default,
+   * because a deployment that schedules nothing never chases a check-in, never
+   * sends a morning summary, never ages a blocker and never flips a neglected
+   * goal to outdated: the agents are the product's stated reason for existing
+   * and until now no instance had ever run one on its own clock. Unlike the
+   * relay, concurrent schedulers are wasteful rather than dangerous: pg-boss
+   * holds one schedule per name however many hosts declare it, and a job is
+   * handed to one worker. Set `off` on the replicas you do not want polling. */
+  OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
+
   /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
    * working directory, and `storage` is what the compose file already mounts a
    * named volume at, so a container keeps its files across an upgrade with

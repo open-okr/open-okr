@@ -4,14 +4,17 @@
  * AI-NATIVE-PLAN.md §6.2 gives the Champion four cadences. This is where each
  * one is written down, once, as a cron expression a driver understands.
  *
- * **Nothing runs this today, and that is not an oversight to work around.**
- * The repository has no relay host and no worker process: the outbox is written
- * correctly by every write path and nothing drains it, which
- * `packages/core/src/scoring/recompute.ts` and three other files already
- * record. A host that starts a queue calls `registerAgentSchedules` once at
- * boot and the schedule begins. Until then the same run is reachable through
- * the `agents.runChampion` action, which is what the tests drive and what an
- * administrator can call.
+ * **`apps/web/lib/scheduler.ts` is the host that runs this** (P6-G01a). It
+ * constructs the pg-boss driver, calls `registerAgentSchedules` once at boot,
+ * and subscribes a worker to every job named in `AGENT_SCHEDULES`.
+ *
+ * This comment said "nothing runs this today" from P4-T05a until the gap audit
+ * of 7 September 2026, and by then half of it was already wrong: the relay host
+ * it claims does not exist has existed since P5-T01a. The other half was true
+ * for four months, which is why no nudge this product can produce had ever been
+ * sent by the product itself. The same runs stay reachable by hand through
+ * `agents.runChampion` and `agents.runCoach`, which is what the tests drive and
+ * what an administrator can still press.
  *
  * Registering a schedule is not enqueuing a job, so this does not break the
  * outbox contract: no write path calls it, and it declares a recurrence rather
@@ -61,6 +64,53 @@ export const CHAMPION_WEEKLY_CRON = "30 * * * *";
 export const CHAMPION_CYCLE_CRON = "45 * * * *";
 
 /**
+ * The Coach's nightly semantic sweep (AI-NATIVE-PLAN.md §6.1, P6-G01a).
+ *
+ * §6.1 gives the Coach four modes and only one of them is a clock: "Nightly:
+ * the semantic sweep: duplicates, conflicts, divergence, drift". The other
+ * three are a write, a phase transition and a request, none of which a
+ * schedule can express.
+ *
+ * **Hourly for the same reason the Champion's daily cadence is hourly**, and
+ * this is the part worth reading twice. "Nightly" is a local fact: a workspace
+ * in Kuala Lumpur and one in Berlin do not share a night, and a sweep pinned to
+ * one host's small hours would run in the middle of a working afternoon for
+ * half the instance. The cron fires every hour; the host skips a workspace
+ * whose own local hour is not `COACH_SWEEP_LOCAL_HOUR`, so each workspace is
+ * swept once a night, in its own night.
+ *
+ * At :50, so it never contends with the four Champion cadences above.
+ */
+export const COACH_NIGHTLY_JOB = "agents.coach.nightly";
+export const COACH_NIGHTLY_CRON = "50 * * * *";
+
+/**
+ * The local hour a workspace's semantic sweep runs in.
+ *
+ * Two in the morning: late enough that the day's writes have settled, early
+ * enough that a finding is waiting when somebody opens the product. The value
+ * is here rather than in the METHOD.md §11 registry because it is an operating
+ * detail of when a machine reads, not a rule of the practice, and nothing a
+ * member sees changes with it.
+ */
+export const COACH_SWEEP_LOCAL_HOUR = 2;
+
+/**
+ * Every recurring agent run, as a job name and the cron it recurs on.
+ *
+ * Exported so a host can assert it has a worker for each. A cron with no
+ * worker is a job that queues forever and does nothing, which is a failure
+ * that looks exactly like a product with nothing to say.
+ */
+export const AGENT_SCHEDULES: readonly (readonly [string, string])[] = [
+  [CHAMPION_HOURLY_JOB, CHAMPION_HOURLY_CRON],
+  [CHAMPION_DAILY_JOB, CHAMPION_DAILY_CRON],
+  [CHAMPION_WEEKLY_JOB, CHAMPION_WEEKLY_CRON],
+  [CHAMPION_CYCLE_JOB, CHAMPION_CYCLE_CRON],
+  [COACH_NIGHTLY_JOB, COACH_NIGHTLY_CRON],
+] as const;
+
+/**
  * Declares every agent schedule on a queue.
  *
  * Idempotent by the port's own contract: `schedule` registers or replaces, so
@@ -76,12 +126,7 @@ export async function registerAgentSchedules(queue: JobQueue): Promise<void> {
   // The marker is per call site, so each of the four carries it. Repeating it
   // beats one comment covering a block, because a fifth call added later would
   // otherwise inherit an exemption nobody reread.
-  for (const [job, cron] of [
-    [CHAMPION_HOURLY_JOB, CHAMPION_HOURLY_CRON],
-    [CHAMPION_DAILY_JOB, CHAMPION_DAILY_CRON],
-    [CHAMPION_WEEKLY_JOB, CHAMPION_WEEKLY_CRON],
-    [CHAMPION_CYCLE_JOB, CHAMPION_CYCLE_CRON],
-  ] as const) {
+  for (const [job, cron] of AGENT_SCHEDULES) {
     // openokr:allow-side-effect: same reason as above.
     await queue.schedule(job, cron);
   }

@@ -3,8 +3,10 @@
  *
  * A goal is `outdated` once its grace window passes, and nothing writes to a
  * neglected goal by definition, so the flip cannot wait for the next write. This
- * is the job that does it. Until a scheduler host exists it runs from cron or by
- * hand, which is the same shape `pnpm audit:verify` already has.
+ * is the job that does it. The scheduler host runs it every day as part of the
+ * Champion's daily cadence (P6-G01a); this command stays for the operator who
+ * wants it now rather than at two in the morning, and for an instance running
+ * with `OPENOKR_SCHEDULER=off`. Same shape as `pnpm audit:verify`.
  *
  * Every workspace, or named ones. Idempotent: a second run over the same rows
  * changes nothing, because they already read `outdated`.

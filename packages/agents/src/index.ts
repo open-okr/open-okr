@@ -17,6 +17,7 @@ export {
   readRunState,
 } from "./run-executor.ts";
 export {
+  AGENT_SCHEDULES,
   CHAMPION_CYCLE_CRON,
   CHAMPION_CYCLE_JOB,
   CHAMPION_DAILY_CRON,
@@ -25,6 +26,9 @@ export {
   CHAMPION_HOURLY_JOB,
   CHAMPION_WEEKLY_CRON,
   CHAMPION_WEEKLY_JOB,
+  COACH_NIGHTLY_CRON,
+  COACH_NIGHTLY_JOB,
+  COACH_SWEEP_LOCAL_HOUR,
   registerAgentSchedules,
 } from "./schedule.ts";
 export {

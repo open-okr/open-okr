@@ -11,9 +11,9 @@ export async function register(): Promise<void> {
     return;
   }
 
-  const { validateEnvironment, startOutboxRelay } = await import(
-    "./instrumentation.node"
-  );
+  const { validateEnvironment, startOutboxRelay, startRecurringWork } =
+    await import("./instrumentation.node");
   validateEnvironment();
   startOutboxRelay();
+  startRecurringWork();
 }

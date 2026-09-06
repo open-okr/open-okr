@@ -2,10 +2,12 @@ import { resetEnvCache } from "@openokr/config";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
 import { startRelay } from "../lib/relay";
+import { startScheduler } from "../lib/scheduler";
 
 // Mocked rather than allowed to run: the real one opens a pool and polls
 // forever, which a unit test should neither connect for nor be kept alive by.
 vi.mock("../lib/relay", () => ({ startRelay: vi.fn() }));
+vi.mock("../lib/scheduler", () => ({ startScheduler: vi.fn() }));
 
 const original = { ...process.env };
 
@@ -20,6 +22,7 @@ afterEach(() => {
   resetEnvCache();
   vi.restoreAllMocks();
   vi.mocked(startRelay).mockClear();
+  vi.mocked(startScheduler).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -85,4 +88,46 @@ test("the edge runtime is skipped, because it holds no database connection", asy
   await register();
 
   expect(exit).not.toHaveBeenCalled();
+});
+
+test("boot starts the scheduler, which is what runs the agents on a clock (P6-G01a)", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  const exit = vi
+    .spyOn(process, "exit")
+    .mockImplementation(() => undefined as never);
+
+  await register();
+
+  expect(exit).not.toHaveBeenCalled();
+  // Without this call the Champion never chases a check-in, the morning
+  // summary never sends and a neglected goal never flips to outdated. That was
+  // every deployment until the gap audit found it (B-01).
+  expect(startScheduler).toHaveBeenCalled();
+});
+
+test("a build worker does not start the scheduler either", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.NEXT_PHASE = "phase-production-build";
+
+  await register();
+
+  expect(startScheduler).not.toHaveBeenCalled();
+});
+
+test("a scheduler that cannot start is logged, not fatal", async () => {
+  // A serving replica that cannot reach pg-boss must still serve. Discovering
+  // it through a log line beats discovering it through an outage.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  vi.mocked(startScheduler).mockImplementationOnce(() => {
+    throw new Error("pgboss schema is not reachable");
+  });
+  const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  const exit = vi
+    .spyOn(process, "exit")
+    .mockImplementation(() => undefined as never);
+
+  await expect(register()).resolves.toBeUndefined();
+
+  expect(exit).not.toHaveBeenCalled();
+  expect(stderr.mock.calls.join()).toMatch(/pgboss schema is not reachable/);
 });

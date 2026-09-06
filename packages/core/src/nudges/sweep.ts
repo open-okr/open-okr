@@ -8,7 +8,8 @@
  *
  * **The staleness sweep is not in this file, and it already exists.** P3-T06
  * built it as `sweepStaleness` in `../cadence/service.ts` and exposed it as
- * `pnpm cadence:sweep`, because no scheduler host ran then and none runs now.
+ * `pnpm cadence:sweep`, because no scheduler host ran then. One does now
+ * (P6-G01a), and it reaches this sweep through the daily cadence below.
  * The daily run calls that function rather than re-deriving it, so a health
  * flip is one piece of code whether a human typed the command or the agent's
  * run reached it.
