@@ -95,7 +95,11 @@ The phase rail draws all eight phases as reachable ([phase-rail.tsx](../../apps/
 
 ## B-04: Publish gate 4 cannot be satisfied from the browser
 
-- [ ] Build the dependency register block on phase 5
+- [x] Build the dependency register block on phase 5. **Closed at P6-G17.** The register renders on phase 5 with confirm, name-a-risk-owner, remove and add, and gate 4's remedy is an anchor into it. `alignment.read` had returned the register since P3-T09 and nothing rendered it; all four writes were registered actions with no caller.
+
+**Gate 5 had the same defect and the test found it.** Its remedy also pointed at `/cycle?phase=5`, which is where the gates panel renders, so it too said "go where you already are". `apps/web/test/gate-remedies.test.ts` now refuses any remedy that navigates to the address its own panel is on, and both gates anchor into their block instead.
+
+**The alignment-mapping block S-10 also asks for is deliberately not duplicated here.** It is screen S-16, `/goals/studio`, which exists and which gate 3 already links at. Two surfaces for one relationship would be two places to keep in step.
 
 Gate 4 is "Every dependency is confirmed, or logged with a named risk owner" ([workflow.ts:224](../../packages/method/src/workflow.ts#L224)). Its remediation link points at `/cycle?phase=5` with the label "Confirm the dependencies" ([gates.tsx:37](../../apps/web/app/cycle/gates.tsx#L37)), which is the page the gates panel is already on.
 
@@ -424,7 +428,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 ## Then, the cycle and the session
 
 - [ ] **B-03** phases 0, 6 and 7.
-- [ ] **B-04** the dependency register on phase 5, which unblocks publish gate 4.
+- [x] **B-04** the dependency register on phase 5. Closed at P6-G17, and gate 5 turned out to have the same self-referential remedy.
 - [ ] **B-09** space creation, settings and membership.
 - [ ] **B-10** the session screen's trend, blockers, streak and commitments.
 

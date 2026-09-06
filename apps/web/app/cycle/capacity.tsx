@@ -45,7 +45,7 @@ export function Capacity({
   const unjudged = initiatives.filter((one) => one.capacity === null);
 
   return (
-    <Card>
+    <Card id="capacity-check">
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">Capacity</h2>

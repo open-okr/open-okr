@@ -14,6 +14,7 @@ import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
+import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
 import { Drafting } from "./drafting.tsx";
@@ -164,6 +165,30 @@ export default async function CyclePage({
         })
       : null;
 
+  // The §5.4 register, and the lists a facilitator needs to add to it (P6-G17).
+  // `alignment.read` has returned `register` since P3-T09 and nothing rendered
+  // it, so publish gate 4 was red with no control anywhere that could turn it
+  // green. Only phase 5 pays for the read, the same rule the two blocks above
+  // follow.
+  const register =
+    viewing === 5
+      ? await callAction(context, "alignment.read", {
+          cycleId: workflow.cycleId,
+          includeDismissed: false,
+        })
+      : null;
+  const registerSpaces =
+    viewing === 5 ? await callAction(context, "spaces.list", {}) : null;
+  // The same directory phase 4 reads, for the risk-owner picker. A risk owner
+  // is a named person carrying a consequence, so an unnamed one is not one.
+  const registerMembers =
+    viewing === 5
+      ? (await callAction(context, "people.directory", {})).map((member) => ({
+          id: member.id,
+          name: member.name,
+        }))
+      : null;
+
   return (
     <AppShellLayout>
       <div className="flex flex-col gap-4.5 xl:flex-row">
@@ -254,6 +279,26 @@ export default async function CyclePage({
               priorities={workflow.priorities}
               issues={workflow.issues}
               bounds={workflow.asks.priorities}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {/* Before the capacity check, because §5.4 comes before §5.5 in the
+              method and because the two answer the same conversation in order:
+              who are we waiting on, and can we carry what is left. */}
+          {register && registerMembers && registerSpaces && capacity ? (
+            <DependencyRegister
+              entries={register.register}
+              keyResults={capacity.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                goalTitle: keyResult.goalTitle,
+              }))}
+              members={registerMembers}
+              spaces={registerSpaces.map((space) => ({
+                id: space.id,
+                name: space.name,
+              }))}
               canEdit={canEdit}
             />
           ) : null}
