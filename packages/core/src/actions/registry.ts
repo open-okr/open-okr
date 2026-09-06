@@ -232,6 +232,7 @@ import {
   createPersonalLink,
   createWorkspaceLink,
   joinByTrustedDomain,
+  listInvitations,
   revokeLink,
 } from "./invitations.ts";
 import { suggestKpi } from "./kpi-assist.ts";
@@ -405,6 +406,7 @@ export const ACTION_MAP = {
   "people.directory": directory,
   "people.orgChart": orgChart,
   "people.possibleManagers": possibleManagersFor,
+  "invitations.list": listInvitations,
   "invitations.createWorkspaceLink": createWorkspaceLink,
   "invitations.createPersonalLink": createPersonalLink,
   "invitations.revokeLink": revokeLink,

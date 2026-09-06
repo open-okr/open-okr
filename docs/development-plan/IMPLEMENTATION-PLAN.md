@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-two tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-four tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1477,12 +1477,27 @@ Deliverables: an S3-compatible `FileStorage` driver in `packages/adapters`, usin
 Test plan: prepare, upload, claim and download against a local MinIO, skipped with a stated reason when none is reachable, the way the MySQL connector suites already skip; an unset endpoint falls back to local disk; a signed URL expires; the boundary gate still refuses the SDK outside `packages/adapters`.
 Acceptance: Given two replicas with the S3 driver configured, when one uploads a file, then the other serves it.
 
-### P6-G06: Invitations [M]
+**P6-G06 was cut in two, at the seam between issuing and redeeming.** Issuing is
+a workspace-scoped screen and needs one new read. Redeeming is not scoped to a
+workspace at all: the visitor holds an opaque token and no membership, so
+resolving it means reading `invite_links` across tenants, and that table's
+row-level security is keyed on `workspace_id`. It needs the second-key policy
+`api_tokens` got at P5-T07a, which is a migration, plus a route, plus the
+closed-instance registration path. That is its own session.
+
+### P6-G06a: Issuing invitations [M]
 Depends on: P2-T04
-Goal: a second person can join from the browser (GAP-AUDIT B-07).
-Deliverables: an invitation card in workspace admin: invite by email, a reusable workspace link with its use count, maximum uses, expiry and allowed domains, a single-use personal link, revoke, and the pending list with what each invitation is for; the accept surface a link lands on, for a signed-out and a signed-in visitor; loading, empty, error and permission-denied states.
-Test plan: an invitation by email sends through the outbox and the invitee joins with the right defaults; a revoked link is refused with a reason rather than a stack trace; a link at its maximum uses is refused; a trusted-domain address joins without an invitation when the setting allows it; a member below the level sees neither the card nor the route.
-Acceptance: Given an admin on the invitation card, when they invite an address and that person follows the link, then they are a member of the workspace with the provisioning defaults, and the audit names who invited them.
+Goal: an administrator can invite somebody and see what they have issued (GAP-AUDIT B-07).
+Deliverables: an invitation card in workspace admin: a single-use personal invitation by address, a reusable workspace link with its use count, maximum uses, expiry and allowed domains, revoke, and the list of what has been issued with what each one is doing; `invitations.list`, which P2-T04 never built, so an administrator could issue a link and then had no way to see or revoke it; the token shown once, never in the list.
+Test plan: the list carries no token on any path; a revoked link stays in the list and says so; a personal link reports its address, its single use and its expiry; a member below `full` is refused the list as well as the create.
+Acceptance: Given an administrator on the invitation card, when they issue a personal invitation, then the token is shown once, the list records it, and revoking it changes its state without removing it.
+
+### P6-G06b: Accepting an invitation [M]
+Depends on: P6-G06a
+Goal: the link an administrator hands out goes somewhere (GAP-AUDIT B-07).
+Deliverables: a migration giving `invite_links` the second-key row-level security policy `api_tokens` has, so a token digest admits exactly its own row without a tenant being known; a cross-tenant `previewInvite` in `packages/core` answering what a token is for without consuming it; the `/join` route, for a signed-in visitor and a signed-out one; registration allowed on a closed instance when, and only when, a valid token says so; trusted-domain joining offered where the workspace allows it; the address rendered on the issuing card, which shows only the token until this lands.
+Test plan: a valid token names its workspace without incrementing its use count; an invalid, revoked, expired or used-up token refuses identically; a closed instance refuses registration without a token and allows it with one; a personal token refuses an address it was not issued to; two visitors racing one single-use token produce one member.
+Acceptance: Given a closed instance and a personal invitation, when the invitee follows the address, then they create an account, land in the workspace with the provisioning defaults, and the audit names who invited them.
 
 ### P6-G07: The in-app inbox, S-03 [L]
 Depends on: P2-T06
@@ -1658,6 +1673,22 @@ Goal: finish S-20 (GAP-AUDIT, the `/kpis` row).
 Deliverables: the row sparkline and the category subtotal, both computed with the aggregate rules already in `packages/method`; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
 Test plan: a subtotal matches the method function exactly rather than being summed here; a sparkline on a KPI with one record renders without a line and says so; a filter combination survives a reload through the URL; a calculated cell shows its formula and stays read-only.
 Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal matches `packages/method` and each row draws its own twelve-period sparkline.
+
+### P6-G31: A read action's declared access level is enforced [M]
+Depends on: P2-T02, P5-T07a
+Goal: `access` on a read means something (found at P6-G06a).
+Deliverables: an audit of every `defineReadAction` whose declared level is above `view`, sorting each into one whose rows are already access-scoped by the getter and one whose are not; enforcement inside every read in the second group, or in the builder if the shape allows it; a test per enforced read that an ordinary member is refused; a note on `defineReadAction` saying which of the two a new read must be.
+Test plan: a member below the declared level is refused each affected read over `callAction` and over REST with an ordinary token; a member at the level still reads; a read whose rows are access-scoped is unaffected and still returns the caller's own subset.
+Acceptance: Given an ordinary member's REST token, when they call a read declaring `full`, then the instance refuses, and a test enumerating the registry fails if a future read declares a level nothing checks.
+
+**Why this is a row at all.** `defineReadAction` records `access` and nothing
+reads it back: not the builder, not `callAction`, not the REST, agent or chat
+transports, which take it only as the scope name. In the browser the admin
+layout refuses below `full` before the page renders, so the screens are safe.
+Over REST they are not. `invitations.list` was written at P6-G06a, found to
+have exactly this hole, and enforces its own level in the handler with the
+reason written above it; `imports.listRuns` and the nudge volume read are the
+two others already visible, and the sweep is what finds the rest.
 
 **Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
 

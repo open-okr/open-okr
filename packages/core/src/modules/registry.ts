@@ -348,6 +348,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-invitations",
+        label: "Invitations",
+        href: "/admin/invitations",
+        section: "admin",
+        // An invitation adds a member to the workspace, which is the same
+        // authority the other org-structural writes ask for. The screen also
+        // names email addresses (P6-G06).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-imports",
         label: "Import",
         href: "/admin/imports",

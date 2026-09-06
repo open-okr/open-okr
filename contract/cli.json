@@ -310,6 +310,16 @@
       "pages": false
     },
     {
+      "name": "invitations list",
+      "action": "invitations.list",
+      "method": "GET",
+      "path": "/invitations/list",
+      "scope": "read",
+      "summary": "Every invitation link this workspace has issued, without their tokens.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "invitations createWorkspaceLink",
       "action": "invitations.createWorkspaceLink",
       "method": "POST",

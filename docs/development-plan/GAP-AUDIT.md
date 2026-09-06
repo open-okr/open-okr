@@ -131,7 +131,10 @@ The member half of TECHNICAL-PLAN §4.14 is unreachable with it: per-reason rout
 
 ## B-07: No way to invite anybody
 
-- [ ] Build the invitation surface
+- [x] **P6-G06a** the issuing half. An administrator can issue a personal invitation or a shareable link, see everything issued with what each one is doing, and revoke. `invitations.list` is the read P2-T04 never built, which is why revoke was unreachable in practice as well as in the interface.
+- [ ] **P6-G06b** the redeeming half. `/join`, a cross-tenant token lookup behind the second-key policy `api_tokens` already has, and registration on a closed instance. Until it lands, a token issued on the card is redeemable through the command line and the REST surface and nowhere else, and the card says so rather than handing out an address that answers 404.
+
+**A security defect this task turned up, wider than invitations.** `defineReadAction` records `access` and nothing reads it back: not the builder, not `callAction`, not the REST, agent or chat transports, which take it only as a scope name. In the browser the admin layout refuses below `full` before a page renders, so the screens are safe; over REST an ordinary member's token reaches a read declaring `full`. `invitations.list` enforces its own level; `imports.listRuns` and the nudge volume read are the two others already visible. The sweep is **P6-G31**.
 
 P2-T04 is `done`. The words "invite" and "invitation" appear in `apps/web/app` in three places only: the sign-up page, `not-found.tsx` and the setup account page. All five invitation actions have no caller: `invitations.createWorkspaceLink`, `invitations.createPersonalLink`, `invitations.revokeLink`, `invitations.acceptLink`, `invitations.joinByTrustedDomain`.
 

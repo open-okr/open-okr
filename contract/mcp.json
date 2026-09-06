@@ -471,6 +471,21 @@
       }
     },
     {
+      "name": "invitations.list",
+      "description": "Every invitation link this workspace has issued, without their tokens.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "invitations.createWorkspaceLink",
       "description": "Create a reusable link anyone holding it may join through.",
       "inputSchema": {
