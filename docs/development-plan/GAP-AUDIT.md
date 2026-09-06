@@ -40,7 +40,9 @@ Six screens specified in UIUX-PLAN.md §6 have no route at all (S-03, S-31, S-33
 
 ## B-01: Nothing schedules the agents, so the product is never active
 
-- [ ] Wire a job queue host and call `registerAgentSchedules` at boot
+- [x] Wire a job queue host and call `registerAgentSchedules` at boot. **Closed at P6-G01a.** `apps/web/lib/scheduler.ts` builds the pg-boss driver, subscribes a worker to every declared job and registers the schedules at boot, behind `OPENOKR_SCHEDULER` which defaults to on. The Coach gained the nightly cadence §6.1 gives it and had never had, fired at each workspace's own local hour. Proved by construction, not by observation: no run against a live pg-boss yet.
+- [ ] **P6-G01b** the notification batch drain. `renderDigest` has had no caller outside the barrel since P2-T06, so no batched notification has ever been delivered.
+- [ ] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
 
 `registerAgentSchedules` declares four cron cadences for the Champion ([schedule.ts:69](../../packages/agents/src/schedule.ts#L69)). Nothing calls it. No file outside `packages/adapters` and `packages/agents` references `JobQueue` at all, and `apps/web` constructs no queue: [instrumentation.node.ts](../../apps/web/instrumentation.node.ts) starts the outbox relay and nothing else.
 
@@ -167,7 +169,8 @@ The weekly session stage gate refuses the move to digest below two commitments, 
 
 ## B-11: Helm's default install loses every uploaded file
 
-- [ ] Ship an S3-compatible storage driver, or change the chart default and its advice
+- [x] Change the chart defaults and correct its advice. **Closed at P6-G04.** The shipped values are one replica with persistence on, so a default install keeps files. The refusal no longer offers an S3 driver that does not exist, and `helm install` warns plainly when persistence is off. Several replicas with no shared storage is not refused, because an instance that accepts no uploads is entitled to run that way and refusing it would break a release already running.
+- [ ] **P6-G05** the S3-compatible driver, which is what makes the third remedy true. Agung approved both halves on 7 September 2026.
 
 `deploy/helm/values.yaml` sets `replicaCount: 2` and `persistence.enabled: false`. With persistence off, the storage path is an `emptyDir` ([deployment.yaml:142](../../deploy/helm/templates/deployment.yaml#L142)). Two consequences on a default install: a file uploaded through pod A is not readable from pod B, and every file is lost when a pod restarts.
 

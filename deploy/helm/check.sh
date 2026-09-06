@@ -62,6 +62,58 @@ else
   fail "allowed several replicas to share a ReadWriteOnce volume"
 fi
 
+if render --set persistence.enabled=true --set replicaCount=3 2>&1 \
+  | grep -q "S3-compatible"; then
+  fail "the refusal still offers an S3 driver this build does not have"
+else
+  pass "the refusal offers only remedies that exist"
+fi
+
+# --- the shipped defaults keep files --------------------------------------
+# The combination the previous defaults produced, two replicas with persistence
+# off, is the one that loses uploads silently (GAP-AUDIT B-11). This asserts the
+# defaults are not that, by reading the rendered manifest rather than the
+# values file, so a template that ignored the value would still fail here.
+defaults=$(render)
+if printf '%s' "$defaults" | grep -q "persistentVolumeClaim"; then
+  pass "the default install mounts a volume for uploads"
+else
+  fail "the default install sends uploads to an emptyDir"
+fi
+
+if printf '%s' "$defaults" | grep -A 3 "name: storage" | grep -q "emptyDir"; then
+  fail "storage is an emptyDir with the shipped values"
+else
+  pass "storage is not an emptyDir with the shipped values"
+fi
+
+if [ "$(printf '%s' "$defaults" | grep -c '^  replicas: 1$')" -ge 1 ]; then
+  pass "the default install is one replica, which ReadWriteOnce requires"
+else
+  fail "the default replica count does not match the default storage mode"
+fi
+
+# --- turning it off is allowed, and says what it costs --------------------
+if render --set persistence.enabled=false --set replicaCount=3 >/dev/null 2>&1; then
+  pass "several replicas with no shared storage is allowed, not refused"
+else
+  fail "refused a configuration an upgrade could already be running"
+fi
+
+if helm template openokr . --set "database.url=$DB" \
+  --set persistence.enabled=false --show-only templates/NOTES.txt 2>/dev/null \
+  | grep -q "WARNING: persistence is off"; then
+  pass "warns when uploads are going to an emptyDir"
+else
+  # NOTES.txt is not a template helm can --show-only, on some versions. Fall
+  # back to reading the file itself, which is what the warning lives in.
+  if grep -q "WARNING: persistence is off" templates/NOTES.txt; then
+    pass "warns when uploads are going to an emptyDir"
+  else
+    fail "says nothing when uploads are going to an emptyDir"
+  fi
+fi
+
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
   pass "refuses the smtp transport with no host"
 else

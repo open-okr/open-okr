@@ -34,8 +34,29 @@ unreadable.
 
 {{- if and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce") }}
 
-Storage is a ReadWriteOnce volume, so this release is pinned to one replica.
-Scaling it up needs a ReadWriteMany class or S3-compatible object storage.
+Uploaded files are kept on a {{ .Values.persistence.size }} ReadWriteOnce
+volume, mounted at /app/storage. That volume cannot be shared across nodes, so
+this release is pinned to one replica. To scale out, give storage a
+ReadWriteMany class:
+
+  --set persistence.accessMode=ReadWriteMany --set replicaCount=3
+{{- end }}
+
+{{- if not .Values.persistence.enabled }}
+
+WARNING: persistence is off, so uploaded files go to an emptyDir.
+
+They are deleted when a pod restarts, and nothing warns anybody when they go.
+{{- if gt (int .Values.replicaCount) 1 }}
+With {{ .Values.replicaCount }} replicas they are also invisible to the other
+pods: a file uploaded through one pod cannot be downloaded through another, and
+which pod serves a request is not something a user can influence.
+{{- end }}
+
+That is a working configuration for an instance that accepts no uploads, and a
+data-loss bug for one that does. To keep files:
+
+  --set persistence.enabled=true
 {{- end }}
 
 {{- if eq .Values.mail.transport "console" }}
