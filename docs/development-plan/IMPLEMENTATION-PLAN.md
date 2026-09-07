@@ -1761,6 +1761,39 @@ have exactly this hole, and enforces its own level in the handler with the
 reason written above it; `imports.listRuns` and the nudge volume read are the
 two others already visible, and the sweep is what finds the rest.
 
+**What the sweep found, and where it landed.** 29 reads declare above `view`
+and 2 enforced it, so 27 were open. Enforcement went in the builder rather
+than read by read, because the shape did allow it: the level is one number
+compared against the member's level on the workspace's own context, and 27
+copies of that comparison is 27 chances to write it differently. The builder
+checks only when the declared level is above `view`, so a `view` read costs
+nothing extra, and `system` and `operator` actors are exempt exactly as
+`runOperation` exempts them. The two hand-rolled checks are dealt with
+differently: `invitations.list`'s is deleted, because it duplicated the
+builder's; `settings.readWorkspaceSettings` keeps its `getAccessScoped` call,
+because that is the access getter the hard rule requires for a protected
+aggregate and it is not the same check.
+
+**The refusal is `not_found`, in the access getter's own words.** The first
+version raised `forbidden` and named the action and the level, and two existing
+specs refused it: `settings-actions.test.ts` requires `not_found` for a member
+holding `edit`, and `import-table.test.ts` requires "No such workspace" for
+somebody who is not a member at all. Both are right. `forbidden` is defensible
+for a caller who is already a member and knows the workspace exists, and it is
+what the write actions beside these reads raise; it is not defensible for a
+caller with no member row, because "you hold too little access in this
+workspace" confirms the workspace. One check cannot separate the two without
+handing back the oracle it exists to close. So a read refuses the way
+`getAccessScoped` refuses, the message names neither the action nor the level,
+and `invitations.list`'s own spec was corrected from `forbidden` to `not_found`
+in the same change.
+
+**No REST route test, and that is the point of the design.** `route.ts` says
+"nothing here decides who may do what": it resolves the principal, checks the
+token scope, and hands the input to `callAction`. A test at `callAction` is
+therefore a test of the REST surface too, and one at the route would only prove
+that the route still calls the registry.
+
 **Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
 
 ---
