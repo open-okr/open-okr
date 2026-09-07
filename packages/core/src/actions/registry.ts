@@ -251,6 +251,7 @@ import {
   updateKpi,
 } from "./kpis.ts";
 import {
+  drainNotificationBatches,
   getNotificationSettings,
   importWatcher,
   listNotifications,
@@ -451,6 +452,7 @@ export const ACTION_MAP = {
   "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
+  "notifications.drainBatches": drainNotificationBatches,
   "notifications.list": listNotifications,
   "notifications.unreadCount": unreadNotificationCount,
   "notifications.markRead": markNotificationRead,

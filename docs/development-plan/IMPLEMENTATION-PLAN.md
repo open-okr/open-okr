@@ -1442,6 +1442,28 @@ Deliverables: the worker that finds batches whose `send_at` has arrived, renders
 Test plan: four notifications inside one window deliver as one digest listing four items, each deep-linked; a recipient who lost access after enqueue receives nothing; two hosts draining together send once; the summary fires at the member's local time across a daylight-saving boundary.
 Acceptance: Given a member with a ten-minute window, when four notifications arrive inside it, then they receive one digest listing four items and the batch is marked sent exactly once.
 
+**Where the send happens, and why not in the drain.** A write path may cause a
+side effect only by inserting an outbox row, so the drain claims the batch and
+enqueues; the `notification.digest` handler renders and sends. That split is
+what makes the claim and the enqueue atomic, and it is why `sent` on a batch
+means "handed to the outbox" rather than "an SMTP server accepted it": the
+outbox row carries the attempt count and the dead letter, which is where a
+delivery failure belongs.
+
+**The daily summary was already scheduled and already empty.** `digest.daily`
+has fired at each member's own local hour since P4-T05b, carrying `draftFor`'s
+one generic line for every rule. So the half of this task that looked like
+"build the daily summary" was really "give the daily summary its contents",
+through the same builder the batch digest uses. One builder, so the two cannot
+describe one event differently and the access filter is written once.
+
+**The drain's cron is declared by the host, not by `packages/agents`.** That
+package holds AI-NATIVE-PLAN §6.2's cadences, and a batch drain is plumbing
+rather than something the Champion does. `ScheduledRun` gained a `cron` field
+for runs the host owns, and the scheduler test's invariant widened from "the two
+lists are equal" to "nothing is registered without a worker and nothing waits
+on a cron that does not exist", which is the invariant that was always meant.
+
 ### P6-G01c: The orphan-blob reap [S]
 Depends on: P6-G01a, P2-T05
 Goal: an abandoned upload does not stay forever (GAP-AUDIT B-01).

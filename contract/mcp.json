@@ -1897,6 +1897,30 @@
       }
     },
     {
+      "name": "notifications.drainBatches",
+      "description": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "notifications.list",
       "description": "The signed-in member's own inbox.",
       "inputSchema": {

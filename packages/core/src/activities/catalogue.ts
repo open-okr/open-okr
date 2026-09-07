@@ -193,6 +193,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // the nudges are rows of their own, and a feed with one entry per message
   // sent would bury everything a person actually did.
   "nudges.run": z.object({ recorded: z.number().int() }),
+  // The batch drain (P6-G01b). One activity per pass rather than per digest,
+  // for the same reason the nudge run has one: a feed with an entry per mail
+  // would bury everything a person actually did.
+  "notifications.drained": z.object({ claimed: z.number().int() }),
   // A snooze silences the nudge and never the obligation, which is why it
   // is worth recording: somebody chose to stop being messaged about a
   // thing they still owe.

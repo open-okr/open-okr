@@ -674,6 +674,22 @@ export {
   notifyRecipients,
 } from "./notifications/create.ts";
 export {
+  DIGEST_ITEM_LIMIT,
+  type DigestContents,
+  type DigestItemsInput,
+  digestItemsFor,
+} from "./notifications/digest.ts";
+export {
+  claimDueBatches,
+  DIGEST_TOPIC,
+  type DrainResult,
+} from "./notifications/drain.ts";
+export {
+  LINKED_SUBJECT_TYPES,
+  subjectPath,
+  subjectUrl,
+} from "./notifications/links.ts";
+export {
   type Recipient,
   type ResolveRecipientsInput,
   resolveRecipients,
@@ -707,6 +723,7 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export { readerMaySeeSubject } from "./notifications/visibility.ts";
 export {
   ageInWords,
   blockerDraft,

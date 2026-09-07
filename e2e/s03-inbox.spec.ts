@@ -71,6 +71,17 @@ test("sign in", async () => {
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({
     timeout: 15_000,
   });
+
+  // **The shell being visible is not the navigation being finished.** Signing
+  // in ends in a client-side push to `/` that can still be in flight after the
+  // sidebar has painted, and the next test's `page.goto("/inbox")` then loses
+  // the race: Playwright reported "navigation to /inbox is interrupted by
+  // another navigation to /", intermittently, on a spec that had passed twice.
+  // Waiting for the push to land is what makes this file deterministic rather
+  // than usually fine.
+  await page.waitForURL((url) => new URL(url).pathname === "/", {
+    timeout: 15_000,
+  });
 });
 
 test("a notification is listed, links to its goal, and clears the badge", async () => {

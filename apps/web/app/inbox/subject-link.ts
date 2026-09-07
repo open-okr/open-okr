@@ -1,63 +1,20 @@
 /**
- * Where an inbox row goes when you click it (S-03, P6-G07a).
+ * The wording around an inbox row (S-03, P6-G07a).
  *
- * **Its own module, and pure, so it can be tested without a database.** The
- * acceptance criterion for this screen is that a row "deep-links to the
- * comment", and a link that is computed inline in a server component is a link
- * nothing can assert. The table below is the one place a subject type turns
- * into an address in this application.
+ * **The path map moved to `packages/core/src/notifications/links.ts`** at
+ * P6-G01b, the moment the mailed digest needed to link to the same subject.
+ * Two maps would be two answers to "where is this goal", and the digest and the
+ * inbox would eventually disagree. What is left here is presentation: the word
+ * for a subject type in a heading, and the word for a reason on a chip.
  *
- * A subject type with no entry returns null and the row renders without a
- * link, rather than pointing at a route that answers 404. That is the honest
- * failure: a row that says what happened and cannot yet take you there is
- * useful, and a dead link is not.
+ * `subjectLink` stays as the name this screen calls, re-exported rather than
+ * rewritten at every call site, because the screen is asking a different
+ * question from the mailer: it wants a path, not a URL.
  */
-
-/**
- * Subject type to a path builder, or null where the product has no screen for
- * that subject yet.
- *
- * `check_in` has no id-addressable screen: `/check-in` is the composer for the
- * reader's own check-ins and `/goals/<id>` is where a check-in is read, so a
- * check-in notification links to nothing until its goal is known. It carries
- * the check-in's id and not the goal's, which is why this is null rather than a
- * guess.
- *
- * `member` is a nudge about the reader's own day (the morning summary), so it
- * points at the inbox it is already in, which would be a link to the current
- * page. Null.
- *
- * `blocker` has no route at all. Blockers are read inside the cycle and the
- * session rather than on a page of their own, and a blocker nudge is the one
- * kind that carries its own words into the message, so the row already says
- * what it is about. This entry is absent rather than pointed at `/cycle`,
- * because a link that lands on the wrong phase of a nine-phase screen is worse
- * than no link.
- */
-const PATHS: Readonly<Record<string, (id: string) => string>> = {
-  goal: (id) => `/goals/${id}`,
-  initiative: (id) => `/initiatives/${id}`,
-  task: (id) => `/tasks/${id}`,
-  kpi: (id) => `/kpis/${id}`,
-  space: (id) => `/spaces/${id}`,
-  session: (id) => `/session/${id}`,
-  cycle: () => "/cycle",
-  document: (id) => `/documents/${id}`,
-  workspace: () => "/",
-};
-
-/** The subject types this module knows how to address. For the test. */
-export const LINKED_SUBJECT_TYPES = Object.keys(PATHS);
-
-export function subjectLink(
-  subjectType: string | null,
-  subjectId: string | null,
-): string | null {
-  if (!subjectType || !subjectId) {
-    return null;
-  }
-  return PATHS[subjectType]?.(subjectId) ?? null;
-}
+export {
+  LINKED_SUBJECT_TYPES,
+  subjectPath as subjectLink,
+} from "@openokr/core";
 
 /** The word for a subject type, for the group heading above its rows. */
 const NAMES: Readonly<Record<string, string>> = {

@@ -41,7 +41,7 @@ Six screens specified in UIUX-PLAN.md §6 have no route at all (S-03, S-31, S-33
 ## B-01: Nothing schedules the agents, so the product is never active
 
 - [x] Wire a job queue host and call `registerAgentSchedules` at boot. **Closed at P6-G01a.** `apps/web/lib/scheduler.ts` builds the pg-boss driver, subscribes a worker to every declared job and registers the schedules at boot, behind `OPENOKR_SCHEDULER` which defaults to on. The Coach gained the nightly cadence §6.1 gives it and had never had, fired at each workspace's own local hour. Proved by construction, not by observation: no run against a live pg-boss yet.
-- [ ] **P6-G01b** the notification batch drain. `renderDigest` has had no caller outside the barrel since P2-T06, so no batched notification has ever been delivered.
+- [x] **P6-G01b** the notification batch drain. Closed on 7 September 2026. `notifications.drainBatches` claims every batch whose window has closed and enqueues one digest per batch through the outbox; the `notification.digest` handler renders it and sends. The claim is a conditional update from `pending`, which is the whole of the idempotence under several hosts. The daily summary was a second finding inside this one: `digest.daily` had fired at each member's local hour since P4-T05b carrying the generic "you have a reminder waiting" line, so it was scheduled and summarised nothing; it now carries the member's own unread rows through the same builder as the batch digest.
 - [ ] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
 
 `registerAgentSchedules` declares four cron cadences for the Champion ([schedule.ts:69](../../packages/agents/src/schedule.ts#L69)). Nothing calls it. No file outside `packages/adapters` and `packages/agents` references `JobQueue` at all, and `apps/web` constructs no queue: [instrumentation.node.ts](../../apps/web/instrumentation.node.ts) starts the outbox relay and nothing else.
@@ -51,8 +51,8 @@ Consequences in a running instance:
 | What should happen on its own | What happens today |
 |---|---|
 | The Champion chases a due check-in on the hour | Nothing, unless an admin presses Run now on `/admin/agents` |
-| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Never sends |
-| Notification batches drain on their window | Never drain |
+| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Fires since P6-G01a, and says what happened since P6-G01b |
+| Notification batches drain on their window | Every five minutes, since P6-G01b |
 | Staleness flips to `outdated` past the grace | Only when somebody runs `pnpm cadence:sweep` by hand |
 | Orphan blobs are reaped, thumbnails generated (P2-T05) | Never |
 

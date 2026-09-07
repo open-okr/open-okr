@@ -28,6 +28,7 @@ import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
 import { resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
+import { digestItemsFor } from "../notifications/digest.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
@@ -57,6 +58,56 @@ function draftFor(ruleKey: string): { subject: string; text: string } {
       "",
       `Rule: ${ruleKey}`,
     ].join("\n"),
+  };
+}
+
+/** The trigger key §6.4 gives the morning summary. */
+const DAILY_DIGEST_RULE = "digest.daily";
+
+/**
+ * The morning summary's own message: the member's own unread rows (P6-G01b).
+ *
+ * Null when there is nothing unread, and the caller falls back to the generic
+ * line rather than mailing an empty list. A summary of nothing is still worth
+ * sending to somebody who asked for one every day, and saying "you have a
+ * reminder waiting" is the honest version of that.
+ *
+ * The same builder the batch drain uses, so the two digests cannot describe one
+ * event differently, and the access filter is applied once in one place.
+ */
+async function dailyDigestDraft(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly baseUrl: string;
+    readonly now: Date;
+  },
+): Promise<{ subject: string; text: string } | null> {
+  const contents = await digestItemsFor(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    unreadOnly: true,
+    baseUrl: input.baseUrl,
+    now: input.now,
+  });
+  if (contents.items.length === 0) {
+    return null;
+  }
+  const count = contents.items.length;
+  const lines = [
+    "Here is what happened since you last looked.",
+    "",
+    ...contents.items.map((item) => `- ${item.summary}\n  ${item.link}`),
+    ...(contents.omitted > 0 ? ["", `and ${contents.omitted} more.`] : []),
+    "",
+    // The rule key, on this message as on every other proactive message the
+    // product sends. It is what a reader follows back to METHOD.md.
+    `Rule: ${DAILY_DIGEST_RULE}`,
+  ];
+  return {
+    subject: count === 1 ? "OpenOKR: 1 update" : `OpenOKR: ${count} updates`,
+    text: lines.join("\n"),
   };
 }
 
@@ -224,7 +275,23 @@ export async function deliverDueNudges(
               now: input.now,
               ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
             })) ?? draftFor(row.ruleKey))
-          : draftFor(row.ruleKey);
+          : // **The daily summary carries what it is summarising** (P6-G01b).
+            // Every other rule is one line by design, because per-rule wording
+            // is coaching copy and METHOD.md owns that. This rule is the
+            // exception for the opposite reason: `digest.daily` is not a
+            // sentence about a thing, it is a list of things, and a morning
+            // summary that said "you have a reminder waiting" while summarising
+            // nothing was the state of it from P4-T05b until here. Falls back to
+            // the generic line when the list comes back empty, which is what a
+            // member with a quiet day gets.
+            row.ruleKey === DAILY_DIGEST_RULE && input.baseUrl
+            ? ((await dailyDigestDraft(tx, {
+                workspaceId: input.workspaceId,
+                memberId: row.recipientMemberId,
+                baseUrl: input.baseUrl,
+                now: input.now,
+              })) ?? draftFor(row.ruleKey))
+            : draftFor(row.ruleKey);
       // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside
       // Meta's twenty-four hour window the body will not go at all, so the
       // rule's approved template and its filled-in variables are looked up and

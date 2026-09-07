@@ -13,6 +13,7 @@ import {
   nudges,
   subscriptionLists,
   subscriptions,
+  type WorkspaceTx,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
@@ -20,8 +21,8 @@ import { and, count, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped, hasSubjectResolver } from "../access/reads.ts";
 import { renderActivity } from "../activities/renderers.ts";
+import { claimDueBatches } from "../notifications/drain.ts";
 import {
   getOrCreateNotificationSettings,
   updateNotificationSettings,
@@ -31,6 +32,7 @@ import {
   ensureSubscriptionList,
   subscribeMember,
 } from "../notifications/subscriptions.ts";
+import { readerMaySeeSubject } from "../notifications/visibility.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -111,50 +113,6 @@ async function actingMember(
     )
     .limit(1);
   return member?.id ?? null;
-}
-
-/**
- * Whether this reader may still see what the row is about (P6-G07a).
- *
- * **A notification outlives the access that produced it.** Somebody watching a
- * goal in a space they are later removed from keeps the rows that were written
- * while they could see it, and listing those would be a slow leak of exactly
- * the kind the access getter exists to close: the row names a subject, and the
- * subject's title reaches the screen.
- *
- * Two answers, and they need opposite handling. A subject type the getter knows
- * is checked and hidden when the check fails. A subject type it does not know
- * has no context of its own, so the workspace floor is the whole of its
- * visibility and the reader is a member by construction: shown. That is the
- * group every nudge is about, and failing closed on it would empty the inbox of
- * the product's own proactive messages, which is the opposite of the point.
- */
-async function readerMaySee(
-  tx: OperationTx,
-  workspaceId: string,
-  memberId: string,
-  subjectType: string | null,
-  subjectId: string | null,
-): Promise<boolean> {
-  if (!subjectType || !subjectId) {
-    // Nothing to check. The row is addressed to this member and says only that
-    // something happened, which is what a pre-0074 row can honestly say.
-    return true;
-  }
-  if (!hasSubjectResolver(subjectType)) {
-    return true;
-  }
-  try {
-    await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType: subjectType,
-      resourceId: subjectId,
-    });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export const listNotifications = defineReadAction({
@@ -276,7 +234,7 @@ export const listNotifications = defineReadAction({
           row.nudgeSubjectId ??
           null;
         if (
-          !(await readerMaySee(
+          !(await readerMaySeeSubject(
             tx,
             context.workspaceId,
             memberId,
@@ -738,3 +696,67 @@ async function countSubscribers(
     .limit(1);
   return row !== undefined;
 }
+
+/**
+ * Drains the batches whose window has closed (P6-G01b).
+ *
+ * **Nothing had ever called this path.** P2-T06 coalesced notifications into
+ * batches correctly and its own comment said so plainly: "nothing dispatches a
+ * `pending` batch or an unsent immediate row yet". Four months later nothing
+ * did, so a member who chose a thirty-minute window received nothing rather
+ * than one mail every half hour, and `renderDigest` had no caller outside the
+ * package barrel. The gap audit recorded it as the second half of B-01.
+ *
+ * **A write action through the pipeline, not a bare function**, because it
+ * changes rows and enqueues side effects and those two have to commit
+ * together. The claim and the outbox row land in one transaction, so a crash
+ * between them is impossible rather than merely unlikely.
+ *
+ * The scheduler host calls it per workspace as `system`, the same principal
+ * the agent cadences run as. An administrator can call it by hand, which is
+ * what makes the drain testable without a clock.
+ */
+export const drainNotificationBatches = defineWriteAction({
+  name: "notifications.drainBatches",
+  summary:
+    "Claims every notification batch whose window has closed and enqueues its digest.",
+  input: z.object({
+    /** Defaults to the moment the request arrives. Overridden by tests. */
+    now: z.string().optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+  output: z.object({
+    claimed: z.number().int(),
+    waiting: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const now = input.now ? new Date(input.now) : new Date();
+      const drained = await claimDueBatches(tx as WorkspaceTx, {
+        workspaceId,
+        now,
+        ...(input.limit ? { limit: input.limit } : {}),
+      });
+      return {
+        result: { claimed: drained.claimed, waiting: drained.waiting },
+        // The outbox rows the claim produced, written by the pipeline in this
+        // same transaction. This is the only way a side effect leaves a write
+        // path in this product.
+        outbox: drained.outbox,
+        activity: {
+          kind: "notifications.drained",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { claimed: drained.claimed },
+        },
+        audit: {
+          action: "notifications.drainBatches",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { claimed: drained.claimed },
+        },
+      };
+    },
+  }),
+});

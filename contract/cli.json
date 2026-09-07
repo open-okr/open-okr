@@ -1275,6 +1275,29 @@
       "pages": false
     },
     {
+      "name": "notifications drainBatches",
+      "action": "notifications.drainBatches",
+      "method": "POST",
+      "path": "/notifications/drainBatches",
+      "scope": "write",
+      "summary": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "flags": [
+        {
+          "name": "now",
+          "field": "now",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "notifications list",
       "action": "notifications.list",
       "method": "GET",

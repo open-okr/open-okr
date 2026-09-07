@@ -161,6 +161,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "nudges.run": (p) =>
     `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
   "nudge.snoozed": (p) => `snoozed a nudge until ${asString(p.until, "later")}`,
+  "notifications.drained": (p) =>
+    `sent ${String(p.claimed)} notification digest(s)`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>
