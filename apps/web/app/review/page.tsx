@@ -12,6 +12,7 @@ import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge } from "./actions.ts";
+import { NudgeProvenance } from "./nudge-provenance.tsx";
 
 /**
  * Review, "what I owe" (UIUX-PLAN.md §4 S-02, P3-T08).
@@ -25,11 +26,22 @@ import { acknowledge } from "./actions.ts";
  * S-03's, the notification inbox, and keeping them apart is why this page has no
  * unread state and no mark-as-read.
  *
- * Two parts of the mockup are deliberately absent, both because they need a
- * phase that has not landed. "Why you got nudged" needs a nudge to be about, and
- * nudges are P4-T05. "Your week" needs the blocker clock and the session streak,
- * which are P3-T09 and P4-T04. Drawing either with invented numbers would make
- * the screen look finished while telling somebody something untrue.
+ * **"Why you got nudged" is here since P4-T04c**, with the rule that caused each
+ * message and a snooze that stops the messages without clearing what is owed.
+ * The list of obligations does not move when somebody snoozes, and the control
+ * says so: choosing not to be messaged about a thing is not the same as no
+ * longer owing it.
+ *
+ * **All seven sources are here since P6-G02**: check-ins as champion,
+ * acknowledgements as reviewer of record, assigned tasks, blockers owned or
+ * escalated, commitments still open, sessions to facilitate, and agent
+ * proposals waiting on a decision. Four of those were declared and empty for
+ * weeks after the tasks that were supposed to fill them had landed, which is
+ * what the gap audit of 7 September 2026 recorded as B-02.
+ *
+ * "Your week" is still absent. It is the summary strip S-02 also asks for, and
+ * it belongs with the confidence trend and the streak ribbon at P6-G19 rather
+ * than being drawn here from a second read of the same tables.
  */
 
 const GROUPS = [
@@ -55,9 +67,22 @@ export default async function ReviewPage() {
     {},
   );
 
+  // The nudges this member has had, sent and held alike. A held one is on the
+  // list too: the point of recording a suppression is that the silence can be
+  // accounted for.
+  const { nudges } = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "nudges.list",
+    { limit: 20 },
+  );
+
   return (
     <AppShellLayout>
-      <div className="mx-auto flex max-w-3xl flex-col gap-4.5">
+      <div className="flex flex-col gap-4.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">
@@ -111,28 +136,50 @@ export default async function ReviewPage() {
           })
         )}
 
+        {/* Empty since P6-G02, and the card is kept rather than deleted. It
+            listed four sources naming P3-T09, P4-T07, P4-T04 and P4-T05, and
+            all four of those tasks had been done for weeks by the time the gap
+            audit read it. The mechanism is what makes the next source that
+            arrives ahead of its reader legible; the card renders nothing when
+            there is nothing to say. */}
+        {inbox.pending.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">Not here yet</h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1.5">
+              <p className="text-xs text-ink-3">
+                These sources of obligation are named here rather than left out,
+                so this page cannot look complete while quietly failing to tell
+                you about something you own.
+              </p>
+              <ul className="flex flex-col gap-1">
+                {inbox.pending.map((source) => (
+                  <li
+                    key={source.kind}
+                    className="flex items-center justify-between gap-2.5 text-xs"
+                  >
+                    <span className="text-ink-2">{source.label}</span>
+                    <Chip tone="neutral">{source.task}</Chip>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Not here yet</h2>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-bold text-ink">Why you got nudged</h2>
+              <p className="text-xs text-ink-3">
+                Every message the product sent you, and every one it decided to
+                hold, with the rule behind it.
+              </p>
+            </div>
           </CardHeader>
-          <CardBody className="flex flex-col gap-1.5">
-            <p className="text-xs text-ink-3">
-              S-02 lists six sources of obligation. Two of them work. The rest
-              are named here rather than left out, so this page cannot look
-              complete while quietly failing to tell you about something you
-              own.
-            </p>
-            <ul className="flex flex-col gap-1">
-              {inbox.pending.map((source) => (
-                <li
-                  key={source.kind}
-                  className="flex items-center justify-between gap-2.5 text-xs"
-                >
-                  <span className="text-ink-2">{source.label}</span>
-                  <Chip tone="neutral">{source.task}</Chip>
-                </li>
-              ))}
-            </ul>
+          <CardBody>
+            <NudgeProvenance nudges={nudges} />
           </CardBody>
         </Card>
       </div>

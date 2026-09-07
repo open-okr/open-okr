@@ -36,6 +36,11 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import {
+  assertLegacyKeyFree,
+  legacyColumns,
+  legacyKey,
+} from "../imports/legacy.ts";
+import {
   cascadeFromKpi,
   evaluateKpiForPeriod,
   setKpiFormula,
@@ -88,18 +93,32 @@ function shortId(): string {
 export const createKpiCategory = defineWriteAction({
   name: "kpis.createCategory",
   summary: "Adds a KPI category, which is how the grid groups its rows.",
-  input: z.object({ name: z.string().trim().min(1).max(120) }),
+  input: z.object({
+    name: z.string().trim().min(1).max(120),
+    /** The source-system identity, when an import is creating this (P6-T03d). */
+    legacy: legacyKey.optional(),
+  }),
   output: z.object({ id: z.uuid(), name: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       await actingMember(tx, workspaceId, context.actor.userId);
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        kpiCategories,
+        input.legacy,
+        "KPI category",
+      );
       const id = newId();
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx.insert(kpiCategories).values({
         id,
         workspaceId,
         name: input.name,
+        ...(input.legacy
+          ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+          : {}),
       });
       return {
         result: { id, name: input.name },
@@ -140,12 +159,16 @@ export const createKpi = defineWriteAction({
     targetDefault: z.number().optional(),
     healthyPct: z.number().min(0).max(200).optional(),
     watchPct: z.number().min(0).max(200).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid(), shortId: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       await actingMember(tx, workspaceId, context.actor.userId);
+
+      await assertLegacyKeyFree(tx, workspaceId, kpis, input.legacy, "KPI");
 
       if (
         (input.healthyPct !== undefined || input.watchPct !== undefined) &&
@@ -189,6 +212,7 @@ export const createKpi = defineWriteAction({
         ...(input.watchPct === undefined
           ? {}
           : { watchPct: String(input.watchPct) }),
+        ...legacyColumns(input.legacy),
       });
 
       // No records yet, so this settles the KPI at `no_data` rather than leaving
@@ -770,6 +794,14 @@ export const launchKpiRecovery = defineWriteAction({
     kpiId: z.uuid(),
     /** The cycle the objective lives in. The caller resolves the current one. */
     cycleId: z.uuid(),
+    /**
+     * A title instead of §6.5's template sentence (P4-T05c-b).
+     *
+     * Carried on a Champion proposal when a model wrote a better one. Bounded
+     * like every other objective title, because a proposal is applied through
+     * this action by a human and gets no exemption from §4.1's length rule.
+     */
+    objectiveTitle: z.string().trim().min(1).max(500).optional(),
   }),
   output: z.object({
     goalId: z.uuid(),
@@ -793,6 +825,9 @@ export const launchKpiRecovery = defineWriteAction({
         cycleId: input.cycleId,
         spaceId: null,
         keyResultCap: Number(rhythm.thresholds["kpi.recoveryKeyResultCap"]),
+        ...(input.objectiveTitle
+          ? { objectiveTitle: input.objectiveTitle }
+          : {}),
       });
 
       return {

@@ -146,16 +146,51 @@ function open(key: Buffer, sealed: Buffer, label: string): Buffer {
   }
 }
 
+/**
+ * The same envelope, over bytes rather than a string (P6-T05a).
+ *
+ * A workspace archive is megabytes, so it cannot go through `encryptSecret`:
+ * that takes a string and hands back base64, which would mean three copies of
+ * the payload in memory and a 33 per cent inflation on a file already
+ * compressed. The scheme is identical, and it is the same two functions doing
+ * it, because two implementations of one envelope is how they come to disagree.
+ *
+ * The wrapped data key comes back base64 because it goes in the archive's
+ * plaintext header, which is JSON. The ciphertext stays bytes.
+ */
+export interface SealedBytes {
+  readonly ciphertext: Buffer;
+  /** The data key, encrypted under the root key. Base64. */
+  readonly dataKey: string;
+  readonly keyId: string;
+}
+
+export function sealBytes(ring: KeyRing, plaintext: Buffer): SealedBytes {
+  const dataKey = randomBytes(KEY_BYTES);
+  return {
+    ciphertext: seal(dataKey, plaintext),
+    dataKey: seal(ring.current.key, dataKey).toString("base64"),
+    keyId: ring.current.id,
+  };
+}
+
+/** Opens what `sealBytes` sealed. Throws rather than returning a partial result. */
+export function openBytes(ring: KeyRing, sealed: SealedBytes): Buffer {
+  const dataKey = open(
+    rootKeyFor(ring, sealed.keyId),
+    Buffer.from(sealed.dataKey, "base64"),
+    "wrapped data key",
+  );
+  return open(dataKey, sealed.ciphertext, "archive");
+}
+
 /** Seals a secret: a fresh data key, wrapped by the ring's current root key. */
 export function encryptSecret(ring: KeyRing, plaintext: string): SealedSecret {
-  const dataKey = randomBytes(KEY_BYTES);
-  const ciphertext = seal(dataKey, Buffer.from(plaintext, "utf8"));
-  const wrapped = seal(ring.current.key, dataKey);
-
+  const sealed = sealBytes(ring, Buffer.from(plaintext, "utf8"));
   return {
-    ciphertext: ciphertext.toString("base64"),
-    dataKey: wrapped.toString("base64"),
-    keyId: ring.current.id,
+    ciphertext: sealed.ciphertext.toString("base64"),
+    dataKey: sealed.dataKey,
+    keyId: sealed.keyId,
   };
 }
 

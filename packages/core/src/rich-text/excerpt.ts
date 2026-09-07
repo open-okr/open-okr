@@ -54,3 +54,25 @@ export function excerptRichText(
     .trim();
   return truncate(text, maxLength);
 }
+
+/**
+ * The document as plain text, one line per block (P5-T12).
+ *
+ * **`excerptRichText` collapses every whitespace run to a single space**, which
+ * is right for a one-line preview and wrong for anything that wants to know
+ * where a paragraph ended. The version difference is a line comparison, and
+ * against a collapsed excerpt every edit reads as "the whole document changed":
+ * found by publishing two versions of a two-paragraph document in a browser and
+ * getting one line back.
+ *
+ * The same `textOf` walk, applied per top-level node instead of once over all
+ * of them, so this is the same parser rather than a second one.
+ */
+export function plainTextLines(
+  doc: RichTextDocument,
+  resolvers: ExcerptResolvers = {},
+): string[] {
+  return doc.content
+    .map((node) => textOf(node, resolvers).replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "");
+}

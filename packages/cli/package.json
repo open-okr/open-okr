@@ -1,0 +1,23 @@
+{
+  "name": "@openokr/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "okr": "./src/bin/okr.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "okr": "node --experimental-strip-types --no-warnings src/bin/okr.ts"
+  },
+  "devDependencies": {
+    "@openokr/core": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

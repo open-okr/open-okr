@@ -26,7 +26,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { canPublish, INPUT_PACK_ITEMS } from "@openokr/method";
+import { INPUT_PACK_ITEMS } from "@openokr/method";
 import { asc, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -956,8 +956,30 @@ export const publishCycle = defineWriteAction({
   name: "workflow.publish",
   summary:
     "Publishes the set, refusing while any of the six gates is red or cannot be evaluated.",
-  input: z.object({ cycleId: z.uuid() }),
-  output: z.object({ cycleId: z.uuid(), publishedAt: z.string() }),
+  input: z.object({
+    cycleId: z.uuid(),
+    /**
+     * The override, and the reason for it (METHOD.md §4.5, P4-T03).
+     *
+     * §4.5 makes the six gates hard, and a product with no way past a hard
+     * refusal is a product people leave. So the override exists, and everything
+     * about it is designed to be uncomfortable: it needs the same `full` access
+     * publishing needs, it needs a reason written in the sentence somebody will
+     * read six months later, and it writes an audit row naming who did it and
+     * which gates were red at the time.
+     *
+     * The reason is not optional and not defaulted. An override with no reason
+     * is indistinguishable from a bug.
+     */
+    override: z
+      .object({ reason: z.string().trim().min(20).max(2000) })
+      .optional(),
+  }),
+  output: z.object({
+    cycleId: z.uuid(),
+    publishedAt: z.string(),
+    overrodeGates: z.array(z.number().int()),
+  }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
@@ -977,20 +999,30 @@ export const publishCycle = defineWriteAction({
         );
       }
 
-      if (!canPublish(snapshot.gates)) {
-        const reasons = snapshot.gates
-          .filter((gate) => !gate.passed || !gate.evaluable)
-          .map((gate) => {
-            const detail = gate.evaluable
-              ? gate.detail.missing.join("; ")
-              : `cannot be evaluated: ${gate.detail.blocked}`;
-            return `Gate ${gate.gateKey} (${gate.title}): ${detail}`;
-          });
+      const red = snapshot.gates.filter(
+        (gate) => !gate.passed || !gate.evaluable,
+      );
+      if (red.length > 0 && !input.override) {
+        const reasons = red.map((gate) => {
+          const detail = gate.evaluable
+            ? gate.detail.missing.join("; ")
+            : `cannot be evaluated: ${gate.detail.blocked}`;
+          return `Gate ${gate.gateKey} (${gate.title}): ${detail}`;
+        });
         throw new OperationError(
           "forbidden",
           `The set cannot be published until all six gates are green. ${reasons.join(" ")}`,
         );
       }
+      if (input.override && red.length === 0) {
+        // Refused rather than ignored. An override recorded against nothing
+        // teaches the reader of the audit log that overrides are routine.
+        throw new OperationError(
+          "forbidden",
+          "Every gate is green, so there is nothing to override.",
+        );
+      }
+      const overrodeGates = red.map((gate) => gate.gateKey);
 
       const at = new Date();
       // Publication is the moment the set becomes the thing everybody reads, so
@@ -1006,18 +1038,40 @@ export const publishCycle = defineWriteAction({
         .where(activeOnly(cycles, eq(cycles.id, input.cycleId)));
 
       return {
-        result: { cycleId: input.cycleId, publishedAt: at.toISOString() },
+        result: {
+          cycleId: input.cycleId,
+          publishedAt: at.toISOString(),
+          overrodeGates,
+        },
         activity: {
           kind: "cycle.published",
           subjectType: "cycle",
           subjectId: input.cycleId,
-          payload: { name: cycle.name },
+          payload: { name: cycle.name, overrodeGates },
         },
         audit: {
-          action: "workflow.publish",
+          // A different action name when a gate was overridden, so the audit
+          // log can be read for overrides without parsing a payload. Somebody
+          // asking "has anybody ever published past a red gate" should not have
+          // to know the shape of a JSON column to find out.
+          action:
+            overrodeGates.length > 0 ? "workflow.override" : "workflow.publish",
           targetType: "cycle",
           targetId: input.cycleId,
-          payload: { name: cycle.name },
+          payload:
+            overrodeGates.length > 0
+              ? {
+                  name: cycle.name,
+                  overrodeGates,
+                  reason: input.override?.reason,
+                  gates: red.map((gate) => ({
+                    gateKey: gate.gateKey,
+                    title: gate.title,
+                    missing: gate.detail.missing,
+                    blocked: gate.detail.blocked ?? null,
+                  })),
+                }
+              : { name: cycle.name },
         },
       };
     },

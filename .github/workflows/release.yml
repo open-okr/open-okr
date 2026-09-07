@@ -22,6 +22,11 @@ jobs:
   verify:
     name: Verify the tagged commit
     runs-on: ubuntu-latest
+    # Its own stack name, so a leftover container from another job on the same
+    # host cannot hold this one's port. The defaults are fine here: nothing else
+    # in this workflow starts a database.
+    env:
+      COMPOSE_PROJECT_NAME: openokr-test-release
     steps:
       - uses: actions/checkout@v7
         with:

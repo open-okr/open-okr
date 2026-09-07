@@ -53,6 +53,7 @@ import {
   resolveWorkspaceCadence,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -314,11 +315,22 @@ export const createCycle = defineWriteAction({
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .nullable()
       .optional(),
+    /**
+     * The name to use instead of the period's own (P6-T03a).
+     *
+     * Set by the importer, which keeps the name the source used because that is
+     * the one the people being migrated recognise. The period still decides the
+     * dates and the mode, so nothing about the rhythm changes; only the label.
+     */
+    name: z.string().trim().min(1).max(120).optional(),
+    /** The source system's identifier for this cycle, when an import made it. */
+    legacy: legacyKey.optional(),
   }),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(tx, workspaceId, cycles, input.legacy, "cycle");
       const cadence =
         input.cadence ?? (await resolveWorkspaceCadence(tx, workspaceId));
       const period = cyclePeriodFor(cadence, parseLocalDate(input.on));
@@ -332,6 +344,8 @@ export const createCycle = defineWriteAction({
         sponsorId: input.sponsorId ?? null,
         facilitatorId: input.facilitatorId ?? null,
         publicationDeadline: input.publicationDeadline ?? null,
+        ...(input.name ? { name: input.name } : {}),
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
       const [row] = await tx
         .select(CYCLE_COLUMNS)
@@ -1062,8 +1076,12 @@ export const feedForwardCycle = defineWriteAction({
     priorScores: z.number().int(),
     issues: z.number().int(),
     frameCarried: z.boolean(),
-    /** Rows of the mapping this build cannot fill, each naming its task. */
+    /** Rows of the mapping this build cannot fill, each naming its task. Empty since P4-T12-b. */
     waiting: z.array(z.string()),
+    /** Whether the lowest process-health statement became an issue. */
+    processHealthIssue: z.boolean(),
+    /** Whether the learnings reached the next cycle's input pack. */
+    packNote: z.boolean(),
   }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({

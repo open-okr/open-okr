@@ -278,6 +278,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `cycle.starts` | Day one | Everyone |
 | `cycle.review_due` | Two weeks before the cycle ends | Facilitator |
 | `cycle.closing` | The cycle ends unscored | Facilitator and sponsor |
+| `channel.reconnect_needed` | A send to the member’s primary channel fails | The member, by email and in-app. Operational rather than a practice rule, and it is in this catalogue because every proactive message is a nudge row and every nudge row cites a key from here (P5-T01b-b) |
 
 **Quality triggers, owned by the Coach**
 

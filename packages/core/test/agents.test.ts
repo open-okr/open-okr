@@ -103,7 +103,15 @@ describe("agents.create", () => {
       createAgentInput({ name: "B" }),
     );
     const rows = await callAction(ownerContext(), "agents.list", {});
-    expect(rows.map((r) => r.name).sort()).toEqual(["A", "B"]);
+    // Filtered to custom agents: every workspace is seeded with the Champion
+    // (P4-T05a), and this test is about what it created rather than about how
+    // many agents a workspace has.
+    expect(
+      rows
+        .filter((r) => r.kind === "custom")
+        .map((r) => r.name)
+        .sort(),
+    ).toEqual(["A", "B"]);
   });
 });
 
@@ -119,8 +127,10 @@ describe("agents.setEnabled", () => {
       enabled: false,
     });
     expect(off.enabled).toBe(false);
-    const [row] = await callAction(ownerContext(), "agents.list", {});
-    expect(row?.enabled).toBe(false);
+    const rows = await callAction(ownerContext(), "agents.list", {});
+    // Found by id rather than by position. The list holds the seeded Champion
+    // too, and its order is not a promise.
+    expect(rows.find((r) => r.id === agent.id)?.enabled).toBe(false);
   });
 });
 

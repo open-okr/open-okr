@@ -196,6 +196,11 @@ export const GOALS: readonly DemoGoal[] = [
         baselineValue: 9,
         targetValue: 15,
         weight: 2,
+        // The Chief Executive owns the margin, which is also who champions the
+        // objective. This was the only key result of the fifteen with no owner,
+        // and §4.2's KR-3 wants all four of baseline, target, date and owner:
+        // it failed on the owner long after the others were complete.
+        ownerKey: "admin",
         capacity: "fits",
         // §10: this key result reads the KPI rather than a typed value, so the
         // number on the objective and the number on the grid cannot disagree.

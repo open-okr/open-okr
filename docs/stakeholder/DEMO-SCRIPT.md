@@ -101,13 +101,13 @@ Gate 5, red, naming the exact row:
 
 > "This is the whole product in one line. Somebody marked that key result as exceeding the team's capacity, and rather than let it be quietly carried into the quarter, the product refuses to publish the set and names the row. The choice in front of the leadership team is to cut the target or make the hire. It will not let them choose neither."
 
-Gate 2, which cannot be judged at all:
+Gate 2, red for one reason of its own:
 
-> `Cannot be judged yet: the §4 quality engine arrives at P4-T01`
+> `KR-5 on "Publish the weekly cohort report in all 13 weeks of the quarter"`
 
-> "That is the honest version of an unfinished feature. The quality engine is the next phase of the build. Rather than pass the gate on an empty check, the product treats a gate it cannot evaluate exactly like a red one. A gate that checks nothing must not pass."
+> "That is the Draft Coach reading the set the way a good facilitator would. The key result measures the activity, publishing a report, rather than the outcome the report is meant to prove. §4.2 asks for impact, not effort. The team can still do the work; they just cannot call it the result."
 
-**The live fix.** If you want a moment where the product moves under your hands: open the objective *Serve twice the accounts on the cost base we have today*, change that key result's capacity from `exceeds` to `tight`, come back to `/cycle`, and watch gate 5 turn green. Gate 2 still holds publication, which is the point.
+**The live fix.** If you want a moment where the product moves under your hands: open the objective *Serve twice the accounts on the cost base we have today*, change that key result's capacity from `exceeds` to `tight`, come back to `/cycle`, and watch gate 5 turn green. Gate 2 still holds publication until the cohort key result says what it will prove, which is the point.
 
 ### Beat 4 — An objective, end to end (4 min)
 
@@ -193,7 +193,7 @@ Say these before somebody notices them. Each one is a consequence of a rule wort
 
 **The KPI charts are real, though.** `kpis.record` takes the period date, so those six-month series are genuinely spaced and their charts are true trends.
 
-**The strip says the set is 51 days overdue.** Publish gate 6 asks for a publication deadline before day one of the cycle, and the demo sits mid-quarter, so a compliant deadline is necessarily in the past. It is a true statement about a set that has not been published — and it stops counting the moment you publish. You cannot publish today, because gate 2 cannot be evaluated.
+**The strip says the set is 51 days overdue.** Publish gate 6 asks for a publication deadline before day one of the cycle, and the demo sits mid-quarter, so a compliant deadline is necessarily in the past. It is a true statement about a set that has not been published, and it stops counting the moment you publish. You cannot publish today, because gates 2 and 5 are each red for a reason the screen names.
 
 **The scorecard is empty.** It reads key result scores, and scoring at the quarterly review arrives with that session.
 
@@ -228,4 +228,4 @@ pnpm dev                          # register through the wizard again
 pnpm db:seed
 ```
 
-The builder's own tests are in `packages/core/test/demo.test.ts`. They assert the things this script promises: all four objective levels present, gate 5 red for exactly one reason, gate 2 unevaluable, every KPI state on the grid, a three-deep manager chain, a dependency register that passes gate 4 three different ways, and one value point per key result so no nonsense trend appears.
+The builder's own tests are in `packages/core/test/demo.test.ts`. They assert the things this script promises: all four objective levels present, gates 2 and 5 each red for exactly one reason, every KPI state on the grid, a three-deep manager chain, a dependency register that passes gate 4 three different ways, and one value point per key result so no nonsense trend appears.

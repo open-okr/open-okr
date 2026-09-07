@@ -31,6 +31,15 @@ export const workspaceFeed = defineReadAction({
   }),
   output: z.array(feedItem),
   access: ACCESS_LEVELS.view,
+  /**
+   * The one action in the registry that already paged (P5-T07a).
+   *
+   * The page size is the feed query's own, not the caller's: this action takes
+   * no limit, so the public surface does not offer one. A caller who wants
+   * smaller pages needs `queryFeed` to accept a limit first, and then it is an
+   * ordinary input field.
+   */
+  page: { cursorFrom: ["at", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
     return withWorkspace(db, context.workspaceId, async (tx) => {

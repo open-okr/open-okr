@@ -241,10 +241,13 @@ describe("the gate rows", () => {
     // the first case.
     const four = rows.rows.find((entry) => entry.gate_key === 4);
     expect(four?.evaluable).toBe(true);
-    // Gate 2 waits for the quality engine, gate 6 answers today.
+    // Gate 2 answered "cannot be judged" until P4-T03 taught it to evaluate the
+    // §4.2 checks over the set itself. On an empty cycle it passes, because a
+    // set with no key results has none that fail.
     expect(rows.rows.find((entry) => entry.gate_key === 2)?.evaluable).toBe(
-      false,
+      true,
     );
+    expect(rows.rows.find((entry) => entry.gate_key === 2)?.passed).toBe(true);
     expect(rows.rows.find((entry) => entry.gate_key === 6)?.evaluable).toBe(
       true,
     );
@@ -466,7 +469,187 @@ describe("the workflow actions", () => {
     await callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
       cycleId,
     }).catch((error: unknown) => {
-      expect(String(error)).toMatch(/P4-T01/);
+      // Every gate that is red or unevaluable is named with its number and its
+      // title. A refusal that says only "not allowed" sends a facilitator
+      // hunting through six screens.
+      expect(String(error)).toMatch(/Gate \d/);
+    });
+  });
+
+  /**
+   * The override (P4-T03).
+   *
+   * §4.5's gates are hard, and a product with no way past a hard refusal is a
+   * product people leave. So the override exists and everything about it is
+   * uncomfortable: the same access publishing needs, a written reason, and an
+   * audit row naming who did it and which gates were red.
+   */
+  describe("publishing past a red gate", () => {
+    /**
+     * A goal with no parent and no contribution statement, which is exactly
+     * what gate 3 refuses. Built rather than assumed: an override test that
+     * happened to run against a green set would pass by testing nothing.
+     */
+    beforeEach(async () => {
+      const wb = await workerDb();
+      const member = await wb.admin.query<{ id: string }>(
+        "select id from workspace_members where workspace_id = $1 limit 1",
+        [workspaceId],
+      );
+      const memberId = member.rows[0]?.id as string;
+      await callAction({ pool: wb.appPool, ...context() }, "goals.create", {
+        title: "Become the preferred platform for mid-market teams",
+        cycleId,
+        level: "company",
+        ownerKind: "workspace",
+        championId: memberId,
+        reviewerId: memberId,
+        weight: 1,
+      });
+      const read = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.read",
+        { cycleId },
+      );
+      expect(read.publishable).toBe(false);
+    });
+
+    it("refuses an override with no reason, at the boundary", async () => {
+      const wb = await workerDb();
+      await expect(
+        callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
+          cycleId,
+          override: { reason: "too short" },
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("publishes with a reason, and records which gates were overridden", async () => {
+      const wb = await workerDb();
+      const reason =
+        "The board meets tomorrow and the set is agreed; the dependency register is being filled in this week.";
+      const result = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.publish",
+        { cycleId, override: { reason } },
+      );
+      expect(result.overrodeGates.length).toBeGreaterThan(0);
+
+      const { rows } = await wb.admin.query<{
+        action: string;
+        payload: { reason?: string; overrodeGates?: number[] };
+        actor_member_id: string | null;
+      }>(
+        `select action, payload, actor_member_id from audit_events
+         where workspace_id = $1 and target_id = $2 order by seq desc limit 1`,
+        [workspaceId, cycleId],
+      );
+      const event = rows[0];
+      // A separate action name, so the log can be read for overrides without
+      // parsing a JSON column. "Has anybody published past a red gate" should
+      // not require knowing the payload's shape.
+      expect(event?.action).toBe("workflow.override");
+      expect(event?.payload.reason).toBe(reason);
+      expect(event?.payload.overrodeGates).toEqual(result.overrodeGates);
+      expect(event?.actor_member_id).not.toBeNull();
+    });
+
+    it("refuses an override when there is nothing to override", async () => {
+      // Recorded against nothing, an override teaches the reader of the audit
+      // log that overrides are routine. Gate 3 is cleared first so the set is
+      // genuinely green, which is the only way to reach that refusal.
+      const wb = await workerDb();
+      const { goals } = await callAction(
+        { pool: wb.appPool, ...context() },
+        "goals.list",
+        { cycleId, includeClosed: false },
+      );
+      for (const goal of goals) {
+        await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+          id: goal.id,
+          contributionStatement: "Carries the annual platform thrust",
+        });
+        // Gate 2 reads §4.2 over the set, so a goal with no key results is red
+        // on KR-1 and KR-4. Two of them, one leading and one lagging, is the
+        // smallest set that passes both.
+        for (const [title, indicatorType] of [
+          ["Increase NPS from 32 to 50", "lagging"],
+          ["Cut first response from 9h to 2h", "leading"],
+        ] as const) {
+          await callAction(
+            { pool: wb.appPool, ...context() },
+            "goals.addKeyResult",
+            {
+              goalId: goal.id,
+              title,
+              direction: "increase",
+              indicatorType,
+              baselineValue: 32,
+              targetValue: 50,
+              weight: 1,
+              dueOn: "2027-03-31",
+              ownerId: goal.champion.id,
+            },
+          );
+        }
+      }
+      // Gate 6 wants a publication deadline before day one, which the fixture
+      // leaves null.
+      const cycle = await withTx((tx) =>
+        loadCycleForWorkflow(tx, workspaceId, cycleId),
+      );
+      const weekBefore = new Date(`${cycle?.startsOn}T00:00:00Z`);
+      weekBefore.setUTCDate(weekBefore.getUTCDate() - 7);
+      await callAction({ pool: wb.appPool, ...context() }, "cycles.update", {
+        id: cycleId,
+        publicationDeadline: weekBefore.toISOString().slice(0, 10),
+      });
+
+      // Gate 5 wants the capacity check recorded, which is a cycle-level row
+      // rather than anything on a goal.
+      await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.setCapacityNotes",
+        {
+          cycleId,
+          cuts: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  {
+                    type: "text",
+                    text: "Dropped the partner portal to make this fit.",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      );
+
+      const read = await callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.read",
+        { cycleId },
+      );
+      // Named in the assertion, so a failure says which gate is still red
+      // instead of only that something is.
+      expect(
+        read.gates
+          .filter((gate) => !gate.evaluable || !gate.passed)
+          .map((gate) => gate.gateKey),
+      ).toEqual([]);
+
+      await expect(
+        callAction({ pool: wb.appPool, ...context() }, "workflow.publish", {
+          cycleId,
+          override: {
+            reason: "There is nothing wrong with this set at all, honestly.",
+          },
+        }),
+      ).rejects.toThrow(/nothing to override/i);
     });
   });
 

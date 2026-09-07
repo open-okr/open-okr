@@ -106,9 +106,13 @@ html, body {
 .navitem .ic { width: 15px; height: 15px; flex: none; opacity: .75; }
 .navitem.on .ic { opacity: 1; }
 .navitem .badge {
-  margin-left: auto; background: var(--bad-dot); color: #fff;
+  /* --bad, not --bad-dot: white on #EF4444 measures 3.75:1 and misses the
+     4.5:1 floor UIUX-PLAN.md §7 sets for text. One stop darker clears it at
+     6.5:1 and reads the same at badge size. packages/ui carries the same
+     pair as --bad-solid/--on-bad-solid. */
+  margin-left: auto; background: var(--bad); color: #fff;
   font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 20px;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--bad-dot) 35%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--bad) 35%, transparent);
 }
 .navitem .badge.mute { background: var(--raised); color: var(--ink-3); box-shadow: none; }
 .navsec { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;

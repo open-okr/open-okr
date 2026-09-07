@@ -11,6 +11,7 @@ import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
+import { SubjectDocuments } from "../../documents/subject-documents.tsx";
 import {
   closeGoal,
   editGoal,
@@ -18,6 +19,7 @@ import {
   recordValue,
   reopenGoal,
 } from "./actions.ts";
+import { CoachStrip } from "./coach-strip";
 import { GoalComments } from "./goal-comments.tsx";
 import { Rail } from "./rail.tsx";
 import { Sparkline } from "./sparkline.tsx";
@@ -72,6 +74,23 @@ export default async function GoalPage({
     : [];
   const closed = goal.closedAt !== null;
 
+  /**
+   * The decisions taken about this goal (METHOD.md §7.5, P4-T09).
+   *
+   * §7.5 calls the decision log "the artifact that survives the meeting", and
+   * this page is where it survives to: a month after the review, nobody opens
+   * the session again, they open the goal.
+   */
+  const decisions = (await callAction(context, "decisions.forGoal", {
+    goalId: id,
+  })) as Array<{
+    id: string;
+    text: string;
+    at: string;
+    authorName: string;
+    keyResultTitle: string | null;
+  }>;
+
   const relations = await callAction(context, "goals.relations", { id });
 
   // One history per key result. A goal carries a handful, so this is a handful
@@ -81,6 +100,14 @@ export default async function GoalPage({
     string,
     readonly { readonly value: number; readonly at: string }[]
   >();
+  // Whether the assist can offer anything, asked of the stored configuration
+  // rather than assumed. With no provider the strip still shows every failing
+  // rule and says the suggestion is what needs one.
+  const providers = await callAction(context, "ai.readProviderConfig", {});
+  const drafting = providers.some(
+    (entry) => entry.enabled && entry.hasWorkspaceCredential,
+  );
+
   for (const keyResult of goal.keyResults) {
     const history = await callAction(context, "goals.keyResultHistory", {
       keyResultId: keyResult.id,
@@ -95,6 +122,22 @@ export default async function GoalPage({
   // The discussion (P3-T16). Read here rather than inside the client component
   // so the thread server-renders with the page, the way every other read on
   // this page does.
+  // Documents on this goal. The query has already dropped anybody else's
+  // draft, so this list is safe to render as it comes (P5-T12).
+  const documents = (
+    await callAction(context, "documents.list", {
+      subjectType: "goal",
+      subjectId: id,
+    })
+  ).map((document) => ({
+    id: document.id,
+    title: document.title,
+    state: document.state,
+    authorName: document.authorName,
+    versionCount: document.versionCount,
+    updatedAt: document.updatedAt,
+  }));
+
   const comments = await callAction(context, "comments.list", {
     subjectType: "goal",
     subjectId: id,
@@ -131,7 +174,7 @@ export default async function GoalPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4.5 lg:flex-row lg:items-start">
+      <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-4.5">
           <Card>
             <CardHeader className="justify-between">
@@ -181,6 +224,19 @@ export default async function GoalPage({
             </CardBody>
           </Card>
 
+          <CoachStrip
+            goalId={goal.id}
+            score={goal.quality.score}
+            flags={goal.quality.flags}
+            keyResults={goal.keyResults.map((kr) => ({
+              id: kr.id,
+              title: kr.title,
+              qualityFlags: kr.qualityFlags,
+            }))}
+            drafting={drafting}
+            canEdit={canEdit && !closed}
+          />
+
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
@@ -198,7 +254,11 @@ export default async function GoalPage({
                   {goal.keyResults.map((keyResult) => (
                     <li
                       key={keyResult.id}
-                      className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0"
+                      // The quality panel links straight at the key result a
+                      // check named, so an issue found in the panel lands on the
+                      // row that fixes it rather than at the top of the page.
+                      id={`kr-${keyResult.id}`}
+                      className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0 target:rounded-md target:bg-brand-weak"
                     >
                       {/* `gap-1` rather than nothing: the three children stack
                           tight without it, and the sparkline's own box then sits
@@ -403,6 +463,47 @@ export default async function GoalPage({
             </Card>
           ) : null}
 
+          {decisions.length === 0 ? null : (
+            // Named, so it is a landmark a screen reader can jump to and a
+            // test can scope to. A card with no accessible name is a div.
+            <Card role="region" aria-labelledby="goal-decisions-heading">
+              <CardHeader>
+                <h2
+                  id="goal-decisions-heading"
+                  className="text-sm font-bold text-ink"
+                >
+                  Decisions
+                </h2>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {decisions.map((decision) => (
+                    <li
+                      key={decision.id}
+                      className="flex flex-col gap-1 rounded-md border border-line p-2.5"
+                    >
+                      <span className="text-sm text-ink">{decision.text}</span>
+                      {/* The criterion names the date and the author, and the
+                          key result when one was named, because a decision
+                          about one number is not a decision about the goal. */}
+                      <span className="text-xs text-ink-3">
+                        {decision.keyResultTitle
+                          ? `${decision.keyResultTitle} · `
+                          : ""}
+                        {new Date(decision.at).toLocaleDateString()} ·{" "}
+                        {decision.authorName}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-4">
+                  Recorded in a monthly review. Kept whether the goal is open or
+                  closed.
+                </p>
+              </CardBody>
+            </Card>
+          )}
+
           {goal.retrospective ? (
             <Card>
               <CardHeader>
@@ -511,16 +612,19 @@ export default async function GoalPage({
             </Card>
           ) : null}
 
+          <SubjectDocuments
+            subjectType="goal"
+            subjectId={id}
+            documents={documents}
+            canEdit={canEdit}
+          />
+
           <Card>
             <CardBody>
               <GoalComments
                 goalId={id}
                 comments={comments.map((comment) => ({
                   ...comment,
-                  createdAt: comment.createdAt.toISOString(),
-                  editedAt: comment.editedAt
-                    ? comment.editedAt.toISOString()
-                    : null,
                   reactions: reactions.get(comment.id) ?? [],
                 }))}
                 currentMemberId={workspace.memberId}

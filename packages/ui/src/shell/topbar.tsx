@@ -11,10 +11,11 @@ import { cn } from "../lib/cn.ts";
  * the avatar menu." Height 50px per the mockups' `.topbar`.
  *
  * `search`/`newAction`/`askAi`/`notifications`/`avatarMenu` are slots, not
- * built-in buttons: the palette (S-32), Ask AI (S-39) and live
- * notifications (S-03) are each their own unbuilt screen, and a slot that
- * simply is not filled in is the honest state for a feature that does not
- * exist yet, rather than a button wired to nothing.
+ * built-in buttons: a slot that simply is not filled in is the honest state
+ * for a feature that does not exist yet, rather than a button wired to
+ * nothing. The palette (S-32) and live notifications (S-03) are still their
+ * own unbuilt screens. `askAi` is filled now, by S-39's copilot panel from
+ * `apps/web`, which is where a slot's content belongs.
  */
 export interface TopbarProps {
   readonly breadcrumb: ReactNode;

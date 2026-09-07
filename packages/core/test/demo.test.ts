@@ -114,7 +114,7 @@ describe("the demo builder", () => {
     expect(forecasts.rows[0]?.count).toBe("0");
   });
 
-  it("leaves publish gate 5 red for one reason and gate 2 unevaluable", async () => {
+  it("leaves publish gates 2 and 5 each red for one reason", async () => {
     const wb = await workerDb();
     await seed();
     const ctx = { pool: wb.appPool, ...context() };
@@ -130,9 +130,16 @@ describe("the demo builder", () => {
     for (const gateKey of [1, 3, 4, 6]) {
       expect(byKey.get(gateKey)?.passed).toBe(true);
     }
-    // The §4 quality engine arrives at P4-T01, and a gate that cannot check
-    // anything must not pass.
-    expect(byKey.get(2)?.evaluable).toBe(false);
+    // Gate 2 was unevaluable while the §4 quality engine was still ahead of
+    // this seed. P4-T01 shipped it, so the gate now judges the set and the demo
+    // is held to it like any other workspace. One key result is worded as the
+    // activity rather than the outcome, and the Draft Coach saying so on a real
+    // set is worth more to a reader than a green gate would be.
+    expect(byKey.get(2)?.evaluable).toBe(true);
+    const two = byKey.get(2);
+    expect(two?.passed).toBe(false);
+    expect(two?.missing).toHaveLength(1);
+    expect(two?.missing[0]).toContain("KR-5");
 
     const five = byKey.get(5);
     expect(five?.passed).toBe(false);

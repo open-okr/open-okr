@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Chip } from "../components/chip.tsx";
 import { cn } from "../lib/cn.ts";
 
 /**
@@ -78,11 +77,16 @@ export function Sidebar({
     <nav
       aria-label="Primary"
       className={cn(
-        "side hidden flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-2 md:flex",
+        "side hidden flex-col gap-0.5 overflow-y-auto border-r border-line md:flex",
+        // The mockup's `.side`: a vertical gradient from the card surface to
+        // the app background, 14px/10px padding, 2px between rows. It shipped
+        // flat with 8px padding and 4px gaps, which read as a different panel.
+        "bg-linear-to-b from-surface to-bg px-2.5 py-3.5",
         "md:w-17 xl:w-59",
       )}
     >
-      <div className="mb-1 px-1">{workspaceSwitcher}</div>
+      {/* `.brandmark { padding: 4px 8px 14px }`. */}
+      <div className="px-2 pt-1 pb-3.5">{workspaceSwitcher}</div>
       {groups.map((group) => (
         <div key={group.id} className="flex flex-col gap-0.5">
           {group.label ? (
@@ -95,15 +99,31 @@ export function Sidebar({
               key={item.id}
               href={item.href}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-2 transition-colors duration-fast ease-out",
+                // `rounded-control`, not `rounded-lg`: the latter resolves to
+                // the card radius (14px), which on a 29px row is a pill. The
+                // mockup's `.navitem` is 8px. The weights are the mockup's own
+                // 520 and 650 rather than Tailwind's 500 and 600 steps.
+                //
+                // `py-2` is a deliberate deviation from the mockup, which uses
+                // 6px for a 30.8px row. Measured side by side the two were
+                // within 0.3px of each other, and the panel still read as
+                // tighter than the drawing, because the mockup carries eight
+                // rows plus an agent card while this carries eleven and no
+                // card. 8px gives a 35px row. Recorded here because §10 asks
+                // for the deviation to be stated, and asserted in
+                // `test/shell.test.tsx` so an audit does not read it as drift
+                // and put it back.
+                "flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-[520] text-ink-2 transition-colors duration-fast ease-out",
                 "hover:bg-ink/[0.045] md:justify-center xl:justify-start",
                 item.active &&
-                  "bg-brand-weak font-semibold text-brand-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_12%,transparent)] hover:bg-brand-weak",
+                  "bg-brand-weak font-[650] text-brand-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_12%,transparent)] hover:bg-brand-weak",
               )}
             >
               <span
                 className={cn(
-                  "relative size-[15px] flex-none opacity-75",
+                  // 16px, one step up from the mockup's 15px, matching the
+                  // taller row above rather than sitting small inside it.
+                  "relative size-4 flex-none opacity-75",
                   item.active && "opacity-100",
                 )}
                 aria-hidden="true"
@@ -125,12 +145,18 @@ export function Sidebar({
                   {/* Read out at every width, including the collapsed rail
                       where the dot alone says "something", not "how much". */}
                   <span className="sr-only">{item.badge} waiting on you</span>
-                  <Chip
-                    tone={item.active ? "brand" : "bad"}
-                    className="ml-auto hidden xl:inline-flex"
+                  {/* A solid field, per the mockup's `.navitem .badge`: an
+                      overdue count has to read as overdue, and the tinted chip
+                      it shipped as read as information. The pair is
+                      --bad-solid/--on-bad-solid rather than the mockup's own
+                      white-on-#ef4444, which measures 3.75:1 and misses §7's
+                      4.5:1 floor. */}
+                  <span
+                    data-sidebar-badge=""
+                    className="ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex"
                   >
                     {item.badge}
-                  </Chip>
+                  </span>
                 </>
               ) : null}
             </Link>

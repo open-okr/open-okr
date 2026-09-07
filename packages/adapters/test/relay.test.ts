@@ -1,6 +1,6 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { OutboxRelay } from "../src/relay.ts";
+import { OutboxRelay, PermanentDispatchError } from "../src/relay.ts";
 
 /**
  * The outbox relay (TECHNICAL-PLAN §5, "the outbox contract").
@@ -291,6 +291,61 @@ describe("OutboxRelay", () => {
     const dispatchesBefore = dispatches;
     expect(await relay.drainOnce()).toBe(0);
     expect(dispatches).toBe(dispatchesBefore);
+  });
+
+  it("dead-letters a permanent failure on its first attempt, without waiting for the ceiling (P5-T01a)", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "nobody.consumes.this", "unhandled:1");
+
+    let dispatches = 0;
+    const deadLettered: string[] = [];
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 10,
+      dispatch: async () => {
+        dispatches++;
+        throw new PermanentDispatchError("nothing handles this topic");
+      },
+      onDeadLetter: (record) => deadLettered.push(record.idempotencyKey),
+    });
+
+    // One attempt, nine short of the ceiling, and it is already given up on:
+    // a topic nobody handles will not start being handled on the second try.
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(1);
+    expect(deadLettered).toEqual(["unhandled:1"]);
+
+    const row = await wb.admin.query(
+      "select dead_lettered_at, last_error from outbox",
+    );
+    expect(row.rows[0].dead_lettered_at).toBeInstanceOf(Date);
+    expect(row.rows[0].last_error).toContain("nothing handles this topic");
+
+    // And it stops competing for the relay entirely.
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(1);
+  });
+
+  it("still retries an ordinary failure, so one permanent case does not make every failure fatal", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "mail.send", "transient:1");
+
+    let dispatches = 0;
+    const deadLettered: string[] = [];
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 10,
+      dispatch: async () => {
+        dispatches++;
+        throw new Error("the provider had a bad minute");
+      },
+      onDeadLetter: (record) => deadLettered.push(record.idempotencyKey),
+    });
+
+    expect(await relay.drainOnce()).toBe(0);
+    expect(await relay.drainOnce()).toBe(0);
+    expect(dispatches).toBe(2);
+    expect(deadLettered).toEqual([]);
   });
 
   it("surfaces dead-lettered rows through listDeadLettered", async () => {

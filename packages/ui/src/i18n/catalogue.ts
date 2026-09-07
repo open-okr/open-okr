@@ -8,13 +8,19 @@
  * keys exist and resolve to something today rather than falling back
  * silently, which is a different, larger failure than a wrong word choice.
  *
- * Scope today: only the strings this task's own shell components
- * (`ShortcutOverlay`, `TopbarSearch`, the mobile tab bar) actually render.
- * §8 wants every user-facing string in a catalogue; there is barely any UI
- * yet for that to mean more than this until Phase 3 and 4 build screens
- * with real text of their own — each one adds its own keys the same way,
- * rather than this task inventing placeholders for screens that do not
- * exist.
+ * Scope today: only the strings `ShortcutOverlay`, `TopbarSearch` and the
+ * stale-deployment watcher actually render. §8 wants every user-facing string
+ * in a catalogue and the gap audit of 7 September 2026 found that all
+ * forty-seven routes still hardcode theirs; closing that is P6-G22, which also
+ * wires the locale, since the root layout pins `en` and the language setting
+ * therefore does nothing.
+ *
+ * **Four keys were removed on 7 September 2026 because nothing read them.**
+ * `shell.mobile.home`, `.review`, `.inbox` and `.search` were written for the
+ * mobile tab bar, which takes its labels from the module registry instead, and
+ * `.inbox` named a screen that has never existed. A key with no consumer is a
+ * translation somebody pays for and nobody sees; P6-G22 is where the assertion
+ * that every key has one belongs, once the catalogue is the real one.
  */
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";

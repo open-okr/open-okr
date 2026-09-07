@@ -20,7 +20,35 @@ import { publishCycle } from "./actions.ts";
  * The publish button re-evaluates on the server before it commits. What the
  * screen shows is a snapshot, and the refusal it may come back with is the
  * authority.
+ *
+ * **Every unmet gate links at what would fix it** (P4-T03). A checklist that
+ * says "gate 4 is red" and stops has told a facilitator the one thing they
+ * already knew from the dot. The destinations are phases and screens rather
+ * than fields, because a gate is a property of the whole set: gate 4 is the
+ * dependency register, gate 5 is the capacity check, gate 6 is the cycle's own
+ * dates.
  */
+
+/** Where the work that clears each gate actually happens. Exported so a test
+ * can assert no gate sends a facilitator to a screen that cannot clear it. */
+export const FIX: Record<
+  number,
+  { readonly href: string; readonly label: string }
+> = {
+  1: { href: "/cycle?phase=4", label: "Name the champion and reviewer" },
+  2: { href: "/cycle?phase=4", label: "Open the quality panel" },
+  3: { href: "/goals/studio", label: "Map the alignment" },
+  // The register is on this page, so the link is an anchor to it rather than a
+  // second visit to the address the reader is already at. It pointed at
+  // `/cycle?phase=5` from P4-T03 until P6-G17, which meant gate 4's remedy was
+  // "go where you already are", and nothing there could confirm anything.
+  4: { href: "#dependency-register", label: "Confirm the dependencies" },
+  // An anchor for the same reason gate 4 is: the capacity check renders on
+  // this page, and gate-remedies.test.ts refuses a remedy that navigates to the
+  // address the panel is already at.
+  5: { href: "#capacity-check", label: "Check the capacity" },
+  6: { href: "/admin/rhythm", label: "Set the publication date" },
+};
 export interface Gate {
   readonly gateKey: number;
   readonly title: string;
@@ -86,6 +114,14 @@ export function Gates({
                     Cannot be judged yet: {gate.blocked}
                   </span>
                 )}
+                {gate.evaluable && gate.passed ? null : (
+                  <a
+                    href={FIX[gate.gateKey]?.href ?? "/cycle?phase=4"}
+                    className="w-fit text-xs font-semibold text-brand-text hover:underline"
+                  >
+                    {FIX[gate.gateKey]?.label ?? "Go to the drafting screen"}
+                  </a>
+                )}
               </span>
             </li>
           ))}
@@ -108,7 +144,52 @@ export function Gates({
               </p>
             )}
           </ActionForm>
-        ) : (
+        ) : null}
+
+        {publishedAt || !canPublish || publishable ? null : (
+          <details className="rounded-md border border-line p-2.5">
+            <summary className="cursor-pointer text-xs font-semibold text-ink-2">
+              Publish anyway, past the red gates
+            </summary>
+            <ActionForm
+              action={publishCycle}
+              className="mt-2 flex flex-col gap-1.5"
+            >
+              <input type="hidden" name="cycleId" value={cycleId} />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-2">
+                  Why is this set being published with{" "}
+                  {
+                    gates.filter((gate) => !gate.evaluable || !gate.passed)
+                      .length
+                  }{" "}
+                  gate
+                  {gates.filter((gate) => !gate.evaluable || !gate.passed)
+                    .length === 1
+                    ? ""
+                    : "s"}{" "}
+                  unmet?
+                </span>
+                <textarea
+                  name="override.reason"
+                  required
+                  minLength={20}
+                  rows={3}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+                  placeholder="The reason somebody will read six months from now"
+                />
+              </label>
+              <Button type="submit">Override and publish</Button>
+              <p className="text-xs text-ink-4">
+                This writes an audit event naming you, the reason and every gate
+                that was unmet. Twenty characters minimum, because an override
+                with no reason is indistinguishable from a bug.
+              </p>
+            </ActionForm>
+          </details>
+        )}
+
+        {publishedAt || canPublish ? null : (
           <p className="text-xs text-ink-3">
             Publishing is a workspace administrator's call.
           </p>

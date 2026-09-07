@@ -7,7 +7,9 @@
  */
 import {
   activeOnly,
+  NOTIFICATION_REASONS,
   notifications,
+  subscriptions,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
@@ -24,7 +26,7 @@ import {
   ensureSubscriptionList,
   subscribeMember,
 } from "../notifications/subscriptions.ts";
-import { OperationError } from "../operations/operation.ts";
+import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const notificationRow = z.object({
@@ -340,3 +342,92 @@ export const toggleSubscription = defineWriteAction({
     },
   }),
 });
+
+/**
+ * A watcher an import found (P6-T04b).
+ *
+ * `subscriptions.toggle` subscribes the signed-in member and nobody else,
+ * which is right for the product: choosing to follow something is a decision
+ * only its owner makes. An import is restoring decisions other people already
+ * made, in another system, sometimes years ago, so it needs to name the
+ * member. Widening `toggle` with a member id would let anyone sign anyone up
+ * to anything, which is the same trade `people.importMember` and `goals
+ * .importCheckIn` refused before it.
+ *
+ * **No legacy key.** A subscription is unique per list and member, so a second
+ * run of the same company finds the row already there. There is nothing to
+ * recognise it by that the pair does not already say.
+ *
+ * A placeholder, an agent and a suspended member are silently not subscribed:
+ * §7.2 says so and `subscribeMember` enforces it. The result reports which
+ * happened, so the import can say how many watchers had nobody to notify
+ * rather than claiming it wrote rows it did not.
+ */
+export const importWatcher = defineWriteAction({
+  name: "subscriptions.importWatcher",
+  summary: "Subscribes a member an import found watching something.",
+  input: z.object({
+    subjectType: z.string().min(1),
+    subjectId: z.uuid(),
+    /** The member who was watching in the source, not the one importing. */
+    memberId: z.uuid(),
+    reason: z.enum(NOTIFICATION_REASONS).default("role"),
+  }),
+  output: z.object({ subscribed: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const listId = await ensureSubscriptionList(tx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+      });
+      const before = await countSubscribers(tx, listId, input.memberId);
+      await subscribeMember(tx, {
+        workspaceId,
+        listId,
+        memberId: input.memberId,
+        reason: input.reason,
+      });
+      const subscribed =
+        before || (await countSubscribers(tx, listId, input.memberId));
+      return {
+        result: { subscribed },
+        activity: {
+          kind: "subscription.added",
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          payload: { imported: true, memberId: input.memberId },
+        },
+        audit: {
+          action: "subscriptions.importWatcher",
+          targetType: input.subjectType,
+          targetId: input.subjectId,
+          payload: { memberId: input.memberId },
+        },
+      };
+    },
+  }),
+});
+
+/** Whether this member already has a live row on this list. Read twice around
+ * the write, because `subscribeMember` returns nothing and declining to
+ * subscribe a placeholder looks identical to succeeding. */
+async function countSubscribers(
+  tx: OperationTx,
+  listId: string,
+  memberId: string,
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: subscriptions.id })
+    .from(subscriptions)
+    .where(
+      activeOnly(
+        subscriptions,
+        eq(subscriptions.listId, listId),
+        eq(subscriptions.memberId, memberId),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}

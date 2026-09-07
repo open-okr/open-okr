@@ -12,14 +12,36 @@ In this order. The first four take seconds; the rest take minutes.
 
 ```
 pnpm typecheck        # strict types across all ten packages
-pnpm lint             # Biome
+pnpm lint             # Biome. Read the whole tail, not the last few lines
 pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage
 pnpm check:boundaries # the architecture gate
 pnpm check:licences   # dependency licences
+pnpm check:contract   # the committed OpenAPI document against the registry
 pnpm test             # unit and integration, needs a database
 pnpm build            # then pnpm test:e2e
 ```
+
+**Read `pnpm lint`'s last three lines, not its last one.** Biome counts errors,
+warnings and infos on three separate lines in that order, so a `tail` short
+enough to cut the first one shows two clean-looking numbers over a red build.
+That has cost this branch twice. The script also passes
+`--max-diagnostics=400`: the default cap of 20 stops Biome *emitting* the rest,
+so an error past the cap is neither shown nor counted, and this repository is
+long past 20.
+
+**`pnpm lint` refuses a TypeScript parameter property, and that rule earns its
+place.** `noParameterProperties` is on because `constructor(readonly x: string)`
+is valid TypeScript that **every entry point in this repository refuses at
+runtime**: they all run under Node's `--experimental-strip-types`, which erases
+types without transpiling. Vitest transpiles, so a suite stays green while the
+real command dies on its first import. It has happened twice. `pnpm
+import:flowyteam` died on `mappers/reconcile.ts` at P6-T04a with 107 tests
+green, and again on `ports/realtime.ts` at P6-T04c with 153 green, that second
+time because the importer started importing the adapters barrel for one driver
+and the barrel loads every port. Turning the rule on found a third in
+`packages/agents/src/structured-extraction.ts` that nothing had run yet. Write
+the field out and assign it in the constructor body.
 
 If all of those pass locally, CI passes, with one exception named under
 **Sign-off** below that no local command checks unless you ask it to.
@@ -28,7 +50,7 @@ If all of those pass locally, CI passes, with one exception named under
 
 | Job | Steps | Skipped when |
 |---|---|---|
-| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries` | The push changed no code |
+| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
 | End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
@@ -36,6 +58,26 @@ If all of those pass locally, CI passes, with one exception named under
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
+| Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
+
+**Dependency review is the second gate no local command covers**, and the
+first is sign-off above. It runs on pull requests only, reads the advisory
+database rather than the repository, and fails on **moderate**, so it can turn
+red on a branch that has not changed a single dependency: an advisory
+published today against a package installed last month is enough. It refused
+PR #40 on 3 September 2026 over two moderate advisories against a transitive
+`qs`, while every other check on the same commit passed.
+
+The fix is usually a lockfile refresh rather than an override. `qs` arrives
+under `@modelcontextprotocol/sdk` through `express` and `body-parser`, and
+`body-parser` declares `^6.15.2`, so the patched `6.16.0` satisfied a range the
+tree already had: `pnpm update -r --depth Infinity qs` was the whole change.
+Reach for `overrides` only when the parent's own range excludes the fix, and
+say why in the change.
+
+`gh pr checks <number>` is how to see it, because a green `pnpm test:ci` says
+nothing about it. Note that a run listed as failed against an older head sha
+stays in `gh run list` forever; what matters is the checks on the current head.
 
 A documentation-only change skips every code job. That is why a `.md` edit comes
 back green in a minute and a one-line code change does not.
@@ -110,17 +152,83 @@ The unit and integration suites are the only gate that catches a write that
 **refuses at run time**. Typecheck and lint cannot see an action that throws the
 moment somebody calls it.
 
+`pnpm test` is the shorter route and runs Turbo's per-package tasks, so it
+caches and only re-runs what changed. The command below is the whole repository
+as one suite, which is what CI shards and what you want before a pull request.
+
 On this machine the harness needs pointing at the native Postgres, and the
 worker count kept down:
 
 ```
 TEST_DB_HOST=localhost TEST_DB_PORT=5432 TEST_DB_SUPERUSER=postgres TEST_DB_PASSWORD=postgres
-node node_modules/vitest/vitest.mjs run --no-file-parallelism
+node node_modules/vitest/vitest.mjs run --config vitest.ci.config.ts --retry=2 --no-file-parallelism
 ```
 
 `--no-file-parallelism` is not optional here. The default worker count opens
 more connections than this machine's `max_connections` allows, and the failures
 that produces look like real bugs in unrelated code.
+
+**`--config vitest.ci.config.ts` is not optional either**, and leaving it off is
+worse than forgetting the database, because the run finishes and reports
+failures rather than refusing. That config sets `projects: ["packages/*",
+"apps/*"]`, which is what makes each package use its own `include`, `exclude`
+and environment. Without it, one default configuration is applied to every file
+in the repository, and two things go wrong at once: React tests needing a DOM
+run in a node environment, and `packages/test-support/fixtures/flaky/` is swept
+in. That directory exists to fail on the first attempt and pass on the retry,
+which is how the flakiness reporter is tested, so `--retry=2` belongs with it.
+
+This cost a run here: 46 failures across 16 files, every one of them the
+invocation rather than the code. The same commit was green on CI at the same
+moment. If a local run fails in files your change never touched, check the
+command before you start reading the diff.
+
+#### What still cannot run without Docker
+
+`packages/db/test/pooling-spike.test.ts` needs PgBouncer, which arrives with
+`pnpm db:up`. Without Docker it fails four tests with `ECONNREFUSED` on port
+56432. That is the machine, not the change. Everything else in the repository
+runs against a native Postgres.
+
+#### The encoding trap
+
+The Windows Postgres installer initialises a cluster as **WIN1252**, while the
+Linux Postgres CI runs is **UTF8**. A `create database` with no encoding clause
+inherits whichever the cluster has, so the same SQL succeeds on CI and fails on
+a developer's machine with:
+
+```
+character with byte sequence 0xe2 0x94 0x80 in encoding "UTF8"
+has no equivalent in encoding "WIN1252"
+```
+
+Two rules follow.
+
+**Creating a database in a test:** name the encoding, and copy `template0`
+rather than `template1`, which carries the cluster's own encoding and will
+refuse the copy.
+
+```sql
+create database x encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0
+```
+
+**Writing a migration:** every character in the file has to survive the target
+database's encoding, and you do not control what that is on somebody else's
+install. `§` and `—` exist in WIN1252 and are safe. Box drawing (`─`, `│`, `└`)
+does not, and a decorative rule made of it stops the migration dead.
+
+`pnpm db:lint` refuses this now, naming the character and how many times it
+appears. The rule was added after migration 0032 shipped 123 box-drawing
+characters in two decorative comment rules, and nobody found out until a
+developer on Windows could not run the test suite. It is mechanical, so nobody
+has to remember it.
+
+If you ever do need to edit a migration that has already run somewhere,
+`_migrations` records a checksum per file and the change raises **"Applied
+migration X was edited after it ran"** on every database that applied it. There
+is no command that repairs the ledger: drop the database and migrate again. That
+is why editing one is a decision rather than a fix, and why it is on the
+ask-a-human list in `CLAUDE.md`.
 
 ## Sign-off
 

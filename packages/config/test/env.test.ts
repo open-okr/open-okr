@@ -150,3 +150,72 @@ function captureError(run: () => unknown): Error {
 
   throw new Error("expected the call to throw, but it returned");
 }
+
+describe("S3 storage", () => {
+  test("unset means local disk, which is the default a self-host needs", () => {
+    const env = parseEnv(VALID);
+    expect(env.OPENOKR_STORAGE_S3_BUCKET).toBeUndefined();
+    expect(env.OPENOKR_STORAGE_ROOT).toBe("storage");
+  });
+
+  test("a named bucket with no credentials is a boot error naming them", () => {
+    // The failure worth catching here rather than at the first upload: the
+    // driver would build fine, every request would fail, and the message a
+    // user saw would be about their file rather than about a missing variable.
+    expect(() =>
+      parseEnv({ ...VALID, OPENOKR_STORAGE_S3_BUCKET: "openokr-files" }),
+    ).toThrow(/OPENOKR_STORAGE_S3_ACCESS_KEY_ID/);
+  });
+
+  test("half a credential pair is still refused", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+        OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "key",
+      }),
+    ).toThrow(/OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY/);
+  });
+
+  test("a complete configuration parses, with a region default", () => {
+    const env = parseEnv({
+      ...VALID,
+      OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+      OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "key",
+      OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY: "secret",
+    });
+    expect(env.OPENOKR_STORAGE_S3_BUCKET).toBe("openokr-files");
+    // Required by the SDK even for services that ignore it, so it has a
+    // default rather than being a fourth thing to set for MinIO.
+    expect(env.OPENOKR_STORAGE_S3_REGION).toBe("us-east-1");
+    expect(env.OPENOKR_STORAGE_S3_ENDPOINT).toBeUndefined();
+  });
+
+  test("an endpoint that is not a URL is refused", () => {
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+        OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "key",
+        OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY: "secret",
+        OPENOKR_STORAGE_S3_ENDPOINT: "localhost:9000",
+      }),
+    ).toThrow(/OPENOKR_STORAGE_S3_ENDPOINT/);
+  });
+
+  test("credentials never appear in the error message", () => {
+    // Rule 2 of this file: boot errors end up in logs and these variables hold
+    // credentials.
+    try {
+      parseEnv({
+        ...VALID,
+        OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+        OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "AKIAsupersecretvalue",
+        OPENOKR_STORAGE_S3_ENDPOINT: "not-a-url",
+      });
+      throw new Error("expected a refusal");
+    } catch (error) {
+      expect((error as Error).message).not.toContain("AKIAsupersecretvalue");
+    }
+  });
+});

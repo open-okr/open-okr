@@ -5,9 +5,5 @@
   "shell.shortcuts.title": "Pintasan papan kekunci",
   "shell.shortcuts.empty": "Tiada pintasan didaftarkan pada skrin ini lagi.",
   "shell.shortcuts.close": "Tutup",
-  "shell.mobile.home": "Utama",
-  "shell.mobile.review": "Semakan",
-  "shell.mobile.inbox": "Peti Masuk",
-  "shell.mobile.search": "Cari",
   "shell.version.updateAvailable": "Versi baharu tersedia. Memuat semula…"
 }

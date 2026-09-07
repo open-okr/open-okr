@@ -27,20 +27,32 @@ Reference, not authority: UIUX-PLAN.md SS10.
 
 Shared schema across all three session kinds.
 
+**Schema note (P4-T07a):** This table was corrected on 2026-08-19 to match
+TECHNICAL-PLAN §4, which outranks this document per CLAUDE.md's authority
+order. The original design carried `current_stage integer`, `status: open`,
+`closed_at` and `scheduled_at`; the shipped table uses `stage_key text`,
+`state: running`, `ended_at` and `scheduled_for` alongside additional columns
+TECHNICAL-PLAN specifies. The database table is named `okr_sessions` because
+the auth schema already owns `sessions`.
+
 | Field | Type | Notes |
 |---|---|---|
 | `id` | uuid | |
-| `workspace_id` | uuid | RLS |
-| `space_id` | uuid | The space this session belongs to |
-| `cycle_id` | uuid | |
-| `kind` | `'weekly'`, `'monthly'`, `'quarterly'` | |
-| `scheduled_at` | timestamp | When it was supposed to start |
-| `started_at` | timestamp, nullable | Null until the facilitator opens |
-| `closed_at` | timestamp, nullable | |
+| `workspace_id` | uuid | RLS (`okr_sessions` table, force row level security) |
+| `space_id` | uuid, nullable | The space this session belongs to |
+| `cycle_id` | uuid, nullable | |
+| `kind` | `'planning'`, `'weekly'`, `'monthly'`, `'quarterly'` | |
+| `title` | text | |
+| `scheduled_for` | timestamptz | When it was supposed to start |
+| `started_at` | timestamptz, nullable | Null until the facilitator opens |
+| `ended_at` | timestamptz, nullable | |
 | `facilitator_id` | uuid | The coordinator (weekly) or facilitator (quarterly) |
-| `current_stage` | integer | Index into the session's stage list |
-| `stage_started_at` | timestamp | When the current stage began |
-| `status` | `'scheduled'`, `'open'`, `'closed'`, `'skipped'` | |
+| `stage_key` | text, nullable | Current stage key (e.g. `confidence`, `diagnose`); null until opened |
+| `stage_started_at` | timestamptz, nullable | When the current stage began |
+| `elapsed` | jsonb | Elapsed seconds per stage, keyed by stage_key |
+| `notes` | jsonb | Per-stage facilitator notes, keyed by stage_key |
+| `state` | `'scheduled'`, `'running'`, `'closed'`, `'skipped'` | |
+| `digest_id` | uuid, nullable | FK to digest once P4-T08 adds that table |
 
 ## 2. The weekly session (SS7.2)
 
@@ -170,6 +182,26 @@ The decision table is surfaced on:
 - The goal page (decisions affecting that goal)
 - The cycle workspace (all decisions this cycle)
 
+**Two things this table left implicit, settled at P4-T09 by TECHNICAL-PLAN
+§4.7.** Both were the obvious reading of the rows above and both are wrong.
+
+*A trend belongs to a month, not to a meeting.* `objective_trends` is keyed on
+`(goal_id, month)`. A space that reschedules and ends up holding two reviews in
+one March has one March opinion per objective, and the quarterly review reads
+three months of trend without joining sessions. Keying on the session would
+have produced two March opinions and no way to say which one the room meant.
+
+*A decision carries its own `cycle_id`.* Deriving the cycle by joining through
+the goal looks equivalent and is not: `goals.moveToCycle` is a real action, so
+a goal moved into the next quarter would drag every past decision with it, and
+a decision taken in Q1 would start reading as a Q2 decision. Both are driven by
+tests, because the reason for a column is worth more than the column.
+
+*The trend is never pre-filled.* §3.7's progress signal is shown beside each
+objective as evidence and no button starts selected. §7.5 records the trend as
+a judgement, and a judgement that arrives pre-answered is a judgement most
+rooms stop making.
+
 Given / When / Then:
 - Given a monthly review recording a decision against a key result, when the
   goal page is opened, then the decision appears in its history.
@@ -195,6 +227,28 @@ Each stage has:
 - An add-a-minute control for the facilitator
 - Private facilitator notes (per stage, not shared with participants)
 - Live synchronisation: stage changes reach every connected client within budget
+
+**Three things P4-T10a-a settled that this list left implicit.**
+
+*The stage keys are their own list, not slugs of the titles.* `REVIEW_STAGE_KEYS`
+in `packages/method` is what `stage_key`, `elapsed`, `notes` and `added_minutes`
+are keyed by. A slug generated from canon text would change the moment somebody
+reworded a stage, and every stored note and every elapsed second would stop
+resolving to the stage it belongs to.
+
+*Added minutes are stored per stage, not folded into the agenda.* §11's
+`sessions.quarterlyStageMinutes` is the workspace's standing agenda; one room
+running long on one day must not retune every future review.
+
+*Private means enforced by the read, not by the screen.* `sessions.read` hands
+the notes map to the facilitator and an empty object to everybody else. It did
+not, from P4-T07a until here: the whole map went to every caller. Nothing wrote
+notes in between, so nothing leaked, and the shape was still wrong. The activity
+payload names the stage and never the note, because an activity row is read by
+everybody who can see the space.
+
+*Live synchronisation is still blocked.* The outbox rows exist now; nothing
+drains them. See PHASE-4-SPLIT.md.
 
 | # | Stage | Act | Minutes | Completion condition |
 |---|---|---|---|---|
@@ -223,7 +277,33 @@ Each stage has:
 | 3.0 to 3.9 | Steady. Watch for polite scoring later |
 | Below 3.0 | The cycle cost something. Name it early |
 
-Boundaries: SS11 `sessions.roomPulseBands` (already in `thresholds.ts`).
+Boundaries: SS11 `sessions.roomPulseBands` (already in `thresholds.ts`), read
+through `roomPulseRead` in `packages/method` (P4-T10a-b).
+
+**Three things P4-T10a-b settled.**
+
+*The read is withheld for a practice reason, not a permission one.* Section 8.2
+shows the average to the facilitator. A room that can see its own average before
+scoring has been handed an anchor, which is the failure section 8.3's hidden
+objective score exists to prevent. `sessions.roomPulse` returns the average, the
+band and the sentence to the facilitator and nulls to everybody else, so the
+screen is not the thing keeping the secret. Everybody always sees their own
+pulse.
+
+*The words come back counted, not listed.* A list in row order can be lined up
+against the member list, and section 8.2 asks for the room's mood rather than who
+felt what. Case-folded and sorted by frequency, so the order is a property of the
+words rather than of the rows.
+
+*An empty room is not a costly one.* `roomPulseRead` returns null when nobody has
+spoken. A sentence about the cycle costing something before anybody has given a
+pulse would be the product inventing a mood.
+
+The three sentences are verified in both directions: the method suite asserts
+every sentence the package produces appears in METHOD.md, and `pnpm method:check`
+asserts every read the document lists is one the package can produce. Editing
+either without the other fails the build, and that was proved by breaking it on
+purpose.
 
 ### 4.3 Stage 2: Score the key results (SS8.3)
 
@@ -234,39 +314,275 @@ Boundaries: SS11 `sessions.roomPulseBands` (already in `thresholds.ts`).
 | Reason | One-line per KR (required) |
 | Objective score | Hidden until the team reveals together |
 | Reveal | Deterministic, instant under reduced motion |
-| Running cycle score | Updates live as KRs are scored |
+| Running cycle score | Updates as objectives are revealed |
 
 The reveal is one write. All connected clients see the same number at the
 same time (same atomicity contract as the check-in vote reveal from P3-T07).
+
+**The running cycle score line was corrected on 26 August 2026.** It read
+"Updates live as KRs are scored", which contradicted the row above it. The
+cycle score is §3.4's plain average over key results and an objective's score
+is §3.2's weighted average over the same rows, so on a review with one
+objective whose key results carry equal weights the two numbers are the same
+figure. A cycle score that moved on every grade therefore published the hidden
+objective score under a different label. Agung decided the cycle score runs
+through the reveals instead, which also makes the acceptance criterion literal:
+revealing is then the thing that moves it.
+
+**What P4-T10b-a settled.**
+
+*An objective's score is weighted; the cycle score is not.* METHOD.md §8.3 now
+says so, written at Agung's direction on 24 August 2026 after the gap was found
+while sizing this task: §3.3 graded a key result and §3.4 averaged a set, and
+nothing stated how an objective's own score was built. The objective follows
+§3.2's weights, the cycle stays §3.4's plain average over key results. Weights 3
+and 1 with scores 0.2 and 0.8 give an objective 0.35 and a cycle 0.5, and a
+single formula for both would be wrong about one of them.
+
+*The grade lives in `review_scores` until the session closes.* Writing straight
+to `key_results.score` would put the number on the goal page before the room
+revealed it, and would stop the room revising it while they talk. The write-back
+is in the same transaction as the close, so a session cannot end with half its
+scores landed, and only what was graded is written: an ungraded key result keeps
+what it had rather than being claimed as a zero.
+
+*A score with no reason is refused.* §8.3's "facts, not feelings" cannot be
+enforced. A score nobody explained can be, at the boundary and on the screen.
+
+*The running objective score is deliberately absent from the grading screen.*
+It would be the reveal happening one grade at a time with nobody deciding it.
+The end-to-end spec asserts that absence, so a later task cannot quietly put the
+number there.
+
+**What P4-T10b-b settled.**
+
+*The withholding is in the action, not on the screen.* P4-T10b-a kept the
+number off the grading screen and `sessions.scoringStatus` went on returning
+it, so a second surface, a REST caller or the agent tool catalogue read what
+the room had not. The read now returns `score: null` and `revealed: false`
+until the room reveals, and the screen has nothing left to keep secret.
+
+*The reveal animates in CSS, deliberately.* The design system's one
+reduced-motion override collapses every CSS animation and transition to nothing
+(`packages/ui/src/styles/tokens.css` §2), so the existing `.animate-pop` class
+is instant for a reader who asked for that and no component has to check. A
+JavaScript count-up would keep counting straight through that override, which
+is the trap worth marking rather than the technique worth using.
+
+*A redundant reveal is answered, not refused.* A second reveal stamps nothing
+and returns a count of nought, the same shape `sessions.revealVotes` uses. A
+facilitator on a stale screen pressing again should not meet an error, and
+there is no error code in this codebase that means already done without also
+claiming the objective does not exist. It enqueues no outbox row either,
+because there is no second reveal to push and the idempotency key would collide
+with the first.
+
+*Revealing a half-graded objective is allowed; revealing an ungraded one is
+not.* §8.3 leaves an unscored key result out rather than counting it as zero,
+so a half-graded objective has a legitimate score to put out. An objective with
+nothing graded has none, and letting it enter its revealed state would show the
+room a blank where the number goes.
+
+*A revealed objective is not frozen.* A grade changed after the reveal moves the
+number that is already out. The reveal decides who sees it first, not when the
+argument ends.
+
+*The push is an outbox row and no relay drains it yet*, the same position
+P4-T10a-a recorded for `session.stageChanged`. The write is one write and every
+client that re-reads gets the same answer; `session.scoresRevealed` is declared,
+enqueued and listened for, and it reaches nobody until a relay host exists. The
+end-to-end spec reloads the second client rather than claiming a live rail.
+
+*An end-to-end defect this task uncovered rather than caused.* P4-T10b-a's spec
+filled `getByLabel("Score")`, which matched the facilitator's private note
+first, because on this stage that field is labelled "Private note for Score the
+key results" and its panel renders above the grading panel. The slider was never
+moved, the grade stored as nought, and the following `getByText("0.6")` found
+the note and reported success. The whole sequence passed while nothing under
+test had happened. It surfaced the moment the reveal showed the honest 0.00.
+Both locators are now scoped to the row.
 
 Given / When / Then:
 - Given a running review at the scoring stage, when the facilitator reveals an
   objective's score, then every participant sees the same number at the same
   time, and the cycle score updates.
+- Given a graded but unrevealed objective, when any caller reads the scoring
+  status, then the objective's score is null and the cycle score excludes its
+  key results.
 
 ### 4.4 Stage 3: Objective narratives (SS8.3)
 
 Pass-the-mic control. Each objective's owner tells the story behind the score.
 Facilitator marks each as spoken.
 
+| Element | Behaviour |
+|---|---|
+| The mic | Exactly one objective holds it. The facilitator hands it on and puts it down |
+| Spoken | Stamped by the pass, not by a second control |
+| Narrative | Optional. What the number does not show, one note per objective |
+| Completion | Every objective spoken for |
+
+**What P4-T10c settled.**
+
+*The mic is a column, not a row per turn.* `okr_sessions.mic_goal_id` is a
+single pointer, so two holders is not a state the data can be in. Every client
+agrees who is speaking because there is one write and they all read it, not
+because they coordinate. The panel draws whoever the read says holds it and
+keeps no holder of its own, because a second copy of that answer is a second
+answer.
+
+*The pass is what marks an objective spoken for.* Section 4.4 asks the
+facilitator to mark each as spoken, and the honest moment for that is the mic
+moving on: in a real room the facilitator says thank you and turns to the next
+owner. A separate tick would be a second thing to forget. Putting the mic down
+with a null is therefore a real act rather than tidying up, because nothing
+takes the mic after the last owner and without it that owner is never marked.
+
+*A mic that comes back does not un-speak an objective.* A room returns to an
+objective for a question. `spoken_at` is stamped once and never re-stamped, so
+the record says when the story was told rather than when it was last discussed.
+
+*The narrative is nullable and usually null.* Section 8.1 gives the stage nine
+minutes of talking, not writing. A row appears when the mic moves on, carrying
+no body and no author. Storing an empty document instead would put "somebody
+wrote nothing" in the same shape as "nobody wrote", and the minutes at P4-T12
+have to tell those apart. Clearing a note drops the body and the author
+together and leaves `spoken_at` where it is: deleting the note is not
+un-telling the story.
+
+*Writing is not the facilitator's alone.* Stage three is owner by owner, and an
+objective's champion is usually not the person running the review. A narrative
+only the facilitator could write would be the facilitator telling somebody
+else's story. Passing the mic is the facilitator's; the note is the room's.
+
+*The narrative is a textarea, not an editor.* Collected as plain text and
+stored as editor JSON through the one shared rich text module, the same path
+the check-in composer uses (P3-T07). A stage with nine minutes of talking in it
+does not need a toolbar.
+
+Given / When / Then:
+- Given a narratives stage, when the facilitator passes the mic, then every
+  participant sees who is speaking, and exactly one objective is speaking.
+- Given an objective that held the mic, when the mic moves on, then that
+  objective reads as spoken for whether or not anybody typed a note.
+
 ### 4.5 Stage 4: Recognition and wins (SS8.3)
 
 Specific recognition entries. "Name the effort that deserved to be seen.
 Specific beats generous" (SS8.1).
 
+**What P4-T10c settled.**
+
+*Nothing aggregates.* Two entries naming the same person are two things they
+did, and `kudos` is unique on nothing so the second cannot overwrite the first.
+A count per person would turn recognition into a leaderboard, which is the
+opposite of specific.
+
+*Anybody in the room may give it.* Section 8.1 asks the room to name what it
+saw, so recognition handed out by the facilitator alone would be a different
+ritual with the same name. The action refuses two things and no more:
+recognising yourself, and an empty line.
+
+*Who may be named comes from the read, not the screen.* `sessions.recognition`
+returns the recipients it would accept, which is every active human member
+except the reader. Two places deciding that is one place to get it wrong, and
+the seeded Coach and Champion are excluded because recognition names a person's
+effort rather than a scheduler's.
+
+Given / When / Then:
+- Given a recognition stage, when a participant names somebody's effort, then
+  the entry appears for the room with both names on it.
+- Given a participant, when they open the recipients, then they are not among
+  them.
+
 ### 4.6 Stage 5: Team retro (SS8.4)
 
 | Element | Behaviour |
 |---|---|
-| Prompt chips | Configurable starting prompts |
+| Prompt chips | Deferred, see below |
 | Two columns | What worked, what did not |
-| Sticky notes | Silent writing phase, then display |
-| Dot voting | Each participant gets a fixed number of dots |
+| Sticky notes | Written into either column, optionally without a name |
+| Dot voting | SS11 `Retro dots per member`, canon default 3 |
+
+**What P4-T11a settled.**
+
+*The dot cap is a SS11 parameter, added at Agung's direction on 26 August 2026.*
+SS11 states it plainly: every numeric value the product enforces is a parameter
+in that registry, and a value not in the registry is not a setting. A cap that
+shapes how a room votes is enforced, so the alternative homes were closed. Three
+because the stage has seven minutes: it forces a room to choose, where more
+turns the vote into a full ranking, which is a different exercise. It lands in
+`rhythm_settings` like every other SS11 parameter, so it is already tunable from
+the rhythm card on S-36 with no new surface.
+
+*Two caps, holding different things.* One dot per member per note, held by a
+unique index. `Retro dots per member` in total across notes, held by the action
+because it counts across rows no index can see. Spending two dots on one note is
+how three dots become one loud opinion, and SS8.1's vote is about spread; a
+second cast therefore withdraws the first rather than erroring, because a
+facilitator's room should not meet a refusal for pressing a toggle twice.
+
+*Removing a note removes the dots spent on it.* A dot spent on something that no
+longer exists is a dot its owner cannot get back, which silently shrinks the cap
+for the rest of the stage.
+
+*Anonymity is per note, not per session.* SS8.1 asks for silent writing, and one
+thing in a retro is usually harder to say than the rest. The board shows
+"anonymous" rather than an empty author line, so a reader can tell a choice from
+an absence. An anonymous note has no author to take it back, which is why the
+facilitator can remove any note and the room can only remove its own.
+
+*`retro_notes.votes` is denormalised and held honest by a test.* TECHNICAL-PLAN
+SS4 specifies the column and the board sorts on it, so it stays, recounted from
+the rows and rewritten inside the same transaction as every vote. A cached total
+is usually the wrong idea, so the test asserts it equals the count behind it
+rather than assuming the maintenance held.
+
+*Prompt chips are deferred, not half-built.* The line above said "configurable
+starting prompts" and no document carries the prompt text: METHOD.md has none,
+and TECHNICAL-PLAN SS4.14 has no home for a list like it. Writing the prompts
+here would be inventing practice, which is a human decision. Agung chose on
+26 August 2026 to ship the two canon columns without chips and record the gap
+rather than fill it with invented text. Reopening it means either adding the
+prompts to METHOD.md as canon or giving them a home in the SS4.14 map.
+
+Given / When / Then:
+- Given a team retro with three notes, when members vote, then the top-voted
+  note is identifiable and each member's votes are capped.
+- Given a member who has spent every dot, when they cast another, then it is
+  refused, and taking one back frees it.
 
 ### 4.7 Stage 6: Management retro (SS8.7)
 
 The four questions from METHOD.md SS8.7 (specified in p4-t00-method-package.md
 SS8). Leadership answers out loud. Facilitator records.
+
+**What P4-T11a settled.**
+
+*Leadership is a space's managers and its coordinator*, decided by Agung on
+26 August 2026. SS8.7 says leadership answers out loud, plural, and those are the
+leadership roles this product has (P3-T01). Facilitator-only would be narrower
+than the canon describes; everybody would make the test-plan line "the two
+retros are visible to different audiences" unmeetable. A review with no space has
+no space roles to read, so it falls back to workspace administration, which is
+the only principal left who can be said to lead it.
+
+*The refusal is not-found, not forbidden.* Telling somebody a management retro
+exists and is closed to them is itself a disclosure about the room. The page
+catches the refusal and renders one line saying the stage is leadership's, which
+discloses nothing the stage rail does not already show everybody.
+
+*The questions are never stored.* SS11 lists the management-retro questions as
+unchangeable structure, so a row carries the question number and the answer. The
+read is driven by the canon list rather than by the rows, so all four are always
+asked and an unanswered one is a visible gap rather than a question that quietly
+disappeared.
+
+Given / When / Then:
+- Given an ordinary member of the room, when they open stage six, then they read
+  that the stage is leadership's and no answer.
+- Given a space manager, when they answer a question, then the answer is
+  recorded against that question with their name on it.
 
 ### 4.8 Stage 7: Root cause and diagnostic (SS8.4, SS8.6)
 
@@ -284,6 +600,52 @@ Then the rhythm diagnostic renders (p4-t00-method-package.md SS9):
 
 The diagnostic is deterministic. With AI on, a narrative adds specifics from
 this cycle. With AI off, the verdict sentence is the same.
+
+**What P4-T11b settled.** The diagnostic itself arrives at P4-T11c; this is the
+root-cause half and the survey it reads.
+
+*SS8.4's taxonomy was missing from `packages/method` and is there now.* SS11 lists
+the root-cause taxonomy among the structures a workspace cannot change and
+CLAUDE.md says every taxonomy is implemented in that package, so its absence was
+a gap between the document and the code rather than a decision. Two tests read it
+back out of METHOD.md, word for word and in the document's order, because a set
+comparison would pass on a shuffled list and the picker shows the order.
+
+*The list reads `review_scores`, not `key_results.score`.* Grades do not land on
+the key results until the session closes (P4-T10b-a) and stage seven runs before
+that, so reading the key result would show an empty list in every live review.
+Strictly below the threshold, because SS8.4 says "below 0.7": a key result that
+scored exactly it met it, and asking a room to explain a result it did not miss
+is how a stage loses its credibility.
+
+*Anonymity, stated precisely.* `process_health_responses` carries
+`sha256(salt || member_id)` where a member id would go, and the salt lives on the
+session, written when the first response arrives. A hash of the member id alone
+would be the same string in every review, so somebody holding the table could
+follow one unnamed person across quarters; the per-review salt breaks that. A salt
+rather than an HMAC on the instance root key, because a rotation would leave every
+stored hash unmatchable and silently break the one-response rule mid-review. **It
+is not anonymity against somebody holding both the database and the member list**,
+because a room is small enough to enumerate and no scheme that lets this
+application recount a member's response could be. What the product guarantees, and
+what the tests assert, is that no read returns an attribution and no column
+carries one.
+
+*The activity payloads carry neither the cause nor the scores.* An activity row
+carries its actor, so scores in a payload would attribute an anonymous survey in
+the one place everybody in the space reads. The root-cause payload omits the cause
+number for SS8.4's own reason: look for the system, not the person.
+
+*All five statements are answered together*, refused at the boundary and on the
+screen. SS8.6 reads statements two and five, so a set missing one produces a
+diagnostic with a hole in it, and one built on a missing answer is worse than none
+because it reads as evidence.
+
+Given / When / Then:
+- Given a survey with four responses, when the averages render, then no response
+  can be traced to a member and the count reads four.
+- Given a key result graded exactly at the threshold, when the root-cause list
+  renders, then it is not in it.
 
 Given / When / Then:
 - Given a cycle score below 0.7 and a rhythm score above 3.5, when the

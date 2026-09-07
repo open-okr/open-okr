@@ -34,6 +34,7 @@ Also here:
 - [START-PROMPT.md](START-PROMPT.md): the one prompt that starts every development session.
 - [PROMPT.md](PROMPT.md): copy-and-paste prompts for the other situations: bootstrap, rework, spikes, phase exits, conformance.
 - [STATUS.md](STATUS.md): task tracking. The agent updates rows; only a human sets `done`.
+- [GAP-AUDIT.md](GAP-AUDIT.md): a per page and per module audit of what is missing from work already built, with the fixes as a checklist. Dated, static reading only, and superseded by whatever lands against it. Not authority.
 - [Reference mockups](../stakeholder/mockups/README.md): eleven screens from UIUX-PLAN.md §6 drawn as HTML and rendered to PNG. Look at the mockup before starting a UI task. Reference, not authority: UIUX-PLAN.md §10 has the rule.
 
 `docs/design/` exists only once execution starts: detailed designs written by the agent at each phase's design gate.

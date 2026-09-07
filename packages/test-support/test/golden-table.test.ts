@@ -133,6 +133,24 @@ const MANIFEST: Record<
       ],
       minRows: 14,
     },
+    "cadence.acknowledgement": {
+      columns: [
+        "case",
+        "days_since_publication",
+        "expected_step",
+        "expected_targets",
+      ],
+      minRows: 5,
+    },
+    "cadence.blocker": {
+      columns: [
+        "case",
+        "hours_since_opened",
+        "expected_step",
+        "expected_targets",
+      ],
+      minRows: 7,
+    },
   },
   "p3-t00-kpi-engine.md": {
     "kpi.period": {

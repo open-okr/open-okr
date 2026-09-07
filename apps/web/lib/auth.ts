@@ -1,14 +1,20 @@
 import { loadEnv } from "@openokr/config";
 import { createAuth } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
-import { Pool } from "pg";
+import { getPool } from "./pool";
+
+export { getPool };
 
 /**
  * The process-wide authentication instance.
  *
  * The configuration lives in `packages/core` because it needs the database,
  * which TECHNICAL-PLAN §1 does not allow this app to reach directly. Here we
- * only supply the environment and hold the pool.
+ * only supply the environment.
+ *
+ * `getPool` is re-exported because most of the app imports it from here, and
+ * it now lives in `lib/pool.ts` so a process with no sessions can have a pool
+ * without loading Better Auth.
  *
  * Built on first use rather than on import, so that loading a page module
  * does not open a database connection as a side effect. The environment is
@@ -20,16 +26,8 @@ import { Pool } from "pg";
  * pool and eventually exhaust the database's connection limit.
  */
 const globals = globalThis as typeof globalThis & {
-  openokrPool?: Pool;
   openokrAuth?: ReturnType<typeof createAuth>;
 };
-
-export function getPool(): Pool {
-  globals.openokrPool ??= new Pool({
-    connectionString: loadEnv().DATABASE_URL,
-  });
-  return globals.openokrPool;
-}
 
 export function getAuth(): ReturnType<typeof createAuth> {
   if (!globals.openokrAuth) {

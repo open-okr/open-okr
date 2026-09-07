@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { ZodError, z } from "zod";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
+import { defineReadAction } from "../src/actions/define.ts";
 import { ACTIONS, actionNames, getAction } from "../src/actions/registry.ts";
+import { errorFor } from "../src/api/errors.ts";
 
 /**
  * The action contract registry (TECHNICAL-PLAN §14).
@@ -71,7 +74,43 @@ describe("the registry", () => {
       const discussion =
         action.name.startsWith("comments.") ||
         action.name.startsWith("reactions.");
-      const floor = discussion ? ACCESS_LEVELS.comment : ACCESS_LEVELS.edit;
+      // `nudges.snooze` is the second exception, and for a related reason
+      // (P4-T04c). It writes to the member's own nudge rows and to nothing
+      // else: it changes what the product says to them, never what the work
+      // says. A member at `view` still receives nudges, so putting the floor at
+      // `edit` would leave the people with the least power the only ones who
+      // cannot make the product stop talking to them. The action refuses
+      // somebody else's nudge as a not-found, which is what keeps the narrow
+      // grant safe.
+      const ownMessages = action.name === "nudges.snooze";
+      // The copilot is the third, and it is `nudges.snooze`'s reason again
+      // (P4-T14a-a): both writes touch one member's own conversation and
+      // nothing in the workspace. A member who may read a space but not change
+      // it should be able to ask about it, and retrieval decides what they are
+      // answered from by their own access, so the narrow grant leaks nothing.
+      // Both actions refuse a thread that is not the caller's as a not-found,
+      // which is what `nudges.snooze` relies on too.
+      const ownConversation = action.name.startsWith("copilot.");
+      // Channel identities are the fourth, and it is `nudges.snooze`'s reason
+      // once more (P5-T01b-a). Linking and unlinking touch one row that is
+      // about the member and nobody else, and both resolve the member from the
+      // caller's own session rather than from an input, so there is no
+      // identifier a caller could pass to reach somebody else's. A member at
+      // `view` still receives nudges, and telling the product where to send
+      // them cannot be a privilege only editors have. `channels.connect`,
+      // `channels.disconnect` and `channels.send` are workspace-wide and stay
+      // at `full`.
+      const ownIdentity =
+        action.name === "channels.linkIdentity" ||
+        action.name === "channels.unlinkIdentity" ||
+        // Asking for a code to prove their own account (P5-T02a). The member
+        // comes from the session, the code is theirs alone, and it grants
+        // nothing except the ability to be reached.
+        action.name === "channels.startLink";
+      const floor =
+        discussion || ownMessages || ownConversation || ownIdentity
+          ? ACCESS_LEVELS.comment
+          : ACCESS_LEVELS.edit;
       expect(
         action.access,
         `${action.name} writes but only needs view`,
@@ -124,5 +163,97 @@ describe("action input validation", () => {
     expect(action.input.safeParse({ name: "x".repeat(201) }).success).toBe(
       false,
     );
+  });
+});
+
+describe("a read validates its input before its handler runs", () => {
+  // **P5-T16.** `defineWriteAction` has parsed its declared input since P1-T07,
+  // before the operation opens a transaction. The read builder did not, and
+  // `callAction` parses nothing either, so until this block every read in the
+  // product trusted the shape its caller passed. The callers are not the typed
+  // internal client alone: REST builds a read's input out of query strings, the
+  // agent transport out of a tool call, the chat router out of a message.
+
+  const CONTEXT = {
+    // A pool that would throw the moment anything queried it. That is the
+    // assertion: a refused input never reaches a database.
+    pool: undefined as never,
+    workspaceId: "00000000-0000-0000-0000-000000000000",
+    actor: {
+      kind: "human" as const,
+      userId: "00000000-0000-0000-0000-000000000000",
+    },
+  };
+
+  it("refuses input its schema refuses, without calling the handler", async () => {
+    let reached = false;
+    const action = defineReadAction({
+      name: "test.readOne",
+      summary: "A read that declares one identifier.",
+      input: z.object({ id: z.uuid() }),
+      output: z.object({ id: z.string() }),
+      async handler(_context, input) {
+        reached = true;
+        return { id: input.id };
+      },
+    });
+
+    await expect(
+      action.handler(CONTEXT, { id: "not-a-uuid" } as never),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(reached, "the handler ran on input the schema refuses").toBe(false);
+  });
+
+  it("hands the handler only the fields the schema declares", async () => {
+    let seen: unknown;
+    const action = defineReadAction({
+      name: "test.readTwo",
+      summary: "A read that declares one field and gets two.",
+      input: z.object({ id: z.uuid() }),
+      output: z.object({ id: z.string() }),
+      async handler(_context, input) {
+        seen = input;
+        return { id: input.id };
+      },
+    });
+
+    await action.handler(CONTEXT, {
+      id: "11111111-1111-4111-8111-111111111111",
+      // A surface that passes something the action never declared. Dropping it
+      // is the point: the handler cannot branch on what it does not know.
+      spaceId: "22222222-2222-4222-8222-222222222222",
+    } as never);
+
+    expect(seen).toEqual({ id: "11111111-1111-4111-8111-111111111111" });
+  });
+
+  it("refuses a registry read with a wrong-shaped identifier before it queries", async () => {
+    const action = getAction("goals.read");
+    if (!action) {
+      throw new Error("goals.read is missing");
+    }
+
+    // No database is reachable through this context, so a rejection that is a
+    // `ZodError` rather than a connection failure proves the order.
+    await expect(
+      action.handler(CONTEXT, { id: "nope" }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it("reports that refusal to a caller as invalid_input, naming the field", async () => {
+    const action = getAction("goals.read");
+    if (!action) {
+      throw new Error("goals.read is missing");
+    }
+
+    const thrown = await action
+      .handler(CONTEXT, { id: "nope" })
+      .catch((error: unknown) => error);
+
+    expect(errorFor(thrown)).toEqual({
+      code: "invalid_input",
+      message: "That input is not valid.",
+      fields: { id: expect.any(String) },
+    });
   });
 });

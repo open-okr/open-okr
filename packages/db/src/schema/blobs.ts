@@ -33,6 +33,8 @@ export const blobs = pgTable("blobs", {
     .default("pending"),
   width: integer("width"),
   height: integer("height"),
+  legacyType: text("legacy_type"),
+  legacyId: text("legacy_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

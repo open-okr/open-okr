@@ -10,14 +10,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@base-ui-components/react": "catalog:",
+    "@better-auth/passkey": "catalog:",
     "@openokr/adapters": "workspace:*",
     "@openokr/agents": "workspace:*",
     "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
     "@openokr/method": "workspace:*",
-    "@better-auth/passkey": "catalog:",
     "@openokr/ui": "workspace:*",
-    "@base-ui-components/react": "catalog:",
+    "@react-pdf/renderer": "^4.8.1",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
     "next": "16.3.2",

@@ -30,6 +30,8 @@
  * `full`, so the level check is real machinery over a placeholder answer. It
  * is one function, replaced wholesale, and no handler changes when it is.
  */
+
+import { randomUUID } from "node:crypto";
 import {
   activeOnly,
   activities,
@@ -52,6 +54,8 @@ import { validateActivityPayload } from "../activities/catalogue.ts";
 import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
+import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import { INDEX_TOPIC, isIndexableSubject } from "../search/subjects.ts";
 import { OperationError } from "./errors.ts";
 import { isRecoveryAction } from "./freeze.ts";
 
@@ -97,6 +101,29 @@ export interface ActivityInput {
    * about.
    */
   readonly notify?: boolean;
+  /**
+   * Names the content this write changed, so the pipeline enqueues it for
+   * embedding (AI-NATIVE-PLAN.md §9, P4-T13a).
+   *
+   * **Only for writes whose activity points at a container rather than at what
+   * changed.** A goal's activity names the goal, so a goal write needs nothing
+   * here: the pipeline reads `subjectType` and enqueues by itself. A retro
+   * note's activity names the space and a narrative's names the goal, and
+   * embedding the container would be embedding the wrong thing, so those writes
+   * say what actually changed.
+   *
+   * Same shape as `notify` above and for the same reason: the mechanism is
+   * central so it cannot be implemented inconsistently, and the opt-in is per
+   * write because most writes change no embeddable text. Agung chose this on
+   * 26 August 2026.
+   *
+   * Setting it does not mean the text changed. The worker re-reads and hashes,
+   * and an unchanged hash embeds nothing.
+   */
+  readonly embed?: {
+    readonly entityType: string;
+    readonly entityId: string;
+  };
 }
 
 export interface AuditInput {
@@ -140,6 +167,42 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    * the operation's own logic is the whole of what authorises it.
    */
   readonly bootstrap?: boolean;
+  /**
+   * Where this write came from, when it did not come from the browser
+   * (P5-T06a).
+   *
+   * Merged into the audit payload here rather than by each action, for the
+   * reason every cross-cutting fact belongs in one place: `channels.md`'s §7
+   * requires "an audit event with the channel named" for *every* inbound
+   * action, and forty actions each remembering to add it is forty chances to
+   * forget. Absent for a browser write, which is what "no channel" means.
+   *
+   * The payload is inside the hash chain, so the channel is as tamper-evident
+   * as the rest of the row without a migration to the append-only table.
+   */
+  readonly channel?: string;
+  /**
+   * A pre-tenant policy key this operation's own transaction needs (P5-T07c-b).
+   *
+   * Three tables are readable before a workspace is known, each through a second
+   * policy key: `channel_installations`, `api_tokens` and
+   * `device_authorisations`. Only the last of them is *written* through the
+   * pipeline: approving a device login puts a workspace onto a row that has none,
+   * and the policy cannot see that row through the tenant setting alone. Absent
+   * on every other operation, which is what "this write is about rows that
+   * already belong to a workspace" means.
+   */
+  readonly deviceCodeHash?: string;
+  /**
+   * Skip notification fan-out for this write (P6-T01a).
+   *
+   * Set from the call context's bulk flag and by nothing else. §7.1 step 3
+   * asks for an import to run through the normal pipeline with notification
+   * dispatch suppressed by a bulk flag. Everything else about the write is
+   * unchanged, the activity row included, so the feed still shows what the
+   * import did.
+   */
+  readonly suppressNotifications?: boolean;
   /** Freshly loaded rows the authorisation and the change both depend on. */
   readonly load?: (context: {
     tx: OperationTx;
@@ -299,6 +362,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
     {
       workspaceId: spec.workspaceId,
       ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
+      ...(spec.deviceCodeHash ? { deviceCodeHash: spec.deviceCodeHash } : {}),
     },
     async (tx) => {
       // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`
@@ -385,7 +449,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
         })
         .returning({ id: activities.id });
 
-      if (outcome.activity.notify) {
+      if (outcome.activity.notify && !spec.suppressNotifications) {
         await fanOutActivity(tx, {
           workspaceId: spec.workspaceId,
           activityId: (insertedActivity as { id: string }).id,
@@ -395,13 +459,93 @@ export async function runOperation<TResult, TLoaded = undefined>(
         });
       }
 
-      // 6. The audit row, chained.
-      await appendAudit(tx, spec.workspaceId, actor, outcome.audit);
+      // 6. The audit row, chained. The channel is merged in here, once, so
+      //    "she checked in from Slack" is answerable for every action rather
+      //    than only for the ones whose author remembered (P5-T06a).
+      await appendAudit(tx, spec.workspaceId, actor, {
+        ...outcome.audit,
+        ...(spec.channel
+          ? {
+              payload: {
+                ...(outcome.audit.payload ?? {}),
+                channel: spec.channel,
+              },
+            }
+          : {}),
+      });
 
       // 7. Side effects, as outbox rows. The relay delivers them after this
       //    transaction commits, so nothing fires for a change that rolls back.
       for (const message of outcome.outbox ?? []) {
         await enqueueOutbox(tx, message);
+      }
+
+      /**
+       * 8. The embedding job, as one more outbox row (P4-T13a).
+       *
+       * Here rather than in each action, because an enqueue that every write has
+       * to remember is an enqueue the ninth content kind will forget. Two ways in:
+       * the activity's own subject is embeddable, or the write named the content
+       * explicitly because its activity points at a container.
+       *
+       * The key carries a timestamp, so it never collides. Coalescing to one
+       * pending row per entity was the first idea and was wrong: a second edit
+       * arriving while the relay holds the first row would collide on the unique
+       * key, and a failed enqueue inside this transaction would roll back a
+       * legitimate domain write. Duplicate rows are the cheaper mistake, because
+       * the worker's hash check makes the second one a no-op.
+       */
+      const embedTarget =
+        outcome.activity.embed ??
+        (isEmbeddableSubject(outcome.activity.subjectType)
+          ? {
+              entityType: outcome.activity.subjectType,
+              entityId: outcome.activity.subjectId,
+            }
+          : null);
+      if (embedTarget) {
+        await enqueueOutbox(tx, {
+          topic: EMBED_TOPIC,
+          payload: {
+            workspaceId: spec.workspaceId,
+            entityType: embedTarget.entityType,
+            entityId: embedTarget.entityId,
+          },
+          idempotencyKey: `${EMBED_TOPIC}:${embedTarget.entityType}:${embedTarget.entityId}:${Date.now()}:${randomUUID()}`,
+        });
+      }
+
+      /**
+       * 9. The search indexing job, beside the embedding one (P5-T13).
+       *
+       * The same trigger and the same shape, from the same place, so the two
+       * indexes are refreshed by the same write and cannot come to disagree
+       * about what exists. The sets differ because the questions differ: a KPI,
+       * an initiative, a task and a session are searchable and hold no prose
+       * worth embedding.
+       */
+      const indexTarget =
+        outcome.activity.embed ??
+        (isIndexableSubject(outcome.activity.subjectType)
+          ? {
+              entityType: outcome.activity.subjectType,
+              entityId: outcome.activity.subjectId,
+            }
+          : null);
+      if (indexTarget) {
+        await enqueueOutbox(tx, {
+          topic: INDEX_TOPIC,
+          payload: {
+            workspaceId: spec.workspaceId,
+            entityType: indexTarget.entityType,
+            entityId: indexTarget.entityId,
+          },
+          // A timestamp and a fresh identifier, for the reason the embedding
+          // key above records: coalescing to one pending row per entity
+          // collides the moment a second edit arrives while the relay holds
+          // the first, and a failed enqueue would roll back a real write.
+          idempotencyKey: `${INDEX_TOPIC}:${indexTarget.entityType}:${indexTarget.entityId}:${Date.now()}:${randomUUID()}`,
+        });
       }
 
       return outcome.result;
