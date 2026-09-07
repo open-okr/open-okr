@@ -51,6 +51,52 @@ Blocked? Set the task to `blocked` in `STATUS.md`, write down exactly why, and a
 
 Phases have design gates at P3-T00, P4-T00, P5-T00 and P8-T01. Do not begin a phase's implementation tasks until the human approves that gate's output with an explicit "design approved".
 
+## Committing and pushing
+
+**Commit on your own. Never push on your own.** Committing is how the work
+becomes reviewable and you do it without being asked, one commit per task, on
+`agung`. Pushing is what starts continuous integration and puts the work in
+front of other people, and it happens only when Agung says to push. Agung set
+this on 7 September 2026.
+
+**A push must leave continuous integration green. Every job, no exception.**
+Not "green except the one that was already failing", and not "green except the
+gate this machine cannot run". A red build on a shared branch blocks everybody
+else's work and the next person cannot tell your failure from theirs.
+
+So before you say the work is ready to push, run the whole set in the order
+`docs/development-plan/CI-GATES.md` gives, and read the output rather than the
+exit code:
+
+```
+pnpm typecheck
+pnpm lint             # read the last three lines, not the last one
+pnpm dead-code
+pnpm db:lint
+pnpm check:boundaries
+pnpm check:licences
+pnpm check:contract
+pnpm method:check
+pnpm test             # needs a database. One suite at a time
+pnpm build && pnpm test:e2e
+pnpm check:signoff origin/main HEAD
+```
+
+**A gate you did not run is not a gate that passed.** When this machine cannot
+run one, say which, why, and what would run it, in the `STATUS.md` row and in
+the summary you give Agung. `helm` and Docker are absent here, so
+`deploy/helm/check.sh`, `deploy/helm/cluster-test.sh` and
+`deploy/docker/smoke-test.sh` cannot run locally and are the ones to name.
+Never write "all gates pass" when you ran nine of eleven.
+
+**`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look
+green for days and fail the moment one opens. Run it yourself, and commit with
+`-s`.
+
+**Two jobs are not in the list above and still have to be green:** CodeQL and
+Dependency review. Neither is runnable locally. A new dependency is what
+usually turns them red, which is a second reason not to add one without asking.
+
 ## Design docs
 
 Detailed designs live in `docs/design/`, written by you at each design gate. Keep them scannable: tables and examples over prose. Write acceptance criteria as testable Given / When / Then. When implementation deviates from a design document, update the document in the same change.
@@ -213,6 +259,7 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 - Contract projections regenerated and the drift check green if the registry changed.
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The design document is updated if implementation deviated. The `STATUS.md` row is updated.
+- Every gate in "Committing and pushing" ran and is green, or the row names the ones this machine could not run and why. The commit is made; the push waits for Agung.
 
 ## Writing style for everything you write in this repo
 

@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-five tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-six tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1639,12 +1639,27 @@ Deliverables: a theme and density control on the member's settings surface and i
 Test plan: switching theme survives a reload and a second device; compact density changes row heights on a virtualised table; reduced motion is still honoured in both themes.
 Acceptance: Given a member who chooses dark and compact, when they sign in on another browser, then the product renders dark and compact with no flash of the other.
 
-### P6-G24: Loading and error boundaries [M]
+**P6-G24 was cut in two, and the seam is an architecture fact rather than a
+size judgement.** One clause of the row was "section-level error boundaries so
+a failure in one card does not replace the shell", and that cannot be built as
+written: thirty-one pages render `AppShellLayout` inside themselves rather than
+through a `layout.tsx`, so when a page throws the shell never rendered and a
+boundary below it has no sidebar to keep. Moving the shell into per-segment
+layouts is a change to every one of those pages and belongs on its own row.
+
+### P6-G24a: Loading states and per-segment error boundaries [M]
 Depends on: none
 Goal: a slow read and a failed read both look like themselves (GAP-AUDIT G-06, G-07).
-Deliverables: a loading state on every route whose reads are not instant, through `loading.tsx` or a Suspense boundary around the slow region rather than the whole page; section-level error boundaries so a failure in one card does not replace the shell; a `global-error.tsx`; a not-found path on every dynamic route.
-Test plan: a deliberately slow read renders the loading state and then the content; a thrown read inside one card leaves the sidebar standing; every dynamic route returns not-found for an id that does not exist; the permission-denied state is distinct from not-found only where an existence oracle is acceptable.
-Acceptance: Given a route whose read takes two seconds, when a member navigates to it, then they see a loading state immediately and the content when it arrives.
+Deliverables: a `loading.tsx` per route segment, announced with `role="status"` and a real label so a screen reader is told something is loading rather than hearing nothing; an `error.tsx` per segment naming the screen that failed and nothing else about the failure; a `global-error.tsx`, for a root layout that throws before any screen can be drawn; a test that enumerates the segments and fails when one resolves neither boundary.
+Test plan: every segment holding a `page.tsx` resolves both boundaries, walked the way Next resolves them rather than by a fixed list; no in-shell segment falls all the way back to the root boundary, which renders standalone on purpose; `global-error.tsx` exists; an exemption naming a prefix that matches no segment fails.
+Acceptance: Given a segment added with no boundary of its own and no ancestor that has one, when the suite runs, then it fails naming that segment.
+
+### P6-G24b: The application shell as a layout [M]
+Depends on: P6-G24a
+Goal: an error boundary renders inside the product rather than instead of it (GAP-AUDIT G-07).
+Deliverables: `AppShellLayout` moved out of the thirty-one pages that call it and into the segment layouts, so the shell renders above every boundary and a failed read leaves the sidebar, the cycle strip and the search standing; the root `error.tsx` left standalone, because whatever threw there may have been the shell's own read; the per-segment cards from P6-G24a unchanged, since they already draw as a card in a column.
+Test plan: a page that throws renders its boundary with the sidebar present; the root boundary still renders with no shell; a signed-out visitor still reaches the auth screens, which are outside the shell; no page renders the shell twice.
+Acceptance: Given a page whose read throws, when a member is on it, then the sidebar, the workspace switcher and the search are still there and only the content area shows the error.
 
 ### P6-G25: Workspace state and the freeze overlay [M]
 Depends on: P2-T09

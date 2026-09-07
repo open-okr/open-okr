@@ -330,7 +330,7 @@ An agent also cannot be disabled or scoped from the product, which is the contro
 
 ## G-06: No loading state on any route
 
-- [ ] Decide whether Next's own pending state is enough, and if not add `loading.tsx` where a read is slow
+- [x] **Closed at P6-G24a.** Next own pending state is nothing: it leaves the previous screen up. Every segment has a `loading.tsx` now, announced with `role="status"` and a real label so a screen reader is told something is loading rather than hearing nothing.
 
 `find apps/web/app -name loading.tsx` returns nothing, and one file in the whole app tree mentions `Suspense`. Every page is an async server component that awaits its reads before rendering, so a navigation shows the previous page until the new one is ready with no indication that anything is happening.
 
@@ -338,7 +338,8 @@ UIUX-PLAN §9's first checked item is "Loading, empty, error and permission-deni
 
 ## G-07: One error boundary for the whole application
 
-- [ ] Add section-level `error.tsx` files, or record the single boundary as the decision
+- [x] **P6-G24a** an `error.tsx` per segment, plus `global-error.tsx` for a root layout that throws. Eighteen segments own one; `segment-boundaries.test.ts` fails when a new segment resolves neither.
+- [ ] **P6-G24b** the shell into the segment layouts. Thirty-one pages render `AppShellLayout` themselves, so a boundary below a thrown page has no sidebar to keep: the card renders standalone until that moves.
 
 [apps/web/app/error.tsx](../../apps/web/app/error.tsx) is the only error boundary and there is no `global-error.tsx`. Any thrown read anywhere replaces the entire shell, including the sidebar, so a failure in one admin card looks like a failure of the product. This is also what makes G-06's `kpis/[id]` finding user-visible: a mistyped KPI id shows "something went wrong" rather than not-found.
 
@@ -439,7 +440,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 - [ ] **G-04** nudge rule cards.
 - [ ] **G-08** string catalogue and locale wiring.
 - [ ] **G-09** theme and density control.
-- [ ] **G-06** and **G-07** loading and error states.
+- [x] **G-06** and **G-07** loading and error states. Closed at P6-G24a; the shell-into-layouts half is P6-G24b.
 - [ ] **G-02** decide who owns S-34.
 
 ## Housekeeping, cheap and worth doing in one pass
