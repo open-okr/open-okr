@@ -7,16 +7,21 @@
  */
 import {
   activeOnly,
+  activities,
   NOTIFICATION_REASONS,
   notifications,
+  nudges,
+  subscriptionLists,
   subscriptions,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped, hasSubjectResolver } from "../access/reads.ts";
+import { renderActivity } from "../activities/renderers.ts";
 import {
   getOrCreateNotificationSettings,
   updateNotificationSettings,
@@ -29,46 +34,157 @@ import {
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
+/**
+ * One inbox row (screen S-03, P6-G07a).
+ *
+ * **The reason enum came from the table, not from a copy of it.** It listed
+ * four of the six until P6-G07a: `review` and `check_in` were added to
+ * `NOTIFICATION_REASONS` at P3-T07 and P4-T04 and never reached this schema,
+ * so the OpenAPI document and the command line described an inbox that could
+ * not contain a reviewer's obligation or a nudge. Nothing validated the output,
+ * which is why it went unnoticed, and a client that did validate would have
+ * rejected the two reasons that matter most.
+ */
 const notificationRow = z.object({
   id: z.uuid(),
-  reason: z.enum(["invited", "joined", "mentioned", "role"]),
+  reason: z.enum(NOTIFICATION_REASONS),
   channel: z.string(),
   readAt: z.string().nullable(),
   snoozedUntil: z.string().nullable(),
   createdAt: z.string(),
+  /**
+   * What this row is about, so it can be grouped and linked.
+   *
+   * Null only on a row written before migration 0074, where the activity's own
+   * subject is the fallback and there is nothing to fall back to when the
+   * producer wrote no activity either.
+   */
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  /**
+   * What happened, in the activity renderer's words: the same sentence the
+   * feed shows, so the inbox and the feed can never describe one event
+   * differently. Null for a nudge, which has no activity behind it.
+   */
+  rendered: z.string().nullable(),
+  /**
+   * The rule a proactive message cites (UIUX-PLAN §3: "Every proactive
+   * message shows its rule"). Null for everything that is not a nudge.
+   */
+  ruleKey: z.string().nullable(),
+  /**
+   * Whether the reader still holds a live subscription to this subject, so the
+   * row can offer mute without the screen guessing. False when the subject is
+   * one nothing subscribes to, such as an invitation or a role change.
+   */
+  watching: z.boolean(),
 });
+
+/** The page the screen draws, and the ceiling the read will not go above. */
+const INBOX_PAGE_SIZE = 50;
+
+/**
+ * The acting member, or null when the caller is not one.
+ *
+ * The inbox is addressed to a member, so a caller with no member row has no
+ * inbox rather than an empty one. Returning null and letting each action decide
+ * keeps the read answering `[]` where it always did, so nothing that already
+ * calls it changes behaviour.
+ */
+async function actingMember(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+  return member?.id ?? null;
+}
+
+/**
+ * Whether this reader may still see what the row is about (P6-G07a).
+ *
+ * **A notification outlives the access that produced it.** Somebody watching a
+ * goal in a space they are later removed from keeps the rows that were written
+ * while they could see it, and listing those would be a slow leak of exactly
+ * the kind the access getter exists to close: the row names a subject, and the
+ * subject's title reaches the screen.
+ *
+ * Two answers, and they need opposite handling. A subject type the getter knows
+ * is checked and hidden when the check fails. A subject type it does not know
+ * has no context of its own, so the workspace floor is the whole of its
+ * visibility and the reader is a member by construction: shown. That is the
+ * group every nudge is about, and failing closed on it would empty the inbox of
+ * the product's own proactive messages, which is the opposite of the point.
+ */
+async function readerMaySee(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  subjectType: string | null,
+  subjectId: string | null,
+): Promise<boolean> {
+  if (!subjectType || !subjectId) {
+    // Nothing to check. The row is addressed to this member and says only that
+    // something happened, which is what a pre-0074 row can honestly say.
+    return true;
+  }
+  if (!hasSubjectResolver(subjectType)) {
+    return true;
+  }
+  try {
+    await getAccessScoped(tx, {
+      workspaceId,
+      memberId,
+      resourceType: subjectType,
+      resourceId: subjectId,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const listNotifications = defineReadAction({
   name: "notifications.list",
   summary: "The signed-in member's own inbox.",
-  input: z.object({ unreadOnly: z.boolean().optional() }),
+  input: z.object({
+    unreadOnly: z.boolean().optional(),
+    /** One reason, for §3's reason filter. Absent means every reason. */
+    reason: z.enum(NOTIFICATION_REASONS).optional(),
+    cursor: z.object({ createdAt: z.string(), id: z.uuid() }).optional(),
+  }),
   output: z.array(notificationRow),
   access: ACCESS_LEVELS.view,
+  page: { cursorFrom: ["createdAt", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
-    return withWorkspace(db, context.workspaceId, async (tx) => {
-      const userId = context.actor.userId;
-      if (!userId) {
-        return [];
-      }
-      const [member] = await tx
-        .select({ id: workspaceMembers.id })
-        .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.workspaceId, context.workspaceId),
-            eq(workspaceMembers.userId, userId),
-          ),
-        )
-        .limit(1);
-      if (!member) {
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
         return [];
       }
 
       const now = new Date();
       const conditions = [
-        eq(notifications.recipientMemberId, member.id),
+        eq(notifications.recipientMemberId, memberId),
         or(
           isNull(notifications.snoozedUntil),
           lte(notifications.snoozedUntil, now),
@@ -76,6 +192,24 @@ export const listNotifications = defineReadAction({
       ];
       if (input.unreadOnly) {
         conditions.push(isNull(notifications.readAt));
+      }
+      if (input.reason) {
+        conditions.push(eq(notifications.reason, input.reason));
+      }
+      if (input.cursor) {
+        // Keyset rather than an offset, and the id breaks the tie: two
+        // notifications written in the same millisecond are ordinary in a
+        // fan-out, and an offset page would show one of them twice.
+        const at = new Date(input.cursor.createdAt);
+        conditions.push(
+          or(
+            lt(notifications.createdAt, at),
+            and(
+              eq(notifications.createdAt, at),
+              lt(notifications.id, input.cursor.id),
+            ),
+          ) as never,
+        );
       }
 
       const rows = await tx
@@ -86,8 +220,22 @@ export const listNotifications = defineReadAction({
           readAt: notifications.readAt,
           snoozedUntil: notifications.snoozedUntil,
           createdAt: notifications.createdAt,
+          // Coalesced in that order: the row's own subject where it has one,
+          // then the activity behind it for a row written before migration
+          // 0074, then the nudge's. Left joins, because a row can have none.
+          ownSubjectType: notifications.subjectType,
+          ownSubjectId: notifications.subjectId,
+          activityKind: activities.kind,
+          activityPayload: activities.payload,
+          activitySubjectType: activities.subjectType,
+          activitySubjectId: activities.subjectId,
+          ruleKey: nudges.ruleKey,
+          nudgeSubjectType: nudges.subjectType,
+          nudgeSubjectId: nudges.subjectId,
         })
         .from(notifications)
+        .leftJoin(activities, eq(activities.id, notifications.activityId))
+        .leftJoin(nudges, eq(nudges.id, notifications.nudgeId))
         .where(
           activeOnly(
             notifications,
@@ -95,15 +243,174 @@ export const listNotifications = defineReadAction({
             and(...conditions),
           ),
         )
-        .orderBy(desc(notifications.createdAt))
-        .limit(100);
+        .orderBy(desc(notifications.createdAt), desc(notifications.id))
+        .limit(INBOX_PAGE_SIZE);
 
-      return rows.map((row) => ({
-        ...row,
-        readAt: row.readAt?.toISOString() ?? null,
-        snoozedUntil: row.snoozedUntil?.toISOString() ?? null,
-        createdAt: row.createdAt.toISOString(),
-      }));
+      // The subjects this reader is watching, in one query rather than one per
+      // row. Only the subjects on this page, so a member watching a thousand
+      // things pays for the fifty in front of them.
+      const watched = await watchedSubjects(
+        tx,
+        context.workspaceId,
+        memberId,
+        rows.map((row) => ({
+          subjectType:
+            row.ownSubjectType ??
+            row.activitySubjectType ??
+            row.nudgeSubjectType,
+          subjectId:
+            row.ownSubjectId ?? row.activitySubjectId ?? row.nudgeSubjectId,
+        })),
+      );
+
+      const visible: z.infer<typeof notificationRow>[] = [];
+      for (const row of rows) {
+        const subjectType =
+          row.ownSubjectType ??
+          row.activitySubjectType ??
+          row.nudgeSubjectType ??
+          null;
+        const subjectId =
+          row.ownSubjectId ??
+          row.activitySubjectId ??
+          row.nudgeSubjectId ??
+          null;
+        if (
+          !(await readerMaySee(
+            tx,
+            context.workspaceId,
+            memberId,
+            subjectType,
+            subjectId,
+          ))
+        ) {
+          continue;
+        }
+        visible.push({
+          id: row.id,
+          reason: row.reason,
+          channel: row.channel,
+          readAt: row.readAt?.toISOString() ?? null,
+          snoozedUntil: row.snoozedUntil?.toISOString() ?? null,
+          createdAt: row.createdAt.toISOString(),
+          subjectType,
+          subjectId,
+          rendered: row.activityKind
+            ? renderActivity(row.activityKind, row.activityPayload ?? {})
+            : null,
+          ruleKey: row.ruleKey ?? null,
+          watching:
+            subjectType !== null &&
+            subjectId !== null &&
+            watched.has(`${subjectType}:${subjectId}`),
+        });
+      }
+      return visible;
+    });
+  },
+});
+
+/**
+ * Which of these subjects the member holds a live subscription to.
+ *
+ * One query for the page. A canceled subscription is not one: `mute` cancels
+ * rather than deletes, so the row has to read the flag and not merely the
+ * row's existence.
+ */
+async function watchedSubjects(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  subjects: readonly {
+    subjectType: string | null;
+    subjectId: string | null;
+  }[],
+): Promise<ReadonlySet<string>> {
+  const pairs = subjects.filter(
+    (subject): subject is { subjectType: string; subjectId: string } =>
+      subject.subjectType !== null && subject.subjectId !== null,
+  );
+  if (pairs.length === 0) {
+    return new Set();
+  }
+  const rows = await tx
+    .select({
+      subjectType: subscriptionLists.subjectType,
+      subjectId: subscriptionLists.subjectId,
+    })
+    .from(subscriptions)
+    .innerJoin(
+      subscriptionLists,
+      eq(subscriptionLists.id, subscriptions.listId),
+    )
+    .where(
+      activeOnly(
+        subscriptions,
+        eq(subscriptions.workspaceId, workspaceId),
+        eq(subscriptions.memberId, memberId),
+        eq(subscriptions.canceled, false),
+      ),
+    );
+  const held = new Set(
+    rows.map((row) => `${row.subjectType}:${row.subjectId}`),
+  );
+  return new Set(
+    pairs
+      .map((subject) => `${subject.subjectType}:${subject.subjectId}`)
+      .filter((key) => held.has(key)),
+  );
+}
+
+/**
+ * The number on the Inbox item in the sidebar (UIUX-PLAN §3, S-03, P6-G07a).
+ *
+ * Unread and not snoozed, which is the same set the screen's default view
+ * lists, so the badge and the list cannot disagree. Snoozed rows are excluded
+ * on purpose: a snooze that left the badge standing would be a snooze that did
+ * nothing the reader asked for.
+ *
+ * **Not access-scoped, and it says so rather than pretending.** A count is a
+ * number, not a subject, and scoping it would mean running the getter over
+ * every unread row on every page load to decide a digit. What it can overstate
+ * by is the rows whose subject the reader has since lost access to, which the
+ * screen then does not list. The alternative is a badge that costs a page of
+ * access checks on every navigation in the product.
+ */
+export const unreadNotificationCount = defineReadAction({
+  name: "notifications.unreadCount",
+  summary: "How many unread, unsnoozed notifications the member has.",
+  input: z.object({}),
+  output: z.object({ unread: z.number().int() }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
+        return { unread: 0 };
+      }
+      const now = new Date();
+      const [row] = await tx
+        .select({ unread: count() })
+        .from(notifications)
+        .where(
+          activeOnly(
+            notifications,
+            eq(notifications.workspaceId, context.workspaceId),
+            eq(notifications.recipientMemberId, memberId),
+            isNull(notifications.readAt),
+            or(
+              isNull(notifications.snoozedUntil),
+              lte(notifications.snoozedUntil, now),
+            ) as never,
+          ),
+        );
+      return { unread: Number(row?.unread ?? 0) };
     });
   },
 });

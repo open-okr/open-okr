@@ -1287,8 +1287,38 @@
           "field": "unreadOnly",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "invited",
+            "joined",
+            "mentioned",
+            "role",
+            "review",
+            "check_in"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
         }
       ],
+      "pages": true
+    },
+    {
+      "name": "notifications unreadCount",
+      "action": "notifications.unreadCount",
+      "method": "GET",
+      "path": "/notifications/unreadCount",
+      "scope": "read",
+      "summary": "How many unread, unsnoozed notifications the member has.",
+      "flags": [],
       "pages": false
     },
     {

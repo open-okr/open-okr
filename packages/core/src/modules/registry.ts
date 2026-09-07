@@ -78,6 +78,23 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "inbox",
+    navigation: [
+      {
+        id: "inbox",
+        label: "Inbox",
+        href: "/inbox",
+        section: "sidebar",
+        group: "primary",
+        // UIUX-PLAN §3 puts it in the primary block beside Home and Review,
+        // and it belongs at view for the same reason Review does: the list
+        // only ever holds rows addressed to the reader, so there is nothing
+        // here to withhold from anybody (P6-G07a).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "review",
     navigation: [
       {

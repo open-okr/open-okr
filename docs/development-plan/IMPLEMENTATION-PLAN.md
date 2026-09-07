@@ -1499,12 +1499,27 @@ Deliverables: a migration giving `invite_links` the second-key row-level securit
 Test plan: a valid token names its workspace without incrementing its use count; an invalid, revoked, expired or used-up token refuses identically; a closed instance refuses registration without a token and allows it with one; a personal token refuses an address it was not issued to; two visitors racing one single-use token produce one member.
 Acceptance: Given a closed instance and a personal invitation, when the invitee follows the address, then they create an account, land in the workspace with the provisioning defaults, and the audit names who invited them.
 
-### P6-G07: The in-app inbox, S-03 [L]
+### P6-G07a: The in-app inbox, S-03 [M]
 Depends on: P2-T06
 Goal: the notification spine gets its screen (GAP-AUDIT B-06).
-Deliverables: the inbox route with the live badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block, grouped and deep-linked rows, mark-read, mute and snooze, and the subscription toggle on every subject that has one; loading, empty, error and permission-denied states.
-Test plan: a notification a member may not see never appears; snoozing hides the row and never hides a review-inbox obligation; the badge is live and clears on read; muting a subject stops new rows without deleting old ones.
+Deliverables: the inbox route with the badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block with an icon of its own, `notifications.list` widened to carry the subject, the reason and the rule key so a row can be grouped and deep-linked and access-scoped so a subject the reader cannot reach is not listed, an unread count for the badge, mark-read, snooze and mute from the row; empty, error and permission-denied states.
+Test plan: a notification whose subject the member cannot reach never appears; snoozing hides the row and never hides a review-inbox obligation; the badge counts unread and clears on read; muting a subject stops new rows without deleting old ones; every reason in the table's own enum renders a chip, which is what catches the output schema listing four of the six.
 Acceptance: Given a member mentioned in a comment, when they open the inbox, then the notification is listed, deep-links to the comment, and the badge clears.
+
+### P6-G07b: The watch control on every subject [M]
+Depends on: P6-G07a
+Goal: `subscriptions.toggle` gets its surfaces, and the inbox row inserts live.
+Deliverables: a watch control on every subject that has a subscription list, which is the goal, initiative, task, document, KPI and space detail pages, each showing whether the reader is watching and why they were subscribed; the inbox subscribing to the realtime channel the board and the session already use, so a new row arrives without a navigation.
+Test plan: watching a goal from its own page produces a row in the inbox on the next check-in; unwatching stops new rows and keeps old ones; a watch control on a subject the reader may only view still works, because watching is not a write to the subject; the live insert arrives without a reload and is not duplicated by the next navigation.
+Acceptance: Given a member who watches an initiative from its page, when somebody checks it in, then the row appears in their open inbox without a reload.
+
+**Why P6-G07 was cut in two.** The screen and the read are one job. "The
+subscription toggle on every subject that has one" is a different job in six
+other files, and it needs the inbox to exist first to be worth anything, since
+watching something with nowhere to read the result is a control with no
+outcome. Live insert goes with it rather than with the screen, because the
+screen's own honest description is the one `review-badge.ts` already gives:
+recomputed on navigation and after the writes that move it.
 
 ### P6-G08: Member notification settings [M]
 Depends on: P6-G07

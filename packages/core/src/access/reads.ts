@@ -419,6 +419,22 @@ export async function resolveSubjectContext<
   return resolver(tx, subjectId, workspaceId);
 }
 
+/**
+ * Whether a subject type has a resolver at all (P6-G07a).
+ *
+ * `resolveSubjectContext` raises for a type it does not know, and a caller
+ * looping over rows of mixed subject types needs to tell "this one is not
+ * reachable" from "nobody has taught the getter about this type yet". Those two
+ * answers demand opposite handling: the first must hide the row, the second
+ * must not, because the types with no resolver are the ones with no context of
+ * their own, whose visibility the workspace floor already decides. A check-in,
+ * a blocker, a KPI, a session and a cycle are all in that group, and every
+ * nudge in the product is about one of them.
+ */
+export function hasSubjectResolver(subjectType: string): boolean {
+  return subjectType in SUBJECT_RESOLVERS;
+}
+
 export interface GetAccessScopedInput {
   readonly workspaceId: string;
   readonly memberId: string;

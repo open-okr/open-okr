@@ -195,6 +195,12 @@ export async function deliverDueNudges(
       workspaceId: input.workspaceId,
       recipientMemberId: row.recipientMemberId,
       nudgeId: row.id,
+      // Copied from the nudge so the inbox row can be grouped and linked
+      // without joining back to it (migration 0074, P6-G07a). The nudge's
+      // subject types are a narrower list than the activity's, and every one
+      // of them is a subject the access getter can resolve.
+      subjectType: row.subjectType,
+      subjectId: row.subjectId,
       // One reason across every cadence. The inbox is a list of obligations,
       // not a taxonomy of clocks; the rule key on the nudge row says which
       // trigger fired.
