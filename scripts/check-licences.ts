@@ -75,6 +75,17 @@ const CLEARED_PACKAGES = new Map<string, string>([
       "2-Clause throughout, with no Good-not-Evil clause. Read in full on " +
       "8.0.2, 2026-08-31.",
   ],
+  [
+    "pkg:npm/bowser",
+    "Reported as MIT AND MITNFA, and the report is right. The LICENSE is the " +
+      "MIT text plus one paragraph: a distribution that substantially alters " +
+      "or disables the software must replace or remove the original author's " +
+      "bug reporting addresses. That adds an attribution duty and takes no " +
+      "freedom away, so it can ship inside an AGPL-3.0 work, and the duty " +
+      "does not fall on us because we redistribute it unmodified under " +
+      "@aws-sdk/core. package.json declares MIT. Read in full on 2.14.1, " +
+      "2026-09-07.",
+  ],
 ]);
 
 /**

@@ -784,6 +784,8 @@ async function launchRecovery(
   context: Ctx,
   kpis: Map<KpiKey, string>,
   cycleId: string,
+  cycleEndsOn: string,
+  launcherId: string,
 ): Promise<boolean> {
   const kpiId = kpis.get(RECOVERY_KPI_KEY);
   if (!kpiId) {
@@ -807,6 +809,23 @@ async function launchRecovery(
     // changes, only that it now has one.
     checkInFrequency: null,
   });
+
+  // **A third defect, the same shape as the other two.** `launchRecoveryInTx`
+  // creates its key results with no date, and it has no owner to give them
+  // either: the drafter takes one from the driver KPI, and a KPI owned by the
+  // workspace rather than by a member has none to pass on. §4.2's KR-3 wants a
+  // baseline, a target, a date and an owner, so a launched recovery turns
+  // publish gate 2 red on the two it leaves out, on every instance rather than
+  // only in the demo. The launcher already champions and reviews the objective
+  // for the reason `launchRecoveryInTx` gives, which makes them the owner of
+  // its key results until somebody reassigns the role.
+  for (const keyResultId of launched.keyResultIds) {
+    await callAction(context, "goals.updateKeyResult", {
+      id: keyResultId,
+      dueOn: cycleEndsOn,
+      ownerId: launcherId,
+    });
+  }
   return true;
 }
 
@@ -874,7 +893,19 @@ export async function buildDemoWorkspace(
     cycle.id,
     cycle.endsOn,
   );
-  const recoveryLaunched = await launchRecovery(context, metrics.ids, cycle.id);
+  // The launcher is whoever runs the seed, and `kpis.launchRecovery` resolves
+  // that same member from the acting user, so the two cannot disagree.
+  const launcherId = cast.get("admin");
+  if (!launcherId) {
+    throw new Error("The demo cast is missing its administrator.");
+  }
+  const recoveryLaunched = await launchRecovery(
+    context,
+    metrics.ids,
+    cycle.id,
+    cycle.endsOn,
+    launcherId,
+  );
   await seedDiscussion(context, okrs.goals);
   await recordCapacity(context, cycle.id);
 
