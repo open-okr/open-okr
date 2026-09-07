@@ -111,6 +111,38 @@ export function insideQuietHours(
 }
 
 /**
+ * Minutes to wait before a nudge may be delivered, or 0 to send now
+ * (AI-NATIVE-PLAN §5.4, P5-T01b-b).
+ *
+ * The counterpart to `insideQuietHours`: that one answers whether a member is
+ * asleep, this one answers when they wake. A message inside the window is held
+ * until the window ends rather than dropped, which is what "queues to the next
+ * open window" means.
+ *
+ * Urgency overrides it. §6.3's escalations are the messages that have already
+ * widened past the person who owns the work, and those are worth a phone
+ * lighting up at three in the morning; nothing below step 3 is.
+ */
+export function deferralFor(input: {
+  readonly urgent: boolean;
+  readonly localTime: { readonly hour: number; readonly minute: number };
+  readonly quietHours: { readonly start: string; readonly end: string } | null;
+}): number {
+  if (input.urgent || !insideQuietHours(input.localTime, input.quietHours)) {
+    return 0;
+  }
+  const end = minutesOf(input.quietHours?.end ?? "");
+  if (end === null) {
+    return 0;
+  }
+  const now = input.localTime.hour * 60 + input.localTime.minute;
+  // Wrapping the day when the window crosses midnight: at 02:00 with a window
+  // ending at 07:00 the wait is five hours, and at 23:00 it is eight.
+  const minutes = end - now;
+  return minutes > 0 ? minutes : minutes + 24 * 60;
+}
+
+/**
  * The reason to stay quiet, or null to send.
  *
  * `disabled` comes first because a switched-off rule should never appear in the
@@ -146,9 +178,19 @@ export function suppressionFor(
     return "quiet_hours";
   }
 
-  if (!input.urgent && insideQuietHours(input.localTime, input.quietHours)) {
-    return "quiet_hours";
-  }
+  // A member's own quiet hours are deliberately absent from this function.
+  //
+  // They used to return `quiet_hours` here, which dropped the message: the row
+  // was written with a reason and nothing ever sent it, so a member whose night
+  // covered the sweep never heard about their overdue check-in at all.
+  // AI-NATIVE-PLAN §5.4 says a nudge inside quiet hours "queues to the next
+  // open window", and §11's test list says quiet hours *defer*. `deferralFor`
+  // below is that rule, and the caller schedules rather than suppresses
+  // (P5-T01b-b, 27 August 2026).
+  //
+  // Workspace quiet mode above stays a suppression, because it is a different
+  // decision: an organisation that has switched the product off for a week is
+  // not asking to be told everything at once when it comes back.
 
   // The ceiling last, so a member at their limit still hears an escalation.
   // §11 bounds noise; it does not bound the product's duty to tell somebody

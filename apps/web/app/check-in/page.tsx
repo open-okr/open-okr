@@ -57,7 +57,7 @@ export default async function CheckInPage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex max-w-3xl flex-col gap-4.5">
+      <div className="flex flex-col gap-4.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex flex-col">

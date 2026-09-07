@@ -99,6 +99,20 @@ export interface KeyResultSnapshot {
   };
 }
 
+/**
+ * One initiative, as gate 5 needs to see it (METHOD.md §5.5, P5-T10a).
+ *
+ * §5.5 asks a facilitator to record "the main initiatives that will move it and
+ * one of three capacity verdicts". The verdict already lives on the key result;
+ * this is the other half of the same sentence, and the gate reads both because a
+ * cycle can fail for two different reasons with two different fixes.
+ */
+export interface InitiativeSnapshot {
+  readonly id: string;
+  readonly title: string;
+  readonly capacity: "fits" | "tight" | "exceeds" | null;
+}
+
 /** One goal, as the gates need to see it. */
 export interface GoalSnapshot {
   readonly id: string;
@@ -158,6 +172,17 @@ export interface CycleWorkflowInput {
   readonly frame: FrameSnapshot | null;
   /** Undefined until P3-T04 ships goals and key results. */
   readonly goals?: readonly GoalSnapshot[];
+  /**
+   * The initiatives serving this cycle's key results. Undefined until P5-T10a
+   * ships the table.
+   *
+   * Deliberately not defaulted to an empty array, for the reason this file's own
+   * header gives: an empty list says somebody looked and found no initiative at
+   * `exceeds`, and gate 5 may pass on it. Undefined says nobody can look, and
+   * gate 5 reports itself unevaluable instead of passing while checking half of
+   * §5.5.
+   */
+  readonly initiatives?: readonly InitiativeSnapshot[];
   /** Undefined until P4-T01 ships the quality engine. */
   readonly qualityChecksPass?: boolean;
   /** Undefined until P4-T04 ships sessions and the decision log. */
@@ -792,11 +817,25 @@ export function publishGates(
   // 5. Capacity is checked, nothing left at "exceeds", and the cuts recorded.
   if (goals === undefined) {
     results.push(unevaluable(5, goalsBlocked));
+  } else if (input.initiatives === undefined) {
+    // §5.5 is one sentence about two things: the measures and the initiatives
+    // that will move them. Passing on the half that exists would be the exact
+    // failure this file's header records from Phase 1.
+    results.push(
+      unevaluable(5, "the §5.5 initiative register arrives at P5-T10a"),
+    );
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults
         .filter((keyResult) => keyResult.capacity === "exceeds")
         .map((keyResult) => `"${keyResult.title}" still exceeds capacity`),
+    );
+    // Named, because "gate five is red" sends a facilitator hunting and "this
+    // project is over-committed" does not.
+    missing.push(
+      ...input.initiatives
+        .filter((initiative) => initiative.capacity === "exceeds")
+        .map((initiative) => `"${initiative.title}" still exceeds capacity`),
     );
     if (!input.hasCapacityNotes) {
       // §5.5: "The facilitator must record what was cut. If the answer is

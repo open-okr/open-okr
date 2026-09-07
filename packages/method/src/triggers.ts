@@ -196,6 +196,16 @@ const RHYTHM: readonly Trigger[] = [
     recipient: "Facilitator + sponsor",
     escalates: false,
   },
+  {
+    // Operational rather than a practice rule, and it is here because every
+    // proactive message is a nudge row and every nudge row cites a key this
+    // file defines (P5-T01b-b, approved 27 August 2026). The Champion owns it
+    // because a channel nobody can reach is the rhythm failing to arrive.
+    key: "channel.reconnect_needed",
+    fires: "A send to the member’s primary channel fails",
+    recipient: "The member, by email and in-app",
+    escalates: false,
+  },
 ].map((entry) => ({
   ...entry,
   owner: "champion" as const,

@@ -54,10 +54,24 @@ export const MAX_EVENT_BYTES = 8000;
 
 export class EventTooLargeError extends Error {
   override readonly name = "EventTooLargeError";
-  constructor(readonly bytes: number) {
+  /**
+   * Declared, not a parameter property.
+   *
+   * Every entry point in this repository runs under Node's
+   * `--experimental-strip-types`, which erases types without transpiling and
+   * refuses `constructor(readonly bytes: number)` outright. Vitest transpiles,
+   * so 153 tests passed and only running `pnpm import:flowyteam` found it: the
+   * importer imports this package's barrel for the storage driver at P6-T04c,
+   * and the barrel loads this file. The same trap caught
+   * `mappers/reconcile.ts` at P6-T04a, which is why the note is here too.
+   */
+  readonly bytes: number;
+
+  constructor(bytes: number) {
     super(
       `Realtime event is ${bytes} bytes, over the ${MAX_EVENT_BYTES} byte limit. ` +
         `Events carry identifiers and counts; the client refetches the data.`,
     );
+    this.bytes = bytes;
   }
 }

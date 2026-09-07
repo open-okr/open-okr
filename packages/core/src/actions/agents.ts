@@ -37,14 +37,33 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
-import { runDueNudgesInTx } from "../nudges/run.ts";
+import { coachInTx } from "../agents/coach.ts";
+import { type NudgeCadence, runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
 
-/** What the Champion's hourly run records as its trigger. */
-const CHAMPION_HOURLY_TRIGGER = "schedule.hourly";
+/**
+ * What each run records as its trigger (P4-T05b, P4-T06a).
+ *
+ * One string per cadence, so `agent_runs` can be read by clock: an
+ * administrator asking "did the countdown fire this week" gets an answer, which
+ * a single `schedule.champion` trigger could not give. The first four match
+ * AI-NATIVE-PLAN.md §6.2's own rows for the Champion; `quality` is the Coach's,
+ * from §6.1.
+ *
+ * `satisfies` rather than a plain object, so adding a cadence without a trigger
+ * string fails the build here rather than writing an empty trigger into a run
+ * row. It has already earned that once.
+ */
+const RUN_TRIGGERS = {
+  hourly: "schedule.hourly",
+  daily: "schedule.daily",
+  weekly: "schedule.weekly",
+  cycle: "schedule.cycle",
+  quality: "schedule.quality",
+} as const satisfies Record<NudgeCadence, string>;
 
 const agentOutput = z.object({
   id: z.uuid(),
@@ -709,6 +728,11 @@ export const runChampion = defineWriteAction({
   input: z.object({
     /** Defaults to the moment the request arrives. Overridden by tests. */
     now: z.string().optional(),
+    /**
+     * Which of §6.2's four cadences to run, defaulting to the hourly nudge
+     * queue so every caller written before P4-T05b keeps its behaviour.
+     */
+    cadence: z.enum(["hourly", "daily", "weekly", "cycle"]).optional(),
   }),
   output: z.object({
     runId: z.uuid(),
@@ -716,6 +740,14 @@ export const runChampion = defineWriteAction({
     recorded: z.number().int(),
     suppressed: z.number().int(),
     ruleKeys: z.array(z.string()),
+    /** Goals the daily sweep flipped to `outdated`. Zero for the other three. */
+    staleFlipped: z.number().int(),
+    /** Changes written into the review queue, pending a human (P4-T05c-a). */
+    proposed: z.number().int(),
+    /** Always zero here: divergence is the Coach's sweep (P4-T06b-a). */
+    diverged: z.number().int(),
+    /** Always zero here: §5.3's review is the Coach's (P4-T06b-b). */
+    reviewed: z.number().int(),
   }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -754,6 +786,8 @@ export const runChampion = defineWriteAction({
     },
     async execute({ tx, workspaceId, loaded }) {
       const at = input.now ? new Date(input.now) : new Date();
+      const cadence: NudgeCadence = input.cadence ?? "hourly";
+      const trigger = RUN_TRIGGERS[cadence];
       const log: AgentRunLogEntry[] = [];
       const stamp = at.toISOString();
 
@@ -774,7 +808,7 @@ export const runChampion = defineWriteAction({
           .values({
             workspaceId,
             agentId: loaded.agentId,
-            trigger: CHAMPION_HOURLY_TRIGGER,
+            trigger,
             // Cancelled, not failed. A limit the workspace chose is not an
             // error, and paging somebody about their own setting is how a
             // product teaches people to ignore it.
@@ -793,6 +827,10 @@ export const runChampion = defineWriteAction({
             recorded: 0,
             suppressed: 0,
             ruleKeys: [] as string[],
+            staleFlipped: 0,
+            proposed: 0,
+            diverged: 0,
+            reviewed: 0,
           },
           activity: {
             // The catalogue already has this kind, from the manual cancel
@@ -801,20 +839,51 @@ export const runChampion = defineWriteAction({
             kind: "agent.run_cancelled",
             subjectType: "workspace",
             subjectId: workspaceId,
-            payload: { trigger: CHAMPION_HOURLY_TRIGGER, reason: "cost_cap" },
+            payload: { trigger, reason: "cost_cap" },
           },
           audit: {
             action: "agents.runChampion",
             targetType: "workspace",
             targetId: workspaceId,
-            payload: { status: "cancelled", capUsd: loaded.costCapUsd },
+            payload: {
+              status: "cancelled",
+              capUsd: loaded.costCapUsd,
+              trigger,
+            },
           },
         };
       }
 
+      // The run row is written **before** the work, not after it (P4-T05c-a).
+      //
+      // A proposal's `run_id` is not null, so a run that inserted its own row
+      // last could not attach one: the proposal would have nothing to point at.
+      // It is also the more honest shape. A run that crashes now leaves a
+      // `running` row that says something started and did not finish, where
+      // before it left nothing at all and read as a run that never happened.
+      // openokr:allow-mutation: the operation's own execute.
+      const [started] = await tx
+        .insert(agentRuns)
+        .values({
+          workspaceId,
+          agentId: loaded.agentId,
+          trigger,
+          status: "running",
+          tasks: [],
+          log: [],
+          startedAt: at,
+        })
+        .returning({ id: agentRuns.id });
+      const runId = (started as { id: string }).id;
+
       const run = await runDueNudgesInTx(tx as WorkspaceTx, {
         workspaceId,
         at,
+        cadence,
+        runId,
+        // Absent unless the host has a provider, which is the normal case and
+        // is what makes every assertion in the deterministic suites true.
+        ...(_context.drafter ? { drafter: _context.drafter } : {}),
       });
 
       // One entry per rule, because a log that said "3 nudges" could not
@@ -834,22 +903,49 @@ export const runChampion = defineWriteAction({
         kind: "applied",
         message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
       });
+      if (run.staleFlipped > 0) {
+        // The one thing a run does that is not a message. It earns its own line
+        // for the same reason each rule key does: a count of nudges cannot say
+        // that four goals also went outdated.
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 1,
+          kind: "applied",
+          message: `cadence.staleness: ${run.staleFlipped} goals flipped to outdated.`,
+        });
+      }
 
-      // openokr:allow-mutation: the operation's own execute.
-      const [row] = await tx
-        .insert(agentRuns)
-        .values({
-          workspaceId,
-          agentId: loaded.agentId,
-          trigger: CHAMPION_HOURLY_TRIGGER,
+      if (run.proposed > 0) {
+        // A proposal is not a message, so it earns its own line rather than
+        // being counted among the nudges. A reader asking "did the agent want
+        // to change anything" is asking a different question from "did it
+        // speak".
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 2,
+          kind: "applied",
+          message: `${run.proposed} change(s) proposed, pending a human.`,
+        });
+      }
+
+      // openokr:allow-mutation: the operation's own execute. The row was
+      // inserted above so the proposals could reference it; this closes it.
+      // What the run actually spent, from the drafter itself rather than from
+      // an estimate. Zero with no provider, which is why the cap never stops a
+      // deterministic run.
+      const spent = _context.drafter?.spentUsd() ?? 0;
+
+      await tx
+        .update(agentRuns)
+        .set({
           status: "completed",
-          tasks: [],
           log,
-          startedAt: at,
           finishedAt: at,
+          cost: String(spent),
         })
-        .returning({ id: agentRuns.id });
-      const runId = (row as { id: string }).id;
+        // Not `activeOnly`: `agent_runs` carries no `deleted_at` at all, by
+        // 0018's own decision that a run is a fact rather than a document.
+        .where(eq(agentRuns.id, runId));
 
       return {
         result: {
@@ -858,13 +954,17 @@ export const runChampion = defineWriteAction({
           recorded: run.recorded,
           suppressed: run.suppressed,
           ruleKeys: [...run.ruleKeys],
+          staleFlipped: run.staleFlipped,
+          proposed: run.proposed,
+          diverged: run.diverged,
+          reviewed: run.reviewed,
         },
         activity: {
           kind: "agent.run_completed",
           subjectType: "workspace",
           subjectId: workspaceId,
           payload: {
-            trigger: CHAMPION_HOURLY_TRIGGER,
+            trigger,
             recorded: run.recorded,
           },
         },
@@ -872,7 +972,174 @@ export const runChampion = defineWriteAction({
           action: "agents.runChampion",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { status: "completed", recorded: run.recorded },
+          payload: { status: "completed", recorded: run.recorded, trigger },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * One Coach run (P4-T06a).
+ *
+ * §6.1's continuous half already happens without this: P4-T02a evaluates every
+ * goal against the §4 catalogue inside the transaction that writes it, and
+ * stores the score and the flags. This is the other half, the one that turns a
+ * standing verdict into a message somebody receives.
+ *
+ * Deliberately its own action rather than a `cadence` on `agents.runChampion`.
+ * They are two agents with two personas, two scopes and two run logs, and an
+ * administrator reading `/admin/agents` has to be able to see which of them
+ * spoke. The **implementation** is shared all the way down: one
+ * `runDueNudgesInTx`, one suppression decision, one row writer.
+ *
+ * With the AI provider off this run is the whole Coach. Every trigger it fires
+ * is deterministic, which is what §6.1's own matrix claims and what this makes
+ * true in code.
+ */
+export const runCoach = defineWriteAction({
+  name: "agents.runCoach",
+  summary:
+    "Runs the Coach's quality pass once, recording what fired in its run log.",
+  input: z.object({
+    /** Defaults to the moment the request arrives. Overridden by tests. */
+    now: z.string().optional(),
+  }),
+  output: z.object({
+    runId: z.uuid(),
+    status: z.string(),
+    recorded: z.number().int(),
+    suppressed: z.number().int(),
+    ruleKeys: z.array(z.string()),
+    /** Divergence findings written or refreshed (P4-T06b-a). */
+    diverged: z.number().int(),
+    /** §5.3 semantic findings written or refreshed (P4-T06b-b). */
+    reviewed: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId }) {
+      const coach = await coachInTx(tx as WorkspaceTx, workspaceId);
+      if (!coach) {
+        throw new OperationError("not_found", "This workspace has no Coach.");
+      }
+      const [agent] = await tx
+        .select({ id: agents.id, enabled: agents.enabled })
+        .from(agents)
+        .where(activeOnly(agents, eq(agents.id, coach.agentId)))
+        .limit(1);
+      if (!agent?.enabled) {
+        throw new OperationError("not_found", "The Coach is turned off.");
+      }
+      return { agentId: agent.id };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const at = input.now ? new Date(input.now) : new Date();
+      const stamp = at.toISOString();
+      const log: AgentRunLogEntry[] = [];
+
+      // No cost cap check, and that is not an omission. This run reads stored
+      // verdicts and stored findings and calls no provider, so it cannot spend.
+      // P4-T06b's semantic sweep is the Coach's first paid run and is where the
+      // cap belongs.
+      // openokr:allow-mutation: the operation's own execute.
+      const [started] = await tx
+        .insert(agentRuns)
+        .values({
+          workspaceId,
+          agentId: loaded.agentId,
+          trigger: RUN_TRIGGERS.quality,
+          status: "running",
+          tasks: [],
+          log: [],
+          startedAt: at,
+        })
+        .returning({ id: agentRuns.id });
+      const runId = (started as { id: string }).id;
+
+      const run = await runDueNudgesInTx(tx as WorkspaceTx, {
+        workspaceId,
+        at,
+        cadence: "quality",
+        runId,
+        ...(_context.drafter ? { drafter: _context.drafter } : {}),
+      });
+
+      for (const [index, ruleKey] of run.ruleKeys.entries()) {
+        log.push({
+          at: stamp,
+          taskIndex: index,
+          kind: "applied",
+          message: `${ruleKey}: delivered`,
+        });
+      }
+      log.push({
+        at: stamp,
+        taskIndex: run.ruleKeys.length,
+        kind: "applied",
+        message: `${run.recorded} delivered, ${run.suppressed} held with a reason.`,
+      });
+      if (run.diverged > 0) {
+        // A finding is not a message, so it earns its own line. A count of
+        // nudges cannot say that four goals disagree with their own data.
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 1,
+          kind: "applied",
+          message: `quality.divergence: ${run.diverged} finding(s) written or refreshed.`,
+        });
+      }
+      if (run.reviewed > 0) {
+        log.push({
+          at: stamp,
+          taskIndex: run.ruleKeys.length + 2,
+          kind: "applied",
+          message: `§5.3 semantic review: ${run.reviewed} finding(s) written or refreshed.`,
+        });
+      }
+
+      // openokr:allow-mutation: the operation's own execute. Not `activeOnly`:
+      // `agent_runs` carries no `deleted_at`.
+      await tx
+        .update(agentRuns)
+        .set({
+          status: "completed",
+          log,
+          finishedAt: at,
+          // Zero without a provider, which is why the note above about this
+          // run never spending held until §5.3's review arrived.
+          cost: String(_context.drafter?.spentUsd() ?? 0),
+        })
+        .where(eq(agentRuns.id, runId));
+
+      return {
+        result: {
+          runId,
+          status: "completed",
+          recorded: run.recorded,
+          suppressed: run.suppressed,
+          ruleKeys: [...run.ruleKeys],
+          diverged: run.diverged,
+          reviewed: run.reviewed,
+        },
+        activity: {
+          kind: "agent.run_completed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            trigger: RUN_TRIGGERS.quality,
+            recorded: run.recorded,
+          },
+        },
+        audit: {
+          action: "agents.runCoach",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {
+            status: "completed",
+            recorded: run.recorded,
+            trigger: RUN_TRIGGERS.quality,
+          },
         },
       };
     },

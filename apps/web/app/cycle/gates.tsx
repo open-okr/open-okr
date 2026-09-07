@@ -29,13 +29,24 @@ import { publishCycle } from "./actions.ts";
  * dates.
  */
 
-/** Where the work that clears each gate actually happens. */
-const FIX: Record<number, { readonly href: string; readonly label: string }> = {
+/** Where the work that clears each gate actually happens. Exported so a test
+ * can assert no gate sends a facilitator to a screen that cannot clear it. */
+export const FIX: Record<
+  number,
+  { readonly href: string; readonly label: string }
+> = {
   1: { href: "/cycle?phase=4", label: "Name the champion and reviewer" },
   2: { href: "/cycle?phase=4", label: "Open the quality panel" },
   3: { href: "/goals/studio", label: "Map the alignment" },
-  4: { href: "/cycle?phase=5", label: "Confirm the dependencies" },
-  5: { href: "/cycle?phase=5", label: "Check the capacity" },
+  // The register is on this page, so the link is an anchor to it rather than a
+  // second visit to the address the reader is already at. It pointed at
+  // `/cycle?phase=5` from P4-T03 until P6-G17, which meant gate 4's remedy was
+  // "go where you already are", and nothing there could confirm anything.
+  4: { href: "#dependency-register", label: "Confirm the dependencies" },
+  // An anchor for the same reason gate 4 is: the capacity check renders on
+  // this page, and gate-remedies.test.ts refuses a remedy that navigates to the
+  // address the panel is already at.
+  5: { href: "#capacity-check", label: "Check the capacity" },
   6: { href: "/admin/rhythm", label: "Set the publication date" },
 };
 export interface Gate {

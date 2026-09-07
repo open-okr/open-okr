@@ -31,6 +31,15 @@ export const ALIGNMENT_FINDING_KINDS = [
   "dependency",
   "conflict",
   "gap",
+  /**
+   * Reported health against the goal's own data (P4-T06b-a).
+   *
+   * Not one of METHOD.md §5.3's four semantic types, which are judgements the
+   * Coach makes by reading content. This one is arithmetic, so it gets its own
+   * kind rather than being filed under `gap`: a reader filtering by kind should
+   * not find a deterministic finding among semantic ones.
+   */
+  "divergence",
 ] as const;
 export type AlignmentFindingKind = (typeof ALIGNMENT_FINDING_KINDS)[number];
 
@@ -136,6 +145,19 @@ export const alignmentFindings = pgTable("alignment_findings", {
   targetGoalId: uuid("target_goal_id").references(() => goals.id, {
     onDelete: "cascade",
   }),
+  /**
+   * Which measure this is about, when it is about one (P5-T14).
+   *
+   * Additional to `subject_goal_id`, never a replacement: a finding that named
+   * only a key result would vanish from every surface that already asks about
+   * goals. What it changes is the finding identity, so a goal with three key
+   * results can carry three findings that do not overwrite each other. Null on
+   * everything the four earlier sweeps write.
+   */
+  subjectKeyResultId: uuid("subject_key_result_id").references(
+    () => keyResults.id,
+    { onDelete: "cascade" },
+  ),
   reason: text("reason").notNull(),
   ruleKey: text("rule_key"),
   source: text("source", { enum: ALIGNMENT_FINDING_SOURCES })

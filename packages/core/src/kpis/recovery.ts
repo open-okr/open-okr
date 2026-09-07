@@ -206,6 +206,15 @@ export interface LaunchRecoveryInput {
   readonly cycleId: string;
   readonly spaceId: string | null;
   readonly keyResultCap: number;
+  /**
+   * A title to use instead of §6.5's template sentence (P4-T05c-b).
+   *
+   * The only thing a model is allowed to change about a recovery objective.
+   * The key results, their baselines, their targets and the breadth-first walk
+   * that chose them all stay §6.5's, because those are the practice and a
+   * sentence is not. Absent is the ordinary case.
+   */
+  readonly objectiveTitle?: string;
   readonly now?: Date;
 }
 
@@ -283,7 +292,8 @@ export async function launchRecoveryInTx(
   const spaceId = input.spaceId ?? kpi.spaceId;
   const goal = await createGoalInTx(tx, {
     workspaceId: input.workspaceId,
-    title: draft.objective,
+    // The drafted sentence when one was offered, the §6.5 template otherwise.
+    title: input.objectiveTitle?.trim() || draft.objective,
     cycleId: input.cycleId,
     level: "team",
     ownerKind: spaceId ? "space" : "workspace",

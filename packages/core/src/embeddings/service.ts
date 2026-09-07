@@ -17,7 +17,9 @@ import { embeddings, newId, withWorkspace } from "@openokr/db";
 import { and, eq, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import type { OperationTx } from "../operations/operation.ts";
 import { type ChunkOptions, chunkText, contentHash } from "./chunker.ts";
+import { mayRead } from "./governing.ts";
 
 export interface EmbedContentInput {
   readonly workspaceId: string;
@@ -29,6 +31,12 @@ export interface EmbedContentInput {
 
 export interface RetrievalInput {
   readonly workspaceId: string;
+  /**
+   * Who is asking. Required, because retrieval without a requester is retrieval
+   * that cannot be filtered, and an unfiltered index is the leak §9 exists to
+   * prevent (P4-T13b).
+   */
+  readonly memberId: string;
   readonly query: string;
   readonly entityTypes?: readonly string[];
   readonly limit?: number;
@@ -48,6 +56,39 @@ export type EmbedFunction = (input: readonly string[]) => Promise<{
 }>;
 
 const DEFAULT_RETRIEVAL_LIMIT = 10;
+
+/**
+ * How many candidates to rank per requested hit before access filtering.
+ *
+ * Four is a guess with a reason: most readers can see most of their workspace, so
+ * the first page of candidates is usually almost all readable, and a factor that
+ * multiplied the work by ten to serve the narrowest reader would slow every
+ * query for the common case.
+ */
+const RETRIEVAL_OVERFETCH = 4;
+
+/**
+ * The question, as a text-search query that ranks rather than filters.
+ *
+ * `plainto_tsquery` joins every term with `&`, so a passage has to contain all
+ * of them. That is right for a search box and wrong for the copilot, whose query
+ * is a sentence somebody typed: "What is happening with mid-market activation?"
+ * matched nothing, because no goal contains the word "happening". The first real
+ * caller of retrieval found this (P4-T14a-a); nothing before it passed a
+ * sentence.
+ *
+ * So the operators are swapped for `|` and the ranking decides. A passage
+ * holding two of the terms outranks one holding a single term, and a question
+ * with one word in common with the corpus returns something instead of nothing.
+ * The cast through text is the standard way to do it: `plainto_tsquery` also
+ * emits `<->` between the parts of a hyphenated compound, and only `&` is
+ * replaced, so "mid-market" stays one phrase.
+ *
+ * A query of nothing but stop words becomes an empty tsquery, which matches
+ * nothing. That is the right answer to a question with no content in it.
+ */
+const ANY_TERM_TSQUERY = (parameter: string) =>
+  `replace(plainto_tsquery('english', ${parameter})::text, '&', '|')::tsquery`;
 
 export class EmbeddingService {
   readonly #pool: Pool;
@@ -219,22 +260,96 @@ export class EmbeddingService {
    * through the access-aware getter, so retrieval never widens what someone
    * can see.
    */
+  /**
+   * Retrieval, filtered by what the requester may read (P4-T13b).
+   *
+   * **Candidates are over-fetched and then filtered, not filtered in SQL.** The
+   * alternative was a `context_id` column on `embeddings`, which would be faster
+   * and would be a second implementation of the access model. Asking
+   * `getAccessScoped` for each candidate means retrieval cannot drift from the
+   * rest of the product: a member who loses access to a space stops seeing its
+   * chunks on the next query, with no reindex.
+   *
+   * **A known limitation, stated rather than hidden.** Up to `limit` readable
+   * hits are returned out of the first `limit * OVERFETCH` candidates, so a
+   * member with narrow access can get fewer than `limit` even when more readable
+   * chunks exist further down the ranking. Widening the factor trades latency for
+   * recall; the honest fix is the `context_id` column, recorded on the P4-T13b
+   * row.
+   */
   async retrieve(input: RetrievalInput): Promise<RetrievalHit[]> {
     const limit = input.limit ?? DEFAULT_RETRIEVAL_LIMIT;
     const useVector = this.#embed && (await this.hasPgvector());
 
-    if (useVector) {
-      return this.#vectorRetrieve(input, limit);
+    const candidates = useVector
+      ? await this.#vectorRetrieve(input, limit * RETRIEVAL_OVERFETCH)
+      : await this.#fullTextRetrieve(input, limit * RETRIEVAL_OVERFETCH);
+
+    return this.#readable(input, candidates, limit);
+  }
+
+  /**
+   * Keeps the candidates this member may read, in ranking order, up to the limit.
+   *
+   * A candidate whose entity has no governing resource is dropped: an entity
+   * deleted since it was embedded has no access to inherit, and returning its
+   * chunk would let the index outlive the thing it describes.
+   */
+  async #readable(
+    input: RetrievalInput,
+    candidates: readonly RetrievalHit[],
+    limit: number,
+  ): Promise<RetrievalHit[]> {
+    if (candidates.length === 0) {
+      return [];
     }
-    return this.#fullTextRetrieve(input, limit);
+    return withWorkspace(
+      drizzle(this.#pool),
+      input.workspaceId,
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const kept: RetrievalHit[] = [];
+        for (const hit of candidates) {
+          if (kept.length >= limit) {
+            break;
+          }
+          // `mayRead` rather than the resolve-then-ask pair this loop used to
+          // inline: the copilot has to ask the same question about a stored
+          // citation (P4-T14a-a), and two copies of the check are how a
+          // citation and a retrieval hit would come to disagree.
+          const readable = await mayRead(tx, {
+            workspaceId: input.workspaceId,
+            memberId: input.memberId,
+            entityType: hit.entityType,
+            entityId: hit.entityId,
+          });
+          if (readable) {
+            kept.push(hit);
+          }
+        }
+        return kept;
+      },
+    );
   }
 
   async #vectorRetrieve(
     input: RetrievalInput,
     limit: number,
   ): Promise<RetrievalHit[]> {
-    // Embed the query
-    const embedResult = await this.#embed!([input.query]);
+    // `#embed` is non-null on this path: `#retrieve` only calls it when
+    // `this.#embed && (await this.hasPgvector())` held. Captured into a local
+    // and guarded rather than asserted with `!`, so the compiler proves it
+    // rather than being told, and the fallback is the one the empty-vector
+    // case below already takes.
+    //
+    // Not `this.#embed?.(...)`, which is what the linter's own unsafe fix
+    // suggested: that makes `embedResult` possibly undefined and the next line
+    // reads `.vectors` off it.
+    const embed = this.#embed;
+    if (!embed) {
+      return this.#fullTextRetrieve(input, limit);
+    }
+    const embedResult = await embed([input.query]);
     const queryVector = embedResult.vectors[0];
     if (!queryVector) {
       return this.#fullTextRetrieve(input, limit);
@@ -251,7 +366,8 @@ export class EmbeddingService {
     }
 
     // Hybrid: combine vector cosine similarity with full-text rank
-    const result = await this.#pool.query(
+    const rows = await this.#queryInWorkspace(
+      input.workspaceId,
       `with vector_hits as (
          select entity_type, entity_id, content,
                 1 - (embedding <=> $2::vector) as vector_score
@@ -265,11 +381,11 @@ export class EmbeddingService {
        text_hits as (
          select entity_type, entity_id, content,
                 ts_rank(to_tsvector('english', content),
-                        plainto_tsquery('english', $${params.length + 1})) as text_score
+                        ${ANY_TERM_TSQUERY(`${params.length + 1}`)}) as text_score
          from embeddings
          where workspace_id = $1
            ${typeFilter}
-           and to_tsvector('english', content) @@ plainto_tsquery('english', $${params.length + 1})
+           and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY(`${params.length + 1}`)}
          limit ${limit * 2}
        )
        select
@@ -287,12 +403,43 @@ export class EmbeddingService {
       [...params, input.query],
     );
 
-    return result.rows.map((row) => ({
+    return rows.map((row) => ({
       entityType: row.entity_type as string,
       entityId: row.entity_id as string,
       content: row.content as string,
       score: Number(row.score),
     }));
+  }
+
+  /**
+   * Runs one raw query with the workspace applied for its transaction.
+   *
+   * **Not optional.** Row-level security is forced on `embeddings`, so a query on
+   * a connection with no `app.workspace_id` returns nothing at all rather than
+   * everything. Before P4-T13b these three queries ran straight on the pool,
+   * which is the exact shape `index()`'s own comment records having hit once
+   * already, and retrieval would have returned an empty list for every caller.
+   */
+  async #queryInWorkspace(
+    workspaceId: string,
+    text: string,
+    params: readonly unknown[],
+  ): Promise<Record<string, unknown>[]> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config('app.workspace_id', $1, true)", [
+        workspaceId,
+      ]);
+      const result = await client.query(text, [...params]);
+      await client.query("commit");
+      return result.rows as Record<string, unknown>[];
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async #fullTextRetrieve(
@@ -308,20 +455,21 @@ export class EmbeddingService {
       params.push(input.entityTypes);
     }
 
-    const result = await this.#pool.query(
+    const rows = await this.#queryInWorkspace(
+      input.workspaceId,
       `select entity_type, entity_id, content,
               ts_rank(to_tsvector('english', content),
-                      plainto_tsquery('english', $2)) as score
+                      ${ANY_TERM_TSQUERY("$2")}) as score
        from embeddings
        where workspace_id = $1
          ${typeFilter}
-         and to_tsvector('english', content) @@ plainto_tsquery('english', $2)
+         and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY("$2")}
        order by score desc
        limit ${limit}`,
       params,
     );
 
-    return result.rows.map((row) => ({
+    return rows.map((row) => ({
       entityType: row.entity_type as string,
       entityId: row.entity_id as string,
       content: row.content as string,

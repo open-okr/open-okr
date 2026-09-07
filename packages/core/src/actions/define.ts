@@ -2,16 +2,20 @@
  * How an action is declared (TECHNICAL-PLAN §14).
  *
  * Two builders, and the difference between them is the point. A read action
- * gets a plain handler. A write action gets an *operation spec* instead of a
- * handler, and the builder runs it through the pipeline. There is no way to
- * declare a write that skips the audit row, because the shape that would
- * express it does not exist.
+ * gets a handler. A write action gets an *operation spec* instead, and the
+ * builder runs it through the pipeline. There is no way to declare a write that
+ * skips the audit row, because the shape that would express it does not exist.
+ *
+ * Both parse their declared input before anything else runs, so no surface can
+ * reach a handler with a shape the contract does not describe.
  */
 
 import type { Pool } from "pg";
 import type { ZodType } from "zod";
 import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import type { AgentDrafter } from "../agents/drafter.ts";
+import type { EmbedFunction } from "../embeddings/service.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -21,6 +25,30 @@ import type { KeyRing } from "../secrets/key-ring.ts";
 
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
+
+/**
+ * How a read action pages, when it does (P5-T07a).
+ *
+ * Declared here rather than inferred, and only by an action that genuinely
+ * takes a cursor. The public surface builds the next cursor from the fields
+ * named below and refuses a cursor on an action that declares nothing, instead
+ * of loading everything and slicing it in the transport. Paging in the
+ * transport is not paging: it costs the same query and tells the caller it did
+ * not.
+ */
+export interface PageContract {
+  /**
+   * Fields of the last returned item that make up the next cursor.
+   *
+   * The cursor is opaque to clients, so this can change without a version.
+   */
+  readonly cursorFrom: readonly string[];
+  /**
+   * Where the array sits in the output, when the output is an object wrapping
+   * it. Absent when the output is the array itself.
+   */
+  readonly itemsAt?: string;
+}
 
 /** What every action needs to run: the database and who is asking.
  * `ring` is optional because only the handful of actions that seal or open a
@@ -32,6 +60,58 @@ export interface ActionCallContext {
   readonly workspaceId: string;
   readonly actor: ActorInput;
   readonly ring?: KeyRing;
+  /**
+   * Reads a file's bytes, when the host has a storage port to give (P6-T05a).
+   *
+   * One method rather than the whole `FileStorage`, because `packages/core`
+   * does not depend on `packages/adapters`: the driver satisfies this
+   * structurally and the app passes the one it already has. Absent means an
+   * archive carries rows and no bytes, and says so in its manifest.
+   */
+  readonly storage?: { get(key: string): Promise<Buffer> };
+  /**
+   * Language for the agents, when the host has a provider to give (P4-T05c-b).
+   *
+   * Absent is the normal case and means the AI provider is off. Every trigger,
+   * ladder, gate and corridor works without it; it adds wording to a proposal
+   * and never decides that the proposal should exist.
+   */
+  readonly drafter?: AgentDrafter;
+  /**
+   * How to turn text into a vector, when the host has a provider that can
+   * (P4-T14a-a).
+   *
+   * Separate from `drafter` because they fail separately. Without this,
+   * retrieval takes the full-text path, which is AI-NATIVE-PLAN §2.4's own
+   * degradation and still answers. Without the drafter there is no prose. A
+   * workspace can have one and not the other.
+   */
+  readonly embed?: EmbedFunction;
+  /**
+   * Where this call came from, when it did not come from the browser
+   * (P5-T06a).
+   *
+   * Set by the chat router and by nothing else. It reaches the audit row
+   * through the Operation pipeline, in one place, so that every inbound action
+   * is answerable a quarter later without each action having to remember.
+   */
+  readonly channel?: string;
+  /**
+   * This call is one of many in a bulk load, so no notification is
+   * dispatched (TECHNICAL-PLAN §7.1 step 3, P6-T01a).
+   *
+   * Set by the importer and by nothing else. An import writes a quarter of
+   * somebody else's history in one run, and fanning that out would mean
+   * every member who subscribes to an imported goal reads a hundred
+   * notifications about work that was already finished. The activity row is
+   * still written, so the feed still shows what the import did, and so are
+   * the audit and outbox rows, because the import is a real thing this
+   * instance performed.
+   *
+   * It suppresses the fan-out and nothing else, and an action cannot set it:
+   * it comes from the caller, in one place, the way the channel does.
+   */
+  readonly bulk?: boolean;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
@@ -41,6 +121,8 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly output: ZodType<TOutput>;
   readonly access: AccessLevel;
   readonly safety: SafetyClass;
+  /** Set when this action takes a cursor. Reads only. */
+  readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
@@ -49,6 +131,15 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
 /**
  * A read action. Its handler may query, and the mutation lint stops it
  * writing.
+ *
+ * The input is parsed before the handler runs, the same way the write builder
+ * parses before its operation opens a transaction (§8.2, "validate at the
+ * boundary"). Until P5-T16 it was not, and the asymmetry was invisible because
+ * the typed internal client keeps its own callers honest at compile time. The
+ * other callers are text: REST assembles a read's input out of query strings,
+ * the agent transport out of a tool call, the chat router out of a message.
+ * Each of those could hand a read a number where it declared a string, or a
+ * key it never declared, and the handler would carry it into SQL.
  */
 export function defineReadAction<TInput, TOutput>(definition: {
   name: string;
@@ -56,6 +147,8 @@ export function defineReadAction<TInput, TOutput>(definition: {
   input: ZodType<TInput>;
   output: ZodType<TOutput>;
   access?: AccessLevel;
+  /** Declare this only if the input really takes a cursor. */
+  page?: PageContract;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }): ActionDefinition<TInput, TOutput> {
   return {
@@ -63,6 +156,12 @@ export function defineReadAction<TInput, TOutput>(definition: {
     access: definition.access ?? ACCESS_LEVELS.view,
     safety: "read",
     runsThroughPipeline: false,
+    // Declared after the spread, so it wraps the handler the caller passed
+    // rather than being replaced by it.
+    async handler(context, rawInput) {
+      const input = definition.input.parse(rawInput);
+      return definition.handler(context, input);
+    },
   };
 }
 
@@ -115,6 +214,14 @@ export function defineWriteAction<
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,
+          // Carried from the call context, so an action reached from chat is
+          // audited with the channel on it without the action knowing there
+          // are channels (P5-T06a). Absent for a browser call.
+          ...(context.channel ? { channel: context.channel } : {}),
+          // Threaded rather than read inside the pipeline, so that a bulk
+          // load is a property of the call and not of a global the next
+          // caller inherits (P6-T01a).
+          ...(context.bulk ? { suppressNotifications: true } : {}),
         },
       );
     },

@@ -155,7 +155,7 @@ export default async function NudgeVolumePage() {
         </CardHeader>
         <CardBody>
           {volume.loudestMembers.length === 0 ? (
-            <p className="text-sm text-ok-text">
+            <p className="text-sm text-ok">
               Nobody is over the ceiling. The §11 limit is doing its job before
               anybody has to notice.
             </p>

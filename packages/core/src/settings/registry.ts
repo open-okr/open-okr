@@ -115,6 +115,20 @@ export const trustedEmailDomainsSchema = z.array(
 
 const storageQuotaBytesSchema = z.number().int().positive();
 
+const exportInlineRowLimitSchema = z.number().int().positive();
+
+const importRowLimitSchema = z.number().int().positive();
+
+/**
+ * How many rows one wizard run may carry (P6-T01b-b).
+ *
+ * Exported because the two table actions need it for workspaces provisioned
+ * before the setting existed, whose settings map has no key to read. One
+ * constant, so the default a fresh workspace stores and the default an old one
+ * falls back to cannot drift apart.
+ */
+export const DEFAULT_IMPORT_ROW_LIMIT = 1000;
+
 /** Dollars, not cents, and zero is allowed: it means "may not spend". */
 const agentRunCostCapSchema = z.number().nonnegative();
 
@@ -127,6 +141,9 @@ const agentRunCostCapSchema = z.number().nonnegative();
  * cannot drift apart.
  */
 export const DEFAULT_AGENT_RUN_COST_CAP_USD = 2;
+
+/** How long a half-finished chat conversation waits to be resumed (P5-T06b). */
+export const DEFAULT_CHAT_CONVERSATION_MINUTES = 30;
 
 const primaryChannelSchema = z.enum([
   "app",
@@ -188,6 +205,36 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: storageQuotaBytesSchema,
   },
   {
+    key: "exportInlineRowLimit",
+    scope: "workspace",
+    why:
+      "5000 rows: enough that every ordinary export is a file somebody gets " +
+      "in the moment they ask, small enough that a request never spends a " +
+      "minute building one. Above it the relay builds the file and the " +
+      "person collects it from their own list. TECHNICAL-PLAN §4.9 says to " +
+      "run large sets asynchronously and names no figure; P5-T15 picked " +
+      "this one. No S-36 card names it yet, so it has none here.",
+    resolve: () => 5000,
+    schema: exportInlineRowLimitSchema,
+  },
+  {
+    key: "importRowLimit",
+    scope: "workspace",
+    why:
+      "1000 rows: a run the browser waits for, and each row is its own " +
+      "transaction through the Operation pipeline, so a thousand is already " +
+      "a thousand transactions plus their reference lookups. A bigger file " +
+      "is what `pnpm import:csv` is for, and it reads a path rather than " +
+      "holding a table in a request, so the bound is on the wizard's two " +
+      "actions and not on the command. IMPLEMENTATION-PLAN asks for a bound " +
+      "and names no figure; P6-T01b-b picked this one. A file above it is " +
+      "refused with the number rather than truncated, because half an " +
+      "import nobody asked for is worse than none. No S-36 card names it " +
+      "yet, so it has none here.",
+    resolve: () => DEFAULT_IMPORT_ROW_LIMIT,
+    schema: importRowLimitSchema,
+  },
+  {
     key: "primaryChannel",
     scope: "member",
     why: "Email, beside the always-on in-app inbox, until a chat identity is linked.",
@@ -213,6 +260,24 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "S-36 card names it yet, so it has none here.",
     resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
     schema: agentRunCostCapSchema,
+  },
+  {
+    key: "chatConversationMinutes",
+    scope: "workspace",
+    why:
+      "Thirty minutes. Long enough that somebody can answer three questions " +
+      "between meetings, short enough that a half-finished check-in does not " +
+      "wait overnight to be resumed by a message about something else. " +
+      "Design §8.1 named the figure and put it in METHOD.md's §11 registry; " +
+      "it is here instead, because §11 is the OKR practice canon and how long " +
+      "a chat window stays open is an interaction timeout rather than a " +
+      "practice rule. Corrected in the design document at P5-T06b.",
+    resolve: () => DEFAULT_CHAT_CONVERSATION_MINUTES,
+    schema: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60),
   },
   {
     key: "demoEnabled",

@@ -130,3 +130,89 @@ describe("AppShell composition", () => {
     expect(screen.getByText("content-slot")).toBeTruthy();
   });
 });
+
+/**
+ * The sidebar against the mockup it cites (UIUX-PLAN.md §10, mockup
+ * `01-work-map`). Every value below is quoted from that file's own
+ * `style.css`, and each one was measurably different in the shipped
+ * component.
+ */
+describe("the sidebar matches its reference mockup", () => {
+  const sidebar = () =>
+    render(
+      <Sidebar
+        groups={[
+          {
+            id: "g",
+            label: "Practice",
+            items: [
+              {
+                id: "review",
+                label: "Review",
+                href: "/review",
+                icon: <span />,
+                badge: 7,
+              },
+            ],
+          },
+        ]}
+        workspaceSwitcher={<div>Workspace</div>}
+      />,
+    );
+
+  test("a nav row uses the control radius, not the card radius", () => {
+    const { container } = sidebar();
+    const link = container.querySelector("a");
+    // `rounded-lg` resolves to --card-radius-lg (14px), which on a 29px row is
+    // a pill. The mockup's `.navitem` is 8px.
+    expect(link?.className).toContain("rounded-control");
+    expect(link?.className).not.toContain("rounded-lg");
+  });
+
+  test("the panel carries the mockup's vertical gradient, not a flat surface", () => {
+    const { container } = sidebar();
+    const nav = container.querySelector("nav");
+    // `.side { background: linear-gradient(180deg, var(--surface), var(--bg)) }`
+    expect(nav?.className).toContain("bg-linear-to-b");
+    expect(nav?.className).toContain("from-surface");
+    expect(nav?.className).toContain("to-bg");
+  });
+
+  test("the panel uses the mockup's own padding and row gap", () => {
+    const { container } = sidebar();
+    const nav = container.querySelector("nav");
+    // `.side { padding: 14px 10px; gap: 2px }`
+    expect(nav?.className).toContain("px-2.5");
+    expect(nav?.className).toContain("py-3.5");
+    expect(nav?.className).toContain("gap-0.5");
+  });
+
+  /**
+   * A stated deviation, not drift.
+   *
+   * The mockup's `.navitem` is 6px of vertical padding, a 30.8px row, and the
+   * shipped rows matched it to within 0.3px when measured side by side. The
+   * panel still read tighter than the drawing, because the mockup carries
+   * eight rows and an agent card filling the bottom while this carries eleven
+   * and no card. 8px gives a 35px row, decided on 2026-09-01.
+   *
+   * Asserted so a later audit reads the difference as a decision rather than a
+   * defect and puts 6px back.
+   */
+  test("a nav row is one step taller than the mockup, on purpose", () => {
+    const { container } = sidebar();
+    const link = container.querySelector("a");
+    expect(link?.className).toContain("py-2");
+    expect(link?.className).not.toContain("py-1.5");
+  });
+
+  test("the count badge is a solid field, not a tinted chip", () => {
+    const { container } = sidebar();
+    // `.navitem .badge` is a filled pill with white text. The tinted Chip it
+    // shipped as reads as information rather than as something overdue.
+    const badge = container.querySelector("[data-sidebar-badge]");
+    expect(badge).not.toBeNull();
+    expect(badge?.className).toContain("bg-bad-solid");
+    expect(badge?.className).toContain("text-on-bad-solid");
+  });
+});

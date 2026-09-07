@@ -94,6 +94,57 @@ export function mailProbe(options: MailProbeOptions): ConnectionProbe {
   };
 }
 
+export interface StorageProbeOptions {
+  /**
+   * What the operator is looking at: "local disk at storage", or the bucket
+   * and the service. Never a credential; it goes on a screen and in a log.
+   */
+  readonly describe: () => string;
+  /**
+   * Writes a probe object and removes it again.
+   *
+   * A write rather than a read, because a read proves nothing an operator
+   * cares about: the failures worth catching here are an unwritable directory,
+   * a bucket that does not exist and a key pair that cannot put. All three
+   * would otherwise surface as a broken upload later, which reads as a product
+   * fault rather than a setup one.
+   */
+  readonly verify: () => Promise<void>;
+}
+
+/**
+ * Proves files can actually be stored (P6-G05).
+ *
+ * Local disk reports `ok` rather than `unavailable` for the same reason the
+ * console mail transport does: it is a real, working default and the state
+ * most fresh installs are in, not a missing driver.
+ */
+export function storageProbe(options: StorageProbeOptions): ConnectionProbe {
+  return {
+    port: "storage",
+    async run() {
+      const where = options.describe();
+      try {
+        await options.verify();
+        return {
+          outcome: "ok" as const,
+          detail: `Wrote and removed a test file: ${where}.`,
+        };
+      } catch (error) {
+        return {
+          outcome: "failed" as const,
+          // The driver's own message, which for S3 names the bucket or the
+          // permission. Credentials never reach it: the SDK reports the
+          // operation, not the key.
+          detail: `Could not write to ${where}. ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        };
+      }
+    },
+  };
+}
+
 /**
  * A port with no driver in this build.
  *

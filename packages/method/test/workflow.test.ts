@@ -79,6 +79,10 @@ function base(overrides: Partial<CycleWorkflowInput> = {}): CycleWorkflowInput {
     },
     focusKeyResultCount: 0,
     hasCapacityNotes: true,
+    // The §5.5 initiative register (P5-T10a). An empty list is a real answer:
+    // somebody looked and found no project over-committed. Leaving it out is
+    // what makes gate 5 unevaluable, which one test below asserts on purpose.
+    initiatives: [],
     frame: {
       hasMission: true,
       hasStrategy: true,
@@ -528,6 +532,52 @@ describe("the six publish gates", () => {
       (g) => g.gateKey === 5,
     );
     expect(gate?.detail.missing.join(" ")).toMatch(/still exceeds capacity/);
+  });
+
+  it("gate 5 refuses an initiative left exceeding capacity, and names it", () => {
+    // The other half of §5.5's one sentence (P5-T10a). Two different problems
+    // with two different fixes, so the gate has to say which one it found.
+    const gate = publishGates(
+      base({
+        goals: [goal()],
+        initiatives: [
+          {
+            id: "i1",
+            title: "Rebuild the activation flow",
+            capacity: "exceeds",
+          },
+        ],
+      }),
+    ).find((g) => g.gateKey === 5);
+    expect(gate?.passed).toBe(false);
+    expect(gate?.detail.missing).toContain(
+      '"Rebuild the activation flow" still exceeds capacity',
+    );
+  });
+
+  it("gate 5 passes an initiative that fits, or one nobody has judged", () => {
+    for (const capacity of ["fits", "tight", null] as const) {
+      const gate = publishGates(
+        base({
+          goals: [goal()],
+          initiatives: [{ id: "i1", title: "Rebuild it", capacity }],
+        }),
+      ).find((g) => g.gateKey === 5);
+      expect(gate?.passed, capacity ?? "unjudged").toBe(true);
+    }
+  });
+
+  it("gate 5 cannot be answered at all without the initiative register", () => {
+    // The rule this file exists to hold: a predicate that cannot see its input
+    // reports `todo`, never `pass`. §5.5 is one sentence about the measures and
+    // the work behind them, and passing on half of it is the Phase 1 failure.
+    const { initiatives: _omitted, ...withoutRegister } = base({
+      goals: [goal()],
+    });
+    const gate = publishGates(withoutRegister).find((g) => g.gateKey === 5);
+    expect(gate?.evaluable).toBe(false);
+    expect(gate?.passed).toBe(false);
+    expect(gate?.detail.blocked).toMatch(/initiative register/);
   });
 
   it("gate 5 refuses a set where nothing was recorded as cut", () => {

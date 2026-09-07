@@ -51,6 +51,90 @@ Blocked? Set the task to `blocked` in `STATUS.md`, write down exactly why, and a
 
 Phases have design gates at P3-T00, P4-T00, P5-T00 and P8-T01. Do not begin a phase's implementation tasks until the human approves that gate's output with an explicit "design approved".
 
+## Committing and pushing
+
+**Commit on your own. Never push on your own.** Committing is how the work
+becomes reviewable and you do it without being asked, one commit per task, on
+`agung`. Pushing is what starts continuous integration and puts the work in
+front of other people, and it happens only when Agung says to push. Agung set
+this on 7 September 2026.
+
+**A push must leave continuous integration green. Every job, no exception.**
+Not "green except the one that was already failing", and not "green except the
+gate this machine cannot run". A red build on a shared branch blocks everybody
+else's work and the next person cannot tell your failure from theirs.
+
+So before you say the work is ready to push, run the whole set in the order
+`docs/development-plan/CI-GATES.md` gives, and read the output rather than the
+exit code:
+
+```
+pnpm typecheck
+pnpm lint             # read the last three lines, not the last one
+pnpm dead-code
+pnpm db:lint
+pnpm check:boundaries
+pnpm check:licences
+pnpm check:contract
+pnpm method:check
+pnpm test             # needs a database. One suite at a time
+pnpm build && pnpm test:e2e
+pnpm check:signoff origin/main HEAD
+```
+
+**A gate you did not run is not a gate that passed.** When this machine cannot
+run one, say which, why, and what would run it, in the `STATUS.md` row and in
+the summary you give Agung. `helm` and Docker are absent here, so
+`deploy/helm/check.sh`, `deploy/helm/cluster-test.sh` and
+`deploy/docker/smoke-test.sh` cannot run locally and are the ones to name.
+Never write "all gates pass" when you ran nine of eleven.
+
+**`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look
+green for days and fail the moment one opens. Run it yourself, and commit with
+`-s`.
+
+**Two jobs are not in the list above and still have to be green:** CodeQL and
+Dependency review. Neither is runnable locally. A new dependency is what
+usually turns them red, which is a second reason not to add one without asking.
+
+### Watch the run. A push is not finished until CI says so
+
+**After every push, find the run for your own commit and watch it to its
+conclusion.** Then report what it said. Not "the gates passed locally", not
+"it should be green": the run's own verdict, per job.
+
+```
+gh run list --branch agung --limit 10 \
+  --json databaseId,headSha,name,event,conclusion,createdAt
+gh run view <id> --json jobs          # which job, which step
+gh run view <id> --log-failed         # why
+```
+
+**A push with no run is not a pass.** `ci.yml` triggers on `push` to `main` and
+on `pull_request`, so a push to `agung` with no open pull request gets no
+verdict at all. Say that plainly and ask whether to open one. Never let silence
+read as green.
+
+**This rule exists because the alternative already happened.** On 6 September
+2026 nine commits went to `agung` under an open pull request, every local gate
+green, and left **six red checks from five causes**. Four were mine and
+somebody else fixed them in `dea40e6` and `5abf56f`:
+
+| Check | Cause |
+|---|---|
+| Helm | A grep in `check.sh` matched the explanatory `#` comment beside the setting it was checking for. `helm template` renders template comments into its output |
+| CodeQL | `js/polynomial-redos` on the S3 driver's `/^\/+\|\/+$/g`, two quantifiers backtracking on a value that is mostly slashes |
+| Dependency review | `bowser`, reached under `@aws-sdk/core`, reported as MIT AND MITNFA. A consequence of adding the dependency, invisible until CI |
+| An end-to-end spec | Serving the last four review-inbox sources emptied `inbox.pending`, and the spec still asserted the labels of the card that used to list them |
+
+Every one of those is a class the local gates cannot see: a rendered Helm
+manifest, a security query, a transitive licence, and a spec that encoded the
+old behaviour. That is the whole argument for watching the run.
+
+**A change to a spec's expectations is part of the change.** When you serve
+something a spec asserted was missing, the spec is now wrong and updating it is
+yours, not the next person's.
+
 ## Design docs
 
 Detailed designs live in `docs/design/`, written by you at each design gate. Keep them scannable: tables and examples over prose. Write acceptance criteria as testable Given / When / Then. When implementation deviates from a design document, update the document in the same change.
@@ -102,7 +186,7 @@ Detailed designs live in `docs/design/`, written by you at each design gate. Kee
 - Import runs are idempotent: keep `legacy_id` and `legacy_type`, unique on `(workspace_id, legacy_type, legacy_id)`. Imports run through the normal Operation pipeline with notification dispatch suppressed.
 - Cannot map cleanly? Do not silently drop it. Record it in the import report and raise it as an open question.
 - Derived values (progress, health, achievement, alignment score, next check-in, streaks) are recomputed after load, never trusted from the source.
-- Importer code lives in `packages/importer`. It may depend on `packages/db` and `packages/core`, never on `apps/web`.
+- Importer code lives in `packages/importer`, **except the spreadsheet engine**, which lives in `packages/core/src/imports` because the wizard on S-36 needs the same readers, templates, mapping and runner the command uses and `apps/web` may not depend on `packages/importer` (P6-T01b, TECHNICAL-PLAN §1). Either way it may depend on `packages/db` and `packages/core`, never on `apps/web`.
 
 ## Locked stack
 
@@ -117,14 +201,23 @@ apps/web            Next.js app: interface, internal API, public REST, agent
                     endpoint, channel webhooks
 packages/method     The METHOD.md canon as data and pure functions. No I/O
 packages/core       Domain logic, the Operation pipeline, the action registry,
-                    can() and the access getter, the engines, rich text
+                    can() and the access getter, the engines, rich text, the
+                    spreadsheet import engine
 packages/db         Drizzle schema, migrations, row-level security, seed,
                     data-change runner, soft-delete scope
 packages/adapters   Ports and drivers (the only place vendor SDKs live) plus
                     the outbox relay
-packages/agents     The Coach and Champion runtimes, the trigger catalogue and
-                    scheduler, run state machines, proposal envelopes
-packages/importer   Spreadsheet and FlowyTeam importers (command line)
+packages/agents     Run state machines, the schedule the runs are registered
+                    under, structured extraction, and the AI capabilities the
+                    runs call. The Coach's and the Champion's own seeding and
+                    scope are in packages/core/src/agents/ instead, because
+                    both are created inside the workspace-provisioning
+                    transaction and so need packages/db, which this package
+                    sits above rather than beside. Corrected 7 September 2026:
+                    this line said the runtimes lived here and they never did
+packages/importer   The import command line, and the FlowyTeam connector
+packages/cli        The `okr` command line. Reads contract/cli.json and calls
+                    the REST surface. No runtime dependency on anything
 packages/ui         Shared components
 packages/config     Shared TypeScript, lint and environment schema
 packages/test-support  Factory building through core services, test harness
@@ -141,17 +234,31 @@ docs/stakeholder    Stakeholder pack, and the reference mockups the UI tasks cit
 Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
-- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs `pnpm db:up`, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs
+- `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs a Postgres, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs. **Docker is not required.** `pnpm db:up` is the easy way to get the Postgres, and `TEST_DB_PORT` points the suite at one you already run, exactly as it does for the unit suites: `TEST_DB_PORT=5432 pnpm build && TEST_DB_PORT=5432 pnpm test:e2e`. This line said `pnpm db:up` outright for eight tasks, and four end-to-end defects reached continuous integration behind the belief that the suite could not be run locally
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
+- **`pnpm test` and `pnpm build` at the root honour `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT`, `TEST_MYSQL_PORT`, `TEST_MYSQL_HOST`, `TEST_MYSQL_USER`, `TEST_MYSQL_PASSWORD`, `TEST_DB_HOST` and `DATABASE_URL`** through `passThroughEnv` in `turbo.json`. The same two port variables now also drive the compose stack itself, so the database and the suite move together, and continuous integration gives each job its own pair. Without that entry Turbo filters them out and the harness looks for the Docker stack on port 55432, which fails with `ECONNREFUSED` after running two of its ten tasks. Add any new variable a test needs to that list, or the root command will quietly not see it
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
+- **Clear the build caches when you are done with a stretch of builds or end-to-end runs.** Turborepo keeps every task's output forever and nothing prunes it, so a long task loop turns into tens of gigabytes: measured on 3 September 2026 at **112 GB in `.turbo/cache` alone**, with the whole checkout at 118 GB and 977 MB after clearing. All of it is in `.gitignore`, so nothing tracked is lost and the next build repopulates what it needs.
+
+  ```
+  rm -rf .turbo/cache apps/web/.next test-results .playwright-mcp
+  rm -rf packages/*/.turbo apps/*/.turbo
+  ```
+
+- **Never run two Vitest suites at once against the same Postgres.** The harness creates and drops a per-worker database, so a second run tears the first one's out from under it: 604 of 1987 tests failed that way on 3 September 2026, which reads as a regression and is not one. Worse, it can leave the server in recovery ("FATAL 57P03: the database system is not yet accepting connections") and the next run dies before it starts. Wait for a background suite to finish.
+
 - `pnpm dead-code`: the dead-code gate
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate. Sign-off runs in CI on pull requests only, so a branch can look green for days and fail the moment one opens. `docs/development-plan/CI-GATES.md` lists every gate and the order to run them in
+- `pnpm okr`: the command line, generated from the registry. `pnpm okr help` lists the domains, `pnpm okr <domain> <verb> --help` one command's flags. It reads `contract/cli.json` and nothing else, so it has no database and no domain code in it. `okr login --url <instance>` runs the device login: it prints a link, somebody approves it at `/account/device`, and the granted token lands in the profile. `--token` stores one you already have instead, from `/account/api-tokens`. `--scopes` narrows what is asked for; the default is read and write, never destructive. Exit 2 is a usage error decided before anything is sent, exit 1 is the instance refusing
+- `pnpm gen:contract` and `pnpm check:contract`: regenerate `contract/openapi.json` and `contract/cli.json` from the action registry, then the drift gate that compares fresh artifacts against the committed ones and fails naming the actions and commands that moved. One script in two modes, so a generator and a checker cannot disagree about what the artifact should be. The document is also served live at `/api/v1/openapi.json`, built by the same function, so it describes the running instance
 - `pnpm check:boundaries`: the architecture boundary gate (vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline)
 - `pnpm audit:verify`: verify the append-only audit hash chain. Every workspace with a maintenance role, or named workspaces with any role
-- `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. Cron or by hand until a scheduler host exists
+- `pnpm cadence:sweep`: flip health to `outdated` for every goal past its staleness grace. Every workspace, or named ones. Idempotent, and runs through the Operation pipeline so the change is audited. **The scheduler host runs this on its own** as part of the Champion's daily cadence (P6-G01a); the command stays for an operator who wants it now, and for an instance running with `OPENOKR_SCHEDULER=off`
 - `pnpm flaky merge <reports>` and `pnpm flaky quarantine`: merge shard flakiness reports, then quarantine what is newly flaky
-- `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres plus PgBouncer, Docker)
+- `pnpm db:up` and `pnpm db:down`: start and stop the test database stack (Postgres, PgBouncer and, since P6-T02, MySQL, all in Docker). `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT` and `TEST_MYSQL_PORT` choose the host ports; set any of them to `0` and Docker picks a free one, which `pnpm db:ports` then reads back as the three lines the harness needs. Continuous integration does exactly that, because choosing numbers by hand collided twice. **MySQL is the FlowyTeam source the importer's connector reads, and it is test-only**: the product needs Postgres and nothing else. Point the suite at a MySQL you already run with `TEST_MYSQL_PORT`, and say so when its root account has no password: `TEST_MYSQL_PASSWORD=` set to empty means empty, unlike every other variable here. Without a MySQL the connector's three suites skip themselves and say why
 - `pnpm db:migrate`: migrations
+- `pnpm import:csv`: the spreadsheet importer (P6-T01a). `--entity`, `--file`, `--workspace <slug>` and `--as <email>` are required; `--map <mapping.json>` names the columns when the headers are not recognisable, and `--write` is what makes it real. **A dry run unless `--write` is given**, and the dry run reports exactly what the real run writes, because the two share every line up to the call. `--as` is the member every write is authorised as: there is no ambient importer identity, and the audit rows name whoever ran it. Exit 2 is a usage error, exit 1 means some rows were skipped, and the report names each one by its line in the file
+- `pnpm import:flowyteam`: the FlowyTeam importer (P6-T02, P6-T03a). `--source <mysql://user:password@host:3306/database>`, `--workspace <slug>` and `--as <email>` are required, and `--company <id>` names the one company this run reads. **It reads the source and never writes to it**: the session is opened with `SET SESSION TRANSACTION READ ONLY` and every statement is checked against an allow list of reads before it is sent, so neither a write nor a `LOCK TABLES` leaves the process. Run it without `--company` and it lists what the source holds; one real instance holds 8257, which is why the flag has no default. **A workspace holds one company for good**, and a second one is refused by name. **A dry run unless `--write` is given**, and the dry run resolves every source id against the target, so what it reports is what a real run would write. It imports people, spaces, space membership, cycles, objectives, key results, key result history, check-ins, KPI categories, KPIs and their records, initiatives, tasks, checklists, task comments and watchers. **`--files-root <path>` points at the FlowyTeam server's storage directory**: `task_files` names a file on that server's own disk rather than in MySQL, so without it every local file is reported by name instead of copied. An image sitting inline in comment markup needs no directory, because those bytes are in MySQL. **`--only <domains>`** is a comma-separated list of `organisation`, `objectives`, `checkins`, `kpis`, `work`, `collaboration`, `files`, and the default is all of them. A domain brings whatever it depends on and the report says which it added: `--only objectives` runs the organisation first, because an objective names a champion, a reviewer, a cycle and a space. An unknown domain is a usage error, not a smaller import. Exit 2 is a usage error, exit 1 is the source or the instance refusing
 - `pnpm db:change`: the data-change runner. Batched, resumable, idempotent-by-ledger backfills, kept out of schema migrations. Scripts declare the columns and types they depend on and the runner checks every one before each run, so a later migration cannot silently change what an old script does
 - `pnpm keys:rotate`: re-wrap every stored instance secret onto the current root key. Reads `OPENOKR_ENCRYPTION_KEY` and `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
 - `deploy/docker/openokr`: the self-hosted lifecycle helper. `up` generates every secret on first run, `upgrade` pulls and re-runs migrations, `rotate-key` rotates the root key, `status`, `logs`, `down`, `destroy`
@@ -170,10 +277,7 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 | Command | Arrives at | What it will do |
 |---|---|---|
 | `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
-| `pnpm gen:contract` | P5-T07 | Regenerate OpenAPI and the command line from the action registry, with the drift check against committed artifacts that task builds. The chat command surface (P5-T06) and the MCP tool catalogue (P5-T09) are their own generated projections of the same registry, each landing with its own task |
 | `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
-| `pnpm import:csv` | P6-T01 | The spreadsheet importer, dry-run by default |
-| `pnpm import:flowyteam` | P6-T02 | The FlowyTeam importer, dry-run by default |
 
 ## Definition of done for every task
 
@@ -193,6 +297,8 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 - Contract projections regenerated and the drift check green if the registry changed.
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The design document is updated if implementation deviated. The `STATUS.md` row is updated.
+- Every gate in "Committing and pushing" ran and is green, or the row names the ones this machine could not run and why. The commit is made; the push waits for Agung.
+- After a push, the run for that commit was watched to its conclusion and reported per job. No run means no verdict, and the row says so rather than implying green.
 
 ## Writing style for everything you write in this repo
 

@@ -3,10 +3,11 @@
 /**
  * The studio's writes (P3-T10).
  *
- * Two, and both are one click: link mode connects two goals into a dependency,
- * and a gap in the health tab can be dismissed. Everything else on the panel is
- * a link to the goal page, because editing a goal properly belongs on the screen
- * built for it rather than in a side panel that would drift from it.
+ * Three, and each is one click: link mode connects two goals into a dependency,
+ * a finding can be dismissed, and a relink finding can be applied (P4-T06c).
+ * Everything else on the panel is a link to the goal page, because editing a
+ * goal properly belongs on the screen built for it rather than in a side panel
+ * that would drift from it.
  */
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
@@ -58,5 +59,23 @@ export async function dismissFinding(
   const id = String(formData.get("findingId") ?? "");
   return run((context) =>
     callAction(context, "alignment.dismissFinding", { id }),
+  );
+}
+
+/**
+ * Applying a relink finding (METHOD.md §5.3, P4-T06c).
+ *
+ * §5.3 offers a one-click apply "where the fix is mechanical", and the action
+ * refuses any kind whose fix is not. The re-parent runs through `goals.update`
+ * in its own transaction, so the tree, the §5.2 score and the level-skip and
+ * silo findings all move together.
+ */
+export async function applyFinding(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("findingId") ?? "");
+  return run((context) =>
+    callAction(context, "alignment.applyFinding", { id }),
   );
 }

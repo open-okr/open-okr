@@ -1,5 +1,6 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 
 /**
  * Registration to dashboard, in a real browser (P1-T08).
@@ -15,9 +16,10 @@ import { expect, test } from "@playwright/test";
  * clean context each time: there is one account, and this is its session.
  */
 
-const EMAIL = "ada@example.com";
-const PASSWORD = "correct horse battery staple";
-const NAME = "Ada Lovelace";
+// This spec is the one that claims the instance, and every later spec signs in
+// as whoever did. The constant says so out loud rather than leaving three
+// files to agree by accident.
+const { email: EMAIL, password: PASSWORD, name: NAME } = INSTANCE_ACCOUNT;
 
 test.describe.configure({ mode: "serial" });
 
@@ -120,21 +122,60 @@ test("hydrates, so a write happens without loading a new document", async () => 
   expect(documentLoads).toBe(0);
 });
 
-test("the seeded Champion is in admin, with its schedule and an empty log", async () => {
-  // P4-T05a. The agent is created at provisioning, so a workspace that has
-  // answered no questions still has one, and this is the page that says what
-  // it is and what it has done.
+test("both seeded agents are in admin, with their schedules and an empty log", async () => {
+  // P4-T05a seeded the Champion and P4-T06a the Coach. Both are created at
+  // provisioning, so a workspace that has answered no questions still has
+  // both, and this is the page that says what they are and what they have
+  // done.
+  //
+  // **Scoped per row rather than per page.** This test asserted a bare
+  // `getByText("propose")` while one agent existed; the moment a second was
+  // seeded it matched twice and Playwright refused it under strict mode. Both
+  // agents propose and neither is "the" one, so every assertion below names
+  // the row it is about.
   await page.goto("/admin/agents");
 
   await expect(
     page.getByRole("heading", { name: "Agents and runs" }),
   ).toBeVisible();
-  await expect(page.getByText("OKR Champion")).toBeVisible();
-  await expect(page.getByText("On the hour")).toBeVisible();
-  await expect(page.getByText("propose")).toBeVisible();
+
+  const champion = page
+    .getByRole("listitem")
+    .filter({ hasText: "OKR Champion" });
+  await expect(champion).toHaveCount(1);
+  await expect(champion.getByText("On the hour")).toBeVisible();
+  await expect(champion.getByText("propose")).toBeVisible();
+
+  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await expect(coach).toHaveCount(1);
+  await expect(coach.getByText("On every write")).toBeVisible();
+  await expect(coach.getByText("propose")).toBeVisible();
+
   // Nothing schedules a run on this instance, and the page says so rather
   // than showing an empty list that reads like a bug.
   await expect(page.getByText(/No run yet/)).toBeVisible();
+});
+
+test("an administrator can run an agent, and the page says whether it can draft", async () => {
+  // P4-T05c-b. Nothing executes the declared crons, so this control is the
+  // only way an agent ever speaks. A screen that listed runs without being
+  // able to cause one would describe a product nobody could use.
+  await page.goto("/admin/agents");
+
+  await expect(
+    page.getByRole("heading", { name: "Run one now" }),
+  ).toBeVisible();
+  // No provider is configured on this instance, and the control says so
+  // instead of offering drafting that cannot happen. "Deterministic only" is a
+  // complete product, which is why it is stated rather than hidden.
+  await expect(page.getByText("Deterministic only")).toBeVisible();
+  await expect(page.getByText("Drafting on")).toBeHidden();
+
+  await page.getByRole("button", { name: "Quality pass" }).click();
+  // The run log stops saying it is empty, which is the whole point of the
+  // button: a run happened because somebody asked for one.
+  await expect(page.getByText(/No run yet/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText("schedule.quality")).toBeVisible();
 });
 
 test("registration is closed once the instance has been claimed", async () => {
@@ -328,6 +369,19 @@ test("the coach fails a rule as you type, and the score moves with it", async ()
     page.getByText(/Launch the new mobile app by end of Q3/),
   ).toBeVisible();
 
+  // The field reports how much is firing, so the count is not only in the
+  // chips below it (mockup 03b-rule-card's own `.field`).
+  await expect(page.getByText(/rules? firing/)).toBeVisible();
+
+  // The card closes from inside itself. The chip toggles it too, but a card
+  // that can only be closed by the control that opened it is a card somebody
+  // hunts for.
+  await page.getByRole("button", { name: "Dismiss" }).first().click();
+  await expect(
+    page.getByText(/Your objective starts with a deliverable, not a destination/),
+  ).toBeHidden();
+  await chip.click();
+
   // Every verdict links to the rule itself.
   await page.getByRole("link", { name: "See the rule in METHOD" }).first().click();
   await expect(page).toHaveURL("/method/OBJ-1");
@@ -371,6 +425,46 @@ test("the quality panel groups every issue and links at the field", async () => 
   // The anchor resolves to a real row rather than to the top of the page.
   const anchored = (href ?? "").split("#")[1] ?? "";
   await expect(page.locator(`[id="${anchored}"]`)).toBeVisible();
+});
+
+/**
+ * The coach strip on the goal page (P4-T06c).
+ *
+ * The half of the task's test plan only a browser settles: with no provider,
+ * the surface explains rather than disappearing. A hidden control and an absent
+ * feature look identical from the outside, and a writer who cannot tell the
+ * difference assumes the rules stopped applying too.
+ *
+ * The goal is the one the drafting test made, whose two key results both fail
+ * KR-3 for carrying no date and no owner. Stored flags, written by P4-T02a in
+ * the transaction that created them, not a fresh evaluation on this page.
+ */
+test("the goal page shows the stored verdicts and explains the missing assist", async () => {
+  await page.goto("/cycle?phase=4");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/goals\//);
+
+  const strip = page
+    .getByRole("region")
+    .filter({ hasText: "What the Coach sees" });
+  await expect(
+    page.getByRole("heading", { name: "What the Coach sees" }),
+  ).toBeVisible();
+
+  // The verdict links to the rule, the same way the draft coach's chips do.
+  const rule = strip.getByRole("link", { name: /KR-3/ }).first();
+  await expect(rule).toBeVisible();
+  await expect(rule).toHaveAttribute("href", "/method/KR-3");
+
+  // No provider on this instance, so no suggestion is offered and the strip
+  // says why. Both halves matter: an absent button with no sentence beside it
+  // is the failure this test exists to catch.
+  await expect(
+    strip.getByRole("button", { name: "Suggest a fix" }),
+  ).toBeHidden();
+  await expect(
+    page.getByText(/checked with or without an AI provider/),
+  ).toBeVisible();
 });
 
 test("closing a goal requires a retrospective and keeps it on reopen", async () => {
@@ -425,10 +519,37 @@ test("the check-in walker lists only what is actually due", async () => {
   await page.goto("/check-in");
 
   await expect(page.getByRole("heading", { name: "Check in" })).toBeVisible();
-  // The goal created earlier is due next Monday, so nothing is inside the
-  // two-day window and the walker says so rather than offering it.
-  await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
-  await expect(page.getByText("0 due")).toBeVisible();
+
+  // **This asserted "Nothing of yours is due." and that made it a test about
+  // the day of the week.**
+  //
+  // The goal is created during the run with the Monday anchor, so its next
+  // check-in is the coming Monday and the two-day window opens on the Saturday.
+  // The assertion held from Tuesday to Friday and failed from Saturday to
+  // Monday. It went red on 23 August 2026 for no reason but the calendar, the
+  // same way the quiet-hours nudge tests went red at 01:39 UTC.
+  //
+  // What the walker actually promises is that it lists what is due and nothing
+  // else, and both branches of that are correct behaviour. So the count on the
+  // page and the list under it have to agree with each other: an empty walker
+  // says zero, and a walker with rows says how many rows it has. A walker
+  // offering a goal while claiming nothing is due, or claiming a number it does
+  // not show, is the defect this is here to catch.
+  // The chip is the walker's own claim about how many are due, and the anchors
+  // are what it actually offers. Those two agreeing is the promise; which branch
+  // the calendar lands on is not.
+  const chip = page.getByText(/^\d+ due$/);
+  await expect(chip).toBeVisible();
+  const claimed = Number(((await chip.textContent()) ?? "0").split(" ")[0]);
+
+  const offered = page.locator('a[href^="/check-in?goal="]');
+  await expect(offered).toHaveCount(claimed);
+
+  if (claimed === 0) {
+    await expect(page.getByText("Nothing of yours is due.")).toBeVisible();
+  } else {
+    await expect(page.getByText("Nothing of yours is due.")).toBeHidden();
+  }
 });
 
 test("a goal reached directly shows its history and refuses a draft", async () => {
@@ -438,15 +559,32 @@ test("a goal reached directly shows its history and refuses a draft", async () =
   const goalId = new URL(page.url()).pathname.split("/").pop() as string;
 
   await page.goto(`/check-in?goal=${goalId}`);
-  await expect(page.getByText("This goal is not due")).toBeVisible();
-  // No composer, because opening one on a goal already reported on would leave an
-  // empty draft behind every time somebody looked at the page.
-  await expect(
-    page.getByRole("button", { name: "Publish" }),
-  ).toHaveCount(0);
+
+  // **The second test in this file that asserted a day of the week.**
+  //
+  // It waited for "This goal is not due", which was true from Tuesday to Friday
+  // and false from Saturday, because the goal is created during the run with the
+  // Monday anchor and the window opens two days out. It went red on 23 August
+  // 2026 for no reason but the calendar, exactly as the walker test above did.
+  //
+  // The history is the part that is always true: a goal reached directly shows
+  // what it has reported. The composer is the part that depends on the window,
+  // and the promise is that the two agree — no composer while it says the goal
+  // is not due, a composer when it does not say that. Opening one on a goal
+  // already reported on would leave an empty draft behind every time somebody
+  // looked at the page, and that is what this is here to catch.
   await expect(
     page.getByRole("heading", { name: "Check-in history" }),
   ).toBeVisible();
+
+  const notDue = page.getByText("This goal is not due");
+  if (await notDue.isVisible().catch(() => false)) {
+    await expect(page.getByRole("button", { name: "Publish" })).toHaveCount(0);
+  } else {
+    await expect(
+      page.getByRole("button", { name: "Publish" }),
+    ).not.toHaveCount(0);
+  }
 });
 
 /**
@@ -481,10 +619,13 @@ test("the review inbox lists what this member owes, with an action on each", asy
     page.getByRole("main").getByRole("link", { name: "Check in" }),
   ).toBeVisible();
 
-  // Named, not hidden. A page that showed two of six sources without saying so
-  // would look complete while failing to mention a blocker somebody owns.
-  await expect(page.getByText("Blockers you own")).toBeVisible();
-  await expect(page.getByText("Sessions to run")).toBeVisible();
+  // The same promise this spec has always made, now that it reads the other
+  // way round. It used to name the sources the page could not serve, because a
+  // page showing two of six without saying so would look complete while
+  // failing to mention a blocker somebody owns. P6-G02 served the last four,
+  // so the card that named them renders nothing, and its absence is what says
+  // no source is missing.
+  await expect(page.getByText("Not here yet")).toHaveCount(0);
 });
 
 test("the review action opens the composer for that goal", async () => {
@@ -526,16 +667,13 @@ test("a KPI recorded below the corridor reaches the recovery board", async () =>
   await cell.fill("60");
   await cell.press("Enter");
 
-  // Wait for the standing figure to come back before leaving the page. Enter
-  // commits through a server action, and navigating while it is still in
-  // flight abandons it: the value never lands, the KPI stays at no data, and
-  // the recovery board is empty for a reason that has nothing to do with the
-  // recovery board. It passed here in under a second and failed on a CI runner
-  // at the full ten-second timeout, which is what a race looks like from the
-  // outside.
-  await expect(
-    page.getByRole("row").filter({ hasText: "Operating margin" }),
-  ).toContainText("60%");
+  // Enter starts a transition, and the row's own figure is the only proof it
+  // finished. Navigating while it is still in flight cancels the server action,
+  // so nothing is recorded and the board reads a KPI that has no value. It
+  // passed here in under a second and failed on a CI runner at the full
+  // ten-second timeout, which is what a race looks like from the outside.
+  const row = page.getByRole("row").filter({ hasText: "Operating margin" });
+  await expect(row).toContainText("60%");
 
   await page.goto("/kpis/recovery");
   await expect(

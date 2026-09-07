@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "catalog:",
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@google/genai": "catalog:",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@openokr/config": "workspace:*",
     "nodemailer": "catalog:",
     "openai": "catalog:",

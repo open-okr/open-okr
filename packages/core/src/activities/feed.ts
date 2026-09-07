@@ -22,9 +22,10 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, notInArray, or } from "drizzle-orm";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { accessScopeFilter } from "../access/reads.ts";
+import { PRIVATE_ACTIVITY_KINDS } from "./catalogue.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -103,6 +104,10 @@ export async function queryFeed<
 
   const conditions = [
     eq(activities.workspaceId, input.workspaceId),
+    // A member's own copilot conversation is not the workspace's reading
+    // (P4-T14a-a). Excluded here rather than at each caller, so a feed added
+    // later cannot forget it.
+    notInArray(activities.kind, [...PRIVATE_ACTIVITY_KINDS]),
     // Workspace-public by construction when no context was resolvable;
     // otherwise gated at the reader's own level, exactly like a single read.
     or(

@@ -8,18 +8,59 @@ This file says what will refuse the work, and why each refusal exists.
 
 ## Run these before every push
 
-In this order. The first four take seconds; the rest take minutes.
+In this order. The first four take seconds; the rest take minutes. **All of
+them, every time.** CLAUDE.md's rule is that a push leaves continuous
+integration green, and a push happens only when Agung asks for one, so there is
+always time to run the list.
 
 ```
 pnpm typecheck        # strict types across all ten packages
-pnpm lint             # Biome
+pnpm lint             # Biome. Read the whole tail, not the last few lines
 pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage
 pnpm check:boundaries # the architecture gate
 pnpm check:licences   # dependency licences
-pnpm test             # unit and integration, needs a database
+pnpm check:contract   # the committed OpenAPI document against the registry
+pnpm method:check     # packages/method against METHOD.md
+pnpm test             # unit and integration, needs a database. One at a time
 pnpm build            # then pnpm test:e2e
+pnpm check:signoff origin/main HEAD   # CI runs this on pull requests only
 ```
+
+**`pnpm test` at the root stops the whole run when one package fails**, and
+`packages/db`'s pooling spike always fails here for want of PgBouncer, which
+would take `packages/core` down with it. Run them apart:
+
+```
+TEST_DB_PORT=5432 pnpm exec turbo run test \
+  --filter=!@openokr/core --filter=!@openokr/db -- --no-file-parallelism
+TEST_DB_PORT=5432 pnpm --filter @openokr/db exec vitest run --no-file-parallelism
+TEST_DB_PORT=5432 pnpm --filter @openokr/core exec vitest run --no-file-parallelism
+```
+
+The last one takes about half an hour. Start it and do document work while it
+goes, but **do not edit the package mid-run** or the result is stale.
+
+**Read `pnpm lint`'s last three lines, not its last one.** Biome counts errors,
+warnings and infos on three separate lines in that order, so a `tail` short
+enough to cut the first one shows two clean-looking numbers over a red build.
+That has cost this branch twice. The script also passes
+`--max-diagnostics=400`: the default cap of 20 stops Biome *emitting* the rest,
+so an error past the cap is neither shown nor counted, and this repository is
+long past 20.
+
+**`pnpm lint` refuses a TypeScript parameter property, and that rule earns its
+place.** `noParameterProperties` is on because `constructor(readonly x: string)`
+is valid TypeScript that **every entry point in this repository refuses at
+runtime**: they all run under Node's `--experimental-strip-types`, which erases
+types without transpiling. Vitest transpiles, so a suite stays green while the
+real command dies on its first import. It has happened twice. `pnpm
+import:flowyteam` died on `mappers/reconcile.ts` at P6-T04a with 107 tests
+green, and again on `ports/realtime.ts` at P6-T04c with 153 green, that second
+time because the importer started importing the adapters barrel for one driver
+and the barrel loads every port. Turning the rule on found a third in
+`packages/agents/src/structured-extraction.ts` that nothing had run yet. Write
+the field out and assign it in the constructor body.
 
 If all of those pass locally, CI passes, with one exception named under
 **Sign-off** below that no local command checks unless you ask it to.
@@ -28,7 +69,7 @@ If all of those pass locally, CI passes, with one exception named under
 
 | Job | Steps | Skipped when |
 |---|---|---|
-| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries` | The push changed no code |
+| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
 | End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
@@ -36,6 +77,26 @@ If all of those pass locally, CI passes, with one exception named under
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
+| Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
+
+**Dependency review is the second gate no local command covers**, and the
+first is sign-off above. It runs on pull requests only, reads the advisory
+database rather than the repository, and fails on **moderate**, so it can turn
+red on a branch that has not changed a single dependency: an advisory
+published today against a package installed last month is enough. It refused
+PR #40 on 3 September 2026 over two moderate advisories against a transitive
+`qs`, while every other check on the same commit passed.
+
+The fix is usually a lockfile refresh rather than an override. `qs` arrives
+under `@modelcontextprotocol/sdk` through `express` and `body-parser`, and
+`body-parser` declares `^6.15.2`, so the patched `6.16.0` satisfied a range the
+tree already had: `pnpm update -r --depth Infinity qs` was the whole change.
+Reach for `overrides` only when the parent's own range excludes the fix, and
+say why in the change.
+
+`gh pr checks <number>` is how to see it, because a green `pnpm test:ci` says
+nothing about it. Note that a run listed as failed against an older head sha
+stays in `gh run list` forever; what matters is the checks on the current head.
 
 A documentation-only change skips every code job. That is why a `.md` edit comes
 back green in a minute and a one-line code change does not.
@@ -213,6 +274,40 @@ git rebase --signoff origin/main    # several
 The rebase rewrites every commit on the branch, so agree it with whoever else is
 working there before running it. On a branch two people share, that is a
 conversation, not a command.
+
+## What this machine cannot run, and what covers it
+
+Added 7 September 2026, alongside CLAUDE.md's rule that a push must leave every
+CI job green. **A gate you did not run is not a gate that passed**, so this is
+the list of the ones to name rather than quietly skip.
+
+| Gate | Why not here | Where it does run |
+|---|---|---|
+| `deploy/helm/check.sh` | `helm` is not installed | The `helm` CI job |
+| `deploy/helm/cluster-test.sh` | Needs `helm` and a kind cluster | The `helm` CI job |
+| `deploy/docker/smoke-test.sh` | Needs Docker | The `deploy` CI job |
+| `packages/db/test/pooling-spike.test.ts` | Needs PgBouncer, which needs Docker | Every `test` shard |
+| The S3 round trip in `storage-s3.test.ts` | Needs an S3-compatible service | Nowhere yet. Point `TEST_S3_*` at a MinIO |
+| The FlowyTeam connector's three suites | Need a MySQL | Every `test` shard |
+| CodeQL, Dependency review | Not runnable locally at all | Their own workflows |
+
+Everything else runs here. `TEST_DB_PORT=5432` against the native Postgres is
+what makes the unit suites and the end-to-end suite work without Docker, and
+CLAUDE.md's Commands section has the exact lines.
+
+**So the only way to know those seven are green is to watch the run**, which
+CLAUDE.md now requires after every push. On 6 September 2026 three of them went
+red at once behind a single change and nobody noticed for a day: the Helm chart
+check, CodeQL and Dependency review, all from the commit that added the S3
+driver. Every local gate was green throughout.
+
+**A push to `agung` with no open pull request produces no run at all**, because
+`ci.yml` triggers on `push` to `main` and on `pull_request`. That is the state
+most likely to be mistaken for success.
+
+**The four `pooling-spike` failures are the expected local result**, not a
+regression: 105 of 109 in `packages/db` pass and those four need PgBouncer. Say
+so rather than reporting the suite as red or as green.
 
 ## Two mechanics of this machine
 

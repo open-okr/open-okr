@@ -25,13 +25,6 @@ interface KrConfidenceStatus {
   readonly whatChanged: string | null;
 }
 
-interface Vote {
-  readonly id: string;
-  readonly memberId: string;
-  readonly confidence: number;
-  readonly revealedAt: string | null;
-}
-
 interface ConfidenceRoundProps {
   readonly sessionId: string;
   readonly krStatuses: readonly KrConfidenceStatus[];

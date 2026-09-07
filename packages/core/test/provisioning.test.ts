@@ -110,16 +110,16 @@ describe("the first registration provisions a workspace", () => {
     const wb = await workerDb();
     await register("ada@example.com", "Ada Lovelace");
 
-    // Two members, not one: the registering person and the Champion agent,
-    // seeded in the same transaction (P4-T05a). The property under test is
-    // still atomicity, so both halves are counted rather than the total being
-    // loosened to "at least one".
+    // Three members, not one: the registering person and both seeded agents,
+    // the Champion (P4-T05a) and the Coach (P4-T06a), all in the same
+    // transaction. The property under test is still atomicity, so every half
+    // is counted rather than the total being loosened to "at least one".
     const counts = await wb.admin.query(
       `select (select count(*) from workspaces)::int as w,
               (select count(*) from workspace_members where kind = 'human')::int as humans,
               (select count(*) from workspace_members where kind = 'agent')::int as agents`,
     );
-    expect(counts.rows[0]).toEqual({ w: 1, humans: 1, agents: 1 });
+    expect(counts.rows[0]).toEqual({ w: 1, humans: 1, agents: 2 });
   });
 });
 
@@ -260,10 +260,11 @@ describe("one user, several workspaces", () => {
         const rows = await client.query<{ workspace_id: string }>(
           "select workspace_id from workspace_members",
         );
-        // The member and the workspace's own Champion (P4-T05a). What this
-        // test is about is that neither workspace can see the other's rows,
-        // so every row is checked rather than the count being the assertion.
-        expect(rows.rows).toHaveLength(2);
+        // The member and the workspace's own two agents (P4-T05a, P4-T06a).
+        // What this test is about is that neither workspace can see the
+        // other's rows, so every row is checked rather than the count being
+        // the assertion.
+        expect(rows.rows).toHaveLength(3);
         for (const row of rows.rows) {
           expect(row.workspace_id).toBe(membership.workspaceId);
         }

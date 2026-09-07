@@ -27,11 +27,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ALIGNMENT_CHECKS,
+  canonThresholds,
   CYCLE_CHECKS,
   isTriggerKey,
   KEY_RESULT_CHECKS,
   OBJECTIVE_CHECKS,
   QUALITY_WORD_LISTS,
+  roomPulseRead,
   THRESHOLDS,
 } from "../packages/method/src/index.ts";
 
@@ -247,6 +249,43 @@ for (const entry of corpusEntries) {
     fail(
       "corpus",
       `corpus entry ${entry.number} ("${entry.title}") is approved and no test names it`,
+    );
+  }
+}
+
+// --- §8.2's read of the room (P4-T10a-b) ------------------------------------
+//
+// A facilitator acts on these three sentences, so the package must carry them
+// word for word. The method test suite already asserts each one appears in
+// METHOD.md; this is the other direction, and the one that matters when
+// somebody edits the document: every read the document lists has to be a read
+// the package can produce.
+
+const roomPulseSection = section(method, "### 8.2 Room pulse", "### 8.3");
+const documentedReads = roomPulseSection
+  .split(NEWLINE)
+  .map((line) => /^\|\s*(?:[^|]+)\|\s*([^|]+?)\s*\|$/.exec(line)?.[1])
+  .filter((read): read is string => read !== undefined && read !== "Read")
+  .filter((read) => !/^-+$/.test(read));
+
+if (documentedReads.length !== 3) {
+  fail(
+    "room pulse",
+    `found ${documentedReads.length} reads in METHOD.md §8.2; the parse is wrong, not the document`,
+  );
+}
+
+const packageReads = [
+  roomPulseRead([5], canonThresholds()),
+  roomPulseRead([3.5], canonThresholds()),
+  roomPulseRead([1], canonThresholds()),
+].map((entry) => entry?.read);
+
+for (const documentedRead of documentedReads) {
+  if (!packageReads.includes(documentedRead)) {
+    fail(
+      "room pulse",
+      `METHOD.md §8.2 reads "${documentedRead}", which packages/method does not produce for any band`,
     );
   }
 }

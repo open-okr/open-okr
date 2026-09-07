@@ -10,6 +10,23 @@
 # Non-default host ports so a locally installed Postgres on 5432 is never
 # touched. Credentials are throwaway test values; never reuse them anywhere.
 #
+# Both ports come from the environment, defaulting to the numbers above, and
+# they are the same two variables the test harness already reads
+# (packages/test-support/src/db-env.ts). Set them and the stack and the suite
+# move together. Continuous integration sets a different pair per job, because
+# two jobs sharing a host cannot both bind 55432 and the second one fails while
+# starting rather than while testing, which reads as a broken test suite.
+# `COMPOSE_PROJECT_NAME` names the stack, so two of them can also coexist.
+#
+# One consequence worth knowing: if you have set `TEST_DB_PORT=5432` to point
+# the suite at a Postgres you installed yourself, do not also run `db:up` — it
+# would now try to publish the container on 5432 and collide with that server.
+# Pointing the suite at your own Postgres means not needing this stack at all.
+#
+# Set either to `0` and Docker picks a free port; `pnpm db:ports` reads back
+# which. That is what continuous integration does, because two rounds of choosing
+# numbers by hand both ended in "address already in use".
+#
 # Start with: pnpm db:up   Stop with: pnpm db:down
 name: openokr-test
 
@@ -20,7 +37,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "55432:5432"
+      - "${TEST_DB_PORT:-55432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
@@ -30,13 +47,38 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
 
+  # The FlowyTeam source the importer's connector reads (P6-T02). Test-only,
+  # like everything else here: the product needs Postgres and nothing else, and
+  # this exists because the one source system this importer migrates from runs
+  # on MySQL. The connector's acceptance criterion is that it provably cannot
+  # write to a real source, and only a real server can answer that.
+  #
+  # 8.4 rather than latest: it is the version the instances this connector was
+  # written against run, and a source database is not a thing a customer
+  # upgrades because a test suite prefers it.
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+    command:
+      - --skip-mysqlx
+    ports:
+      - "${TEST_MYSQL_PORT:-53306}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/mysql
+
   pgbouncer:
     image: edoburu/pgbouncer:v1.24.1-p1
     volumes:
       - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
     ports:
-      - "56432:6432"
+      - "${TEST_PGBOUNCER_PORT:-56432}:6432"
     depends_on:
       postgres:
         condition: service_healthy

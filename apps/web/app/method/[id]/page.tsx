@@ -73,7 +73,7 @@ export default async function RulePage({
 
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">
@@ -129,14 +129,14 @@ export default async function RulePage({
               {examples.map((pair) => (
                 <div key={pair.weak} className="flex flex-col gap-2">
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-md border border-bad/40 bg-bad-weak p-2">
-                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad-text">
+                    <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
+                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
                         Weak
                       </p>
                       <p className="text-sm text-ink">{pair.weak}</p>
                     </div>
-                    <div className="rounded-md border border-ok/40 bg-ok-weak p-2">
-                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok-text">
+                    <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
+                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
                         Strong
                       </p>
                       <p className="text-sm text-ink">{pair.strong}</p>
@@ -180,7 +180,7 @@ export default async function RulePage({
 function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-3.5">
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">

@@ -2,15 +2,20 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  CLOSE_DECISION_MEANINGS,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   PROCESS_HEALTH_STATEMENTS,
+  REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
   RHYTHM_STATEMENTS,
   RITUALS,
+  ROOT_CAUSES,
+  reviewStageKey,
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
+  roomPulseRead,
   WEEKLY_STEPS,
 } from "../src/sessions.ts";
 import { canonThresholds, resolveThresholds } from "../src/thresholds.ts";
@@ -58,6 +63,23 @@ describe("§8.1's eleven stages", () => {
     expect(reviewStages(thresholds)[0]?.minutes).toBe(5);
   });
 
+  it("each carry one stage key, in the same order (P4-T10a-a)", () => {
+    // The keys are what `sessions.stage_key`, `sessions.elapsed` and
+    // `sessions.notes` are keyed by, so the pairing with the stage numbers has
+    // to hold or a stored note stops resolving to the stage it was written in.
+    expect(REVIEW_STAGE_KEYS).toHaveLength(REVIEW_STAGES.length);
+    expect(new Set(REVIEW_STAGE_KEYS).size).toBe(REVIEW_STAGE_KEYS.length);
+    for (const stage of REVIEW_STAGES) {
+      expect(reviewStageKey(stage.stage)).toBe(
+        REVIEW_STAGE_KEYS[stage.stage - 1],
+      );
+    }
+    // Out of range is null rather than undefined-shaped, so a caller has one
+    // thing to check.
+    expect(reviewStageKey(0)).toBeNull();
+    expect(reviewStageKey(12)).toBeNull();
+  });
+
   it("group into the four acts, in the document's order", () => {
     const acts = REVIEW_STAGES.map((entry) => entry.act);
     // An act never resumes after another has started: the rail is drawn in
@@ -90,6 +112,55 @@ describe("§7.2's four steps", () => {
     expect(WEEKLY_STEPS.map((entry) => entry.step)).toEqual([1, 2, 3, 4]);
     for (const step of WEEKLY_STEPS) {
       expect(method).toContain(step.title);
+    }
+  });
+});
+
+describe("§8.8's close decisions", () => {
+  it("carry the document's three meanings, word for word", () => {
+    // Read back out of METHOD.md rather than restated here. The three words
+    // themselves live in `packages/db` as GOAL_CLOSE_DECISIONS because a goal
+    // stores which one it ended on; what belongs to the method is what each one
+    // means, and a screen writing its own gloss on "modify" is drift.
+    expect(Object.keys(CLOSE_DECISION_MEANINGS)).toEqual([
+      "keep",
+      "modify",
+      "abandon",
+    ]);
+    for (const meaning of Object.values(CLOSE_DECISION_MEANINGS)) {
+      expect(method).toContain(meaning);
+    }
+  });
+
+  it("states the rule the stage exists for", () => {
+    // §8.8's closing line, and the reason no decision is pre-selected anywhere.
+    expect(method).toContain("Nothing carries over by default.");
+  });
+});
+
+describe("§8.4's root causes", () => {
+  it("are the document's eight, word for word", () => {
+    // Read back out of METHOD.md rather than restated here, so editing either
+    // one without the other fails the build. Same shape as the §8.5 statements
+    // and the §8.7 questions below.
+    expect(ROOT_CAUSES).toHaveLength(8);
+    for (const cause of ROOT_CAUSES) {
+      expect(method).toContain(cause);
+    }
+  });
+
+  it("keeps the document's order, because the picker shows it", () => {
+    // §8.4 numbers them, and a room reading the picker top to bottom should be
+    // reading the document. A set comparison would pass on a shuffled list.
+    const section = method.slice(
+      method.indexOf("### 8.4 Root causes"),
+      method.indexOf("### 8.5 Process health"),
+    );
+    let cursor = -1;
+    for (const cause of ROOT_CAUSES) {
+      const at = section.indexOf(cause);
+      expect(at).toBeGreaterThan(cursor);
+      cursor = at;
     }
   });
 });
@@ -203,5 +274,57 @@ describe("§8.6's rhythm diagnostic", () => {
       expect(method).toContain(result.diagnosis);
       expect(method).toContain(result.prescription);
     }
+  });
+});
+
+describe("section 8.2's read of the room (P4-T10a-b)", () => {
+  it("reads every band's sentence out of the document", () => {
+    // The same conformance the diagnostic gets: a facilitator acts on these
+    // words, so a paraphrase would be the product giving different advice than
+    // the method does.
+    for (const pulses of [
+      [5, 4],
+      [3, 4],
+      [1, 2],
+    ]) {
+      const result = roomPulseRead(pulses, thresholds);
+      expect(result).not.toBeNull();
+      expect(method).toContain(result?.read);
+    }
+  });
+
+  it("puts the boundaries where the document puts them", () => {
+    // "4.0 and above", "3.0 to 3.9", "below 3.0". Inclusive at the top of each
+    // band, exclusive at the bottom, and the boundary values themselves are
+    // the cases most likely to be written the wrong way round.
+    expect(roomPulseRead([4], thresholds)?.band).toBe("energetic");
+    expect(roomPulseRead([3.9], thresholds)?.band).toBe("steady");
+    expect(roomPulseRead([3], thresholds)?.band).toBe("steady");
+    expect(roomPulseRead([2.99], thresholds)?.band).toBe("costly");
+  });
+
+  it("takes its boundaries from the registry, not from literals", () => {
+    // A workspace that retuned the bands is read by its own numbers. Four is
+    // energetic by default and merely steady once the bar moves to 4.5.
+    const strict = resolveThresholds({
+      "sessions.roomPulseBands": { high: 4.5, low: 3.5 },
+    });
+    expect(roomPulseRead([4], thresholds)?.band).toBe("energetic");
+    expect(roomPulseRead([4], strict)?.band).toBe("steady");
+  });
+
+  it("returns nothing when nobody has spoken", () => {
+    // An empty room is not a costly one. Telling a facilitator the cycle cost
+    // something before anybody has given a pulse would be the product
+    // inventing a mood.
+    expect(roomPulseRead([], thresholds)).toBeNull();
+  });
+
+  it("carries the average it read, unrounded", () => {
+    // The screen decides how to display it. Rounding here would make 3.95 show
+    // as 4.0 beside the sentence for a steady room, which reads as a bug in the
+    // bands rather than a rounding choice.
+    expect(roomPulseRead([4, 3, 4, 5], thresholds)?.average).toBe(4);
+    expect(roomPulseRead([3, 4], thresholds)?.average).toBe(3.5);
   });
 });

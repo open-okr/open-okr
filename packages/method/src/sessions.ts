@@ -145,6 +145,38 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
 
 export type ReviewAct = "open" | "review" | "retro" | "reset";
 
+/**
+ * Stage keys for quarterly reviews, in §8.1's order (P4-T10a-a).
+ *
+ * These are what the database stores in `sessions.stage_key`, and what
+ * `sessions.elapsed` and `sessions.notes` are keyed by. Explicit rather than
+ * derived from the titles: a slug generated from canon text would change the
+ * moment somebody rewords a stage, and every stored `elapsed` key and
+ * facilitator note would stop resolving.
+ *
+ * Index 0 is stage 1, index 10 is stage 11, matching `REVIEW_STAGES`
+ * position for position. A test asserts that pairing rather than trusting it.
+ */
+export const REVIEW_STAGE_KEYS = [
+  "open",
+  "score",
+  "narratives",
+  "recognition",
+  "team_retro",
+  "management_retro",
+  "root_cause",
+  "process_health",
+  "keep_modify_abandon",
+  "learnings",
+  "actions",
+] as const;
+export type ReviewStageKey = (typeof REVIEW_STAGE_KEYS)[number];
+
+/** The stage key for a §8.1 stage number, 1 to 11. */
+export function reviewStageKey(stage: number): ReviewStageKey | null {
+  return REVIEW_STAGE_KEYS[stage - 1] ?? null;
+}
+
 export interface ReviewStage {
   /** 1 to 11, as §8.1 numbers them. */
   readonly stage: number;
@@ -256,6 +288,100 @@ export function reviewStages(
  * diagnostic. `RHYTHM_STATEMENTS` names them rather than leaving two indexes
  * written down somewhere else.
  */
+/** Section 8.2's three bands, highest first. */
+export type RoomPulseBand = "energetic" | "steady" | "costly";
+
+export interface RoomPulseRead {
+  readonly band: RoomPulseBand;
+  /** The average the band was read from, unrounded. */
+  readonly average: number;
+  /** METHOD.md 8.2's own sentence for this band, word for word. */
+  readonly read: string;
+}
+
+/**
+ * The three reads from METHOD.md 8.2, keyed by band.
+ *
+ * Verbatim from the document, and the conformance suite compares them against
+ * it: this is a coaching sentence a facilitator acts on, not a label, and a
+ * paraphrase here would be the product quietly giving different advice than the
+ * method does.
+ */
+const ROOM_PULSE_READS: Record<RoomPulseBand, string> = {
+  energetic:
+    "The room has energy. Use it. Be honest about ambition, not just relieved",
+  steady:
+    "Steady, not euphoric. Watch for polite scoring later. Steady rooms round their numbers up",
+  costly:
+    "The cycle cost something. Name it early or it leaks into every score in the next ten minutes",
+};
+
+/**
+ * Section 8.2's read of the room, from the pulses the room gave (P4-T10a-b).
+ *
+ * The boundaries come from `sessions.roomPulseBands` rather than from literals,
+ * so a workspace that retuned them is read by its own numbers. Section 8.2's
+ * table is inclusive at the top of each band and exclusive at the bottom: "4.0
+ * and above", "3.0 to 3.9", "below 3.0".
+ *
+ * Null when nobody has given a pulse. An average of zero is not a costly room,
+ * it is an empty one, and telling a facilitator the cycle cost something before
+ * anybody has spoken would be the product inventing a mood.
+ */
+export function roomPulseRead(
+  pulses: readonly number[],
+  thresholds: ResolvedThresholds,
+): RoomPulseRead | null {
+  if (pulses.length === 0) {
+    return null;
+  }
+  const { high, low } = thresholds["sessions.roomPulseBands"];
+  const average = pulses.reduce((sum, pulse) => sum + pulse, 0) / pulses.length;
+  const band: RoomPulseBand =
+    average >= high ? "energetic" : average >= low ? "steady" : "costly";
+  return { band, average, read: ROOM_PULSE_READS[band] };
+}
+
+/**
+ * §8.8's three ways to close an objective, and what each one means.
+ *
+ * **A taxonomy, so it lives here.** The three words already exist as
+ * `GOAL_CLOSE_DECISIONS` in `packages/db` because a goal stores which one it
+ * ended on; what was missing is the meaning, and a screen that writes its own
+ * gloss on "modify" is a screen that will disagree with the document. Keyed by
+ * the same three words so the two cannot drift apart.
+ *
+ * §8.8's closing line is the point of the stage: nothing carries over by
+ * default.
+ */
+export const CLOSE_DECISION_MEANINGS: Readonly<Record<string, string>> = {
+  keep: "Still relevant. Carry forward deliberately",
+  modify: "Adjust the target or wording from what we learned",
+  abandon: "Priority shifted. End it cleanly",
+};
+
+/**
+ * §8.4's eight causes, one-based, and exactly one of them is primary.
+ *
+ * **A taxonomy, so it lives here and never in a row.** §11 lists the root-cause
+ * taxonomy among the structures a workspace cannot change, and a cause stored as
+ * text would let one be edited and would leave old reviews naming a cause the
+ * method no longer has.
+ *
+ * The order is the document's, because the picker shows them in it and a room
+ * reading the list top to bottom is reading §8.4.
+ */
+export const ROOT_CAUSES: readonly string[] = [
+  "Ambition set too high",
+  "Wrong key result. We measured the wrong thing",
+  "Blocked by a dependency",
+  "Capacity or resourcing",
+  "Priority shifted mid-cycle",
+  "External or market change",
+  "Lack of focus. Too many OKRs",
+  "No clear owner or cadence",
+];
+
 export const PROCESS_HEALTH_STATEMENTS: readonly string[] = [
   "Our OKRs stayed visible and were genuinely used to make decisions this cycle.",
   "We held a real check-in cadence, not a status report.",

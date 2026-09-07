@@ -63,8 +63,54 @@ export const sessions = pgTable("okr_sessions", {
     .$type<Record<string, number>>()
     .notNull()
     .default({}),
-  /** Per-stage facilitator notes, keyed by stage_key. */
+  /**
+   * Per-stage facilitator notes, keyed by stage_key.
+   *
+   * **Private to the facilitator.** `sessions.read` returns this only to the
+   * member the session names as facilitator and an empty object to everybody
+   * else (P4-T10a-a). Nothing else may be filed in here for that reason.
+   */
   notes: jsonb("notes").$type<Record<string, unknown>>().notNull().default({}),
+  /**
+   * Whole minutes the facilitator added to a stage, keyed by stage_key
+   * (METHOD.md §8.1, P4-T10a-a).
+   *
+   * Separate from §11's `sessions.quarterlyStageMinutes`, which is the
+   * workspace's standing agenda: one room running long on one day must not
+   * retune every future review.
+   */
+  addedMinutes: jsonb("added_minutes")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  /**
+   * §7.5's resource or priority shifts, one note for a monthly review.
+   *
+   * Its own column rather than a key inside `notes`, which holds the
+   * facilitator's private per-stage notes (P4-T10a). A shared record inside a
+   * private-by-design column is one refactor away from being published by
+   * accident.
+   */
+  shifts: text("shifts"),
+  /**
+   * Which objective holds the mic in stage three (METHOD.md §8.1, P4-T10c).
+   *
+   * A pointer rather than a row per turn. Exactly one objective holds it at a
+   * time, and a single column is the only shape that cannot represent two
+   * holders. Null before the stage starts and null again once the last owner has
+   * spoken.
+   */
+  micGoalId: uuid("mic_goal_id"),
+  /**
+   * The salt behind `process_health_responses.respondent_hash` (P4-T11b).
+   *
+   * Written when the first response arrives. A hash of the member id alone
+   * would be the same string in every review, so somebody holding the table
+   * could follow one unnamed person's answers across quarters. A per-review
+   * salt breaks that link, and it survives root-key rotation, which an HMAC on
+   * the instance secret would not.
+   */
+  processHealthSalt: text("process_health_salt"),
   state: text("state", { enum: SESSION_STATES }).notNull().default("scheduled"),
   /** FK to the digest row once P4-T08 adds the digests table. */
   digestId: uuid("digest_id"),

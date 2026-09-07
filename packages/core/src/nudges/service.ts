@@ -22,10 +22,12 @@ import {
   checkIns,
   cycles,
   goals,
+  keyResults,
   type NudgeKind,
   type NudgeSubjectType,
   nudgeRules,
   nudges,
+  proposedChanges,
   rhythmSettings,
   spaceMembers,
   type WorkspaceTx,
@@ -42,9 +44,26 @@ import {
   trigger,
 } from "@openokr/method";
 import { and, asc, count, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
 import { daysPastDue } from "../cadence/service.ts";
 import { OperationError } from "../operations/errors.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
+
+/**
+ * A change the agent would make, offered rather than made (P4-T05c-a).
+ *
+ * `action` and `payload` are exactly what `proposals.bulkApply` will call, so a
+ * proposal is a deferred action call and nothing more. That is what keeps
+ * "propose by default" honest: there is no second write path an agent could
+ * take, only an action a human runs later under their own name.
+ */
+export interface NudgeProposal {
+  /** A key in the action registry. Applying it calls that action verbatim. */
+  readonly action: string;
+  readonly payload: Record<string, unknown>;
+  /** True only where a model wrote the content. §6.5's template is not AI. */
+  readonly aiGenerated: boolean;
+}
 
 export interface DueNudge {
   readonly ruleKey: string;
@@ -61,6 +80,15 @@ export interface DueNudge {
    * champion's own reminders and none of them earns waking somebody up.
    */
   readonly urgent: boolean;
+  /**
+   * The change this nudge offers, when it offers one.
+   *
+   * Absent on almost every nudge: a reminder to do something yourself carries
+   * no draft. Present, it is written as a `proposed_changes` row and the nudge
+   * links to it, so the recipient sees one thing to act on rather than two rows
+   * to correlate.
+   */
+  readonly proposal?: NudgeProposal;
 }
 
 /**
@@ -83,13 +111,18 @@ const RULE_FOR_STEP: Record<number, string> = {
 /**
  * Which member holds a role for a goal.
  *
+ * Exported since P4-T05b, because the blocker ladder resolves the same four
+ * roles against the same goal columns. A second copy of "the coordinator falls
+ * back to the manager, and the sponsor lives on the cycle" is how two ladders
+ * end up escalating to different people from the same row.
+ *
  * The champion and the reviewer are columns. The coordinator and the sponsor are
  * space roles, and where a space has no coordinator the role resolves to the
  * space manager (TECHNICAL-PLAN §4.2). A role nobody holds resolves to nothing
  * rather than to somebody arbitrary: escalating to a person who was never given
  * the job is worse than not escalating.
  */
-async function memberForRole(
+export async function memberForRole(
   tx: WorkspaceTx,
   goal: {
     readonly championId: string | null;
@@ -153,6 +186,12 @@ export async function dueCheckInNudges(
     readonly now: Date;
     readonly timeZone: string;
     readonly thresholds: ResolvedThresholds;
+    /**
+     * Language for the champion's own reminder, when the host has a provider
+     * (P4-T05c-b). Absent is the normal case: the ladder, the escalation and
+     * the nudge are unchanged, and only the drafted check-in is missing.
+     */
+    readonly drafter?: AgentDrafter;
   },
 ): Promise<readonly DueNudge[]> {
   const grace = input.thresholds["cadence.stalenessGraceDays"];
@@ -160,6 +199,8 @@ export async function dueCheckInNudges(
   const rows = await tx
     .select({
       id: goals.id,
+      title: goals.title,
+      health: goals.health,
       nextCheckInAt: goals.nextCheckInAt,
       championId: goals.championId,
       reviewerId: goals.reviewerId,
@@ -202,6 +243,12 @@ export async function dueCheckInNudges(
       );
     }
 
+    // Drafted once per goal, not once per recipient: the escalation may reach
+    // four people and they are all looking at one check-in. Only the champion's
+    // own nudge carries it, because they are the one who can publish it.
+    const drafted =
+      input.drafter && past > 0 ? await draftFor(tx, input, goal, past) : null;
+
     for (const role of step.targets) {
       const memberId = await memberForRole(tx, goal, role);
       if (!memberId) {
@@ -234,10 +281,81 @@ export async function dueCheckInNudges(
         // past a ceiling written to stop exactly that, which is what the
         // simulated month found.
         urgent: role !== "champion",
+        ...(drafted && role === "champion"
+          ? {
+              proposal: {
+                action: "goals.publishDraftedCheckIn",
+                payload: {
+                  goalId: goal.id,
+                  status: drafted.status,
+                  confidence: drafted.confidence,
+                  narrative: drafted.narrative,
+                  values: [],
+                },
+                // A model wrote these words, and the review queue says so.
+                aiGenerated: true,
+              } as const,
+            }
+          : {}),
       });
     }
   }
   return due;
+}
+
+/**
+ * One drafted check-in for a goal, or nothing.
+ *
+ * **Never throws.** A provider that is off, a budget that is spent or output
+ * the schema refused twice all arrive here as null, and the nudge goes out
+ * without a draft. A run that fell over because a model was having a bad
+ * minute would take the whole rhythm with it, and the rhythm is the part that
+ * has to work.
+ *
+ * `values: []` on the proposal, deliberately. A model may write a narrative and
+ * read a status; it may not invent the numbers. Whoever applies the proposal
+ * fills the values in the composer, which is where the key results and their
+ * units are in front of them.
+ */
+async function draftFor(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly drafter?: AgentDrafter;
+  },
+  goal: {
+    readonly id: string;
+    readonly title: string;
+    readonly health: string;
+  },
+  daysOverdue: number,
+): Promise<DraftedCheckIn | null> {
+  if (!input.drafter) {
+    return null;
+  }
+  const rows = await tx
+    .select({ title: keyResults.title, progressPct: keyResults.progressPct })
+    .from(keyResults)
+    .where(activeOnly(keyResults, eq(keyResults.goalId, goal.id)));
+
+  try {
+    return (
+      (await input.drafter.draftCheckIn?.({
+        goalTitle: goal.title,
+        daysOverdue,
+        // `pending` is not a previous status, it is the absence of one, and
+        // telling a model the goal was "pending" invites it to write about a
+        // state nobody reported.
+        previousStatus: goal.health === "pending" ? null : goal.health,
+        keyResults: rows.map((row) => ({
+          title: row.title,
+          progressPct: Number(row.progressPct),
+        })),
+      })) ?? null
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -254,18 +372,65 @@ export async function recordNudgesInTx(
     readonly due: readonly {
       readonly nudge: DueNudge;
       readonly suppressedReason: SuppressionReason | null;
+      /**
+       * When this one may be delivered (P5-T01b-b).
+       *
+       * Defaults to `at`. Later than `at` inside the member’s own quiet
+       * hours, which AI-NATIVE-PLAN §5.4 says queues to the next open window
+       * rather than dropping the message.
+       */
+      readonly deliverAt?: Date;
     }[];
     readonly at: Date;
+    /**
+     * The agent run these proposals belong to (P4-T05c-a).
+     *
+     * `proposed_changes.run_id` is not null, so without a run there is nothing
+     * for a proposal to hang off and any proposal on a due nudge is skipped.
+     * That is the correct behaviour rather than a gap: `nudges.run`, the hourly
+     * queue an administrator can call by hand, is not an agent run and must not
+     * invent one to look like it proposed something.
+     */
+    readonly runId?: string;
   },
-): Promise<readonly { readonly id: string; readonly sent: boolean }[]> {
-  const written: { id: string; sent: boolean }[] = [];
-  for (const { nudge, suppressedReason } of input.due) {
+): Promise<
+  readonly {
+    readonly id: string;
+    readonly sent: boolean;
+    readonly proposalId: string | null;
+  }[]
+> {
+  const written: {
+    id: string;
+    sent: boolean;
+    proposalId: string | null;
+  }[] = [];
+  for (const { nudge, suppressedReason, deliverAt } of input.due) {
     if (!isTriggerKey(nudge.ruleKey)) {
       throw new OperationError(
         "forbidden",
         `\`${nudge.ruleKey}\` is not a rule the method package defines.`,
       );
     }
+
+    // The proposal is written first, so the nudge can carry its id in the same
+    // insert rather than being updated a moment later. Both are on this
+    // transaction, so they commit together or not at all.
+    //
+    // A suppressed nudge still gets its proposal. The suppression decided that
+    // **the message** was noise, not that the change was unwanted, and the
+    // review queue is an obligation rather than a message: P3-T08's rule that
+    // a snooze never hides a review-inbox obligation is the same rule seen
+    // from here.
+    const proposalId =
+      nudge.proposal && input.runId
+        ? await recordProposalInTx(tx, {
+            workspaceId: input.workspaceId,
+            runId: input.runId,
+            nudge,
+            proposal: nudge.proposal,
+          })
+        : null;
     // openokr:allow-mutation: runs on the transaction the calling Operation
     // opened, so the nudge rows and that Operation's audit row commit together.
     const [row] = await tx
@@ -279,18 +444,87 @@ export async function recordNudgesInTx(
         recipientMemberId: nudge.recipientMemberId,
         channel: nudge.channel,
         escalationStep: nudge.escalationStep,
-        scheduledFor: input.at,
+        scheduledFor: deliverAt ?? input.at,
+        // Never stamped here (P5-T01b-b). A recorded nudge is owed to somebody
+        // and not yet delivered; `deliverDueNudges` is what routes it, writes
+        // the inbox row and stamps `sent_at`. Writing it here would have said
+        // a message was sent before anything decided where it was going.
+        //
         // A suppressed nudge is a row with a reason and no `sent_at`. Both
         // halves matter: the row is what makes the silence answerable.
-        sentAt: suppressedReason === null ? input.at : null,
+        sentAt: null,
         suppressedReason,
+        proposalId,
       })
       .returning({ id: nudges.id });
     if (row) {
-      written.push({ id: row.id, sent: suppressedReason === null });
+      written.push({
+        id: row.id,
+        sent: suppressedReason === null,
+        proposalId,
+      });
     }
   }
   return written;
+}
+
+/**
+ * Writes one proposal, unless an identical one is already waiting.
+ *
+ * **One pending proposal per subject per action.** A run happens every hour and
+ * the condition that raised it holds until somebody acts, so an unguarded
+ * insert would grow the review queue by one row an hour for a KPI nobody has
+ * got to yet. The deduplication window does that job for nudges; this is the
+ * same idea for the queue, and it has to be a distinct check because a proposal
+ * has no `scheduled_for` to compare.
+ *
+ * Only `pending` blocks a new one. A proposal somebody dismissed was a decision
+ * about that proposal, and a KPI still unhealthy a week later is entitled to be
+ * offered again rather than silently never mentioned.
+ */
+async function recordProposalInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly runId: string;
+    readonly nudge: DueNudge;
+    readonly proposal: NudgeProposal;
+  },
+): Promise<string | null> {
+  const [existing] = await tx
+    .select({ id: proposedChanges.id })
+    .from(proposedChanges)
+    .where(
+      and(
+        eq(proposedChanges.workspaceId, input.workspaceId),
+        eq(proposedChanges.status, "pending"),
+        eq(proposedChanges.action, input.proposal.action),
+        eq(proposedChanges.subjectType, input.nudge.subjectType),
+        eq(proposedChanges.subjectId, input.nudge.subjectId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    // Linked to the one already waiting rather than skipped, so today's nudge
+    // still points at something the recipient can act on.
+    return existing.id;
+  }
+
+  // openokr:allow-mutation: the calling Operation's own transaction, so the
+  // proposal, the nudge that carries it and the audit row commit together.
+  const [row] = await tx
+    .insert(proposedChanges)
+    .values({
+      workspaceId: input.workspaceId,
+      runId: input.runId,
+      action: input.proposal.action,
+      payload: input.proposal.payload,
+      subjectType: input.nudge.subjectType,
+      subjectId: input.nudge.subjectId,
+      aiGenerated: input.proposal.aiGenerated,
+    })
+    .returning({ id: proposedChanges.id });
+  return row?.id ?? null;
 }
 
 /** Members who are active, so a suspended one is never nudged. */
@@ -610,7 +844,7 @@ export async function dueAcknowledgementNudges(
 }
 
 /** The role columns a goal carries, for resolving a ladder target. */
-async function goalRolesFor(
+export async function goalRolesFor(
   tx: WorkspaceTx,
   workspaceId: string,
   goalId: string,

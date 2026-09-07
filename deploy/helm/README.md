@@ -48,24 +48,67 @@ and skip generation entirely.
 | `database.url` | none | Required unless `database.existingSecret` is set |
 | `database.adminUrl` | none | Owner-role connection used only by the migration hook, so the application role never owns the tables |
 | `publicUrl` | first ingress host | Passkeys are bound to this origin. Get it right |
-| `replicaCount` | 2 | Migrations run in a hook, so more than one is safe from the first install |
-| `persistence.enabled` | false | Local-disk file storage. See the warning below |
+| `replicaCount` | 1 | Migrations run in a hook, so more than one is safe. One is the default because the default storage mode cannot be shared |
+| `persistence.enabled` | true | A volume for uploaded files. See below |
 | `mail.transport` | console | `console` writes mail to the pod log and needs no server |
 | `instance.registration` | auto | Open until the instance is claimed, then closed |
 
 ## Storage and replicas
 
-`persistence.enabled=true` with the default `ReadWriteOnce` access mode and
-more than one replica is refused at template time, with an explanation. A
-ReadWriteOnce volume cannot be shared across nodes, so uploads would land on
-one pod and be missing from the others — which reads as random data loss
-rather than as a configuration error.
+**The defaults keep files: one replica, one `ReadWriteOnce` volume at
+`/app/storage`.** They changed on 7 September 2026. They used to be two
+replicas with persistence off, which is the one combination that loses uploads
+without saying anything: the mount falls back to an `emptyDir`, so a file lands
+on whichever pod served the request, is missing from the other, and is gone when
+either restarts. The gap audit recorded it as B-11.
 
-Pick one:
+`persistence.enabled=true` with `ReadWriteOnce` and more than one replica is
+refused at template time, with an explanation, because such a volume cannot be
+mounted by pods on more than one node.
 
-- one replica
-- a `ReadWriteMany` storage class
-- S3-compatible object storage, leaving persistence off
+To run more than one replica, pick one:
+
+- a `ReadWriteMany` class: `--set persistence.accessMode=ReadWriteMany`
+- S3-compatible object storage, which is shared by definition
+
+Turning persistence off is allowed and not refused. An instance that accepts no
+uploads is entitled to run that way, and refusing it would break a release that
+is already running. `helm install` prints what it costs.
+
+### S3-compatible object storage
+
+Naming a bucket is the whole switch. Works with AWS S3, MinIO, Ceph, Garage,
+Cloudflare R2, Backblaze B2 and DigitalOcean Spaces: set `storage.s3.endpoint`
+for anything that is not AWS.
+
+```sh
+kubectl create secret generic openokr-s3 \
+  --from-literal=access-key-id=... \
+  --from-literal=secret-access-key=...
+
+helm upgrade openokr . \
+  --set storage.s3.bucket=openokr-files \
+  --set storage.s3.existingSecret=openokr-s3 \
+  --set storage.s3.endpoint=https://s3.example.com \
+  --set replicaCount=3
+```
+
+Credentials come from a Secret and never from values, because a value lands in
+the release and `helm get values` reads it back. The chart refuses a bucket
+with no Secret named.
+
+A named bucket lifts the single-replica limit: object storage is shared, so the
+access mode of the local volume stops mattering. The volume stays mounted and
+unused, which costs nothing and means turning S3 off again needs no new claim.
+
+| Value | Default | Notes |
+|---|---|---|
+| `storage.s3.bucket` | none | Empty means local disk |
+| `storage.s3.region` | `us-east-1` | Required by the SDK even where it is ignored |
+| `storage.s3.endpoint` | none | Empty means AWS S3 itself |
+| `storage.s3.forcePathStyle` | none | `on`, `off`, or empty to let the driver decide |
+| `storage.s3.keyPrefix` | none | So one bucket can hold several instances |
+| `storage.s3.existingSecret` | none | Required when a bucket is named |
 
 ## Upgrading
 

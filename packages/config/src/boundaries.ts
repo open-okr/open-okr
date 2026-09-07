@@ -99,6 +99,18 @@ const VENDOR_SDKS: readonly string[] = [
   // Payments and analytics
   "stripe",
   "posthog-node",
+  // Databases this product does not run on. Postgres is the only required
+  // service, so a client for anything else is a vendor SDK like any other.
+  // `mysql2` is here rather than absent because the FlowyTeam importer does
+  // import it, with an `allow-vendor-sdk` marker giving the reason
+  // (TECHNICAL-PLAN §1, P6-T02): listing it is what makes that one exception
+  // deliberate instead of an omission, and what makes the second one fail.
+  "mysql2",
+  "mysql",
+  "mariadb",
+  "mongodb",
+  "sqlite3",
+  "better-sqlite3",
 ];
 
 /** Where vendor SDKs and driver modules are allowed to live. */
@@ -117,6 +129,22 @@ const WRITE_PATH_PREFIXES: readonly string[] = [
   "packages/core/",
   "packages/agents/",
   "apps/",
+];
+
+/**
+ * The other side of the outbox: where a committed row is finally delivered
+ * (P5-T01a).
+ *
+ * The rule above exists so that a write does not reach the outside world
+ * before it commits. These paths run after the commit, on a row the relay has
+ * claimed, and calling out is the whole reason they exist. Exempting the
+ * directory rather than marking each call keeps the exemption structural: it
+ * says where delivery happens, instead of trusting that whoever adds the next
+ * handler remembers the marker comment.
+ */
+const DELIVERY_PATH_PREFIXES: readonly string[] = [
+  "packages/core/src/outbox/",
+  "apps/web/lib/relay.ts",
 ];
 
 /**
@@ -253,6 +281,9 @@ const checkWritePathSideEffects = (
   file: BoundarySourceFile,
 ): BoundaryViolation[] => {
   if (!WRITE_PATH_PREFIXES.some((prefix) => file.path.startsWith(prefix))) {
+    return [];
+  }
+  if (DELIVERY_PATH_PREFIXES.some((prefix) => file.path.startsWith(prefix))) {
     return [];
   }
 

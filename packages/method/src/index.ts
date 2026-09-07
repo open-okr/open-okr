@@ -14,6 +14,38 @@ export {
   alignmentScore,
 } from "./alignment.ts";
 export {
+  type BlockerEscalation,
+  type BlockerLadderHours,
+  escalationFor,
+  type RankableBlocker,
+  type RankedBlocker,
+  rankBlockers,
+} from "./blocker-board.ts";
+export {
+  cycleClosingDue,
+  cycleStartsDue,
+  planningOpensDue,
+  publicationCountdownMilestone,
+  reviewPreparationDue,
+  type SessionLifecycleStage,
+  sessionLifecycleStage,
+} from "./countdown.ts";
+export {
+  BLOCKER_CLOCK_HOURS,
+  type DigestBlocker,
+  type DigestRisk,
+  type WeeklyDigestInput,
+  weeklyDigestLines,
+  weeklyDigestNumbers,
+} from "./digest.ts";
+export {
+  averageConfidence,
+  type Divergence,
+  type DivergenceInput,
+  type DivergenceKind,
+  divergences,
+} from "./divergence.ts";
+export {
   acknowledgementEscalation,
   blockerEscalation,
   type Escalation,
@@ -84,6 +116,13 @@ export {
   shouldProposeRecoveryClose,
 } from "./kpi-recovery.ts";
 export {
+  type LinkedWork,
+  type LinkedWorkDivergence,
+  type LinkedWorkDivergenceInput,
+  linkedWorkDivergence,
+  linkedWorkShare,
+} from "./linked-work.ts";
+export {
   ALIGNMENT_CHECKS,
   type AlignmentCheckInput,
   applyStrictness,
@@ -116,6 +155,7 @@ export {
   type ConfidenceVerdict,
   cascadeProgress,
   confidenceBand,
+  cycleScore,
   type DraftVerdict,
   draftVerdict,
   type Forecast,
@@ -126,6 +166,7 @@ export {
   type KeyResultDirection,
   type KeyResultProgressInput,
   keyResultProgress,
+  objectiveScore,
   type PortfolioVerdict,
   type ProgressSignal,
   portfolioVerdict,
@@ -134,6 +175,7 @@ export {
   round2,
   type ScoreAnnotation,
   type ScoreBand,
+  type ScoredKeyResult,
   scoreAnnotation,
   scoreBand,
   trendForecast,
@@ -142,21 +184,29 @@ export {
 } from "./scoring.ts";
 export {
   BLOCKER_TYPE_DEFINITIONS,
+  CLOSE_DECISION_MEANINGS,
   type Diagnosis,
   type DiagnosisKind,
   lowestProcessHealthStatement,
   MANAGEMENT_RETRO_QUESTIONS,
   PROCESS_HEALTH_STATEMENTS,
+  REVIEW_STAGE_KEYS,
   REVIEW_STAGES,
   type ReviewAct,
   type ReviewStage,
+  type ReviewStageKey,
   RHYTHM_STATEMENTS,
   RITUALS,
   type Ritual,
   type RitualKind,
+  ROOT_CAUSES,
+  type RoomPulseBand,
+  type RoomPulseRead,
+  reviewStageKey,
   reviewStages,
   rhythmDiagnostic,
   rhythmScore,
+  roomPulseRead,
   type TimedReviewStage,
   WEEKLY_STAGE_KEYS,
   WEEKLY_STEPS,
@@ -164,6 +214,7 @@ export {
   type WeeklyStep,
 } from "./sessions.ts";
 export {
+  deferralFor,
   insideQuietHours,
   type SuppressionInput,
   type SuppressionReason,
@@ -222,6 +273,7 @@ export {
   type GateResult,
   type GoalSnapshot,
   INPUT_PACK_ITEMS,
+  type InitiativeSnapshot,
   type KeyResultSnapshot,
   PHASE_TITLES,
   type PhaseResult,

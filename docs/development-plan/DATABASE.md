@@ -44,7 +44,7 @@ Additional conventions:
 |---|---|---|---|
 | `outbox` | `topic`, `payload jsonb`, `idempotency_key` unique, `created_at`, `delivered_at?`, `attempts`, `available_at`, `last_error?`, `dead_lettered_at?` | Not tenant scoped | The transactional side-effect queue. Only the relay reads it, and it must drain every workspace in one pass. Tenant context travels inside the payload. Delivered rows are purged by retention, so no soft delete. `dead_lettered_at` (P2-T06, closing a P1-hardening follow-up) is set once a row reaches `maxAttempts`: before it existed, a row that could never succeed retried on the lease interval forever, invisible to anyone, because nothing read `last_error` and `attempts` had no ceiling. `OutboxRelay.listDeadLettered()` is the visibility this was missing |
 | `cache_entries` | `key` primary key, `value jsonb`, `expires_at?` | Not tenant scoped | The Postgres cache driver's storage. Callers namespace keys with the workspace id. Reads filter on expiry, so a missed sweep cannot serve stale data |
-| `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. Queries return identifiers and a rank; the caller reloads each hit through the access getter |
+| `search_documents` | `workspace_id`, `entity_type`, `entity_id`, `title`, `body?`, `context_id?`, generated `document tsvector`, unique on `(workspace_id, entity_type, entity_id)` | `workspace_id` with a row-level security policy | The full-text index: a projection refreshed by outbox-driven jobs. Removed outright when its source is deleted, because a surviving entry would leak a deleted title into results. `context_id` arrived at P5-T13 and is what lets a query filter in SQL rather than fetching and discarding: a null context is invisible to everybody |
 
 ## 2. Domains
 
@@ -118,7 +118,9 @@ The workspace `language` default now resolves through the instance's own `instan
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
 
 ### workspace_members
-`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`.
+`user_id?` to users, `name`, `title?`, `avatar_blob_id?` to blobs, `timezone?`, `manager_id?` to workspace_members, `kind` (`human` / `guest` / `agent` / `placeholder`), `status` (`active` / `invited` / `suspended`), `suspended_at?`, `bio` (rich), `primary_channel` (`app` / `email` / `slack` / `teams` / `whatsapp` / `telegram`), `quiet_hours jsonb?`, `placeholder_email?`, `legacy_id?`, `legacy_type?`.
+
+`placeholder_email` is the address an imported member is waiting to be claimed by (P6-T03a). Set only on a `placeholder` row, which has no `user_id` and so cannot be signed in as; unique per workspace among live rows, so two imported employees sharing an address cannot become two members waiting for one person. Every member with a real account has this null and their address on the user row. An imported placeholder is `active`, not `invited`: the kind says nobody has signed in as it, the status says the membership is live, and it is, because the row champions objectives (P6-T03b). **The spreadsheet importer's member reference resolves against this column as well as `users.email` and the membership name** (P6-T04d): a workspace that has just imported a company is full of placeholders, a spreadsheet exported from that same source names people by the address they had there, and reading only `users.email` skipped every row of a goals file naming an imported champion. One workspace holding both importers is unusable without it.
 
 Unique on `(workspace_id, user_id)` for live rows, so one person has at most one membership per workspace while a rejoin does not collide with their own soft-deleted row.
 
@@ -169,8 +171,10 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 
 ## 5. Spaces (domain B)
 
-### spaces
-`name`, `mission?`, `settings jsonb`.
+### spaces *(importable)*
+`name`, `mission?`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+The two legacy columns and their unique partial index arrived at P6-T03a, seventeen migrations after the table: `spaces` was written before there was an importer to write them, and the FlowyTeam mapper is the first thing to map a source table onto it (§7.2, teams).
 
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
@@ -184,7 +188,9 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
 ### cycles *(short_id, importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`.
+`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `levels jsonb`, `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+
+The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An imported cycle keeps the name the source used, because that is the name the people being migrated recognise; the period still decides the dates and the mode.
 
 ### cycle_pack_items
 `cycle_id` to cycles, `item_key smallint` (1 to 7), `gathered bool`, `note?`.
@@ -222,7 +228,7 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 ## 7. Goals, key results and check-ins (domain D)
 
 ### goals *(short_id, importable)*
-`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id` to workspace_members, `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool`, `position`.
+`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id` to workspace_members, `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed`), `close_decision?` (`keep` / `modify` / `abandon`), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `position`.
 
 At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the alignment graph are rejected.
 
@@ -256,9 +262,11 @@ Horizontal links between goals in different teams (METHOD.md §5.1). Two-way by 
 The §5.4 register. A provider is named either as a space in this workspace or as free text, and a check constraint requires one of the two. Only a space provider can be confirmed, and only by that space; only a space provider clears a silo finding, because only it names something the engine can find. Unconfirmed and unowned blocks publish gate 4.
 
 ### alignment_findings
-`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
+`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
 
 `subject_goal_id` is nullable, decision D-16: the anchor finding has no subject because no goal caused it, and attaching it to an arbitrary goal would send a facilitator to fix something that is not broken. Identity for the deterministic engine is `(scope, scope_id, cycle_id, rule_key, subject_goal_id, target_goal_id)`, held by a unique index that coalesces the nullable columns so two nulls do not read as distinct. The engine only ever touches `source = 'engine'` rows, so a structural recompute cannot delete the Coach's semantic findings.
+
+`subject_key_result_id` was added at P5-T14 so one goal can carry a finding per measure. TECHNICAL-PLAN §4.9's divergence is about a key result against the work behind it, and three measures that each finished their plan without moving are three separate conversations: dismissing one must leave the other two. It is always set alongside `subject_goal_id`, never instead of it, so every reader that asks about goals keeps working. It is null on every row the four structural sweeps write, and the engine's unique index is unchanged and still excludes it: that index is scoped to `source = 'engine'`, and the Coach's rows are reconciled by identity in application code.
 
 ### goal_retrospectives
 `goal_id` to goals, `body` (rich), `author_member_id` to workspace_members, `ai_drafted bool`.
@@ -272,7 +280,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members.
 
 ### alignment_findings
-`scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap`), `severity` (`high` / `medium` / `low`), `subject_goal_id` to goals, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
+`scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
 
 ### alignment_scores
 `scope`, `scope_id?`, `cycle_id` to cycles, `score smallint`, `breakdown jsonb`, `computed_at`.
@@ -306,10 +314,20 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `added_minutes jsonb`.
+
+`shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes.
+
+`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there.
+
+`added_minutes` is the whole minutes the facilitator added per stage (METHOD.md §8.1), keyed by `stage_key` exactly as `elapsed` is. Separate from §11's `sessions.quarterlyStageMinutes`, which is the workspace's standing agenda: one room running long on one day must not retune every future review.
 
 ### session_participants
 `session_id` to sessions, `member_id` to workspace_members, `attended bool`, `pulse smallint?`, `word?`.
+
+Unique on `(workspace_id, session_id, member_id)` where not deleted: one person, one voice. Giving a pulse again corrects it rather than adding a second voice to the average.
+
+A row is created when somebody takes part, not when the session is made. Seeding the space would claim attendance nobody confirmed, and a room pulse averaged over people who never arrived is not the room's pulse. `pulse` and `word` are null until the person gives them, because a missing pulse and a pulse of one are different facts.
 
 ### blockers
 `key_result_id?` to key_results, `goal_id?` to goals, `type` (`resource` / `dependency` / `clarity` / `priority_conflict` / `external`), `description?`, `owner_id` to workspace_members, `next_action`, `opened_at`, `due_at`, `resolved_at?`, `escalated_at?`, `escalated_to_id?` to workspace_members, `session_id?` to sessions, `source` (`session` / `manual` / `channel` / `agent`).
@@ -337,47 +355,106 @@ Every table references `session_id` to sessions.
 
 | Table | Key columns |
 |---|---|
-| `review_scores` | `key_result_id`, `score numeric`, `comment?`, `scored_by_id` |
-| `review_narratives` | `goal_id`, `body` (rich), `author_member_id` |
+| `review_scores` | `key_result_id`, `score numeric` (0 to 1), `reason`, `scored_by_id`, `revealed_at?` |
+| `review_narratives` | `goal_id`, `body?` (rich), `body_version?`, `author_member_id?`, `spoken_at?` |
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
-| `retro_notes` | `column` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
+| `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
-| `management_answers` | `question_key smallint` (1 to 4), `body` |
-| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?` |
+| `management_answers` | `question_key smallint` (1 to 4), `body`, `answered_by_id` |
+| `root_causes` | `key_result_id`, `cause_key smallint` (1 to 8), `detail?`, `named_by_id` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
-| `review_decisions` | `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why` |
-| `learnings` | `cycle_id`, `text`, `carry_forward bool`, `source` |
+| `review_decisions` | `goal_id`, `decision` (`keep` / `modify` / `abandon`), `why`, `decided_by_id` |
+| `learnings` | `cycle_id`, `text`, `carry_forward bool`, `source`, `retro_note_id?`, `created_by_id` |
 | `next_cycle_drafts` | `title`, `why`, `promoted_to_goal_id?` |
-| `review_actions` | `what`, `owner_id?`, `due_on?`, `done bool` |
-| `review_diagnostics` | `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`delivered` / `strategy_or_quality` / `rhythm`), `narrative` |
+| `review_actions` | `what`, `owner_id`, `due_on`, `done bool`, `created_by_id` |
+| `review_diagnostics` | `cycle_score numeric`, `rhythm_score numeric?`, `verdict` (`results_delivered` / `strategy_or_quality` / `rhythm`), `narrative`, `ai_narrative?`, `recorded_by_id` |
 
-`respondent_hash` allows one response per member per statement without identifying who gave it.
+`review_scores` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: regrading corrects the row, because a room that changes its mind has one answer and not two. The score lands on `key_results.score` when the session closes, in the same transaction, and only for what was graded. METHOD.md §8.3 hides the objective score until the room reveals it, and a score on the key result is visible on the goal page immediately; a grade also has to be revisable while the room talks. `revealed_at` sits on the row rather than the objective, so the reveal is one update over an objective's rows and every client reads the same answer from it, the same shape as `check_in_votes.revealed_at`.
+
+`review_narratives` is unique on `(workspace_id, session_id, goal_id)` where not deleted: an objective's story is one story, and a second row would make stage three list it twice. `body` is nullable and usually null, because §8.1 gives the stage nine minutes of talking rather than writing: a row appears the moment the mic moves on from an objective, and `spoken_at` is what records that. Two check constraints hold the shape: a body always has its version, and an author only exists with a body, so the facilitator who marked a turn over cannot end up named as the author of a narrative they never wrote.
+
+`kudos` is unique on nothing at all. Two entries naming the same person are two things they did, and collapsing them would turn recognition into a count, which is the opposite of what §8.1 asks for. `from_member_id <> to_member_id` is a check constraint: recognising yourself is not recognition.
+
+**Who holds the mic is `okr_sessions.mic_goal_id`, not a row per turn.** Exactly one objective holds it, which is the property stage three exists to enforce, and a single pointer is the only shape that cannot represent two holders. Null before the round starts and null again once the last owner has spoken, which is also what marks that last owner: the pass is what stamps `spoken_at`, so putting the mic down is a real act rather than tidying up.
+
+**The dot vote has two caps and they hold different things.** `retro_votes` is unique on `(workspace_id, note_id, member_id)` where not deleted, so one member spends at most one dot on any note: spending two is how three dots become one loud opinion, and §8.1's vote is about spread. The total per member across notes is the §11 `Retro dots per member` parameter, held in the action because it counts across rows no index can see. Removing a note soft-deletes the dots spent on it, or their owners could not get them back and the cap would silently shrink for the rest of the stage.
+
+`retro_notes.votes` is denormalised from `retro_votes`, recounted from the rows and rewritten inside the same transaction as every vote. TECHNICAL-PLAN §4 specifies the column and the board sorts on it; a test asserts it equals the count behind it rather than trusting that it was maintained. `column_key` rather than `column`, because `column` is a reserved word in SQL.
+
+`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read.
+
+`root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: §8.4's own word is "primary", and a key result with two causes has had the question dodged rather than answered. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
+
+`review_diagnostics` is unique on `(workspace_id, session_id)` and **stores the two numbers the verdict was read against**. §8.6 calls the diagnostic the review's most valuable output and the minutes have to show what the room was told, so a verdict recomputed later would quietly change as scores were corrected. Reading it again replaces the row, numbers and verdict together, so a room that deliberately re-reads has one internally consistent answer. `verdict` is `results_delivered` rather than `delivered`, matching `packages/method`'s `DiagnosisKind`: two names for one verdict is a translation layer with nothing to gain. `narrative` holds the deterministic prescription and `ai_narrative` anything a provider added, so the sentence survives with AI off.
+
+`review_decisions` is unique on `(workspace_id, session_id, goal_id)`: §8.8 closes every objective deliberately, which is one decision each rather than a history of opinions. `why` is required, because a decision nobody explained is the automatic carry-over §8.8 exists to stop. **The decision is not written onto the goal.** `goals_close_is_complete` holds that `closed_at`, `success_status` and `close_decision` are present together or not at all, so writing the decision alone is refused, and closing the objective from the review would mean inventing a retrospective body `closeGoalInTx` requires. The decision stays here; the integration with the goal-close path is an open question on the P4-T11c-a row.
+
+`learnings.retro_note_id` is unique per note where not deleted: §8.9 promotes the top dot-voted themes, and promoting the same note twice would double a theme's weight in the next cycle, which is the opposite of what the dot vote was for. A check constraint ties it to `source = 'retro_theme'` in both directions, so a promoted learning names the note it came from and a typed one cannot claim to.
+
+**`review_actions.owner_id` and `due_on` are not null**, a correction to TECHNICAL-PLAN §4's optional columns made at P4-T11c-b. METHOD.md §8.1 stage 11 is unambiguous: "Every action has a name and a date, or it is a wish." Nullable columns would let the product store exactly what the stage exists to prevent.
+
+**Nothing writes `goals.close_decision` from a review.** `goals_close_is_complete` holds that `closed_at`, `success_status` and `close_decision` are present together or not at all, and a review collects no retrospective to close with. `goals.reviewDecision` reads the last review's decision and why so the close screen can offer them as its default, which is what "written back to the goal on close" means here. Agung settled that on 26 August 2026.
+
+`respondent_hash` allows one response per member per statement without identifying who gave it. It is `sha256(salt || member_id)` where the salt is `okr_sessions.process_health_salt`, written when the first response of a review arrives. **A per-review salt, and the reason is precise:** a hash of the member id alone would be the same string in every review, so somebody holding the table could follow one unnamed person's answers across quarters without ever learning their name. It is a salt rather than an HMAC on the instance root key because a key rotation would leave every stored hash unmatchable and silently break the one-response rule mid-review. **What it does not buy:** anonymity against somebody holding both this database and the member list, because a room is small enough to enumerate, and no scheme that lets the same application recount a member's response could be. What the product guarantees is narrower and real, and is what the tests assert: no read returns an attribution, and no column carries one.
 
 ## 12. The work (domain I)
 
-### initiatives *(short_id, importable)*
-`space_id` to spaces, `title`, `description` (rich), `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity` (`fits` / `tight` / `exceeds`), `progress_pct`.
+### initiatives *(importable, built at P5-T10a)*
+`space_id` to spaces, `title`, `description` (rich) with `description_version`, `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`, default `planned`), `confidence numeric(3,2)?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric(5,2)`, `position`.
 
-### initiative_key_results
-`initiative_id` to initiatives, `key_result_id` to key_results.
+No `short_id` yet: TECHNICAL-PLAN §4.9 does not ask for one and nothing addresses an initiative by a short code until the palette at P5-T13. `capacity` is nullable and null means nobody has judged it, which publish gate five reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks at P5-T11 and holds its default of zero until then; no input schema accepts one, which is the work-layer design's answer to W2.
 
-### tasks *(short_id, importable)*
-`space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb`.
+A check constraint refuses a window that ends before it starts. There is no `cycle_id`: an initiative reaches a cycle through the key results it serves, which is the only relationship METHOD.md §5.5 describes, and a column would be a second answer that disagrees the first time one initiative serves two cycles.
 
-### task_assignees
-`task_id` to tasks, `member_id` to workspace_members.
+Each initiative owns an access context (`resourceType: "initiative"`): `workspace_standard` at view because alignment reads across spaces, the owning space's `space_standard` at edit, and the owner's own `member` group at full. The owner binding is untagged, unlike a goal's champion, because the tag column carries a fixed set of five role names and `owner_id` already names the owner. Moving ownership is a rebind, not a column write. It inherits the goal's open question with the shape: `initiatives.delete` needs `full` at the workspace and `full` on the initiative, so an initiative whose owner is suspended has nobody left who can remove it.
 
-### checklist_items
-`task_id` to tasks, `title`, `done bool`, `position`.
+### initiative_key_results *(built at P5-T10a)*
+`initiative_id` to initiatives, `key_result_id` to key_results. Unique on `(workspace_id, initiative_id, key_result_id)` while live, so recording the same link twice is one link; a soft-deleted link is revived rather than duplicated.
 
-### documents *(short_id)*
-`subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` to workspace_members.
+### tasks *(importable, built at P5-T11)*
+`space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich) with `description_version`, `status` (`backlog` / `todo` / `in_progress` / `done`, default `backlog`), `due_on?`, `position`, `ordering_state jsonb`.
 
-### attachments
-`subject_type`, `subject_id`, `blob_id` to blobs, `position`.
+No `short_id` yet, for the reason `initiatives` has none: nothing addresses a task by a short code until the palette at P5-T13. Both links are optional and independent, which is the work-layer design's answer to W1: a task may serve a key result with no initiative behind it.
+
+`position` is sparse, spaced by 1024 (`TASK_POSITION_SPACING` in `packages/core`). A move reads the destination column under `select … for update` and places the card between its new neighbours; when the gap falls below two the whole column is renumbered inside the same transaction, never as a background job. The lock is over the space's column rather than whichever board the drag happened on, because three boards read one set of rows. `ordering_state` records the spacing and the last renumber, so a reader can tell a fresh column from one dragged a hundred times without reading every row.
+
+Each task owns an access context (`resourceType: "task"`): `workspace_standard` at view, the owning space's `space_standard` at edit, and each assignee's own `member` group at edit. The third is why a task owns a context rather than inheriting its initiative's: binding an assignee on the initiative would hand them every task under it.
+
+**Nothing here writes `key_results`.** Completing every task under a measure moves no number, and there is no trigger, no derived column and no code path that would. TECHNICAL-PLAN §4.9: the ratio of completed linked tasks is shown beside the measured value and never instead of it.
+
+### task_assignees *(built at P5-T11)*
+`task_id` to tasks, `member_id` to workspace_members. Unique on `(workspace_id, task_id, member_id)` while live; an unassigned member is revived rather than inserted beside. Assigning grants the edit binding, subscribes the member as `role`, and notifies everybody on the list except the actor. Unassigning takes the binding back. An agent is refused: an agent proposes work and does not carry it (AI-NATIVE-PLAN.md §1.3).
+
+### checklist_items *(built at P5-T11, importable)*
+`task_id` to tasks, `title`, `done bool`, `position`, `legacy_id?`, `legacy_type?`. Appended at the end of its task's list; the count on a card is ticked over total.
+
+The two legacy columns and their unique partial index arrived at P6-T04a, the third and last importable table written before there was an importer to write them. A line of text is not a natural key: two sub-tasks on one task can read "Call the supplier" and mean different calls, so matching on the title would silently collapse them.
+
+### documents *(built at P5-T12)*
+`subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich) with `body_version`, `state` (`draft` / `published`, default `draft`), `published_at?`, `author_member_id` to workspace_members.
+
+No `short_id` yet, for the reason `initiatives` and `tasks` have none: nothing addresses a document by a short code until the palette at P5-T13.
+
+**A draft is visible to its author and to nobody else, and the query is what makes it so.** Every read composes `(state = 'published' or author_member_id = $me)`, so there is no code path that returns a draft to somebody else, including a direct identifier probe: that answers not-found, indistinguishable from a document that never existed. A filter in a component is a filter one careless read forgets.
+
+A document has no access context of its own. It inherits its subject's: a document on a goal is readable by whoever reads the goal, one on a space by whoever reads the space, and one on a cycle or a session through the workspace. A key result resolves through its owning goal, which is the rule the rest of the product follows. `SUBJECT_RESOLVERS.document` walks the same chain, so a comment on a document resolves too.
+
+A check constraint keeps `state` and `published_at` from disagreeing: a published document has a moment it was published and nothing else may.
+
+### document_versions *(built at P5-T12)*
+`document_id` to documents, `version`, `title`, `body` (rich) with `body_version`, `author_member_id` to workspace_members. Unique on `(workspace_id, document_id, version)`.
+
+**openokr:hard-delete**, unlike almost everything else here: a version is a snapshot of a document that still exists, so when the document goes the cascade takes its history. A surviving version row would be a readable copy of something the reader was told is gone.
+
+One row per publish and nothing else writes one. A draft edited forty times is one document with whatever versions it has published, because a version is a thing somebody decided to show other people. The difference a reader sees is computed from the stored editor JSON through `plainTextLines` in the one shared rich-text module, one line per block: the collapsed excerpt `excerptRichText` produces is right for a preview and makes every edit read as "the whole document changed" in a line comparison.
+
+### attachments *(built at P5-T12)*
+`subject_type`, `subject_id`, `blob_id` to blobs, `position`. Unique on `(workspace_id, subject_type, subject_id, blob_id)` while live: attaching the same file twice is the same decision made twice.
+
+The subject list is wider than the document one, because §4.9 says files go on any subject: a task, a document and a check-in are all in it. Detaching says "not here", never "gone": the blob is untouched and its own orphan cleanup decides its fate.
 
 ### blobs *(built at P2-T05, ahead of `initiatives`/`tasks`/`attachments` above, which are still Phase 3)*
-`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`.
+`filename`, `content_type`, `filesize?`, `digest?`, `storage_key`, `author_member_id?` to workspace_members, `status` (`pending` / `ok` / `scanning` / `quarantined`), `width?`, `height?`, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live: a legacy key arrived at migration 0073 because two files can share a name, a size and even a digest and still be two uploads, so the digest is not the identity and the source's own id is (P6-T04b). `prepareBlob` takes it, and its presence is also what says an import made this blob, which is what decides whether the run's actor gets a binding of its own beside the uploader's: the uploader an import names is a placeholder who cannot sign in, so binding only them would leave a blob nobody can read and an `attachments.attach` that refuses (P6-T04c).
 
 `status` carries a fourth value beyond the three TECHNICAL-PLAN names: `pending`, the gap between prepare and claim that "prepare, upload, claim" needs somewhere to sit, and that the orphan cleanup job's own query targets. `filesize` and `digest` are null until claim fills them in.
 
@@ -390,7 +467,9 @@ No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: a
 ## 13. Collaboration (domain J)
 
 ### comments
-`subject_type`, `subject_id`, `author_member_id` to workspace_members, `body` (rich), `edited_at?`.
+`subject_type` (`goal` / `key_result` / `check_in` / `cycle` / `document` / `task`), `subject_id`, `author_member_id` to workspace_members, `body` (rich), `body_version`, `edited_at?`, `parent_id?` to comments, `legacy_id?`, `legacy_type?`. Unique on `(workspace_id, legacy_type, legacy_id)` while live.
+
+`task` and `parent_id` arrived at migration 0073 for the FlowyTeam importer (P6-T04b). Every one of the 7223 comments on the instance it reads is on a task, which the subject list this table was created with did not allow, and 8 of them answer another comment. `parent_id` is `on delete set null` rather than cascade: a deleted parent must not take the answers with it, because the answer is somebody else's words. Nothing renders a thread yet; `comments.list` returns the column so the relationship is addressable rather than only stored.
 
 ### reactions
 `subject_type`, `subject_id`, `member_id` to workspace_members, `emoji`.
@@ -399,7 +478,7 @@ No image re-encoding, no thumbnail worker and no virus-scan hook are wired in: a
 `subject_type`, `subject_id`, `send_to_everyone bool`. One per notifiable artifact; built before anything creates one, the same way access contexts existed before spaces did.
 
 ### subscriptions *(built at P2-T06)*
-`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring.
+`list_id` to subscription_lists, `member_id` to workspace_members, `reason` (`invited` / `joined` / `mentioned` / `role`), `canceled bool`. One live row per member per list; re-subscribing after a cancel is a new row, not an un-cancel, so the reason history is not overwritten. `reconcileMentions` in `packages/core/src/notifications/subscriptions.ts` re-diffs `mentioned` subscriptions on every edit: subscribes anyone newly named, cancels anyone removed, and never touches a subscription held for a different reason. Every auto-subscribe path silently excludes a suspended, placeholder or agent member rather than erroring, and `subscriptions.importWatcher` (P6-T04b) is one of those paths: an import restores a watch only for somebody who can hold one. Since every member an import creates is a placeholder, a first company import restores none, and the report names each rather than counting a row that is not there.
 
 ## 14. Feed, notifications and channels (domain K)
 
@@ -412,24 +491,53 @@ The typed catalogue lives in code (`packages/core/src/activities/catalogue.ts`),
 `recipient_member_id` to workspace_members, `activity_id?` to activities, `nudge_id?` (no foreign key: nudges are P4-T04), `batch_id?` to notification_batches, `reason`, `read_at?`, `snoozed_until?` (not in TECHNICAL-PLAN's column list: the inbox's own snooze action needs somewhere to record "hide until", distinct from `read_at`), `channel`, `sent_at?`.
 
 ### notification_settings *(built at P2-T06)*
-`member_id` to workspace_members, `routing jsonb` (per reason, falling back to the member's `primary_channel` when a reason is absent), `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`. Created lazily on first read or write, with defaults from TECHNICAL-PLAN §11's worked example (mentions immediate, everything else batched in thirty minutes, the daily summary at 08:00 local) — a member who never touches their settings still gets the documented default, because `getOrCreateNotificationSettings` always returns one.
+`member_id` to workspace_members, `routing jsonb` (per reason, falling back to the member's `primary_channel` when a reason is absent), `mention_immediate bool`, `batch_window_minutes`, `daily_summary bool`, `daily_summary_time`, `quiet_hours jsonb`. Created lazily on first read or write, with defaults from TECHNICAL-PLAN §11's worked example (mentions immediate, everything else batched in thirty minutes, the daily summary at 08:00 local) — a member who never touches their settings still gets the documented default, because `getOrCreateNotificationSettings` always returns one. Since P4-T05b the Champion's daily run reads `daily_summary` and `daily_summary_time` here for §6.4's `digest.daily`, through a left join plus these same defaults, because the row is created lazily and most members have none. **This is the one home for that preference.** P4-T05b's first draft added a second pair of columns to `workspace_members` before finding this table.
 
 ### notification_batches *(built at P2-T06)*
 `member_id` to workspace_members, `channel`, `status` (`pending` / `sent` / `failed` — `failed` is not in TECHNICAL-PLAN's list; a send attempt that errors has to land somewhere other than `pending` forever), `window_minutes`, `send_at`, `sent_at?`, `error?`. "Found or created under a row lock" is a partial unique index on `(workspace_id, member_id, channel) where status = 'pending'`, not an explicit `SELECT ... FOR UPDATE`: a losing concurrent insert falls back to reading the winning row.
 
 Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-PLAN's "and role obligations" is not built, because no role tag carries a notification meaning yet. Creating the rows (`notifyRecipients`) and driving the actual send are separate: nothing dispatches a `pending` batch or an unsent immediate row yet, and nothing calls `notifyRecipients` from an activity — "notification fan-out driven from activities" is P2-T07's own deliverable. Per-reason mail templates exist as pure string builders (`packages/core/src/notifications/templates.ts`), HTML and plain text, with no development preview page: there is no app shell yet (P2-T10) to serve one into.
 
-### channel_connections
-`provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `credentials_ciphertext`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`.
+### channel_connections *(built at P5-T01b-a)*
+`provider` (`slack` / `teams` / `whatsapp` / `telegram`), `state` (`connected` / `error` / `disabled`), `ciphertext`, `data_key`, `key_id`, `config jsonb`, `installed_by_id` to workspace_members, `last_verified_at`, `error?`. Unique on `(workspace_id, provider)` where not deleted.
 
-### channel_identities
-`member_id` to workspace_members, `provider`, `external_id`, `external_handle?`, `verified_at?`.
+Email is absent from the provider list on purpose: it is the instance’s own mail settings and needs no connection row, which is what lets routing always fall back to it. The three key columns are TECHNICAL-PLAN’s single `credentials_ciphertext` split into the envelope shape `ai_credentials` already uses, so one rotation command covers both. `last_verified_at` stays null until something actually calls the provider: connecting stores a credential, verifying proves it, and a card that says verified because a string was pasted is worse than one that says nothing.
 
-### channel_messages
-`provider`, `direction` (`out` / `in`), `member_id?` to workspace_members, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status`, `error?`, `at`.
+### channel_identities *(built at P5-T01b-a)*
+`member_id` to workspace_members, `provider`, `external_id`, `external_handle?`, `verified_at?`. Unique on `(workspace_id, provider, external_id)` **and** on `(workspace_id, provider, member_id)`, both where not deleted.
 
-### nudges
-`kind`, `subject_type`, `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`.
+Both directions, because one constraint alone leaves a hole: without the first, two members can claim the same chat account; without the second, one member holds two identities that inbound resolution would have to choose between. Resolution reads `external_id` and never the handle, which is changeable, reusable and sometimes shared.
+
+### channel_messages *(built at P5-T01b-a)*
+`provider` (the four plus `email`), `direction` (`out` / `in`), `member_id?` to workspace_members, `external_thread_id?`, `payload jsonb`, `idempotency_key`, `status` (`queued` / `sent` / `failed` / `suppressed`), `error?`, `sent_at?`.
+
+Unique on `(workspace_id, idempotency_key)`, and deliberately **not** partial on `deleted_at`: soft-deleting the record of a send must not let the send happen again. `error` carries either the provider’s complaint or the reason a send was suppressed, and suppression is a normal state rather than a failure. TECHNICAL-PLAN lists an `at` column; the table uses the repository-wide `created_at` for that and adds `sent_at`, because when the product decided to send and when the provider accepted it are different facts and a support question needs both.
+
+### channel_conversations *(built at P5-T06b)*
+`member_id`, `provider`, `external_thread_id?`, `command`, `subject_id?`, `collected jsonb`, `awaiting`, `expires_at`. Unique on `(workspace_id, member_id, provider)`. **Hard-deleted** when a conversation finishes or is abandoned: a tombstone would hold the unique index and the same member could never start another.
+
+**A row rather than memory, which is the whole reason the table exists.** A provider without a modal asks one question at a time, and either the web process or the relay can restart between two messages; a half-finished check-in held in a process would be lost by a deploy.
+
+`collected` holds the answers so far and nothing else in the product reads it. The registry action runs once, when every required field is in, in one transaction. A draft check-in somebody did not know they had created is worse than starting again.
+
+`awaiting` names the field a reply belongs to, so the state is one row rather than a position inferred from what is missing. `expires_at` restarts on every answer: thirty minutes is per question, because somebody answering slowly is still answering. The window is `chatConversationMinutes` in the §4.14 settings map, not METHOD.md §11 as the design first said: how long a chat window stays open is an interaction timeout rather than an OKR practice rule.
+
+### channel_link_codes *(built at P5-T02a)*
+`member_id` to workspace_members, `provider`, `code_hash`, `expires_at`, `consumed_at?`. Partial unique on `(workspace_id, member_id, provider) where consumed_at is null`, plus an index on `(workspace_id, provider, code_hash)` for the inbound lookup.
+
+Four properties, each a column rather than a convention: hashed, so a table of live codes is not a table of ways to become other people; expiring, at AI-NATIVE-PLAN §5.5's ten minutes; single-use, and `consumed_at` is set rather than the row deleted so "that code was already used" stays distinguishable from "no such code"; and one live code per member per provider, so asking again replaces the last one rather than adding a second.
+
+### channel_installations *(built at P5-T02a)*
+`workspace_id`, `provider`, `external_team_id`. Unique on `(provider, external_team_id)`. **Hard-deleted**, not soft: a tombstone would hold the unique index and the same provider workspace could never be reconnected.
+
+**The one table read before a tenant is known**, and the reason it exists. An inbound webhook has not identified a workspace: finding out which one it is *is* the question. The first version of the inbound endpoint asked `channel_connections` through the ordinary application role with no tenant setting, and forced row-level security answered with nothing every time, so no inbound message could ever have been accepted. A test caught it before it shipped.
+
+The floor is kept rather than lifted. The policy admits a row two ways: `workspace_id = app.workspace_id`, or `external_team_id = app.channel_team_id`. That second key is the same arrangement `app.user_id` has on `workspace_members` for the "which workspaces are mine" lookup, and `withProviderTeam` is the only wrapper that sets it. A caller reaches exactly the row for a team id they already hold; the `with check` clause takes the tenant setting alone, so nothing can be *written* through the second key.
+
+### nudges *(delivery semantics changed at P5-T01b-b)*
+A nudge row is the delivery queue as well as the record. `sent_at is null` with no `suppressed_reason` and a `scheduled_for` that has passed means "owed to somebody and not yet delivered", which is what `deliverDueNudges` reads. The run that decides *whether* the product speaks no longer stamps `sent_at`; the pass that decides *where* does, along with `channel`. Before this, `channel` was written as the literal `in_app` by the run and resolved nowhere.
+
+`kind`, `subject_type` (`goal` / `check_in` / `blocker` / `kpi` / `session` / `cycle` / `member`), `subject_id`, `recipient_member_id` to workspace_members, `agent_id?` to agents, `rule_key`, `channel`, `scheduled_for`, `sent_at?`, `acted_at?`, `escalation_step smallint`, `suppressed_reason?`, `proposal_id?` to proposed_changes (P4-T05c-a: the change this nudge offers, null on almost every row, `on delete set null` because deleting a proposal must not delete the record that the product spoke). `member` was added at P4-T05b for the morning summary, which is about a person's day rather than about a row: the deduplication window is per (member, subject), so a member id under `goal` would have read as a goal to everything that joins on it.
 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.
@@ -444,29 +552,227 @@ Recipient resolution (`resolveRecipients`) reads subscriptions only; TECHNICAL-P
 | `ai_model_policies` | `tier`, `provider`, `model_id`, `sampling jsonb`, `json_mode` |
 | `ai_feature_settings` | `feature_key`, `enabled`, `tier_override?`, `quota jsonb` |
 | `ai_prompts` | `feature_key?`, `agent_id?`, `phase?`, `version`, `system_prompt`, `is_default` |
-| `ai_threads` | `subject_type?`, `subject_id?`, `member_id`, `title?` |
-| `ai_messages` | `thread_id`, `role`, `content`, `tokens`, `cost` |
+| `ai_threads` | `subject_type?`, `subject_id?`, `member_id`, `title?`. Both anchor columns are present or neither: half an anchor is a thread nothing resolves. One member's, because §2.4 answers across what that member may see, so the same question has two answers for two readers (P4-T14a-a) |
+| `ai_messages` | `thread_id`, `role` (`member` / `assistant`), `content`, `citations jsonb`, `model?`, `tokens_in?`, `tokens_out?`, `cost?`, `stopped_at?`. `citations` is the answer's own claim about what it used, stored rather than resolved: whether the reader may *see* a cited thing is a different question, asked again on every read. `stopped_at` is set when a reader ends a stream early (written by P4-T14a-b, the column ships with the table so the stop control is a write and not a migration) |
 | `ai_tool_calls` | `message_id?`, `run_id?`, `tool`, `input jsonb`, `output_excerpt`, `status`, `permission_checked bool`, `duration_ms` |
 | `ai_usage_events` | `member_id?`, `agent_id?`, `feature`, `source`, `provider`, `model_id`, `tokens_in`, `tokens_out`, `cost`, `latency_ms`, `status`, `flagged` |
 | `embeddings` | `subject_type`, `subject_id`, `chunk_index`, `content`, `vector`, `model_id`, `content_hash` |
-| `agents` | `member_id` to workspace_members, `builtin_kind` (`coach` / `champion` / `custom`), `definition`, `planning_instructions`, `execution_instructions`, `provider?`, `tier`, `schedule`, `autonomy` (`sandbox` / `propose` / `scoped_direct`), `scope jsonb`, `enabled` |
+| `agents` | `member_id` to workspace_members, `builtin_kind` (`coach` / `champion` / `custom`), `definition`, `planning_instructions`, `execution_instructions`, `provider?`, `tier`, `schedule` (`manual` / `continuous` / `nightly` / `hourly` / `daily` / `weekly`), `autonomy` (`sandbox` / `propose` / `scoped_direct`), `scope jsonb`, `enabled`. The Champion's own row stays `hourly`: the column names the finest cadence an agent runs, and P4-T05b's daily, weekly and per-cycle sweeps are separate runs with their own `agent_runs.trigger` |
 | `agent_runs` | `agent_id` to agents, `trigger`, `status`, `tasks jsonb`, `log text`, `started_at`, `finished_at?`, `error?`, `cost` |
-| `proposed_changes` | `run_id` to agent_runs, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?` |
-| `oauth_clients` | Registered and cached client metadata |
-| `oauth_grants` | `member_id`, `client_id`, `scopes`, `revoked_at?` |
-| `oauth_codes` | `code_hash`, `challenge`, `resource`, `consumed_at?` |
-| `oauth_access_tokens` | `token_hash`, `grant_id`, `resource`, `expires_at` |
-| `oauth_refresh_tokens` | `token_hash`, `grant_id`, `used_at?`, `replaced_by?`, `expires_at` |
-| `mcp_sessions` | `grant_id`, `protocol_version`, `last_seen_at`, `closed_at?` |
+| `proposed_changes` | `run_id?` to agent_runs, `thread_id?` to ai_threads, `action`, `payload jsonb`, `subject_type`, `subject_id`, `status` (`pending` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`, `result jsonb?`, `undone_at?`, `ai_generated bool` (P4-T05c-a, P4-T14b-a). A proposal names its origin, a run or a thread, exactly one, and a check constraint enforces that: a copilot proposal came from a member's question and inventing an agent run for it would put a run in the log that nobody scheduled. `result` is what applying it returned, which is the only place the created entity's identifier exists and therefore what undo needs. `undone_at` is set on an applied row rather than becoming a status, because it was applied and then it was undone and both are true. On `ai_generated`: `run_id` already says a proposal came from an agent, and this answers the different question a reviewer has, which is whether a model chose the words. METHOD.md §6.5's recovery draft is a template and works with the provider off, so not every agent proposal is AI-generated; every copilot proposal is. |
+| `device_authorisations` *(built at P5-T07c-b)* | `workspace_id?`, `device_code_hash`, `user_code_hash`, `client_name`, `requested_scopes text[]`, `approved_member_id?`, `approved_at?`, `denied_at?`, `consumed_at?`, `last_polled_at?`, `expires_at`. Unique on each code hash |
+| `whatsapp_templates` *(built at P5-T04b-a)* | `meta_id`, `name`, `language`, `status`, `category?`, `body_text?`, `variables`, `synced_at`. Unique on `(workspace_id, meta_id)`, deliberately not partial on `deleted_at` |
+| `whatsapp_template_mappings` *(built at P5-T04b-b)* | `rule_key`, `template_id` to whatsapp_templates, `bindings jsonb` (one source name per placeholder, in placeholder order). Unique on `(workspace_id, rule_key)` where not deleted |
+| `api_tokens` *(built at P5-T07a)* | `member_id` to workspace_members, `name`, `audience` (`rest` / `mcp`), `token_hash`, `prefix`, `scopes text[]`, `expires_at?`, `last_used_at?`, `revoked_at?`. Unique on `token_hash`, and an index on `(workspace_id, member_id)` for the list |
+| `oauth_clients` *(built at P5-T08a)* | `client_id`, `name`, `redirect_uris text[]`, `source` (`allow_list` / `registered`), `metadata_url?`. Unique on `client_id` where not deleted. **Not tenant scoped:** a client registers with the instance, not a workspace |
+| `oauth_grants` *(built at P5-T08a)* | `member_id`, `client_id` to oauth_clients, `scopes text[]`, `resource`, `revoked_at?`, `revoked_reason?`, `last_used_at?` |
+| `oauth_codes` *(built at P5-T08a)* | `grant_id`, `code_hash`, `challenge`, `challenge_method`, `redirect_uri`, `resource`, `consumed_at?`, `expires_at`. Unique on `code_hash` |
+| `oauth_access_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `resource`, `expires_at`, `revoked_at?`. Unique on `token_hash` |
+| `oauth_refresh_tokens` *(built at P5-T08a)* | `grant_id`, `token_hash`, `used_at?`, `replaced_by?` to itself, `revoked_at?`, `expires_at`. Unique on `token_hash` |
+| `mcp_sessions` *(built at P5-T09b)* | `grant_id` to oauth_grants, `session_hash`, `protocol_version`, `client_name?`, `client_version?`, `last_seen_at`, `closed_at?`. Unique on `session_hash` |
+
+### device_authorisations *(built at P5-T07c-b)*
+The third table read before a tenant is known, and the only one *written* before
+one: a terminal running `okr login` has no session and no workspace, and finding
+out which workspace it belongs to is the whole flow. `workspace_id` is null until
+a member approves the request, and the policy admits a row through
+`app.device_code_hash` matching either code hash. `withDeviceCode` is the only
+wrapper that sets it, and the check clause permits a workspace-less write only
+when the caller names its own code, so nobody can insert or edit a request they
+do not hold.
+
+Approving is the write that names the workspace, and it goes through the
+Operation pipeline: `tokens.approveDevice` carries `deviceCodeHash` on its
+operation spec, which is why `OperationSpec` has that field at all. Starting a
+request does not, and is marked as an allowed exception with its reason: there is
+no actor and no workspace for a pipeline to authorise against, and nothing is
+granted by it.
+
+**No granted token is stored here.** The poll mints the token and claims the row
+in one transaction, with `consumed_at is null` in the where clause, so a code
+approved twice grants once and no credential sits in a short-lived table waiting
+to be collected. The tenant setting is applied inside that transaction, after the
+row has said which workspace it belongs to: the one place in the product where
+the workspace is learned rather than given.
+
+Both codes are hashed with the same function, which upper-cases and trims,
+because a person retypes the short one. The alphabet has no 0/O and no 1/I/L for
+the same reason.
+
+State is the timestamps rather than a `state` column beside them. Pending is
+`approved_at` and `denied_at` both null; granted and collected is `consumed_at`
+set. A column carrying the same facts is a second answer that can disagree.
+
+### whatsapp_templates *(built at P5-T04b-a)*
+A mirror of one customer's Meta Business account, not something this product
+authors. The words are theirs, the approval is Meta's, and two workspaces cannot
+share a template, which is why design C3's answer (a registry in
+`packages/method` because "a template is a coaching message") was wrong: §11 is
+the threshold registry and holds numbers, and no document here could name
+templates for everybody.
+
+A sync replaces rather than merges: there is no local edit to conflict with, so
+what Meta no longer lists is marked withdrawn. Withdrawn rather than removed, and
+the unique index is deliberately **not** partial on `deleted_at`, so one template
+is one row for the life of the workspace and a mapping that referred to a
+withdrawn one can still say which it meant. A template Meta lists again is the
+same row, back.
+
+`variables` is the highest `{{n}}` in the body rather than how many times a
+placeholder appears: Meta numbers them from one with no gaps, and a body that
+says `{{1}}` twice still takes one parameter. Counted at sync time so a mapping
+with the wrong number of bindings is refused when it is saved rather than when a
+nudge is due.
+
+Templates that are not approved are kept and labelled, because an administrator
+wants to know their submission is pending rather than that it does not exist.
+Only approved ones are offered for a mapping.
+
+### whatsapp_template_mappings *(built at P5-T04b-b)*
+Which of a workspace's approved templates answers which reminder, and where each
+of its `{{n}}` placeholders gets its value. One row per rule key, so a reminder
+that could arrive as either of two templates is not expressible: that would be a
+reminder nobody could predict.
+
+`bindings` is an ordered list rather than a map keyed on "1". The first entry
+fills `{{1}}`, and Meta refuses a send whose parameter count does not match, so
+storing it as a list makes that check a length comparison rather than a walk
+looking for gaps. The vocabulary is closed and `packages/core` owns it:
+`member.name`, `workspace.name`, `subject.title`, `rule.key` and
+`reply.command`. Not an expression language, because a settings screen is not
+the place for a second query language and every value one could reach is already
+in that list.
+
+Every source resolves to a non-empty string. Meta refuses a blank parameter, so
+a member with no name is "you" and a subject with no title is "your goal".
+`reply.command` is the one that makes the flow work: WhatsApp has no buttons,
+so a template that wants an answer has to say what to type, identifier and all.
+
+The count, the template's approval and the source names are all checked when the
+mapping is **saved**. The two moments that check could happen are "an
+administrator is looking at the screen" and "it is seven in the morning and a
+reminder did not arrive".
+
+A withdrawn template keeps its mapping. Meta removing a template does not remove
+the administrator's decision about which reminder it answered; the mapping stops
+resolving until the template comes back or another is chosen, and the screen says
+which.
+
+### channel_identities.last_inbound_at *(added at P5-T04b-b)*
+When this member last wrote to us on this provider, and the only thing WhatsApp's
+conversation window is measured from. Meta carries a free-form message only
+within twenty-four hours of the member's own last one; outside that, an approved
+template or nothing. Null means they have never written, which is outside every
+window.
+
+Stamped on the inbound path for every provider, because the column is on the
+identity and one code path is cheaper to keep right than four. Nothing but
+WhatsApp reads it. Deriving it from the message log instead would be the same
+fact read the slower way, once per outbound message.
+
+### api_tokens *(built at P5-T07a)*
+The second table in the product read before a tenant is known, after `channel_installations`, and for the same reason. A REST request arrives with a bearer token and nothing else: which workspace it belongs to *is* the question. Its policy admits a row through `app.workspace_id` or through `app.api_token_hash` matching its own `token_hash`, and `withApiToken` is the only wrapper that sets the second key. A caller reaches exactly the row whose digest it already holds; the `with check` clause takes the tenant setting alone, so nothing can be written through the second key.
+
+`audience` is on the row rather than read off the token's text. The text carries a readable prefix (`okr_rest_`, `okr_mcp_`) so a person can tell two of their own tokens apart and so a wrong-door request can be refused without a query, but a string a caller presents is not evidence.
+
+`scopes` holds the action registry's own three safety classes, so "may this token run this action" is set membership rather than a mapping table with two chances to disagree. There is deliberately no access level: a token carries the minting member's authority narrowed by its scopes, and `can()` decides as it does in the browser. A write-scoped token held by a view-level member writes nothing. That is what makes it safe for any member to mint one, and it is why there is no service account.
+
+`revoked_at` is separate from `deleted_at`. Revoking keeps the row, marked, so a person debugging a service that stopped working can see what they turned off; the soft-delete column is the repository default scope and nothing sets it yet.
+
+`last_used_at` is stamped outside the request's own transaction, on purpose: a person wants to know which of their four tokens is still in something's configuration file, and a failed stamp must never fail a call that was otherwise fine.
 
 Credentials and every token hash are never selected to the client.
+
+### The five OAuth tables *(built at P5-T08a)*
+Five tables because the flow has five lifetimes. A client lives for years, a
+grant until somebody ends it, a code for a minute, an access token for an hour,
+and a refresh token until its first use. Collapsing any two puts two lifetimes in
+one row.
+
+**A fourth pre-tenant key, and the only one three tables share.** The token
+endpoint receives a secret and nothing else: which workspace it belongs to *is*
+the question. So `oauth_codes`, `oauth_access_tokens` and
+`oauth_refresh_tokens` each admit a row whose own hash equals
+`app.oauth_secret_hash`, the same shape `channel_installations`,
+`api_tokens` and `device_authorisations` use with their own keys. Sharing the
+setting name widens nothing: each policy compares against its own column, so a
+caller holding a code hash cannot reach an access token.
+
+**The grant is the unit that gets revoked**, and every other row points at one.
+Revoking is one update rather than a sweep, and a token whose grant is gone stops
+working on its next use without anything having had to find it.
+
+**Membership is read on every use rather than cached on the grant.** Somebody
+suspended a minute ago is refused a minute ago, and a person who leaves a
+workspace loses everything they connected, with nobody having to remember.
+
+**`replaced_by` is self-referential, which is what makes reuse detection
+work.** Each refresh token is used exactly once and points at what replaced it.
+A second presentation of a used one means the value was copied, so the whole
+lineage is revoked rather than the one link refused: an attacker holding one copy
+holds whatever the client holds.
+
+**`oauth_clients` is the one table here with no tenant floor**, marked
+`openokr:not-tenant-scoped`. The same agent connecting to two workspaces on one
+instance is one piece of software; a per-workspace copy would mean two
+registrations and two places to allow-list it. What is per workspace is the
+grant. The allow-list is a fallback in the lookup rather than a seeding step: a
+row is written the first time somebody actually uses an allow-listed client,
+which works on a fresh install and on one upgraded from an earlier release, where
+the first-run wizard never runs again.
+
+### mcp_sessions *(built at P5-T09b)*
+**A record, never an authority.** Every request from an external agent presents
+its own access token and is resolved from scratch, so a session whose grant was
+revoked a second ago is refused a second ago. What this table buys is that a
+person can see what is connected, and that a question about which protocol
+version a client agreed to has an answer.
+
+**The session is this product's, not the transport's.** The protocol SDK keeps
+session state in memory, and a server built per request has no memory to keep it
+in; a module map of transports stops working the moment a second instance
+answers a request. So the transport runs stateless, the identifier is generated
+at `initialize`, and the row is what carries it. That is also what the design
+claimed a session was before the first implementation tried to let the library
+own one.
+
+**The identifier is stored as a digest**, like every other secret here. It is
+not a credential and must never become one; hashing costs nothing and means a
+table of live sessions is not a table of ways to attach to somebody's stream if
+the transport ever comes to trust it. It reaches its row through the same
+`app.oauth_secret_hash` pre-tenant key the OAuth secrets use, because a
+transport holding only an identifier does not yet know which workspace it
+belongs to.
+
+**Cascade on the grant.** A session under a grant that has gone is a session for
+nothing, so revoking a connection takes its sessions with it.
+
+### search_documents *(built at P2 as an empty table, filled at P5-T13)*
+`entity_type`, `entity_id`, `title`, `body`, `context_id` to access_contexts, `document tsvector` (generated: title at weight A, body at weight B), `updated_at`. Unique on `(workspace_id, entity_type, entity_id)`.
+
+**openokr:hard-delete**: a projection, not a record. When a source row is soft-deleted its projection is removed outright, because a surviving entry would leak a deleted title into somebody's results.
+
+Written by an outbox-driven worker on the `content.index` topic, enqueued by the Operation pipeline beside the `content.embed` row: the same write feeds both indexes, so they cannot come to disagree about what exists. The sets differ because the questions differ, and retrieval wants prose while search wants anything somebody might type the name of. Nine types are indexed: goal, key result, KPI, initiative, task, document, comment, check-in and session.
+
+`context_id` arrived at migration 0067 and is what lets a query filter in SQL through the same `EXISTS` clause every list read composes, rather than fetching rows and discarding them the way retrieval over `embeddings` does. A null context is invisible to everybody, which is the safe direction for a mistake to fall; a row whose context cannot be resolved is removed rather than written contextless.
+
+**An unpublished document is never indexed at all.** The index has one context per row and no notion of an author, so a draft in it would be findable by everybody who can read its subject: exactly the leak the draft rule exists to stop. The same applies to a draft check-in.
 
 ## 16. Import, export and tenancy (domain M)
 
 ### import_runs
-`source` (`csv` / `flowyteam`), `mode` (`dry_run` / `real`), `status`, `report jsonb`, `started_at`, `finished_at?`.
+`source` (`csv` / `flowyteam`), `entity?`, `mode` (`dry_run` / `real`), `status` (`running` / `completed` / `failed`), `filename?`, `rows_read`, `rows_written`, `rows_skipped`, `report jsonb`, `error?`, `requested_by_id` to workspace_members, `started_at`, `finished_at?`.
 
-### export_runs and workspace_imports
+One row per run at migration 0070, including a run that failed and a dry run that wrote nothing (P6-T01a). `entity` is what separates the two sources: a spreadsheet holds one kind of thing and names it, and a FlowyTeam run loads a company across every domain and names none. `mode` is stored rather than inferred, because a real run that wrote nothing and a dry run that would have written nothing produce the same counts and are not the same event. The report is jsonb because its shape belongs to the importer and differs per source: per-row errors against line numbers for a spreadsheet, per-table reconciliation for FlowyTeam.
+
+### export_runs
+`kind` (`list` / `archive`), `list`, `format` (`csv` / `xlsx`), `cycle_id?` to cycles, `space_id?` to spaces, `requested_by_id` to workspace_members, `state` (`queued` / `building` / `ready` / `failed`), `row_count?`, `filename`, `blob_id?` to blobs, `error?`, `finished_at?`.
+
+`kind: "archive"` is a whole-workspace export (§7.3, P6-T05a). It joins this lifecycle rather than needing a table of its own, at the cost of two columns reading oddly: `list` is not nullable so an archive repeats its kind there, and `format` has no archive value so it says `csv` while the filename says `.okr`. Recorded here because the alternative was widening two enums for one row shape. An archive run is written `ready` and not `queued`: the file is built inside the action and returned in its answer, so nothing comes back for it later.
+
+One row per asked-for file (P5-T15). The blob is nullable until the worker has one, because a run is recorded the moment the request commits and the file is what the relay produces afterwards. `requested_by_id` is what scopes the read: the file holds exactly the rows that member could see when the worker built it, so nobody else may collect it, an administrator included. `kind` is `list` today; `archive` belongs to §7.3's portability engine, which adds a manifest and a checksum to the same lifecycle rather than a second table.
+
+### workspace_imports
 Archive manifest, checksum, status, progress.
 
 ### tenants *(cloud only)*

@@ -11,7 +11,9 @@ import { cn } from "../lib/cn.ts";
  */
 export const buttonVariants = cva(
   [
-    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border",
+    // `rounded-control`, not `rounded-lg`: the latter is the card radius (14px),
+    // and 14px on a 30px control is a pill. The mockups' `.btn` is 8px.
+    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control border",
     "text-sm font-semibold transition-[border-color,box-shadow,transform] duration-fast ease-out",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-strong",
     "disabled:pointer-events-none disabled:bg-raised disabled:border-line disabled:text-ink-4 disabled:shadow-none",
@@ -42,7 +44,7 @@ export const buttonVariants = cva(
       },
       size: {
         default: "h-7.5 px-3",
-        sm: "h-6.25 rounded-md px-2.5 text-xs",
+        sm: "h-6.25 rounded-control px-2.5 text-xs",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

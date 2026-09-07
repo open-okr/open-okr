@@ -199,8 +199,8 @@ describe("sessions.advanceStage", () => {
       { id: sessionId },
     );
     const elapsed = (read as { elapsed: Record<string, number> }).elapsed;
-    expect(typeof elapsed["confidence"]).toBe("number");
-    expect(elapsed["confidence"]).toBeGreaterThanOrEqual(0);
+    expect(typeof elapsed.confidence).toBe("number");
+    expect(elapsed.confidence).toBeGreaterThanOrEqual(0);
   });
 
   it("is refused when already on the last stage", async () => {
@@ -707,7 +707,7 @@ describe("sessions.createBlocker (P4-T07c)", () => {
     )) as Array<{ dueAt: string; openedAt: string }>;
 
     expect(status.length).toBe(1);
-    const blocker = status[0]!;
+    const blocker = status[0] as { dueAt: string; openedAt: string };
     const opened = new Date(blocker.openedAt);
     const due = new Date(blocker.dueAt);
     const diffHours = (due.getTime() - opened.getTime()) / (1000 * 60 * 60);

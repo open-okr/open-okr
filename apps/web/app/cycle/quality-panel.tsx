@@ -42,10 +42,10 @@ const ORDER: Record<QualityStatus, number> = {
 };
 
 const TONE: Record<QualityStatus, string> = {
-  fail: "bg-bad-weak text-bad-text",
-  warn: "bg-warn-weak text-warn-text",
+  fail: "bg-bad-bg text-bad",
+  warn: "bg-warn-bg text-warn",
   todo: "bg-raised text-ink-3",
-  pass: "bg-ok-weak text-ok-text",
+  pass: "bg-ok-bg text-ok",
 };
 
 export interface PanelObjective {
@@ -154,7 +154,7 @@ export function QualityPanel({
           Quality panel
         </h2>
         {mustFix > 0 ? (
-          <span className="rounded-full bg-bad-weak px-2 py-0.5 text-xs font-semibold text-bad-text">
+          <span className="rounded-full bg-bad-bg px-2 py-0.5 text-xs font-semibold text-bad">
             {mustFix} must fix
           </span>
         ) : null}
@@ -166,7 +166,7 @@ export function QualityPanel({
           objectives arrive.
         </p>
       ) : total === 0 ? (
-        <p className="text-xs text-ok-text">
+        <p className="text-xs text-ok">
           Every check passes across {set.length} objective
           {set.length === 1 ? "" : "s"}. Nothing here is blocking a publication.
         </p>

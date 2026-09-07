@@ -3,11 +3,13 @@ import {
   mailProbe,
   notInThisBuild,
   runConnectionTests,
+  storageProbe,
 } from "@openokr/core";
 import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
+import { getStorage, storageDescription } from "../../lib/storage";
 import { CheckList } from "./check-list";
 
 /**
@@ -39,6 +41,19 @@ export default async function SetupPage() {
       configured: mail.transport === "smtp",
       verify: () => mailerFrom(mail).verify(),
       host: mail.host,
+    }),
+    // Storage is tested by writing and removing a probe object (P6-G05).
+    // A read would prove nothing an operator cares about: the failures worth
+    // catching are an unwritable directory, a bucket that does not exist and a
+    // key pair that cannot put, and all three otherwise surface as a broken
+    // upload weeks later.
+    storageProbe({
+      describe: () => storageDescription(),
+      verify: async () => {
+        const key = `setup-probe/${crypto.randomUUID()}`;
+        await getStorage().put(key, Buffer.from("openokr"));
+        await getStorage().delete(key);
+      },
     }),
     notInThisBuild("channel", "Phase 5"),
     notInThisBuild("ai", "Phase 6"),
