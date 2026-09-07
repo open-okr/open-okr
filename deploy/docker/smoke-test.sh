@@ -150,6 +150,28 @@ until app_log | grep -q "schema is up to date"; do
 done
 pass "re-running migrations is idempotent"
 
+# **"Migrations are current" is not "the server is listening".** The entrypoint
+# prints that line and then execs the server, so the check below used to race a
+# process that had not opened its port yet: the proxy answered 502 with
+# "connection refused" and the failure read as "the instance did not survive the
+# upgrade", which is the one thing it had not proved.
+#
+# It won that race for seven runs and lost it on the eighth, when P6-G01b
+# registered one more cron at boot and P6-G07a added a badge query to the
+# application shell that every render of `/` now makes. Neither is a reason the
+# instance would not survive an upgrade, and the end-to-end job boots the same
+# standalone server and passed. So the wait is what was missing.
+#
+# The first boot needs none of this because `./openokr up` waits for health
+# itself. Only the restart path asserted straight off a log line.
+waited=0
+until [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")" != "502" ]; do
+  waited=$((waited + 2))
+  [ "$waited" -lt 60 ] || fail "the app did not start listening after the upgrade"
+  sleep 2
+done
+pass "the app is serving again after the upgrade"
+
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the instance did not survive the upgrade"
 pass "the instance survived the upgrade"

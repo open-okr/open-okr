@@ -355,9 +355,22 @@ export function startScheduler(): PgBossJobQueue | null {
       }
       // One line, naming what was registered. A host that says nothing is a
       // host nobody can tell apart from one that never started.
+      //
+      // **Both sources, not just the agent cadences.** This counted
+      // `SCHEDULED_RUNS` and then named only `AGENT_SCHEDULES`, so the moment
+      // P6-G01b added the batch drain the line read "6 recurring runs" and
+      // listed five. A log line that miscounts what it just did is worse than
+      // no log line, and this one is the only evidence a deployment has that
+      // the scheduler is running at all.
+      const crons = new Map<string, string>(AGENT_SCHEDULES);
+      for (const run of SCHEDULED_RUNS) {
+        if (run.cron) {
+          crons.set(run.job, run.cron);
+        }
+      }
       log(
-        `started, ${SCHEDULED_RUNS.length} recurring runs: ` +
-          `${AGENT_SCHEDULES.map(([name, cron]) => `${name} (${cron})`).join(", ")}`,
+        `started, ${crons.size} recurring runs: ` +
+          `${[...crons].map(([name, cron]) => `${name} (${cron})`).join(", ")}`,
       );
     } catch (error) {
       logError(`could not start: ${reason(error)}`);
