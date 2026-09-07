@@ -4,7 +4,7 @@ The single source of truth for execution progress against IMPLEMENTATION-PLAN.md
 
 Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skipping requires a note and human sign-off. The rules are in EXECUTION-GUIDE.md §5.
 
-**170 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, 132 until P6-T04 was cut in three, 134 until the gap audit added thirty rows between Phase 6 and Phase 7, 164 until P6-G01 was cut in three, 166 until P6-G06 was cut in two beside a security finding it turned up, 168 until P6-G18 was cut in two, and 169 until P6-G24 was cut in two.
+**171 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, 132 until P6-T04 was cut in three, 134 until the gap audit added thirty rows between Phase 6 and Phase 7, 164 until P6-G01 was cut in three, 166 until P6-G06 was cut in two beside a security finding it turned up, 168 until P6-G18 was cut in two, 169 until P6-G24 was cut in two, and 170 until P6-G11 was cut in two.
 
 ## Phase 1: Foundation
 
@@ -450,7 +450,7 @@ need the space filter the explorer already has. KPI tiles are P3-T12.
 
 ## Gap closure: between Phase 6 and Phase 7
 
-Thirty-six tasks closing `GAP-AUDIT.md`, the per page and per module audit of
+Thirty-seven tasks closing `GAP-AUDIT.md`, the per page and per module audit of
 7 September 2026. Not a phase. The audit is the evidence for every row; each
 task's entry in IMPLEMENTATION-PLAN.md names the finding it closes.
 
@@ -469,7 +469,8 @@ task's entry in IMPLEMENTATION-PLAN.md names the finding it closes.
 | P6-G08 | Member notification settings | todo |  |  | GAP-AUDIT B-06, second half |
 | P6-G09 | The people directory and org chart, S-33 | todo |  |  | GAP-AUDIT B-08 |
 | P6-G10 | The people lifecycle controls | todo |  |  | GAP-AUDIT B-08. Suspend, restore, guest conversion and erasure have no browser path |
-| P6-G11 | The activity feed, S-31 | todo |  |  | GAP-AUDIT G-01. Nineteen catalogued kinds written on every operation and shown to nobody |
+| P6-G11a | The workspace activity feed, S-31 | in_review | agung | 2026-09-07 | GAP-AUDIT G-01. **The engine has been complete and unread since P2-T07**: nineteen catalogued kinds, a renderer each, access-scoped queries at four scopes, consecutive-edit aggregation, key-based paging, and `activities.workspaceFeed` in the registry with no caller anywhere. Every operation in the product writes one of these rows and nobody had ever been able to look at one. **Cut in two**, because S-31 asks for four scopes and only the workspace one is a registered action: `queryFeed` can answer all four and three more reads have to exist before a panel on a goal, a space or a profile can ask for one. That is P6-G11b. IMPLEMENTATION-PLAN corrected here; 171 tasks. **A route and no sidebar entry, and both halves are deliberate.** §6 gives S-31 a screen; §3's sidebar lists nine items and Activity is not one of them. So it is reached from the work map, which is what §3 actually describes, and `reachability.test.ts` is satisfied by that link rather than by a registry row nobody asked for. **The actor's name comes from the directory, not from the row.** A renderer describes the subject ("Goal X was created") and never the actor, so the page joins `actorMemberId` against `people.directory`; a row with no actor is a system principal and reads as the product acting rather than as a blank. **The audit log distinction is stated on the screen**, because confusing the two is a real risk: this record is human-readable, permission-filtered and aggregated, and the audit chain is none of those. Somebody after a compliance answer needs `pnpm audit:verify`. **A half cursor is ignored rather than refused**: both or neither, because a one-parameter link is somebody editing a URL by hand and a schema refusal there would be a broken page instead of the newest one. **Verified:** `apps/web` 17 files 86/86, typecheck 11/11, Biome, `check:boundaries`, `dead-code`, `pnpm build`. **Not verified:** no browser run, so the paging and the aggregate chip are proved by construction; and no seeded feed to look at, because `pnpm db:seed` writes goals rather than a month of activity |
+| P6-G11b | The feed at space, goal and profile scope | todo |  |  | Split from P6-G11. Needs three read actions over `queryFeed`, plus the panel on each of the three surfaces |
 | P6-G12a | The AI console: provider, keys and models | todo |  |  | GAP-AUDIT B-05. Nineteen of twenty-four `ai.*` actions have no caller |
 | P6-G12b | The AI console: features, prompts, budgets and usage | todo |  |  | GAP-AUDIT B-05 |
 | P6-G13 | Agent configuration and the proposal review queue | todo |  |  | GAP-AUDIT G-05. The propose-and-approve default has no surface, so a proposal can be made and never seen |

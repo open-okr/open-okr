@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-six tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-seven tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1527,12 +1527,25 @@ Deliverables: suspend, restore, convert-to-guest and erasure on the profile scre
 Test plan: suspending removes every access and restoring returns it; converting to guest leaves no stale binding; erasure keeps authorship readable under the placeholder identity and produces the export; removing the last owner is refused by name.
 Acceptance: Given an administrator erasing a member, when it completes, then that member's comments still read with an anonymised author, an export is produced, and the audit names who ran it.
 
-### P6-G11: The activity feed, S-31 [M]
+**P6-G11 was cut in two.** S-31 asks for the feed at four scopes: workspace,
+space, goal and profile. Only the workspace scope is a registered action.
+`queryFeed` in `packages/core` takes a context and can answer all four, and
+three more read actions have to exist before a panel on a goal, a space or a
+profile can ask for one. The workspace screen needs none of that.
+
+### P6-G11a: The workspace activity feed, S-31 [M]
 Depends on: P2-T07
-Goal: the typed event log gets its screen (GAP-AUDIT G-01).
-Deliverables: the per-kind renderer registry rendered at workspace, space, goal and profile scope; the feed on each of those surfaces; live inserts; key-based pagination; the aggregation rules already in the engine respected on screen.
-Test plan: a private-space activity never appears in a non-member's workspace feed; five consecutive field edits collapse into one row and a check-in never does; a soft-deleted subject drops out; a live insert appears without a reload.
-Acceptance: Given a member without access to a space, when they read the workspace feed, then no activity from it appears, while a member of that space sees typed, readable entries.
+Goal: the typed event log is readable at last (GAP-AUDIT G-01).
+Deliverables: the `/activity` route rendering `activities.workspaceFeed` with its own cursor paging; the actor named by joining `actorMemberId` against the directory, because a renderer describes the subject and never the actor; the aggregate count shown where consecutive edits collapsed; the distinction from the audit log stated on the screen; a link from the work map, because §6 gives S-31 a screen and §3 gives it no sidebar slot.
+Test plan: the route is reachable without a registry row, asserted by the existing reachability test; a system-authored row reads as the product acting rather than as an empty name; a half cursor from a hand-edited link is ignored rather than refused by the schema; an empty first page and an empty later page say different things.
+Acceptance: Given a workspace where anything has happened, when a member opens the feed, then they see the readable events they are allowed to see, newest first, with who did each one and when.
+
+### P6-G11b: The feed at space, goal and profile scope [M]
+Depends on: P6-G11a
+Goal: the other three scopes S-31 names (GAP-AUDIT G-01).
+Deliverables: three read actions over `queryFeed` for the space, goal and profile scopes, each access-scoped by the same context resolver the workspace feed uses; the panel on each of those three surfaces; live inserts, which the realtime port already carries; the reactions and comments §6 also asks for on a feed row, or a recorded reason for leaving them off.
+Test plan: a private-space activity never appears in a non-member goal or profile feed; a goal feed carries its key results and check-ins and not its siblings; a profile feed carries what that member did and not what was done to them; each scope pages independently.
+Acceptance: Given a member without access to a space, when they read a goal feed inside it, then they get not-found rather than an empty feed.
 
 ### P6-G12a: The AI console: provider, keys and models [L]
 Depends on: P2-T13, P2-T14

@@ -290,7 +290,8 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 
 ## G-01: No activity feed anywhere
 
-- [ ] Build screen S-31
+- [x] **P6-G11a** the workspace feed. `/activity` renders it with its own cursor paging, the actor joined from the directory, and the audit-log distinction stated on the screen. Reached from the work map rather than the sidebar, because §6 gives S-31 a screen and §3's nine sidebar items do not include one.
+- [ ] **P6-G11b** the space, goal and profile scopes. `queryFeed` can answer all three and none of them is a registered action yet, so a panel on those surfaces has nothing to call.
 
 P2-T07 is `done` and its deliverables name "per-kind renderers behind a registry" and "live inserts" (IMPLEMENTATION-PLAN.md:176). The engine is real: 19 catalogued kinds, `queryFeed`, `aggregateFeed`. No screen renders any of it, and `activities.workspaceFeed` has no caller. Nineteen kinds of typed, access-scoped, human-readable history are written on every operation and never shown to anyone.
 
@@ -424,7 +425,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 - [ ] **B-06** inbox (S-03) plus member notification settings.
 - [ ] **B-07** invitations. Smallest of these and it unblocks every multi-person test.
 - [ ] **B-08** people directory and org chart (S-33).
-- [ ] **G-01** activity feed (S-31).
+- [x] **G-01** activity feed (S-31). Workspace scope closed at P6-G11a; the other three scopes are P6-G11b.
 - [ ] **G-05** proposal review queue and agent configuration.
 
 ## Then, the cycle and the session

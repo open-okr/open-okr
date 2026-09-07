@@ -217,6 +217,12 @@ export default async function HomePage({
           <a className="text-brand-text underline" href="/sessions">
             Sessions
           </a>
+          {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
+              this is how it is reached. The engine has written a row on every
+              operation since P2-T07 and nothing has ever shown one. */}
+          <a className="text-brand-text underline" href="/activity">
+            What has happened here
+          </a>
         </p>
       </div>
     </AppShellLayout>
