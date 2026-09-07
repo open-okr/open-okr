@@ -3,21 +3,31 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
 /**
- * Every route segment has a loading state and an error boundary (P6-G24a).
+ * Every route segment has an error boundary (P6-G24a).
  *
- * UIUX-PLAN.md §9's first checked item is "loading, empty, error and
- * permission-denied states implemented and checked", and §4 asks specifically
- * for "a surface-level error card with retry, never a blank screen, an error
- * boundary per route segment". Before this there was one `error.tsx`, at the
- * root, and not one `loading.tsx` anywhere: every page is an async server
- * component awaiting several reads, so a navigation left the previous screen up
- * with no sign anything was happening, and any failed read replaced the whole
- * application. The gap audit of 7 September 2026 recorded the two as G-06 and
- * G-07.
+ * UIUX-PLAN.md §4 asks for "a surface-level error card with retry, never a
+ * blank screen, an error boundary per route segment", and before this there
+ * was one, at the root, so any failed read replaced the whole application. The
+ * gap audit of 7 September 2026 recorded it as G-07.
  *
  * This is a test rather than a habit because the failure is invisible in a
  * diff: the missing file is the one nobody opened. A segment added next month
  * fails here rather than being found by somebody clicking into it.
+ *
+ * **The loading half of this test was removed the same day it was written, and
+ * that is worth reading.** P6-G24a shipped a `loading.tsx` per segment as well,
+ * and twenty-two of them turned the end-to-end suite from 184 passing into 75
+ * passing and 86 not run. A `loading.tsx` makes Next stream the segment behind
+ * a Suspense boundary, so `page.goto` resolves once the fallback is painted and
+ * a spec that asserts immediately races the streamed content; one assertion
+ * caught two copies of the same chip in the DOM at once. These specs are
+ * serial, so one failure stops the rest.
+ *
+ * The boundaries are right and §9 asks for them. What is not yet understood is
+ * the duplicate render, which may be a real defect the boundaries merely
+ * exposed, and that has to be explained before they land again. **P6-G24c**
+ * carries both halves. Asserting a loading state here now would be a test
+ * demanding something the branch deliberately does not have.
  */
 
 const APP = fileURLToPath(new URL("../app/", import.meta.url));
@@ -105,12 +115,14 @@ describe("route segment boundaries", () => {
     expect(orphans).toEqual([]);
   });
 
-  test("every segment resolves a loading state", async () => {
+  test("no segment has a loading state yet, and that is on purpose", async () => {
+    // The inverse of the assertion this file was written with. Twenty-two
+    // `loading.tsx` files took the end-to-end suite from 184 passing to 75, so
+    // they came back out; putting one back before P6-G24c explains the
+    // duplicate render would break the suite again, quietly, from a file
+    // nobody reviewed twice.
     const owners = await has("loading.tsx");
-    const orphans = (await segments()).filter(
-      (segment) => !exempt(segment) && resolvedFrom(segment, owners) === null,
-    );
-    expect(orphans).toEqual([]);
+    expect([...owners]).toEqual([]);
   });
 
   test("no in-shell segment falls all the way back to the root boundary", async () => {

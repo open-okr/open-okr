@@ -332,7 +332,11 @@ An agent also cannot be disabled or scoped from the product, which is the contro
 
 ## G-06: No loading state on any route
 
-- [x] **Closed at P6-G24a.** Next own pending state is nothing: it leaves the previous screen up. Every segment has a `loading.tsx` now, announced with `role="status"` and a real label so a screen reader is told something is loading rather than hearing nothing.
+- [ ] **Attempted at P6-G24a and reverted the same day. Now P6-G24c.** Twenty-two `loading.tsx` files took the end-to-end suite from **184 passing to 75 passing and 86 not run**: a loading boundary makes Next stream the segment, so `page.goto` resolves once the fallback is painted and a spec that asserts immediately races the content, and these specs are serial so the first failure stops the rest.
+
+  **The first failure is the reason this is not just a test fix.** It caught two copies of the same chip in the DOM at once on `/admin/agents`, and streaming does not explain that: it inserts one copy of the content beside one fallback. That may be a real defect the boundaries merely exposed, and it is explained before they come back.
+
+  Attribution was measured. A worktree at the pre-change commit passes the same spec 24/24; removing the boundaries with every other change of the day still in place returns the suite to 184/184.
 
 `find apps/web/app -name loading.tsx` returns nothing, and one file in the whole app tree mentions `Suspense`. Every page is an async server component that awaits its reads before rendering, so a navigation shows the previous page until the new one is ready with no indication that anything is happening.
 
@@ -442,7 +446,8 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 - [ ] **G-04** nudge rule cards.
 - [ ] **G-08** string catalogue and locale wiring.
 - [ ] **G-09** theme and density control.
-- [x] **G-06** and **G-07** loading and error states. Closed at P6-G24a; the shell-into-layouts half is P6-G24b.
+- [x] **G-07** error states. Closed at P6-G24a; the shell-into-layouts half is P6-G24b.
+- [ ] **G-06** loading states. Attempted at P6-G24a, reverted the same day for taking the end-to-end suite from 184 passing to 75. Now P6-G24c.
 - [ ] **G-02** decide who owns S-34.
 
 ## Housekeeping, cheap and worth doing in one pass

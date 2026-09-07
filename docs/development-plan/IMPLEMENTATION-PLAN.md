@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-eight tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-nine tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1675,12 +1675,26 @@ through a `layout.tsx`, so when a page throws the shell never rendered and a
 boundary below it has no sidebar to keep. Moving the shell into per-segment
 layouts is a change to every one of those pages and belongs on its own row.
 
-### P6-G24a: Loading states and per-segment error boundaries [M]
+### P6-G24a: Per-segment error boundaries [M]
 Depends on: none
-Goal: a slow read and a failed read both look like themselves (GAP-AUDIT G-06, G-07).
-Deliverables: a `loading.tsx` per route segment, announced with `role="status"` and a real label so a screen reader is told something is loading rather than hearing nothing; an `error.tsx` per segment naming the screen that failed and nothing else about the failure; a `global-error.tsx`, for a root layout that throws before any screen can be drawn; a test that enumerates the segments and fails when one resolves neither boundary.
-Test plan: every segment holding a `page.tsx` resolves both boundaries, walked the way Next resolves them rather than by a fixed list; no in-shell segment falls all the way back to the root boundary, which renders standalone on purpose; `global-error.tsx` exists; an exemption naming a prefix that matches no segment fails.
+Goal: a failed read looks like itself rather than like a broken instance (GAP-AUDIT G-07).
+Deliverables: an `error.tsx` per segment naming the screen that failed and nothing else about the failure; a `global-error.tsx`, for a root layout that throws before any screen can be drawn; a test that enumerates the segments and fails when one resolves no boundary. **The loading half was built here, broke the end-to-end suite, and was removed the same day: it is P6-G24c and the row above says why.**
+Test plan: every segment holding a `page.tsx` resolves an error boundary, walked the way Next resolves them rather than by a fixed list; no in-shell segment falls all the way back to the root boundary, which renders standalone on purpose; `global-error.tsx` exists; an exemption naming a prefix that matches no segment fails.
 Acceptance: Given a segment added with no boundary of its own and no ancestor that has one, when the suite runs, then it fails naming that segment.
+
+### P6-G24c: Loading states, once the duplicate render is explained [M]
+Depends on: P6-G24a
+Goal: a slow read looks like itself, without taking the end-to-end suite down (GAP-AUDIT G-06).
+Deliverables: the explanation first, because the symptom may be a real defect rather than a test artefact: a `loading.tsx` per segment took the end-to-end suite from 184 passing to 75 passing and 86 not run, and the first failure caught **two copies of the same chip in the DOM at once** on `/admin/agents`; a Suspense boundary makes `page.goto` resolve once the fallback is painted, so a spec that asserts immediately races the streamed content, but streaming inserts one copy of the content beside one fallback and does not explain two copies of the content; then the boundaries themselves, announced with `role="status"` the way `segment-skeleton.tsx` did before it was removed; then whatever the specs need, which is a wait for content rather than a trust in `goto`, applied once in a helper rather than in twenty specs.
+Test plan: the full end-to-end suite passes with every boundary in place, run three times rather than once, because these specs are serial and a timing failure moves between them; a deliberately slow read renders the fallback and then the content; the duplicate render is reproduced in a test that fails without the fix.
+Acceptance: Given every segment carrying a loading state, when the end-to-end suite runs three times, then it passes every time, and the duplicate render has a named cause written down.
+
+**Why this is a row and not a retry.** P6-G24a shipped these boundaries and
+they were removed the same day, with the suite as the evidence. The temptation
+is to make the twenty specs wait and call it done. That would be bending the
+tests around an unexplained symptom: two identical elements in one DOM is not
+something streaming does, and if it happens to a spec it can happen to a
+person. The explanation comes first.
 
 ### P6-G24b: The application shell as a layout [M]
 Depends on: P6-G24a
