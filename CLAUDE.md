@@ -97,6 +97,44 @@ green for days and fail the moment one opens. Run it yourself, and commit with
 Dependency review. Neither is runnable locally. A new dependency is what
 usually turns them red, which is a second reason not to add one without asking.
 
+### Watch the run. A push is not finished until CI says so
+
+**After every push, find the run for your own commit and watch it to its
+conclusion.** Then report what it said. Not "the gates passed locally", not
+"it should be green": the run's own verdict, per job.
+
+```
+gh run list --branch agung --limit 10 \
+  --json databaseId,headSha,name,event,conclusion,createdAt
+gh run view <id> --json jobs          # which job, which step
+gh run view <id> --log-failed         # why
+```
+
+**A push with no run is not a pass.** `ci.yml` triggers on `push` to `main` and
+on `pull_request`, so a push to `agung` with no open pull request gets no
+verdict at all. Say that plainly and ask whether to open one. Never let silence
+read as green.
+
+**This rule exists because the alternative already happened.** On 6 September
+2026 nine commits went to `agung` under an open pull request, every local gate
+green, and left **six red checks from five causes**. Four were mine and
+somebody else fixed them in `dea40e6` and `5abf56f`:
+
+| Check | Cause |
+|---|---|
+| Helm | A grep in `check.sh` matched the explanatory `#` comment beside the setting it was checking for. `helm template` renders template comments into its output |
+| CodeQL | `js/polynomial-redos` on the S3 driver's `/^\/+\|\/+$/g`, two quantifiers backtracking on a value that is mostly slashes |
+| Dependency review | `bowser`, reached under `@aws-sdk/core`, reported as MIT AND MITNFA. A consequence of adding the dependency, invisible until CI |
+| An end-to-end spec | Serving the last four review-inbox sources emptied `inbox.pending`, and the spec still asserted the labels of the card that used to list them |
+
+Every one of those is a class the local gates cannot see: a rendered Helm
+manifest, a security query, a transitive licence, and a spec that encoded the
+old behaviour. That is the whole argument for watching the run.
+
+**A change to a spec's expectations is part of the change.** When you serve
+something a spec asserted was missing, the spec is now wrong and updating it is
+yours, not the next person's.
+
 ## Design docs
 
 Detailed designs live in `docs/design/`, written by you at each design gate. Keep them scannable: tables and examples over prose. Write acceptance criteria as testable Given / When / Then. When implementation deviates from a design document, update the document in the same change.
@@ -260,6 +298,7 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The design document is updated if implementation deviated. The `STATUS.md` row is updated.
 - Every gate in "Committing and pushing" ran and is green, or the row names the ones this machine could not run and why. The commit is made; the push waits for Agung.
+- After a push, the run for that commit was watched to its conclusion and reported per job. No run means no verdict, and the row says so rather than implying green.
 
 ## Writing style for everything you write in this repo
 

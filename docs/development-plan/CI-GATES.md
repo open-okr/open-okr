@@ -295,6 +295,16 @@ Everything else runs here. `TEST_DB_PORT=5432` against the native Postgres is
 what makes the unit suites and the end-to-end suite work without Docker, and
 CLAUDE.md's Commands section has the exact lines.
 
+**So the only way to know those seven are green is to watch the run**, which
+CLAUDE.md now requires after every push. On 6 September 2026 three of them went
+red at once behind a single change and nobody noticed for a day: the Helm chart
+check, CodeQL and Dependency review, all from the commit that added the S3
+driver. Every local gate was green throughout.
+
+**A push to `agung` with no open pull request produces no run at all**, because
+`ci.yml` triggers on `push` to `main` and on `pull_request`. That is the state
+most likely to be mistaken for success.
+
 **The four `pooling-spike` failures are the expected local result**, not a
 regression: 105 of 109 in `packages/db` pass and those four need PgBouncer. Say
 so rather than reporting the suite as red or as green.
