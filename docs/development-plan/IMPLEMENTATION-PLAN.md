@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-seven tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-eight tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1561,12 +1561,27 @@ Deliverables: the feature switches, the versioned prompt editor with restore, th
 Test plan: crossing a quota disables the feature with a clear message and every manual path still works; a prompt version change is recorded and reversible; a hard cap halts a running agent with the reason in its log; the usage figures match the metered events.
 Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then the console shows it halted with the reason, and every deterministic path is unaffected.
 
-### P6-G13: Agent configuration and the proposal review queue [L]
+**P6-G13 was cut in two, along what the registry already offers.** Enable,
+disable, cancel and the three proposal actions all exist and needed only a
+surface. The write policy does not: `agents.create` takes an autonomy and
+nothing changes it afterwards, so `agents.setAutonomy` has to exist first. The
+scope binder is the other half: `agents.bindScope` exists, and a picker over
+three resource types with a level each is its own piece of interface rather
+than a control to bolt onto a list row.
+
+### P6-G13a: The proposal review queue, and turning an agent off [M]
 Depends on: P2-T17, P4-T05a, P4-T06a
 Goal: the propose-and-approve default has a surface (GAP-AUDIT G-05).
-Deliverables: agent detail on S-38 gaining enable and disable, the write policy of sandbox, propose or scoped direct, and least-privilege binding on named spaces, goals and KPI trees; run cancellation; the proposal review queue with the envelope rendered as what would change, bulk apply and bulk dismiss, and the same queue reachable from the review inbox.
-Test plan: an agent in propose mode commits nothing until a proposal is applied, and applying goes through the Operation pipeline with audit; a binding cannot be widened to the workspace; cancelling a run stops it and says so in its log; a dismissed proposal cannot be applied afterwards.
+Deliverables: the review queue on S-38 with the action and its payload shown as what would change, nothing preselected, bulk apply and bulk dismiss, and each refusal kept on screen beside the successes; copilot proposals excluded, because they belong to the thread that asked; enable and disable per agent, with the confirmation saying that disabling keeps the scope, the persona and the run log; cancelling a run that is still planning or running.
+Test plan: a proposal that refuses does not stop the others in the same batch and its reason is shown; a dismissed proposal cannot then be applied; disabling an agent stops it speaking and leaves its bindings; only a planning or running run offers a stop.
 Acceptance: Given an agent proposal, when a member applies it from the queue, then the change lands through the pipeline, the audit names both the agent and the member, and the proposal cannot be applied twice.
+
+### P6-G13b: The write policy and the scope binder [M]
+Depends on: P6-G13a
+Goal: least privilege is set from the product, not from the command line (GAP-AUDIT G-05).
+Deliverables: `agents.setAutonomy`, which the registry has never had, so an agent's write policy can move between sandbox, propose and scoped direct after it is created; the control for it, with what each policy does written beside it rather than three words to guess between; the scope binder over `agents.bindScope`, a picker across named spaces, goals and KPI trees with a level each; the workspace context refused as a binding target, in the interface as well as in the action.
+Test plan: raising an agent to scoped direct is audited and takes effect on the next run; a binding on the workspace context is refused by name; a sandbox agent commits nothing whatever its bindings say; lowering the policy leaves existing proposals alone.
+Acceptance: Given an agent bound to one space in propose mode, when an administrator raises it to scoped direct on that space alone, then it writes there and nowhere else, and the audit names who raised it.
 
 ### P6-G14: Cycle phase 0, the annual frame, S-05 [M]
 Depends on: P3-T03, P4-T02

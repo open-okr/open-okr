@@ -321,7 +321,8 @@ TECHNICAL-PLAN §4.14 names "per-rule enable, channel override, ladder override 
 
 ## G-05: Agents can be watched but not configured
 
-- [ ] Add agent configuration and the proposal review queue
+- [x] **P6-G13a** the proposal review queue, plus enable, disable and cancel. The queue is what closes the hard rule: "Propose by default. Agents produce proposals into the review queue" was true of the engine and of nothing a person could see.
+- [ ] **P6-G13b** the write policy and the scope binder. `agents.setAutonomy` does not exist, so an agent's policy is fixed at creation, and `agents.bindScope` needs a picker across three resource types.
 
 `/admin/agents` reads the agent list and the run log and offers a Run now control. Six actions have no caller: `agents.create`, `agents.setEnabled`, `agents.bindScope`, `agents.startRun`, `agents.readRun`, `agents.cancelRun`. Three more have none: `proposals.list`, `proposals.bulkApply`, `proposals.bulkDismiss`.
 
@@ -426,7 +427,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 - [ ] **B-07** invitations. Smallest of these and it unblocks every multi-person test.
 - [ ] **B-08** people directory and org chart (S-33).
 - [x] **G-01** activity feed (S-31). Workspace scope closed at P6-G11a; the other three scopes are P6-G11b.
-- [ ] **G-05** proposal review queue and agent configuration.
+- [x] **G-05** proposal review queue, and turning an agent off. Closed at P6-G13a; the write policy and the scope binder are P6-G13b.
 
 ## Then, the cycle and the session
 

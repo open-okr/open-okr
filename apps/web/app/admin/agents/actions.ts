@@ -61,3 +61,98 @@ export async function runCoachAction() {
   );
   revalidatePath("/admin/agents");
 }
+
+/**
+ * Turning an agent on or off (P6-G13a).
+ *
+ * **The control CLAUDE.md's least-privilege rule assumes exists.** `setEnabled`
+ * shipped at P2-T17 with no caller, so an agent that was saying the wrong thing
+ * could only be silenced from the command line. Disabling is the answer to a
+ * noisy agent that does not also throw away its bindings, which is what
+ * deleting it would do.
+ */
+export async function setAgentEnabledAction(
+  id: string,
+  enabled: boolean,
+): Promise<void> {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "agents.setEnabled",
+    { id, enabled },
+  );
+  revalidatePath("/admin/agents");
+}
+
+/**
+ * Stopping a run that is still going (P6-G13a).
+ *
+ * A halt is not a failure and the run log already says so: the Champion's cost
+ * cap cancels a run rather than failing it. This is the same state reached on
+ * purpose, and an administrator watching an agent work through a list it should
+ * not have started needs it.
+ */
+export async function cancelRunAction(id: string): Promise<void> {
+  const { session, workspace } = await requireWorkspace();
+  await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "agents.cancelRun",
+    { id },
+  );
+  revalidatePath("/admin/agents");
+}
+
+/**
+ * Applying or dismissing proposals (P6-G13a).
+ *
+ * **This is the missing half of a hard rule.** CLAUDE.md: "Propose by default.
+ * Agents produce proposals into the review queue." The queue had no screen, so
+ * `proposals.list`, `bulkApply` and `bulkDismiss` all shipped at P2-T17 with no
+ * caller and a proposal could be created and never seen by anybody.
+ *
+ * Bulk by design, and the answer is per proposal. `bulkApply` reports what
+ * applied and what refused, each with its reason, because applying ten
+ * proposals where the third is stale must not abandon the other nine.
+ */
+export async function applyProposalsAction(ids: readonly string[]): Promise<{
+  applied: number;
+  failed: readonly { id: string; error: string }[];
+}> {
+  const { session, workspace } = await requireWorkspace();
+  const result = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "proposals.bulkApply",
+    { ids: [...ids] },
+  );
+  revalidatePath("/admin/agents");
+  return { applied: result.applied.length, failed: result.failed };
+}
+
+export async function dismissProposalsAction(
+  ids: readonly string[],
+): Promise<{ dismissed: number }> {
+  const { session, workspace } = await requireWorkspace();
+  const result = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "proposals.bulkDismiss",
+    { ids: [...ids] },
+  );
+  revalidatePath("/admin/agents");
+  return { dismissed: result.dismissed.length };
+}

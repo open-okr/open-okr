@@ -4,7 +4,7 @@ The single source of truth for execution progress against IMPLEMENTATION-PLAN.md
 
 Statuses: `todo`, `in_progress`, `in_review`, `blocked`, `done`, `skipped`. Skipping requires a note and human sign-off. The rules are in EXECUTION-GUIDE.md §5.
 
-**171 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, 132 until P6-T04 was cut in three, 134 until the gap audit added thirty rows between Phase 6 and Phase 7, 164 until P6-G01 was cut in three, 166 until P6-G06 was cut in two beside a security finding it turned up, 168 until P6-G18 was cut in two, 169 until P6-G24 was cut in two, and 170 until P6-G11 was cut in two.
+**172 tasks.** The figure read 105 until P5-T16, which is where somebody counted the plan again, 126 until P6-T01 was cut in two, 129 until P6-T03 was cut in four, 132 until P6-T04 was cut in three, 134 until the gap audit added thirty rows between Phase 6 and Phase 7, 164 until P6-G01 was cut in three, 166 until P6-G06 was cut in two beside a security finding it turned up, 168 until P6-G18 was cut in two, 169 until P6-G24 was cut in two, 170 until P6-G11 was cut in two, and 171 until P6-G13 was cut in two.
 
 ## Phase 1: Foundation
 
@@ -450,7 +450,7 @@ need the space filter the explorer already has. KPI tiles are P3-T12.
 
 ## Gap closure: between Phase 6 and Phase 7
 
-Thirty-seven tasks closing `GAP-AUDIT.md`, the per page and per module audit of
+Thirty-eight tasks closing `GAP-AUDIT.md`, the per page and per module audit of
 7 September 2026. Not a phase. The audit is the evidence for every row; each
 task's entry in IMPLEMENTATION-PLAN.md names the finding it closes.
 
@@ -473,7 +473,8 @@ task's entry in IMPLEMENTATION-PLAN.md names the finding it closes.
 | P6-G11b | The feed at space, goal and profile scope | todo |  |  | Split from P6-G11. Needs three read actions over `queryFeed`, plus the panel on each of the three surfaces |
 | P6-G12a | The AI console: provider, keys and models | todo |  |  | GAP-AUDIT B-05. Nineteen of twenty-four `ai.*` actions have no caller |
 | P6-G12b | The AI console: features, prompts, budgets and usage | todo |  |  | GAP-AUDIT B-05 |
-| P6-G13 | Agent configuration and the proposal review queue | todo |  |  | GAP-AUDIT G-05. The propose-and-approve default has no surface, so a proposal can be made and never seen |
+| P6-G13a | The proposal review queue, and turning an agent off | in_review | agung | 2026-09-07 | GAP-AUDIT G-05. **The missing half of a hard rule.** CLAUDE.md: "Propose by default. Agents produce proposals into the review queue." `proposals.list`, `bulkApply` and `bulkDismiss` all shipped at P2-T17 and no screen ever reached them, so an agent in the default write policy could produce a proposal nobody could see, let alone act on. An agent whose proposals nobody reads has not spoken. **Cut in two, along what the registry already offers.** Enable, disable, cancel and the three proposal actions needed only a surface; the write policy does not, because `agents.create` takes an autonomy and nothing changes it afterwards, so `agents.setAutonomy` has to exist first. That and the scope binder are P6-G13b. IMPLEMENTATION-PLAN corrected here; 172 tasks. **The payload is shown in the caller's own words**, not as prose: a proposal is an action name and a payload, and rendering it as a sentence would mean a second description of every action in the registry with one of the two going stale. An object or an array is summarised rather than dumped, because the run log is where the whole thing lives. **Nothing is preselected.** Applying is a write through the Operation pipeline in the reviewer's own name, and a queue that arrives ticked is the automatic approval the propose-by-default rule exists to prevent; the screen says that under the buttons. **Refusals stay on screen after the successes disappear.** `bulkApply` reports what applied and what refused with a reason each, because applying ten proposals where the third is stale must not abandon the other nine, and a reviewer only learns what happened if the reasons outlive the rows. **Copilot proposals are excluded**, the same filter the review inbox applies at P6-G02: a row with no `run_id` came from somebody's own thread and belongs to the panel that asked, not to a shared administrative queue. **The queue sits above the agents and the runs**, because it is the one thing on the screen waiting on the reader; everything else is a record of what already happened. **Disabling is not deleting** and the confirmation says so: it keeps the bindings, the persona and the run history, where deleting would throw away a least-privilege scope somebody set on purpose. **Verified:** `apps/web` 17 files 86/86, typecheck 11/11, Biome, `check:boundaries` 746 files, `dead-code`, `pnpm build`. **Not verified:** no browser run, so the bulk selection and the refusal list are proved by construction; and no agent proposal exists on this machine to apply, because nothing has run the agents here |
+| P6-G13b | The write policy and the scope binder | todo |  |  | Split from P6-G13. Needs `agents.setAutonomy`, which the registry has never had, plus a picker across named spaces, goals and KPI trees |
 | P6-G14 | Cycle phase 0, the annual frame, S-05 | todo |  |  | GAP-AUDIT B-03. `frame.read` and `frame.set` have no caller |
 | P6-G15 | Cycle phase 6, run the cadence, S-11 | todo |  |  | GAP-AUDIT B-03 |
 | P6-G16 | Cycle phase 7, review and learn, S-12 | todo |  |  | GAP-AUDIT B-03 |
