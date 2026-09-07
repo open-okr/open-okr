@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   findSetting,
   INSTANCE_DEFAULT_LANGUAGE,
+  resolveMemberNotificationSettings,
   resolveMemberSettings,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
@@ -136,13 +137,41 @@ describe("workspace settings", () => {
 });
 
 describe("member settings", () => {
-  it("covers every member-scoped key in the registry", () => {
+  it("covers every key stored as a member column", () => {
+    // **Filtered on the home, not the scope, since P6-G08.** This asserted
+    // that `resolveMemberSettings` covered every member-scoped key, which was
+    // the same statement while every member setting was a member column. The
+    // notification preferences are member-scoped too and live in
+    // `notification_settings`, created lazily on first read, so including them
+    // here would demand that provisioning write keys to columns that do not
+    // exist. Their own coverage is the assertion below.
     const resolved = resolveMemberSettings({});
     for (const setting of SETTINGS_REGISTRY.filter(
-      (entry) => entry.scope === "member",
+      (entry) => entry.home === "workspace_members",
     )) {
       expect(Object.hasOwn(resolved, setting.key)).toBe(true);
     }
+  });
+
+  it("covers every key stored in the notification settings row", () => {
+    const resolved = resolveMemberNotificationSettings({});
+    for (const setting of SETTINGS_REGISTRY.filter(
+      (entry) => entry.home === "notification_settings",
+    )) {
+      expect(Object.hasOwn(resolved, setting.key)).toBe(true);
+    }
+  });
+
+  it("leaves no member-scoped setting without a resolver", () => {
+    // The invariant the split could have lost: a member setting whose home is
+    // neither of the two above would be declared and resolved by nothing.
+    const orphans = SETTINGS_REGISTRY.filter(
+      (entry) =>
+        entry.scope === "member" &&
+        entry.home !== "workspace_members" &&
+        entry.home !== "notification_settings",
+    ).map((entry) => entry.key);
+    expect(orphans).toEqual([]);
   });
 
   it("defaults the primary channel to email beside the in-app inbox", () => {

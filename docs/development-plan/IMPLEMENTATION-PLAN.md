@@ -1544,9 +1544,25 @@ screen's own honest description is the one `review-badge.ts` already gives:
 recomputed on navigation and after the writes that move it.
 
 ### P6-G08: Member notification settings [M]
-Depends on: P6-G07
+Depends on: P6-G07a
 Goal: the member half of the settings map is reachable (GAP-AUDIT B-06).
-Deliverables: per-reason routing, the batching window, the daily summary time and the language, theme and density preferences on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks.
+Deliverables: per-reason routing, the batching window, the daily summary and its time on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks; each one declared in the §4.14 registry with the default it resolves to.
+
+**Language, theme and density moved out of this row**, to P6-G22 and P6-G23,
+which own their controls. No column exists for any of the three, so building
+their storage here and their controls there would split one setting across two
+tasks and leave it owned by nobody for a release. A setting arrives with the
+screen that sets it.
+
+**A setting's scope and its storage home are two different things**, and this
+is the task that separated them. `SETTINGS_REGISTRY` had two scopes and two
+tables, so scope implied the home; the notification preferences are
+member-scoped and live in `notification_settings`, created lazily on first
+read, which is not the same storage as a member column.
+`resolveMemberSettings` writes its answer into `workspace_members` at
+provisioning, so a notification key reaching it would name a column that does
+not exist. The registry declares the home, and both the existing spec and the
+new one enumerate per home.
 Test plan: every setting in the member scope resolves to its documented default on a member who has never opened the screen, enumerated from the registry rather than a fixed list; changing the summary time moves when it fires; a per-reason routing change takes effect on the next notification.
 Acceptance: Given a member who changes their batch window to ten minutes, when four notifications arrive inside it, then they receive one digest listing four items.
 
@@ -1697,12 +1713,23 @@ Deliverables: every user-facing string in the 47 routes moved into the catalogue
 Test plan: the pseudo-locale check runs over every route and fails on a deliberately hardcoded string; a member whose language is `ms` sees the stubbed catalogue; a key missing from `ms` falls back to `en` rather than rendering the key.
 Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language, and a new hardcoded string anywhere fails the build.
 
+**The member's language column arrives here**, with the control that sets it.
+§4.14 documents "Member language, theme, density" and no column exists for any
+of the three; P6-G08 deliberately left them rather than storing a preference
+whose screen was two rows away. So this row brings the migration, the §4.14
+registry entry with its default, and the control together.
+
 ### P6-G23: Theme and density control [S]
 Depends on: P2-T10
 Goal: the two states every UI task must verify are reachable (GAP-AUDIT G-09).
 Deliverables: a theme and density control on the member's settings surface and in the avatar menu, calling the `setTheme` and `setDensity` the provider has always exposed and nothing has ever called; the preference persisted per member rather than only in the browser, so it follows them; the pre-hydration script reading what the control writes.
 Test plan: switching theme survives a reload and a second device; compact density changes row heights on a virtualised table; reduced motion is still honoured in both themes.
 Acceptance: Given a member who chooses dark and compact, when they sign in on another browser, then the product renders dark and compact with no flash of the other.
+
+**The theme and density columns arrive here**, for the reason P6-G22 records
+about language: "persisted per member rather than only in the browser" is a
+migration and a §4.14 registry entry, and a setting arrives with the screen
+that sets it rather than two rows earlier.
 
 **P6-G24 was cut in two, and the seam is an architecture fact rather than a
 size judgement.** One clause of the row was "section-level error boundaries so

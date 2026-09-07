@@ -174,13 +174,26 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
       timeout: 1_000,
     });
   }).toPass({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Save" }).click();
+  // **Scoped to its own form**, which it was not until P6-G08 put a second
+  // card with its own Save on this page: an unscoped lookup matched two
+  // buttons and Playwright refused the click under strict mode.
+  //
+  // Scoped by the input it is about, not by copy. Filtering on the text
+  // "Primary channel" matched both forms, because `hasText` is
+  // case-insensitive and the new card's own help line reads "follows your
+  // primary channel above". A prose filter is a locator that any wording
+  // change can break; the field this test fills is what actually identifies
+  // the form it belongs to.
+  const delivery = page
+    .locator("form")
+    .filter({ has: page.locator('input[name="quietStart"]') });
+  await delivery.getByRole("button", { name: "Save" }).click();
 
   // A refusal would be here, and a spec that only checked the value would read
   // "the write did nothing" as "the write is slow". Scoped to the form: Next
   // renders its own route announcer with role="alert" on every page.
   await expect(
-    page.locator("form").filter({ hasText: "Primary channel" }).getByRole("alert"),
+    delivery.getByRole("alert"),
   ).toBeHidden();
 
   // The confirmation is the saved value coming back, not a message: a write

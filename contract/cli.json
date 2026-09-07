@@ -1425,6 +1425,12 @@
           "field": "dailySummaryTime",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "routing",
+          "field": "routing",
+          "type": "object",
+          "required": false
         }
       ],
       "pages": false

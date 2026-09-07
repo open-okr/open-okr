@@ -474,7 +474,45 @@ const settingsOutput = z.object({
   batchWindowMinutes: z.number(),
   dailySummary: z.boolean(),
   dailySummaryTime: z.string(),
+  /**
+   * A channel per reason, and the primary channel for every reason absent
+   * (P6-G08).
+   *
+   * `notification_settings.routing` has been read by `notifyRecipients` since
+   * P2-T06 and there was no way to see it or set it: this schema described four
+   * of the row's fields and the routing was not one of them, so the member half
+   * of §4.14 was unreachable. The gap audit recorded it under B-06.
+   */
+  routing: z.record(z.string(), z.string()),
 });
+
+/**
+ * The settings row as the contract describes it.
+ *
+ * `NotificationRouting` allows an undefined value per key, because a partial
+ * record is what the jsonb column holds and a caller reading a reason that was
+ * never set gets undefined. The contract describes what is actually stored, so
+ * the undefined entries are dropped here rather than declared as nullable
+ * fields nothing ever writes.
+ */
+function settingsView(
+  row: Awaited<ReturnType<typeof getOrCreateNotificationSettings>>,
+): z.infer<typeof settingsOutput> {
+  const routing: Record<string, string> = {};
+  for (const [reason, channel] of Object.entries(row.routing)) {
+    if (channel !== undefined) {
+      routing[reason] = channel;
+    }
+  }
+  return {
+    memberId: row.memberId,
+    mentionImmediate: row.mentionImmediate,
+    batchWindowMinutes: row.batchWindowMinutes,
+    dailySummary: row.dailySummary,
+    dailySummaryTime: row.dailySummaryTime,
+    routing,
+  };
+}
 
 export const getNotificationSettings = defineReadAction({
   name: "notifications.getSettings",
@@ -503,10 +541,12 @@ export const getNotificationSettings = defineReadAction({
       if (!member) {
         throw new OperationError("not_found", "No such member.");
       }
-      return getOrCreateNotificationSettings(
-        tx,
-        context.workspaceId,
-        member.id,
+      return settingsView(
+        await getOrCreateNotificationSettings(
+          tx,
+          context.workspaceId,
+          member.id,
+        ),
       );
     });
   },
@@ -517,11 +557,35 @@ export const updateOwnNotificationSettings = defineWriteAction({
   summary: "Updates the signed-in member's own notification settings.",
   input: z.object({
     mentionImmediate: z.boolean().optional(),
-    batchWindowMinutes: z.number().int().positive().optional(),
+    // Bounded, where this was any positive integer. A window of a million
+    // minutes is a member who never hears from the product again, and the
+    // registry's own schema is where that bound is written (P6-G08).
+    batchWindowMinutes: z.number().int().min(1).max(1440).optional(),
     dailySummary: z.boolean().optional(),
     dailySummaryTime: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .optional(),
+    /**
+     * The whole map, not one entry (P6-G08).
+     *
+     * `notification_settings.routing` has been read by `notifyRecipients` on
+     * every fan-out since P2-T06 and nothing could write it: this input
+     * described four of the row's fields and the routing was not one of them,
+     * so per-reason routing was storage with no way in. A reason absent from
+     * the map falls back to the member's primary channel, so removing an
+     * override means sending a map without that key; a per-entry patch would
+     * need a second verb to delete one, and the map is six keys at most.
+     */
+    // `partialRecord`, not `record`. In Zod 4 a record keyed by an enum is
+    // exhaustive: it demands an entry for all six reasons, which is exactly
+    // the map §4.14 says not to store, because a reason absent is what "follow
+    // my primary channel" means. Caught by the test that stores two overrides.
+    routing: z
+      .partialRecord(
+        z.enum(NOTIFICATION_REASONS),
+        z.enum(["app", "email", "slack", "teams", "whatsapp", "telegram"]),
+      )
       .optional(),
   }),
   output: settingsOutput,
@@ -538,7 +602,7 @@ export const updateOwnNotificationSettings = defineWriteAction({
         ...input,
       });
       return {
-        result: updated,
+        result: settingsView(updated),
         activity: {
           kind: "notification_settings.updated",
           subjectType: "workspace_member",
