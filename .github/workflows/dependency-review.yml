@@ -52,6 +52,20 @@ jobs:
           # list above. It reaches us transitively:
           # json-schema-typed -> @modelcontextprotocol/sdk -> @openokr/adapters.
           #
+          # The third package, and the report is right rather than confused
+          # this time. GitHub reports bowser as "MIT AND MITNFA" because its
+          # LICENSE is the MIT text plus one added paragraph: a distribution
+          # that substantially alters or disables the software must replace or
+          # remove the original author's bug reporting addresses. That is the
+          # "no false attribs" clause, and it is the whole of the difference.
+          # It is not on the list above because it is not OSI-identified, not
+          # because it conflicts: it adds an attribution duty and takes no
+          # freedom away, so it can ship inside an AGPL-3.0 work. The duty does
+          # not fall on us either way, because we redistribute bowser unmodified
+          # as a transitive dependency. package.json declares "MIT". Read in
+          # full on 2.14.1, 2026-09-07. It reaches us transitively:
+          # bowser -> @aws-sdk/core -> @aws-sdk/client-s3 -> @openokr/adapters.
+          #
           # Recheck on a major bump, and read the file rather than the report.
-          allow-dependencies-licenses: pkg:npm/rou3, pkg:npm/json-schema-typed
+          allow-dependencies-licenses: pkg:npm/rou3, pkg:npm/json-schema-typed, pkg:npm/bowser
           comment-summary-in-pr: on-failure

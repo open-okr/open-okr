@@ -619,10 +619,13 @@ test("the review inbox lists what this member owes, with an action on each", asy
     page.getByRole("main").getByRole("link", { name: "Check in" }),
   ).toBeVisible();
 
-  // Named, not hidden. A page that showed two of six sources without saying so
-  // would look complete while failing to mention a blocker somebody owns.
-  await expect(page.getByText("Blockers you own")).toBeVisible();
-  await expect(page.getByText("Sessions to run")).toBeVisible();
+  // The same promise this spec has always made, now that it reads the other
+  // way round. It used to name the sources the page could not serve, because a
+  // page showing two of six without saying so would look complete while
+  // failing to mention a blocker somebody owns. P6-G02 served the last four,
+  // so the card that named them renders nothing, and its absence is what says
+  // no source is missing.
+  await expect(page.getByText("Not here yet")).toHaveCount(0);
 });
 
 test("the review action opens the composer for that goal", async () => {

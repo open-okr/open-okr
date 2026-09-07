@@ -117,13 +117,19 @@ fi
 # The chart set OPENOKR_STORAGE_DIR from P1-T10 until P6-G05 and nothing has
 # ever read it: the schema declares OPENOKR_STORAGE_ROOT. It happened to work,
 # because ROOT defaults to a relative path and the image runs from /app.
-if printf '%s' "$defaults" | grep -q "OPENOKR_STORAGE_ROOT"; then
+#
+# Both greps match on `name:` rather than on the bare variable. helm template
+# renders a template's `#` comments into its output, and the comment on the
+# deployment explains this very rename, so a bare grep finds the explanation
+# and reports it as the setting. That is what turned this check red while the
+# chart was correct.
+if printf '%s' "$defaults" | grep -q "name: OPENOKR_STORAGE_ROOT"; then
   pass "sets the storage root variable the application reads"
 else
   fail "sets a storage variable the application does not read"
 fi
 
-if printf '%s' "$defaults" | grep -q "OPENOKR_STORAGE_DIR"; then
+if printf '%s' "$defaults" | grep -q "name: OPENOKR_STORAGE_DIR"; then
   fail "still sets OPENOKR_STORAGE_DIR, which nothing reads"
 else
   pass "no longer sets a variable nothing reads"

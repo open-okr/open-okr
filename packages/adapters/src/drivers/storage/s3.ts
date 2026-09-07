@@ -190,4 +190,20 @@ export class S3Storage implements FileStorage {
   }
 }
 
-const trimSlashes = (value: string): string => value.replace(/^\/+|\/+$/g, "");
+// Trimmed by index rather than with /^\/+|\/+$/g. Those two quantifiers
+// backtrack on a value that is mostly slashes, which CodeQL reports as a
+// polynomial denial of service (js/polynomial-redos). The prefix is
+// configuration rather than user input, so the practical risk is a slow start
+// on a misconfigured instance, but a linear scan costs nothing and leaves
+// nothing to argue about.
+const trimSlashes = (value: string): string => {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "/") {
+    start += 1;
+  }
+  while (end > start && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return value.slice(start, end);
+};

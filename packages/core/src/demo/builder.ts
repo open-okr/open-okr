@@ -332,6 +332,8 @@ async function setFrame(context: Ctx): Promise<void> {
 interface CycleFacts {
   readonly id: string;
   readonly startsOn: string;
+  /** Every key result is due when the quarter closes. See `createOkrs`. */
+  readonly endsOn: string;
 }
 
 /**
@@ -431,7 +433,7 @@ async function runCycleWorkflow(
     focusNote: REVALIDATION.focusNote,
   });
 
-  return { id: cycle.id, startsOn: cycle.startsOn };
+  return { id: cycle.id, startsOn: cycle.startsOn, endsOn: cycle.endsOn };
 }
 
 /**
@@ -598,6 +600,7 @@ async function createOkrs(
   spaces: Map<SpaceKey, string>,
   kpis: Map<KpiKey, string>,
   cycleId: string,
+  cycleEndsOn: string,
 ): Promise<OkrResult> {
   const goalIds = new Map<GoalKey, string>();
   const keyResultIds = new Map<string, string>();
@@ -651,6 +654,14 @@ async function createOkrs(
         baselineValue: keyResult.baselineValue,
         targetValue: keyResult.targetValue,
         weight: keyResult.weight ?? 1,
+        // Due when the quarter closes, which is the date §3.6 already projects
+        // a forecast to. §4.2's KR-3 asks for a baseline, a target, a date and
+        // an owner, and it is the one of the four the seed used to leave out:
+        // every demo key result failed KR-3 on a missing date, so publish gate
+        // 2 was red on all seven objectives for a reason no reader could act
+        // on. A key result nobody dated is genuinely incomplete, so the fix is
+        // the date rather than a quieter gate.
+        dueOn: cycleEndsOn,
         ...(ownerId ? { ownerId } : {}),
         ...(keyResult.capacity ? { capacity: keyResult.capacity } : {}),
         ...(kpiId ? { kpiId } : {}),
@@ -855,7 +866,14 @@ export async function buildDemoWorkspace(
   await setFrame(context);
   const cycle = await runCycleWorkflow(context, cast, now);
   const metrics = await createMetrics(context, now);
-  const okrs = await createOkrs(context, cast, spaces, metrics.ids, cycle.id);
+  const okrs = await createOkrs(
+    context,
+    cast,
+    spaces,
+    metrics.ids,
+    cycle.id,
+    cycle.endsOn,
+  );
   const recoveryLaunched = await launchRecovery(context, metrics.ids, cycle.id);
   await seedDiscussion(context, okrs.goals);
   await recordCapacity(context, cycle.id);
@@ -865,7 +883,7 @@ export async function buildDemoWorkspace(
     "Every row was written by you, so the audit trail and the activity feed name you rather than naming Priya for something Priya did not do.",
     "Key result history is stamped now; the note on each value carries the week it belongs to. KPI readings are real month starts, so the KPI charts are genuine six-month trends.",
     "The set is not published, and publish gate 5 says why: one key result is still marked as exceeding capacity. Change it to tight on the goal page and watch the gate turn green.",
-    "Publish gate 2 cannot be evaluated at all, because the §4 quality engine arrives at P4-T01. A gate that cannot check anything must not pass, so it blocks publication like a red one.",
+    "Publish gate 2 is red for one reason, and the Draft Coach names it: the cohort key result is worded as the activity rather than the outcome it is there to prove. §4.2's KR-5 asks for impact, not effort. Reword it on the goal page and watch the gate turn green.",
     "The scorecard is empty. It reads key result scores, and scoring at the quarterly review is P4-T10. Seeding invented scores would put a number on screen that no review agreed.",
   ];
   if (recoveryLaunched) {
