@@ -3,7 +3,7 @@
 import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { ActionForm } from "../../cycle/action-form.tsx";
-import { dismissFinding, linkGoals } from "./actions.ts";
+import { applyFinding, dismissFinding, linkGoals } from "./actions.ts";
 import { Canvas, type StudioEdge, type StudioNode } from "./canvas.tsx";
 
 /**
@@ -12,9 +12,10 @@ import { Canvas, type StudioEdge, type StudioNode } from "./canvas.tsx";
  * The panel's three tabs are three different questions about the same cascade,
  * which is why they are tabs rather than three cards. Details asks "what is this
  * node", health asks "what is wrong with the shape", review asks "what does the
- * Coach think about the words". The third is empty until P4-T03 and says so
- * rather than being hidden, because a tab that appears later is a feature nobody
- * discovers.
+ * Coach think about the words". The third is empty until a provider is
+ * configured, and says so rather than being hidden, because a tab that appears
+ * later is a feature nobody discovers. §5.3's review arrived at P4-T06b-b and
+ * its findings are decided from here.
  */
 
 export interface Finding {
@@ -272,10 +273,10 @@ export function Studio({
                   <p className="text-xs text-ink-4">
                     This tab holds the Coach's semantic findings: two goals that
                     pull against each other, a goal whose content fits a
-                    different parent, a dependency nobody wrote down. They need
-                    the AI provider and arrive with the Coach at P4-T03. The
-                    structural gaps in the health tab work with the provider off
-                    and always will.
+                    different parent, a dependency nobody wrote down. Reading
+                    what goals mean needs an AI provider, so with none
+                    configured this stays empty. The structural gaps in the
+                    health tab work with the provider off and always will.
                   </p>
                 </>
               ) : (
@@ -291,6 +292,37 @@ export function Studio({
                       <span className="text-xs text-ink-2">
                         {finding.reason}
                       </span>
+                      {canEdit ? (
+                        <span className="flex flex-wrap gap-1.5">
+                          {/* §5.3 offers the click only where the fix is
+                              mechanical, so only a relink gets one. A conflict
+                              or a gap has a conversation to have rather than a
+                              button to press, and the action refuses them by
+                              name if anybody tries. */}
+                          {finding.kind === "relink" ? (
+                            <ActionForm action={applyFinding}>
+                              <input
+                                type="hidden"
+                                name="findingId"
+                                value={finding.id}
+                              />
+                              <Button type="submit" size="sm">
+                                Re-parent
+                              </Button>
+                            </ActionForm>
+                          ) : null}
+                          <ActionForm action={dismissFinding}>
+                            <input
+                              type="hidden"
+                              name="findingId"
+                              value={finding.id}
+                            />
+                            <Button type="submit" size="sm">
+                              Dismiss
+                            </Button>
+                          </ActionForm>
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

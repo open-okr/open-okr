@@ -29,9 +29,20 @@ import {
   removeReaction,
   updateComment,
 } from "../comments/service.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/** The same validator every other rich-text write uses: an imported body is
+ * held to the schema exactly as a typed one is. */
+const richText = z
+  .unknown()
+  .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
+    message: "not valid editor JSON for the current rich text schema",
+  });
 
 function requireMemberId(memberId: string | null | undefined): string {
   if (!memberId) {
@@ -98,8 +109,23 @@ export const listCommentsAction = defineReadAction({
       authorMemberId: z.string().uuid(),
       authorName: z.string(),
       body: z.unknown(),
-      editedAt: z.date().nullable(),
-      createdAt: z.date(),
+      /**
+       * ISO strings, not `Date` objects (P5-T07b).
+       *
+       * They were `z.date()`, which no JSON surface can carry: the REST
+       * response has always sent a string here and the schema said otherwise,
+       * and the OpenAPI generator refused to describe it, which is how this was
+       * found. Every other action in the registry already declares an ISO
+       * string, and the goal page was calling `.toISOString()` on the way into
+       * its own component, so this moves that one line to where the contract is
+       * declared instead of past it.
+       */
+      editedAt: z.string().nullable(),
+      createdAt: z.string(),
+      /** The comment this one answers, or null. Returned so the relationship
+       * an import preserved is addressable; no surface renders a thread yet
+       * (P6-T04b). */
+      parentId: z.string().uuid().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -112,12 +138,17 @@ export const listCommentsAction = defineReadAction({
         resourceType: input.subjectType,
         resourceId: input.subjectId,
       });
-      return listComments(
+      const rows = await listComments(
         tx,
         ctx.workspaceId,
         input.subjectType,
         input.subjectId,
       );
+      return rows.map((row) => ({
+        ...row,
+        editedAt: row.editedAt ? row.editedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      }));
     });
   },
 });
@@ -224,6 +255,235 @@ export const createCommentAction = defineWriteAction({
   }),
 });
 
+/**
+ * A comment an import found, kept as its author wrote it (P6-T04b).
+ *
+ * The same trade `goals.importCheckIn` made at P6-T03c and `people
+ * .importMember` made at P6-T03a. A task comment from 2023 was written by
+ * somebody who may have left, on a day that is not today, sometimes in answer
+ * to another comment. `comments.create` posts as the signed-in member, now,
+ * answering nothing, which is correct for the product and useless for a
+ * migration: the imported conversation would be a wall of remarks by whoever
+ * ran the import, all dated the day they ran it.
+ *
+ * Adding an author and a date to `comments.create` would be worse than a
+ * second action: it would let any member post under somebody else's name on
+ * any date they chose, which is an impersonation hole opened for a migration's
+ * benefit.
+ *
+ * **`full`, and a legacy key is required.** There is no call to this that is
+ * not part of a recorded import run. The body is validated and sanitised the
+ * same as any other: `richText` here is the same schema the ordinary write
+ * boundary uses, and the HTML the source held was converted before it arrived.
+ */
+export const importCommentAction = defineWriteAction({
+  name: "comments.importComment",
+  summary:
+    "Records a comment an import found, keeping its author and its date.",
+  input: z.object({
+    subjectType: subjectTypeSchema,
+    subjectId: z.uuid(),
+    /** The member who wrote it in the source, not the one running the import. */
+    authorMemberId: z.uuid(),
+    body: richText,
+    /** When the source says it was written. */
+    createdAt: z.string(),
+    /** Set when the source records that it was edited afterwards. */
+    editedAt: z.string().optional(),
+    /**
+     * The comment this one answers, already imported. The source threads one
+     * level deep and so does this: a parent that is itself a reply is the
+     * caller's problem, not this action's.
+     */
+    parentId: z.uuid().optional(),
+    /** Required: this action exists for imports and for nothing else. */
+    legacy: legacyKey,
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        comments,
+        input.legacy,
+        "comment",
+      );
+
+      const createdAt = new Date(input.createdAt);
+      if (Number.isNaN(createdAt.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.createdAt}" is not a date this comment could have been written on.`,
+        );
+      }
+      const editedAt = input.editedAt ? new Date(input.editedAt) : undefined;
+      if (editedAt && Number.isNaN(editedAt.getTime())) {
+        throw new OperationError(
+          "forbidden",
+          `"${input.editedAt}" is not a date this comment could have been edited on.`,
+        );
+      }
+
+      // The author has to be a member of this workspace. Without the check a
+      // mistyped id would write a comment nobody can attribute, and the
+      // foreign key's error says nothing a person could act on.
+      const [author] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, input.authorMemberId),
+            eq(workspaceMembers.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!author) {
+        throw new OperationError(
+          "forbidden",
+          "No such member to attribute this to.",
+        );
+      }
+
+      const result = await createComment(tx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        authorMemberId: input.authorMemberId,
+        body: input.body,
+        parentId: input.parentId,
+        createdAt,
+        editedAt,
+        legacy: { type: input.legacy.type, id: input.legacy.id },
+      });
+
+      return {
+        result: { id: result.id },
+        activity: {
+          kind: "comment.created" as const,
+          subjectType: "comment",
+          subjectId: result.id,
+          payload: {
+            subjectType: input.subjectType,
+            imported: true,
+            excerpt: excerptRichText(
+              input.body as Parameters<typeof excerptRichText>[0],
+              120,
+            ),
+          },
+        },
+        audit: {
+          action: "comments.importComment",
+          targetType: "comment",
+          targetId: result.id,
+          payload: {
+            subjectType: input.subjectType,
+            legacyType: input.legacy.type,
+            legacyId: input.legacy.id,
+          },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Replaces the body of a comment an import wrote (P6-T04c).
+ *
+ * The second phase of the reference rewrite, and the only thing that needs a
+ * write to a comment that already exists. When comments import, an inline
+ * base64 image has nowhere to go: a picture in this product is an `attachment`
+ * pointing at a blob, and the file domain has not run yet. When it does, the
+ * bytes are decoded, a blob is made, and the body is rebuilt with the
+ * attachment in the image's place.
+ *
+ * `comments.update` cannot do it: it is author-only, and the author is a
+ * placeholder who has never signed in. It also stamps `edited_at`, which would
+ * claim somebody edited their own comment years after writing it.
+ *
+ * **Only a comment carrying a legacy key**, so this can never touch something
+ * a person wrote. `full`, like every other import action.
+ */
+export const replaceImportedBodyAction = defineWriteAction({
+  name: "comments.replaceImportedBody",
+  summary:
+    "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
+  input: z.object({
+    commentId: z.uuid(),
+    body: richText,
+    /** How many files the rewrite put into the body, for the feed line. */
+    attachments: z.number().int().nonnegative().default(0),
+  }),
+  output: z.object({ replaced: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [comment] = await tx
+        .select({
+          id: comments.id,
+          legacyId: comments.legacyId,
+          subjectType: comments.subjectType,
+          subjectId: comments.subjectId,
+        })
+        .from(comments)
+        .where(
+          activeOnly(
+            comments,
+            eq(comments.id, input.commentId),
+            eq(comments.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!comment) {
+        throw new OperationError("not_found", "No such comment.");
+      }
+      if (!comment.legacyId) {
+        // A comment somebody wrote in the product. Not this action's business,
+        // and the refusal says which rule it broke rather than "forbidden".
+        throw new OperationError(
+          "forbidden",
+          "This comment was written here, not imported, so an import may not rewrite it.",
+        );
+      }
+
+      // openokr:allow-mutation: inside an Operation's execute.
+      await tx
+        .update(comments)
+        // `edited_at` is deliberately untouched: nobody edited this comment.
+        // The rewrite finishes an import that was always going to take two
+        // passes, and saying otherwise would put a false fact on the screen.
+        .set({ body: input.body, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            comments,
+            eq(comments.id, input.commentId),
+            eq(comments.workspaceId, workspaceId),
+          ),
+        );
+
+      return {
+        result: { replaced: true },
+        activity: {
+          kind: "comment.filesResolved" as const,
+          subjectType: "comment",
+          subjectId: comment.id,
+          payload: {
+            subjectType: comment.subjectType,
+            attachments: input.attachments,
+          },
+        },
+        audit: {
+          action: "comments.replaceImportedBody",
+          targetType: "comment",
+          targetId: comment.id,
+          payload: { legacyId: comment.legacyId },
+        },
+      };
+    },
+  }),
+});
 export const updateCommentAction = defineWriteAction({
   name: "comments.update",
   summary: "Edit a comment (author only)",

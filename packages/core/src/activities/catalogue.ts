@@ -36,15 +36,59 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     to: z.enum(["active", "read_only", "frozen"]),
   }),
   "member.profile_updated": z.object({ name: z.string() }),
+  "channel.templatesSynced": z.object({
+    recorded: z.number(),
+    withdrawn: z.number(),
+  }),
+  "channel.templateMapped": z.object({
+    ruleKey: z.string(),
+    templateId: z.string(),
+  }),
+  "channel.templateUnmapped": z.object({ ruleKey: z.string() }),
+  "connection.revoked": z.object({ grantId: z.string() }),
+  "api_token.created": z.object({
+    name: z.string(),
+    audience: z.string(),
+  }),
+  "api_token.revoked": z.object({ name: z.string() }),
+  "device.approved": z.object({ clientName: z.string() }),
+  "device.denied": z.object({ clientName: z.string() }),
   "member.updated": z.object({ name: z.string() }),
   "member.suspended": z.object({ name: z.string() }),
   "member.restored": z.object({ name: z.string() }),
   "member.converted_to_guest": z.object({ name: z.string() }),
   "member.erased": z.object({ name: z.string() }),
+  /**
+   * A member an import created or claimed (P6-T03a).
+   *
+   * `matched` says which of the three it was: a placeholder written now, a row
+   * an earlier run already wrote, or a member who was already here under the
+   * same address. The feed shows the import as one act; the audit rows name
+   * each row it touched.
+   */
+  "member.imported": z.object({
+    name: z.string(),
+    legacyId: z.string().optional(),
+    matched: z.enum(["legacy", "email"]).optional(),
+  }),
   "invitation.link_created": z.object({}).catchall(z.unknown()),
   "invitation.link_revoked": z.object({}),
   "invitation.accepted": z.object({}).catchall(z.unknown()),
   "invitation.joined_by_trusted_domain": z.object({}).catchall(z.unknown()),
+  // Channels (P5-T01b-a). The provider, never a credential and never a
+  // message body: an activity row is read by people.
+  "channel.connected": z.object({ provider: z.string() }),
+  "channel.disconnected": z.object({ provider: z.string() }),
+  "channel.identity_linked": z.object({ provider: z.string() }),
+  "channel.identity_unlinked": z.object({ provider: z.string() }),
+  // The provider only. The code itself is never in a row anybody reads
+  // (P5-T02a).
+  "channel.link_started": z.object({ provider: z.string() }),
+  "channel.message_queued": z.object({
+    provider: z.string(),
+    /** True when this key had already been queued, so nothing new was sent. */
+    duplicate: z.boolean(),
+  }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
   "notification.read": z.object({}),
@@ -139,7 +183,20 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.baseline_health_set": z.object({}),
   "cycle.capacity_recorded": z.object({}),
   "cycle.calibrated": z.object({}),
-  "cycle.published": z.object({ name: z.string() }),
+  "cycle.published": z.object({
+    name: z.string(),
+    // Which gates were unmet when somebody published anyway (P4-T03).
+    // Empty on a normal publication, which is most of them.
+    overrodeGates: z.array(z.number().int()).optional(),
+  }),
+  // The nudge run (P4-T04a). One activity per run rather than per nudge:
+  // the nudges are rows of their own, and a feed with one entry per message
+  // sent would bury everything a person actually did.
+  "nudges.run": z.object({ recorded: z.number().int() }),
+  // A snooze silences the nudge and never the obligation, which is why it
+  // is worth recording: somebody chose to stop being messaged about a
+  // thing they still owe.
+  "nudge.snoozed": z.object({ until: z.string() }),
   // Goals and key results (P3-T04). A goal's title is snapshotted for the same
   // reason a member's name is: "closed Raise activation" has to keep reading that
   // way after the goal is renamed or erased.
@@ -150,8 +207,61 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     closeDecision: z.enum(["keep", "modify", "abandon"]),
   }),
   "goal.reopened": z.object({}),
+  // The title, because a feed entry about a goal being removed has to read as
+  // a sentence after the goal is gone (P4-T14b-a).
+  "goal.deleted": z.object({ title: z.string() }),
   "goal.role_reassigned": z.object({ role: z.enum(["champion", "reviewer"]) }),
   "goal.moved_to_cycle": z.object({ title: z.string() }),
+  // Initiatives (P5-T10a). The title travels for the same reason a goal's does:
+  // "deleted Rebuild the activation flow" has to keep reading as a sentence
+  // after the initiative is gone.
+  "initiative.created": z.object({ title: z.string(), spaceId: z.uuid() }),
+  "initiative.updated": z.object({ fields: z.array(z.string()) }),
+  "initiative.deleted": z.object({ title: z.string() }),
+  // The key result, because the feed entry a reader wants is "this work is now
+  // behind that number" rather than "an initiative changed".
+  "initiative.linked": z.object({ keyResultId: z.uuid() }),
+  "initiative.unlinked": z.object({ keyResultId: z.uuid() }),
+  // Exports (P5-T13). An export is the one action that takes data out of the
+  // product, so it leaves a trail in the feed as well as in the audit log.
+  "export.taken": z.object({
+    list: z.string(),
+    rowCount: z.number().int(),
+  }),
+  // Imports (P6-T01a). The counterpart of the line above: an import brings a
+  // quarter of somebody else's history in, and the run behind it is the thing
+  // an administrator asks about later. Neither notifies.
+  "import.started": z.object({
+    source: z.string(),
+    mode: z.string(),
+    entity: z.string().optional(),
+  }),
+  "import.finished": z.object({
+    status: z.string(),
+    rowsWritten: z.number().int(),
+    rowsSkipped: z.number().int(),
+  }),
+  // Documents and attachments (P5-T12). Drafting emits an activity but no
+  // notification: the author's own record that they started one, with nothing
+  // in anybody else's feed about something they cannot open.
+  "document.drafted": z.object({ title: z.string() }),
+  "document.edited": z.object({}),
+  "document.published": z.object({
+    title: z.string(),
+    version: z.number().int(),
+  }),
+  "document.deleted": z.object({ title: z.string() }),
+  "attachment.added": z.object({ duplicate: z.boolean() }),
+  "attachment.removed": z.object({}),
+  // Tasks (P5-T11). The title travels on create and delete for the reason a
+  // goal's does: a feed line has to read as a sentence after the row is gone.
+  "task.created": z.object({ title: z.string(), assigned: z.number().int() }),
+  "task.updated": z.object({ fields: z.array(z.string()) }),
+  "task.moved": z.object({ status: z.string() }),
+  "task.assigned": z.object({ memberId: z.uuid() }),
+  "task.unassigned": z.object({ memberId: z.uuid() }),
+  "task.checklist_changed": z.object({ change: z.string() }),
+  "task.deleted": z.object({ title: z.string() }),
   "key_result.created": z.object({ title: z.string() }),
   "key_result.updated": z.object({}),
   "key_result.value_recorded": z.object({ value: z.number() }),
@@ -176,6 +286,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_risk_owned": z.object({}),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
+  // The one finding kind with a mechanical fix (§5.3, P4-T06b-b). The re-parent
+  // itself emits `goal.updated` from its own action; this records the decision
+  // that caused it, which is the part a reader cannot infer from the goal.
+  "alignment.finding_applied": z.object({ parentGoalId: z.string() }),
   // KPIs (P3-T12). Recording a value is worth a line: it is the one write that
   // moves a corridor state, and a state change is what a nudge reads later.
   "kpi.category_created": z.object({ name: z.string() }),
@@ -226,6 +340,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     excerpt: z.string(),
   }),
   "comment.deleted": z.object({ subjectType: z.string() }),
+  // P6-T04c. Not `comment.updated`: nobody edited anything. An import writes a
+  // comment's words in one pass and the files it held inline in a later one,
+  // because a picture here points at a file that did not exist yet.
+  "comment.filesResolved": z.object({
+    subjectType: z.string(),
+    attachments: z.number().int(),
+  }),
   "reaction.added": z.object({
     emoji: z.string(),
     subjectType: z.string(),
@@ -234,9 +355,151 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     emoji: z.string(),
     subjectType: z.string(),
   }),
+  // Sessions (P4-T07a)
+  "session.created": z.object({ kind: z.string(), title: z.string() }),
+  "session.opened": z.object({ kind: z.string() }),
+  "session.stageAdvanced": z.object({
+    from: z.string().nullable(),
+    to: z.string().nullable(),
+  }),
+  "session.skipped": z.object({ kind: z.string() }),
+  "session.closed": z.object({ kind: z.string() }),
+  // Confidence round (P4-T07b)
+  "session.voteCast": z.object({ keyResultId: z.string() }),
+  "session.votesRevealed": z.object({
+    keyResultId: z.string(),
+    count: z.number(),
+  }),
+  "session.confidenceConfirmed": z.object({
+    keyResultId: z.string(),
+    confidence: z.number(),
+  }),
+  // Blockers (P4-T07c)
+  "session.blockerCreated": z.object({
+    keyResultId: z.string(),
+    type: z.string(),
+  }),
+  "session.blockerResolved": z.object({ type: z.string() }),
+  "session.blockerReassigned": z.object({
+    type: z.string(),
+    ownerName: z.string(),
+  }),
+  // Commitments, digest, streaks (P4-T08)
+  "session.commitmentsSet": z.object({ count: z.number() }),
+  "session.commitmentsClosed": z.object({ count: z.number() }),
+  "session.coordinatorNoteSet": z.object({}),
+  // The monthly review (METHOD.md §7.5, P4-T09). A trend and a decision both
+  // hang off the goal rather than the session, because the goal page is where
+  // somebody comes looking for them a month later.
+  "session.trendRecorded": z.object({
+    trend: z.string(),
+    sessionId: z.string(),
+  }),
+  "session.shiftsRecorded": z.object({ sessionId: z.string() }),
+  "session.decisionRecorded": z.object({
+    sessionId: z.string(),
+    keyResultId: z.string().nullable(),
+  }),
+  // The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a). Neither payload
+  // carries the note: an activity row is read by everybody who can see the
+  // space, and the note is the one thing that is private.
+  "session.minuteAdded": z.object({
+    stageKey: z.string(),
+    added: z.number(),
+  }),
+  "session.stageNoteSet": z.object({ stageKey: z.string() }),
+  // The pulse and the word are deliberately absent: an activity row is read by
+  // everybody who can see the space, and section 8.2 gives the room's read to
+  // the facilitator alone.
+  "session.pulseGiven": z.object({ sessionId: z.string() }),
+  // No score in the payload: section 8.3 hides the objective score until the
+  // room reveals it, and a feed announcing each grade would reveal it one entry
+  // at a time.
+  "session.keyResultScored": z.object({ sessionId: z.string() }),
+  // No score in the payload: the feed reaches the whole space and the reveal
+  // was to the room in the review (P4-T10b-b).
+  "session.objectiveScoreRevealed": z.object({ sessionId: z.string() }),
+  // No goal title, no narrative text and no recognition words: all three reach
+  // the whole space and all three were written for the room (P4-T10c).
+  "session.micPassed": z.object({ sessionId: z.string() }),
+  "session.narrativeWritten": z.object({ sessionId: z.string() }),
+  "session.kudosGiven": z.object({ sessionId: z.string() }),
+  // No note text, no column and no answer: the feed reaches the whole space, an
+  // anonymous retro note would lose its anonymity to it, and the management
+  // retro is read by two roles inside that space (P4-T11a).
+  "session.retroNoteAdded": z.object({ sessionId: z.string() }),
+  "session.retroNoteRemoved": z.object({ sessionId: z.string() }),
+  "session.retroVoteCast": z.object({ sessionId: z.string() }),
+  "session.managementAnswerRecorded": z.object({ sessionId: z.string() }),
+  // No cause number and no scores. §8.4 says look for the system, not the
+  // person, and a space-wide entry naming a cause against a named key result
+  // invites the opposite. The survey's payload matters more still: an activity
+  // row carries its actor, so scores in it would attribute an anonymous
+  // answer in the one place everybody reads (P4-T11b).
+  "session.rootCauseNamed": z.object({ sessionId: z.string() }),
+  "session.processHealthSubmitted": z.object({ sessionId: z.string() }),
+  // The verdict travels because §8.6 makes it a statement about the quarter's
+  // system rather than about anybody in it. The decision travels for the same
+  // reason; the why stays in the room it was given to (P4-T11c-a).
+  "session.diagnosticRead": z.object({
+    sessionId: z.string(),
+    verdict: z.string(),
+  }),
+  "session.learningCaptured": z.object({ sessionId: z.string() }),
+  "session.nextCycleDrafted": z.object({ sessionId: z.string() }),
+  "session.actionAgreed": z.object({ sessionId: z.string() }),
+  "session.actionCompleted": z.object({ sessionId: z.string() }),
+  "session.objectiveDecided": z.object({
+    sessionId: z.string(),
+    decision: z.string(),
+  }),
+  // The copilot writes an activity row because the Operation pipeline requires
+  // one, and neither of these belongs in anybody else's feed. See
+  // PRIVATE_ACTIVITY_KINDS below (P4-T14a-a).
+  "copilot.asked": z.object({ threadId: z.string() }),
+  "copilot.answered": z.object({
+    threadId: z.string(),
+    stopped: z.boolean(),
+  }),
+  // The action name travels; the payload does not. A proposal's content is the
+  // member's own conversation, and the audit row already holds what an
+  // administrator needs (P4-T14b-a).
+  "copilot.proposed": z.object({
+    threadId: z.string(),
+    action: z.string(),
+  }),
+  "copilot.proposalApplied": z.object({ action: z.string() }),
+  "copilot.proposalDismissed": z.object({ action: z.string() }),
+  "copilot.proposalUndone": z.object({ action: z.string() }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
+
+/**
+ * Kinds the activity feed never shows, whatever the reader's access.
+ *
+ * An activity with no `contextId` is workspace-public by construction, which is
+ * right for a rename and wrong for "Agung asked the copilot something". A
+ * copilot thread is one member's conversation: the audit row records that the
+ * call happened and what it cost, which is what an administrator needs, and the
+ * feed is where the workspace reads about the workspace.
+ *
+ * Filtered by kind in `queryFeed` rather than by omitting the activity row,
+ * because the pipeline requires one and an operation that could skip it would be
+ * an operation that could skip the audit row too. Central, so it cannot be
+ * applied to one surface and forgotten on the next.
+ */
+export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
+  "copilot.asked",
+  "copilot.answered",
+  // A proposal is a suggestion in one member's conversation. What it *does* when
+  // applied writes its own activity through the applied action's own operation,
+  // and that one belongs in the feed because the change does (P4-T14b-a).
+  "copilot.proposed",
+  "copilot.proposalApplied",
+  "copilot.proposalDismissed",
+  "copilot.proposalUndone",
+]);
 
 /**
  * The kinds a feed renderer collapses consecutive same-actor rows into one
@@ -249,6 +512,9 @@ export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
 export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
   "member.profile_updated",
   "member.updated",
+  // An import writes one per person. A company of two hundred would otherwise
+  // be two hundred feed rows about one act somebody performed once.
+  "member.imported",
   "workspace.general_settings_updated",
   "workspace.branding_updated",
   // Every real AI call writes one of these; the feed would otherwise be

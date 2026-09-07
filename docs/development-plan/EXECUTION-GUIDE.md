@@ -28,7 +28,17 @@ The plan lives in `docs/development-plan/`. `CLAUDE.md` at the repository root i
 
 ## 3. The task loop
 
-One task, one branch, one change request.
+One task, one branch, one change request, **one working session and one commit**.
+
+That is the unit. A task is cut to fit it before anybody starts, not squeezed
+into it afterwards. `IMPLEMENTATION-PLAN.md` carries no task larger than one
+session in the phases still ahead; where the original cut was bigger, the task
+is split into lettered parts and the letters are the tasks.
+
+If the agent gets partway in and finds the task will not fit, it stops before
+writing more code and proposes the split. Four commits under one task identifier
+reads as progress on a review screen while nothing in it is finishable, and the
+next person inherits a size that was already known to be wrong.
 
 ```
 human picks a task -> agent restates the plan -> human confirms
@@ -83,7 +93,7 @@ Return to step 1. One task at a time per working copy. For parallel work see §6
 
 ## 6. Throughput and parallel work
 
-- **The planning assumption:** one human reviewer plus the agent sustain three to five merged tasks per week, where large tasks count double. Phases 1 to 7 take roughly seven to ten months. Review time is the limiting factor, so budget ten to thirty minutes per task.
+- **The planning assumption:** one human reviewer plus the agent sustain three to five merged tasks per week. Since a task is one session, the count is the throughput; there is no doubling for large tasks any more, because there are none in the phases ahead. Phases 1 to 7 take roughly seven to ten months. Review time is the limiting factor, so budget ten to thirty minutes per task.
 - **Parallel tracks are allowed** for tasks with no dependency edge and no shared files, using separate worktrees and sessions. Never run two tasks in one working copy. Merge order follows the dependency graph.
 - **Re-baseline rather than slip.** If actual throughput diverges from the assumption by more than half over a month, stop and re-baseline. Cut Phase 5 scope before Phase 4 scope. A silent slip is the only unacceptable outcome.
 

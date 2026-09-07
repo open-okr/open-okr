@@ -21,6 +21,7 @@
  *
  * Pure: no database, no clock beyond what the caller passes, no framework.
  */
+import { applyStrictness, evaluateKeyResults } from "./quality.ts";
 import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
@@ -80,6 +81,36 @@ export interface KeyResultSnapshot {
     readonly confirmed: boolean;
     readonly riskOwnerId: string | null;
   }[];
+  /**
+   * What §4.2's checks need to judge this key result, for publish gate 2.
+   *
+   * Undefined means nothing has evaluated it, which keeps gate 2 unevaluable
+   * rather than green on an empty answer. The same distinction `dependencies`
+   * draws, for the same reason.
+   */
+  readonly quality?: {
+    readonly baseline: number;
+    readonly target: number;
+    readonly dueOn: string | null;
+    readonly ownerId: string | null;
+    readonly indicatorType: "leading" | "lagging";
+    readonly direction: "increase" | "reduce" | "maintain" | "move";
+    readonly confidence: number | null;
+  };
+}
+
+/**
+ * One initiative, as gate 5 needs to see it (METHOD.md §5.5, P5-T10a).
+ *
+ * §5.5 asks a facilitator to record "the main initiatives that will move it and
+ * one of three capacity verdicts". The verdict already lives on the key result;
+ * this is the other half of the same sentence, and the gate reads both because a
+ * cycle can fail for two different reasons with two different fixes.
+ */
+export interface InitiativeSnapshot {
+  readonly id: string;
+  readonly title: string;
+  readonly capacity: "fits" | "tight" | "exceeds" | null;
 }
 
 /** One goal, as the gates need to see it. */
@@ -141,6 +172,17 @@ export interface CycleWorkflowInput {
   readonly frame: FrameSnapshot | null;
   /** Undefined until P3-T04 ships goals and key results. */
   readonly goals?: readonly GoalSnapshot[];
+  /**
+   * The initiatives serving this cycle's key results. Undefined until P5-T10a
+   * ships the table.
+   *
+   * Deliberately not defaulted to an empty array, for the reason this file's own
+   * header gives: an empty list says somebody looked and found no initiative at
+   * `exceeds`, and gate 5 may pass on it. Undefined says nobody can look, and
+   * gate 5 reports itself unevaluable instead of passing while checking half of
+   * §5.5.
+   */
+  readonly initiatives?: readonly InitiativeSnapshot[];
   /** Undefined until P4-T01 ships the quality engine. */
   readonly qualityChecksPass?: boolean;
   /** Undefined until P4-T04 ships sessions and the decision log. */
@@ -486,7 +528,12 @@ function phaseFour(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["The §4 quality checks arrive at P4-T01"],
+      // The catalogue and the stored verdicts both exist since P4-T01 and
+      // P4-T02a. What is missing is the reading that turns a set of stored
+      // flags into one answer for the phase, and that is publish gate 2,
+      // which P4-T03 builds. Naming the task that will supply it beats
+      // naming the one that already did.
+      blocked: ["Reading the §4 verdicts across the set arrives at P4-T03"],
       conditions: { met: 0, total: 0 },
     };
   }
@@ -610,7 +657,10 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
  * red gate does. That is the correct direction to be wrong in: a gate that
  * cannot check anything must not pass.
  */
-export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
+export function publishGates(
+  input: CycleWorkflowInput,
+  thresholds?: ResolvedThresholds,
+): readonly GateResult[] {
   const goals = input.goals;
   const goalsBlocked = "goals and key results arrive at P3-T04";
 
@@ -657,9 +707,16 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
   }
 
   // 2. Every key result passes the §4.2 checks.
-  if (input.qualityChecksPass === undefined) {
-    results.push(unevaluable(2, "the §4 quality engine arrives at P4-T01"));
-  } else {
+  //
+  // **A fail blocks and a warn does not**, which is §4's own wording: warn is
+  // "worth another look", fail is "fix before publishing". A workspace that
+  // wants warnings to block sets strictness to strict, and then they are fails
+  // and this gate sees them as such. That is what the setting is for.
+  //
+  // `qualityChecksPass` stays supported for a caller that has already decided,
+  // and it wins when given. Otherwise the gate evaluates the set itself, so it
+  // cannot disagree with the coach that judged the same key results.
+  if (input.qualityChecksPass !== undefined) {
     results.push(
       gate(
         2,
@@ -669,6 +726,53 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
           : ["Some key results do not pass the §4.2 checks"],
       ),
     );
+  } else if (!goals || !thresholds) {
+    results.push(
+      unevaluable(
+        2,
+        goals ? "no thresholds were resolved for this workspace" : goalsBlocked,
+      ),
+    );
+  } else {
+    const unjudged = goals.filter((goal) =>
+      goal.keyResults.some((keyResult) => keyResult.quality === undefined),
+    );
+    if (unjudged.length > 0) {
+      results.push(
+        unevaluable(2, "some key results carry nothing for §4.2 to judge"),
+      );
+    } else {
+      const failures: string[] = [];
+      for (const goal of goals) {
+        const verdicts = applyStrictness(
+          evaluateKeyResults(
+            {
+              keyResults: goal.keyResults.map((keyResult) => ({
+                text: keyResult.title,
+                ...(keyResult.quality as NonNullable<
+                  KeyResultSnapshot["quality"]
+                >),
+              })),
+            },
+            thresholds,
+          ),
+          thresholds["quality.coachStrictness"],
+        );
+        for (const verdict of verdicts.filter(
+          (entry) => entry.status === "fail",
+        )) {
+          const offenders = verdict.keyResults
+            .map((index) => goal.keyResults[index]?.title)
+            .filter((title): title is string => title !== undefined);
+          failures.push(
+            offenders.length > 0
+              ? `${verdict.id} on ${offenders.map((title) => `"${title}"`).join(", ")} in "${goal.title}"`
+              : `${verdict.id} on the set under "${goal.title}"`,
+          );
+        }
+      }
+      results.push(gate(2, failures.length === 0, failures));
+    }
   }
 
   // 3. Alignment is mapped: each objective states what it contributes to.
@@ -713,11 +817,25 @@ export function publishGates(input: CycleWorkflowInput): readonly GateResult[] {
   // 5. Capacity is checked, nothing left at "exceeds", and the cuts recorded.
   if (goals === undefined) {
     results.push(unevaluable(5, goalsBlocked));
+  } else if (input.initiatives === undefined) {
+    // §5.5 is one sentence about two things: the measures and the initiatives
+    // that will move them. Passing on the half that exists would be the exact
+    // failure this file's header records from Phase 1.
+    results.push(
+      unevaluable(5, "the §5.5 initiative register arrives at P5-T10a"),
+    );
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults
         .filter((keyResult) => keyResult.capacity === "exceeds")
         .map((keyResult) => `"${keyResult.title}" still exceeds capacity`),
+    );
+    // Named, because "gate five is red" sends a facilitator hunting and "this
+    // project is over-committed" does not.
+    missing.push(
+      ...input.initiatives
+        .filter((initiative) => initiative.capacity === "exceeds")
+        .map((initiative) => `"${initiative.title}" still exceeds capacity`),
     );
     if (!input.hasCapacityNotes) {
       // §5.5: "The facilitator must record what was cut. If the answer is

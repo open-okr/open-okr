@@ -127,6 +127,36 @@ describe("write path side effect rule", () => {
     expect(violations[0]?.message).toMatch(/outbox row/);
   });
 
+  test("allows the delivery side of the outbox to call out (P5-T01a)", () => {
+    // The handler runs after the row committed and after the relay claimed it.
+    // Reaching a driver there is the point, not a leak.
+    expect(
+      check(
+        "packages/core/src/outbox/handlers.ts",
+        `await deps.publish(channel, delivery.topic, data);
+`,
+      ),
+    ).toEqual([]);
+    expect(
+      check(
+        "apps/web/lib/relay.ts",
+        `await mailerFrom(mail).send(message);
+`,
+      ),
+    ).toEqual([]);
+  });
+
+  test("the delivery exemption is the directory, not the word outbox", () => {
+    // An action that happens to sit near the outbox is still a write path.
+    expect(
+      check(
+        "packages/core/src/actions/invitations.ts",
+        `await mailer.send(message);
+`,
+      ),
+    ).toHaveLength(1);
+  });
+
   test("catches mail, channel and realtime side effects too", () => {
     expect(
       check("packages/core/src/a.ts", `await this.mailer.send(message);\n`),

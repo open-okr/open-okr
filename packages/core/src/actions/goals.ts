@@ -17,6 +17,7 @@ import {
   checkIns,
   cycles,
   GOAL_CLOSE_DECISIONS,
+  GOAL_HEALTH,
   GOAL_LEVELS,
   GOAL_OWNER_KINDS,
   GOAL_SUCCESS_STATUSES,
@@ -26,10 +27,27 @@ import {
   KEY_RESULT_DIRECTIONS,
   keyResults,
   keyResultValues,
+  okrSessions,
+  reviewDecisions,
+  type WorkspaceTx,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  evaluateKeyResults,
+  KEY_RESULT_CHECKS,
+  type KeyResultInput,
+} from "@openokr/method";
+import {
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -55,7 +73,13 @@ import {
   unlinkKpiInTx,
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
+import { bindImporterInTx } from "../imports/binding.ts";
+import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  recomputeGoalQualityInTx,
+  recomputeUnitQualityInTx,
+} from "../quality/service.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
@@ -77,6 +101,8 @@ const timeframe = z.object({
 });
 
 const keyResultOutput = z.object({
+  /** Failing check ids for this row (P4-T02a stored them, P4-T06c reads them). */
+  qualityFlags: z.array(z.string()),
   id: z.uuid(),
   goalId: z.uuid(),
   title: z.string(),
@@ -126,6 +152,18 @@ const goalOutput = z.object({
   daysPastDue: z.number().int().nullable(),
   position: z.number().int(),
   keyResults: z.array(keyResultOutput),
+  /**
+   * §4's verdict on this goal, as P4-T02a stored it (P4-T06c).
+   *
+   * Read rather than recomputed: the score on the row is what the write path
+   * committed to and what the quality panel already shows, and a second
+   * evaluation here could disagree with it on the same screen.
+   */
+  quality: z.object({
+    score: z.number().nullable(),
+    /** Failing check ids, objective checks first. */
+    flags: z.array(z.string()),
+  }),
   /** Present once the goal has been closed at least once. Kept on reopen. */
   retrospective: z
     .object({ id: z.uuid(), body: z.unknown(), updatedAt: z.string() })
@@ -252,6 +290,7 @@ function keyResultRow(row: {
   capacity: (typeof CAPACITY_VERDICTS)[number] | null;
   progressPct: string;
   confidence: string | null;
+  qualityFlags: string[];
   score: string | null;
   carryForward: boolean;
   position: number;
@@ -292,6 +331,8 @@ const GOAL_COLUMNS = {
   health: goals.health,
   nextCheckInAt: goals.nextCheckInAt,
   position: goals.position,
+  qualityScore: goals.qualityScore,
+  qualityFlags: goals.qualityFlags,
 } as const;
 
 const KEY_RESULT_COLUMNS = {
@@ -314,6 +355,7 @@ const KEY_RESULT_COLUMNS = {
   score: keyResults.score,
   carryForward: keyResults.carryForward,
   position: keyResults.position,
+  qualityFlags: keyResults.qualityFlags,
 } as const;
 
 /** Names for the two roles, so a card reads as a sentence without a second query. */
@@ -354,6 +396,25 @@ export const listGoals = defineReadAction({
      * both need (S-01, S-13).
      */
     spaceId: z.uuid().optional(),
+    /**
+     * §3.2's health band (P4-T15d).
+     *
+     * The explorer had no way to ask for "the off-track ones", which made the
+     * filter assist's own acceptance sentence unexpressible. Deterministic in
+     * its own right: a filter chip, with or without a provider.
+     */
+    health: z.enum(GOAL_HEALTH).optional(),
+    /**
+     * Only the ones this member champions or reviews.
+     *
+     * "Mine" rather than an owner id, because a filter naming a member id would
+     * let a caller ask about somebody else's list by editing a URL, and this
+     * question is always about the person asking.
+     */
+    // Optional rather than defaulted, because a `default` on a read action's
+    // input makes the field required in the inferred handler type, and every
+    // existing caller of `goals.list` would have to pass it.
+    mine: z.boolean().optional(),
   }),
   output: z.object({ goals: z.array(goalOutput) }),
   access: ACCESS_LEVELS.view,
@@ -379,6 +440,19 @@ export const listGoals = defineReadAction({
         }
         if (input.spaceId) {
           filters.push(eq(goals.spaceId, input.spaceId));
+        }
+        if (input.health) {
+          filters.push(eq(goals.health, input.health));
+        }
+        if (input.mine) {
+          // Champion or reviewer: both are ways of being accountable for it, and
+          // a reviewer looking for their own list means the ones they answer for.
+          filters.push(
+            or(
+              eq(goals.championId, memberId),
+              eq(goals.reviewerId, memberId),
+            ) as never,
+          );
         }
         if (!input.includeClosed) {
           filters.push(isNull(goals.closedAt));
@@ -459,6 +533,12 @@ export const listGoals = defineReadAction({
             keyResults: children
               .filter((child) => child.goalId === row.id)
               .map(keyResultRow),
+            // The same stored verdict the read returns, so a list and a card
+            // cannot show a different score for one goal.
+            quality: {
+              score: asNumber(row.qualityScore),
+              flags: [...row.qualityFlags],
+            },
             retrospective: null,
           })),
         };
@@ -560,6 +640,13 @@ export const readGoal = defineReadAction({
             name: names.get(row.reviewerId) ?? "Unknown",
           },
           keyResults: children.map(keyResultRow),
+          // Read, never recomputed here: the score on the row is what the
+          // write path committed to and what the quality panel already shows,
+          // and a second evaluation on this screen could disagree with it.
+          quality: {
+            score: asNumber(row.qualityScore),
+            flags: [...row.qualityFlags],
+          },
           retrospective: retro
             ? {
                 id: retro.id,
@@ -820,6 +907,23 @@ export const createGoal = defineWriteAction({
       parentKeyResultId: z.uuid().optional(),
       weight: z.number().default(1),
       contributionStatement: z.string().trim().max(1000).optional(),
+      /**
+       * True when a model wrote the words (P4-T15a).
+       *
+       * The caller's claim, not something inferred: only the surface that ran
+       * the assist knows whether the reader kept the draft or rewrote it. A
+       * reader who replaces every word should not have their objective marked
+       * as written by a model, and one who accepts it verbatim should.
+       */
+      aiGenerated: z.boolean().optional(),
+      /**
+       * The source-system identity, when an import is creating this (P6-T01a).
+       *
+       * Absent for everything created in the product. Present, a second create
+       * carrying the same key is refused rather than duplicating the row, and
+       * the importer updates the row it finds instead.
+       */
+      legacy: legacyKey.optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -839,6 +943,8 @@ export const createGoal = defineWriteAction({
         workspaceId,
         context.actor.userId,
       );
+
+      await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -914,6 +1020,18 @@ export const createGoal = defineWriteAction({
         parentKeyResultId: input.parentKeyResultId ?? null,
         weight: input.weight,
         contributionStatement: input.contributionStatement ?? null,
+        aiGenerated: input.aiGenerated ?? false,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
+      });
+
+      // An import can finish writing the row it started. The reasoning is in
+      // `packages/core/src/imports/binding.ts`, and this is the case that found
+      // it: an objective championed by somebody who has never signed in could
+      // be created and then could not be given its key results.
+      await bindImporterInTx(tx, {
+        workspaceId,
+        memberId: input.legacy ? memberId : null,
+        contextId: created.contextId,
       });
 
       // The rhythm starts at creation (§8 of the cadence design), and the
@@ -930,6 +1048,9 @@ export const createGoal = defineWriteAction({
       );
       await recompute(tx, workspaceId, created.id);
       await realign(tx, workspaceId, created.id);
+      // The whole unit, not just this goal: OBJ-5 is a property of the set, so
+      // a fourth objective changes the verdict on the three already there.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: created.id });
 
       return {
         result: { id: created.id, title: created.title },
@@ -1081,6 +1202,10 @@ export const updateGoal = defineWriteAction({
         );
       }
       await recompute(tx, workspaceId, updated.id);
+      // An update can retitle, recycle, or move the level or owning space, and
+      // every one of those changes a verdict. The unit rather than the goal,
+      // because a level move changes the count on both units it touches.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: updated.id });
       // An update can move the parent, the level or the owning space, and all
       // three are what the score reads. It can also move only a title, and
       // recomputing then costs one query set and keeps this honest without a
@@ -1106,6 +1231,89 @@ export const updateGoal = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * What the last quarterly review decided about this objective (P4-T11c-b).
+ *
+ * **This is what "written back to the goal on close" means.** §8.8 has the room
+ * deciding keep, modify or abandon with a one-line why, and P4-T11c-a found that
+ * the decision cannot be written onto the goal on its own: `goals_close_is_complete`
+ * holds that `closed_at`, `success_status` and `close_decision` are present
+ * together or not at all, and the review collects no retrospective to close with.
+ *
+ * So the decision stays in `review_decisions` and the close screen reads it here
+ * as its default. Agung settled that on 26 August 2026. Closing an objective
+ * stays a deliberate act with a retrospective behind it; what the review
+ * contributes is the decision the room already reached, so nobody has to
+ * remember it or type it twice.
+ *
+ * The most recent review wins. A goal reviewed twice was discussed twice, and
+ * the later conversation is the one that stands.
+ */
+export const goalReviewDecision = defineReadAction({
+  name: "goals.reviewDecision",
+  summary:
+    "The keep/modify/abandon decision the last quarterly review reached for this goal.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({
+    decision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
+    why: z.string().nullable(),
+    /** When the review that decided it was held, so a stale one reads as stale. */
+    decidedAt: z.string().nullable(),
+    sessionTitle: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(
+          tx,
+          context.workspaceId,
+          context.actor.userId,
+        );
+        // Through the access getter, like every other read of a goal: a
+        // non-member reads not-found rather than a decision.
+        await requireGoalAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.id,
+          ACCESS_LEVELS.view,
+        );
+
+        const [row] = await tx
+          .select({
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+            decidedAt: reviewDecisions.updatedAt,
+            sessionTitle: okrSessions.title,
+          })
+          .from(reviewDecisions)
+          .innerJoin(okrSessions, eq(okrSessions.id, reviewDecisions.sessionId))
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, context.workspaceId),
+              eq(reviewDecisions.goalId, input.id),
+            ),
+          )
+          .orderBy(desc(reviewDecisions.updatedAt))
+          .limit(1);
+
+        return {
+          decision: row?.decision ?? null,
+          why: row?.why ?? null,
+          decidedAt: row?.decidedAt?.toISOString() ?? null,
+          sessionTitle: row?.sessionTitle ?? null,
+        };
+      },
+    );
+  },
 });
 
 export const closeGoal = defineWriteAction({
@@ -1159,6 +1367,9 @@ export const closeGoal = defineWriteAction({
       // report an archive as neglected.
       await clearDue(tx, workspaceId, input.id);
       await recompute(tx, workspaceId, input.id);
+      // OBJ-5 counts the open objectives in a unit, so closing one changes the
+      // verdict on every sibling that is still open.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
       // A closed goal still counts (decision D-11), so the score does not climb
       // as a cycle ends. It is recomputed anyway because closing can change what
       // the surface shows beside it.
@@ -1223,6 +1434,8 @@ export const reopenGoal = defineWriteAction({
       );
       await recompute(tx, workspaceId, input.id);
       await realign(tx, workspaceId, input.id);
+      // Rejoining the open set is the closing rule in reverse.
+      await recomputeUnitQualityInTx(tx, { workspaceId, goalId: input.id });
 
       return {
         result: { id: input.id },
@@ -1297,6 +1510,9 @@ export const reassignGoalRole = defineWriteAction({
         fromMemberId,
         toMemberId: input.memberId,
       });
+
+      // OBJ-4 names the champion and the reviewer, so a rebind changes it.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: input.id });
 
       return {
         result: { id: input.id, role },
@@ -1393,6 +1609,9 @@ export const moveGoalToCycle = defineWriteAction({
 
       await recompute(tx, workspaceId, moved.id);
       await realign(tx, workspaceId, moved.id, before?.cycleId ?? null);
+      // OBJ-3 reads whether the goal is in a cycle at all, so a move can flip
+      // it. The unit is untouched by a cycle move, so only this goal.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: moved.id });
 
       return {
         result: { id: moved.id, cycleId: input.cycleId },
@@ -1431,6 +1650,8 @@ export const createKeyResult = defineWriteAction({
     weight: z.number().default(1),
     kpiId: z.uuid().optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
+    /** The source-system identity, when an import is creating this (P6-T01a). */
+    legacy: legacyKey.optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1449,6 +1670,14 @@ export const createKeyResult = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
+      await assertLegacyKeyFree(
+        tx,
+        workspaceId,
+        keyResults,
+        input.legacy,
+        "key result",
+      );
+
       const created = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: input.goalId,
@@ -1465,9 +1694,12 @@ export const createKeyResult = defineWriteAction({
         kpiId: input.kpiId ?? null,
         capacity: input.capacity ?? null,
         authorMemberId: memberId,
+        ...(input.legacy ? { legacy: input.legacy } : {}),
       });
 
       await recompute(tx, workspaceId, input.goalId);
+      // The KR checks judge the set, so adding one rescores all of them.
+      await recomputeGoalQualityInTx(tx, { workspaceId, goalId: input.goalId });
 
       // Only when the count crosses zero (design §7). KR-1 fires at none and at
       // nothing else, so the second key result changes no penalty and the third
@@ -1602,6 +1834,11 @@ export const updateKeyResult = defineWriteAction({
         );
 
       await recompute(tx, workspaceId, owner.goalId);
+      // Editing a key result changes its own verdicts and the set's.
+      await recomputeGoalQualityInTx(tx, {
+        workspaceId,
+        goalId: owner.goalId,
+      });
 
       return {
         result: { id: input.id },
@@ -1753,4 +1990,270 @@ export const unlinkKeyResultKpi = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * Removes a goal (P4-T14b-a).
+ *
+ * **Not the same thing as closing one, and the difference matters.**
+ * `goals.close` is the end of a cycle: an outcome, a keep-or-abandon decision
+ * and a retrospective, all of which are a record of work that happened. This is
+ * for a goal that should not exist, which until now the product had no way to
+ * say. The column has always been there; nothing wrote it.
+ *
+ * The reason it exists now is undo. A copilot proposal that creates an
+ * objective needs a reverse, and closing the objective would file a false
+ * report about a quarter. Agung approved adding it on 26 August 2026, because
+ * an action that removes something a person can see is a product decision and
+ * not a mechanism.
+ *
+ * **Soft, and `full`.** Soft because that is this repository's default scope, so
+ * the row stays where every audit and activity row that points at it can still
+ * find it. `full` because removal is not an editing right: a champion may
+ * change their objective and only an administrator may make it not have
+ * existed. `destructive` in the registry, which is what the safety class is for.
+ *
+ * Its key results go with it. A key result whose goal is gone is a measure of
+ * nothing, and leaving them behind would put orphans in every list that reads
+ * key results without their goal.
+ */
+export const deleteGoal = defineWriteAction({
+  name: "goals.delete",
+  summary:
+    "Removes a goal and its key results, which is not the same as closing one.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.full,
+  safety: "destructive",
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      // Through the getter, so a goal this member cannot see reads as absent
+      // rather than as refused.
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.full,
+      );
+
+      const [goal] = await tx
+        .select({ title: goals.title, level: goals.level })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!goal) {
+        throw new OperationError("not_found", "No such goal.");
+      }
+
+      const now = new Date();
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(keyResults)
+        .set({ deletedAt: now })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.goalId, input.id),
+          ),
+        );
+      await tx
+        .update(goals)
+        .set({ deletedAt: now })
+        .where(
+          activeOnly(
+            goals,
+            eq(goals.workspaceId, workspaceId),
+            eq(goals.id, input.id),
+          ),
+        );
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "goal.deleted",
+          subjectType: "goal",
+          subjectId: input.id,
+          // The title travels because the feed entry has to read as a sentence
+          // after the thing it names is gone, which is exactly this case.
+          payload: { title: goal.title },
+        },
+        audit: {
+          action: "goals.delete",
+          targetType: "goal",
+          targetId: input.id,
+          payload: { title: goal.title, level: goal.level },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The rewrite assist (METHOD.md §4, P4-T06c).
+ *
+ * **A read action, so it commits nothing.** The whole point of an assist is
+ * that a writer sees a suggestion and decides; a version that saved would be an
+ * agent writing under somebody else's name, which is the line
+ * propose-and-approve draws.
+ *
+ * **The product checks the rewrite; the model does not get to claim it.** A
+ * model asked to fix KR-2 will say it fixed KR-2 whatever it wrote. So the
+ * suggestion is run back through §4's own evaluation and the response reports
+ * which previously-failing checks now pass, from the catalogue rather than from
+ * the model. An assist that did not fix the rule says so.
+ */
+export const rewriteKeyResult = defineReadAction({
+  name: "goals.rewriteKeyResult",
+  summary:
+    "Suggests a corrected key result for one failing check, and reports which checks the suggestion actually passes.",
+  input: z.object({
+    keyResultId: z.uuid(),
+    /** The §4 check id to fix, for example `KR-2`. */
+    ruleId: z.string().trim().min(1).max(20),
+  }),
+  output: z
+    .object({
+      /** The suggested sentence. */
+      text: z.string(),
+      /** Checks that failed before and pass now, by their §4 ids. */
+      nowPassing: z.array(z.string()),
+      /** True when the named rule is among them. */
+      fixesTheRule: z.boolean(),
+    })
+    .nullable(),
+  access: ACCESS_LEVELS.edit,
+  async handler(context, input) {
+    const userId = context.actor.userId;
+    // Absent means the provider is off. Null rather than an error: the surface
+    // explains the state instead of showing a failure.
+    const drafter = context.drafter;
+    if (!userId || !drafter) {
+      return null;
+    }
+
+    return withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as WorkspaceTx;
+        const [row] = await tx
+          .select({
+            id: keyResults.id,
+            title: keyResults.title,
+            goalId: keyResults.goalId,
+            baselineValue: keyResults.baselineValue,
+            targetValue: keyResults.targetValue,
+            dueOn: keyResults.dueOn,
+            ownerId: keyResults.ownerId,
+            indicatorType: keyResults.indicatorType,
+            direction: keyResults.direction,
+            confidence: keyResults.confidence,
+          })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!row) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+
+        const [goal] = await tx
+          .select({ title: goals.title })
+          .from(goals)
+          .where(activeOnly(goals, eq(goals.id, row.goalId)))
+          .limit(1);
+
+        const check = KEY_RESULT_CHECKS.find(
+          (entry: { id: string }) => entry.id === input.ruleId,
+        );
+        if (!check) {
+          throw new OperationError(
+            "forbidden",
+            `\`${input.ruleId}\` is not a check the method package defines.`,
+          );
+        }
+
+        const thresholds = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        ).thresholds;
+        const asInput = (text: string): KeyResultInput => ({
+          text,
+          baseline: Number(row.baselineValue),
+          target: Number(row.targetValue),
+          dueOn: row.dueOn,
+          ownerId: row.ownerId,
+          indicatorType: row.indicatorType,
+          direction: row.direction,
+          confidence: row.confidence === null ? null : Number(row.confidence),
+        });
+
+        const failingBefore = new Set(
+          evaluateKeyResults({ keyResults: [asInput(row.title)] }, thresholds)
+            .filter((verdict: { status: string }) => verdict.status !== "pass")
+            .map((verdict: { id: string }) => verdict.id),
+        );
+
+        let suggestion: string | null = null;
+        try {
+          suggestion =
+            (await drafter.rewriteForRule?.({
+              text: row.title,
+              ruleId: check.id,
+              // The catalogue's own words for the failing condition, so the
+              // model is told the rule rather than a paraphrase of it.
+              rulePrompt:
+                check.conditions.find(
+                  (condition: { status: string }) =>
+                    condition.status !== "pass",
+                )?.prompt ?? check.title,
+              goalTitle: goal?.title ?? "",
+            })) ?? null;
+        } catch {
+          // A model having a bad minute is not a reason to show an error where
+          // a suggestion would have been. The surface says nothing was
+          // suggested, which is true.
+          suggestion = null;
+        }
+        if (!suggestion) {
+          return null;
+        }
+
+        // §4 run over the model's own output. This is the part that makes the
+        // response honest rather than optimistic.
+        const nowPassing = [...failingBefore].filter((id) =>
+          evaluateKeyResults(
+            { keyResults: [asInput(suggestion)] },
+            thresholds,
+          ).some(
+            (verdict: { id: string; status: string }) =>
+              verdict.id === id && verdict.status === "pass",
+          ),
+        );
+
+        return {
+          text: suggestion,
+          nowPassing,
+          fixesTheRule: nowPassing.includes(check.id),
+        };
+      },
+    );
+  },
 });

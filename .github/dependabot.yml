@@ -14,12 +14,54 @@ updates:
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
     groups:
-      # One pull request per group keeps review cost down. Security updates
+      # Every npm update belongs to a group, so a week's updates arrive as
+      # three pull requests rather than one per package. Security updates
       # still arrive on their own, immediately.
-      dev-tooling:
-        patterns: ["@biomejs/*", "turbo", "vitest", "knip", "typescript", "@types/*"]
+      #
+      # This is about conflicts, not review cost. Every npm bump rewrites
+      # pnpm-lock.yaml, so any two open at once conflict with each other, and
+      # whichever merges second has to be rebased and re-tested. Nine bot pull
+      # requests reached this repository before grouping covered everything;
+      # six were single packages, and the lock file conflicted repeatedly.
+      #
+      # The groups are drawn by blast radius, so one bad version holds back as
+      # little as possible. `next` is on its own because it is the framework
+      # the application is built on and its bumps have broken the build twice.
       next:
         patterns: ["next", "react", "react-dom", "@next/*"]
+      # Nothing here is shipped to a user. A bad version stops the build
+      # rather than the product.
+      dev-tooling:
+        patterns:
+          - "@biomejs/*"
+          - "turbo"
+          - "vitest"
+          - "knip"
+          - "typescript"
+          - "@types/*"
+          - "@playwright/*"
+          - "@testing-library/*"
+          - "jsdom"
+      # Everything else, which is everything that runs in production. The
+      # excludes repeat the two groups above rather than relying on which
+      # group is declared first, so moving these blocks around cannot
+      # silently change what lands where.
+      runtime:
+        patterns: ["*"]
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@next/*"
+          - "@biomejs/*"
+          - "turbo"
+          - "vitest"
+          - "knip"
+          - "typescript"
+          - "@types/*"
+          - "@playwright/*"
+          - "@testing-library/*"
+          - "jsdom"
     commit-message:
       prefix: "deps"
 

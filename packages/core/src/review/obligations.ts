@@ -29,7 +29,10 @@ type ObligationKind =
   | "blocker"
   | "commitment"
   | "session"
-  | "proposal";
+  | "proposal"
+  // P5-T11. The first kind that does not hang off a goal, which is what
+  // widened `subjectId` below.
+  | "task";
 
 /** S-02's four buckets, in the order the screen renders them. */
 export type ObligationGroup = "overdue" | "today" | "this_week" | "upcoming";
@@ -49,7 +52,11 @@ export interface Obligation {
   readonly daysPastDue: number | null;
   readonly href: string;
   readonly actionLabel: string;
-  /** The goal this is about. Every obligation kind so far hangs off one. */
+  /**
+   * What this is about: a goal for every kind but `task`, which is about a
+   * task. Widened at P5-T11, where the first obligation that hangs off
+   * something other than a goal arrived.
+   */
   readonly subjectId: string;
   /** Set on an acknowledgement, so the row can act without a second lookup. */
   readonly checkInId: string | null;
@@ -58,10 +65,19 @@ export interface Obligation {
 /**
  * The sources S-02 lists that no phase has built yet.
  *
- * Declared rather than omitted on purpose. A screen that silently rendered two
- * of six sources would look complete while quietly failing to tell somebody
- * about a blocker they own, and nothing in the build would catch it. Naming the
- * task that fills each one turns a silent gap into a visible promise.
+ * Declared rather than omitted on purpose. A screen that silently rendered
+ * three of seven sources would look complete while quietly failing to tell
+ * somebody about a blocker they own, and nothing in the build would catch it.
+ * Naming the task that fills each one turns a silent gap into a visible
+ * promise.
+ *
+ * **Empty since P6-G02, and kept rather than deleted.** It held blockers,
+ * commitments, sessions and proposals, naming P3-T09, P4-T07, P4-T04 and
+ * P4-T05, and all four of those tasks had been done for weeks by the time the
+ * gap audit of 7 September 2026 read this file. The mechanism is what stopped
+ * that from being invisible, and the next source to arrive ahead of its reader
+ * needs the same treatment. Deleting it would remove the only thing that made
+ * the gap legible.
  */
 export interface PendingSource {
   readonly kind: ObligationKind;
@@ -69,16 +85,7 @@ export interface PendingSource {
   readonly task: string;
 }
 
-export const PENDING_SOURCES: readonly PendingSource[] = [
-  { kind: "blocker", label: "Blockers you own", task: "P3-T09" },
-  { kind: "commitment", label: "Commitments due", task: "P4-T07" },
-  { kind: "session", label: "Sessions to run", task: "P4-T04" },
-  {
-    kind: "proposal",
-    label: "Agent proposals awaiting your decision",
-    task: "P4-T05",
-  },
-];
+export const PENDING_SOURCES: readonly PendingSource[] = [];
 
 /** Days ahead that still count as "this week" rather than "upcoming". */
 const THIS_WEEK_DAYS = 7;

@@ -1,10 +1,20 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { PHASE_TITLES, phaseWorkAllowed } from "@openokr/method";
+import {
+  canonThresholds,
+  KEY_RESULT_CHECKS,
+  OBJECTIVE_CHECKS,
+  PHASE_TITLES,
+  phaseWorkAllowed,
+  type ResolvedThresholds,
+} from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
+import { assistsAvailableAction } from "./assist-actions.ts";
+import { Capacity } from "./capacity.tsx";
+import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
 import { Drafting } from "./drafting.tsx";
@@ -12,6 +22,7 @@ import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
+import { QualityPanel } from "./quality-panel.tsx";
 
 /**
  * The cycle workspace (UIUX-PLAN.md §4 S-04, S-06 to S-08, P3-T03).
@@ -60,7 +71,7 @@ export default async function CyclePage({
   if (!cycle) {
     return (
       <AppShellLayout>
-        <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+        <div className="flex flex-col gap-4.5">
           <Card>
             <CardHeader>
               <h1 className="text-lg font-bold text-ink">No cycle yet</h1>
@@ -80,6 +91,27 @@ export default async function CyclePage({
   const workflow = await callAction(context, "workflow.read", {
     cycleId: cycle.id,
   });
+
+  /**
+   * The decision log for this cycle (METHOD.md §7.5, P4-T09).
+   *
+   * §7.5 surfaces the log in two places, and this is the second: the goal page
+   * answers "what was decided about this", the cycle workspace answers "what
+   * has this cycle decided". Read on every phase rather than only during the
+   * running one, because a decision taken in month two is still the reason
+   * something looks the way it does at the close.
+   */
+  const cycleDecisions = (await callAction(context, "decisions.forCycle", {
+    cycleId: cycle.id,
+  })) as Array<{
+    id: string;
+    text: string;
+    at: string;
+    authorName: string;
+    goalId: string | null;
+    goalTitle: string | null;
+    keyResultTitle: string | null;
+  }>;
 
   const requested = Number((await searchParams).phase ?? Number.NaN);
   const viewing =
@@ -104,8 +136,58 @@ export default async function CyclePage({
           members: (await callAction(context, "people.directory", {})).map(
             (member) => ({ id: member.id, name: member.name }),
           ),
+          // The coach runs in the browser and cannot read the settings row, so
+          // the resolved thresholds travel with the page. Sending them rather
+          // than letting the client fall back to the canon is what keeps a
+          // workspace that has tuned its bounds judged by its own numbers.
+          // `rhythm.read` types this as an unknown record because the registry
+          // is open-ended at the contract boundary. It is `ResolvedThresholds`
+          // by construction: the same `resolveThresholds` builds both.
+          thresholds: (await callAction(context, "rhythm.read", {}))
+            .thresholds as unknown as ResolvedThresholds,
+          checkTitles: [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map(
+            (check) => ({ id: check.id, title: check.title }),
+          ),
         }
-      : { goals: [], members: [] };
+      : {
+          goals: [],
+          members: [],
+          thresholds: canonThresholds(),
+          checkTitles: [],
+        };
+
+  // Only phase 5 needs the capacity check, and only phase 5 pays for reading
+  // it. The same rule the phase-4 block above follows (P5-T10b).
+  const capacity =
+    viewing === 5
+      ? await callAction(context, "initiatives.capacity", {
+          cycleId: workflow.cycleId,
+        })
+      : null;
+
+  // The §5.4 register, and the lists a facilitator needs to add to it (P6-G17).
+  // `alignment.read` has returned `register` since P3-T09 and nothing rendered
+  // it, so publish gate 4 was red with no control anywhere that could turn it
+  // green. Only phase 5 pays for the read, the same rule the two blocks above
+  // follow.
+  const register =
+    viewing === 5
+      ? await callAction(context, "alignment.read", {
+          cycleId: workflow.cycleId,
+          includeDismissed: false,
+        })
+      : null;
+  const registerSpaces =
+    viewing === 5 ? await callAction(context, "spaces.list", {}) : null;
+  // The same directory phase 4 reads, for the risk-owner picker. A risk owner
+  // is a named person carrying a consequence, so an unnamed one is not one.
+  const registerMembers =
+    viewing === 5
+      ? (await callAction(context, "people.directory", {})).map((member) => ({
+          id: member.id,
+          name: member.name,
+        }))
+      : null;
 
   return (
     <AppShellLayout>
@@ -201,6 +283,33 @@ export default async function CyclePage({
             />
           ) : null}
 
+          {/* Before the capacity check, because §5.4 comes before §5.5 in the
+              method and because the two answer the same conversation in order:
+              who are we waiting on, and can we carry what is left. */}
+          {register && registerMembers && registerSpaces && capacity ? (
+            <DependencyRegister
+              entries={register.register}
+              keyResults={capacity.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                goalTitle: keyResult.goalTitle,
+              }))}
+              members={registerMembers}
+              spaces={registerSpaces.map((space) => ({
+                id: space.id,
+                name: space.name,
+              }))}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {capacity ? (
+            <Capacity
+              keyResults={capacity.keyResults}
+              initiatives={capacity.initiatives}
+            />
+          ) : null}
+
           {viewing === 5 ? (
             <Gates
               cycleId={workflow.cycleId}
@@ -217,6 +326,10 @@ export default async function CyclePage({
               goals={draft.goals}
               members={draft.members}
               canEdit={canEdit}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
+              memberId={workspace.memberId}
+              assistsAvailable={await assistsAvailableAction()}
             />
           ) : null}
 
@@ -225,17 +338,84 @@ export default async function CyclePage({
               <CardBody>
                 <p className="text-sm text-ink-3">
                   {viewing === 0
-                    ? "The annual strategy surface arrives with the frame editor at P4-T02."
+                    ? "The annual strategy surface arrives at P6-G14: the frame, the annual strategies and the year's not-doing list."
                     : viewing === 6
-                      ? "The running cadence arrives with check-ins at P3-T07 and sessions at P4-T04."
-                      : "Scoring every key result and writing the cycle retrospective arrive with the review at P4-T08. The arithmetic behind the scores is already here."}
+                      ? "The running cadence view arrives at P6-G15: sessions held and upcoming, the streak, confidence per key result and open blockers by age. The check-ins and sessions it reads already exist."
+                      : "Scoring every key result and writing the cycle retrospective arrive at P6-G16. The arithmetic behind the scores is already here."}
                 </p>
               </CardBody>
             </Card>
           ) : null}
         </div>
 
-        <div className="w-full flex-none xl:w-80">
+        <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
+          {viewing === 4 ? (
+            <QualityPanel
+              set={draft.goals.map((goal) => ({
+                objective: {
+                  id: goal.id,
+                  title: goal.title,
+                  hasCycle: true,
+                  hasTimeframe: false,
+                  championId: goal.champion.id,
+                  reviewerId: goal.reviewer.id,
+                  objectivesInUnit: draft.goals.filter(
+                    (other) => other.level === goal.level,
+                  ).length,
+                  level: goal.level,
+                },
+                keyResults: goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  baseline: keyResult.baselineValue,
+                  target: keyResult.targetValue,
+                  dueOn: keyResult.dueOn,
+                  ownerId: keyResult.ownerId,
+                  indicatorType: keyResult.indicatorType,
+                  direction: keyResult.direction,
+                  confidence: keyResult.confidence,
+                })),
+              }))}
+              thresholds={draft.thresholds}
+              checkTitles={draft.checkTitles}
+            />
+          ) : null}
+          {cycleDecisions.length === 0 ? null : (
+            <Card>
+              <CardHeader>
+                <h2 className="text-sm font-bold text-ink">
+                  Decisions this cycle
+                </h2>
+              </CardHeader>
+              <CardBody className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {cycleDecisions.map((decision) => (
+                    <li key={decision.id} className="flex flex-col gap-0.5">
+                      <span className="text-sm text-ink">{decision.text}</span>
+                      <span className="text-xs text-ink-3">
+                        {decision.goalId ? (
+                          <a
+                            className="underline"
+                            href={`/goals/${decision.goalId}`}
+                          >
+                            {decision.keyResultTitle ?? decision.goalTitle}
+                          </a>
+                        ) : (
+                          (decision.keyResultTitle ?? decision.goalTitle)
+                        )}{" "}
+                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
+                        {decision.authorName}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-ink-4">
+                  Recorded in the monthly reviews. Each one names the key result
+                  or the objective it affects.
+                </p>
+              </CardBody>
+            </Card>
+          )}
           <GuidanceRail phase={viewing} mode={workflow.mode} />
         </div>
       </div>

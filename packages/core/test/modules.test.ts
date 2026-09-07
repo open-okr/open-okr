@@ -76,3 +76,43 @@ describe("findNavigationItem", () => {
     expect(findNavigationItem("/nowhere")).toBeUndefined();
   });
 });
+
+/**
+ * Navigation blocks (UIUX-PLAN.md §3).
+ *
+ * §3 asks for three separated sidebar blocks, and the registry could not
+ * express that: it carried `section` (which surface an item belongs to) but
+ * nothing saying which block within it. So the sidebar rendered one flat list
+ * of eleven items, which is what STATUS.md recorded as deferred to P3-T11
+ * until the deferral was overridden on 2026-09-01.
+ *
+ * Every sidebar item declares its block. An item that does not is the bug this
+ * catches: it would silently fall into the first, unlabelled block.
+ */
+describe("navigation blocks", () => {
+  it("every sidebar item declares which block it belongs to", () => {
+    const missing = navigationFor("sidebar", ACCESS_LEVELS.full)
+      .filter((item) => item.group === undefined)
+      .map((item) => item.id);
+    expect(missing).toEqual([]);
+  });
+
+  it("admin items declare no block: they render as one entry", () => {
+    for (const item of navigationFor("admin", ACCESS_LEVELS.full)) {
+      expect(item.group).toBeUndefined();
+    }
+  });
+
+  it("the practice block holds the cycle, not the account pages", () => {
+    const byId = new Map(
+      navigationFor("sidebar", ACCESS_LEVELS.full).map((i) => [i.id, i.group]),
+    );
+    expect(byId.get("cycle")).toBe("practice");
+    expect(byId.get("goals")).toBe("practice");
+    expect(byId.get("kpis")).toBe("practice");
+    expect(byId.get("overview")).toBe("primary");
+    expect(byId.get("review")).toBe("primary");
+    expect(byId.get("spaces")).toBe("spaces");
+    expect(byId.get("account-security")).toBe("account");
+  });
+});

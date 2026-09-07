@@ -96,15 +96,21 @@ describe("workspace provisioning wires the access model", () => {
       "select id, kind, member_id from access_groups where workspace_id = $1 order by kind",
       [workspaceId],
     );
-    // Three groups since P3-T01: the default space brings its own
-    // `space_standard`, whose membership is real data rather than structural.
-    expect(groups.rows).toHaveLength(3);
+    // Five groups since P4-T06a: three `member` groups, the founding
+    // member's and both seeded agents', plus the default space's
+    // `space_standard` (P3-T01, whose membership is real data rather than
+    // structural) and the workspace's own `workspace_standard`.
+    expect(groups.rows).toHaveLength(5);
     expect(groups.rows.map((r) => r.kind)).toEqual([
+      "member",
+      "member",
       "member",
       "space_standard",
       "workspace_standard",
     ]);
-    const memberGroup = groups.rows.find((r) => r.kind === "member");
+    // By member rather than by kind: there are three member groups now, and
+    // the one this test is about belongs to the person who registered.
+    const memberGroup = groups.rows.find((r) => r.member_id === memberId);
     expect(memberGroup).toBeDefined();
     expect(memberGroup.member_id).toBe(memberId);
 
@@ -170,9 +176,10 @@ describe("workspace provisioning wires the access model", () => {
       "select count(*)::int as n from access_groups where workspace_id = $1",
       [workspaceId],
     );
-    // Three, not two: the default space's own space_standard group is here
-    // too since P3-T01, and re-ensuring the other two must not add a fourth.
-    expect(groups.rows[0].n).toBe(3);
+    // Five, not two: the default space's own space_standard group is here
+    // since P3-T01, the Champion's member group since P4-T05a and the Coach's
+    // since P4-T06a. Re-ensuring the other two must not add a sixth.
+    expect(groups.rows[0].n).toBe(5);
   });
 
   it("rolls back every access row an operation wrote when it fails afterwards", async () => {

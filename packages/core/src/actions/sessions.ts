@@ -1,0 +1,7573 @@
+/**
+ * Session actions (TECHNICAL-PLAN §4, METHOD.md §7.2, P4-T07a).
+ *
+ * A session is one held ritual: weekly (4 stages), monthly or quarterly
+ * (11 stages). Every write goes through the Operation pipeline. Every read
+ * goes through the access-aware path: a non-member of the space reads
+ * not-found rather than forbidden.
+ *
+ * Live stage sync: `sessions.advanceStage` returns `realtimeChannel` in its
+ * result so the route handler can notify connected clients. The
+ * action itself does not import `packages/adapters` (CLAUDE.md boundary rule).
+ */
+
+import { createHash, randomBytes } from "node:crypto";
+import {
+  accessContexts,
+  activeOnly,
+  BLOCKER_TYPES,
+  blockers,
+  checkInVotes,
+  commitments,
+  DIAGNOSIS_VERDICTS,
+  decisions,
+  digests,
+  GOAL_CLOSE_DECISIONS,
+  goals,
+  keyResultDependencies,
+  keyResults,
+  kudos,
+  learnings,
+  managementAnswers,
+  nextCycleDrafts,
+  OBJECTIVE_TRENDS,
+  objectiveTrends,
+  processHealthResponses,
+  RETRO_COLUMNS,
+  retroNotes,
+  retroVotes,
+  reviewActions,
+  reviewDecisions,
+  reviewDiagnostics,
+  reviewNarratives,
+  reviewScores,
+  rootCauses,
+  SESSION_KINDS,
+  SESSION_STATES,
+  sessionConfidences,
+  sessionParticipants,
+  okrSessions as sessions,
+  spaceMembers,
+  spaces,
+  streaks,
+  withContext,
+  workspaceMembers,
+} from "@openokr/db";
+import {
+  CLOSE_DECISION_MEANINGS,
+  cycleScore,
+  lowestProcessHealthStatement,
+  MANAGEMENT_RETRO_QUESTIONS,
+  objectiveScore,
+  PROCESS_HEALTH_STATEMENTS,
+  portfolioVerdictOf,
+  progressSignal,
+  REVIEW_STAGE_KEYS,
+  ROOT_CAUSES,
+  rhythmDiagnostic,
+  rhythmScore,
+  roomPulseRead,
+  WEEKLY_STAGE_KEYS,
+} from "@openokr/method";
+import {
+  and,
+  avg,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  sql,
+} from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
+import { z } from "zod";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
+import { localDateIn } from "../cycles/generation.ts";
+import { resolveRhythm } from "../cycles/rhythm.ts";
+import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { excerptRichText } from "../rich-text/excerpt.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
+import { sessionChannel } from "../sessions/live.ts";
+import { defineReadAction, defineWriteAction } from "./define.ts";
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+async function actingMember(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<string> {
+  if (!userId) {
+    throw new OperationError("not_found", "No such workspace.");
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError("not_found", "No such workspace.");
+  }
+  return member.id;
+}
+
+/**
+ * The stage list for a ritual, or null when it holds no stages (P4-T10a-a).
+ *
+ * One lookup rather than a branch per call site. The weekly and quarterly
+ * machines are the same walk over two different lists, and a monthly review
+ * has no stages at all: §7.5's agenda is a record the facilitator fills in, not
+ * a rail they advance. A `switch` here means adding a fifth ritual is one
+ * change rather than a hunt.
+ */
+function stageKeysFor(kind: string): readonly string[] | null {
+  switch (kind) {
+    case "weekly":
+      return WEEKLY_STAGE_KEYS;
+    case "quarterly":
+      return REVIEW_STAGE_KEYS;
+    default:
+      return null;
+  }
+}
+
+async function requireSessionAccess(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+  requires: number,
+) {
+  const [session] = await tx
+    .select()
+    .from(sessions)
+    .where(
+      activeOnly(
+        sessions,
+        eq(sessions.workspaceId, workspaceId),
+        eq(sessions.id, sessionId),
+      ),
+    )
+    .limit(1);
+
+  if (!session) {
+    throw new OperationError("not_found", "No such session.");
+  }
+
+  if (session.spaceId) {
+    await getAccessScoped(tx, {
+      workspaceId,
+      memberId,
+      resourceType: "space",
+      resourceId: session.spaceId,
+      requires: requires as never,
+    });
+  }
+
+  return session;
+}
+
+async function resolveSpaceContextId(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string,
+): Promise<string> {
+  const [ctx] = await tx
+    .select({ id: accessContexts.id })
+    .from(accessContexts)
+    .where(
+      activeOnly(
+        accessContexts,
+        eq(accessContexts.workspaceId, workspaceId),
+        eq(accessContexts.resourceType, "space"),
+        eq(accessContexts.resourceId, spaceId),
+      ),
+    )
+    .limit(1);
+  if (!ctx) {
+    throw new OperationError(
+      "not_found",
+      "No such space, or you do not have access to it.",
+    );
+  }
+  return ctx.id;
+}
+
+// ---------------------------------------------------------------------------
+// Output type
+// ---------------------------------------------------------------------------
+
+const sessionOutput = z.object({
+  id: z.uuid(),
+  workspaceId: z.uuid(),
+  spaceId: z.uuid().nullable(),
+  cycleId: z.uuid().nullable(),
+  kind: z.enum(SESSION_KINDS),
+  title: z.string(),
+  scheduledFor: z.string(),
+  startedAt: z.string().nullable(),
+  endedAt: z.string().nullable(),
+  facilitatorId: z.uuid(),
+  stageKey: z.string().nullable(),
+  stageStartedAt: z.string().nullable(),
+  elapsed: z.record(z.string(), z.number()),
+  /**
+   * The facilitator's private per-stage notes, and empty for everybody else.
+   *
+   * §8.1 calls them private and this is where that is enforced. It was not:
+   * `toOutput` returned the whole map to every caller from P4-T07a until
+   * P4-T10a-a. Nothing wrote notes in between, so nothing leaked, and the
+   * shape was still wrong.
+   */
+  notes: z.record(z.string(), z.unknown()),
+  /** Whole minutes added per stage by the facilitator (METHOD.md §8.1). */
+  addedMinutes: z.record(z.string(), z.number()),
+  state: z.enum(SESSION_STATES),
+  digestId: z.uuid().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+type SessionOutput = z.infer<typeof sessionOutput>;
+
+/**
+ * A session as a caller may see it.
+ *
+ * `viewerMemberId` decides one field: the facilitator's notes. Every other
+ * column is the shared record of the ritual and is the same for everybody in
+ * the room.
+ */
+function toOutput(
+  row: typeof sessions.$inferSelect,
+  viewerMemberId: string | null,
+): SessionOutput {
+  const isFacilitator = viewerMemberId === row.facilitatorId;
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    spaceId: row.spaceId ?? null,
+    cycleId: row.cycleId ?? null,
+    kind: row.kind,
+    title: row.title,
+    scheduledFor: row.scheduledFor.toISOString(),
+    startedAt: row.startedAt?.toISOString() ?? null,
+    endedAt: row.endedAt?.toISOString() ?? null,
+    facilitatorId: row.facilitatorId,
+    stageKey: row.stageKey ?? null,
+    stageStartedAt: row.stageStartedAt?.toISOString() ?? null,
+    elapsed: (row.elapsed ?? {}) as Record<string, number>,
+    notes: isFacilitator ? ((row.notes ?? {}) as Record<string, unknown>) : {},
+    addedMinutes: (row.addedMinutes ?? {}) as Record<string, number>,
+    state: row.state,
+    digestId: row.digestId ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Write actions
+// ---------------------------------------------------------------------------
+
+export const createSession = defineWriteAction({
+  name: "sessions.create",
+  summary: "Creates a scheduled session for a space.",
+  input: z.object({
+    spaceId: z.uuid(),
+    cycleId: z.uuid().optional(),
+    kind: z.enum(SESSION_KINDS),
+    title: z.string().trim().min(1).max(200),
+    scheduledFor: z.string(),
+    facilitatorId: z.uuid(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const contextId = await resolveSpaceContextId(
+        tx,
+        workspaceId,
+        input.spaceId,
+      );
+
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "space",
+        resourceId: input.spaceId,
+        requires: ACCESS_LEVELS.edit,
+      });
+
+      const id = crypto.randomUUID();
+      await tx.insert(sessions).values({
+        id,
+        workspaceId,
+        spaceId: input.spaceId,
+        cycleId: input.cycleId ?? null,
+        kind: input.kind,
+        title: input.title,
+        scheduledFor: new Date(input.scheduledFor),
+        facilitatorId: input.facilitatorId,
+        state: "scheduled",
+      });
+
+      return {
+        result: { id },
+        activity: {
+          kind: "session.created",
+          subjectType: "space",
+          subjectId: input.spaceId,
+          contextId,
+          payload: { kind: input.kind, title: input.title },
+        },
+        audit: {
+          action: "sessions.create",
+          targetType: "session",
+          targetId: id,
+          payload: { kind: input.kind, spaceId: input.spaceId },
+        },
+      };
+    },
+  }),
+});
+
+export const openSession = defineWriteAction({
+  name: "sessions.open",
+  summary:
+    "Opens a scheduled session, setting it to running and starting the first stage.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (session.state !== "scheduled") {
+        throw new OperationError(
+          "not_found",
+          `Cannot open a session in state '${session.state}'.`,
+        );
+      }
+
+      const firstStage = stageKeysFor(session.kind)?.[0] ?? null;
+      const now = new Date();
+
+      await tx
+        .update(sessions)
+        .set({
+          state: "running",
+          startedAt: now,
+          stageKey: firstStage ?? null,
+          stageStartedAt: now,
+          updatedAt: now,
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id },
+        /**
+         * Opening is a stage change too (P4-T10a-a).
+         *
+         * Somebody sitting on a scheduled session is waiting for exactly this
+         * moment, and without the row they would wait through the whole review
+         * unless they thought to reload. Same topic as the advance, because to
+         * a client there is no difference: the stage moved.
+         */
+        outbox: [
+          {
+            topic: "session.stageChanged",
+            payload: {
+              channel: sessionChannel(workspaceId, input.id),
+              sessionId: input.id,
+              workspaceId,
+              from: null,
+              to: firstStage,
+            },
+            idempotencyKey: `session.stageChanged:${input.id}:opened`,
+          },
+        ],
+        activity: {
+          kind: "session.opened",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { kind: session.kind },
+        },
+        audit: {
+          action: "sessions.open",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+export const advanceStage = defineWriteAction({
+  name: "sessions.advanceStage",
+  summary:
+    "Advances a running session to its next stage, recording elapsed time.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), realtimeChannel: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (session.state !== "running") {
+        throw new OperationError("not_found", "Session is not running.");
+      }
+
+      let nextStageKey: string | null = null;
+      const stageKeys = stageKeysFor(session.kind);
+      if (stageKeys) {
+        const stageIndex = session.stageKey
+          ? stageKeys.indexOf(session.stageKey)
+          : -1;
+        if (stageIndex === stageKeys.length - 1) {
+          throw new OperationError(
+            "not_found",
+            "Already on the last stage. Close the session to finish.",
+          );
+        }
+        nextStageKey = stageKeys[stageIndex + 1] ?? null;
+
+        // Stage completion gate: confidence → diagnose requires every KR
+        // in the space's active cycle to have a confirmed confidence.
+        // **`session.cycleId` is part of the condition, not defaulted inside
+        // the query.** `cycle_id` is nullable by design, and this read once
+        // passed `session.cycleId ?? ""` into a uuid comparison, which
+        // Postgres refuses outright: the whole session screen fell to its
+        // error boundary with "We could not load your workspace" for any
+        // session created outside a cycle. A gate over the key results in a
+        // cycle has nothing to check when there is no cycle, so it does not
+        // run rather than running against a placeholder.
+        if (
+          session.stageKey === "confidence" &&
+          nextStageKey === "diagnose" &&
+          session.spaceId &&
+          session.cycleId
+        ) {
+          const spaceKrs = await tx
+            .select({ id: keyResults.id, title: keyResults.title })
+            .from(keyResults)
+            .innerJoin(goals, eq(keyResults.goalId, goals.id))
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(goals.spaceId, session.spaceId),
+                eq(goals.cycleId, session.cycleId),
+              ),
+            );
+
+          const confirmed = await tx
+            .select({ keyResultId: sessionConfidences.keyResultId })
+            .from(sessionConfidences)
+            .where(
+              activeOnly(
+                sessionConfidences,
+                eq(sessionConfidences.workspaceId, workspaceId),
+                eq(sessionConfidences.sessionId, input.id),
+              ),
+            );
+
+          const confirmedIds = new Set(confirmed.map((c) => c.keyResultId));
+          const missing = spaceKrs.filter((kr) => !confirmedIds.has(kr.id));
+
+          if (missing.length > 0) {
+            const names = missing.map((kr) => kr.title).join(", ");
+            throw new OperationError(
+              "not_found",
+              `Cannot advance: ${names} has no confirmed confidence.`,
+            );
+          }
+        }
+
+        // Stage completion gate: diagnose → commitments requires every
+        // low-confidence KR to have a blocker with type, owner and action.
+        if (
+          session.stageKey === "diagnose" &&
+          nextStageKey === "commitments" &&
+          session.spaceId
+        ) {
+          // Load confirmed confidences for this session.
+          const confirmations = await tx
+            .select({
+              keyResultId: sessionConfidences.keyResultId,
+              confidence: sessionConfidences.confirmedConfidence,
+            })
+            .from(sessionConfidences)
+            .where(
+              activeOnly(
+                sessionConfidences,
+                eq(sessionConfidences.workspaceId, workspaceId),
+                eq(sessionConfidences.sessionId, input.id),
+              ),
+            );
+
+          // Find KRs with confidence below the low threshold (0.4 default).
+          // The threshold is a §11 parameter; reading it here would require
+          // resolving thresholds inside the action. For now, use 0.4 as the
+          // hard-coded default — it matches the check constraint the design
+          // specifies. METHOD.md says the threshold, not the action, is the
+          // authority, and P4-T15 wires the resolved value.
+          const LOW_THRESHOLD = 0.4;
+          const lowKrIds = confirmations
+            .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
+            .map((c) => c.keyResultId);
+
+          if (lowKrIds.length > 0) {
+            // Check that each low KR has at least one unresolved blocker.
+            const existingBlockers = await tx
+              .select({ keyResultId: blockers.keyResultId })
+              .from(blockers)
+              .where(
+                activeOnly(
+                  blockers,
+                  eq(blockers.workspaceId, workspaceId),
+                  eq(blockers.sessionId, input.id),
+                  isNull(blockers.resolvedAt),
+                ),
+              );
+
+            const blockedIds = new Set(
+              existingBlockers.map((b) => b.keyResultId),
+            );
+            const unblockedLowKrs = lowKrIds.filter(
+              (id) => !blockedIds.has(id),
+            );
+
+            if (unblockedLowKrs.length > 0) {
+              // The titles, for the refusal's own sentence: an error that names
+              // "three key results" and not which three is an error somebody
+              // has to go and look up.
+              const krRows = await tx
+                .select({ id: keyResults.id, title: keyResults.title })
+                .from(keyResults)
+                .where(
+                  activeOnly(
+                    keyResults,
+                    eq(keyResults.workspaceId, workspaceId),
+                  ),
+                );
+
+              const titles = unblockedLowKrs
+                .map((id) => krRows.find((kr) => kr.id === id)?.title ?? id)
+                .join(", ");
+
+              throw new OperationError(
+                "not_found",
+                `Cannot advance: ${titles} scored below ${LOW_THRESHOLD} and has no blocker.`,
+              );
+            }
+          }
+        }
+
+        // Stage completion gate: commitments → digest requires at least 2
+        // new commitments for this session (§11 sessions.weeklyCommitmentBounds).
+        if (
+          session.stageKey === "commitments" &&
+          nextStageKey === "digest" &&
+          session.spaceId &&
+          session.cycleId
+        ) {
+          // Only enforce commitments when the space has KRs.
+          const [krCount] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(keyResults)
+            .innerJoin(goals, eq(keyResults.goalId, goals.id))
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(goals.spaceId, session.spaceId),
+                eq(goals.cycleId, session.cycleId),
+              ),
+            );
+
+          if ((krCount?.count ?? 0) > 0) {
+            const MIN_COMMITMENTS = 2;
+            const [commitmentCount] = await tx
+              .select({ count: sql<number>`count(*)::int` })
+              .from(commitments)
+              .where(
+                activeOnly(
+                  commitments,
+                  eq(commitments.workspaceId, workspaceId),
+                  eq(commitments.sessionId, input.id),
+                ),
+              );
+            if ((commitmentCount?.count ?? 0) < MIN_COMMITMENTS) {
+              throw new OperationError(
+                "not_found",
+                `Cannot advance: at least ${MIN_COMMITMENTS} commitments are required, but only ${commitmentCount?.count ?? 0} were set.`,
+              );
+            }
+          }
+        }
+      }
+
+      const now = new Date();
+      const elapsedMs = session.stageStartedAt
+        ? now.getTime() - session.stageStartedAt.getTime()
+        : 0;
+      const elapsedSeconds = Math.round(elapsedMs / 1000);
+      const currentElapsed = (session.elapsed ?? {}) as Record<string, number>;
+      const updatedElapsed = session.stageKey
+        ? { ...currentElapsed, [session.stageKey]: elapsedSeconds }
+        : currentElapsed;
+
+      await tx
+        .update(sessions)
+        .set({
+          stageKey: nextStageKey,
+          stageStartedAt: now,
+          elapsed: updatedElapsed,
+          updatedAt: now,
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      const channel = sessionChannel(workspaceId, input.id);
+
+      return {
+        result: { id: input.id, realtimeChannel: channel },
+        /**
+         * The realtime publish, as an outbox row (P4-T10a-a).
+         *
+         * **This was missing, and its absence made the live-sync claim false.**
+         * The action returned the channel name and nothing ever published to
+         * it: `session.stageChanged` was declared in `packages/core/src/
+         * sessions/live.ts`, listened for by the client and forwarded by the
+         * SSE route, and emitted by no code at all. Every connected client
+         * therefore sat on a stale rail until somebody reloaded.
+         *
+         * A row rather than a driver call, because that is the only way a side
+         * effect may leave a write path: the change, the activity, the audit
+         * row and this commit together or not at all. It still does not reach
+         * anybody, because no relay drains the outbox yet. That gap is recorded
+         * in PHASE-4-SPLIT.md and it is now the only thing standing between
+         * this write and a live rail.
+         *
+         * The key carries the stage, so advancing twice enqueues two rows while
+         * a retried write of the same advance cannot.
+         */
+        outbox: [
+          {
+            topic: "session.stageChanged",
+            payload: {
+              channel,
+              sessionId: input.id,
+              workspaceId,
+              from: session.stageKey,
+              to: nextStageKey,
+            },
+            idempotencyKey: `session.stageChanged:${input.id}:${nextStageKey ?? "closed"}`,
+          },
+        ],
+        activity: {
+          kind: "session.stageAdvanced",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { from: session.stageKey, to: nextStageKey },
+        },
+        audit: {
+          action: "sessions.advanceStage",
+          targetType: "session",
+          targetId: input.id,
+          payload: { from: session.stageKey, to: nextStageKey },
+        },
+      };
+    },
+  }),
+});
+
+export const skipSession = defineWriteAction({
+  name: "sessions.skip",
+  summary: "Marks a scheduled session as skipped.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (session.state !== "scheduled") {
+        throw new OperationError(
+          "not_found",
+          `Cannot skip a session in state '${session.state}'.`,
+        );
+      }
+
+      const now = new Date();
+      await tx
+        .update(sessions)
+        .set({ state: "skipped", updatedAt: now })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      // Reset streak on skip (§7.4: a skipped week breaks it).
+      if (session.spaceId) {
+        const [existing] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, workspaceId),
+              eq(streaks.spaceId, session.spaceId),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          // openokr:allow-mutation: streak is derived.
+          await tx
+            .update(streaks)
+            .set({ currentWeeks: 0, updatedAt: now })
+            .where(eq(streaks.id, existing.id));
+        }
+      }
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "session.skipped",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { kind: session.kind },
+        },
+        audit: {
+          action: "sessions.skip",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+export const closeSession = defineWriteAction({
+  name: "sessions.close",
+  summary: "Closes a running session.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (session.state !== "running") {
+        throw new OperationError(
+          "not_found",
+          "Only a running session can be closed.",
+        );
+      }
+
+      const now = new Date();
+
+      // Generate digest from session data.
+      let digestId: string | null = null;
+      if (session.spaceId) {
+        const confirmations = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confidence: sessionConfidences.confirmedConfidence,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, workspaceId),
+              eq(sessionConfidences.sessionId, input.id),
+            ),
+          );
+
+        const confidences = confirmations.map((c) => Number(c.confidence));
+        const avgConfidence =
+          confidences.length > 0
+            ? confidences.reduce((s, v) => s + v, 0) / confidences.length
+            : 0;
+
+        const HIGH = 0.7;
+        const LOW = 0.4;
+        const onTrack = confidences.filter((c) => c >= HIGH).length;
+        const atRisk = confidences.filter((c) => c < LOW).length;
+
+        const [blockerRow] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(blockers)
+          .where(
+            activeOnly(
+              blockers,
+              eq(blockers.workspaceId, workspaceId),
+              eq(blockers.sessionId, input.id),
+              isNull(blockers.resolvedAt),
+            ),
+          );
+        const blockerCount = blockerRow?.count ?? 0;
+
+        const [commitmentRow] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.sessionId, input.id),
+            ),
+          );
+        const commitmentCount = commitmentRow?.count ?? 0;
+
+        const weekStart = now.toISOString().slice(0, 10);
+        digestId = crypto.randomUUID();
+        await tx.insert(digests).values({
+          id: digestId,
+          workspaceId,
+          scope: "space",
+          scopeId: session.spaceId,
+          period: "weekly",
+          periodStart: weekStart,
+          body: {
+            averageConfidence: Math.round(avgConfidence * 100) / 100,
+            onTrackCount: onTrack,
+            atRiskCount: atRisk,
+            blockerCount,
+            commitmentCount,
+          },
+          generatedAt: now,
+        });
+      }
+
+      // Update streak.
+      if (session.spaceId) {
+        const weekStart = now.toISOString().slice(0, 10);
+        const [existing] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, workspaceId),
+              eq(streaks.spaceId, session.spaceId),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          const newCurrent = existing.currentWeeks + 1;
+          const newLongest = Math.max(existing.longestWeeks, newCurrent);
+          // openokr:allow-mutation: streak is derived, not a domain change.
+          await tx
+            .update(streaks)
+            .set({
+              currentWeeks: newCurrent,
+              longestWeeks: newLongest,
+              lastSessionWeek: weekStart,
+              updatedAt: now,
+            })
+            .where(eq(streaks.id, existing.id));
+        } else {
+          // openokr:allow-mutation: streak is derived.
+          await tx.insert(streaks).values({
+            id: crypto.randomUUID(),
+            workspaceId,
+            spaceId: session.spaceId,
+            currentWeeks: 1,
+            longestWeeks: 1,
+            lastSessionWeek: weekStart,
+          });
+        }
+      }
+
+      /**
+       * The review's grades become facts about the key results (P4-T10b-a).
+       *
+       * §8.3 grades against the key result as written and hides the objective
+       * score until the room reveals it, so a score written straight onto
+       * `key_results.score` during the stage would be visible on the goal page
+       * immediately and would not be revisable while the room talks. Closing is
+       * the moment it stops moving, which is the moment it becomes a fact.
+       *
+       * Only what was graded is written. An ungraded key result keeps whatever
+       * it had, because writing zero would be the review claiming a result it
+       * never discussed.
+       *
+       * In this transaction with the close, so a session cannot end with half
+       * its scores landed.
+       */
+      if (session.kind === "quarterly") {
+        const graded = await tx
+          .select({
+            keyResultId: reviewScores.keyResultId,
+            score: reviewScores.score,
+          })
+          .from(reviewScores)
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.id),
+            ),
+          );
+
+        for (const grade of graded) {
+          // openokr:allow-mutation: runs on the transaction this Operation
+          // opened, so the score, the close, the audit row and the outbox row
+          // commit together or not at all.
+          await tx
+            .update(keyResults)
+            .set({ score: grade.score, updatedAt: now })
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(keyResults.id, grade.keyResultId),
+              ),
+            );
+        }
+
+        /**
+         * **§8.8's decisions are not written onto the goals, and the schema is
+         * why (P4-T11c-a).**
+         *
+         * `goals_close_is_complete` (migration 0022) holds that a close carries
+         * `closed_at`, `success_status` and `close_decision` together or none of
+         * them: a close decision without a close is a contradiction, and the
+         * constraint refused the write. It was right to.
+         *
+         * Actually closing the objectives here would mean deriving a success
+         * status and inventing a retrospective body for each one, because
+         * `closeGoalInTx` requires both and stage nine collects neither. So the
+         * decision and its why live in `review_decisions`, and the honest
+         * reading of TECHNICAL-PLAN §4's "written back to the goal on close" is
+         * that `goals.close` reads them when somebody closes the objective for
+         * real. **That integration is not built and is an open question on the
+         * P4-T11c-a row rather than a silent gap.**
+         */
+      }
+
+      await tx
+        .update(sessions)
+        .set({
+          state: "closed",
+          endedAt: now,
+          digestId,
+          updatedAt: now,
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "session.closed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { kind: session.kind },
+        },
+        audit: {
+          action: "sessions.close",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// Read actions
+// ---------------------------------------------------------------------------
+
+export const readSession = defineReadAction({
+  name: "sessions.read",
+  summary: "One session by id. Returns not-found when the caller lacks access.",
+  input: z.object({ id: z.uuid() }),
+  output: sessionOutput,
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<SessionOutput> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+
+        if (!member) {
+          throw new OperationError("not_found", "No such session.");
+        }
+
+        const [row] = await tx
+          .select()
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.id),
+            ),
+          )
+          .limit(1);
+
+        if (!row) {
+          throw new OperationError("not_found", "No such session.");
+        }
+
+        // Verify the caller is a member of the session's space.
+        if (row.spaceId) {
+          const [spaceMembership] = await tx
+            .select({ memberId: spaceMembers.memberId })
+            .from(spaceMembers)
+            .where(
+              activeOnly(
+                spaceMembers,
+                eq(spaceMembers.workspaceId, context.workspaceId),
+                eq(spaceMembers.spaceId, row.spaceId),
+                eq(spaceMembers.memberId, member.id),
+              ),
+            )
+            .limit(1);
+
+          if (!spaceMembership) {
+            throw new OperationError("not_found", "No such session.");
+          }
+        }
+
+        return toOutput(row, member.id);
+      },
+    );
+  },
+});
+
+/**
+ * Every session the reader can reach, across every space (P5-T01c).
+ *
+ * **Why this exists at all.** S-22 to S-25 were built across P4-T07 to P4-T10
+ * and nothing in the interface linked to any of them: `/session/<id>` was
+ * reachable only by typing it. Every session feature this product has was
+ * invisible to the people it was built for, and it was raised twice during
+ * Phase 4 before being answered on 27 August 2026.
+ *
+ * `sessions.list` needs a space id, which is the wrong shape for a front door:
+ * a member does not know which of their spaces has a session running.
+ *
+ * **Scoped by space membership, which is `sessions.read`’s own rule and not the
+ * broader one.** Every space is readable at `view` by every member, on purpose:
+ * without that nobody could discover a space to join. A *session* is stricter,
+ * because it is a room you are in rather than a page you can look at, and
+ * `sessions.read` refuses a caller who is not in the space. Matching that here
+ * matters more than being generous: a list offering rows that then refuse to
+ * open is worse than a shorter list.
+ */
+export const listMySessions = defineReadAction({
+  name: "sessions.mine",
+  summary: "Sessions in every space this member can read, running first.",
+  input: z.object({
+    /** Closed and skipped sessions, off by default: the front door is about what is next. */
+    includeFinished: z.boolean().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      kind: z.enum(SESSION_KINDS),
+      title: z.string(),
+      state: z.enum(SESSION_STATES),
+      scheduledFor: z.string(),
+      spaceId: z.uuid().nullable(),
+      spaceName: z.string().nullable(),
+      /** So a facilitator can tell which of these is theirs to run. */
+      isFacilitator: z.boolean(),
+      /** Set while the session is running, so a rejoin is one click. */
+      stageKey: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+        if (!member) {
+          throw new OperationError("not_found", "No such workspace.");
+        }
+
+        const states = input.includeFinished
+          ? (["running", "scheduled", "closed", "skipped"] as const)
+          : (["running", "scheduled"] as const);
+
+        const rows = await tx
+          .select({
+            id: sessions.id,
+            kind: sessions.kind,
+            title: sessions.title,
+            state: sessions.state,
+            scheduledFor: sessions.scheduledFor,
+            spaceId: sessions.spaceId,
+            spaceName: spaces.name,
+            facilitatorId: sessions.facilitatorId,
+            stageKey: sessions.stageKey,
+          })
+          // openokr:allow-raw-read: this is the list form of what
+          // `sessions.read` checks for one row, and it checks the same thing:
+          // the space membership join below is not a filter a caller could
+          // omit. Reading through the single-row getter instead would mean one
+          // query per session.
+          .from(sessions)
+          .innerJoin(
+            spaces,
+            activeOnly(
+              spaces,
+              eq(spaces.id, sessions.spaceId),
+              eq(spaces.workspaceId, context.workspaceId),
+            ),
+          )
+          // The membership join is the access rule, and an inner join is what
+          // makes it one: a space this member is not in contributes no row at
+          // all rather than a row something later has to remember to drop.
+          .innerJoin(
+            spaceMembers,
+            activeOnly(
+              spaceMembers,
+              eq(spaceMembers.workspaceId, context.workspaceId),
+              eq(spaceMembers.spaceId, spaces.id),
+              eq(spaceMembers.memberId, member.id),
+            ),
+          )
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              inArray(sessions.state, [...states]),
+            ),
+          )
+          // Running first, because a session in progress is the only one on
+          // this list that somebody is waiting in. Then soonest, so the next
+          // thing a member has to turn up to is at the top.
+          .orderBy(
+            sql`case when ${sessions.state} = 'running' then 0 else 1 end`,
+            sessions.scheduledFor,
+          )
+          .limit(input.limit ?? 25);
+
+        return rows.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          title: row.title,
+          state: row.state,
+          scheduledFor: row.scheduledFor.toISOString(),
+          spaceId: row.spaceId,
+          spaceName: row.spaceName,
+          isFacilitator: row.facilitatorId === member.id,
+          stageKey: row.stageKey,
+        }));
+      },
+    );
+  },
+});
+
+export const listSessions = defineReadAction({
+  name: "sessions.list",
+  summary: "Sessions for a space, newest first.",
+  input: z.object({ spaceId: z.uuid() }),
+  output: z.array(sessionOutput),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<SessionOutput[]> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+
+        if (!member) {
+          return [];
+        }
+
+        const rows = await tx
+          .select()
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.spaceId, input.spaceId),
+            ),
+          )
+          .orderBy(desc(sessions.scheduledFor));
+
+        return rows.map((row) => toOutput(row, member.id));
+      },
+    );
+  },
+});
+
+export const listParticipants = defineReadAction({
+  name: "sessions.participants",
+  summary: "Active space members for a session's space.",
+  input: z.object({ id: z.uuid() }),
+  output: z.array(
+    z.object({
+      memberId: z.uuid(),
+      name: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<Array<{ memberId: string; name: string }>> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [session] = await tx
+          .select({ spaceId: sessions.spaceId })
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.id),
+            ),
+          )
+          .limit(1);
+
+        if (!session?.spaceId) {
+          return [];
+        }
+
+        const members = await tx
+          .select({
+            memberId: spaceMembers.memberId,
+            name: workspaceMembers.name,
+          })
+          .from(spaceMembers)
+          .innerJoin(
+            workspaceMembers,
+            and(
+              eq(spaceMembers.memberId, workspaceMembers.id),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .where(
+            activeOnly(
+              spaceMembers,
+              eq(spaceMembers.workspaceId, context.workspaceId),
+              eq(spaceMembers.spaceId, session.spaceId),
+            ),
+          );
+
+        return members.map((m) => ({
+          memberId: m.memberId,
+          name: m.name,
+        }));
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07b: Confidence round actions
+// ---------------------------------------------------------------------------
+
+export const castSessionVote = defineWriteAction({
+  name: "sessions.castVote",
+  summary:
+    "A private confidence vote on one key result within a session. Upserts: a second vote replaces the first.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    confidence: z.number().min(0).max(1),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Verify the KR exists.
+      const [kr] = await tx
+        .select({ id: keyResults.id, goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!kr) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+
+      // Upsert: update existing unrevealed vote, or insert.
+      const [existing] = await tx
+        .select({ id: checkInVotes.id })
+        .from(checkInVotes)
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+            eq(checkInVotes.memberId, memberId),
+            isNull(checkInVotes.revealedAt),
+          ),
+        )
+        .limit(1);
+
+      let voteId: string;
+      if (existing) {
+        await tx
+          .update(checkInVotes)
+          .set({
+            confidence: String(input.confidence),
+            updatedAt: new Date(),
+          })
+          .where(activeOnly(checkInVotes, eq(checkInVotes.id, existing.id)));
+        voteId = existing.id;
+      } else {
+        voteId = crypto.randomUUID();
+        await tx.insert(checkInVotes).values({
+          id: voteId,
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          memberId,
+          confidence: String(input.confidence),
+        });
+      }
+
+      return {
+        result: { id: voteId },
+        activity: {
+          kind: "session.voteCast",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: { keyResultId: input.keyResultId },
+        },
+        audit: {
+          action: "sessions.castVote",
+          targetType: "check_in_vote",
+          targetId: voteId,
+          payload: { keyResultId: input.keyResultId },
+        },
+      };
+    },
+  }),
+});
+
+export const revealSessionVotes = defineWriteAction({
+  name: "sessions.revealVotes",
+  summary: "Reveals every vote on a key result in one session, atomically.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+  }),
+  output: z.object({ revealed: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const now = new Date();
+      const revealed = await tx
+        .update(checkInVotes)
+        .set({ revealedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+            isNull(checkInVotes.revealedAt),
+          ),
+        )
+        .returning({ id: checkInVotes.id });
+
+      return {
+        result: { revealed: revealed.length },
+        activity: {
+          kind: "session.votesRevealed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            count: revealed.length,
+          },
+        },
+        audit: {
+          action: "sessions.revealVotes",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: {
+            keyResultId: input.keyResultId,
+            count: revealed.length,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const confirmSessionConfidence = defineWriteAction({
+  name: "sessions.confirmConfidence",
+  summary:
+    "The champion confirms the final confidence and writes the what-changed note.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    confidence: z.number().min(0).max(1),
+    whatChanged: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Compute the team average from revealed votes.
+      const [avgRow] = await tx
+        .select({
+          avg: sql<string>`avg(${checkInVotes.confidence})`,
+        })
+        .from(checkInVotes)
+        .where(
+          activeOnly(
+            checkInVotes,
+            eq(checkInVotes.workspaceId, workspaceId),
+            eq(checkInVotes.sessionId, input.sessionId),
+            eq(checkInVotes.keyResultId, input.keyResultId),
+          ),
+        );
+      const teamAverage = avgRow?.avg
+        ? String(Number(avgRow.avg).toFixed(2))
+        : null;
+
+      // Upsert the confirmed confidence.
+      const [existing] = await tx
+        .select({ id: sessionConfidences.id })
+        .from(sessionConfidences)
+        .where(
+          activeOnly(
+            sessionConfidences,
+            eq(sessionConfidences.workspaceId, workspaceId),
+            eq(sessionConfidences.sessionId, input.sessionId),
+            eq(sessionConfidences.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      let confirmId: string;
+      if (existing) {
+        await tx
+          .update(sessionConfidences)
+          .set({
+            confirmedConfidence: String(input.confidence),
+            teamAverage,
+            whatChanged: input.whatChanged,
+            confirmedById: memberId,
+            updatedAt: new Date(),
+          })
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.id, existing.id),
+            ),
+          );
+        confirmId = existing.id;
+      } else {
+        confirmId = crypto.randomUUID();
+        await tx.insert(sessionConfidences).values({
+          id: confirmId,
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          confirmedConfidence: String(input.confidence),
+          teamAverage,
+          whatChanged: input.whatChanged,
+          confirmedById: memberId,
+        });
+      }
+
+      // Update the KR's confidence on the key_results table.
+      await tx
+        .update(keyResults)
+        .set({
+          confidence: String(input.confidence),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        );
+
+      return {
+        result: { id: confirmId },
+        activity: {
+          kind: "session.confidenceConfirmed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            confidence: input.confidence,
+          },
+        },
+        audit: {
+          action: "sessions.confirmConfidence",
+          targetType: "session_confidence",
+          targetId: confirmId,
+          payload: {
+            keyResultId: input.keyResultId,
+            confidence: input.confidence,
+          },
+        },
+      };
+    },
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07b: Confidence round read actions
+// ---------------------------------------------------------------------------
+
+export const sessionVotes = defineReadAction({
+  name: "sessions.votes",
+  summary:
+    "Votes for one KR in a session. Before reveal: own vote only. After reveal: all.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+  }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      memberId: z.uuid(),
+      confidence: z.number(),
+      revealedAt: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      memberId: string;
+      confidence: number;
+      revealedAt: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+              eq(workspaceMembers.status, "active"),
+            ),
+          )
+          .limit(1);
+
+        if (!member) {
+          throw new OperationError("not_found", "No such session.");
+        }
+
+        // Check if votes are revealed.
+        const allVotes = await tx
+          .select({
+            id: checkInVotes.id,
+            memberId: checkInVotes.memberId,
+            confidence: checkInVotes.confidence,
+            revealedAt: checkInVotes.revealedAt,
+          })
+          .from(checkInVotes)
+          .where(
+            activeOnly(
+              checkInVotes,
+              eq(checkInVotes.workspaceId, context.workspaceId),
+              eq(checkInVotes.sessionId, input.sessionId),
+              eq(checkInVotes.keyResultId, input.keyResultId),
+            ),
+          );
+
+        // If any vote is revealed, all should be (atomic reveal). Show all.
+        const anyRevealed = allVotes.some((v) => v.revealedAt !== null);
+
+        const visible = anyRevealed
+          ? allVotes
+          : allVotes.filter((v) => v.memberId === member.id);
+
+        return visible.map((v) => ({
+          id: v.id,
+          memberId: v.memberId,
+          confidence: Number(v.confidence),
+          revealedAt: v.revealedAt?.toISOString() ?? null,
+        }));
+      },
+    );
+  },
+});
+
+export const sessionConfidenceStatus = defineReadAction({
+  name: "sessions.confidenceStatus",
+  summary: "Which KRs are confirmed vs unconfirmed in this session.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      keyResultId: z.uuid(),
+      title: z.string(),
+      confirmed: z.boolean(),
+      confirmedConfidence: z.number().nullable(),
+      whatChanged: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      keyResultId: string;
+      title: string;
+      confirmed: boolean;
+      confirmedConfidence: number | null;
+      whatChanged: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // Read the session to get the space and cycle.
+        const [session] = await tx
+          .select({
+            spaceId: sessions.spaceId,
+            cycleId: sessions.cycleId,
+          })
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        if (!session?.spaceId || !session.cycleId) {
+          return [];
+        }
+
+        // All KRs in the space's cycle.
+        const krs = await tx
+          .select({ id: keyResults.id, title: keyResults.title })
+          .from(keyResults)
+          .innerJoin(goals, eq(keyResults.goalId, goals.id))
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              eq(goals.spaceId, session.spaceId),
+              eq(goals.cycleId, session.cycleId),
+            ),
+          );
+
+        // Confirmed ones.
+        const confirmed = await tx
+          .select({
+            keyResultId: sessionConfidences.keyResultId,
+            confirmedConfidence: sessionConfidences.confirmedConfidence,
+            whatChanged: sessionConfidences.whatChanged,
+          })
+          .from(sessionConfidences)
+          .where(
+            activeOnly(
+              sessionConfidences,
+              eq(sessionConfidences.workspaceId, context.workspaceId),
+              eq(sessionConfidences.sessionId, input.sessionId),
+            ),
+          );
+
+        const confirmedMap = new Map(confirmed.map((c) => [c.keyResultId, c]));
+
+        return krs.map((kr) => {
+          const c = confirmedMap.get(kr.id);
+          return {
+            keyResultId: kr.id,
+            title: kr.title,
+            confirmed: !!c,
+            confirmedConfidence: c ? Number(c.confirmedConfidence) : null,
+            whatChanged: c?.whatChanged ?? null,
+          };
+        });
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T07c: Blocker actions
+// ---------------------------------------------------------------------------
+
+export const createSessionBlocker = defineWriteAction({
+  name: "sessions.createBlocker",
+  summary:
+    "Opens a blocker for a low-confidence KR during the diagnose step. The 24-hour clock starts on save.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    type: z.enum(BLOCKER_TYPES),
+    description: z.string().max(500).optional(),
+    ownerId: z.uuid(),
+    nextAction: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const now = new Date();
+      // 24-hour clock from §11 cadence.blockerClockHours (default 24).
+      const BLOCKER_CLOCK_HOURS = 24;
+      const dueAt = new Date(
+        now.getTime() + BLOCKER_CLOCK_HOURS * 60 * 60 * 1000,
+      );
+
+      const id = crypto.randomUUID();
+      await tx.insert(blockers).values({
+        id,
+        workspaceId,
+        keyResultId: input.keyResultId,
+        sessionId: input.sessionId,
+        type: input.type,
+        description: input.description ?? null,
+        ownerId: input.ownerId,
+        nextAction: input.nextAction,
+        openedAt: now,
+        dueAt,
+        source: "session",
+      });
+
+      return {
+        result: { id },
+        activity: {
+          kind: "session.blockerCreated",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {
+            keyResultId: input.keyResultId,
+            type: input.type,
+          },
+        },
+        audit: {
+          action: "sessions.createBlocker",
+          targetType: "blocker",
+          targetId: id,
+          payload: {
+            keyResultId: input.keyResultId,
+            type: input.type,
+            ownerId: input.ownerId,
+          },
+        },
+      };
+    },
+  }),
+});
+
+export const resolveSessionBlocker = defineWriteAction({
+  name: "sessions.resolveBlocker",
+  summary: "Marks a blocker as resolved.",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [blocker] = await tx
+        .select()
+        .from(blockers)
+        .where(
+          activeOnly(
+            blockers,
+            eq(blockers.workspaceId, workspaceId),
+            eq(blockers.id, input.id),
+          ),
+        )
+        .limit(1);
+
+      if (!blocker) {
+        throw new OperationError("not_found", "No such blocker.");
+      }
+
+      await tx
+        .update(blockers)
+        .set({ resolvedAt: new Date(), updatedAt: new Date() })
+        .where(activeOnly(blockers, eq(blockers.id, input.id)));
+
+      return {
+        result: { id: input.id },
+        activity: {
+          kind: "session.blockerResolved",
+          subjectType: "space",
+          subjectId: workspaceId,
+          payload: { type: blocker.type },
+        },
+        audit: {
+          action: "sessions.resolveBlocker",
+          targetType: "blocker",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Moves a blocker to a different owner (P5-T03b).
+ *
+ * **Built because the escalation card needs it, and it did not exist.** A
+ * blocker's escalation ladder ends at a coordinator, and the two things they can
+ * usefully do are close it or take it on. Closing it had an action;
+ * taking it on had none, so the card's own acceptance criterion ("an action to
+ * reassign or resolve") could not have been met without one.
+ *
+ * **The new owner is named, not chosen here.** `blocker take` from chat passes
+ * the sender, which is the case the card sends; a board that reassigns to a
+ * third person passes them. Neither is this action's decision.
+ */
+export const reassignSessionBlocker = defineWriteAction({
+  name: "sessions.reassignBlocker",
+  summary: "Moves a blocker to a different owner.",
+  input: z.object({ id: z.uuid(), ownerId: z.uuid() }),
+  output: z.object({ id: z.uuid(), ownerId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      if (!actor.memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            // A suspended member cannot be handed work. The access getter
+            // excludes them everywhere else and this is the same rule.
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError(
+          "not_found",
+          "No such member to hand this to.",
+        );
+      }
+
+      // openokr:allow-mutation: the change this action exists to make, inside
+      // the Operation pipeline's own transaction.
+      const [moved] = await tx
+        .update(blockers)
+        .set({ ownerId: input.ownerId, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            blockers,
+            eq(blockers.workspaceId, workspaceId),
+            eq(blockers.id, input.id),
+            // An open one. Reassigning something already closed moves nothing
+            // and reads as a change that mattered.
+            isNull(blockers.resolvedAt),
+          ),
+        )
+        .returning({ id: blockers.id, type: blockers.type });
+      if (!moved) {
+        throw new OperationError("not_found", "No such open blocker.");
+      }
+
+      return {
+        result: { id: moved.id, ownerId: input.ownerId },
+        activity: {
+          kind: "session.blockerReassigned",
+          subjectType: "space",
+          subjectId: workspaceId,
+          // The name at the moment of the change, so the feed keeps reading
+          // sensibly after a rename or an erasure.
+          payload: { type: moved.type, ownerName: owner.name },
+        },
+        audit: {
+          action: "sessions.reassignBlocker",
+          targetType: "blocker",
+          targetId: moved.id,
+          payload: { ownerId: input.ownerId },
+        },
+      };
+    },
+  }),
+});
+
+export const sessionBlockerStatus = defineReadAction({
+  name: "sessions.blockerStatus",
+  summary: "Blockers for a session, with aging information.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      type: z.enum(BLOCKER_TYPES),
+      description: z.string().nullable(),
+      ownerId: z.uuid(),
+      nextAction: z.string(),
+      openedAt: z.string(),
+      dueAt: z.string(),
+      resolvedAt: z.string().nullable(),
+      hoursOpen: z.number(),
+      overdue: z.boolean(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      keyResultId: string | null;
+      type: (typeof BLOCKER_TYPES)[number];
+      description: string | null;
+      ownerId: string;
+      nextAction: string;
+      openedAt: string;
+      dueAt: string;
+      resolvedAt: string | null;
+      hoursOpen: number;
+      overdue: boolean;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const rows = await tx
+          .select()
+          .from(blockers)
+          .where(
+            activeOnly(
+              blockers,
+              eq(blockers.workspaceId, context.workspaceId),
+              eq(blockers.sessionId, input.sessionId),
+            ),
+          );
+
+        const now = new Date();
+        return rows.map((b) => {
+          const hoursOpen =
+            (now.getTime() - b.openedAt.getTime()) / (1000 * 60 * 60);
+          return {
+            id: b.id,
+            keyResultId: b.keyResultId ?? null,
+            type: b.type,
+            description: b.description ?? null,
+            ownerId: b.ownerId,
+            nextAction: b.nextAction,
+            openedAt: b.openedAt.toISOString(),
+            dueAt: b.dueAt.toISOString(),
+            resolvedAt: b.resolvedAt?.toISOString() ?? null,
+            hoursOpen: Math.round(hoursOpen * 10) / 10,
+            overdue: now > b.dueAt && !b.resolvedAt,
+          };
+        });
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// P4-T08: Commitment actions
+// ---------------------------------------------------------------------------
+
+export const setSessionCommitments = defineWriteAction({
+  name: "sessions.setCommitments",
+  summary:
+    "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
+  input: z.object({
+    sessionId: z.uuid(),
+    items: z.array(
+      z.object({
+        text: z.string().trim().min(1).max(500),
+        ownerId: z.uuid(),
+        keyResultId: z.uuid().optional(),
+      }),
+    ),
+  }),
+  output: z.object({ count: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (!session.spaceId) {
+        throw new OperationError("not_found", "Session has no space.");
+      }
+
+      const weekStart = new Date().toISOString().slice(0, 10);
+
+      for (const item of input.items) {
+        await tx.insert(commitments).values({
+          id: crypto.randomUUID(),
+          workspaceId,
+          sessionId: input.sessionId,
+          spaceId: session.spaceId,
+          weekStart,
+          text: item.text,
+          ownerId: item.ownerId,
+          keyResultId: item.keyResultId ?? null,
+        });
+      }
+
+      return {
+        result: { count: input.items.length },
+        activity: {
+          kind: "session.commitmentsSet",
+          subjectType: "space",
+          subjectId: session.spaceId,
+          payload: { count: input.items.length },
+        },
+        audit: {
+          action: "sessions.setCommitments",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { count: input.items.length },
+        },
+      };
+    },
+  }),
+});
+
+export const closeSessionCommitments = defineWriteAction({
+  name: "sessions.closeCommitments",
+  summary:
+    "Closes last week's commitments with a delivered/not-delivered verdict.",
+  input: z.object({
+    items: z.array(
+      z.object({
+        id: z.uuid(),
+        delivered: z.boolean(),
+      }),
+    ),
+  }),
+  output: z.object({ closed: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const now = new Date();
+      for (const item of input.items) {
+        await tx
+          .update(commitments)
+          .set({
+            delivered: item.delivered,
+            closedAt: now,
+            updatedAt: now,
+          })
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, workspaceId),
+              eq(commitments.id, item.id),
+            ),
+          );
+      }
+
+      return {
+        result: { closed: input.items.length },
+        activity: {
+          kind: "session.commitmentsClosed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { count: input.items.length },
+        },
+        audit: {
+          action: "sessions.closeCommitments",
+          targetType: "commitment",
+          payload: { count: input.items.length },
+        },
+      };
+    },
+  }),
+});
+
+export const listSessionCommitments = defineReadAction({
+  name: "sessions.listCommitments",
+  summary: "Commitments for a session.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      text: z.string(),
+      ownerId: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      delivered: z.boolean().nullable(),
+      closedAt: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      text: string;
+      ownerId: string;
+      keyResultId: string | null;
+      delivered: boolean | null;
+      closedAt: string | null;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const rows = await tx
+          .select()
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, context.workspaceId),
+              eq(commitments.sessionId, input.sessionId),
+            ),
+          );
+
+        return rows.map((r) => ({
+          id: r.id,
+          text: r.text,
+          ownerId: r.ownerId,
+          keyResultId: r.keyResultId ?? null,
+          delivered: r.delivered ?? null,
+          closedAt: r.closedAt?.toISOString() ?? null,
+        }));
+      },
+    );
+  },
+});
+
+export const setCoordinatorNote = defineWriteAction({
+  name: "sessions.setCoordinatorNote",
+  summary: "Adds the coordinator's note to the session digest.",
+  input: z.object({
+    sessionId: z.uuid(),
+    note: z.string().trim().min(1).max(2000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (!session.digestId) {
+        throw new OperationError(
+          "not_found",
+          "No digest exists for this session yet.",
+        );
+      }
+
+      await tx
+        .update(digests)
+        .set({ note: input.note, updatedAt: new Date() })
+        .where(activeOnly(digests, eq(digests.id, session.digestId)));
+
+      return {
+        result: { id: session.digestId },
+        activity: {
+          kind: "session.coordinatorNoteSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          payload: {},
+        },
+        audit: {
+          action: "sessions.setCoordinatorNote",
+          targetType: "digest",
+          targetId: session.digestId,
+        },
+      };
+    },
+  }),
+});
+
+export const readStreak = defineReadAction({
+  name: "sessions.readStreak",
+  summary: "The rhythm streak for a space.",
+  input: z.object({ spaceId: z.uuid() }),
+  output: z.object({
+    currentWeeks: z.number().int(),
+    longestWeeks: z.number().int(),
+    lastSessionWeek: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<{
+    currentWeeks: number;
+    longestWeeks: number;
+    lastSessionWeek: string | null;
+  }> {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(streaks)
+          .where(
+            and(
+              eq(streaks.workspaceId, context.workspaceId),
+              eq(streaks.spaceId, input.spaceId),
+            ),
+          )
+          .limit(1);
+
+        return {
+          currentWeeks: row?.currentWeeks ?? 0,
+          longestWeeks: row?.longestWeeks ?? 0,
+          lastSessionWeek: row?.lastSessionWeek ?? null,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The monthly review (METHOD.md §7.5, P4-T09)
+// ---------------------------------------------------------------------------
+
+/**
+ * A monthly review has no stages, so nothing here advances one.
+ *
+ * §7.5 records four things and this module stores two of them. The dependency
+ * and risk log is a read of P3-T09's alignment register, returned by
+ * `sessions.monthlyRecord` rather than copied into a table of its own, because
+ * two copies of one dependency is two answers a facilitator has to reconcile.
+ */
+/**
+ * `2026-03-14` from an instant, as the workspace's own timezone sees it.
+ *
+ * **Not `toISOString().slice(0, 10)`.** That answers in UTC, so a review held
+ * at six in the morning in Jakarta is recorded on the previous day, and on the
+ * first of a month it lands in the wrong month entirely. `localDateIn` is the
+ * shared answer the cycle engine already uses, and it is the only thing that
+ * knows what the offset was on that particular date.
+ */
+function localDate(value: Date | string, timeZone: string): string {
+  const at = typeof value === "string" ? new Date(value) : value;
+  const { year, month, day } = localDateIn(at, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * The first day of the month a review covers, in the workspace's timezone.
+ *
+ * A trend is keyed on the month rather than the meeting (TECHNICAL-PLAN §4.7),
+ * so a rescheduled review still records one opinion for the month it is about.
+ */
+function firstOfMonth(value: Date | string, timeZone: string): string {
+  return `${localDate(value, timeZone).slice(0, 7)}-01`;
+}
+
+async function requireMonthly(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+  requires: number,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    requires,
+  );
+  if (session.kind !== "monthly") {
+    throw new OperationError(
+      "not_found",
+      "Trends and decisions belong to a monthly review.",
+    );
+  }
+  return session;
+}
+
+export const setTrend = defineWriteAction({
+  name: "sessions.setTrend",
+  summary:
+    "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    trend: z.enum(OBJECTIVE_TRENDS),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // The objective is authorised on its own terms as well. Holding the
+      // space does not automatically mean holding a goal parked inside it.
+      const goalAccess = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.view as never,
+      });
+
+      const timeZone = await workspaceTimeZone(tx, workspaceId);
+      const month = firstOfMonth(session.scheduledFor, timeZone);
+      const [existing] = await tx
+        .select({ id: objectiveTrends.id })
+        .from(objectiveTrends)
+        .where(
+          activeOnly(
+            objectiveTrends,
+            eq(objectiveTrends.workspaceId, workspaceId),
+            eq(objectiveTrends.goalId, input.goalId),
+            eq(objectiveTrends.month, month),
+          ),
+        )
+        .limit(1);
+
+      // One opinion per objective per month. Recording again corrects it,
+      // which is what a room does when it talks itself round, and it is why
+      // the row is keyed on the month rather than on the meeting.
+      const [row] = existing
+        ? await tx
+            .update(objectiveTrends)
+            .set({
+              trend: input.trend,
+              authorMemberId: memberId,
+              updatedAt: new Date(),
+            })
+            .where(
+              activeOnly(objectiveTrends, eq(objectiveTrends.id, existing.id)),
+            )
+            .returning({ id: objectiveTrends.id })
+        : await tx
+            .insert(objectiveTrends)
+            .values({
+              workspaceId,
+              goalId: input.goalId,
+              month,
+              trend: input.trend,
+              authorMemberId: memberId,
+            })
+            .returning({ id: objectiveTrends.id });
+
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "The trend could not be recorded.",
+        );
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.trendRecorded",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId: goalAccess.contextId,
+          payload: { trend: input.trend, sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setTrend",
+          targetType: "session_trend",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const setShifts = defineWriteAction({
+  name: "sessions.setShifts",
+  summary:
+    "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    shifts: z.string().trim().max(4000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Empty is a real answer and means the room noted no shift, so the
+      // column goes back to null rather than holding an empty string that
+      // reads on screen as somebody having written nothing.
+      await tx
+        .update(sessions)
+        .set({
+          shifts: input.shifts.length === 0 ? null : input.shifts,
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      return {
+        result: { id: input.sessionId },
+        activity: {
+          kind: "session.shiftsRecorded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setShifts",
+          targetType: "session",
+          targetId: input.sessionId,
+        },
+      };
+    },
+  }),
+});
+
+export const recordDecision = defineWriteAction({
+  name: "sessions.recordDecision",
+  summary:
+    "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+  input: z
+    .object({
+      sessionId: z.uuid(),
+      goalId: z.uuid().optional(),
+      keyResultId: z.uuid().optional(),
+      text: z.string().trim().min(1).max(2000),
+    })
+    // §7.5: "Every decision names the key result it affects." A decision with
+    // no subject is a meeting note, and the log is not a notepad. Refused at
+    // the boundary as well as by the table constraint, so a caller gets a
+    // sentence rather than a database error.
+    .refine(
+      (value) => value.goalId !== undefined || value.keyResultId !== undefined,
+      { message: "A decision names the key result or the goal it affects." },
+    ),
+  output: z.object({
+    id: z.uuid(),
+    /**
+     * The goal the decision landed on, whichever end named it.
+     *
+     * Returned so a caller can revalidate that goal's own path rather than the
+     * `/goals/[id]` route pattern, and so a surface can link straight to it.
+     */
+    goalId: z.uuid(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireMonthly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // The goal the decision lands on, whichever end named it. A key result
+      // is authorised through its objective, which is where access lives, and
+      // storing both ends is what lets the goal page find it with one index.
+      let goalId = input.goalId ?? null;
+      if (input.keyResultId) {
+        const [owner] = await tx
+          .select({ goalId: keyResults.goalId })
+          .from(keyResults)
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, workspaceId),
+              eq(keyResults.id, input.keyResultId),
+            ),
+          )
+          .limit(1);
+        if (!owner) {
+          throw new OperationError("not_found", "No such key result.");
+        }
+        goalId = goalId ?? owner.goalId;
+      }
+
+      // The refine on the input already refuses a decision naming neither, so
+      // by here there is always a goal to authorise against.
+      if (!goalId) {
+        throw new OperationError(
+          "not_found",
+          "A decision names the key result or the goal it affects.",
+        );
+      }
+      const { contextId: decisionContextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: goalId,
+        requires: ACCESS_LEVELS.view as never,
+      });
+
+      const [row] = await tx
+        .insert(decisions)
+        .values({
+          workspaceId,
+          // Stamped now rather than derived later: `goals.moveToCycle` would
+          // otherwise rewrite which cycle decided this.
+          cycleId: session.cycleId,
+          sessionId: input.sessionId,
+          goalId,
+          keyResultId: input.keyResultId ?? null,
+          text: input.text,
+          at: localDate(new Date(), await workspaceTimeZone(tx, workspaceId)),
+          authorMemberId: memberId,
+        })
+        .returning({ id: decisions.id });
+
+      if (!row) {
+        throw new OperationError(
+          "not_found",
+          "The decision could not be recorded.",
+        );
+      }
+
+      return {
+        result: { id: row.id, goalId },
+        activity: {
+          kind: "session.decisionRecorded",
+          subjectType: "goal",
+          subjectId: goalId,
+          contextId: decisionContextId,
+          payload: {
+            sessionId: input.sessionId,
+            keyResultId: input.keyResultId ?? null,
+          },
+        },
+        audit: {
+          action: "sessions.recordDecision",
+          targetType: "decision",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+const decisionOutput = z.object({
+  id: z.uuid(),
+  text: z.string(),
+  at: z.string(),
+  authorMemberId: z.uuid(),
+  authorName: z.string(),
+  goalId: z.uuid().nullable(),
+  goalTitle: z.string().nullable(),
+  keyResultId: z.uuid().nullable(),
+  keyResultTitle: z.string().nullable(),
+  sessionId: z.uuid().nullable(),
+});
+
+type DecisionOutput = z.infer<typeof decisionOutput>;
+
+/** The shared shape of a decision row wherever it is listed. */
+function decisionRow(row: {
+  id: string;
+  text: string;
+  at: string;
+  authorMemberId: string;
+  authorName: string | null;
+  goalId: string | null;
+  goalTitle: string | null;
+  keyResultId: string | null;
+  keyResultTitle: string | null;
+  sessionId: string | null;
+}): DecisionOutput {
+  return {
+    id: row.id,
+    text: row.text,
+    at: row.at,
+    authorMemberId: row.authorMemberId,
+    // Left-joined, so a decision by a member who has since been removed still
+    // reads rather than dropping out of the log §7.5 calls the artifact.
+    authorName: row.authorName ?? "Unknown",
+    goalId: row.goalId,
+    goalTitle: row.goalTitle,
+    keyResultId: row.keyResultId,
+    keyResultTitle: row.keyResultTitle,
+    sessionId: row.sessionId,
+  };
+}
+
+const decisionColumns = {
+  id: decisions.id,
+  text: decisions.text,
+  at: decisions.at,
+  authorMemberId: decisions.authorMemberId,
+  authorName: workspaceMembers.name,
+  goalId: decisions.goalId,
+  goalTitle: goals.title,
+  keyResultId: decisions.keyResultId,
+  keyResultTitle: keyResults.title,
+  sessionId: decisions.sessionId,
+} as const;
+
+export const readMonthlyRecord = defineReadAction({
+  name: "sessions.monthlyRecord",
+  summary:
+    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note and the decisions.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    shifts: z.string().nullable(),
+    trends: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        trend: z.enum(OBJECTIVE_TRENDS),
+        /**
+         * §3.7's signal from the stored progress, shown beside the trend and
+         * never instead of it. The trend is the room's judgement; this is the
+         * number they judged against.
+         */
+        signal: z.enum(["green", "amber", "red"]).nullable(),
+        progressPct: z.number(),
+      }),
+    ),
+    /** Objectives in the review's scope with no trend recorded yet. */
+    untrended: z.array(z.object({ goalId: z.uuid(), goalTitle: z.string() })),
+    dependencies: z.array(
+      z.object({
+        id: z.uuid(),
+        keyResultId: z.uuid(),
+        keyResultTitle: z.string(),
+        description: z.string(),
+        confirmed: z.boolean(),
+        riskOwnerId: z.uuid().nullable(),
+      }),
+    ),
+    decisions: z.array(decisionOutput),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireMonthly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+
+        // Every open objective in the review's scope, so the screen can list
+        // what still has no trend rather than only what has one. Closed
+        // objectives are left out: a review asks where the work is going, and
+        // a finished objective is not going anywhere.
+        const goalRows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            progressPct: goals.progressPct,
+          })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              isNull(goals.closedAt),
+            ),
+          )
+          // Ordered, because an unordered list reshuffles between loads and a
+          // facilitator working down a screen loses their place.
+          .orderBy(goals.position, goals.createdAt);
+
+        const trendRows = await tx
+          .select({
+            goalId: objectiveTrends.goalId,
+            trend: objectiveTrends.trend,
+          })
+          .from(objectiveTrends)
+          .where(
+            activeOnly(
+              objectiveTrends,
+              eq(objectiveTrends.workspaceId, context.workspaceId),
+              // Keyed on the month the review covers, so a rescheduled or
+              // repeated review reads back the same opinion.
+              eq(
+                objectiveTrends.month,
+                firstOfMonth(session.scheduledFor, timeZone),
+              ),
+            ),
+          );
+        const byGoal = new Map(trendRows.map((row) => [row.goalId, row.trend]));
+
+        const trends = goalRows.flatMap((goal) => {
+          const trend = byGoal.get(goal.id);
+          if (!trend) {
+            return [];
+          }
+          const progressPct = Number(goal.progressPct);
+          return [
+            {
+              goalId: goal.id,
+              goalTitle: goal.title,
+              trend,
+              signal: Number.isFinite(progressPct)
+                ? progressSignal(progressPct, thresholds)
+                : null,
+              progressPct,
+            },
+          ];
+        });
+
+        const untrended = goalRows
+          .filter((goal) => !byGoal.has(goal.id))
+          .map((goal) => ({ goalId: goal.id, goalTitle: goal.title }));
+
+        // §7.5's dependency and risk log, read from P3-T09's register rather
+        // than stored a second time here.
+        const dependencyRows = await tx
+          .select({
+            id: keyResultDependencies.id,
+            keyResultId: keyResultDependencies.keyResultId,
+            keyResultTitle: keyResults.title,
+            note: keyResultDependencies.note,
+            providerText: keyResultDependencies.providerText,
+            confirmed: keyResultDependencies.confirmed,
+            riskOwnerId: keyResultDependencies.riskOwnerId,
+          })
+          .from(keyResultDependencies)
+          .innerJoin(
+            keyResults,
+            eq(keyResults.id, keyResultDependencies.keyResultId),
+          )
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResultDependencies,
+              eq(keyResultDependencies.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+            ),
+          );
+
+        const decisionRows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return {
+          shifts: session.shifts,
+          trends,
+          untrended,
+          dependencies: dependencyRows.map((row) => ({
+            id: row.id,
+            keyResultId: row.keyResultId,
+            keyResultTitle: row.keyResultTitle,
+            description: row.note ?? row.providerText ?? "",
+            confirmed: row.confirmed,
+            riskOwnerId: row.riskOwnerId,
+          })),
+          decisions: decisionRows.map(decisionRow),
+        };
+      },
+    );
+  },
+});
+
+export const decisionsForGoal = defineReadAction({
+  name: "decisions.forGoal",
+  summary:
+    "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+  input: z.object({ goalId: z.uuid() }),
+  output: z.array(decisionOutput),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<DecisionOutput[]> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such goal.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        // Not-found on forbidden, through the one access getter, and before
+        // any decision is read. A caller cannot learn that a decision exists
+        // by watching an empty list come back instead of a refusal.
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: input.goalId,
+          requires: ACCESS_LEVELS.view as never,
+        });
+
+        const rows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.goalId, input.goalId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return rows.map(decisionRow);
+      },
+    );
+  },
+});
+
+export const decisionsForCycle = defineReadAction({
+  name: "decisions.forCycle",
+  summary:
+    "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+  input: z.object({ cycleId: z.uuid() }),
+  output: z.array(decisionOutput),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input): Promise<DecisionOutput[]> {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such cycle.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        // Filtered on the decision's own `cycle_id`, not on the goal's.
+        // `goals.moveToCycle` exists, so joining through the goal would move
+        // every past decision into whichever cycle the goal ends up in, and a
+        // decision taken in Q1 would start reading as a Q2 decision.
+        //
+        // Scoped by row-level security rather than by a getter call per row:
+        // the getter refuses one resource at a time and this list spans a
+        // whole cycle. The left join to `goals` is for the title only.
+        const rows = await tx
+          .select(decisionColumns)
+          .from(decisions)
+          .leftJoin(goals, eq(goals.id, decisions.goalId))
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, decisions.authorMemberId),
+          )
+          .leftJoin(keyResults, eq(keyResults.id, decisions.keyResultId))
+          .where(
+            activeOnly(
+              decisions,
+              eq(decisions.workspaceId, context.workspaceId),
+              eq(decisions.cycleId, input.cycleId),
+            ),
+          )
+          .orderBy(desc(decisions.at));
+
+        return rows.map(decisionRow);
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The quarterly review's pacing (METHOD.md §8.1, P4-T10a-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The session, refused unless the caller is the facilitator running it.
+ *
+ * Space access is not enough for these two. §8.1 gives the add-a-minute
+ * control and the private notes to the facilitator by name, and the write-access
+ * floor in this repository is `edit` for every active member (P3-T16), so
+ * `ACCESS_LEVELS.edit` alone would hand both to the whole room.
+ */
+async function requireFacilitator(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    ACCESS_LEVELS.edit,
+  );
+  if (session.facilitatorId !== memberId) {
+    throw new OperationError(
+      "forbidden",
+      "Only the session's facilitator can do that.",
+    );
+  }
+  return session;
+}
+
+export const addStageMinute = defineWriteAction({
+  name: "sessions.addMinute",
+  summary:
+    "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+  input: z.object({ id: z.uuid() }),
+  output: z.object({ id: z.uuid(), stageKey: z.string(), added: z.number() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireFacilitator(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+      );
+
+      if (session.state !== "running" || !session.stageKey) {
+        throw new OperationError(
+          "not_found",
+          "No stage is running, so there is nothing to extend.",
+        );
+      }
+
+      // One stage's minute, not the agenda's. §11's stage minutes are the
+      // workspace's standing agenda and a room running long on one day must
+      // not retune every future review.
+      const added = (session.addedMinutes ?? {}) as Record<string, number>;
+      const next = (added[session.stageKey] ?? 0) + 1;
+
+      await tx
+        .update(sessions)
+        .set({
+          addedMinutes: { ...added, [session.stageKey]: next },
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id, stageKey: session.stageKey, added: next },
+        activity: {
+          kind: "session.minuteAdded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { stageKey: session.stageKey, added: next },
+        },
+        audit: {
+          action: "sessions.addMinute",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+export const setStageNote = defineWriteAction({
+  name: "sessions.setStageNote",
+  summary:
+    "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+  input: z.object({
+    id: z.uuid(),
+    note: z.string().trim().max(4000),
+  }),
+  output: z.object({ id: z.uuid(), stageKey: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireFacilitator(
+        tx,
+        workspaceId,
+        memberId,
+        input.id,
+      );
+
+      if (session.state !== "running" || !session.stageKey) {
+        throw new OperationError(
+          "not_found",
+          "No stage is running, so there is nothing to note.",
+        );
+      }
+
+      // One note per stage, keyed the same way `elapsed` is. A single note per
+      // session would make the eleventh stage overwrite the first, and a
+      // facilitator reads these back stage by stage while the review runs.
+      const notes = (session.notes ?? {}) as Record<string, unknown>;
+      const next = { ...notes };
+      if (input.note.length === 0) {
+        // Cleared rather than stored empty, so the screen can tell "nothing
+        // written" from "written and then emptied".
+        delete next[session.stageKey];
+      } else {
+        next[session.stageKey] = input.note;
+      }
+
+      await tx
+        .update(sessions)
+        .set({ notes: next, updatedAt: new Date() })
+        .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      return {
+        result: { id: input.id, stageKey: session.stageKey },
+        // **The payload names the stage and never the note.** An activity row
+        // is read by everybody who can see the space, and the whole point of
+        // this column is that the note is not.
+        activity: {
+          kind: "session.stageNoteSet",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { stageKey: session.stageKey },
+        },
+        audit: {
+          action: "sessions.setStageNote",
+          targetType: "session",
+          targetId: input.id,
+        },
+      };
+    },
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// The room pulse (METHOD.md §8.2, P4-T10a-b)
+// ---------------------------------------------------------------------------
+
+export const givePulse = defineWriteAction({
+  name: "sessions.givePulse",
+  summary:
+    "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+  input: z.object({
+    sessionId: z.uuid(),
+    pulse: z.number().int().min(1).max(5),
+    // §8.2 asks for one word. A sentence here turns the read of the room into a
+    // paragraph nobody scans, so the boundary refuses it by name rather than
+    // truncating silently.
+    word: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .refine((value) => !/\s/.test(value), {
+        message: "One word, not a sentence.",
+      }),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSessionAccess(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (session.kind !== "quarterly") {
+        throw new OperationError(
+          "not_found",
+          "The room pulse belongs to a quarterly review.",
+        );
+      }
+
+      const [existing] = await tx
+        .select({ id: sessionParticipants.id })
+        .from(sessionParticipants)
+        .where(
+          activeOnly(
+            sessionParticipants,
+            eq(sessionParticipants.workspaceId, workspaceId),
+            eq(sessionParticipants.sessionId, input.sessionId),
+            eq(sessionParticipants.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      // One person, one voice. Changing your mind corrects the row rather than
+      // adding a second pulse that would weight whoever spoke twice.
+      const [row] = existing
+        ? await tx
+            .update(sessionParticipants)
+            .set({
+              pulse: input.pulse,
+              word: input.word,
+              attended: true,
+              updatedAt: new Date(),
+            })
+            .where(
+              activeOnly(
+                sessionParticipants,
+                eq(sessionParticipants.id, existing.id),
+              ),
+            )
+            .returning({ id: sessionParticipants.id })
+        : await tx
+            .insert(sessionParticipants)
+            .values({
+              workspaceId,
+              sessionId: input.sessionId,
+              memberId,
+              pulse: input.pulse,
+              word: input.word,
+            })
+            .returning({ id: sessionParticipants.id });
+
+      if (!row) {
+        throw new OperationError("not_found", "The pulse could not be saved.");
+      }
+
+      return {
+        result: { id: row.id },
+        // **The payload carries neither the pulse nor the word.** An activity
+        // row is read by everybody who can see the space, and §8.2 gives the
+        // room's read to the facilitator: a feed that announced each number
+        // would hand the room its own average one entry at a time.
+        activity: {
+          kind: "session.pulseGiven",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.givePulse",
+          targetType: "session_participant",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The words given, counted and sorted, with nothing that points at a person.
+ *
+ * Sorted by count then alphabetically, so the order is a property of the words
+ * rather than of the rows: row order can be lined up against a member list, and
+ * §8.2 asks for the room's mood rather than who felt what.
+ */
+function countWords(
+  rows: readonly { readonly word: string | null }[],
+): { word: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.word === null) {
+      continue;
+    }
+    const key = row.word.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+}
+
+export const readRoomPulse = defineReadAction({
+  name: "sessions.roomPulse",
+  summary:
+    "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** Null for anybody but the facilitator, and until somebody has spoken. */
+    average: z.number().nullable(),
+    band: z.enum(["energetic", "steady", "costly"]).nullable(),
+    /** METHOD.md §8.2's sentence for the band. */
+    read: z.string().nullable(),
+    /** How many have given a pulse, and how many are in the space. */
+    given: z.number(),
+    expected: z.number(),
+    /** The caller's own pulse and word, always. */
+    mine: z.object({
+      pulse: z.number().nullable(),
+      word: z.string().nullable(),
+    }),
+    /**
+     * The words given, counted, for the facilitator.
+     *
+     * Counted rather than listed, and that is a privacy decision as much as a
+     * display one: a list in row order can be lined up against the member list,
+     * and §8.2 asks for the room's mood rather than who felt what. "tired 2"
+     * says the thing without naming anybody.
+     */
+    words: z.array(z.object({ word: z.string(), count: z.number() })),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            memberId: sessionParticipants.memberId,
+            pulse: sessionParticipants.pulse,
+            word: sessionParticipants.word,
+          })
+          .from(sessionParticipants)
+          .where(
+            activeOnly(
+              sessionParticipants,
+              eq(sessionParticipants.workspaceId, context.workspaceId),
+              eq(sessionParticipants.sessionId, input.sessionId),
+            ),
+          );
+
+        const spoken = rows.filter(
+          (row): row is typeof row & { pulse: number } => row.pulse !== null,
+        );
+        const mineRow = rows.find((row) => row.memberId === memberId);
+
+        // How many the room is waiting for. Every active member of the space,
+        // which is the same list `sessions.participants` reads.
+        const expectedRows = session.spaceId
+          ? await tx
+              .select({ memberId: spaceMembers.memberId })
+              .from(spaceMembers)
+              .innerJoin(
+                workspaceMembers,
+                eq(workspaceMembers.id, spaceMembers.memberId),
+              )
+              .where(
+                activeOnly(
+                  spaceMembers,
+                  eq(spaceMembers.workspaceId, context.workspaceId),
+                  eq(spaceMembers.spaceId, session.spaceId),
+                  eq(workspaceMembers.status, "active"),
+                ),
+              )
+          : [];
+
+        const isFacilitator = session.facilitatorId === memberId;
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        // §8.2's own function, from `packages/method`. The boundaries are §11's
+        // and the sentences are the document's, so nothing about the read is
+        // decided here.
+        const read = isFacilitator
+          ? roomPulseRead(
+              spoken.map((row) => row.pulse),
+              thresholds,
+            )
+          : null;
+
+        return {
+          average: read?.average ?? null,
+          band: read?.band ?? null,
+          read: read?.read ?? null,
+          given: spoken.length,
+          expected: expectedRows.length,
+          mine: {
+            pulse: mineRow?.pulse ?? null,
+            word: mineRow?.word ?? null,
+          },
+          // The words go with the read, for the same reason: a participant who
+          // could see the room's words could read the room's mood.
+          words: isFacilitator ? countWords(rows) : [],
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Scoring the key results (METHOD.md §8.3, P4-T10b-a)
+// ---------------------------------------------------------------------------
+
+/** The session, refused unless it is a quarterly review. */
+async function requireQuarterly(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+  requires: number,
+) {
+  const session = await requireSessionAccess(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    requires,
+  );
+  if (session.kind !== "quarterly") {
+    throw new OperationError(
+      "not_found",
+      "Scoring belongs to a quarterly review.",
+    );
+  }
+  return session;
+}
+
+export const scoreKeyResult = defineWriteAction({
+  name: "sessions.scoreKeyResult",
+  summary:
+    "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    score: z.number().min(0).max(1),
+    // §8.3 asks for a one-line reason. "Facts, not feelings" cannot be
+    // enforced; a score nobody explained can be refused.
+    reason: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // The key result is authorised through its objective, which is where
+      // access lives.
+      const [owner] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: owner.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const [existing] = await tx
+        .select({ id: reviewScores.id })
+        .from(reviewScores)
+        .where(
+          activeOnly(
+            reviewScores,
+            eq(reviewScores.workspaceId, workspaceId),
+            eq(reviewScores.sessionId, input.sessionId),
+            eq(reviewScores.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      // Regrading corrects the row. A room that talks itself from 0.6 to 0.4
+      // has one answer, not two, and the second would double its weight in
+      // both the objective score and the cycle score.
+      const [row] = existing
+        ? await tx
+            .update(reviewScores)
+            .set({
+              score: String(input.score),
+              reason: input.reason,
+              scoredById: memberId,
+              updatedAt: new Date(),
+            })
+            .where(activeOnly(reviewScores, eq(reviewScores.id, existing.id)))
+            .returning({ id: reviewScores.id })
+        : await tx
+            .insert(reviewScores)
+            .values({
+              workspaceId,
+              sessionId: input.sessionId,
+              keyResultId: input.keyResultId,
+              score: String(input.score),
+              reason: input.reason,
+              scoredById: memberId,
+            })
+            .returning({ id: reviewScores.id });
+
+      if (!row) {
+        throw new OperationError("not_found", "The score could not be saved.");
+      }
+
+      return {
+        result: { id: row.id },
+        // **The payload carries no score.** An activity row is read by
+        // everybody who can see the space, and §8.3 hides the objective score
+        // until the room reveals it: a feed announcing each grade would reveal
+        // it one entry at a time.
+        activity: {
+          kind: "session.keyResultScored",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          contextId,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.scoreKeyResult",
+          targetType: "review_score",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// Stage three: objective narratives, and stage four: recognition (METHOD.md
+// §8.1, p4-t00-session-design.md §4.4 and §4.5, P4-T10c)
+// ---------------------------------------------------------------------------
+
+/** Editor JSON for the current rich text schema, or null. */
+const narrativeBody = z
+  .unknown()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    { message: "not valid editor JSON for the current rich text schema" },
+  );
+
+/**
+ * The review's own objectives: this space, this cycle, still open.
+ *
+ * The same predicate `sessions.scoringStatus` reads, and the reason the mic
+ * cannot be handed to a goal from another space: the stage is about the
+ * objectives the room is reviewing, and a goal outside that set is not one.
+ *
+ * **Returns the conditions, not a finished predicate.** Wrapping `activeOnly`
+ * in here is correct and unprovable: the soft-delete lint reads the call site,
+ * and a `from(goals)` whose scope arrives through a function call is
+ * indistinguishable from one that has no scope. That gate exists to catch
+ * exactly the fail-open shape, so every caller spells `activeOnly(goals, ...)`
+ * out loud and this only holds the three conditions that are easy to forget.
+ */
+function reviewObjectiveConditions(
+  workspaceId: string,
+  session: { spaceId: string | null; cycleId: string | null },
+) {
+  return [
+    eq(goals.workspaceId, workspaceId),
+    session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+    session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+    isNull(goals.closedAt),
+  ] as const;
+}
+
+export const passMic = defineWriteAction({
+  name: "sessions.passMic",
+  summary:
+    "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    /**
+     * Null puts the mic down and ends the round.
+     *
+     * Without it the last objective would never be marked spoken, because the
+     * thing that marks an objective is the mic moving on from it and nothing
+     * takes the mic after the last owner.
+     */
+    goalId: z.uuid().nullable(),
+  }),
+  output: z.object({
+    micGoalId: z.uuid().nullable(),
+    spokenGoalId: z.uuid().nullable(),
+    realtimeChannel: z.string(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // §4.4 gives the pass-the-mic control to the facilitator. The write-access
+      // floor here is `edit` for every active member (P3-T16), so `edit` alone
+      // would let any participant take the mic off whoever is speaking.
+      if (session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the session's facilitator can pass the mic.",
+        );
+      }
+
+      if (input.goalId) {
+        const [inScope] = await tx
+          .select({ id: goals.id })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(workspaceId, session),
+              eq(goals.id, input.goalId),
+            ),
+          )
+          .limit(1);
+        if (!inScope) {
+          throw new OperationError(
+            "not_found",
+            "That objective is not in this review.",
+          );
+        }
+        await getAccessScoped(tx, {
+          workspaceId,
+          memberId,
+          resourceType: "goal",
+          resourceId: input.goalId,
+          requires: ACCESS_LEVELS.edit as never,
+        });
+      }
+
+      const now = new Date();
+      const leaving = session.micGoalId;
+
+      // The objective the mic leaves is spoken for. A row is created if there is
+      // none, carrying no body and no author: most narratives are told and never
+      // typed, and the facilitator marking the turn over did not write anything.
+      if (leaving && leaving !== input.goalId) {
+        const [existing] = await tx
+          .select({
+            id: reviewNarratives.id,
+            spokenAt: reviewNarratives.spokenAt,
+          })
+          .from(reviewNarratives)
+          .where(
+            activeOnly(
+              reviewNarratives,
+              eq(reviewNarratives.workspaceId, workspaceId),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              eq(reviewNarratives.goalId, leaving),
+            ),
+          )
+          .limit(1);
+
+        if (!existing) {
+          await tx.insert(reviewNarratives).values({
+            workspaceId,
+            sessionId: input.sessionId,
+            goalId: leaving,
+            spokenAt: now,
+          });
+        } else if (existing.spokenAt === null) {
+          // Only when it has not been marked. A room that comes back to an
+          // objective for a question is not the owner telling their story a
+          // second time, and re-stamping would move when they told it.
+          await tx
+            .update(reviewNarratives)
+            .set({ spokenAt: now, updatedAt: now })
+            .where(
+              activeOnly(
+                reviewNarratives,
+                eq(reviewNarratives.id, existing.id),
+              ),
+            );
+        }
+      }
+
+      await tx
+        .update(sessions)
+        .set({ micGoalId: input.goalId, updatedAt: now })
+        .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+
+      const channel = sessionChannel(workspaceId, input.sessionId);
+      const spokenGoalId = leaving && leaving !== input.goalId ? leaving : null;
+
+      return {
+        result: {
+          micGoalId: input.goalId,
+          spokenGoalId,
+          realtimeChannel: channel,
+        },
+        /**
+         * The push, as an outbox row. **No relay drains the outbox yet**, the
+         * same position P4-T10a-a recorded for `session.stageChanged` and
+         * P4-T10b-b for the score reveal: one write, every client that re-reads
+         * agrees who is speaking, and the rail goes live the day a relay host
+         * exists.
+         *
+         * The key carries the destination and the clock, because passing the mic
+         * back to an objective it already visited is a real move rather than a
+         * retry of the first one.
+         */
+        outbox: [
+          {
+            topic: "session.micPassed",
+            payload: {
+              channel,
+              sessionId: input.sessionId,
+              workspaceId,
+              goalId: input.goalId,
+            },
+            idempotencyKey: `session.micPassed:${input.sessionId}:${input.goalId ?? "down"}:${now.toISOString()}`,
+          },
+        ],
+        activity: {
+          kind: "session.micPassed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.passMic",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, spokenGoalId },
+        },
+      };
+    },
+  }),
+});
+
+export const setNarrative = defineWriteAction({
+  name: "sessions.setNarrative",
+  summary:
+    "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    body: narrativeBody,
+  }),
+  output: z.object({ goalId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // Not the facilitator's alone. §8.1 stage 3 is owner by owner, and an
+      // objective's champion is often not the person running the review: a
+      // narrative only the facilitator could write would be the facilitator
+      // telling somebody else's story.
+      const [inScope] = await tx
+        .select({ id: goals.id })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            ...reviewObjectiveConditions(workspaceId, session),
+            eq(goals.id, input.goalId),
+          ),
+        )
+        .limit(1);
+      if (!inScope) {
+        throw new OperationError(
+          "not_found",
+          "That objective is not in this review.",
+        );
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const cleared = input.body === null;
+      const [existing] = await tx
+        .select({ id: reviewNarratives.id })
+        .from(reviewNarratives)
+        .where(
+          activeOnly(
+            reviewNarratives,
+            eq(reviewNarratives.workspaceId, workspaceId),
+            eq(reviewNarratives.sessionId, input.sessionId),
+            eq(reviewNarratives.goalId, input.goalId),
+          ),
+        )
+        .limit(1);
+
+      // The author goes with the body. Clearing the note drops both, because an
+      // author on an empty narrative names somebody for something that is no
+      // longer there, and the table's own check constraint refuses it.
+      const values = {
+        body: cleared ? null : input.body,
+        bodyVersion: cleared ? null : RICH_TEXT_SCHEMA_VERSION,
+        authorMemberId: cleared ? null : memberId,
+        updatedAt: now,
+      };
+
+      // The row's id, so the activity can name the narrative rather than the
+      // goal for embedding (P4-T13a).
+      let narrativeId = existing?.id ?? null;
+      if (existing) {
+        // Rewrites rather than storing two: an objective's story is one story,
+        // and a second row would make the stage list it twice.
+        await tx
+          .update(reviewNarratives)
+          .set(values)
+          .where(
+            activeOnly(reviewNarratives, eq(reviewNarratives.id, existing.id)),
+          );
+      } else {
+        const [inserted] = await tx
+          .insert(reviewNarratives)
+          .values({
+            workspaceId,
+            sessionId: input.sessionId,
+            goalId: input.goalId,
+            ...values,
+          })
+          .returning({ id: reviewNarratives.id });
+        narrativeId = inserted?.id ?? null;
+      }
+
+      return {
+        result: { goalId: input.goalId },
+        /**
+         * The payload carries no narrative text.
+         *
+         * An activity row reaches everybody who can see the space, and a
+         * narrative written inside a review is for the room in it. The feed can
+         * say the story was written without repeating it.
+         */
+        activity: {
+          kind: "session.narrativeWritten",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          // The activity names the goal; the content is the narrative, and
+          // embedding the goal would embed its title again (P4-T13a). A cleared
+          // note has nothing to embed, and the worker would find nothing anyway.
+          embed:
+            cleared || narrativeId === null
+              ? undefined
+              : { entityType: "review_narrative", entityId: narrativeId },
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setNarrative",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, cleared },
+        },
+      };
+    },
+  }),
+});
+
+export const giveKudos = defineWriteAction({
+  name: "sessions.giveKudos",
+  summary:
+    "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+  input: z.object({
+    sessionId: z.uuid(),
+    toMemberId: z.uuid(),
+    // §8.1: "Specific beats generous." A required line is the only part of that
+    // a product can hold.
+    text: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      if (input.toMemberId === memberId) {
+        // Recognising yourself is not recognition. §8.1 asks the room to name
+        // the effort it saw, and the room is other people.
+        throw new OperationError(
+          "forbidden",
+          "Recognition names somebody else's effort.",
+        );
+      }
+
+      // Active only. A suspended member is excluded from every access-scoped
+      // read in this repository, so recognising one would name somebody the
+      // room cannot see.
+      const [recipient] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.toMemberId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!recipient) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const [row] = await tx
+        .insert(kudos)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          fromMemberId: memberId,
+          toMemberId: input.toMemberId,
+          text: input.text,
+        })
+        .returning({ id: kudos.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.kudosGiven",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "kudos", entityId: row.id },
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The recipient, not the words. Recognition given in a review is for
+          // the room, and the feed says it happened without quoting it.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.giveKudos",
+          targetType: "kudos",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const readNarratives = defineReadAction({
+  name: "sessions.narratives",
+  summary:
+    "Stage three's state: who holds the mic, who has spoken, and what was written.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** The one objective speaking now, or null before and after the round. */
+    micGoalId: z.uuid().nullable(),
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        championName: z.string().nullable(),
+        hasMic: z.boolean(),
+        spokenAt: z.string().nullable(),
+        /** Editor JSON, and null for the ordinary case of spoken and not typed. */
+        body: z.unknown().nullable(),
+        authorName: z.string().nullable(),
+      }),
+    ),
+    spoken: z.number(),
+    total: z.number(),
+    /** Every objective spoken for. §8.1's completion condition for stage three. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const champions = alias(workspaceMembers, "champions");
+        const authors = alias(workspaceMembers, "authors");
+
+        const rows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            championName: champions.name,
+            spokenAt: reviewNarratives.spokenAt,
+            body: reviewNarratives.body,
+            authorName: authors.name,
+          })
+          .from(goals)
+          .leftJoin(champions, eq(champions.id, goals.championId))
+          .leftJoin(
+            reviewNarratives,
+            and(
+              eq(reviewNarratives.goalId, goals.id),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              isNull(reviewNarratives.deletedAt),
+            ),
+          )
+          .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(context.workspaceId, session),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt);
+
+        const objectives = rows.map((row) => ({
+          goalId: row.goalId,
+          goalTitle: row.goalTitle,
+          championName: row.championName ?? null,
+          hasMic: session.micGoalId === row.goalId,
+          spokenAt: row.spokenAt?.toISOString() ?? null,
+          body: row.body ?? null,
+          authorName: row.authorName ?? null,
+        }));
+        const spoken = objectives.filter(
+          (entry) => entry.spokenAt !== null,
+        ).length;
+
+        return {
+          micGoalId: session.micGoalId ?? null,
+          objectives,
+          spoken,
+          total: objectives.length,
+          complete: objectives.length > 0 && spoken === objectives.length,
+        };
+      },
+    );
+  },
+});
+
+export const readRecognition = defineReadAction({
+  name: "sessions.recognition",
+  summary: "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    entries: z.array(
+      z.object({
+        id: z.uuid(),
+        fromName: z.string(),
+        toName: z.string(),
+        text: z.string(),
+        /** Whether the reader gave this one. */
+        mine: z.boolean(),
+      }),
+    ),
+    /**
+     * Who the reader may name: every active member except themselves.
+     *
+     * Returned with the entries rather than left to the screen, because who can
+     * be recognised is the same decision `sessions.giveKudos` enforces and two
+     * places deciding it is one place to get it wrong. The reader is absent for
+     * the reason the action refuses them: recognising yourself is not
+     * recognition.
+     */
+    recipients: z.array(z.object({ memberId: z.uuid(), name: z.string() })),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const givers = alias(workspaceMembers, "givers");
+        const receivers = alias(workspaceMembers, "receivers");
+
+        const rows = await tx
+          .select({
+            id: kudos.id,
+            fromMemberId: kudos.fromMemberId,
+            fromName: givers.name,
+            toName: receivers.name,
+            text: kudos.text,
+          })
+          .from(kudos)
+          .innerJoin(givers, eq(givers.id, kudos.fromMemberId))
+          .innerJoin(receivers, eq(receivers.id, kudos.toMemberId))
+          .where(
+            activeOnly(
+              kudos,
+              eq(kudos.workspaceId, context.workspaceId),
+              eq(kudos.sessionId, input.sessionId),
+            ),
+          )
+          // Oldest first, so the panel reads as the round happened rather than
+          // reshuffling every time somebody adds one.
+          .orderBy(kudos.createdAt);
+
+        const recipients = await tx
+          .select({
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.status, "active"),
+              eq(workspaceMembers.kind, "human"),
+              ne(workspaceMembers.id, memberId),
+            ),
+          )
+          .orderBy(workspaceMembers.name);
+
+        return {
+          entries: rows.map((row) => ({
+            id: row.id,
+            fromName: row.fromName,
+            toName: row.toName,
+            text: row.text,
+            mine: row.fromMemberId === memberId,
+          })),
+          recipients,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Stage five: the team retro, and stage six: the management retro (METHOD.md
+// §8.1, §8.7, p4-t00-session-design.md §4.6 and §4.7, P4-T11a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The session, refused unless the caller leads the space it belongs to.
+ *
+ * §8.7 has leadership answering the four questions out loud, and the leadership
+ * roles this product has are a space's managers and its coordinator (P3-T01).
+ * Agung decided on 26 August 2026 that those two roles are the management
+ * retro's audience. The write-access floor here is \`edit\` for every active
+ * member (P3-T16), so \`edit\` alone would show it to the whole room, which is the
+ * one thing keeping the two retros apart.
+ *
+ * A review with no space has no space roles to read, so it falls back to
+ * workspace administration. That is the only principal left who can be said to
+ * lead it.
+ */
+async function requireSpaceLeadership(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  sessionId: string,
+) {
+  const session = await requireQuarterly(
+    tx,
+    workspaceId,
+    memberId,
+    sessionId,
+    ACCESS_LEVELS.edit,
+  );
+
+  if (!session.spaceId) {
+    await getAccessScoped(tx, {
+      workspaceId,
+      memberId,
+      resourceType: "workspace",
+      resourceId: workspaceId,
+      requires: ACCESS_LEVELS.full as never,
+    });
+    return session;
+  }
+
+  const [seat] = await tx
+    .select({ role: spaceMembers.role })
+    .from(spaceMembers)
+    .where(
+      activeOnly(
+        spaceMembers,
+        eq(spaceMembers.workspaceId, workspaceId),
+        eq(spaceMembers.spaceId, session.spaceId),
+        eq(spaceMembers.memberId, memberId),
+      ),
+    )
+    .limit(1);
+
+  if (!seat || (seat.role !== "manager" && seat.role !== "coordinator")) {
+    // Not-found rather than forbidden, which is this repository's rule for a
+    // protected read: telling somebody a management retro exists and is closed
+    // to them is itself a disclosure about the room.
+    throw new OperationError("not_found", "No such session.");
+  }
+  return session;
+}
+
+/** The member's dots left in one review, from the §11 parameter. */
+async function dotsLeftFor(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  memberId: string,
+) {
+  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  const perMember = thresholds["sessions.retroDotsPerMember"];
+  const [spent] = await tx
+    .select({ count: count() })
+    .from(retroVotes)
+    .innerJoin(retroNotes, eq(retroNotes.id, retroVotes.noteId))
+    .where(
+      activeOnly(
+        retroVotes,
+        eq(retroVotes.workspaceId, workspaceId),
+        eq(retroVotes.memberId, memberId),
+        eq(retroNotes.sessionId, sessionId),
+        isNull(retroNotes.deletedAt),
+      ),
+    );
+  const used = Number(spent?.count ?? 0);
+  return { perMember, spent: used, left: Math.max(0, perMember - used) };
+}
+
+export const addRetroNote = defineWriteAction({
+  name: "sessions.addRetroNote",
+  summary:
+    "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+  input: z.object({
+    sessionId: z.uuid(),
+    // §8.1's two columns are canon structure. A third would be a different
+    // retro, so the enum refuses it at the boundary rather than storing it.
+    columnKey: z.enum(RETRO_COLUMNS),
+    text: z.string().trim().min(1).max(500),
+    /**
+     * Per note, not per session.
+     *
+     * §8.1 asks for silent writing, and a name changes what people write. One
+     * thing in a retro is usually harder to say than the rest, so the choice
+     * belongs to the note rather than to the member.
+     */
+    anonymous: z.boolean().default(false),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [row] = await tx
+        .insert(retroNotes)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          columnKey: input.columnKey,
+          text: input.text,
+          authorMemberId: input.anonymous ? null : memberId,
+        })
+        .returning({ id: retroNotes.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.retroNoteAdded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          // The activity names the space; the content is the note (P4-T13a).
+          embed: { entityType: "retro_note", entityId: row.id },
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // Neither the text nor the column. A retro note is written for the
+          // room in the retro, and an anonymous one carries an actor on the
+          // activity row already; repeating its words in a space-wide feed
+          // would undo the anonymity the writer chose.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.addRetroNote",
+          targetType: "retro_note",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const removeRetroNote = defineWriteAction({
+  name: "sessions.removeRetroNote",
+  summary: "Removes one retro note, with the dots spent on it.",
+  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [note] = await tx
+        .select({
+          id: retroNotes.id,
+          authorMemberId: retroNotes.authorMemberId,
+        })
+        .from(retroNotes)
+        .where(
+          activeOnly(
+            retroNotes,
+            eq(retroNotes.workspaceId, workspaceId),
+            eq(retroNotes.sessionId, input.sessionId),
+            eq(retroNotes.id, input.noteId),
+          ),
+        )
+        .limit(1);
+      if (!note) {
+        throw new OperationError("not_found", "No such note.");
+      }
+
+      // The author takes their own note back. The facilitator can clear any of
+      // them, because an anonymous note has no author to take it back and
+      // somebody has to be able to fix a mistake in a running room.
+      const isAuthor =
+        note.authorMemberId !== null && note.authorMemberId === memberId;
+      if (!isAuthor && session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the note's author or the facilitator can remove it.",
+        );
+      }
+
+      const now = new Date();
+      // The dots go with it. A dot spent on something that no longer exists is
+      // a dot its owner cannot get back, which silently shrinks the cap for the
+      // rest of the stage.
+      await tx
+        .update(retroVotes)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+          ),
+        );
+      await tx
+        .update(retroNotes)
+        .set({ deletedAt: now, updatedAt: now, votes: 0 })
+        .where(activeOnly(retroNotes, eq(retroNotes.id, input.noteId)));
+
+      return {
+        result: { id: input.noteId },
+        activity: {
+          kind: "session.retroNoteRemoved",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.removeRetroNote",
+          targetType: "retro_note",
+          targetId: input.noteId,
+        },
+      };
+    },
+  }),
+});
+
+export const castRetroVote = defineWriteAction({
+  name: "sessions.castRetroVote",
+  summary:
+    "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  output: z.object({
+    noteId: z.uuid(),
+    votes: z.number().int(),
+    mine: z.boolean(),
+    dotsLeft: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [note] = await tx
+        .select({ id: retroNotes.id })
+        .from(retroNotes)
+        .where(
+          activeOnly(
+            retroNotes,
+            eq(retroNotes.workspaceId, workspaceId),
+            eq(retroNotes.sessionId, input.sessionId),
+            eq(retroNotes.id, input.noteId),
+          ),
+        )
+        .limit(1);
+      if (!note) {
+        throw new OperationError("not_found", "No such note.");
+      }
+
+      const [existing] = await tx
+        .select({ id: retroVotes.id })
+        .from(retroVotes)
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+            eq(retroVotes.memberId, memberId),
+          ),
+        )
+        .limit(1);
+
+      const now = new Date();
+      if (existing) {
+        // A second cast withdraws rather than stacking. Spending two dots on one
+        // note is how three dots become one loud opinion, and the vote is about
+        // spread. The unique index refuses a second row anyway; this makes the
+        // control a toggle instead of an error.
+        await tx
+          .update(retroVotes)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(activeOnly(retroVotes, eq(retroVotes.id, existing.id)));
+      } else {
+        const { left } = await dotsLeftFor(
+          tx,
+          workspaceId,
+          input.sessionId,
+          memberId,
+        );
+        if (left <= 0) {
+          // The total cap counts across notes, which no unique index can see,
+          // so the action is the only place it can be held.
+          throw new OperationError(
+            "forbidden",
+            "You have spent every dot. Take one back before spending it again.",
+          );
+        }
+        await tx.insert(retroVotes).values({
+          workspaceId,
+          noteId: input.noteId,
+          memberId,
+        });
+      }
+
+      // Recounted from the rows and written in the same transaction, so the
+      // denormalised column cannot drift from what is behind it.
+      const [tally] = await tx
+        .select({ count: count() })
+        .from(retroVotes)
+        .where(
+          activeOnly(
+            retroVotes,
+            eq(retroVotes.workspaceId, workspaceId),
+            eq(retroVotes.noteId, input.noteId),
+          ),
+        );
+      const votes = Number(tally?.count ?? 0);
+      await tx
+        .update(retroNotes)
+        .set({ votes, updatedAt: now })
+        .where(activeOnly(retroNotes, eq(retroNotes.id, input.noteId)));
+
+      const after = await dotsLeftFor(
+        tx,
+        workspaceId,
+        input.sessionId,
+        memberId,
+      );
+
+      return {
+        result: {
+          noteId: input.noteId,
+          votes,
+          mine: !existing,
+          dotsLeft: after.left,
+        },
+        activity: {
+          kind: "session.retroVoteCast",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.castRetroVote",
+          targetType: "retro_note",
+          targetId: input.noteId,
+          payload: { withdrawn: Boolean(existing) },
+        },
+      };
+    },
+  }),
+});
+
+export const readRetro = defineReadAction({
+  name: "sessions.retro",
+  summary:
+    "The team retro board: both columns, their notes and the reader's dots.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    columns: z.array(
+      z.object({
+        columnKey: z.enum(RETRO_COLUMNS),
+        notes: z.array(
+          z.object({
+            id: z.uuid(),
+            text: z.string(),
+            votes: z.number().int(),
+            /** Whether the reader spent a dot on it. */
+            mine: z.boolean(),
+            /** Null for an anonymous note, and null is the answer rather than a hidden name. */
+            authorName: z.string().nullable(),
+          }),
+        ),
+      }),
+    ),
+    dotsPerMember: z.number().int(),
+    dotsSpent: z.number().int(),
+    dotsLeft: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const authors = alias(workspaceMembers, "retro_authors");
+        const rows = await tx
+          .select({
+            id: retroNotes.id,
+            columnKey: retroNotes.columnKey,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+            authorName: authors.name,
+            createdAt: retroNotes.createdAt,
+          })
+          .from(retroNotes)
+          .leftJoin(authors, eq(authors.id, retroNotes.authorMemberId))
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, context.workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          // Most-voted first, then oldest, so the board settles as the room
+          // votes rather than reshuffling on every tie.
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        const mine = new Set(
+          (
+            await tx
+              .select({ noteId: retroVotes.noteId })
+              .from(retroVotes)
+              .innerJoin(retroNotes, eq(retroNotes.id, retroVotes.noteId))
+              .where(
+                activeOnly(
+                  retroVotes,
+                  eq(retroVotes.workspaceId, context.workspaceId),
+                  eq(retroVotes.memberId, memberId),
+                  eq(retroNotes.sessionId, input.sessionId),
+                  isNull(retroNotes.deletedAt),
+                ),
+              )
+          ).map((row) => row.noteId),
+        );
+
+        const dots = await dotsLeftFor(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+          memberId,
+        );
+
+        return {
+          // Both columns always, in §8.1's order, so an empty side reads as
+          // empty rather than as missing.
+          columns: RETRO_COLUMNS.map((columnKey) => ({
+            columnKey,
+            notes: rows
+              .filter((row) => row.columnKey === columnKey)
+              .map((row) => ({
+                id: row.id,
+                text: row.text,
+                votes: row.votes,
+                mine: mine.has(row.id),
+                authorName: row.authorName ?? null,
+              })),
+          })),
+          dotsPerMember: dots.perMember,
+          dotsSpent: dots.spent,
+          dotsLeft: dots.left,
+        };
+      },
+    );
+  },
+});
+
+export const setManagementAnswer = defineWriteAction({
+  name: "sessions.setManagementAnswer",
+  summary:
+    "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+  input: z.object({
+    sessionId: z.uuid(),
+    // 1 to 4, indexing the canon questions. The text lives in
+    // `packages/method` and never in a row: §11 lists the management-retro
+    // questions as unchangeable structure.
+    questionKey: z.number().int().min(1).max(4),
+    body: z.string().trim().min(1).max(2000),
+  }),
+  output: z.object({ questionKey: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireSpaceLeadership(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+      );
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: managementAnswers.id })
+        .from(managementAnswers)
+        .where(
+          activeOnly(
+            managementAnswers,
+            eq(managementAnswers.workspaceId, workspaceId),
+            eq(managementAnswers.sessionId, input.sessionId),
+            eq(managementAnswers.questionKey, input.questionKey),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Rewrites rather than storing two. Leadership answers out loud and the
+        // record is one answer; a second row would list the question twice.
+        await tx
+          .update(managementAnswers)
+          .set({ body: input.body, answeredById: memberId, updatedAt: now })
+          .where(
+            activeOnly(
+              managementAnswers,
+              eq(managementAnswers.id, existing.id),
+            ),
+          );
+      } else {
+        await tx.insert(managementAnswers).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          questionKey: input.questionKey,
+          body: input.body,
+          answeredById: memberId,
+        });
+      }
+
+      return {
+        result: { questionKey: input.questionKey },
+        activity: {
+          kind: "session.managementAnswerRecorded",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The question number, never the answer. The feed reaches the whole
+          // space and this stage is read by two roles inside it.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setManagementAnswer",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { questionKey: input.questionKey },
+        },
+      };
+    },
+  }),
+});
+
+export const readManagementRetro = defineReadAction({
+  name: "sessions.managementRetro",
+  summary:
+    "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    questions: z.array(
+      z.object({
+        questionKey: z.number().int(),
+        /** The canon text, from `packages/method`. Never stored on the row. */
+        question: z.string(),
+        body: z.string().nullable(),
+        answeredByName: z.string().nullable(),
+      }),
+    ),
+    answered: z.number().int(),
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        // The audience rule, in the action rather than on the screen. A member
+        // outside leadership reads not-found.
+        await requireSpaceLeadership(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+        );
+
+        const answerers = alias(workspaceMembers, "answerers");
+        const rows = await tx
+          .select({
+            questionKey: managementAnswers.questionKey,
+            body: managementAnswers.body,
+            answeredByName: answerers.name,
+          })
+          .from(managementAnswers)
+          .innerJoin(
+            answerers,
+            eq(answerers.id, managementAnswers.answeredById),
+          )
+          .where(
+            activeOnly(
+              managementAnswers,
+              eq(managementAnswers.workspaceId, context.workspaceId),
+              eq(managementAnswers.sessionId, input.sessionId),
+            ),
+          );
+        const byKey = new Map(rows.map((row) => [row.questionKey, row]));
+
+        // Driven by the canon list, not by the rows: all four questions are
+        // always asked, and an unanswered one is a gap the stage can see rather
+        // than a question that quietly disappeared.
+        const questions = MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
+          const answer = byKey.get(index + 1);
+          return {
+            questionKey: index + 1,
+            question,
+            body: answer?.body ?? null,
+            answeredByName: answer?.answeredByName ?? null,
+          };
+        });
+        const answered = questions.filter(
+          (entry) => entry.body !== null,
+        ).length;
+
+        return {
+          questions,
+          answered,
+          complete: answered === questions.length,
+        };
+      },
+    );
+  },
+});
+// ---------------------------------------------------------------------------
+// Stage seven: root causes, and stage eight: process health (METHOD.md §8.4 and
+// §8.5, p4-t00-session-design.md §4.8, P4-T11b)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every key result this review graded below the threshold.
+ *
+ * Read from `review_scores` rather than from `key_results.score`, because the
+ * grades do not land on the key results until the session closes (P4-T10b-a) and
+ * stage seven runs before that. Strictly below: §8.4 says "below 0.7", so a key
+ * result that scored exactly the threshold met it, and asking a room to explain
+ * a result it did not miss is how a stage loses its credibility.
+ */
+async function missedKeyResultsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  threshold: number,
+) {
+  return tx
+    .select({
+      keyResultId: keyResults.id,
+      title: keyResults.title,
+      goalTitle: goals.title,
+      score: reviewScores.score,
+      position: keyResults.position,
+    })
+    .from(reviewScores)
+    .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+        isNull(keyResults.deletedAt),
+        isNull(goals.deletedAt),
+        lt(reviewScores.score, String(threshold)),
+      ),
+    )
+    .orderBy(goals.position, keyResults.position);
+}
+
+export const setRootCause = defineWriteAction({
+  name: "sessions.setRootCause",
+  summary:
+    "Names the one primary cause for a key result that came in under the threshold (METHOD.md §8.4).",
+  input: z.object({
+    sessionId: z.uuid(),
+    keyResultId: z.uuid(),
+    // 1 to 8, indexing §8.4's taxonomy. The text is canon in
+    // `packages/method`; §11 lists the root-cause taxonomy among the structures
+    // a workspace cannot change.
+    causeKey: z.number().int().min(1).max(8),
+    detail: z.string().trim().max(1000).optional(),
+  }),
+  output: z.object({ keyResultId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      // The access check, not a value. `requireQuarterly` refuses when the
+      // session is not this member's to change; nothing below needs the row.
+      await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      const missed = await missedKeyResultsInTx(
+        tx,
+        workspaceId,
+        input.sessionId,
+        thresholds["scoring.rootCauseThreshold"],
+      );
+      const target = missed.find(
+        (entry) => entry.keyResultId === input.keyResultId,
+      );
+      if (!target) {
+        // Either it was never graded here or it did not miss. Naming a cause for
+        // a result the room hit would put an explanation in the minutes for
+        // something that needs none.
+        throw new OperationError(
+          "not_found",
+          "That key result did not come in under the threshold in this review.",
+        );
+      }
+
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: (
+          await tx
+            .select({ goalId: keyResults.goalId })
+            .from(keyResults)
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, workspaceId),
+                eq(keyResults.id, input.keyResultId),
+              ),
+            )
+            .limit(1)
+        )[0]?.goalId as string,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: rootCauses.id })
+        .from(rootCauses)
+        .where(
+          activeOnly(
+            rootCauses,
+            eq(rootCauses.workspaceId, workspaceId),
+            eq(rootCauses.sessionId, input.sessionId),
+            eq(rootCauses.keyResultId, input.keyResultId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // Replaces rather than adding. §8.4's own word is "primary", and a key
+        // result with two causes has had the question dodged rather than
+        // answered.
+        await tx
+          .update(rootCauses)
+          .set({
+            causeKey: input.causeKey,
+            detail: input.detail ?? null,
+            namedById: memberId,
+            updatedAt: now,
+          })
+          .where(activeOnly(rootCauses, eq(rootCauses.id, existing.id)));
+      } else {
+        await tx.insert(rootCauses).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          keyResultId: input.keyResultId,
+          causeKey: input.causeKey,
+          detail: input.detail ?? null,
+          namedById: memberId,
+        });
+      }
+
+      return {
+        result: { keyResultId: input.keyResultId },
+        activity: {
+          kind: "session.rootCauseNamed",
+          subjectType: "goal",
+          subjectId: contextId ? input.keyResultId : input.keyResultId,
+          contextId,
+          // The cause number stays out of the feed. §8.4 says look for the
+          // system, not the person, and a space-wide entry reading "capacity or
+          // resourcing" against a named key result invites the opposite.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.setRootCause",
+          targetType: "key_result",
+          targetId: input.keyResultId,
+          payload: { causeKey: input.causeKey },
+        },
+      };
+    },
+  }),
+});
+
+export const readRootCauses = defineReadAction({
+  name: "sessions.rootCauses",
+  summary:
+    "Every key result this review graded below the threshold, with its cause (METHOD.md §8.4).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** §11's `scoring.rootCauseThreshold`, so the screen never states its own. */
+    threshold: z.number(),
+    keyResults: z.array(
+      z.object({
+        keyResultId: z.uuid(),
+        title: z.string(),
+        goalTitle: z.string(),
+        score: z.number(),
+        causeKey: z.number().int().nullable(),
+        /** The canon label, from `packages/method`. Never stored on the row. */
+        causeLabel: z.string().nullable(),
+        detail: z.string().nullable(),
+      }),
+    ),
+    named: z.number().int(),
+    /** Every missed key result has a cause. §8.1's condition for the stage. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const threshold = thresholds["scoring.rootCauseThreshold"];
+        const missed = await missedKeyResultsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+          threshold,
+        );
+
+        const named = await tx
+          .select({
+            keyResultId: rootCauses.keyResultId,
+            causeKey: rootCauses.causeKey,
+            detail: rootCauses.detail,
+          })
+          .from(rootCauses)
+          .where(
+            activeOnly(
+              rootCauses,
+              eq(rootCauses.workspaceId, context.workspaceId),
+              eq(rootCauses.sessionId, input.sessionId),
+            ),
+          );
+        const byKeyResult = new Map(named.map((row) => [row.keyResultId, row]));
+
+        const keyResultRows = missed.map((entry) => {
+          const cause = byKeyResult.get(entry.keyResultId);
+          return {
+            keyResultId: entry.keyResultId,
+            title: entry.title,
+            goalTitle: entry.goalTitle,
+            score: Number(entry.score),
+            causeKey: cause?.causeKey ?? null,
+            causeLabel:
+              cause === undefined
+                ? null
+                : (ROOT_CAUSES[cause.causeKey - 1] ?? null),
+            detail: cause?.detail ?? null,
+          };
+        });
+        const withCause = keyResultRows.filter(
+          (entry) => entry.causeKey !== null,
+        ).length;
+
+        return {
+          threshold,
+          keyResults: keyResultRows,
+          named: withCause,
+          complete:
+            keyResultRows.length > 0 && withCause === keyResultRows.length,
+        };
+      },
+    );
+  },
+});
+
+/**
+ * The respondent's hash for one review, and the salt behind it.
+ *
+ * **What this buys, precisely.** A hash of the member id alone would be the same
+ * string in every review, so somebody holding the table could follow one unnamed
+ * person's answers across quarters. The per-review salt breaks that link, and it
+ * survives root-key rotation, which an HMAC keyed on the instance secret would
+ * not: a rotation would leave every stored hash unmatchable and silently break
+ * the one-response rule mid-review.
+ *
+ * **What it does not buy.** It is not anonymity against somebody holding both
+ * this database and the member list, because a room is small enough to
+ * enumerate, and no scheme that lets this same application recount a member's
+ * response could be. What the product guarantees is narrower and real: no read
+ * returns an attribution, and no column carries one.
+ */
+function respondentHash(salt: string, memberId: string) {
+  return createHash("sha256").update(`${salt}:${memberId}`).digest("hex");
+}
+
+export const submitProcessHealth = defineWriteAction({
+  name: "sessions.submitProcessHealth",
+  summary:
+    "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+  input: z.object({
+    sessionId: z.uuid(),
+    /**
+     * All five, together.
+     *
+     * A partial survey would move an average without the respondent having read
+     * the rest, and §8.6 builds the rhythm score out of two specific statements:
+     * a set missing one of them produces a diagnostic with a hole in it.
+     */
+    scores: z
+      .array(
+        z.object({
+          statementKey: z.number().int().min(1).max(5),
+          score: z.number().int().min(1).max(5),
+        }),
+      )
+      .length(5),
+  }),
+  output: z.object({ statements: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const keys = new Set(input.scores.map((entry) => entry.statementKey));
+      if (keys.size !== 5) {
+        throw new OperationError(
+          "not_found",
+          "All five statements are answered together, once each.",
+        );
+      }
+
+      const now = new Date();
+      // **Written here rather than in a helper, on purpose.** The boundary gate
+      // reads the call site, so a `tx.update()` inside a plain function is
+      // indistinguishable from a write outside the Operation pipeline. That gate
+      // exists to catch exactly that shape, so the write is spelled out inside
+      // the operation and only the hashing, which touches nothing, is factored
+      // out.
+      let salt = session.processHealthSalt;
+      if (!salt) {
+        salt = randomBytes(32).toString("hex");
+        await tx
+          .update(sessions)
+          .set({ processHealthSalt: salt, updatedAt: now })
+          .where(activeOnly(sessions, eq(sessions.id, input.sessionId)));
+      }
+      const hash = respondentHash(salt, memberId);
+      for (const entry of input.scores) {
+        const [existing] = await tx
+          .select({ id: processHealthResponses.id })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+              eq(processHealthResponses.statementKey, entry.statementKey),
+              eq(processHealthResponses.respondentHash, hash),
+            ),
+          )
+          .limit(1);
+
+        if (existing) {
+          // A second submission corrects the first rather than counting again.
+          // A room of one that reads as two responses is a survey nobody can
+          // trust.
+          await tx
+            .update(processHealthResponses)
+            .set({ score: entry.score, updatedAt: now })
+            .where(
+              activeOnly(
+                processHealthResponses,
+                eq(processHealthResponses.id, existing.id),
+              ),
+            );
+        } else {
+          await tx.insert(processHealthResponses).values({
+            workspaceId,
+            sessionId: input.sessionId,
+            statementKey: entry.statementKey,
+            score: entry.score,
+            respondentHash: hash,
+          });
+        }
+      }
+
+      return {
+        result: { statements: input.scores.length },
+        activity: {
+          kind: "session.processHealthSubmitted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // **No scores, and this one matters more than the others.** An
+          // activity row carries its actor, so a payload with the answers in it
+          // would attribute an anonymous survey in the one place everybody can
+          // read.
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.submitProcessHealth",
+          targetType: "session",
+          targetId: input.sessionId,
+          // The audit row names the acting principal by design, so it records
+          // that somebody answered and never what they said.
+          payload: { statements: input.scores.length },
+        },
+      };
+    },
+  }),
+});
+
+export const readProcessHealth = defineReadAction({
+  name: "sessions.processHealth",
+  summary:
+    "§8.5's five statements with the room's averages, and the reader's own answers.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    statements: z.array(
+      z.object({
+        statementKey: z.number().int(),
+        /** Canon text from `packages/method`. */
+        statement: z.string(),
+        /** The room's average, null until somebody answers. */
+        average: z.number().nullable(),
+        /** The reader's own score, and null when they have not answered. */
+        mine: z.number().nullable(),
+      }),
+    ),
+    /** Respondents, not answers: five rows from one person is one response. */
+    responses: z.number().int(),
+    /** §8.6's average of statements 2 and 5, from `packages/method`. */
+    rhythmScore: z.number().nullable(),
+    /** §8.5's closing rule: the lowest becomes next cycle's process OKR. */
+    lowest: z
+      .object({ statementKey: z.number().int(), statement: z.string() })
+      .nullable(),
+    submitted: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            statementKey: processHealthResponses.statementKey,
+            score: processHealthResponses.score,
+            respondentHash: processHealthResponses.respondentHash,
+          })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, context.workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+            ),
+          );
+
+        // The reader's own hash, recomputed rather than stored anywhere. With no
+        // salt yet nobody has answered, so there is nothing of theirs to find.
+        const mineHash = session.processHealthSalt
+          ? respondentHash(session.processHealthSalt, memberId)
+          : null;
+
+        const statements = PROCESS_HEALTH_STATEMENTS.map((statement, index) => {
+          const key = index + 1;
+          const forStatement = rows.filter((row) => row.statementKey === key);
+          const average =
+            forStatement.length === 0
+              ? null
+              : forStatement.reduce((sum, row) => sum + row.score, 0) /
+                forStatement.length;
+          const own = forStatement.find(
+            (row) => mineHash !== null && row.respondentHash === mineHash,
+          );
+          return {
+            statementKey: key,
+            statement,
+            average,
+            mine: own?.score ?? null,
+          };
+        });
+
+        // Respondents rather than rows: one person answering five statements is
+        // one response, and the acceptance criterion counts people.
+        const respondents = new Set(rows.map((row) => row.respondentHash));
+        const averages = statements.map((entry) => entry.average);
+        const lowest = lowestProcessHealthStatement(averages);
+
+        return {
+          statements,
+          responses: respondents.size,
+          // Both from `packages/method`. Nothing about which statements make the
+          // rhythm score, or how a tie is broken, is decided here.
+          rhythmScore: rhythmScore(averages),
+          lowest:
+            lowest === null
+              ? null
+              : {
+                  statementKey: lowest.position,
+                  statement: lowest.statement,
+                },
+          submitted:
+            mineHash !== null &&
+            rows.some((row) => row.respondentHash === mineHash),
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Stage seven's second half: the diagnostic, and stage nine: keep, modify or
+// abandon (METHOD.md §8.6 and §8.8, p4-t00-session-design.md §4.8, P4-T11c-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * The two numbers §8.6 reads, or nulls where the room has not produced them.
+ *
+ * The cycle score here is the plain §3.4 average over every key result this
+ * review graded, **not** the reveal-gated running total `sessions.scoringStatus`
+ * shows. The reveal is about who sees an objective's roll-up during stage two
+ * (P4-T10b-b); by stage seven the room has seen everything, and a diagnostic
+ * that ignored unrevealed grades would diagnose a quarter that did not happen.
+ */
+async function diagnosticInputsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const graded = await tx
+    .select({ score: reviewScores.score })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+      ),
+    );
+  const cycle = cycleScore(graded.map((row) => Number(row.score)));
+
+  const responses = await tx
+    .select({
+      statementKey: processHealthResponses.statementKey,
+      score: processHealthResponses.score,
+    })
+    .from(processHealthResponses)
+    .where(
+      activeOnly(
+        processHealthResponses,
+        eq(processHealthResponses.workspaceId, workspaceId),
+        eq(processHealthResponses.sessionId, sessionId),
+      ),
+    );
+  const averages = PROCESS_HEALTH_STATEMENTS.map((_statement, index) => {
+    const forStatement = responses.filter(
+      (row) => row.statementKey === index + 1,
+    );
+    return forStatement.length === 0
+      ? null
+      : forStatement.reduce((sum, row) => sum + row.score, 0) /
+          forStatement.length;
+  });
+
+  return { cycle, rhythm: rhythmScore(averages) };
+}
+
+export const recordDiagnostic = defineWriteAction({
+  name: "sessions.recordDiagnostic",
+  summary:
+    "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    verdict: z.enum(DIAGNOSIS_VERDICTS),
+    cycleScore: z.number(),
+    rhythmScore: z.number(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const { cycle, rhythm } = await diagnosticInputsInTx(
+        tx,
+        workspaceId,
+        input.sessionId,
+      );
+      if (cycle === null || rhythm === null) {
+        // §8.6 combines two numbers and neither is optional. A diagnostic built
+        // on a missing answer is worse than no diagnostic, because it reads as
+        // evidence.
+        throw new OperationError(
+          "not_found",
+          "The diagnostic needs both a cycle score and a rhythm score. Grade the key results and run the survey first.",
+        );
+      }
+
+      const { thresholds } = resolveRhythm(
+        await readRhythmRow(tx, workspaceId),
+      );
+      // The verdict, the diagnosis and the prescription all come from
+      // `packages/method`. Nothing about which of the three cases applies is
+      // decided here.
+      const diagnosis = rhythmDiagnostic(cycle, rhythm, thresholds);
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: reviewDiagnostics.id })
+        .from(reviewDiagnostics)
+        .where(
+          activeOnly(
+            reviewDiagnostics,
+            eq(reviewDiagnostics.workspaceId, workspaceId),
+            eq(reviewDiagnostics.sessionId, input.sessionId),
+          ),
+        )
+        .limit(1);
+
+      const values = {
+        cycleScore: String(cycle),
+        rhythmScore: String(rhythm),
+        verdict: diagnosis.kind,
+        narrative: diagnosis.prescription,
+        recordedById: memberId,
+        updatedAt: now,
+      };
+
+      if (existing) {
+        // Reading it again replaces it. A room that deliberately re-reads after
+        // correcting a score has one answer, not two, and the stored numbers
+        // move with the verdict so the record stays internally consistent.
+        await tx
+          .update(reviewDiagnostics)
+          .set(values)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.id, existing.id),
+            ),
+          );
+      } else {
+        await tx.insert(reviewDiagnostics).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          ...values,
+        });
+      }
+
+      return {
+        result: {
+          verdict: diagnosis.kind,
+          cycleScore: cycle,
+          rhythmScore: rhythm,
+        },
+        activity: {
+          kind: "session.diagnosticRead",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          // The verdict is the one thing worth carrying: it is about the
+          // quarter's system rather than about anybody in it, and §8.6 calls it
+          // the review's most valuable output.
+          payload: { sessionId: input.sessionId, verdict: diagnosis.kind },
+        },
+        audit: {
+          action: "sessions.recordDiagnostic",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { verdict: diagnosis.kind },
+        },
+      };
+    },
+  }),
+});
+
+export const readDiagnostic = defineReadAction({
+  name: "sessions.diagnostic",
+  summary: "§8.6's verdict for this review, stored or still unreadable.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** The stored numbers when recorded, else what the room has so far. */
+    cycleScore: z.number().nullable(),
+    rhythmScore: z.number().nullable(),
+    verdict: z.enum(DIAGNOSIS_VERDICTS).nullable(),
+    /** §8.6's sentences, from `packages/method`. Never stored as the verdict's meaning. */
+    diagnosis: z.string().nullable(),
+    prescription: z.string().nullable(),
+    recorded: z.boolean(),
+    /** Both numbers exist, so the room can read it. */
+    readable: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        const [stored] = await tx
+          .select({
+            cycleScore: reviewDiagnostics.cycleScore,
+            rhythmScore: reviewDiagnostics.rhythmScore,
+            verdict: reviewDiagnostics.verdict,
+          })
+          .from(reviewDiagnostics)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.workspaceId, context.workspaceId),
+              eq(reviewDiagnostics.sessionId, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        if (stored) {
+          // The sentences are recomputed from the stored numbers rather than
+          // stored twice, so a wording correction in METHOD.md reaches old
+          // records while the verdict they were read at does not move.
+          const diagnosis = rhythmDiagnostic(
+            Number(stored.cycleScore),
+            Number(stored.rhythmScore),
+            thresholds,
+          );
+          return {
+            cycleScore: Number(stored.cycleScore),
+            rhythmScore: Number(stored.rhythmScore),
+            verdict: stored.verdict,
+            diagnosis: diagnosis.diagnosis,
+            prescription: diagnosis.prescription,
+            recorded: true,
+            readable: true,
+          };
+        }
+
+        const { cycle, rhythm } = await diagnosticInputsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
+        return {
+          cycleScore: cycle,
+          rhythmScore: rhythm,
+          verdict: null,
+          diagnosis: null,
+          prescription: null,
+          recorded: false,
+          readable: cycle !== null && rhythm !== null,
+        };
+      },
+    );
+  },
+});
+
+export const decideObjective = defineWriteAction({
+  name: "sessions.decideObjective",
+  summary:
+    "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+    decision: z.enum(GOAL_CLOSE_DECISIONS),
+    // Required. §8.8 asks for "one decision and a one-line why", and a decision
+    // nobody explained is the default carry-over the section exists to stop.
+    why: z.string().trim().min(1).max(1000),
+  }),
+  output: z.object({ goalId: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [inScope] = await tx
+        .select({ id: goals.id })
+        .from(goals)
+        .where(
+          activeOnly(
+            goals,
+            ...reviewObjectiveConditions(workspaceId, session),
+            eq(goals.id, input.goalId),
+          ),
+        )
+        .limit(1);
+      if (!inScope) {
+        throw new OperationError(
+          "not_found",
+          "That objective is not in this review.",
+        );
+      }
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      const [existing] = await tx
+        .select({ id: reviewDecisions.id })
+        .from(reviewDecisions)
+        .where(
+          activeOnly(
+            reviewDecisions,
+            eq(reviewDecisions.workspaceId, workspaceId),
+            eq(reviewDecisions.sessionId, input.sessionId),
+            eq(reviewDecisions.goalId, input.goalId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // One decision per objective. §8.8 closes each deliberately, which is
+        // one answer rather than a history of opinions.
+        await tx
+          .update(reviewDecisions)
+          .set({
+            decision: input.decision,
+            why: input.why,
+            decidedById: memberId,
+            updatedAt: now,
+          })
+          .where(
+            activeOnly(reviewDecisions, eq(reviewDecisions.id, existing.id)),
+          );
+      } else {
+        await tx.insert(reviewDecisions).values({
+          workspaceId,
+          sessionId: input.sessionId,
+          goalId: input.goalId,
+          decision: input.decision,
+          why: input.why,
+          decidedById: memberId,
+        });
+      }
+
+      return {
+        result: { goalId: input.goalId },
+        activity: {
+          kind: "session.objectiveDecided",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          // The decision travels; the why does not. Whether an objective is
+          // kept or abandoned is the space's business, and the reasoning was
+          // given to the room.
+          payload: { sessionId: input.sessionId, decision: input.decision },
+        },
+        audit: {
+          action: "sessions.decideObjective",
+          targetType: "goal",
+          targetId: input.goalId,
+          payload: { decision: input.decision },
+        },
+      };
+    },
+  }),
+});
+
+export const readReset = defineReadAction({
+  name: "sessions.reset",
+  summary:
+    "Stage nine's state: every objective in the review and how it was closed.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /** §3.2's weighted score over what this review graded, or null. */
+        score: z.number().nullable(),
+        decision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
+        /** §8.8's meaning for the chosen decision, from `packages/method`. */
+        meaning: z.string().nullable(),
+        why: z.string().nullable(),
+      }),
+    ),
+    decided: z.number().int(),
+    total: z.number().int(),
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({ goalId: goals.id, goalTitle: goals.title })
+          .from(goals)
+          .where(
+            activeOnly(
+              goals,
+              ...reviewObjectiveConditions(context.workspaceId, session),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt);
+
+        const decisions = await tx
+          .select({
+            goalId: reviewDecisions.goalId,
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+          })
+          .from(reviewDecisions)
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, context.workspaceId),
+              eq(reviewDecisions.sessionId, input.sessionId),
+            ),
+          );
+        const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
+
+        const graded = await tx
+          .select({
+            goalId: keyResults.goalId,
+            score: reviewScores.score,
+            weight: keyResults.weight,
+          })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, context.workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+            ),
+          );
+
+        const objectives = rows.map((row) => {
+          const decided = byGoal.get(row.goalId);
+          const forGoal = graded.filter((entry) => entry.goalId === row.goalId);
+          return {
+            goalId: row.goalId,
+            goalTitle: row.goalTitle,
+            // §3.2's weighting, from `packages/method`. Shown here as evidence
+            // beside the decision, which is what §8.8 asks a room to decide on.
+            score: objectiveScore(
+              forGoal.map((entry) => ({
+                score: Number(entry.score),
+                weight: Number(entry.weight),
+              })),
+            ),
+            decision: decided?.decision ?? null,
+            meaning:
+              decided === undefined
+                ? null
+                : (CLOSE_DECISION_MEANINGS[decided.decision] ?? null),
+            why: decided?.why ?? null,
+          };
+        });
+        const decidedCount = objectives.filter(
+          (entry) => entry.decision !== null,
+        ).length;
+
+        return {
+          objectives,
+          decided: decidedCount,
+          total: objectives.length,
+          complete: objectives.length > 0 && decidedCount === objectives.length,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Stage ten: learnings and next-cycle drafts, and stage eleven: decisions and
+// actions (METHOD.md §8.9 and §8.1 stage 11, P4-T11c-b)
+// ---------------------------------------------------------------------------
+
+export const captureLearning = defineWriteAction({
+  name: "sessions.captureLearning",
+  summary:
+    "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+  input: z.object({
+    sessionId: z.uuid(),
+    text: z.string().trim().min(1).max(1000),
+    /**
+     * §8.9's "mark the ones to carry forward".
+     *
+     * Off by default, because §8.9's own rule is that carried work re-enters the
+     * next cycle as an issue and has to survive prioritisation on its merits. A
+     * default of true would be the free pass that section refuses.
+     */
+    carryForward: z.boolean().default(false),
+    /**
+     * The retro note this came from, when it was promoted rather than typed.
+     *
+     * §8.9 promotes the top dot-voted themes into learnings, and naming the note
+     * is what lets the minutes show where a learning came from and stops the same
+     * theme being promoted twice.
+     */
+    retroNoteId: z.uuid().optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      if (!session.cycleId) {
+        // A learning belongs to a cycle: §8.9 feeds it into the next one's input
+        // pack, and a learning with no cycle behind it has nowhere to go.
+        throw new OperationError(
+          "not_found",
+          "This review is not attached to a cycle, so a learning has nothing to belong to.",
+        );
+      }
+
+      if (input.retroNoteId) {
+        const [note] = await tx
+          .select({ id: retroNotes.id })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+              eq(retroNotes.id, input.retroNoteId),
+            ),
+          )
+          .limit(1);
+        if (!note) {
+          throw new OperationError(
+            "not_found",
+            "That retro note is not in this review.",
+          );
+        }
+
+        const [already] = await tx
+          .select({ id: learnings.id })
+          .from(learnings)
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, workspaceId),
+              eq(learnings.retroNoteId, input.retroNoteId),
+            ),
+          )
+          .limit(1);
+        if (already) {
+          // Promoting the same note twice would double a theme's weight in the
+          // next cycle, which is the opposite of what dot voting was for.
+          throw new OperationError(
+            "forbidden",
+            "That retro note is already a learning.",
+          );
+        }
+      }
+
+      const [row] = await tx
+        .insert(learnings)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          cycleId: session.cycleId,
+          text: input.text,
+          carryForward: input.carryForward,
+          source: input.retroNoteId ? "retro_theme" : "manual",
+          retroNoteId: input.retroNoteId ?? null,
+          createdById: memberId,
+        })
+        .returning({ id: learnings.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.learningCaptured",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "learning", entityId: row.id },
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.captureLearning",
+          targetType: "learning",
+          targetId: row.id,
+          payload: { carryForward: input.carryForward },
+        },
+      };
+    },
+  }),
+});
+
+export const draftNextCycle = defineWriteAction({
+  name: "sessions.draftNextCycle",
+  summary:
+    "Notes an objective the next cycle might carry (METHOD.md §8.9 stage 10).",
+  input: z.object({
+    sessionId: z.uuid(),
+    title: z.string().trim().min(1).max(280),
+    // Required. A draft with no reason behind it is a title somebody liked, and
+    // the next cycle cannot prioritise it against anything.
+    why: z.string().trim().min(1).max(1000),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [row] = await tx
+        .insert(nextCycleDrafts)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          title: input.title,
+          why: input.why,
+          createdById: memberId,
+        })
+        .returning({ id: nextCycleDrafts.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.nextCycleDrafted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          embed: { entityType: "next_cycle_draft", entityId: row.id },
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.draftNextCycle",
+          targetType: "next_cycle_draft",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const addReviewAction = defineWriteAction({
+  name: "sessions.addAction",
+  summary: "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+  input: z.object({
+    sessionId: z.uuid(),
+    what: z.string().trim().min(1).max(500),
+    /**
+     * Both required, and §8.1 says why in one line: "Every action has a name and
+     * a date, or it is a wish." Optional columns would let the product store the
+     * exact thing the stage exists to prevent.
+     */
+    ownerId: z.uuid(),
+    dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // Active only. An action owned by a suspended member is an action with
+      // nobody on it, which is the wish §8.1 refuses.
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such member.");
+      }
+
+      const [row] = await tx
+        .insert(reviewActions)
+        .values({
+          workspaceId,
+          sessionId: input.sessionId,
+          what: input.what,
+          ownerId: input.ownerId,
+          dueOn: input.dueOn,
+          createdById: memberId,
+        })
+        .returning({ id: reviewActions.id });
+      if (!row) {
+        throw new OperationError("not_found", "That did not save.");
+      }
+
+      return {
+        result: { id: row.id },
+        activity: {
+          kind: "session.actionAgreed",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.addAction",
+          targetType: "review_action",
+          targetId: row.id,
+        },
+      };
+    },
+  }),
+});
+
+export const completeReviewAction = defineWriteAction({
+  name: "sessions.completeAction",
+  summary: "Marks one review action done, or not done again.",
+  input: z.object({
+    sessionId: z.uuid(),
+    actionId: z.uuid(),
+    done: z.boolean(),
+  }),
+  output: z.object({ id: z.uuid(), done: z.boolean() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const [action] = await tx
+        .select({ id: reviewActions.id })
+        .from(reviewActions)
+        .where(
+          activeOnly(
+            reviewActions,
+            eq(reviewActions.workspaceId, workspaceId),
+            eq(reviewActions.sessionId, input.sessionId),
+            eq(reviewActions.id, input.actionId),
+          ),
+        )
+        .limit(1);
+      if (!action) {
+        throw new OperationError("not_found", "No such action.");
+      }
+
+      // Reversible on purpose. An action ticked by mistake in a running room
+      // should be untickable, and "closed honestly" is the weekly session's own
+      // standard (P4-T08).
+      await tx
+        .update(reviewActions)
+        .set({ done: input.done, updatedAt: new Date() })
+        .where(activeOnly(reviewActions, eq(reviewActions.id, input.actionId)));
+
+      return {
+        result: { id: input.actionId, done: input.done },
+        activity: {
+          kind: "session.actionCompleted",
+          subjectType: "space",
+          subjectId: session.spaceId ?? workspaceId,
+          contextId: session.spaceId
+            ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
+            : undefined,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.completeAction",
+          targetType: "review_action",
+          targetId: input.actionId,
+          payload: { done: input.done },
+        },
+      };
+    },
+  }),
+});
+
+export const readForward = defineReadAction({
+  name: "sessions.forward",
+  summary:
+    "Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    learnings: z.array(
+      z.object({
+        id: z.uuid(),
+        text: z.string(),
+        carryForward: z.boolean(),
+        source: z.string(),
+        authorName: z.string().nullable(),
+      }),
+    ),
+    /**
+     * The retro notes not yet promoted, most-voted first.
+     *
+     * §8.9 promotes the top dot-voted themes, so the stage needs the board's
+     * verdict in front of it rather than asking the room to remember it. A note
+     * already promoted is absent rather than shown as unavailable, because the
+     * learning it became is in the list above.
+     */
+    promotable: z.array(
+      z.object({
+        noteId: z.uuid(),
+        text: z.string(),
+        votes: z.number().int(),
+      }),
+    ),
+    drafts: z.array(
+      z.object({
+        id: z.uuid(),
+        title: z.string(),
+        why: z.string(),
+        promoted: z.boolean(),
+      }),
+    ),
+    actions: z.array(
+      z.object({
+        id: z.uuid(),
+        what: z.string(),
+        ownerName: z.string(),
+        dueOn: z.string(),
+        done: z.boolean(),
+      }),
+    ),
+    /** Everybody who can own an action: active humans in the workspace. */
+    owners: z.array(z.object({ memberId: z.uuid(), name: z.string() })),
+    carried: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const authors = alias(workspaceMembers, "learning_authors");
+        const learningRows = await tx
+          .select({
+            id: learnings.id,
+            text: learnings.text,
+            carryForward: learnings.carryForward,
+            source: learnings.source,
+            retroNoteId: learnings.retroNoteId,
+            authorName: authors.name,
+          })
+          .from(learnings)
+          .leftJoin(authors, eq(authors.id, learnings.createdById))
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, context.workspaceId),
+              eq(learnings.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(learnings.createdAt);
+
+        const promotedNotes = new Set(
+          learningRows
+            .map((row) => row.retroNoteId)
+            .filter((id): id is string => id !== null),
+        );
+        const noteRows = await tx
+          .select({
+            noteId: retroNotes.id,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+          })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, context.workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        const draftRows = await tx
+          .select({
+            id: nextCycleDrafts.id,
+            title: nextCycleDrafts.title,
+            why: nextCycleDrafts.why,
+            promotedToGoalId: nextCycleDrafts.promotedToGoalId,
+          })
+          .from(nextCycleDrafts)
+          .where(
+            activeOnly(
+              nextCycleDrafts,
+              eq(nextCycleDrafts.workspaceId, context.workspaceId),
+              eq(nextCycleDrafts.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(nextCycleDrafts.createdAt);
+
+        const owners = alias(workspaceMembers, "action_owners");
+        const actionRows = await tx
+          .select({
+            id: reviewActions.id,
+            what: reviewActions.what,
+            ownerName: owners.name,
+            dueOn: reviewActions.dueOn,
+            done: reviewActions.done,
+          })
+          .from(reviewActions)
+          .innerJoin(owners, eq(owners.id, reviewActions.ownerId))
+          .where(
+            activeOnly(
+              reviewActions,
+              eq(reviewActions.workspaceId, context.workspaceId),
+              eq(reviewActions.sessionId, input.sessionId),
+            ),
+          )
+          // Soonest first: §8.1 stage 11 is about dates, so the list reads as a
+          // schedule rather than as an order of typing.
+          .orderBy(reviewActions.dueOn, reviewActions.createdAt);
+
+        const candidates = await tx
+          .select({
+            memberId: workspaceMembers.id,
+            name: workspaceMembers.name,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.status, "active"),
+              eq(workspaceMembers.kind, "human"),
+            ),
+          )
+          .orderBy(workspaceMembers.name);
+
+        return {
+          learnings: learningRows.map((row) => ({
+            id: row.id,
+            text: row.text,
+            carryForward: row.carryForward,
+            source: row.source,
+            authorName: row.authorName ?? null,
+          })),
+          promotable: noteRows
+            .filter((row) => !promotedNotes.has(row.noteId))
+            .map((row) => ({
+              noteId: row.noteId,
+              text: row.text,
+              votes: row.votes,
+            })),
+          drafts: draftRows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            why: row.why,
+            promoted: row.promotedToGoalId !== null,
+          })),
+          actions: actionRows.map((row) => ({
+            id: row.id,
+            what: row.what,
+            ownerName: row.ownerName,
+            dueOn: row.dueOn,
+            done: row.done,
+          })),
+          owners: candidates,
+          carried: learningRows.filter((row) => row.carryForward).length,
+        };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// The minutes (METHOD.md §8.10, screen S-25, P4-T12-a)
+// ---------------------------------------------------------------------------
+
+/**
+ * §8.10's executive summary and every stage's record, in one read.
+ *
+ * **Two things are deliberately absent, and both are promises the product
+ * already made.**
+ *
+ * The facilitator's private per-stage notes. UIUX-PLAN's S-25 lists "facilitator
+ * notes" among the minutes' contents, and §8.1 makes them private: the screen
+ * that collects them says "Nobody else in the room can see it, and it is not in
+ * the activity feed" (P4-T10a-a). METHOD.md sits above UIUX-PLAN in the authority
+ * order and §8.10's own list does not mention them, so they stay out and the
+ * UIUX-PLAN line is corrected.
+ *
+ * The management retro, unless the reader may see it. §8.7's four answers are read
+ * by a space's managers and its coordinator (P4-T11a), and a shareable document
+ * that carried them to everybody would undo that in one step. `management` is
+ * null for anybody else, which is the same shape `sessions.roomPulse` uses for
+ * the room's read.
+ *
+ * Everything here is read, never recomputed. The cycle score and the verdict come
+ * from `review_diagnostics` as the room was told them, because a document that
+ * recalculated would disagree with the meeting it minutes.
+ */
+export const readMinutes = defineReadAction({
+  name: "sessions.minutes",
+  summary:
+    "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    title: z.string(),
+    heldOn: z.string().nullable(),
+    state: z.string(),
+    /** §8.10's executive summary, in its own words. */
+    summary: z.object({
+      cycleScore: z.number().nullable(),
+      verdict: z.string().nullable(),
+      objectivesReviewed: z.number().int(),
+      keyResultsReviewed: z.number().int(),
+      /** §8.4's threshold, so the count says what it counted. */
+      belowThreshold: z.number().int(),
+      threshold: z.number(),
+      teamPulse: z.number().nullable(),
+      learningsCarried: z.number().int(),
+      actionsAgreed: z.number().int(),
+    }),
+    scores: z.array(
+      z.object({
+        goalTitle: z.string(),
+        keyResultTitle: z.string(),
+        score: z.number(),
+        reason: z.string(),
+      }),
+    ),
+    narratives: z.array(
+      z.object({ goalTitle: z.string(), excerpt: z.string().nullable() }),
+    ),
+    recognition: z.array(
+      z.object({ toName: z.string(), fromName: z.string(), text: z.string() }),
+    ),
+    retro: z.array(
+      z.object({
+        columnKey: z.string(),
+        text: z.string(),
+        votes: z.number().int(),
+      }),
+    ),
+    /** Null unless the reader is a manager or the space's coordinator. */
+    management: z
+      .array(z.object({ question: z.string(), body: z.string() }))
+      .nullable(),
+    rootCauses: z.array(
+      z.object({
+        keyResultTitle: z.string(),
+        cause: z.string(),
+        detail: z.string().nullable(),
+      }),
+    ),
+    processHealth: z.array(
+      z.object({ statement: z.string(), average: z.number() }),
+    ),
+    decisions: z.array(
+      z.object({
+        goalTitle: z.string(),
+        decision: z.string(),
+        why: z.string(),
+      }),
+    ),
+    learnings: z.array(
+      z.object({ text: z.string(), carryForward: z.boolean() }),
+    ),
+    drafts: z.array(z.object({ title: z.string(), why: z.string() })),
+    actions: z.array(
+      z.object({
+        what: z.string(),
+        ownerName: z.string(),
+        dueOn: z.string(),
+        done: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const workspaceId = context.workspaceId;
+        const memberId = await actingMember(tx, workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+        const threshold = thresholds["scoring.rootCauseThreshold"];
+
+        // --- the scored key results, which most of the summary counts ---
+        const scoreRows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            keyResultTitle: keyResults.title,
+            score: reviewScores.score,
+            reason: reviewScores.reason,
+            position: goals.position,
+          })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position, keyResults.position);
+
+        const [diagnostic] = await tx
+          .select({
+            cycleScore: reviewDiagnostics.cycleScore,
+            verdict: reviewDiagnostics.verdict,
+          })
+          .from(reviewDiagnostics)
+          .where(
+            activeOnly(
+              reviewDiagnostics,
+              eq(reviewDiagnostics.workspaceId, workspaceId),
+              eq(reviewDiagnostics.sessionId, input.sessionId),
+            ),
+          )
+          .limit(1);
+
+        const [pulse] = await tx
+          .select({ average: avg(sessionParticipants.pulse) })
+          .from(sessionParticipants)
+          .where(
+            activeOnly(
+              sessionParticipants,
+              eq(sessionParticipants.workspaceId, workspaceId),
+              eq(sessionParticipants.sessionId, input.sessionId),
+            ),
+          );
+
+        // --- stage three ---
+        const narrativeRows = await tx
+          .select({
+            goalTitle: goals.title,
+            body: reviewNarratives.body,
+            spokenAt: reviewNarratives.spokenAt,
+          })
+          .from(reviewNarratives)
+          .innerJoin(goals, eq(goals.id, reviewNarratives.goalId))
+          .where(
+            activeOnly(
+              reviewNarratives,
+              eq(reviewNarratives.workspaceId, workspaceId),
+              eq(reviewNarratives.sessionId, input.sessionId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position);
+
+        // --- stage four ---
+        const givers = alias(workspaceMembers, "minutes_givers");
+        const receivers = alias(workspaceMembers, "minutes_receivers");
+        const kudosRows = await tx
+          .select({
+            toName: receivers.name,
+            fromName: givers.name,
+            text: kudos.text,
+          })
+          .from(kudos)
+          .innerJoin(givers, eq(givers.id, kudos.fromMemberId))
+          .innerJoin(receivers, eq(receivers.id, kudos.toMemberId))
+          .where(
+            activeOnly(
+              kudos,
+              eq(kudos.workspaceId, workspaceId),
+              eq(kudos.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(kudos.createdAt);
+
+        // --- stage five ---
+        const retroRows = await tx
+          .select({
+            columnKey: retroNotes.columnKey,
+            text: retroNotes.text,
+            votes: retroNotes.votes,
+          })
+          .from(retroNotes)
+          .where(
+            activeOnly(
+              retroNotes,
+              eq(retroNotes.workspaceId, workspaceId),
+              eq(retroNotes.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(desc(retroNotes.votes), retroNotes.createdAt);
+
+        // --- stage six, audience-gated ---
+        let management: { question: string; body: string }[] | null = null;
+        if (session.spaceId) {
+          const [seat] = await tx
+            .select({ role: spaceMembers.role })
+            .from(spaceMembers)
+            .where(
+              activeOnly(
+                spaceMembers,
+                eq(spaceMembers.workspaceId, workspaceId),
+                eq(spaceMembers.spaceId, session.spaceId),
+                eq(spaceMembers.memberId, memberId),
+              ),
+            )
+            .limit(1);
+          if (seat?.role === "manager" || seat?.role === "coordinator") {
+            management = [];
+          }
+        } else {
+          // No space means no space roles to read, the same fallback
+          // `sessions.managementRetro` uses.
+          management = [];
+        }
+        if (management !== null) {
+          const answers = await tx
+            .select({
+              questionKey: managementAnswers.questionKey,
+              body: managementAnswers.body,
+            })
+            .from(managementAnswers)
+            .where(
+              activeOnly(
+                managementAnswers,
+                eq(managementAnswers.workspaceId, workspaceId),
+                eq(managementAnswers.sessionId, input.sessionId),
+              ),
+            )
+            .orderBy(managementAnswers.questionKey);
+          management = answers.map((row) => ({
+            question:
+              MANAGEMENT_RETRO_QUESTIONS[row.questionKey - 1] ??
+              `Question ${row.questionKey}`,
+            body: row.body,
+          }));
+        }
+
+        // --- stage seven ---
+        const causeRows = await tx
+          .select({
+            keyResultTitle: keyResults.title,
+            causeKey: rootCauses.causeKey,
+            detail: rootCauses.detail,
+          })
+          .from(rootCauses)
+          .innerJoin(keyResults, eq(keyResults.id, rootCauses.keyResultId))
+          .where(
+            activeOnly(
+              rootCauses,
+              eq(rootCauses.workspaceId, workspaceId),
+              eq(rootCauses.sessionId, input.sessionId),
+              isNull(keyResults.deletedAt),
+            ),
+          );
+
+        // --- stage eight, pooled and never attributed ---
+        const healthRows = await tx
+          .select({
+            statementKey: processHealthResponses.statementKey,
+            score: processHealthResponses.score,
+          })
+          .from(processHealthResponses)
+          .where(
+            activeOnly(
+              processHealthResponses,
+              eq(processHealthResponses.workspaceId, workspaceId),
+              eq(processHealthResponses.sessionId, input.sessionId),
+            ),
+          );
+
+        // --- stage nine ---
+        const decisionRows = await tx
+          .select({
+            goalTitle: goals.title,
+            decision: reviewDecisions.decision,
+            why: reviewDecisions.why,
+          })
+          .from(reviewDecisions)
+          .innerJoin(goals, eq(goals.id, reviewDecisions.goalId))
+          .where(
+            activeOnly(
+              reviewDecisions,
+              eq(reviewDecisions.workspaceId, workspaceId),
+              eq(reviewDecisions.sessionId, input.sessionId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .orderBy(goals.position);
+
+        // --- stages ten and eleven ---
+        const learningRows = await tx
+          .select({
+            text: learnings.text,
+            carryForward: learnings.carryForward,
+          })
+          .from(learnings)
+          .where(
+            activeOnly(
+              learnings,
+              eq(learnings.workspaceId, workspaceId),
+              eq(learnings.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(learnings.createdAt);
+
+        const draftRows = await tx
+          .select({
+            title: nextCycleDrafts.title,
+            why: nextCycleDrafts.why,
+          })
+          .from(nextCycleDrafts)
+          .where(
+            activeOnly(
+              nextCycleDrafts,
+              eq(nextCycleDrafts.workspaceId, workspaceId),
+              eq(nextCycleDrafts.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(nextCycleDrafts.createdAt);
+
+        const owners = alias(workspaceMembers, "minutes_owners");
+        const actionRows = await tx
+          .select({
+            what: reviewActions.what,
+            ownerName: owners.name,
+            dueOn: reviewActions.dueOn,
+            done: reviewActions.done,
+          })
+          .from(reviewActions)
+          .innerJoin(owners, eq(owners.id, reviewActions.ownerId))
+          .where(
+            activeOnly(
+              reviewActions,
+              eq(reviewActions.workspaceId, workspaceId),
+              eq(reviewActions.sessionId, input.sessionId),
+            ),
+          )
+          .orderBy(reviewActions.dueOn);
+
+        const scores = scoreRows.map((row) => ({
+          goalTitle: row.goalTitle,
+          keyResultTitle: row.keyResultTitle,
+          score: Number(row.score),
+          reason: row.reason,
+        }));
+        const pulseAverage =
+          pulse?.average === null || pulse?.average === undefined
+            ? null
+            : Number(pulse.average);
+
+        return {
+          title: session.title,
+          heldOn: session.endedAt?.toISOString() ?? null,
+          state: session.state,
+          summary: {
+            // From the diagnostic as the room was told it, never recomputed: a
+            // document that recalculated would disagree with the meeting it
+            // minutes.
+            cycleScore:
+              diagnostic === undefined ? null : Number(diagnostic.cycleScore),
+            verdict: diagnostic?.verdict ?? null,
+            objectivesReviewed: new Set(scoreRows.map((row) => row.goalId))
+              .size,
+            keyResultsReviewed: scores.length,
+            belowThreshold: scores.filter((row) => row.score < threshold)
+              .length,
+            threshold,
+            teamPulse: pulseAverage,
+            learningsCarried: learningRows.filter((row) => row.carryForward)
+              .length,
+            actionsAgreed: actionRows.length,
+          },
+          scores,
+          narratives: narrativeRows.map((row) => ({
+            goalTitle: row.goalTitle,
+            excerpt:
+              row.body === null
+                ? null
+                : excerptRichText(row.body as never, 4000) || null,
+          })),
+          recognition: kudosRows,
+          retro: retroRows,
+          management,
+          rootCauses: causeRows.map((row) => ({
+            keyResultTitle: row.keyResultTitle,
+            cause: ROOT_CAUSES[row.causeKey - 1] ?? `Cause ${row.causeKey}`,
+            detail: row.detail,
+          })),
+          // Pooled averages, never a respondent. The survey is anonymous and a
+          // document is the last place that should stop being true.
+          processHealth: PROCESS_HEALTH_STATEMENTS.map((statement, index) => {
+            const forStatement = healthRows.filter(
+              (row) => row.statementKey === index + 1,
+            );
+            return {
+              statement,
+              average:
+                forStatement.length === 0
+                  ? 0
+                  : forStatement.reduce((sum, row) => sum + row.score, 0) /
+                    forStatement.length,
+            };
+          }).filter((entry) => entry.average > 0),
+          decisions: decisionRows,
+          learnings: learningRows,
+          drafts: draftRows,
+          actions: actionRows,
+        };
+      },
+    );
+  },
+});
+
+export const revealObjectiveScore = defineWriteAction({
+  name: "sessions.revealObjectiveScore",
+  summary:
+    "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+  input: z.object({
+    sessionId: z.uuid(),
+    goalId: z.uuid(),
+  }),
+  output: z.object({
+    revealed: z.number().int(),
+    realtimeChannel: z.string(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const session = await requireQuarterly(
+        tx,
+        workspaceId,
+        memberId,
+        input.sessionId,
+        ACCESS_LEVELS.edit,
+      );
+      // §8.3 has the room grading and the room revealing *together*, which in
+      // practice is the facilitator saying now. The write-access floor here is
+      // `edit` for every active member (P3-T16), so `edit` alone would let any
+      // participant pre-empt the room. Same reasoning as §8.1's add-a-minute
+      // control.
+      if (session.facilitatorId !== memberId) {
+        throw new OperationError(
+          "forbidden",
+          "Only the session's facilitator can reveal a score.",
+        );
+      }
+
+      // The objective, authorised where access lives.
+      const { contextId } = await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: input.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const now = new Date();
+      // One update over the objective's rows. The room sees one answer because
+      // there is one write, not because the clients agree to pretend.
+      const revealed = await tx
+        .update(reviewScores)
+        .set({ revealedAt: now, updatedAt: now })
+        .where(
+          activeOnly(
+            reviewScores,
+            eq(reviewScores.workspaceId, workspaceId),
+            eq(reviewScores.sessionId, input.sessionId),
+            isNull(reviewScores.revealedAt),
+            sql`${reviewScores.keyResultId} in (
+              select kr.id from key_results kr
+              where kr.goal_id = ${input.goalId}
+                and kr.workspace_id = ${workspaceId}
+                and kr.deleted_at is null
+            )`,
+          ),
+        )
+        .returning({ id: reviewScores.id });
+
+      if (revealed.length === 0) {
+        // Nothing was stamped, and the two reasons are not the same thing.
+        //
+        // Nothing graded is refused: an objective that entered its revealed
+        // state with no grades behind it would show the room a blank where the
+        // number goes. Already out is not refused, because a facilitator on a
+        // stale screen pressing again should not meet an error, and there is no
+        // error code in this codebase that means "already done" without also
+        // claiming the objective does not exist. Same shape as
+        // `sessions.revealVotes` (P3-T07), which also answers a redundant call
+        // with a count of nought.
+        const [graded] = await tx
+          .select({ id: reviewScores.id })
+          .from(reviewScores)
+          .innerJoin(keyResults, eq(keyResults.id, reviewScores.keyResultId))
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+              eq(keyResults.goalId, input.goalId),
+            ),
+          )
+          .limit(1);
+        if (!graded) {
+          throw new OperationError(
+            "not_found",
+            "Nothing is graded on this objective, so there is no score to reveal.",
+          );
+        }
+      }
+
+      const channel = sessionChannel(workspaceId, input.sessionId);
+
+      return {
+        result: { revealed: revealed.length, realtimeChannel: channel },
+        /**
+         * The push, as an outbox row (the only way a side effect may leave a
+         * write path).
+         *
+         * The key carries the objective, so revealing two objectives enqueues
+         * two rows. **A redundant reveal enqueues nothing**, which is the same
+         * fact stated twice: the key would collide with the row the first reveal
+         * wrote, and there is no second reveal to push. That collision is not
+         * theoretical, it failed the idempotence test before this guard existed.
+         *
+         * **No relay drains the outbox yet**, exactly as P4-T10a-a recorded for
+         * `session.stageChanged`: the write is one write and every client that
+         * re-reads gets the same answer, and the moment a relay host exists the
+         * rail becomes live with no change here.
+         */
+        outbox:
+          revealed.length === 0
+            ? []
+            : [
+                {
+                  topic: "session.scoresRevealed",
+                  payload: {
+                    channel,
+                    sessionId: input.sessionId,
+                    workspaceId,
+                    goalId: input.goalId,
+                  },
+                  idempotencyKey: `session.scoresRevealed:${input.sessionId}:${input.goalId}`,
+                },
+              ],
+        /**
+         * The payload carries no score, unlike the reveal itself.
+         *
+         * An activity row is read by everybody who can see the space, which is
+         * wider than the room in the review. Revealing to the room is not
+         * publishing to the space, and the feed can say the room got there
+         * without carrying the number out of it.
+         */
+        activity: {
+          kind: "session.objectiveScoreRevealed",
+          subjectType: "goal",
+          subjectId: input.goalId,
+          contextId,
+          payload: { sessionId: input.sessionId },
+        },
+        audit: {
+          action: "sessions.revealObjectiveScore",
+          targetType: "session",
+          targetId: input.sessionId,
+          payload: { goalId: input.goalId, revealed: revealed.length },
+        },
+      };
+    },
+  }),
+});
+
+const scoringKeyResult = z.object({
+  keyResultId: z.uuid(),
+  title: z.string(),
+  weight: z.number(),
+  /** §8.3's evidence, read from the key result rather than typed into the review. */
+  baseline: z.number().nullable(),
+  target: z.number().nullable(),
+  current: z.number().nullable(),
+  unit: z.string().nullable(),
+  score: z.number().nullable(),
+  reason: z.string().nullable(),
+});
+
+export const readScoringStatus = defineReadAction({
+  name: "sessions.scoringStatus",
+  summary:
+    "Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    objectives: z.array(
+      z.object({
+        goalId: z.uuid(),
+        goalTitle: z.string(),
+        /**
+         * §3.2's weighted average over the graded key results, and **null until
+         * the room reveals it** (§8.3, P4-T10b-b).
+         *
+         * Withheld here rather than on the screen. P4-T10b-a kept the number
+         * off the grading screen and this read still returned it, so a second
+         * surface, a REST caller or the agent tool catalogue saw what the room
+         * had not.
+         */
+        score: z.number().nullable(),
+        /** Whether the room has revealed this objective's score. */
+        revealed: z.boolean(),
+        scored: z.number(),
+        total: z.number(),
+        keyResults: z.array(scoringKeyResult),
+      }),
+    ),
+    /**
+     * §8.6's plain average, over the key results of the **revealed** objectives
+     * only.
+     *
+     * Counting every grade would publish a hidden number under another label:
+     * on a review with one objective whose key results carry equal weights, the
+     * plain average and the weighted average are the same figure. Running
+     * through the reveals also makes the acceptance criterion literal, because
+     * revealing is then the thing that moves it. Agung decided this on
+     * 26 August 2026, and p4-t00-session-design.md §4.3 is corrected to match.
+     */
+    cycleScore: z.number().nullable(),
+    /** §3.4's verdict on that average. */
+    verdict: z
+      .enum(["too_safe", "healthy", "partial", "outran_capacity"])
+      .nullable(),
+    /** Every key result graded. §8.1's completion condition for stage two. */
+    complete: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireQuarterly(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+
+        const rows = await tx
+          .select({
+            goalId: goals.id,
+            goalTitle: goals.title,
+            goalPosition: goals.position,
+            keyResultId: keyResults.id,
+            title: keyResults.title,
+            weight: keyResults.weight,
+            baseline: keyResults.baselineValue,
+            target: keyResults.targetValue,
+            current: keyResults.currentValue,
+            unit: keyResults.unit,
+            position: keyResults.position,
+          })
+          .from(keyResults)
+          .innerJoin(goals, eq(goals.id, keyResults.goalId))
+          .where(
+            activeOnly(
+              keyResults,
+              eq(keyResults.workspaceId, context.workspaceId),
+              session.spaceId ? eq(goals.spaceId, session.spaceId) : sql`true`,
+              session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
+              isNull(goals.closedAt),
+            ),
+          )
+          .orderBy(goals.position, goals.createdAt, keyResults.position);
+
+        const graded = await tx
+          .select({
+            keyResultId: reviewScores.keyResultId,
+            score: reviewScores.score,
+            reason: reviewScores.reason,
+            revealedAt: reviewScores.revealedAt,
+          })
+          .from(reviewScores)
+          .where(
+            activeOnly(
+              reviewScores,
+              eq(reviewScores.workspaceId, context.workspaceId),
+              eq(reviewScores.sessionId, input.sessionId),
+            ),
+          );
+        const byKeyResult = new Map(
+          graded.map((row) => [
+            row.keyResultId,
+            {
+              score: Number(row.score),
+              reason: row.reason,
+              revealed: row.revealedAt !== null,
+            },
+          ]),
+        );
+
+        // Grouped in the order the rows came back, so the screen reads down the
+        // cascade rather than in whatever order Postgres chose.
+        const objectives: {
+          goalId: string;
+          goalTitle: string;
+          score: number | null;
+          revealed: boolean;
+          scored: number;
+          total: number;
+          keyResults: z.infer<typeof scoringKeyResult>[];
+        }[] = [];
+        for (const row of rows) {
+          let objective = objectives.find(
+            (entry) => entry.goalId === row.goalId,
+          );
+          if (!objective) {
+            objective = {
+              goalId: row.goalId,
+              goalTitle: row.goalTitle,
+              score: null,
+              revealed: false,
+              scored: 0,
+              total: 0,
+              keyResults: [],
+            };
+            objectives.push(objective);
+          }
+          const grade = byKeyResult.get(row.keyResultId);
+          objective.total += 1;
+          if (grade) {
+            objective.scored += 1;
+            // One reveal covers the objective, so one revealed row is the
+            // objective revealed. A key result graded after the reveal joins the
+            // number that is already out rather than hiding it again.
+            if (grade.revealed) {
+              objective.revealed = true;
+            }
+          }
+          objective.keyResults.push({
+            keyResultId: row.keyResultId,
+            title: row.title,
+            weight: Number(row.weight),
+            baseline: row.baseline === null ? null : Number(row.baseline),
+            target: row.target === null ? null : Number(row.target),
+            current: row.current === null ? null : Number(row.current),
+            unit: row.unit ?? null,
+            score: grade?.score ?? null,
+            reason: grade?.reason ?? null,
+          });
+        }
+
+        for (const objective of objectives) {
+          // §3.2's weighting, from `packages/method`. Nothing about how a score
+          // is built is decided here.
+          //
+          // Computed only once the room has revealed it. An unrevealed
+          // objective returns null, which is the test-plan line "no caller can
+          // read an objective's score before it is revealed" held at the read
+          // rather than at the screen.
+          objective.score = objective.revealed
+            ? objectiveScore(
+                objective.keyResults.map((entry) => ({
+                  score: entry.score,
+                  weight: entry.weight,
+                })),
+              )
+            : null;
+        }
+
+        const { thresholds } = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        );
+        // §8.6's own words: the §3.4 portfolio average over scored key results.
+        // A plain average over key results, not over objective scores.
+        //
+        // Over the revealed rows only, for the reason the output schema gives:
+        // a running average that counted unrevealed grades would be the hidden
+        // objective score wearing a different label on any review with one
+        // objective and even weights.
+        const average = cycleScore(
+          [...byKeyResult.values()]
+            .filter((entry) => entry.revealed)
+            .map((entry) => entry.score),
+        );
+
+        return {
+          objectives,
+          cycleScore: average,
+          verdict:
+            average === null ? null : portfolioVerdictOf(average, thresholds),
+          complete:
+            objectives.length > 0 &&
+            objectives.every((entry) => entry.scored === entry.total),
+        };
+      },
+    );
+  },
+});

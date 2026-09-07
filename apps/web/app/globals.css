@@ -6,12 +6,25 @@
  * reaches it on its own. */
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
-html,
-body {
-  background: var(--color-bg);
-  color: var(--color-ink);
-}
+/* Inside `@layer base`, not at the top level. Tailwind v4 emits its utilities
+ * in `@layer utilities`, and an unlayered rule beats every layered one whatever
+ * its specificity, so `* { border-color }` out here made every
+ * `border-<colour>` utility in the product dead: 34 of them, `border-brand`
+ * fourteen times among them, all rendering as the neutral hairline. Measured
+ * in Chrome 151: `border border-bad-dot` computed to `--line`.
+ *
+ * The default itself is wanted. Tailwind v4's own Preflight sets
+ * `border-color: currentColor`, which turns an undecorated border into whatever
+ * the text colour is; a neutral hairline is the sane default for this design
+ * system. It just has to be a default a utility can win against. */
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+  }
 
-* {
-  border-color: var(--color-line);
+  * {
+    border-color: var(--color-line);
+  }
 }

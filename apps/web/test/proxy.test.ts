@@ -56,6 +56,21 @@ describe("proxy", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 
+  it("leaves the surfaces that carry their own credential reachable", () => {
+    // The REST surface authenticates a bearer token and the channel webhooks
+    // verify a provider signature. Neither sends a cookie, and a redirect
+    // would answer an API client with the sign-in page at status 200.
+    for (const path of [
+      "/api/v1",
+      "/api/v1/goals/list",
+      "/api/channels/slack",
+      "/api/channels/telegram/123456",
+    ]) {
+      const response = proxy(request(path));
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
+
   it("protects everything else", () => {
     for (const path of ["/", "/account/security", "/goals", "/api/goals"]) {
       const response = proxy(request(path));

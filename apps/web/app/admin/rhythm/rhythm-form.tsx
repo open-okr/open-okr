@@ -108,11 +108,35 @@ const WEEKDAYS = [
   [7, "Sunday"],
 ] as const;
 
-export function RhythmForm({ rhythm }: { readonly rhythm: Rhythm }) {
+export function RhythmForm({
+  rhythm,
+  canManage,
+}: {
+  readonly rhythm: Rhythm;
+  /**
+   * `manage_coaching`, which `rhythm.update` requires as `full`.
+   *
+   * The server refuses either way and always will: the interface never hides
+   * an authorisation. This says so instead of letting somebody fill the form
+   * and meet the refusal on submit, which is the same permission read twice
+   * for two different jobs.
+   */
+  readonly canManage: boolean;
+}) {
   const groups = [...new Set(rhythm.registry.map((entry) => entry.group))];
 
   return (
     <form action={save} className="flex flex-col gap-4.5">
+      {canManage ? null : (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-2">
+              You can read every threshold your goals are judged against, and
+              changing one needs the coaching permission. Ask a workspace admin.
+            </p>
+          </CardBody>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <h2 className="font-semibold text-ink">The check-in rhythm</h2>
@@ -156,6 +180,7 @@ export function RhythmForm({ rhythm }: { readonly rhythm: Rhythm }) {
             <span className="text-ink-2">Coach strictness</span>
             <select
               name="coachStrictness"
+              disabled={!canManage}
               defaultValue={rhythm.coachStrictness}
               className="rounded-md border border-line bg-bg px-2 py-1"
             >
@@ -261,7 +286,9 @@ export function RhythmForm({ rhythm }: { readonly rhythm: Rhythm }) {
       </Card>
 
       <div>
-        <Button type="submit">Save</Button>
+        <Button type="submit" disabled={!canManage}>
+          Save
+        </Button>
       </div>
     </form>
   );

@@ -40,6 +40,17 @@ export interface CreateCommentInput {
   readonly subjectId: string;
   readonly authorMemberId: string;
   readonly body: unknown; // rich-text JSON, validated before reaching here
+  /**
+   * The four fields below exist for `comments.importComment` and for nothing
+   * else (P6-T04b). A comment written in the product is by the person writing
+   * it, now, answering nothing and carrying no legacy key. An imported one is
+   * by somebody who may have left, dated when they wrote it, and has to be
+   * recognisable on a second run.
+   */
+  readonly parentId?: string;
+  readonly createdAt?: Date;
+  readonly editedAt?: Date;
+  readonly legacy?: { readonly type: string; readonly id: string };
 }
 
 export interface CreateCommentResult {
@@ -59,6 +70,14 @@ export async function createComment<
       subjectId: input.subjectId,
       authorMemberId: input.authorMemberId,
       body: input.body,
+      ...(input.parentId ? { parentId: input.parentId } : {}),
+      ...(input.createdAt
+        ? { createdAt: input.createdAt, updatedAt: input.createdAt }
+        : {}),
+      ...(input.editedAt ? { editedAt: input.editedAt } : {}),
+      ...(input.legacy
+        ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
+        : {}),
     })
     .returning({ id: comments.id });
 
@@ -176,6 +195,8 @@ export interface CommentRow {
   readonly body: unknown;
   readonly editedAt: Date | null;
   readonly createdAt: Date;
+  /** The comment this one answers, or null. One level deep (P6-T04b). */
+  readonly parentId: string | null;
 }
 
 export async function listComments<
@@ -196,6 +217,7 @@ export async function listComments<
       body: comments.body,
       editedAt: comments.editedAt,
       createdAt: comments.createdAt,
+      parentId: comments.parentId,
     })
     .from(comments)
     .innerJoin(
@@ -221,6 +243,7 @@ export async function listComments<
     body: r.body,
     editedAt: r.editedAt,
     createdAt: r.createdAt,
+    parentId: r.parentId,
   }));
 }
 

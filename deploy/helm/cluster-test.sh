@@ -120,6 +120,13 @@ pass "a database is running"
 # --- install --------------------------------------------------------------
 # --wait makes helm block until the hook and the pods are ready, so a failure
 # here is a real failure rather than a race with the next command.
+#
+# Two replicas with persistence off, which is not the shipped default any more
+# and is deliberate here: this test is about the migration hook running once for
+# several pods and about a rolling upgrade, and neither needs a volume. The
+# defaults pin the release to one replica, because a ReadWriteOnce claim cannot
+# be shared, and one replica would prove nothing about the hook. check.sh is
+# where the default storage combination is asserted.
 helm install "$RELEASE" . \
   --namespace "$NAMESPACE" \
   --set "image.repository=$OPENOKR_IMAGE_REPO" \
@@ -127,6 +134,7 @@ helm install "$RELEASE" . \
   --set image.pullPolicy=Never \
   --set "database.url=postgres://openokr:test-only-password@postgres:5432/openokr" \
   --set replicaCount=2 \
+  --set persistence.enabled=false \
   --wait --timeout 5m >/dev/null \
   || fail "helm install did not complete"
 pass "the chart installed and every pod became ready"
@@ -194,6 +202,7 @@ helm upgrade "$RELEASE" . \
   --set image.pullPolicy=Never \
   --set "database.url=postgres://openokr:test-only-password@postgres:5432/openokr" \
   --set replicaCount=2 \
+  --set persistence.enabled=false \
   --wait --timeout 5m >/dev/null \
   || fail "helm upgrade did not complete"
 pass "the chart upgraded"

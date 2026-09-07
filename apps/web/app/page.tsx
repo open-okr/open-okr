@@ -1,10 +1,18 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../lib/access";
 import { AppShellLayout } from "../lib/app-shell.tsx";
 import { getPool } from "../lib/auth";
 import { requireWorkspace } from "../lib/workspace";
+import { mapNodesFor } from "./goal-nodes.ts";
 import { type MapNode, WorkMap } from "./work-map.tsx";
+import {
+  type ScopeTab,
+  type WorkMapContext,
+  WorkMapContextStrip,
+  WorkMapHeader,
+  WorkMapScopeTabs,
+  type WorkMapStats,
+} from "./work-map-header.tsx";
 
 /**
  * The Work Map, the front door (UIUX-PLAN.md §4 S-01, P3-T11).
@@ -48,79 +56,142 @@ export default async function HomePage({
   });
   const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
 
+  // The scope tab. "company" is every goal the reader may see; a space id
+  // narrows to that space. S-01 names a "my spaces" tab too, and it is left out
+  // rather than faked: `goals.list` filters by one space, and answering "mine"
+  // properly means the reader's space membership, which is a read this screen
+  // does not have yet.
+  const spaces = await callAction(context, "spaces.list", {});
+  const scope =
+    query.scope && spaces.some((space) => space.id === query.scope)
+      ? query.scope
+      : "company";
+
   const { goals } = cycleId
     ? await callAction(context, "goals.list", {
         cycleId,
         includeClosed: false,
+        ...(scope === "company" ? {} : { spaceId: scope }),
       })
     : { goals: [] };
+
+  // The cycle's phase, its gates and its deadline (P3-T03, P4-T03). The front
+  // door is where somebody asks "where are we", and a tree of goals alone does
+  // not answer it.
+  const workflow = cycleId
+    ? await callAction(context, "workflow.read", { cycleId })
+    : null;
+
+  const alignment = cycleId
+    ? await callAction(context, "alignment.read", {
+        cycleId,
+        includeDismissed: false,
+        ...(scope === "company" ? {} : { spaceId: scope }),
+      })
+    : null;
 
   const nodes = flatten(goals);
   const selected = nodes.find((node) => node.id === query.node) ?? null;
 
-  const hrefFor = (nodeId: string | null): string => {
-    const next = new URLSearchParams();
-    if (cycleId) {
-      next.set("cycle", cycleId);
+  // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on
+  // track" is counted over goals and reported against the measures they carry:
+  // a set of four objectives is a smaller number than the fourteen key results
+  // somebody is actually reading about.
+  const keyResultCount = goals.reduce(
+    (sum, goal) => sum + goal.keyResults.length,
+    0,
+  );
+  const measured = goals.filter((goal) => goal.keyResults.length > 0);
+  const onTrackKeyResults = measured
+    .filter((goal) => goal.health === "on_track" || goal.health === "achieved")
+    .reduce((sum, goal) => sum + goal.keyResults.length, 0);
+  const stats: WorkMapStats = {
+    objectiveCount: goals.length,
+    keyResultCount,
+    onTrackPct:
+      keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
+    outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
+    alignmentScore: alignment?.score ?? null,
+    alignmentThreshold: alignment?.threshold ?? 0,
+  };
+
+  const workMapContext: WorkMapContext | null = workflow
+    ? {
+        phase: workflow.phase,
+        phaseTitle:
+          workflow.phases.find((phase) => phase.phase === workflow.phase)
+            ?.title ?? "",
+        unmetGates: workflow.gates
+          .filter((gate) => !gate.passed)
+          .map((gate) => gate.title),
+        daysToDeadline: workflow.daysToDeadline,
+        published: workflow.publishedAt !== null,
+      }
+    : null;
+
+  const linkTo = (next: {
+    cycle?: string | null;
+    node?: string | null;
+    scope?: string | null;
+  }): string => {
+    const params = new URLSearchParams();
+    const cycle = next.cycle === undefined ? cycleId : next.cycle;
+    const node = next.node === undefined ? (query.node ?? null) : next.node;
+    const nextScope = next.scope === undefined ? scope : next.scope;
+    if (cycle) {
+      params.set("cycle", cycle);
     }
-    if (nodeId) {
-      next.set("node", nodeId);
+    if (nextScope && nextScope !== "company") {
+      params.set("scope", nextScope);
     }
-    const search = next.toString();
+    if (node) {
+      params.set("node", node);
+    }
+    const search = params.toString();
     return search ? `/?${search}` : "/";
   };
 
+  const hrefFor = (nodeId: string | null): string => linkTo({ node: nodeId });
+
+  const scopeTabs: ScopeTab[] = [
+    {
+      key: "company",
+      label: "Company",
+      href: linkTo({ scope: "company", node: null }),
+    },
+    ...spaces.map((space) => ({
+      key: space.id,
+      label: space.name,
+      href: linkTo({ scope: space.id, node: null }),
+    })),
+  ];
+
+  const scopeLabel =
+    scope === "company"
+      ? "Company-wide tree"
+      : (spaces.find((space) => space.id === scope)?.name ?? "One space");
+
   return (
     <AppShellLayout>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Work map</h1>
-              <p className="text-xs text-ink-3">
-                {nodes.length === 0
-                  ? "Nothing to show yet."
-                  : `${goals.length} objective${
-                      goals.length === 1 ? "" : "s"
-                    } and their key results, health rolled up from the measures.`}
-              </p>
-            </div>
-            <div className="flex flex-none flex-wrap gap-1">
-              {cycles.map((cycle) => (
-                <a
-                  key={cycle.id}
-                  href={
-                    cycle.id === cycleId
-                      ? hrefFor(query.node ?? null)
-                      : `/?cycle=${cycle.id}`
-                  }
-                  aria-current={cycle.id === cycleId ? "true" : undefined}
-                  className={
-                    cycle.id === cycleId
-                      ? "rounded-md bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
-                      : "rounded-md px-2 py-0.5 text-xs font-medium text-ink-3 hover:bg-raised"
-                  }
-                >
-                  {cycle.name}
-                </a>
-              ))}
-            </div>
-          </CardHeader>
-          <CardBody className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-            <a className="text-xs text-brand-text underline" href="/goals">
-              Filter and search in the explorer
-            </a>
-            <a
-              className="text-xs text-brand-text underline"
-              href="/goals/studio"
-            >
-              See the cascade
-            </a>
-            <a className="text-xs text-brand-text underline" href="/review">
-              What you owe
-            </a>
-          </CardBody>
-        </Card>
+      <div className="flex w-full flex-col gap-3.5">
+        <WorkMapContextStrip
+          context={workMapContext}
+          cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
+        />
+
+        <WorkMapHeader
+          workspaceName={workspace.name}
+          scopeLabel={scopeLabel}
+          stats={stats}
+        />
+
+        <WorkMapScopeTabs
+          tabs={scopeTabs}
+          active={scope}
+          cycles={cycles}
+          activeCycleId={cycleId}
+          cycleHrefFor={(id) => linkTo({ cycle: id, node: null })}
+        />
 
         <WorkMap
           nodes={nodes}
@@ -128,6 +199,25 @@ export default async function HomePage({
           canEdit={canEdit}
           hrefFor={hrefFor}
         />
+
+        <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
+          <a className="text-brand-text underline" href="/goals">
+            Filter and search in the explorer
+          </a>
+          <a className="text-brand-text underline" href="/goals/studio">
+            See the cascade
+          </a>
+          <a className="text-brand-text underline" href="/review">
+            What you owe
+          </a>
+          {/* P5-T01c. The sidebar carries it on every page; this is here
+              because the task asks for a door from the front door itself, and
+              a member who lands here should not have to know the product has
+              a sidebar item for the room they are late to. */}
+          <a className="text-brand-text underline" href="/sessions">
+            Sessions
+          </a>
+        </p>
       </div>
     </AppShellLayout>
   );
@@ -170,57 +260,7 @@ function flatten(goals: readonly Goal[]): MapNode[] {
       return;
     }
     seen.add(goal.id);
-
-    const confidences = goal.keyResults
-      .map((keyResult) => keyResult.confidence)
-      .filter((value): value is number => value !== null);
-
-    out.push({
-      id: goal.id,
-      kind: "goal",
-      title: goal.title,
-      depth,
-      owner: goal.champion.name,
-      health: goal.health,
-      progressPct: goal.progressPct,
-      confidence:
-        confidences.length === 0
-          ? null
-          : confidences.reduce((sum, value) => sum + value, 0) /
-            confidences.length,
-      timeframe: goal.timeframe
-        ? `${goal.timeframe.startsOn} to ${goal.timeframe.endsOn}`
-        : null,
-      nextStep: nextStepFor(goal),
-      goalId: goal.id,
-      keyResultId: null,
-      currentValue: null,
-      unit: null,
-    });
-
-    for (const keyResult of goal.keyResults) {
-      out.push({
-        id: keyResult.id,
-        kind: "key_result",
-        title: keyResult.title,
-        depth: depth + 1,
-        owner: goal.champion.name,
-        // A key result carries no health of its own: §3.5 puts health on the
-        // goal, and inventing one per measure would be a second answer.
-        health: goal.health,
-        progressPct: keyResult.progressPct,
-        confidence: keyResult.confidence,
-        timeframe: keyResult.dueOn,
-        nextStep: `${keyResult.currentValue} of ${keyResult.targetValue}${
-          keyResult.unit ? ` ${keyResult.unit}` : ""
-        }`,
-        goalId: goal.id,
-        keyResultId: keyResult.id,
-        currentValue: keyResult.currentValue,
-        unit: keyResult.unit,
-      });
-    }
-
+    out.push(...mapNodesFor(goal, depth));
     for (const child of childrenOf.get(goal.id) ?? []) {
       walk(child, depth + 1);
     }
@@ -229,20 +269,4 @@ function flatten(goals: readonly Goal[]): MapNode[] {
     walk(root, 0);
   }
   return out;
-}
-
-/** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(goal: Goal): string {
-  if (goal.closedAt) {
-    return `closed · ${goal.successStatus ?? "no outcome"}`;
-  }
-  if (goal.daysPastDue !== null && goal.daysPastDue > 0) {
-    return `check-in ${goal.daysPastDue} day${
-      goal.daysPastDue === 1 ? "" : "s"
-    } overdue`;
-  }
-  if (goal.nextCheckInOn) {
-    return `check in by ${goal.nextCheckInOn}`;
-  }
-  return "no cadence set";
 }

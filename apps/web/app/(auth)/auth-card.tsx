@@ -72,7 +72,7 @@ export function FormError({ children }: { children: ReactNode }) {
  * `password-field.tsx`) cannot drift from this one.
  */
 export const fieldInputClass =
-  "h-7.5 w-full rounded-lg border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
+  "h-7.5 w-full rounded-control border border-line-2 bg-surface px-2.5 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-line";
 
 export function Field({
   label,

@@ -151,8 +151,53 @@ const OPEN_USING = /\busing\s*\(\s*true\s*\)/i;
  * Lints one migration file's SQL. Returns human-readable problems; an empty
  * array means the file passes.
  */
+/**
+ * Characters a WIN1252 database cannot store.
+ *
+ * Postgres refuses the whole migration, not the comment it sits in, with
+ * "character with byte sequence ... has no equivalent in encoding WIN1252".
+ * The Windows installer creates a WIN1252 cluster by default, so a migration
+ * carrying one of these applies on CI's Linux Postgres and cannot be installed
+ * on Windows at all. Migration 0032 shipped 123 box-drawing characters in two
+ * decorative comment rules before anybody found out.
+ *
+ * WIN1252 covers Latin-1 plus a handful of punctuation in 0x80 to 0x9F, which
+ * is why the section sign and the em dash this repository uses everywhere are
+ * fine and box drawing is not.
+ */
+const WIN1252_EXTRAS = new Set([
+  0x20ac, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030,
+  0x0160, 0x2039, 0x0152, 0x017d, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+  0x2013, 0x2014, 0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x017e, 0x0178,
+]);
+
+const untranslatable = (sql: string): string[] => {
+  const found = new Map<string, number>();
+  for (const character of sql) {
+    const code = character.codePointAt(0) ?? 0;
+    if (code <= 0xff || WIN1252_EXTRAS.has(code)) {
+      continue;
+    }
+    found.set(character, (found.get(character) ?? 0) + 1);
+  }
+  return [...found].map(
+    ([character, count]) =>
+      `U+${character.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")} ` +
+      `"${character}" x${count}`,
+  );
+};
+
 export function lintMigrationSql(fileName: string, sql: string): string[] {
   const problems: string[] = [];
+
+  const unrepresentable = untranslatable(sql);
+  if (unrepresentable.length > 0) {
+    problems.push(
+      `${fileName}: characters a WIN1252 database cannot store, which makes ` +
+        `the whole migration refuse on a default Windows Postgres: ` +
+        `${unrepresentable.join(", ")}`,
+    );
+  }
 
   for (const table of tableStatements(sql)) {
     const label = `${fileName}: table ${table.name}`;

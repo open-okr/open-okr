@@ -11,7 +11,7 @@
 -- subject-to-context resolver in packages/core/src/access/reads.ts.
 -- Neither owns an access context of its own.
 
--- ── Comments ────────────────────────────────────────────────────────────
+-- Comments
 
 create table comments (
   id uuid primary key,
@@ -54,7 +54,7 @@ create policy comments_tenant on comments
   using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
   with check (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);
 
--- ── Reactions ───────────────────────────────────────────────────────────
+-- Reactions
 
 create table reactions (
   id uuid primary key,

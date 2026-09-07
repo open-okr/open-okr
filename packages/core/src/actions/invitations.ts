@@ -12,10 +12,20 @@
  * That comment is widened alongside this file rather than left describing
  * only the first of its two callers.
  */
-import { activeOnly, inviteLinks } from "@openokr/db";
-import { eq, sql } from "drizzle-orm";
+import {
+  activeOnly,
+  inviteLinks,
+  type WorkspaceTx,
+  withWorkspace,
+} from "@openokr/db";
+import { desc, eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import {
+  resolveMemberAccessLevel,
+  resolveSubjectContext,
+} from "../access/reads.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
 import {
   emailDomain,
@@ -23,7 +33,8 @@ import {
   hashInviteToken,
 } from "../invitations/tokens.ts";
 import { OperationError } from "../operations/operation.ts";
-import { defineWriteAction } from "./define.ts";
+import { actingMemberId } from "./api-tokens.ts";
+import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const linkSummary = z.object({
   id: z.uuid(),
@@ -32,6 +43,115 @@ const linkSummary = z.object({
   maxUses: z.number().nullable(),
   expiresAt: z.string().nullable(),
   revokedAt: z.string().nullable(),
+});
+
+/**
+ * Every invitation this workspace has issued (P6-G06).
+ *
+ * P2-T04 built five write actions and no read, so the only way to see what had
+ * been issued was to query the table. An administrator cannot revoke a link
+ * they cannot see, and `invitations.revokeLink` takes an id, so revoke was
+ * unreachable in practice as well as in the interface. The gap audit of
+ * 7 September 2026 recorded the whole domain as B-07.
+ *
+ * **The token is never returned.** It is stored hashed and shown exactly once,
+ * at creation, which is what makes a leaked list of invitations harmless. A
+ * read that could hand back a working token would undo that, and there is no
+ * version of this screen that needs one: an administrator who lost a link
+ * revokes it and issues another.
+ *
+ * Revoked and expired links stay in the list. An administrator asking "did I
+ * already invite this person" is asking about history, and a list that hid the
+ * answer would send them to issue a second link.
+ */
+export const listInvitations = defineReadAction({
+  name: "invitations.list",
+  summary:
+    "Every invitation link this workspace has issued, without their tokens.",
+  input: z.object({}),
+  output: z.array(
+    linkSummary.extend({
+      email: z.string().nullable(),
+      allowedDomains: z.array(z.string()),
+      createdAt: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (tx) => {
+      // **The level is enforced here, not by the `access` field above.**
+      // `defineReadAction` records `access` and nothing checks it: not the
+      // builder, not `callAction`, not the REST or agent transports. For a read
+      // whose rows are already access-scoped that is fine, because the getter
+      // does the work. This read is not one of those: `invite_links` is scoped
+      // by tenant and by nothing else, so without this any member of the
+      // workspace could list every address anybody has ever invited, over REST
+      // with an ordinary token. Found at P6-G06a; the general sweep is P6-G31.
+      //
+      // `forbidden` rather than the getter's usual `not_found`: the caller is
+      // already a member of this workspace and knows it exists, so there is no
+      // existence oracle to protect here, and the write actions beside this one
+      // refuse the same way.
+      const memberId = await actingMemberId(
+        tx as WorkspaceTx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      const workspaceContext = await resolveSubjectContext(
+        tx,
+        "workspace",
+        context.workspaceId,
+        context.workspaceId,
+      );
+      const level = workspaceContext
+        ? await resolveMemberAccessLevel(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            contextId: workspaceContext.contextId,
+          })
+        : 0;
+      if (level < ACCESS_LEVELS.full) {
+        throw new OperationError(
+          "forbidden",
+          "Only a workspace administrator can read the invitations.",
+        );
+      }
+
+      const rows = await tx
+        .select({
+          id: inviteLinks.id,
+          mode: inviteLinks.mode,
+          email: inviteLinks.email,
+          allowedDomains: inviteLinks.allowedDomains,
+          useCount: inviteLinks.useCount,
+          maxUses: inviteLinks.maxUses,
+          expiresAt: inviteLinks.expiresAt,
+          revokedAt: inviteLinks.revokedAt,
+          createdAt: inviteLinks.createdAt,
+        })
+        .from(inviteLinks)
+        .where(
+          activeOnly(
+            inviteLinks,
+            eq(inviteLinks.workspaceId, context.workspaceId),
+          ),
+        )
+        .orderBy(desc(inviteLinks.createdAt));
+
+      return rows.map((row) => ({
+        id: row.id,
+        mode: row.mode as "workspace" | "personal",
+        email: row.email,
+        allowedDomains: row.allowedDomains ?? [],
+        useCount: row.useCount,
+        maxUses: row.maxUses,
+        expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
+        revokedAt: row.revokedAt ? row.revokedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      }));
+    });
+  },
 });
 
 export const createWorkspaceLink = defineWriteAction({

@@ -70,7 +70,11 @@ export function WorkspaceSwitcher({
     <div className="flex items-center gap-2 rounded-lg p-1.5">
       <span
         aria-hidden="true"
-        className="grid size-7 flex-none place-items-center rounded-lg bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed] text-sm font-extrabold text-on-brand shadow-brand-hover"
+        // `rounded-control` (8px), not `rounded-lg`. `rounded-lg` is the card
+        // radius, 14px, and 14px on a 28px square is exactly half of it, so
+        // the mockup's rounded-square brandmark rendered as a circle. The
+        // mockup's `.brandmark .logo` is 8px.
+        className="grid size-7 flex-none place-items-center rounded-control bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed] text-sm font-extrabold text-on-brand shadow-brand-hover"
       >
         {initialsOf(active.name)}
       </span>

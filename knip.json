@@ -7,14 +7,12 @@
         "e2e/*.spec.ts",
         "e2e/prepare-database.ts",
         "e2e/repair-standalone-links.ts",
-        "deploy/docker/migrate.ts"
+        "deploy/docker/migrate.ts",
+        "playwright.dev.config.ts"
       ]
     },
     "apps/web": {
       "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]
-    },
-    "packages/core": {
-      "ignore": ["src/embeddings/service.ts"]
     },
     "packages/test-support": {
       "entry": ["bin/*.ts", "fixtures/**/vitest.config.ts"]

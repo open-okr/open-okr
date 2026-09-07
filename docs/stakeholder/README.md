@@ -6,6 +6,7 @@ The `mockups/` folder does double duty. It supplies the screenshots for both art
 
 | File | What it is |
 |---|---|
+| `DEMO-SCRIPT.md` | **The live demo.** How to stand a fresh instance up with `pnpm db:seed`, what to walk through, and what the build honestly does not have yet. The only artifact here that shows the running product rather than a picture of it |
 | `OpenOKR-Overview.docx` | **The document.** A4, ~20 pages, eleven screen mockups. Generated, so never edit it directly |
 | `OpenOKR-Deck.pptx` | **The deck.** 36 slides, 16:9, the same content and all eleven mockups. Also generated |
 | `OpenOKR-Overview.md` | The document source. Edit this |

@@ -401,6 +401,68 @@ export function scoreAnnotation(
   return "none";
 }
 
+/** One key result's contribution to its objective's score. */
+export interface ScoredKeyResult {
+  /** 0.0 to 1.0, as §3.3 grades it. Null when it has not been scored. */
+  readonly score: number | null;
+  /** `key_results.weight`. §3.2's weighting, and the reason this is not a mean. */
+  readonly weight: number;
+}
+
+/**
+ * An objective's score from its key results (METHOD.md §3.2 and §3.3).
+ *
+ * **Weighted, following §3.2's weights.** §8.3 says so now; it did not when this
+ * was written. §3.3 graded a key result and §3.4 averaged a set, and nothing
+ * stated how an objective's own score was built. Agung decided on 21 August 2026
+ * that it follows progress, and §8.3 carries the sentence as of 24 August: a team
+ * that said one key result matters three times as much sees that in the score,
+ * exactly as it sees it in the progress. The cycle score stays the plain average
+ * §3.4 states, which is a different question about a different set.
+ *
+ * Null when nothing is scored yet, so a screen can tell "not scored" from
+ * "scored zero". Unscored key results are left out of both the numerator and the
+ * denominator rather than counted as zero: a half-graded objective must not read
+ * as a failing one while the room is still working through it.
+ *
+ * A weight of zero contributes nothing and is not an error. A set whose scored
+ * rows all weigh zero has no weighted answer at all, and null is the honest one.
+ */
+export function objectiveScore(
+  keyResults: readonly ScoredKeyResult[],
+): number | null {
+  const scored = keyResults.filter(
+    (entry): entry is ScoredKeyResult & { score: number } =>
+      entry.score !== null,
+  );
+  if (scored.length === 0) {
+    return null;
+  }
+  const weight = scored.reduce((sum, entry) => sum + entry.weight, 0);
+  if (weight <= 0) {
+    return null;
+  }
+  return (
+    scored.reduce((sum, entry) => sum + entry.score * entry.weight, 0) / weight
+  );
+}
+
+/**
+ * The cycle score (METHOD.md §8.6, over §3.4's average).
+ *
+ * §8.6 words it exactly: "the §3.4 portfolio average over every scored key
+ * result in the cycle". A plain average, not weighted, and over key results
+ * rather than over objective scores. Averaging the objective scores would weight
+ * an objective with two key results the same as one with eight, which is a
+ * different number than the document asks for.
+ */
+export function cycleScore(scores: readonly number[]): number | null {
+  if (scores.length === 0) {
+    return null;
+  }
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+
 export type PortfolioVerdict =
   | "too_safe"
   | "healthy"

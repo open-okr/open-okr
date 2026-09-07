@@ -1,22 +1,28 @@
 import {
   activeOnly,
   cycleIssues,
+  cyclePackItems,
   cyclePriorScores,
   cycles,
   goals,
   includeDeleted,
   keyResults,
+  learnings,
   newId,
+  okrSessions,
   performanceSnapshots,
+  processHealthResponses,
 } from "@openokr/db";
 import {
+  lowestProcessHealthStatement,
+  PROCESS_HEALTH_STATEMENTS,
   portfolioVerdictOf,
   type ResolvedThresholds,
   round2,
   type ScoreBand,
   scoreBand,
 } from "@openokr/method";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { desc, eq, inArray, isNull } from "drizzle-orm";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 
 /**
@@ -278,6 +284,10 @@ export interface FeedForwardResult {
   readonly frameCarried: boolean;
   /** Rows of §8.9's mapping this build cannot fill, each naming its task. */
   readonly waiting: readonly string[];
+  /** Whether the lowest process-health statement became an issue (P4-T12-b). */
+  readonly processHealthIssue: boolean;
+  /** Whether the learnings reached the next cycle's input pack (P4-T12-b). */
+  readonly packNote: boolean;
 }
 
 /**
@@ -420,6 +430,213 @@ export async function feedForwardInTx(
     issues += 1;
   }
 
+  /**
+   * §8.9's remaining two rows, filled at P4-T12-b.
+   *
+   * Both were reported in `waiting` because the tables did not exist when
+   * P3-T15 wrote this: learnings arrived at P4-T11c-b and the process-health
+   * survey at P4-T11b. The `waiting` list is what made their absence visible
+   * instead of letting a half-done mapping read as complete, and it is empty now.
+   *
+   * The review is found rather than passed in: §8.10 holds the review before the
+   * next cycle is drafted, so by the time anything feeds forward the review is a
+   * closed session on the cycle being left behind.
+   */
+  const [review] = await tx
+    .select({ id: okrSessions.id })
+    .from(okrSessions)
+    .where(
+      activeOnly(
+        okrSessions,
+        eq(okrSessions.workspaceId, workspaceId),
+        eq(okrSessions.cycleId, fromCycleId),
+        eq(okrSessions.kind, "quarterly"),
+        eq(okrSessions.state, "closed"),
+      ),
+    )
+    .orderBy(desc(okrSessions.endedAt))
+    .limit(1);
+
+  // --- carried learnings join carried key results as issues at impact four ---
+  //
+  // §8.9's row is "every carry-forward item", and a learning marked to carry is
+  // one. It re-enters as an issue for the same reason a key result does: it has
+  // to survive the next prioritisation on its merits.
+  const carriedLearnings = await tx
+    .select({ text: learnings.text })
+    .from(learnings)
+    .where(
+      activeOnly(
+        learnings,
+        eq(learnings.workspaceId, workspaceId),
+        eq(learnings.cycleId, fromCycleId),
+        eq(learnings.carryForward, true),
+      ),
+    );
+
+  for (const learning of carriedLearnings) {
+    if (alreadyCarried.has(learning.text)) {
+      continue;
+    }
+    const [duplicate] = await tx
+      .select({ id: cycleIssues.id })
+      .from(cycleIssues)
+      .where(
+        activeOnly(
+          cycleIssues,
+          eq(cycleIssues.workspaceId, workspaceId),
+          eq(cycleIssues.cycleId, toCycleId),
+          eq(cycleIssues.source, "carry_forward"),
+          eq(cycleIssues.text, learning.text),
+        ),
+      )
+      .limit(1);
+    if (duplicate) {
+      continue;
+    }
+    // openokr:allow-mutation: same transaction.
+    await tx.insert(cycleIssues).values({
+      id: newId(),
+      workspaceId,
+      cycleId: toCycleId,
+      text: learning.text,
+      impact: 4,
+      source: "carry_forward",
+    });
+    issues += 1;
+  }
+
+  // --- the lowest process-health statement becomes an issue ---
+  //
+  // **§8.9 calls this "a process priority" and it lands as an issue, which is a
+  // deliberate reading.** `cycle_issues.source` has carried a `process_health`
+  // value since P3-T03 with nothing writing it, so the schema was built for this.
+  // §8.9's own closing line settles the disagreement: carried work re-enters as
+  // an issue and does not get a free pass, and a statement promoted straight to a
+  // priority would be exactly that free pass.
+  let processHealthIssue = false;
+  if (review) {
+    const responses = await tx
+      .select({
+        statementKey: processHealthResponses.statementKey,
+        score: processHealthResponses.score,
+      })
+      .from(processHealthResponses)
+      .where(
+        activeOnly(
+          processHealthResponses,
+          eq(processHealthResponses.workspaceId, workspaceId),
+          eq(processHealthResponses.sessionId, review.id),
+        ),
+      );
+
+    if (responses.length > 0) {
+      const averages = PROCESS_HEALTH_STATEMENTS.map((_statement, index) => {
+        const forStatement = responses.filter(
+          (row) => row.statementKey === index + 1,
+        );
+        return forStatement.length === 0
+          ? null
+          : forStatement.reduce((sum, row) => sum + row.score, 0) /
+              forStatement.length;
+      });
+      // From `packages/method`, including how a tie is broken: strictly lower, so
+      // the earlier statement wins and the answer does not depend on iteration
+      // order.
+      const lowest = lowestProcessHealthStatement(averages);
+      if (lowest) {
+        const [duplicate] = await tx
+          .select({ id: cycleIssues.id })
+          .from(cycleIssues)
+          .where(
+            activeOnly(
+              cycleIssues,
+              eq(cycleIssues.workspaceId, workspaceId),
+              eq(cycleIssues.cycleId, toCycleId),
+              eq(cycleIssues.source, "process_health"),
+              eq(cycleIssues.text, lowest.statement),
+            ),
+          )
+          .limit(1);
+        if (!duplicate) {
+          // openokr:allow-mutation: same transaction.
+          await tx.insert(cycleIssues).values({
+            id: newId(),
+            workspaceId,
+            cycleId: toCycleId,
+            text: lowest.statement,
+            impact: 4,
+            source: "process_health",
+          });
+          issues += 1;
+        }
+        processHealthIssue = true;
+      }
+    }
+  }
+
+  // --- learnings and the retrospective into the input pack ---
+  //
+  // §2.6's item two is "Prior cycle OKRs with scores and retrospective notes",
+  // which is where §8.9 sends them. The note is rewritten rather than appended,
+  // so running the feed-forward twice leaves one note and not two copies of it.
+  let packNote = false;
+  if (carriedLearnings.length > 0 || review) {
+    const allLearnings = await tx
+      .select({ text: learnings.text, carryForward: learnings.carryForward })
+      .from(learnings)
+      .where(
+        activeOnly(
+          learnings,
+          eq(learnings.workspaceId, workspaceId),
+          eq(learnings.cycleId, fromCycleId),
+        ),
+      )
+      .orderBy(learnings.createdAt);
+
+    if (allLearnings.length > 0) {
+      const note = allLearnings
+        .map(
+          (row) => `${row.text}${row.carryForward ? " (carried forward)" : ""}`,
+        )
+        .join("\n");
+
+      const [existing] = await tx
+        .select({ id: cyclePackItems.id })
+        .from(cyclePackItems)
+        .where(
+          activeOnly(
+            cyclePackItems,
+            eq(cyclePackItems.workspaceId, workspaceId),
+            eq(cyclePackItems.cycleId, toCycleId),
+            eq(cyclePackItems.itemKey, 2),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        // openokr:allow-mutation: same transaction.
+        await tx
+          .update(cyclePackItems)
+          .set({ note, gathered: true, updatedAt: now })
+          .where(
+            activeOnly(cyclePackItems, eq(cyclePackItems.id, existing.id)),
+          );
+      } else {
+        // openokr:allow-mutation: same transaction.
+        await tx.insert(cyclePackItems).values({
+          id: newId(),
+          workspaceId,
+          cycleId: toCycleId,
+          itemKey: 2,
+          gathered: true,
+          note,
+        });
+      }
+      packNote = true;
+    }
+  }
+
   // The annual frame carries forward as a reference. The focus flags clear
   // themselves: `cycle_focus_key_results` is per cycle, so a new cycle starts
   // with none and there is nothing to unset.
@@ -443,11 +660,17 @@ export async function feedForwardInTx(
     priorScores,
     issues,
     frameCarried,
-    // Two of §8.9's five rows cannot be filled by this build, and saying so is
-    // the point: a mapping that silently skipped them would look complete.
-    waiting: [
-      "learnings and the retrospective into the input pack (P4-T11 owns learnings)",
-      "the lowest process-health statement as a process priority (P4-T11 owns the survey)",
-    ],
+    /**
+     * Empty since P4-T12-b, and kept rather than deleted.
+     *
+     * Two of §8.9's five rows sat here from P3-T15 until the tables existed:
+     * learnings arrived at P4-T11c-b and the process-health survey at P4-T11b.
+     * The field is what made their absence visible instead of letting a
+     * half-done mapping read as complete, and the next row §8.9 grows will use
+     * it the same way.
+     */
+    waiting: [],
+    processHealthIssue,
+    packNote,
   };
 }

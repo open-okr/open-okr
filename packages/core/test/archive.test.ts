@@ -214,9 +214,15 @@ describe("the feed-forward", () => {
     );
     expect(result.priorScores).toBe(2);
     expect(result.issues).toBe(2);
-    // Two rows of §8.9's mapping need tables P4-T11 owns, and the result says
-    // so rather than reporting a complete hand-over.
-    expect(result.waiting).toHaveLength(2);
+    // **Empty since P4-T12-b, and this assertion is the reason the field exists.**
+    // It read `toHaveLength(2)` from P3-T15 until the tables arrived: learnings
+    // at P4-T11c-b and the process-health survey at P4-T11b. A partial mapping
+    // that reported nothing waiting would have looked complete for four months.
+    expect(result.waiting).toEqual([]);
+    // This cycle has no review behind it, so §8.9's last two rows hand over
+    // nothing and say so rather than inventing a hand-over.
+    expect(result.processHealthIssue).toBe(false);
+    expect(result.packNote).toBe(false);
 
     const scores = await wb.admin.query<{ text: string; score: string }>(
       "select text, score from cycle_prior_scores where cycle_id = $1 order by position",
