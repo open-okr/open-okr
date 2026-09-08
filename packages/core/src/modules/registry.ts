@@ -78,6 +78,23 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "inbox",
+    navigation: [
+      {
+        id: "inbox",
+        label: "Inbox",
+        href: "/inbox",
+        section: "sidebar",
+        group: "primary",
+        // UIUX-PLAN §3 puts it in the primary block beside Home and Review,
+        // and it belongs at view for the same reason Review does: the list
+        // only ever holds rows addressed to the reader, so there is nothing
+        // here to withhold from anybody (P6-G07a).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "review",
     navigation: [
       {
@@ -365,6 +382,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // An import writes across every domain at once, as the member who ran
         // it, and its report names rows the reader may not otherwise reach
         // (P6-T01b-b). The same level the two table actions require.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-ai",
+        label: "AI",
+        href: "/admin/ai",
+        section: "admin",
+        // The provider key reaches every AI call the workspace makes and the
+        // spend it books, so who may set one is the same question the channel
+        // card asks about a bot token (S-37, P6-G12a).
         minLevel: ACCESS_LEVELS.full,
       },
       {

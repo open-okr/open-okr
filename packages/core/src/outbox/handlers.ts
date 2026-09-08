@@ -41,6 +41,9 @@ import {
   parseExportJob,
   runExportJob,
 } from "../exports/worker.ts";
+import { digestItemsFor } from "../notifications/digest.ts";
+import { DIGEST_TOPIC } from "../notifications/drain.ts";
+import { renderDigest } from "../notifications/templates.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
@@ -77,6 +80,15 @@ export interface OutboxHandlerDeps {
     readonly to: string;
     readonly subject: string;
     readonly text: string;
+    /**
+     * The HTML alternative, for a message that has one (P6-G01b).
+     *
+     * The Mailer port has taken it since P1-T07 and this shape did not
+     * describe it, so the digest's rendered list could only have been sent as
+     * plain text. Optional, because the invitation deliberately sends none:
+     * "the link is the message".
+     */
+    readonly html?: string;
   }) => Promise<void>;
   /**
    * Delivers one message over a channel (P5-T01b-a).
@@ -231,6 +243,86 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
       "",
       "If you were not expecting this, you can ignore it.",
     ].join("\n"),
+  });
+};
+
+/**
+ * Sends one closed batch as a digest (P6-G01b).
+ *
+ * **Safe to run twice in the only sense mail can be.** The batch is claimed
+ * once by `claimDueBatches`, so this row exists once, but a relay that dies
+ * between the send and the commit will deliver a second copy of the same
+ * digest. That is the same exposure `invitation.email` has, for the same
+ * reason: mail has no idempotency of its own and inventing one here would mean
+ * a sent-mail table nothing else needs.
+ *
+ * **The items are built here, not at claim time.** Two reasons. The access
+ * filter has to run against the state at delivery, so a member who lost access
+ * to a goal in the minutes between the window closing and the mail going out
+ * does not read its title in their inbox. And a digest built at claim time
+ * would have to be stored somewhere, which is a payload of unbounded size on a
+ * queue row.
+ *
+ * A batch whose items all fail the access filter sends nothing and says so.
+ * That is a normal outcome rather than a failure: the rows are still in the
+ * member's in-app inbox, filtered there by the same rule.
+ */
+const sendDigest: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const batchId = asString(delivery.payload.batchId);
+  const memberId = asString(delivery.payload.memberId);
+  if (!workspaceId || !batchId || !memberId) {
+    // The workspace is on the payload rather than the delivery, the way
+    // `channel.message` carries it: `OutboxDelivery` describes the queue row
+    // and not the tenant, and every handler that touches business data has to
+    // open the transaction under a workspace of its own.
+    throw new PermanentDispatchError(
+      "A digest needs a workspace, a batch and a member, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    // Not a failure. An instance with no mail configured has an in-app inbox,
+    // and the rows are in it.
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+
+  const to = await memberEmail(deps.pool, workspaceId, memberId);
+  if (!to) {
+    // An agent member, or somebody removed between the claim and now. Both are
+    // ordinary and neither is worth a retry.
+    deps.onSkipped?.(delivery, "the member has no address");
+    return;
+  }
+
+  const db = drizzle(deps.pool);
+  const contents = await withWorkspace(db, workspaceId, (tx) =>
+    digestItemsFor(tx, {
+      workspaceId: workspaceId,
+      memberId,
+      batchId,
+      baseUrl: withoutTrailingSlashes(deps.baseUrl as string),
+    }),
+  );
+
+  if (contents.items.length === 0) {
+    deps.onSkipped?.(delivery, "nothing in this batch is still visible");
+    return;
+  }
+
+  const mail = renderDigest({ items: contents.items });
+  // Never silently truncated. A digest is capped at twenty lines because a
+  // hundred-line mail is not read, and saying how many were left is what keeps
+  // the cap from hiding them.
+  const tail =
+    contents.omitted > 0
+      ? `\n\nand ${contents.omitted} more in your inbox.`
+      : "";
+  await deps.sendMail({
+    to,
+    subject: mail.subject,
+    text: `${mail.text}${tail}`,
+    html: mail.html,
   });
 };
 
@@ -493,6 +585,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [EMBED_TOPIC]: embedContent,
   [CHANNEL_MESSAGE_TOPIC]: deliverChannelMessage,
   "invitation.email": sendInvitation,
+  // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
+  // outside the package barrel from P2-T06 until this row existed.
+  [DIGEST_TOPIC]: sendDigest,
   "session.stageChanged": publishEvent,
   "session.micPassed": publishEvent,
   "session.scoresRevealed": publishEvent,

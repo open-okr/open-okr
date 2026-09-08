@@ -644,6 +644,19 @@ export {
   templateFor,
 } from "./imports/templates/index.ts";
 export {
+  cookieHeaderFrom,
+  INVITE_COOKIE,
+  INVITE_COOKIE_MAX_AGE_SECONDS,
+  inviteTokenFromCookies,
+} from "./invitations/pending.ts";
+export {
+  addressMayAccept,
+  type InvitePreview,
+  type InviteRefusal,
+  type InviteResolution,
+  previewInvite,
+} from "./invitations/preview.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,
@@ -673,6 +686,22 @@ export {
   type NotifyRecipientsResult,
   notifyRecipients,
 } from "./notifications/create.ts";
+export {
+  DIGEST_ITEM_LIMIT,
+  type DigestContents,
+  type DigestItemsInput,
+  digestItemsFor,
+} from "./notifications/digest.ts";
+export {
+  claimDueBatches,
+  DIGEST_TOPIC,
+  type DrainResult,
+} from "./notifications/drain.ts";
+export {
+  LINKED_SUBJECT_TYPES,
+  subjectPath,
+  subjectUrl,
+} from "./notifications/links.ts";
 export {
   type Recipient,
   type ResolveRecipientsInput,
@@ -707,6 +736,7 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export { readerMaySeeSubject } from "./notifications/visibility.ts";
 export {
   ageInWords,
   blockerDraft,
@@ -898,4 +928,5 @@ export {
 export {
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
+  registrationOpenOrInvited,
 } from "./workspaces/registration.ts";

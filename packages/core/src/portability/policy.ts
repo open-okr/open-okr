@@ -296,6 +296,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "The same, and it would include the archive's own row, which cannot be inside itself.",
   },
   {
+    table: "workspace_imports",
+    decision: "exclude",
+    reason:
+      "An archive import that happened on this instance. The report describes rows in this database, not in the one the archive came from.",
+  },
+  {
     table: "agent_runs",
     decision: "exclude",
     reason:

@@ -91,6 +91,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
+  /** The orphan reap's own row, so the removal is accountable (P6-G01c). */
+  "blob.reaped": z.object({
+    discarded: z.number().int(),
+    bytesLeft: z.number().int(),
+    olderThanMinutes: z.number().int(),
+  }),
   "notification.read": z.object({}),
   "notification.snoozed": z.object({}),
   "notification_settings.updated": z.object({}),
@@ -193,6 +199,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // the nudges are rows of their own, and a feed with one entry per message
   // sent would bury everything a person actually did.
   "nudges.run": z.object({ recorded: z.number().int() }),
+  // The batch drain (P6-G01b). One activity per pass rather than per digest,
+  // for the same reason the nudge run has one: a feed with an entry per mail
+  // would bury everything a person actually did.
+  "notifications.drained": z.object({ claimed: z.number().int() }),
   // A snooze silences the nudge and never the obligation, which is why it
   // is worth recording: somebody chose to stop being messaged about a
   // thing they still owe.
@@ -240,6 +250,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     status: z.string(),
     rowsWritten: z.number().int(),
     rowsSkipped: z.number().int(),
+  }),
+  // Archive import (P6-T05b). An archive carries a whole workspace, so the
+  // feed records whether it was a dry run and what digest identified it.
+  "import.archive": z.object({
+    mode: z.string(),
+    digest: z.string(),
   }),
   // Documents and attachments (P5-T12). Drafting emits an activity but no
   // notification: the author's own record that they started one, with nothing

@@ -419,7 +419,11 @@
       "description": "Every active member of the workspace.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "includeSuspended": {
+            "type": "boolean"
+          }
+        }
       },
       "scope": "read",
       "annotations": {
@@ -428,6 +432,32 @@
         "idempotentHint": true
       },
       "example": {}
+    },
+    {
+      "name": "people.readMember",
+      "description": "One member's profile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "memberId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "people.orgChart",
@@ -1753,6 +1783,27 @@
       }
     },
     {
+      "name": "blobs.reapOrphans",
+      "description": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "olderThanMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "blobs.prepareImport",
       "description": "Reserves a storage key for a file an import found, keeping its uploader.",
       "inputSchema": {
@@ -1897,6 +1948,30 @@
       }
     },
     {
+      "name": "notifications.drainBatches",
+      "description": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "notifications.list",
       "description": "The signed-in member's own inbox.",
       "inputSchema": {
@@ -1904,8 +1979,51 @@
         "properties": {
           "unreadOnly": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "joined",
+              "mentioned",
+              "role",
+              "review",
+              "check_in"
+            ]
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "createdAt",
+              "id"
+            ]
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "notifications.unreadCount",
+      "description": "How many unread, unsnoozed notifications the member has.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {
@@ -2000,8 +2118,8 @@
           },
           "batchWindowMinutes": {
             "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "minimum": 1,
+            "maximum": 1440
           },
           "dailySummary": {
             "type": "boolean"
@@ -2009,6 +2127,31 @@
           "dailySummaryTime": {
             "type": "string",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "routing": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "invited",
+                "joined",
+                "mentioned",
+                "role",
+                "review",
+                "check_in"
+              ]
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "app",
+                "email",
+                "slack",
+                "teams",
+                "whatsapp",
+                "telegram"
+              ]
+            }
           }
         }
       },
@@ -2160,6 +2303,34 @@
         "idempotentHint": false
       },
       "example": {}
+    },
+    {
+      "name": "workspace.importArchive",
+      "description": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archiveBase64": {
+            "type": "string"
+          },
+          "dryRun": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archiveBase64"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "archiveBase64": "…"
+      }
     },
     {
       "name": "settings.readWorkspaceSettings",
@@ -3994,7 +4165,17 @@
       "description": "Creates the cycle containing today if the workspace has none. Idempotent.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "semiannual",
+              "quarterly",
+              "monthly"
+            ]
+          }
+        }
       },
       "scope": "write",
       "annotations": {
@@ -4384,6 +4565,21 @@
       "example": {}
     },
     {
+      "name": "frame.annualObjectives",
+      "description": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "frame.read",
       "description": "The current annual frame and its strategic thrusts.",
       "inputSchema": {
@@ -4423,6 +4619,38 @@
           "agreed": {
             "default": false,
             "type": "boolean"
+          },
+          "mission": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vision": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategy": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notDoing": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
           },
           "strategies": {
             "default": [],
@@ -6803,6 +7031,11 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "strategyId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "weight": {
             "default": 1,
             "type": "number"
@@ -6909,6 +7142,18 @@
             ]
           },
           "parentKeyResultId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategyId": {
             "anyOf": [
               {
                 "type": "string",
@@ -10359,6 +10604,64 @@
       },
       "example": {
         "items": []
+      }
+    },
+    {
+      "name": "sessions.carriedCommitments",
+      "description": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "sessions.confidenceTrend",
+      "description": "A space's weekly average confidence, oldest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "weeks": {
+            "default": 12,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

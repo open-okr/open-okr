@@ -3,6 +3,8 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
+import { AgentSwitch, CancelRun } from "./agent-switch";
+import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
 
 /**
@@ -75,6 +77,17 @@ export default async function AgentsPage() {
   };
   const agents = await callAction(context, "agents.list", {});
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
+  // The review queue (P6-G13a). Pending only: an applied or dismissed proposal
+  // is history, and the run log already carries it.
+  //
+  // Agent proposals only. A row with no `run_id` came from a copilot thread and
+  // belongs to the panel that asked for it: the person who typed the question
+  // is the one who decides, and putting it in a shared administrative queue
+  // would hand their conversation to somebody else. The same filter the review
+  // inbox applies at P6-G02.
+  const proposals = (
+    await callAction(context, "proposals.list", { status: "pending" })
+  ).filter((proposal) => proposal.runId !== null);
 
   // Whether a run could draft anything, asked of the stored configuration
   // rather than assumed. The control says which of the two products this
@@ -94,6 +107,11 @@ export default async function AgentsPage() {
       </p>
 
       <RunControls drafting={drafting} />
+
+      {/* Above the agents and the runs on purpose. A proposal is the one thing
+          on this screen that is waiting on the reader, and everything else is a
+          record of what already happened (P6-G13a). */}
+      <ProposalQueue proposals={proposals} />
 
       <Card>
         <CardHeader>
@@ -123,6 +141,13 @@ export default async function AgentsPage() {
                       {SCHEDULE_LABEL[agent.schedule] ?? agent.schedule}
                     </Chip>
                     <Chip tone="agent">{agent.autonomy}</Chip>
+                    <span className="ml-auto">
+                      <AgentSwitch
+                        id={agent.id}
+                        enabled={agent.enabled}
+                        name={agent.name}
+                      />
+                    </span>
                   </span>
                   {agent.persona === "" ? null : (
                     <span className="text-xs text-ink-3">{agent.persona}</span>
@@ -169,6 +194,11 @@ export default async function AgentsPage() {
                         <span className="text-xs tabular-nums text-ink-4">
                           {run.finishedAt.slice(0, 16).replace("T", " ")}
                         </span>
+                      ) : null}
+                      {/* Only a run that has not finished can be stopped, and
+                          the action refuses the rest anyway (P6-G13a). */}
+                      {run.status === "running" || run.status === "planning" ? (
+                        <CancelRun id={run.id} />
                       ) : null}
                     </span>
                   </span>

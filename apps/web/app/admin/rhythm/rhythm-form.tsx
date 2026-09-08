@@ -1,22 +1,44 @@
-import { callAction, OperationError } from "@openokr/core";
+"use client";
+
+import type { callAction } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { revalidatePath } from "next/cache";
-import { getPool } from "../../../lib/auth";
-import { requireWorkspace } from "../../../lib/workspace";
+import { useActionState, useState, useTransition } from "react";
+import { resetGroup, saveRhythm } from "./rhythm-actions.ts";
+import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
 
 /**
- * Editing the §11 registry for one workspace (P3-T02).
+ * Editing the §11 registry for one workspace (P3-T02, widened at P6-G20).
  *
- * Two things this form deliberately does not do. It does not invent a field for
- * a parameter the registry does not declare, because it is generated from the
- * registry. And it does not offer inline editing for a composite parameter (a
- * ladder, a band set, a bounds pair): those are edited as a whole object, no
- * screen in UIUX-PLAN.md §4 specifies how yet, and a half-set ladder is worse
- * than an unset one. They render read-only with their resolved value, so an
- * admin can at least see what is in force.
+ * **Generated from the registry, so a threshold added to METHOD.md next month
+ * appears here with no change to this file.** That was already true and is
+ * what makes the rest of this worth doing.
+ *
+ * Three things P6-G20 changed.
+ *
+ * **A composite is editable.** Ladders, band sets, corridors and bounds pairs
+ * are flat objects of numbers, and they rendered as `JSON.stringify` of the
+ * resolved value with a note that no screen specified how to edit them. So
+ * eighteen of the registry's parameters, including every escalation ladder and
+ * every scoring band, could be read and not changed. One input per part, and
+ * the whole set is written or none of it is.
+ *
+ * **A refusal is read.** The save caught `OperationError` and returned, so an
+ * out-of-range value looked exactly like a successful save: the page came back
+ * unchanged and said nothing at all. `rhythm.update` names the key and the
+ * bound; that sentence now lands above the button.
+ *
+ * **A card returns to the canon.** Reset sends nulls rather than the canon's
+ * current numbers, which is the difference between having no opinion and
+ * having chosen today's default and keeping it after the canon moves.
+ *
+ * Still read-only: the six §11 word lists. They are arrays of words rather
+ * than numbers, editing them is a different control, and P6-G20's deliverables
+ * name clocks, ladders, bands, corridors, caps, boundaries and timings. Their
+ * resolved value is shown so an admin can see what the Coach is matching on.
  */
 
 type Rhythm = Awaited<ReturnType<typeof callAction<"rhythm.read">>>;
+type RegistryEntry = Rhythm["registry"][number];
 
 const GROUP_TITLES: Record<string, string> = {
   cadence: "Cadence and escalation",
@@ -27,77 +49,6 @@ const GROUP_TITLES: Record<string, string> = {
   sessions: "Sessions",
 };
 
-async function save(formData: FormData): Promise<void> {
-  "use server";
-
-  const { session, workspace } = await requireWorkspace();
-
-  const overrides: Record<string, unknown> = {};
-  const labels: Record<string, { singular: string; plural: string }> = {};
-
-  for (const [field, raw] of formData.entries()) {
-    const value = String(raw);
-
-    if (field.startsWith("threshold:")) {
-      const key = field.slice("threshold:".length);
-      // Empty means "return this one to the canon", which the action reads as
-      // null. A blank field is the only way to un-set a threshold.
-      overrides[key] = value.trim() === "" ? null : Number(value);
-      continue;
-    }
-    if (field.startsWith("label:")) {
-      const [, term, form] = field.split(":");
-      if (!term || !form) {
-        continue;
-      }
-      const existing = labels[term] ?? { singular: "", plural: "" };
-      labels[term] = { ...existing, [form]: value.trim() };
-    }
-  }
-
-  // Only send a rename where both forms were filled in. A partial one is
-  // refused by the action anyway, and sending it would fail the whole save for
-  // a row the admin never meant to touch.
-  const renames = Object.fromEntries(
-    Object.entries(labels).filter(
-      ([, label]) => label.singular !== "" && label.plural !== "",
-    ),
-  );
-
-  try {
-    await callAction(
-      {
-        pool: getPool(),
-        workspaceId: workspace.workspaceId,
-        actor: { kind: "human", userId: session.user.id },
-      },
-      "rhythm.update",
-      {
-        defaultCheckInFrequency: formData.get("defaultCheckInFrequency") as
-          | "daily"
-          | "weekly"
-          | "biweekly"
-          | "monthly"
-          | "quarterly",
-        checkInAnchorDay: Number(formData.get("checkInAnchorDay")),
-        coachStrictness: formData.get("coachStrictness") as
-          | "advisory"
-          | "warn"
-          | "strict",
-        overrides,
-        labels: renames,
-      },
-    );
-  } catch (error) {
-    if (!(error instanceof OperationError)) {
-      throw error;
-    }
-    return;
-  }
-
-  revalidatePath("/admin/rhythm");
-}
-
 const WEEKDAYS = [
   [1, "Monday"],
   [2, "Tuesday"],
@@ -107,6 +58,162 @@ const WEEKDAYS = [
   [6, "Saturday"],
   [7, "Sunday"],
 ] as const;
+
+/**
+ * A flat object whose every value is a number: a ladder, a band set, a pair.
+ *
+ * An array counts, and is reported as one, because §11 declares two of these
+ * as `z.array` and reassembling those into an object would be refused by the
+ * schema. `Object.entries` reads an array's indices as the part names, which
+ * is exactly the order they go back in.
+ */
+function numericParts(
+  value: unknown,
+): ReadonlyArray<readonly [string, number]> | null {
+  if (value === null || typeof value !== "object") {
+    return null;
+  }
+  const pairs = Object.entries(value as Record<string, unknown>);
+  if (pairs.length === 0) {
+    return null;
+  }
+  return pairs.every(([, part]) => typeof part === "number")
+    ? (pairs as ReadonlyArray<readonly [string, number]>)
+    : null;
+}
+
+/** One registry row: scalar, composite, or shown as it stands. */
+function Parameter({
+  entry,
+  resolved,
+  override,
+  canManage,
+}: {
+  readonly entry: RegistryEntry;
+  readonly resolved: unknown;
+  readonly override: unknown;
+  readonly canManage: boolean;
+}) {
+  const parts = numericParts(resolved);
+  // A list's fields carry a different prefix, so the save can put an array
+  // back together as an array.
+  const prefix = Array.isArray(resolved) ? "list" : "composite";
+  const overrideParts =
+    override && typeof override === "object"
+      ? (override as Record<string, unknown>)
+      : null;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-medium text-ink">{entry.label}</span>
+        <span className="flex items-center gap-2">
+          <Chip tone="neutral">METHOD {entry.section}</Chip>
+          {override === undefined ? null : <Chip tone="brand">changed</Chip>}
+        </span>
+      </div>
+      <p className="text-sm text-ink-3">{entry.why}</p>
+
+      {typeof resolved === "number" ? (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="number"
+            step="any"
+            name={`threshold:${entry.key}`}
+            disabled={!canManage}
+            defaultValue={override === undefined ? "" : String(override)}
+            placeholder={String(resolved)}
+            className="w-28 rounded-md border border-line bg-bg px-2 py-1 tabular"
+          />
+          <span className="text-ink-3">
+            in force: {String(resolved)}. Leave blank for the canon.
+          </span>
+        </label>
+      ) : parts ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-2.5">
+            {parts.map(([part, inForce]) => (
+              <label
+                key={part}
+                className="flex flex-col gap-0.5 text-xs text-ink-3"
+              >
+                {part}
+                <input
+                  type="number"
+                  step="any"
+                  name={`${prefix}:${entry.key}:${part}`}
+                  disabled={!canManage}
+                  defaultValue={
+                    overrideParts && typeof overrideParts[part] === "number"
+                      ? String(overrideParts[part])
+                      : ""
+                  }
+                  placeholder={String(inForce)}
+                  className="w-24 rounded-md border border-line bg-bg px-2 py-1 text-sm tabular"
+                />
+              </label>
+            ))}
+          </div>
+          <span className="text-xs text-ink-4">
+            Fill in every part or leave them all blank. A set is written whole.
+          </span>
+        </div>
+      ) : (
+        <p className="tabular text-sm text-ink-3">
+          in force: {JSON.stringify(resolved)}
+          <span className="ml-1.5 text-ink-4">
+            Shown as it stands: this one is a list of words, not numbers.
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** "Return this card to the canon", for one group. */
+function ResetCard({
+  keys,
+  disabled,
+}: {
+  readonly keys: readonly string[];
+  readonly disabled: boolean;
+}) {
+  const [pending, start] = useTransition();
+  const [outcome, setOutcome] = useState<RhythmState>(NOTHING_SAVED);
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={disabled || pending}
+        onClick={() => {
+          if (
+            !window.confirm(
+              "Return every threshold in this card to the canon? Anything this workspace changed here goes back to METHOD.md's number. Nothing else moves.",
+            )
+          ) {
+            return;
+          }
+          start(async () => {
+            setOutcome(await resetGroup(keys));
+          });
+        }}
+        className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"
+      >
+        {pending ? "Resetting…" : "Reset to the canon"}
+      </button>
+      {outcome.error ? (
+        <p role="alert" className="text-xs text-bad">
+          {outcome.error}
+        </p>
+      ) : outcome.saved ? (
+        <p role="status" className="text-xs text-ok">
+          {outcome.saved}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export function RhythmForm({
   rhythm,
@@ -123,10 +230,11 @@ export function RhythmForm({
    */
   readonly canManage: boolean;
 }) {
+  const [state, submit, pending] = useActionState(saveRhythm, NOTHING_SAVED);
   const groups = [...new Set(rhythm.registry.map((entry) => entry.group))];
 
   return (
-    <form action={save} className="flex flex-col gap-4.5">
+    <form action={submit} aria-busy={pending} className="flex flex-col gap-4.5">
       {canManage ? null : (
         <Card>
           <CardBody>
@@ -137,6 +245,7 @@ export function RhythmForm({
           </CardBody>
         </Card>
       )}
+
       <Card>
         <CardHeader>
           <h2 className="font-semibold text-ink">The check-in rhythm</h2>
@@ -150,6 +259,7 @@ export function RhythmForm({
             <span className="text-ink-2">Check-in frequency</span>
             <select
               name="defaultCheckInFrequency"
+              disabled={!canManage}
               defaultValue={rhythm.defaultCheckInFrequency}
               className="rounded-md border border-line bg-bg px-2 py-1"
             >
@@ -166,6 +276,7 @@ export function RhythmForm({
             <span className="text-ink-2">Anchor day</span>
             <select
               name="checkInAnchorDay"
+              disabled={!canManage}
               defaultValue={String(rhythm.checkInAnchorDay)}
               className="rounded-md border border-line bg-bg px-2 py-1"
             >
@@ -197,63 +308,35 @@ export function RhythmForm({
         </CardBody>
       </Card>
 
-      {groups.map((group) => (
-        <Card key={group}>
-          <CardHeader>
-            <h2 className="font-semibold text-ink">
-              {GROUP_TITLES[group] ?? group}
-            </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3.5">
-            {rhythm.registry
-              .filter((entry) => entry.group === group && !entry.columnBacked)
-              .map((entry) => {
-                const resolved = rhythm.thresholds[entry.key];
-                const override = rhythm.overrides[entry.key];
-                const scalar =
-                  typeof resolved === "number" || typeof resolved === "string";
-                return (
-                  <div key={entry.key} className="flex flex-col gap-1">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-medium text-ink">
-                        {entry.label}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <Chip tone="neutral">METHOD {entry.section}</Chip>
-                        {override === undefined ? null : (
-                          <Chip tone="brand">changed</Chip>
-                        )}
-                      </span>
-                    </div>
-                    <p className="text-sm text-ink-3">{entry.why}</p>
-                    {scalar && typeof resolved === "number" ? (
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="number"
-                          step="any"
-                          name={`threshold:${entry.key}`}
-                          defaultValue={
-                            override === undefined ? "" : String(override)
-                          }
-                          placeholder={String(resolved)}
-                          className="w-28 rounded-md border border-line bg-bg px-2 py-1 tabular"
-                        />
-                        <span className="text-ink-3">
-                          in force: {String(resolved)}. Leave blank for the
-                          canon.
-                        </span>
-                      </label>
-                    ) : (
-                      <p className="tabular text-sm text-ink-3">
-                        in force: {JSON.stringify(resolved)}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-          </CardBody>
-        </Card>
-      ))}
+      {groups.map((group) => {
+        const rows = rhythm.registry.filter(
+          (entry) => entry.group === group && !entry.columnBacked,
+        );
+        return (
+          <Card key={group}>
+            <CardHeader className="justify-between">
+              <h2 className="font-semibold text-ink">
+                {GROUP_TITLES[group] ?? group}
+              </h2>
+              <ResetCard
+                keys={rows.map((entry) => entry.key)}
+                disabled={!canManage}
+              />
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3.5">
+              {rows.map((entry) => (
+                <Parameter
+                  key={entry.key}
+                  entry={entry}
+                  resolved={rhythm.thresholds[entry.key]}
+                  override={rhythm.overrides[entry.key]}
+                  canManage={canManage}
+                />
+              ))}
+            </CardBody>
+          </Card>
+        );
+      })}
 
       <Card>
         <CardHeader>
@@ -271,11 +354,13 @@ export function RhythmForm({
                 <span className="w-32 text-ink-3">{term}</span>
                 <input
                   name={`label:${term}:singular`}
+                  disabled={!canManage}
                   defaultValue={value.singular}
                   className="w-40 rounded-md border border-line bg-bg px-2 py-1"
                 />
                 <input
                   name={`label:${term}:plural`}
+                  disabled={!canManage}
                   defaultValue={value.plural}
                   className="w-40 rounded-md border border-line bg-bg px-2 py-1"
                 />
@@ -285,10 +370,27 @@ export function RhythmForm({
         </CardBody>
       </Card>
 
-      <div>
-        <Button type="submit" disabled={!canManage}>
-          Save
+      <div className="flex flex-col gap-1.5">
+        <Button type="submit" disabled={!canManage || pending}>
+          {pending ? "Saving…" : "Save"}
         </Button>
+        {state.error ? (
+          <p
+            role="alert"
+            data-testid="rhythm-save"
+            className="max-w-prose text-sm text-bad"
+          >
+            {state.error}
+          </p>
+        ) : state.saved ? (
+          <p
+            role="status"
+            data-testid="rhythm-save"
+            className="text-sm text-ok"
+          >
+            {state.saved}
+          </p>
+        ) : null}
       </div>
     </form>
   );

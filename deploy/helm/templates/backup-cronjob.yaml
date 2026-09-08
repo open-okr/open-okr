@@ -1,0 +1,98 @@
+{{- if .Values.backup.enabled }}
+{{- include "openokr.validate" . -}}
+# Scheduled encrypted backup (P6-T06).
+#
+# pg_dump custom format, encrypted with the instance's root key, and a
+# SHA-256 checksum. The volume mount is where the backups land; an operator
+# points it at a PVC or an NFS mount.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "openokr.fullname" . }}-backup
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.backup.historyLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.backup.historyLimit | default 3 }}
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 172800
+      template:
+        metadata:
+          labels:
+            {{- include "openokr.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: backup
+              image: postgres:17-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+                  BACKUP_DIR="/backups/$TIMESTAMP"
+                  mkdir -p "$BACKUP_DIR"
+
+                  echo "backup: dumping database..."
+                  pg_dump "$DATABASE_URL" -Fc > "$BACKUP_DIR/db.dump"
+
+                  echo "backup: encrypting..."
+                  apk add --no-cache openssl >/dev/null 2>&1 || true
+                  openssl enc -aes-256-cbc -salt -pbkdf2 \
+                    -pass "pass:$OPENOKR_ENCRYPTION_KEY" \
+                    -in "$BACKUP_DIR/db.dump" \
+                    -out "$BACKUP_DIR/db.dump.enc"
+                  rm -f "$BACKUP_DIR/db.dump"
+
+                  DB_SIZE="$(wc -c < "$BACKUP_DIR/db.dump.enc" | tr -d ' ')"
+                  cat > "$BACKUP_DIR/manifest.json" <<MANIFEST
+                  {"timestamp":"$TIMESTAMP","dbBytes":$DB_SIZE,"format":"openokr-backup-v1"}
+                  MANIFEST
+
+                  (cd "$BACKUP_DIR" && sha256sum db.dump.enc manifest.json > checksum.sha256)
+
+                  # Retention
+                  KEPT=0
+                  for D in $(ls -1dr /backups/*/); do
+                    KEPT=$((KEPT + 1))
+                    if [ "$KEPT" -gt "{{ .Values.backup.retention | default 7 }}" ]; then
+                      echo "backup: removing old $D"
+                      rm -rf "$D"
+                    fi
+                  done
+
+                  echo "backup: complete ($BACKUP_DIR, $DB_SIZE bytes)"
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "openokr.fullname" . }}
+                      key: database-url
+                - name: OPENOKR_ENCRYPTION_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "openokr.fullname" . }}
+                      key: encryption-key
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              {{- if .Values.backup.existingClaim }}
+              persistentVolumeClaim:
+                claimName: {{ .Values.backup.existingClaim }}
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+{{- end }}

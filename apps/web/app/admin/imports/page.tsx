@@ -3,6 +3,8 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { requireWorkspace } from "../../../lib/workspace";
+import { ArchiveImportCard } from "./archive-import-card.tsx";
+import { ExportCard } from "./export-card.tsx";
 import { ImportWizard } from "./wizard.tsx";
 
 /**
@@ -97,6 +99,10 @@ export default async function ImportsPage() {
             )}
           </CardBody>
         </Card>
+        {/* Workspace archive export and import (P6-T05c) */}
+        <h2 className="mt-2 text-base font-bold text-ink">Workspace archive</h2>
+        <ExportCard />
+        <ArchiveImportCard />
       </div>
     </>
   );

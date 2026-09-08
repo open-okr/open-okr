@@ -279,7 +279,31 @@
       "path": "/people/directory",
       "scope": "read",
       "summary": "Every active member of the workspace.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "include-suspended",
+          "field": "includeSuspended",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people readMember",
+      "action": "people.readMember",
+      "method": "GET",
+      "path": "/people/readMember",
+      "scope": "read",
+      "summary": "One member's profile.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "pages": false
     },
     {
@@ -1176,6 +1200,23 @@
       "pages": false
     },
     {
+      "name": "blobs reapOrphans",
+      "action": "blobs.reapOrphans",
+      "method": "POST",
+      "path": "/blobs/reapOrphans",
+      "scope": "write",
+      "summary": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "flags": [
+        {
+          "name": "older-than-minutes",
+          "field": "olderThanMinutes",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blobs prepareImport",
       "action": "blobs.prepareImport",
       "method": "POST",
@@ -1275,6 +1316,29 @@
       "pages": false
     },
     {
+      "name": "notifications drainBatches",
+      "action": "notifications.drainBatches",
+      "method": "POST",
+      "path": "/notifications/drainBatches",
+      "scope": "write",
+      "summary": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "flags": [
+        {
+          "name": "now",
+          "field": "now",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "notifications list",
       "action": "notifications.list",
       "method": "GET",
@@ -1287,8 +1351,38 @@
           "field": "unreadOnly",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "invited",
+            "joined",
+            "mentioned",
+            "role",
+            "review",
+            "check_in"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
         }
       ],
+      "pages": true
+    },
+    {
+      "name": "notifications unreadCount",
+      "action": "notifications.unreadCount",
+      "method": "GET",
+      "path": "/notifications/unreadCount",
+      "scope": "read",
+      "summary": "How many unread, unsnoozed notifications the member has.",
+      "flags": [],
       "pages": false
     },
     {
@@ -1371,6 +1465,12 @@
           "name": "daily-summary-time",
           "field": "dailySummaryTime",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "routing",
+          "field": "routing",
+          "type": "object",
           "required": false
         }
       ],
@@ -1476,6 +1576,29 @@
         {
           "name": "include-files",
           "field": "includeFiles",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "workspace importArchive",
+      "action": "workspace.importArchive",
+      "method": "POST",
+      "path": "/workspace/importArchive",
+      "scope": "write",
+      "summary": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "flags": [
+        {
+          "name": "archive-base64",
+          "field": "archiveBase64",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "dry-run",
+          "field": "dryRun",
           "type": "boolean",
           "required": false
         }
@@ -2835,7 +2958,20 @@
       "path": "/cycles/ensureCurrent",
       "scope": "write",
       "summary": "Creates the cycle containing today if the workspace has none. Idempotent.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "cadence",
+          "field": "cadence",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "annual",
+            "semiannual",
+            "quarterly",
+            "monthly"
+          ]
+        }
+      ],
       "pages": false
     },
     {
@@ -3099,6 +3235,16 @@
       "pages": false
     },
     {
+      "name": "frame annualObjectives",
+      "action": "frame.annualObjectives",
+      "method": "GET",
+      "path": "/frame/annualObjectives",
+      "scope": "read",
+      "summary": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "frame read",
       "action": "frame.read",
       "method": "GET",
@@ -3132,6 +3278,30 @@
           "name": "agreed",
           "field": "agreed",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "mission",
+          "field": "mission",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "vision",
+          "field": "vision",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy",
+          "field": "strategy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "not-doing",
+          "field": "notDoing",
+          "type": "string",
           "required": false
         },
         {
@@ -4940,6 +5110,12 @@
           "required": false
         },
         {
+          "name": "strategy-id",
+          "field": "strategyId",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "weight",
           "field": "weight",
           "type": "number",
@@ -5025,6 +5201,12 @@
         {
           "name": "parent-key-result-id",
           "field": "parentKeyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy-id",
+          "field": "strategyId",
           "type": "string",
           "required": false
         },
@@ -7559,6 +7741,46 @@
           "field": "items",
           "type": "array",
           "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions carriedCommitments",
+      "action": "sessions.carriedCommitments",
+      "method": "GET",
+      "path": "/sessions/carriedCommitments",
+      "scope": "read",
+      "summary": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions confidenceTrend",
+      "action": "sessions.confidenceTrend",
+      "method": "GET",
+      "path": "/sessions/confidenceTrend",
+      "scope": "read",
+      "summary": "A space's weekly average confidence, oldest first.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "weeks",
+          "field": "weeks",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false

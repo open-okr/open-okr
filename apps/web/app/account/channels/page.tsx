@@ -1,9 +1,11 @@
 import { callAction } from "@openokr/core";
+import { NOTIFICATION_REASONS } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
-import { saveDelivery, startLink, unlink } from "./actions.ts";
+import { saveCadence, saveDelivery, startLink, unlink } from "./actions.ts";
+import { CadenceForm } from "./cadence-form.tsx";
 import { LinkForm } from "./link-form.tsx";
 
 /**
@@ -23,6 +25,22 @@ import { LinkForm } from "./link-form.tsx";
  * any.
  */
 
+/**
+ * The six reasons a notification exists, in the words a member reads.
+ *
+ * Enumerated from the table's own constant rather than written out, so a
+ * seventh reason appears on this card without anybody remembering it exists.
+ * The labels are here because they are wording; the list is not.
+ */
+const REASON_LABELS: Readonly<Record<string, string>> = {
+  mentioned: "Somebody mentions me",
+  review: "A check-in is waiting on my review",
+  check_in: "A reminder from the Champion or the Coach",
+  invited: "An invitation",
+  joined: "Somebody joins the workspace",
+  role: "My role changes",
+};
+
 const CHOICES = [
   { id: "app", label: "In the product only", needsLink: false },
   { id: "email", label: "Email", needsLink: false },
@@ -41,6 +59,16 @@ export default async function AccountChannelsPage() {
       actor: { kind: "human", userId: session.user.id },
     },
     "channels.mySettings",
+    {},
+  );
+
+  const cadence = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human", userId: session.user.id },
+    },
+    "notifications.getSettings",
     {},
   );
 
@@ -187,6 +215,33 @@ export default async function AccountChannelsPage() {
                 );
               })
             )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-bold text-ink">How often</h2>
+              <p className="text-xs text-ink-3">
+                The member half of the settings map, which had no surface until
+                P6-G08: the routing, the window and the summary were all stored
+                and read and none of them could be seen or changed.
+              </p>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <CadenceForm
+              action={saveCadence}
+              settings={cadence}
+              reasons={NOTIFICATION_REASONS.map((reason) => ({
+                id: reason,
+                label: REASON_LABELS[reason] ?? reason,
+              }))}
+              channels={CHOICES.map((choice) => ({
+                id: choice.id,
+                label: choice.label,
+              }))}
+            />
           </CardBody>
         </Card>
       </div>

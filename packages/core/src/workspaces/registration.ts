@@ -18,6 +18,8 @@
  * one actually wants.
  */
 import type { Pool } from "pg";
+import { inviteTokenFromCookies } from "../invitations/pending.ts";
+import { previewInvite } from "../invitations/preview.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 
 /** The computed half: an instance nobody has claimed is open. */
@@ -48,3 +50,35 @@ export async function isRegistrationOpen(pool: Pool): Promise<boolean> {
  */
 export const REGISTRATION_CLOSED_MESSAGE =
   "This instance is invitation-only. Ask a workspace admin to invite you.";
+
+/**
+ * Whether this request may register, invitation included (P6-G06b).
+ *
+ * **The hook and the page have to agree, and they did not.** P1-T06 refuses
+ * user creation inside Better Auth's own `user.create.before`, deliberately,
+ * so no future sign-in path can reopen registration by not knowing the rule.
+ * P6-G06b taught that hook about invitations and left the sign-up page asking
+ * the narrower question, so a closed instance showed an invitee "Registration
+ * is closed" and never rendered a form the hook would have accepted. The
+ * invitation was redeemable and unreachable at the same time.
+ *
+ * Found by the end-to-end spec, which pressed the button and waited for a name
+ * field that was never going to appear.
+ *
+ * One function, both callers. The cookie is the same one `/join` sets, and a
+ * token that is not usable is the same as no token at all.
+ */
+export async function registrationOpenOrInvited(
+  pool: Pool,
+  cookieHeader: string | null,
+): Promise<boolean> {
+  if (await isRegistrationOpen(pool)) {
+    return true;
+  }
+  const token = inviteTokenFromCookies(cookieHeader);
+  if (!token) {
+    return false;
+  }
+  const invitation = await previewInvite(pool, { token, now: new Date() });
+  return invitation.kind === "usable";
+}

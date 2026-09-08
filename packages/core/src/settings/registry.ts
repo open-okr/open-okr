@@ -31,8 +31,25 @@ import { z } from "zod";
  * is reset only one key at a time.
  */
 
-/** Where a setting is stored. Each scope has exactly one storage home. */
+/** Who the setting belongs to: the whole workspace, or one person. */
 export type SettingScope = "workspace" | "member";
+
+/**
+ * Which table holds it (P6-G08).
+ *
+ * Scope used to imply the home, because there were two scopes and two tables.
+ * §4.14's member half is larger than that: the notification preferences have
+ * lived in `notification_settings` since P2-T06, created lazily on first read,
+ * and a member's own row is not the same storage as a member column. So the
+ * home is declared rather than inferred, and `resolveMemberSettings` filters
+ * on it: that function's answer is written into `workspace_members` at
+ * provisioning, and a notification key in it would be written to a column that
+ * does not exist.
+ */
+type SettingHome =
+  | "workspaces.settings"
+  | "workspace_members"
+  | "notification_settings";
 
 /** What provisioning knows about the person and the request. */
 export interface ProvisioningContext {
@@ -46,6 +63,8 @@ export interface SettingDefinition {
   /** The key inside its storage home. Unique across the registry. */
   readonly key: string;
   readonly scope: SettingScope;
+  /** The table the value lives in. */
+  readonly home: SettingHome;
   /** One line on why the default is the right one to ship. */
   readonly why: string;
   resolve(context: ProvisioningContext): unknown;
@@ -66,6 +85,19 @@ export const INSTANCE_DEFAULT_LANGUAGE = "en";
 
 /** Quiet hours, in the member's own timezone. */
 export const DEFAULT_QUIET_HOURS = { start: "19:00", end: "08:00" } as const;
+
+/**
+ * The batch window and the daily summary hour, from §11's worked example.
+ *
+ * Moved here from `notifications/settings.ts` at P6-G08, so every §4.14
+ * default is defined in the one file the registry is. They were declared
+ * beside the table helper that reads them, which was the right place while the
+ * registry did not know about them and the wrong place the moment it did:
+ * "never hardcode a value that belongs in the §4.14 map" applies to a
+ * constant in another module as much as to a literal.
+ */
+export const DEFAULT_BATCH_WINDOW_MINUTES = 30;
+export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
 
 /**
  * Is this a timezone the runtime actually knows?
@@ -145,6 +177,30 @@ export const DEFAULT_AGENT_RUN_COST_CAP_USD = 2;
 /** How long a half-finished chat conversation waits to be resumed (P5-T06b). */
 export const DEFAULT_CHAT_CONVERSATION_MINUTES = 30;
 
+/**
+ * How long a prepared upload waits to be claimed before it is an orphan
+ * (P6-G01c).
+ *
+ * Twenty-four hours. A prepare that is never claimed is a browser that closed,
+ * an upload that failed, or a tab somebody abandoned, and none of those come
+ * back a day later. Short enough that a bucket does not fill with bytes nobody
+ * asked for, long enough that a slow upload over a bad connection is never
+ * reaped out from under itself. TECHNICAL-PLAN asks for the reap and names no
+ * figure; P6-G01c picked this one.
+ *
+ * Exported for the same reason the two above it are: a workspace provisioned
+ * before this setting existed has no key to read, and one constant keeps the
+ * stored default and the fallback from drifting apart.
+ */
+export const DEFAULT_ORPHAN_BLOB_MINUTES = 24 * 60;
+
+/** Minutes. An hour is the floor; a month is well past any use for one. */
+const orphanBlobMinutesSchema = z
+  .number()
+  .int()
+  .min(60)
+  .max(60 * 24 * 30);
+
 const primaryChannelSchema = z.enum([
   "app",
   "email",
@@ -159,10 +215,28 @@ const quietHoursSchema = z.object({
   end: z.string().regex(/^\d{2}:\d{2}$/),
 });
 
+/**
+ * Per-reason routing: a channel per reason, and the member's primary channel
+ * for every reason absent (P6-G08).
+ *
+ * A partial record rather than one entry per reason. §4.14's default is "the
+ * primary channel for everything", and a map pre-filled with six copies of the
+ * primary channel would freeze it: changing the primary would then leave six
+ * stale overrides behind it.
+ */
+const routingSchema = z.partialRecord(z.string(), primaryChannelSchema);
+
+/** Minutes. One is the floor, a day is the ceiling. */
+const batchWindowSchema = z.number().int().min(1).max(1440);
+
+/** "HH:MM" on a 24-hour clock. The hour is what the hourly sweep reads. */
+const summaryTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
 export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "timezone",
     scope: "workspace",
+    home: "workspaces.settings",
     why: "The registering member's browser timezone, falling back to UTC. Every rhythm date is read in it, so it cannot be left unset.",
     resolve: resolveTimezone,
     schema: timezoneSchema,
@@ -171,6 +245,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "language",
     scope: "workspace",
+    home: "workspaces.settings",
     why: "Inherited from the instance default, which is English until somebody changes it.",
     resolve: (context) => context.language ?? INSTANCE_DEFAULT_LANGUAGE,
     schema: languageSchema,
@@ -179,6 +254,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "branding",
     scope: "workspace",
+    home: "workspaces.settings",
     why: "The product's own palette until a brand colour is chosen. Empty means the default theme, not an unanswered question.",
     resolve: () => ({}),
     schema: brandingSchema,
@@ -187,6 +263,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "trustedEmailDomains",
     scope: "workspace",
+    home: "workspaces.settings",
     why: "None. Joining is by invitation, so an open domain is never the default.",
     resolve: () => [],
     schema: trustedEmailDomainsSchema,
@@ -195,6 +272,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "storageQuotaBytes",
     scope: "workspace",
+    home: "workspaces.settings",
     why:
       "5 GiB: enough for a small team's files on the local disk driver " +
       "without configuration, small enough that a runaway upload loop is " +
@@ -207,6 +285,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "exportInlineRowLimit",
     scope: "workspace",
+    home: "workspaces.settings",
     why:
       "5000 rows: enough that every ordinary export is a file somebody gets " +
       "in the moment they ask, small enough that a request never spends a " +
@@ -220,6 +299,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "importRowLimit",
     scope: "workspace",
+    home: "workspaces.settings",
     why:
       "1000 rows: a run the browser waits for, and each row is its own " +
       "transaction through the Operation pipeline, so a thousand is already " +
@@ -235,8 +315,23 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: importRowLimitSchema,
   },
   {
+    key: "orphanBlobMinutes",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "A day. `findOrphanedBlobs` and `discardOrphanedBlob` were written at " +
+      "P2-T05 and nothing called them, so every prepare that was never " +
+      "claimed stayed in the table and its bytes stayed in the bucket for " +
+      "good. The reap is a scheduled run now (P6-G01c) and this is how old a " +
+      "pending row has to be before it takes it. No S-36 card names it yet, " +
+      "so it has none here.",
+    resolve: () => DEFAULT_ORPHAN_BLOB_MINUTES,
+    schema: orphanBlobMinutesSchema,
+  },
+  {
     key: "primaryChannel",
     scope: "member",
+    home: "workspace_members",
     why: "Email, beside the always-on in-app inbox, until a chat identity is linked.",
     resolve: () => "email",
     schema: primaryChannelSchema,
@@ -244,13 +339,71 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "quietHours",
     scope: "member",
+    home: "workspace_members",
     why: "19:00 to 08:00 in the member's own timezone, so the product cannot wake somebody up on its first day.",
     resolve: () => DEFAULT_QUIET_HOURS,
     schema: quietHoursSchema,
   },
   {
+    key: "routing",
+    scope: "member",
+    home: "notification_settings",
+    why:
+      "Empty, which means every reason goes to the member's primary channel. " +
+      "A map pre-filled with the primary channel would freeze it: changing " +
+      "the primary would leave a stale override behind for every reason.",
+    resolve: () => ({}),
+    schema: routingSchema,
+  },
+  {
+    key: "mentionImmediate",
+    scope: "member",
+    home: "notification_settings",
+    why:
+      "On. §11's worked example makes a mention the one reason that does not " +
+      "wait for a window: somebody wrote your name and expects you to read " +
+      "it, and a mention held for half an hour is a conversation missed.",
+    resolve: () => true,
+    schema: z.boolean(),
+  },
+  {
+    key: "batchWindowMinutes",
+    scope: "member",
+    home: "notification_settings",
+    why:
+      "Thirty minutes, from §11's worked example. Short enough that a busy " +
+      "morning still reaches somebody the same morning, long enough that a " +
+      "fan-out across a goal's watchers arrives as one mail.",
+    resolve: () => DEFAULT_BATCH_WINDOW_MINUTES,
+    schema: batchWindowSchema,
+  },
+  {
+    key: "dailySummary",
+    scope: "member",
+    home: "notification_settings",
+    why:
+      "On. §4.14 makes this the default and it outranks AI-NATIVE-PLAN §6.4's " +
+      '"everyone opted in", which reads as opt-out in practice. A member ' +
+      "who never opens their settings still gets the summary.",
+    resolve: () => true,
+    schema: z.boolean(),
+  },
+  {
+    key: "dailySummaryTime",
+    scope: "member",
+    home: "notification_settings",
+    why:
+      "08:00 in the member's own timezone. The hour is what the run checks: " +
+      "the sweep is hourly, so a summary set to 08:30 arrives in the 08:00 " +
+      "hour, and storing a minute the product cannot honour would be a " +
+      "setting that quietly does nothing.",
+    resolve: () => DEFAULT_DAILY_SUMMARY_TIME,
+    schema: summaryTimeSchema,
+  },
+  {
     key: "agentRunCostCapUsd",
     scope: "workspace",
+    home: "workspaces.settings",
     why:
       "2.00 US dollars per agent run. The deterministic path costs nothing, " +
       "so this only ever bounds AI spend, and one run drafting a handful of " +
@@ -264,6 +417,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "chatConversationMinutes",
     scope: "workspace",
+    home: "workspaces.settings",
     why:
       "Thirty minutes. Long enough that somebody can answer three questions " +
       "between meetings, short enough that a half-finished check-in does not " +
@@ -282,6 +436,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "demoEnabled",
     scope: "workspace",
+    home: "workspaces.settings",
     why: "Off. Demo data is opted into, never assumed. The wizard offers the checkbox (P3-T17), and the seed command reads it.",
     resolve: () => false,
     schema: z.boolean(),
@@ -315,14 +470,38 @@ export function resolveWorkspaceSettings(context: ProvisioningContext): {
   ) as ReturnType<typeof resolveWorkspaceSettings>;
 }
 
-/** Every member-scoped setting, resolved. Stored as member columns. */
+/**
+ * Every setting stored as a member column, resolved. Written at provisioning.
+ *
+ * Filtered on the home rather than the scope since P6-G08: the notification
+ * preferences are member-scoped too and live in their own table, created
+ * lazily, so including them here would write keys to columns that do not exist.
+ */
 export function resolveMemberSettings(context: ProvisioningContext): {
   readonly primaryChannel: string;
   readonly quietHours: { readonly start: string; readonly end: string };
 } {
   return Object.fromEntries(
-    SETTINGS_REGISTRY.filter((setting) => setting.scope === "member").map(
-      (setting) => [setting.key, setting.resolve(context)],
-    ),
+    SETTINGS_REGISTRY.filter(
+      (setting) => setting.home === "workspace_members",
+    ).map((setting) => [setting.key, setting.resolve(context)]),
   ) as ReturnType<typeof resolveMemberSettings>;
+}
+
+/**
+ * Every notification preference, resolved (P6-G08).
+ *
+ * The registry's answer for a member who has never opened the screen, which
+ * must agree with what `notification_settings`' own column defaults produce.
+ * A test asserts they do, enumerated from here rather than from a list: two
+ * homes for one default is one default that will drift.
+ */
+export function resolveMemberNotificationSettings(
+  context: ProvisioningContext,
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    SETTINGS_REGISTRY.filter(
+      (setting) => setting.home === "notification_settings",
+    ).map((setting) => [setting.key, setting.resolve(context)]),
+  );
 }

@@ -82,6 +82,7 @@ import {
   getBlobForDownload,
   prepareImport,
   prepareUpload,
+  reapOrphanedBlobs,
 } from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
@@ -161,6 +162,7 @@ import {
   feedForwardCycle,
   listCycles,
   readAnnualFrame,
+  readAnnualObjectives,
   readCurrentCycle,
   readRhythmSettings,
   readScorecard,
@@ -251,12 +253,14 @@ import {
   updateKpi,
 } from "./kpis.ts";
 import {
+  drainNotificationBatches,
   getNotificationSettings,
   importWatcher,
   listNotifications,
   markNotificationRead,
   snoozeNotification,
   toggleSubscription,
+  unreadNotificationCount,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
 import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
@@ -269,12 +273,13 @@ import {
   importMember,
   orgChart,
   possibleManagersFor,
+  readMember,
   restoreMember,
   suspendMember,
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
-import { exportArchive } from "./portability.ts";
+import { exportArchive, importArchive } from "./portability.ts";
 import { reviewInbox } from "./review.ts";
 import {
   clusterRetroNotes,
@@ -291,11 +296,13 @@ import {
   addStageMinute,
   advanceStage,
   captureLearning,
+  carriedCommitments,
   castRetroVote,
   castSessionVote,
   closeSession,
   closeSessionCommitments,
   completeReviewAction,
+  confidenceTrend,
   confirmSessionConfidence,
   createSession,
   createSessionBlocker,
@@ -404,6 +411,7 @@ export const ACTION_MAP = {
   "people.convertToGuest": convertToGuest,
   "people.erase": eraseMember,
   "people.directory": directory,
+  "people.readMember": readMember,
   "people.orgChart": orgChart,
   "people.possibleManagers": possibleManagersFor,
   "invitations.list": listInvitations,
@@ -446,11 +454,14 @@ export const ACTION_MAP = {
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
   "blobs.prepareUpload": prepareUpload,
+  "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.
   "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
+  "notifications.drainBatches": drainNotificationBatches,
   "notifications.list": listNotifications,
+  "notifications.unreadCount": unreadNotificationCount,
   "notifications.markRead": markNotificationRead,
   "notifications.snooze": snoozeNotification,
   "notifications.getSettings": getNotificationSettings,
@@ -461,6 +472,8 @@ export const ACTION_MAP = {
   "activities.workspaceFeed": workspaceFeed,
   // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
   "workspace.exportArchive": exportArchive,
+  // P6-T05b. An archive into another instance (§7.3).
+  "workspace.importArchive": importArchive,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
@@ -523,6 +536,7 @@ export const ACTION_MAP = {
   "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
+  "frame.annualObjectives": readAnnualObjectives,
   "frame.read": readAnnualFrame,
   "frame.set": setAnnualFrame,
   "workflow.read": readWorkflow,
@@ -677,6 +691,8 @@ export const ACTION_MAP = {
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,
   "sessions.closeCommitments": closeSessionCommitments,
+  "sessions.carriedCommitments": carriedCommitments,
+  "sessions.confidenceTrend": confidenceTrend,
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,

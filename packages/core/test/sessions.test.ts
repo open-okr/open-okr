@@ -1031,3 +1031,228 @@ describe("sessions.close digest and streak (P4-T08)", () => {
     expect((streak as { currentWeeks: number }).currentWeeks).toBe(0);
   });
 });
+
+describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
+  it("names this workspace's own lower bound when it is refused", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    // A workspace that wants three a week. The gate held `const
+    // MIN_COMMITMENTS = 2` under a comment naming this very registry entry,
+    // so a workspace that moved the bound was still gated on the canon
+    // default and told the wrong number.
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      overrides: { "sessions.weeklyCommitmentBounds": { low: 3, high: 4 } },
+    });
+
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "One", ownerId: facilitatorMemberId },
+          { text: "Two", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    // Two would have passed the canon default. This workspace asked for three.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+      }),
+    ).rejects.toThrow(/at least 3 commitments/i);
+  });
+});
+
+describe("sessions.carriedCommitments (P6-G19a)", () => {
+  it("lists an earlier session's open commitments and not this session's own", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    const lastWeek = await openSessionAtConfidence();
+    await advanceToCommitments(lastWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: lastWeek,
+        items: [
+          { text: "Carried across", ownerId: facilitatorMemberId },
+          { text: "Also carried", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    const thisWeek = await openSessionAtConfidence();
+    await advanceToCommitments(thisWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: thisWeek,
+        items: [{ text: "Set here, not carried", ownerId: memberMemberId }],
+      },
+    );
+
+    const carried = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    )) as Array<{ id: string; text: string }>;
+
+    expect(carried.map((one) => one.text).sort()).toEqual([
+      "Also carried",
+      "Carried across",
+    ]);
+  });
+
+  it("drops one once it is closed, whichever verdict it was given", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    const lastWeek = await openSessionAtConfidence();
+    await advanceToCommitments(lastWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: lastWeek,
+        items: [
+          { text: "Delivered one", ownerId: facilitatorMemberId },
+          { text: "Missed one", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    const thisWeek = await openSessionAtConfidence();
+    const before = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    )) as Array<{ id: string; text: string }>;
+    expect(before).toHaveLength(2);
+
+    // Not delivered is still closed. §7.2 asks the room to say whether it
+    // landed, not to keep asking until it does.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.closeCommitments",
+      {
+        items: before.map((one) => ({ id: one.id, delivered: false })),
+      },
+    );
+
+    const after = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    );
+    expect(after).toEqual([]);
+  });
+
+  it("refuses a session id it cannot see, rather than answering empty", async () => {
+    const wb = await workerDb();
+    // An empty list would read as "that session had nothing carried in",
+    // which is a different answer from "there is no such session".
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.carriedCommitments",
+        { sessionId: "00000000-0000-4000-8000-000000000000" },
+      ),
+    ).rejects.toThrow(/no such session/i);
+  });
+});
+
+/** Runs a whole weekly session and closes it, which writes the digest. */
+async function holdAWeek(confidence: number): Promise<string> {
+  const wb = await workerDb();
+  const sessionId = await openSessionAtConfidence();
+  await advanceToCommitments(sessionId, confidence);
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.setCommitments",
+    {
+      sessionId,
+      items: [
+        { text: "One", ownerId: facilitatorMemberId },
+        { text: "Two", ownerId: memberMemberId },
+      ],
+    },
+  );
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.advanceStage",
+    { id: sessionId },
+  );
+  await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+    id: sessionId,
+  });
+  return sessionId;
+}
+
+describe("sessions.confidenceTrend (P6-G19b)", () => {
+  it("answers nothing before a week has closed", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await openSessionAtConfidence();
+
+    const trend = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    );
+    // Not a row of zeroes. A space that has never closed a week has no trend,
+    // and drawing twelve empty columns would say something untrue about it.
+    expect(trend).toEqual([]);
+  });
+
+  it("takes the figure from the digest the room read, not a second sum", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdAWeek(0.6);
+
+    const trend = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    )) as Array<{ weekStart: string; average: number }>;
+
+    expect(trend).toHaveLength(1);
+    expect(trend[0]?.average).toBeCloseTo(0.6, 5);
+  });
+});
+
+describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
+  it("returns what setCoordinatorNote wrote", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    // **After the close.** The note is written onto the digest row and
+    // `sessions.close` is what creates it, so a note added on step 4 is
+    // refused with "No digest exists for this session yet". That is why the
+    // form sits after the close on the screen rather than on the stage §7.2
+    // names, and this test is where that was found.
+    const sessionId = await holdAWeek(0.6);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCoordinatorNote",
+      { sessionId, note: "Hiring is the constraint, not the roadmap." },
+    );
+
+    const digest = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.digest",
+      { sessionId },
+    )) as { note: string | null } | null;
+
+    // The digest builder has rendered this line since P4-T15b and the read did
+    // not return it, so a surface could show the note it had just written only
+    // by reloading somebody else's page.
+    expect(digest?.note).toBe("Hiring is the constraint, not the roadmap.");
+  });
+});

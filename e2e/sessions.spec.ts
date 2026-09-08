@@ -254,6 +254,96 @@ test("acceptance criterion: second context sees stage advance without reload", a
 });
 
 // ---------------------------------------------------------------------------
+// Step 5a: The diagnose stage's blockers (P6-G19b)
+// ---------------------------------------------------------------------------
+
+/**
+ * §7.2 step 2, which rendered nothing at all before P6-G19b.
+ *
+ * The rail is at "Diagnose what is low" when this starts, left there by the
+ * test above.
+ *
+ * **The raise is not exercised end to end here, and the fixture is why.** This
+ * spec inserts its session with no `cycle_id`, deliberately: a session inside
+ * a cycle puts every key result under the confidence gate and the rail walk
+ * below could not finish. No cycle means no key results, and a blocker names
+ * one. Raising, resolving and reassigning are covered against a real database
+ * in `packages/core/test/sessions.test.ts`. What is proved here is that the
+ * stage has a surface and offers the canon's taxonomy.
+ */
+test("the diagnose stage offers the blocker controls", async () => {
+  await page.goto(`/session/${sessionId}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByRole("heading", { name: "Blockers" })).toBeVisible();
+  await expect(page.getByText("Nothing raised in this session yet")).toBeVisible();
+
+  // §6.2's five types, from the method package rather than from a list typed
+  // into the component.
+  const types = page.locator("select[name='type'] option");
+  await expect(types).toHaveCount(6); // the five, plus "What kind"
+  await expect(page.getByRole("button", { name: "Raise a blocker" })).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// Step 5b: The commitment stage (P6-G19a)
+// ---------------------------------------------------------------------------
+
+/**
+ * §7.2 step 3, which had no surface until P6-G19a.
+ *
+ * The rail is at "Diagnose what is low" when this starts, because the test
+ * above advanced it there. One more step reaches the commitments stage rather
+ * than hunting for it, which keeps this test about the stage and not about
+ * navigation.
+ */
+test("the commitment stage closes last week and sets this week", async () => {
+  await page.goto(`/session/${sessionId}`);
+  await page.waitForLoadState("networkidle");
+
+  const continueBtn = page.getByRole("button", {
+    name: "Continue to next step",
+  });
+  await expect(async () => {
+    await continueBtn.click({ timeout: 4_000 });
+    await expect(page.getByRole("heading", { name: "This week" })).toBeVisible({
+      timeout: 5_000,
+    });
+  }).toPass({ timeout: 20_000 });
+
+  // Nothing is carried in: this is the space's first weekly session, and the
+  // card says which of the two reasons that is rather than showing an empty
+  // list.
+  await expect(page.getByRole("heading", { name: "Last week" })).toBeVisible();
+  await expect(page.getByText("Nothing is carried in")).toBeVisible();
+
+  // The bounds are stated, and they come from the workspace's resolved §11
+  // numbers rather than from a sentence written into the component.
+  await expect(page.getByText("2 to 3 a week")).toBeVisible();
+
+  // Two commitments, each with an owner. The owner select lists the session's
+  // participants.
+  const texts = page.locator("input[name='text']");
+  const owners = page.locator("select[name='ownerId']");
+  await texts.nth(0).fill("Ship the onboarding flow");
+  await owners.nth(0).selectOption({ index: 1 });
+  await texts.nth(1).fill("Review the pipeline");
+  await owners.nth(1).selectOption({ index: 1 });
+
+  await page
+    .getByRole("button", { name: "Set this week's commitments" })
+    .click();
+
+  await expect(page.getByText("Ship the onboarding flow")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByText("Review the pipeline")).toBeVisible();
+  // Set, and the form now offers one more row rather than the whole set again,
+  // because the action appends.
+  await expect(page.getByRole("button", { name: "Add one more" })).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
 // Step 6: Advance through remaining stages and close
 // ---------------------------------------------------------------------------
 test("facilitator advances through remaining stages and closes", async () => {
@@ -323,4 +413,79 @@ test("facilitator advances through remaining stages and closes", async () => {
 
   await expect(page.getByRole("button", { name: "Start session" })).not.toBeVisible();
   await expect(closeBtn).not.toBeVisible();
+});
+
+/**
+ * The trend, the streak and the blockers (P6-G19b).
+ *
+ * Runs after the close, so the space has at least one closed week behind it.
+ *
+ * **How many is not this spec's business.** The first version asserted "One
+ * week so far.", which held when this file ran on its own and failed in the
+ * full suite: earlier specs close sessions in the same space, so the count is
+ * whatever they left. What is worth asserting is that the panel draws from the
+ * tables rather than from a placeholder, which is true at one point or twelve.
+ */
+test("the weekly figures read the tables the placeholder used to name", async () => {
+  await page.goto(`/session/${sessionId}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(
+    page.getByRole("heading", { name: "Confidence trend" }),
+  ).toBeVisible();
+  await expect(page.getByText("week streak")).toBeVisible();
+
+  // At least one bar, drawn from a digest rather than from nothing, and the
+  // empty state absent because a week has closed.
+  const trend = page.getByTestId("confidence-trend");
+  await expect(trend).toBeVisible();
+  expect(await trend.locator("li").count()).toBeGreaterThan(0);
+  await expect(page.getByText("No week has been closed yet")).toHaveCount(0);
+
+  // The sentence that stood in for all of this is gone.
+  await expect(page.getByText("arrive at P6-G19")).toHaveCount(0);
+});
+
+test("the coordinator's note reaches the digest once the session is closed", async () => {
+  const note = "Hiring is the constraint, not the roadmap.";
+  await expect(
+    page.getByRole("heading", { name: "The coordinator's note" }),
+  ).toBeVisible();
+
+  await page.locator("textarea[name='note']").fill(note);
+  await page.getByRole("button", { name: "Add the note" }).click();
+
+  // Written, and read back: the form now offers to replace it, which it can
+  // only know from the digest read carrying the note.
+  await expect(
+    page.getByRole("button", { name: "Replace the note" }),
+  ).toBeVisible({ timeout: 10_000 });
+});
+
+/**
+ * The space home answers "how is this team doing" (P6-G19c).
+ *
+ * Runs last, so the space has one closed week behind it: one trend point, a
+ * streak, and a digest to show as last week.
+ */
+test("the space home shows the trend, the streak and last week", async () => {
+  const space = (
+    await pool.query<{ id: string }>(
+      "select s.id from spaces s join workspace_members m on m.workspace_id = s.workspace_id join users u on u.id = m.user_id where u.email = $1 and s.deleted_at is null limit 1",
+      [EMAIL],
+    )
+  ).rows[0];
+  if (!space) throw new Error("Space not found.");
+
+  await page.goto(`/spaces/${space.id}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(
+    page.getByRole("heading", { name: "Confidence trend" }),
+  ).toBeVisible();
+  await expect(page.getByText("week streak")).toBeVisible();
+
+  // Last week is the closed session's digest, not the running one's figures.
+  await expect(page.getByText("Last week", { exact: true })).toBeVisible();
+  await expect(page.getByText("No week has closed in this space yet")).toHaveCount(0);
 });

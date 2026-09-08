@@ -525,6 +525,10 @@ export {
   whatsappTemplates,
 } from "./schema/whatsapp-templates.ts";
 export {
+  type WorkspaceImport,
+  workspaceImports,
+} from "./schema/workspace-imports.ts";
+export {
   type QuietHours,
   type Workspace,
   type WorkspaceMember,
@@ -554,6 +558,7 @@ export {
   withContext,
   withDeviceCode,
   withInstanceAdmin,
+  withInviteToken,
   withOAuthSecret,
   withProviderTeam,
   withUser,

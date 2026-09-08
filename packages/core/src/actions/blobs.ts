@@ -21,6 +21,8 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import {
   claimBlob,
+  discardOrphanedBlob,
+  findOrphanedBlobs,
   prepareBlob,
   QuotaExceededError,
   ValidationFailedError,
@@ -28,6 +30,7 @@ import {
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import { DEFAULT_ORPHAN_BLOB_MINUTES } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** The workspace's own byte ceiling, resolved from its settings. */
@@ -337,4 +340,103 @@ export const getBlobForDownload = defineReadAction({
       return row;
     });
   },
+});
+
+/**
+ * Removes every upload that was prepared and never claimed (P6-G01c).
+ *
+ * **`findOrphanedBlobs` and `discardOrphanedBlob` were written at P2-T05 and
+ * nothing ever called them.** Their own comments said so: "unwired
+ * scaffolding", "not yet built". So a prepare that failed left its row in the
+ * table and, when the bytes had reached the bucket before the claim did, left
+ * those there too, for good. The gap audit recorded it under B-01 with the
+ * rest of the scheduled work.
+ *
+ * **The bytes go with the row, and in that order.** Deleting the row first and
+ * failing on the object would leave bytes nothing points at, which is the
+ * state this exists to end. Deleting the object first and failing on the row
+ * leaves a pending row whose key is gone, and the next run tries it again:
+ * that one is recoverable, so it is the order chosen.
+ *
+ * **A storage failure on one blob does not stop the sweep.** An object that
+ * was never uploaded is the ordinary case, not an error, and it is
+ * indistinguishable from a driver problem at this level. Each is counted and
+ * the run reports both numbers.
+ */
+export const reapOrphanedBlobs = defineWriteAction({
+  name: "blobs.reapOrphans",
+  summary:
+    "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+  input: z.object({
+    /** Overrides the workspace's own setting. For tests and an operator. */
+    olderThanMinutes: z.number().int().min(1).optional(),
+  }),
+  output: z.object({
+    discarded: z.number().int(),
+    /** Rows discarded whose bytes could not be removed. */
+    bytesLeft: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [workspace] = await tx
+        .select({ settings: workspaces.settings })
+        // openokr:allow-raw-read: reading this workspace's own settings row
+        // from inside the Operation, the same as `readQuotaBytes` above.
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      const configured = (
+        workspace?.settings as Record<string, unknown> | undefined
+      )?.orphanBlobMinutes;
+      const olderThanMinutes =
+        input.olderThanMinutes ??
+        (typeof configured === "number"
+          ? configured
+          : DEFAULT_ORPHAN_BLOB_MINUTES);
+
+      const orphans = await findOrphanedBlobs(
+        tx as OperationTx,
+        workspaceId,
+        olderThanMinutes,
+      );
+
+      let bytesLeft = 0;
+      for (const orphan of orphans) {
+        if (context.storage) {
+          try {
+            await context.storage.delete(orphan.storageKey);
+          } catch {
+            // The object may never have been uploaded, which is the ordinary
+            // reason a prepare goes unclaimed and not a failure. A driver
+            // problem looks the same here, so both are counted and neither
+            // stops the row being discarded: leaving it would mean trying the
+            // same dead key again every day.
+            bytesLeft += 1;
+          }
+        } else {
+          // No storage port. The rows still go, and the count says the bytes
+          // did not, so an operator reading the log knows to sweep the bucket.
+          bytesLeft += 1;
+        }
+        await discardOrphanedBlob(tx as OperationTx, workspaceId, orphan.id);
+      }
+
+      return {
+        result: { discarded: orphans.length, bytesLeft },
+        activity: {
+          kind: "blob.reaped",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { discarded: orphans.length, bytesLeft, olderThanMinutes },
+        },
+        audit: {
+          action: "blobs.reapOrphans",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { discarded: orphans.length, bytesLeft },
+        },
+      };
+    },
+  }),
 });

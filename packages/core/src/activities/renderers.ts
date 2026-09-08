@@ -53,6 +53,19 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "Someone joined through a trusted email domain",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
+  "blob.reaped": (payload) => {
+    const { discarded, bytesLeft } = payload as {
+      discarded: number;
+      bytesLeft: number;
+    };
+    if (discarded === 0) {
+      return "No abandoned uploads to clear";
+    }
+    const files = `${discarded} abandoned upload${discarded === 1 ? "" : "s"}`;
+    return bytesLeft === 0
+      ? `Cleared ${files}`
+      : `Cleared ${files}, and ${bytesLeft} left bytes behind`;
+  },
   "notification.read": () => "A notification was read",
   "notification.snoozed": () => "A notification was snoozed",
   "notification_settings.updated": () => "Notification settings were updated",
@@ -161,6 +174,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "nudges.run": (p) =>
     `ran the nudge engine and recorded ${String(p.recorded)} nudge(s)`,
   "nudge.snoozed": (p) => `snoozed a nudge until ${asString(p.until, "later")}`,
+  "notifications.drained": (p) =>
+    `sent ${String(p.claimed)} notification digest(s)`,
   "frame.set": (p) =>
     `The annual frame for ${asString(p.yearLabel, "the year")} was set`,
   "goal.created": (p) =>
@@ -199,6 +214,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
           p.rowsSkipped ?? 0,
         )}`
       : "An import failed",
+  // Archive import (P6-T05b).
+  "import.archive": (p) =>
+    p.mode === "dry_run"
+      ? "A workspace archive was previewed as a dry run"
+      : "A workspace archive was imported",
   // Documents and attachments (P5-T12).
   "document.drafted": (p) =>
     `A document "${asString(p.title, "untitled")}" was started`,
