@@ -22,6 +22,7 @@
 import { callAction, excerptRichText } from "@openokr/core";
 import {
   REVIEW_STAGE_KEYS,
+  type ResolvedThresholds,
   ROOT_CAUSES,
   reviewStages,
   WEEKLY_STAGE_KEYS,
@@ -34,11 +35,12 @@ import { notFound } from "next/navigation";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
-  advanceStageAction,
   closeSessionAction,
   openSessionAction,
   skipSessionAction,
 } from "./actions";
+import { AdvanceControl } from "./advance-control.tsx";
+import { Commitments } from "./commitments.tsx";
 import { ConfidenceRound } from "./confidence-round";
 import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
 import { Digest } from "./digest";
@@ -77,8 +79,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
+  // A hand-written narrowing of what `sessions.read` answers, cast into
+  // below. `spaceId` and `cycleId` were absent from it although the action has
+  // returned both since P4-T07a, so this screen did not know which space its
+  // own session belonged to. Added at P6-G19a, which needs the space's key
+  // results to offer them to a commitment.
   let sessionRow: {
     id: string;
+    spaceId: string | null;
+    cycleId: string | null;
     kind: string;
     title: string;
     state: string;
@@ -119,6 +128,97 @@ export default async function SessionPage({ params }: SessionPageProps) {
     } catch {
       // No KRs in this space's cycle, or action not available.
     }
+  }
+
+  // §7.2 step 3 (P6-G19a). Loaded only on its own stage, like the confidence
+  // round above: three reads a facilitator on stage 1 has no use for.
+  let commitmentStage: {
+    carried: Array<{
+      id: string;
+      text: string;
+      ownerName: string;
+      weekStart: string;
+      keyResultTitle: string | null;
+    }>;
+    already: Array<{
+      id: string;
+      text: string;
+      ownerName: string;
+      keyResultTitle: string | null;
+    }>;
+    owners: Array<{ id: string; label: string }>;
+    keyResults: Array<{ id: string; label: string }>;
+    low: number;
+    high: number;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.stageKey === "commitments") {
+    const [carriedRows, setRows, rhythm] = await Promise.all([
+      callAction(context, "sessions.carriedCommitments", { sessionId: id }),
+      callAction(context, "sessions.listCommitments", { sessionId: id }),
+      callAction(context, "rhythm.read", {}),
+    ]);
+
+    // The space's key results in this cycle, which is what a commitment may
+    // point at. Empty when the session sits outside a cycle, and the select
+    // then offers only "No key result", which is the honest answer.
+    const cycleGoals =
+      sessionRow.spaceId && sessionRow.cycleId
+        ? (
+            await callAction(context, "goals.list", {
+              cycleId: sessionRow.cycleId,
+              spaceId: sessionRow.spaceId,
+              includeClosed: false,
+            })
+          ).goals
+        : [];
+    const keyResultTitles = new Map<string, string>();
+    for (const goal of cycleGoals) {
+      for (const keyResult of goal.keyResults) {
+        keyResultTitles.set(keyResult.id, keyResult.title);
+      }
+    }
+
+    const memberNames = new Map(
+      participants.map((one) => [one.memberId, one.name]),
+    );
+    // A commitment's owner can have left the room since it was set, so a name
+    // the participant list does not hold is reported rather than blanked.
+    const nameOf = (memberId: string) =>
+      memberNames.get(memberId) ?? "Someone no longer in this session";
+
+    const bounds = (rhythm.thresholds as unknown as ResolvedThresholds)[
+      "sessions.weeklyCommitmentBounds"
+    ];
+
+    commitmentStage = {
+      carried: carriedRows.map((row) => ({
+        id: row.id,
+        text: row.text,
+        ownerName: nameOf(row.ownerId),
+        weekStart: row.weekStart,
+        keyResultTitle: row.keyResultId
+          ? (keyResultTitles.get(row.keyResultId) ?? null)
+          : null,
+      })),
+      already: setRows.map((row) => ({
+        id: row.id,
+        text: row.text,
+        ownerName: nameOf(row.ownerId),
+        keyResultTitle: row.keyResultId
+          ? (keyResultTitles.get(row.keyResultId) ?? null)
+          : null,
+      })),
+      owners: participants.map((one) => ({
+        id: one.memberId,
+        label: one.name,
+      })),
+      keyResults: [...keyResultTitles].map(([keyResultId, title]) => ({
+        id: keyResultId,
+        label: title,
+      })),
+      low: bounds.low,
+      high: bounds.high,
+    };
   }
 
   // The weekly digest (P4-T15b-a). Deterministic, so it loads with the page and
@@ -489,20 +589,26 @@ export default async function SessionPage({ params }: SessionPageProps) {
         />
       )}
 
+      {isRunning &&
+        sessionRow.stageKey === "commitments" &&
+        commitmentStage && (
+          <Commitments
+            sessionId={id}
+            carried={commitmentStage.carried}
+            already={commitmentStage.already}
+            owners={commitmentStage.owners}
+            keyResults={commitmentStage.keyResults}
+            low={commitmentStage.low}
+            high={commitmentStage.high}
+            canWrite={isFacilitator}
+          />
+        )}
+
       {/* Continue / close controls for the facilitator during a running session */}
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
           {!isOnLastStage && !isMonthly ? (
-            <form
-              action={async () => {
-                "use server";
-                await advanceStageAction(id);
-              }}
-            >
-              <Button type="submit" variant="primary">
-                Continue to next step
-              </Button>
-            </form>
+            <AdvanceControl sessionId={id} />
           ) : (
             <form
               action={async () => {
@@ -705,9 +811,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           standing, which is the kind of claim that stops anybody looking. */}
       {isRunning && !isMonthly && !isQuarterly && (
         <p className="text-xs text-ink-3">
-          The confidence trend, the open blockers with their ages, the streak
-          ribbon and this week's commitments arrive at P6-G19. Their tables are
-          already here.
+          The confidence trend, the open blockers with their ages and the streak
+          ribbon arrive at P6-G19b. Their tables are already here. The
+          commitment stage landed at P6-G19a and is on step 3.
         </p>
       )}
     </div>

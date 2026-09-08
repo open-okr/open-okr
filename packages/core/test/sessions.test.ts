@@ -1031,3 +1031,139 @@ describe("sessions.close digest and streak (P4-T08)", () => {
     expect((streak as { currentWeeks: number }).currentWeeks).toBe(0);
   });
 });
+
+describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
+  it("names this workspace's own lower bound when it is refused", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    // A workspace that wants three a week. The gate held `const
+    // MIN_COMMITMENTS = 2` under a comment naming this very registry entry,
+    // so a workspace that moved the bound was still gated on the canon
+    // default and told the wrong number.
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      overrides: { "sessions.weeklyCommitmentBounds": { low: 3, high: 4 } },
+    });
+
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "One", ownerId: facilitatorMemberId },
+          { text: "Two", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    // Two would have passed the canon default. This workspace asked for three.
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+      }),
+    ).rejects.toThrow(/at least 3 commitments/i);
+  });
+});
+
+describe("sessions.carriedCommitments (P6-G19a)", () => {
+  it("lists an earlier session's open commitments and not this session's own", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    const lastWeek = await openSessionAtConfidence();
+    await advanceToCommitments(lastWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: lastWeek,
+        items: [
+          { text: "Carried across", ownerId: facilitatorMemberId },
+          { text: "Also carried", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    const thisWeek = await openSessionAtConfidence();
+    await advanceToCommitments(thisWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: thisWeek,
+        items: [{ text: "Set here, not carried", ownerId: memberMemberId }],
+      },
+    );
+
+    const carried = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    )) as Array<{ id: string; text: string }>;
+
+    expect(carried.map((one) => one.text).sort()).toEqual([
+      "Also carried",
+      "Carried across",
+    ]);
+  });
+
+  it("drops one once it is closed, whichever verdict it was given", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+
+    const lastWeek = await openSessionAtConfidence();
+    await advanceToCommitments(lastWeek, 0.5);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId: lastWeek,
+        items: [
+          { text: "Delivered one", ownerId: facilitatorMemberId },
+          { text: "Missed one", ownerId: memberMemberId },
+        ],
+      },
+    );
+
+    const thisWeek = await openSessionAtConfidence();
+    const before = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    )) as Array<{ id: string; text: string }>;
+    expect(before).toHaveLength(2);
+
+    // Not delivered is still closed. §7.2 asks the room to say whether it
+    // landed, not to keep asking until it does.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.closeCommitments",
+      {
+        items: before.map((one) => ({ id: one.id, delivered: false })),
+      },
+    );
+
+    const after = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.carriedCommitments",
+      { sessionId: thisWeek },
+    );
+    expect(after).toEqual([]);
+  });
+
+  it("refuses a session id it cannot see, rather than answering empty", async () => {
+    const wb = await workerDb();
+    // An empty list would read as "that session had nothing carried in",
+    // which is a different answer from "there is no such session".
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.carriedCommitments",
+        { sessionId: "00000000-0000-4000-8000-000000000000" },
+      ),
+    ).rejects.toThrow(/no such session/i);
+  });
+});

@@ -470,6 +470,16 @@ export const advanceStage = defineWriteAction({
         }
         nextStageKey = stageKeys[stageIndex + 1] ?? null;
 
+        // **Every gate below reads this workspace's own §11 numbers.**
+        // Two of them held a hand-written copy instead: 0.4 for the low
+        // confidence boundary and 2 for the commitment minimum, the second
+        // sitting under a comment that named the registry entry it was not
+        // reading. Resolved once here, because a stage advance should not
+        // load the settings row twice to answer two questions about it.
+        const { thresholds: gateThresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+
         // Stage completion gate: confidence → diagnose requires every KR
         // in the space's active cycle to have a confirmed confidence.
         // **`session.cycleId` is part of the condition, not defaulted inside
@@ -544,13 +554,14 @@ export const advanceStage = defineWriteAction({
               ),
             );
 
-          // Find KRs with confidence below the low threshold (0.4 default).
-          // The threshold is a §11 parameter; reading it here would require
-          // resolving thresholds inside the action. For now, use 0.4 as the
-          // hard-coded default — it matches the check constraint the design
-          // specifies. METHOD.md says the threshold, not the action, is the
-          // authority, and P4-T15 wires the resolved value.
-          const LOW_THRESHOLD = 0.4;
+          // Below §3.2's low boundary, resolved for this workspace.
+          //
+          // This was `const LOW_THRESHOLD = 0.4` with a comment saying P4-T15
+          // would wire the resolved value, and P4-T15 did not. A workspace that
+          // moved its own boundary was gated on the canon default instead of
+          // its own number, which is the hardcoding the method rule exists to
+          // stop. Fixed at P6-G19a.
+          const LOW_THRESHOLD = gateThresholds["scoring.confidenceLow"];
           const lowKrIds = confirmations
             .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
             .map((c) => c.keyResultId);
@@ -625,7 +636,11 @@ export const advanceStage = defineWriteAction({
             );
 
           if ((krCount?.count ?? 0) > 0) {
-            const MIN_COMMITMENTS = 2;
+            // §11's own lower bound, not a second copy of it. The
+            // registry entry this gate cites was already named in the comment
+            // above; the number beside it was written out by hand.
+            const MIN_COMMITMENTS =
+              gateThresholds["sessions.weeklyCommitmentBounds"].low;
             const [commitmentCount] = await tx
               .select({ count: sql<number>`count(*)::int` })
               .from(commitments)
@@ -2352,6 +2367,102 @@ export const listSessionCommitments = defineReadAction({
           keyResultId: r.keyResultId ?? null,
           delivered: r.delivered ?? null,
           closedAt: r.closedAt?.toISOString() ?? null,
+        }));
+      },
+    );
+  },
+});
+
+/**
+ * Last week's commitments, still open, for the space this session belongs to
+ * (P6-G19a).
+ *
+ * **This is the rollover P4-T08 deferred.** `sessions.listCommitments` answers
+ * for one session, so the stage that closes last week's commitments had no way
+ * to reach them: the session that set them is a different row. Nothing is
+ * copied forward. A commitment stays on the session that set it, and this read
+ * is what makes it reachable from the next one, so the record of who committed
+ * to what in which week stays true.
+ *
+ * "Still open" is `closedAt` being null. A commitment closed as not delivered
+ * is closed: §7.2 asks the room to say whether it landed, not to keep asking
+ * until it does.
+ */
+export const carriedCommitments = defineReadAction({
+  name: "sessions.carriedCommitments",
+  summary:
+    "Commitments set by earlier sessions in this session's space and not yet closed.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      text: z.string(),
+      ownerId: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      /** The Monday of the week it was set for, as an ISO date. */
+      weekStart: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      text: string;
+      ownerId: string;
+      keyResultId: string | null;
+      weekStart: string;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const [session] = await tx
+          .select({ spaceId: sessions.spaceId })
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.sessionId),
+            ),
+          )
+          .limit(1);
+        if (!session) {
+          // An empty list would read as "nothing was carried in", which is a
+          // different answer from "there is no such session".
+          throw new OperationError("not_found", "No such session.");
+        }
+        if (!session.spaceId) {
+          // The column is nullable although `sessions.create` requires a
+          // space, so this is reachable only by a row written another way.
+          return [];
+        }
+
+        const rows = await tx
+          .select()
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, context.workspaceId),
+              eq(commitments.spaceId, session.spaceId),
+              ne(commitments.sessionId, input.sessionId),
+              isNull(commitments.closedAt),
+            ),
+          )
+          .orderBy(commitments.weekStart);
+
+        return rows.map((row) => ({
+          id: row.id,
+          text: row.text,
+          ownerId: row.ownerId,
+          keyResultId: row.keyResultId ?? null,
+          weekStart: row.weekStart,
         }));
       },
     );

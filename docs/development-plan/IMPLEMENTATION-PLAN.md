@@ -1700,12 +1700,35 @@ Deliverables: the three settings §4.14 names for a space declared in the settin
 Test plan: every space setting resolves to its documented default on a space where nothing was configured, enumerated from the registry rather than a fixed list; a strictness override changes what the Coach refuses in that space and nowhere else; resetting restores the defaults exactly.
 Acceptance: Given a space that has configured nothing, when every space setting is read, then each returns its documented default, and a space that turns team voting off stops offering it.
 
-### P6-G19: The weekly session's trend, blockers, streak and commitments [L]
-Depends on: P4-T07b, P4-T07c, P4-T08
-Goal: S-22 shows the data its tables already hold (GAP-AUDIT B-10).
-Deliverables: the twelve-week confidence trend, the streak ribbon, the open blockers with ages and last week's scores on the space home; the commitment stage with the previous week closed as delivered or not and the new week set with owner and linked key result; the commitment rollover at session open that P4-T08 deferred; the coordinator note rendered in the digest; the blocker controls of raise, resolve and reassign; the placeholder card removed.
-Test plan: closing a session rolls this week's commitments into next week's list to close; a skipped week breaks the streak and a held one extends it; the digest content matches the session record exactly; the stage gate refusing fewer than two commitments is reachable and its message is readable.
-Acceptance: Given a completed session, when it closes, then the digest is generated with correct figures, the streak advances, last week's commitments are closed, this week's are open, and the space home shows all of it.
+**P6-G19 was cut in three.** It carried six deliverables across two screens
+plus one behaviour the weekly ritual does not have yet, which is three working
+sessions and not one. The seam is what each part cannot be finished without:
+the commitment stage needs the rollover, because a stage that closes last
+week's commitments cannot be built while last week's commitments are not
+reachable from this session; the trend, the streak and the blockers are
+read-only panels on a stage that already exists; the space home is a different
+screen with a different reader. Split at P6-G19, 8 September 2026.
+
+### P6-G19a: The weekly commitment stage, and the rollover [M]
+Depends on: P4-T08
+Goal: stage 3 of §7.2 exists, with last week in it (GAP-AUDIT B-10).
+Deliverables: the commitment stage on the weekly session, closing each of last week's commitments as delivered or not and setting this week's with an owner and an optional key result; the rollover P4-T08 deferred, so a session opened this week can see the commitments the last one set; the §11 commitment bounds stated from the registry rather than restated; the stage gate refusing fewer than two commitments surfaced with its own message.
+Test plan: a session opened after another in the same space lists that one's unclosed commitments and no others; closing one records the verdict and takes it off next week's list; a space with no previous session shows the stage without an empty accusation; advancing to the digest with one commitment is refused and the refusal names the bound; the bounds come from the resolved thresholds, so a workspace that changed them sees its own numbers.
+Acceptance: Given a session opened a week after the last one, when the facilitator reaches the commitment stage, then last week's commitments are listed to close and this week's can be set with an owner each.
+
+### P6-G19b: The weekly session's trend, streak, blockers and coordinator note [M]
+Depends on: P6-G19a
+Goal: the weekly session shows what its own tables hold (GAP-AUDIT B-10).
+Deliverables: the twelve-week confidence trend, the streak ribbon, the open blockers with their ages on the 24-hour clock and the controls to raise, resolve and reassign one; the coordinator's note on the digest stage, which has an action and no caller; the placeholder line naming P6-G19 removed.
+Test plan: a space with fewer than twelve weeks of history draws what it has rather than padding; a resolved blocker leaves the open list and stays in the record; reassigning names the new owner in the activity; the note reaches the digest lines and an empty note leaves them unchanged; the streak figure matches what `sessions.readStreak` answers.
+Acceptance: Given a space that has held four weekly sessions, when the facilitator opens the fifth, then the trend shows four points, the streak reads four, and every blocker still open is listed with its age.
+
+### P6-G19c: The space home [M]
+Depends on: P6-G19b
+Goal: the space home answers "how is this team doing" (GAP-AUDIT B-10).
+Deliverables: the twelve-week trend, the streak ribbon, the open blockers with ages and last week's scores on the space home; each reachable by a member of that space and refused as not-found to anybody else.
+Test plan: a member of another space gets not-found rather than an empty page; a space that has never held a session says so rather than drawing zeroes; last week's scores are the closed session's and not the running one's.
+Acceptance: Given a space with a held session behind it, when a member opens the space home, then the trend, the streak, the open blockers and last week's scores are all there.
 
 ### P6-G20: Rhythm and threshold cards [M]
 Depends on: P2-T08, P4-T01

@@ -294,6 +294,7 @@ import {
   addStageMinute,
   advanceStage,
   captureLearning,
+  carriedCommitments,
   castRetroVote,
   castSessionVote,
   closeSession,
@@ -683,6 +684,7 @@ export const ACTION_MAP = {
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,
   "sessions.closeCommitments": closeSessionCommitments,
+  "sessions.carriedCommitments": carriedCommitments,
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,

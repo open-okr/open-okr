@@ -10516,6 +10516,32 @@
       }
     },
     {
+      "name": "sessions.carriedCommitments",
+      "description": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "sessions.listCommitments",
       "description": "Commitments for a session.",
       "inputSchema": {

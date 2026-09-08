@@ -7671,6 +7671,23 @@
       "pages": false
     },
     {
+      "name": "sessions carriedCommitments",
+      "action": "sessions.carriedCommitments",
+      "method": "GET",
+      "path": "/sessions/carriedCommitments",
+      "scope": "read",
+      "summary": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions listCommitments",
       "action": "sessions.listCommitments",
       "method": "GET",
