@@ -385,6 +385,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-ai",
+        label: "AI",
+        href: "/admin/ai",
+        section: "admin",
+        // The provider key reaches every AI call the workspace makes and the
+        // spend it books, so who may set one is the same question the channel
+        // card asks about a bot token (S-37, P6-G12a).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-agents",
         label: "Agents and runs",
         href: "/admin/agents",
