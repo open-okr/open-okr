@@ -643,13 +643,9 @@
                           "type": "string"
                         },
                         "title": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "kind": {
@@ -682,13 +678,9 @@
                           ]
                         },
                         "timezone": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -964,13 +956,9 @@
                           "type": "string"
                         },
                         "title": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "kind": {
@@ -1003,13 +991,9 @@
                           ]
                         },
                         "timezone": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -1431,24 +1415,16 @@
                                   "type": "string"
                                 },
                                 "title": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
+                                  "type": [
+                                    "string",
+                                    "null"
                                   ]
                                 },
                                 "bio": {},
                                 "timezone": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
+                                  "type": [
+                                    "string",
+                                    "null"
                                   ]
                                 }
                               },
@@ -1561,13 +1537,9 @@
                             "type": "string"
                           },
                           "title": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "kind": {
@@ -1600,13 +1572,9 @@
                             ]
                           },
                           "timezone": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -1688,13 +1656,9 @@
                             "type": "string"
                           },
                           "title": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "children": {
@@ -1869,43 +1833,27 @@
                             "type": "number"
                           },
                           "maxUses": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "expiresAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "revokedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "email": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "allowedDomains": {
@@ -2003,33 +1951,21 @@
                           "type": "number"
                         },
                         "maxUses": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "expiresAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "revokedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "token": {
@@ -2147,33 +2083,21 @@
                           "type": "number"
                         },
                         "maxUses": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "expiresAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "revokedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "token": {
@@ -2553,33 +2477,21 @@
                                 "additionalProperties": {}
                               },
                               "installedById": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "lastVerifiedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "error": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -2680,33 +2592,21 @@
                           "additionalProperties": {}
                         },
                         "installedById": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "lastVerifiedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "error": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -2923,23 +2823,15 @@
                                 "type": "string"
                               },
                               "externalHandle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "verifiedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -3026,23 +2918,15 @@
                           "type": "string"
                         },
                         "externalHandle": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "verifiedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -3485,13 +3369,9 @@
                                 ]
                               },
                               "memberId": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "status": {
@@ -3504,23 +3384,15 @@
                                 ]
                               },
                               "error": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "sentAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "createdAt": {
@@ -3666,23 +3538,15 @@
                                 "type": "string"
                               },
                               "externalHandle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "verifiedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -3890,23 +3754,15 @@
                                 "type": "string"
                               },
                               "category": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "bodyText": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "variables": {
@@ -4072,23 +3928,15 @@
                           "minLength": 1
                         },
                         "category": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "bodyText": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "variables": {
@@ -4444,33 +4292,21 @@
                                 }
                               },
                               "lastUsedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "revokedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "revokedReason": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "createdAt": {
@@ -4671,33 +4507,21 @@
                                 }
                               },
                               "expiresAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "lastUsedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "revokedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "createdAt": {
@@ -5446,13 +5270,9 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "subjectType": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "subjectId": {
@@ -5468,13 +5288,9 @@
                           ]
                         },
                         "title": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "messages": {
@@ -5523,13 +5339,9 @@
                                 }
                               },
                               "model": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "tokensIn": {
@@ -5557,13 +5369,9 @@
                                 ]
                               },
                               "cost": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "stopped": {
@@ -5673,13 +5481,9 @@
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
                           "subjectType": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "subjectId": {
@@ -5695,13 +5499,9 @@
                             ]
                           },
                           "title": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "updatedAt": {
@@ -5813,13 +5613,9 @@
                           "type": "boolean"
                         },
                         "reason": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "searchAvailable": {
@@ -6890,23 +6686,15 @@
                             "type": "string"
                           },
                           "readAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "snoozedUntil": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "createdAt": {
@@ -8257,13 +8045,9 @@
                             ]
                           },
                           "baseUrl": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "enabled": {
@@ -8276,13 +8060,9 @@
                             "type": "boolean"
                           },
                           "workspaceKeyHint": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "workspaceKeyStatus": {
@@ -8380,13 +8160,9 @@
                           ]
                         },
                         "baseUrl": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "enabled": {
@@ -8399,13 +8175,9 @@
                           "type": "boolean"
                         },
                         "workspaceKeyHint": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "workspaceKeyStatus": {
@@ -8981,13 +8753,9 @@
                             "type": "boolean"
                           },
                           "keyHint": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "status": {
@@ -9164,13 +8932,9 @@
                             ]
                           },
                           "id": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "provider": {
@@ -9324,13 +9088,9 @@
                           ]
                         },
                         "id": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "provider": {
@@ -9577,13 +9337,9 @@
                           ]
                         },
                         "id": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "provider": {
@@ -9940,23 +9696,15 @@
                             ]
                           },
                           "modelId": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "temperature": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "maxTokens": {
@@ -10074,23 +9822,15 @@
                           ]
                         },
                         "modelId": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "temperature": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "maxTokens": {
@@ -11314,7 +11054,7 @@
             "schema": {
               "type": "string",
               "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
             }
           }
         ]
@@ -12040,13 +11780,9 @@
                           "type": "number"
                         },
                         "error": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -12249,13 +11985,9 @@
                           "type": "number"
                         },
                         "error": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -12737,33 +12469,21 @@
                             "type": "number"
                           },
                           "error": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "startedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "finishedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -12872,13 +12592,9 @@
                             "additionalProperties": {}
                           },
                           "subjectType": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "subjectId": {
@@ -13204,13 +12920,9 @@
                             "type": "string"
                           },
                           "mission": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "memberCount": {
@@ -13308,13 +13020,9 @@
                           "type": "string"
                         },
                         "mission": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "memberCount": {
@@ -14343,13 +14051,9 @@
                             "type": "boolean"
                           },
                           "publicationDeadline": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "sponsorId": {
@@ -14512,13 +14216,9 @@
                               "type": "boolean"
                             },
                             "publicationDeadline": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "sponsorId": {
@@ -14698,13 +14398,9 @@
                           "type": "boolean"
                         },
                         "publicationDeadline": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "sponsorId": {
@@ -14879,13 +14575,9 @@
                           "type": "boolean"
                         },
                         "publicationDeadline": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "sponsorId": {
@@ -15138,13 +14830,9 @@
                           "type": "boolean"
                         },
                         "publicationDeadline": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "sponsorId": {
@@ -15442,23 +15130,15 @@
                           "maximum": 9007199254740991
                         },
                         "resultValue": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "verdict": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -15678,23 +15358,15 @@
                                 "type": "string"
                               },
                               "resultValue": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "verdict": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "fullyAchieved": {
@@ -16087,13 +15759,9 @@
                               "type": "string"
                             },
                             "horizonLabel": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "agreed": {
@@ -16113,13 +15781,9 @@
                                     "type": "string"
                                   },
                                   "note": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "position": {
@@ -16216,13 +15880,9 @@
                           "type": "string"
                         },
                         "horizonLabel": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "agreed": {
@@ -16242,13 +15902,9 @@
                                 "type": "string"
                               },
                               "note": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "position": {
@@ -16425,13 +16081,9 @@
                           "type": "string"
                         },
                         "publicationDeadline": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "daysToDeadline": {
@@ -16447,23 +16099,15 @@
                           ]
                         },
                         "publishedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "packDistributedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "firstCycle": {
@@ -16648,13 +16292,9 @@
                                 }
                               },
                               "blocked": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -16698,13 +16338,9 @@
                                 "type": "boolean"
                               },
                               "note": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -16782,13 +16418,9 @@
                                 "type": "string"
                               },
                               "successStatement": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "position": {
@@ -17951,13 +17583,9 @@
                             ]
                           },
                           "publishedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "authorMemberId": {
@@ -18107,13 +17735,9 @@
                           ]
                         },
                         "publishedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "authorMemberId": {
@@ -18812,13 +18436,9 @@
                             "type": "string"
                           },
                           "filesize": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "position": {
@@ -19351,23 +18971,15 @@
                           "type": "string"
                         },
                         "csv": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "xlsxBase64": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "rowCount": {
@@ -19552,26 +19164,18 @@
                             ]
                           },
                           "error": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "requestedAt": {
                             "type": "string"
                           },
                           "finishedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -19676,13 +19280,9 @@
                                 ]
                               },
                               "entity": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "mode": {
@@ -19701,13 +19301,9 @@
                                 ]
                               },
                               "filename": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "rowsRead": {
@@ -19733,26 +19329,18 @@
                                 "additionalProperties": {}
                               },
                               "error": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "startedAt": {
                                 "type": "string"
                               },
                               "finishedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -20159,13 +19747,9 @@
                       "type": "string"
                     },
                     "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     }
                   }
@@ -20385,13 +19969,9 @@
                       "type": "string"
                     },
                     "additionalProperties": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     }
                   }
@@ -20711,13 +20291,9 @@
                                       ]
                                     },
                                     "keyResultTitle": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     },
                                     "title": {
@@ -20733,13 +20309,9 @@
                                       ]
                                     },
                                     "dueOn": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     },
                                     "position": {
@@ -20853,13 +20425,9 @@
                                 "additionalProperties": false
                               },
                               "divergence": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -21005,13 +20573,9 @@
                             ]
                           },
                           "keyResultTitle": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "title": {
@@ -21027,13 +20591,9 @@
                             ]
                           },
                           "dueOn": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "position": {
@@ -21221,13 +20781,9 @@
                           ]
                         },
                         "keyResultTitle": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "title": {
@@ -21243,13 +20799,9 @@
                           ]
                         },
                         "dueOn": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "position": {
@@ -21302,13 +20854,9 @@
                           "type": "string"
                         },
                         "initiativeTitle": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "description": {
@@ -21658,13 +21206,9 @@
                     ]
                   },
                   "dueOn": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "initiativeId": {
@@ -22447,13 +21991,9 @@
                             "additionalProperties": false
                           },
                           "divergence": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -22562,23 +22102,15 @@
                             "type": "string"
                           },
                           "startsOn": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "endsOn": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "status": {
@@ -22591,13 +22123,9 @@
                             ]
                           },
                           "confidence": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "capacity": {
@@ -22774,23 +22302,15 @@
                           "type": "string"
                         },
                         "startsOn": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "endsOn": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "status": {
@@ -22803,13 +22323,9 @@
                           ]
                         },
                         "confidence": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "capacity": {
@@ -23152,23 +22668,15 @@
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "startsOn": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "endsOn": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "status": {
@@ -23838,23 +23346,15 @@
                                 "type": "number"
                               },
                               "contributionStatement": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "closedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "successStatus": {
@@ -23887,13 +23387,9 @@
                                 ]
                               },
                               "closeReason": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "progressPct": {
@@ -23903,13 +23399,9 @@
                                 "type": "string"
                               },
                               "nextCheckInOn": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "daysPastDue": {
@@ -23954,13 +23446,9 @@
                                       "type": "string"
                                     },
                                     "unit": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     },
                                     "direction": {
@@ -23989,13 +23477,9 @@
                                       "type": "number"
                                     },
                                     "dueOn": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     },
                                     "ownerId": {
@@ -24044,23 +23528,15 @@
                                       "type": "number"
                                     },
                                     "confidence": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "score": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "carryForward": {
@@ -24101,13 +23577,9 @@
                                 "type": "object",
                                 "properties": {
                                   "score": {
-                                    "anyOf": [
-                                      {
-                                        "type": "number"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "number",
+                                      "null"
                                     ]
                                   },
                                   "flags": {
@@ -24473,23 +23945,15 @@
                           "type": "number"
                         },
                         "contributionStatement": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "closedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "successStatus": {
@@ -24522,13 +23986,9 @@
                           ]
                         },
                         "closeReason": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "progressPct": {
@@ -24538,13 +23998,9 @@
                           "type": "string"
                         },
                         "nextCheckInOn": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "daysPastDue": {
@@ -24589,13 +24045,9 @@
                                 "type": "string"
                               },
                               "unit": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "direction": {
@@ -24624,13 +24076,9 @@
                                 "type": "number"
                               },
                               "dueOn": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "ownerId": {
@@ -24679,23 +24127,15 @@
                                 "type": "number"
                               },
                               "confidence": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "score": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "carryForward": {
@@ -24736,13 +24176,9 @@
                           "type": "object",
                           "properties": {
                             "score": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "flags": {
@@ -25451,33 +24887,21 @@
                           ]
                         },
                         "why": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "decidedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "sessionTitle": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -26110,13 +25534,9 @@
                     "type": "number"
                   },
                   "dueOn": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "ownerId": {
@@ -26386,13 +25806,9 @@
                                 "type": "string"
                               },
                               "note": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -26519,13 +25935,9 @@
                                 "type": "number"
                               },
                               "nextCheckInOn": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "daysPastDue": {
@@ -26670,13 +26082,9 @@
                                 ]
                               },
                               "confidence": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "narrative": {
@@ -26688,23 +26096,15 @@
                                 ]
                               },
                               "publishedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "acknowledgedAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "author": {
@@ -26745,36 +26145,24 @@
                                       "type": "number"
                                     },
                                     "previousValue": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "progressPct": {
                                       "type": "number"
                                     },
                                     "confidence": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "previousConfidence": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     }
                                   },
@@ -27009,13 +26397,9 @@
                                     "type": "string"
                                   },
                                   "unit": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "direction": {
@@ -27197,13 +26581,9 @@
                           "type": "object",
                           "properties": {
                             "unit": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "direction": {
@@ -28648,23 +28028,15 @@
                           "maximum": 9007199254740991
                         },
                         "own": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "average": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "votes": {
@@ -29331,23 +28703,15 @@
                       "type": "object",
                       "properties": {
                         "score": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "healthy": {
-                          "anyOf": [
-                            {
-                              "type": "boolean"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "boolean",
+                            "null"
                           ]
                         },
                         "threshold": {
@@ -29369,13 +28733,9 @@
                                 "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                               },
                               "ruleKey": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "severity": {
@@ -29406,13 +28766,9 @@
                                 ]
                               },
                               "subjectGoalTitle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -29487,13 +28843,9 @@
                                 ]
                               },
                               "riskOwnerName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "blocksPublish": {
@@ -29867,13 +29219,9 @@
                                 "type": "string"
                               },
                               "note": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -29906,13 +29254,9 @@
                                 "type": "boolean"
                               },
                               "riskOwnerName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "blocksPublish": {
@@ -30334,26 +29678,18 @@
                           "type": "boolean"
                         },
                         "achievementPct": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "state": {
                           "type": "string"
                         },
                         "diagnostic": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -30417,23 +29753,15 @@
                     "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                   },
                   "actualValue": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "targetValue": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "remark": {
@@ -30538,13 +29866,9 @@
                                 "type": "string"
                               },
                               "unit": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "direction": {
@@ -30560,23 +29884,15 @@
                                 "type": "string"
                               },
                               "achievementPct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "targetDefault": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "healthyPct": {
@@ -30597,33 +29913,21 @@
                                       "type": "string"
                                     },
                                     "actualValue": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "targetValue": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "remark": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     }
                                   },
@@ -30747,23 +30051,15 @@
                           }
                         },
                         "value": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "diagnostic": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -30966,13 +30262,9 @@
                           }
                         },
                         "startedPct": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "state": {
@@ -31239,36 +30531,24 @@
                                 ]
                               },
                               "treeName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "state": {
                                 "type": "string"
                               },
                               "achievementPct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "effectivePct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "healthyPct": {
@@ -31278,13 +30558,9 @@
                                 "type": "number"
                               },
                               "unit": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "recovery": {
@@ -31312,13 +30588,9 @@
                                         "maximum": 9007199254740991
                                       },
                                       "startedPct": {
-                                        "anyOf": [
-                                          {
-                                            "type": "number"
-                                          },
-                                          {
-                                            "type": "null"
-                                          }
+                                        "type": [
+                                          "number",
+                                          "null"
                                         ]
                                       },
                                       "closeProposed": {
@@ -31479,13 +30751,9 @@
                                 "type": "string"
                               },
                               "unit": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "indicatorType": {
@@ -31501,23 +30769,15 @@
                                 "type": "string"
                               },
                               "achievementPct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "effectivePct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "healthyPct": {
@@ -31527,13 +30787,9 @@
                                 "type": "number"
                               },
                               "targetDefault": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "recoveryGoalId": {
@@ -31549,13 +30805,9 @@
                                 ]
                               },
                               "recoveryProgressPct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               }
                             },
@@ -31676,36 +30928,24 @@
                               "type": "string"
                             },
                             "categoryName": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "ownerName": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "frequency": {
                               "type": "string"
                             },
                             "unit": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "direction": {
@@ -31721,23 +30961,15 @@
                               "type": "string"
                             },
                             "achievementPct": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "effectivePct": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "healthyPct": {
@@ -31747,13 +30979,9 @@
                               "type": "number"
                             },
                             "targetDefault": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "isCalculated": {
@@ -31773,13 +31001,9 @@
                               ]
                             },
                             "treeName": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "recoveryGoalId": {
@@ -31795,13 +31019,9 @@
                               ]
                             },
                             "recoveryStartedPct": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             }
                           },
@@ -31880,13 +31100,9 @@
                                 "type": "string"
                               },
                               "achievementPct": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               }
                             },
@@ -31909,33 +31125,21 @@
                                 "type": "string"
                               },
                               "actualValue": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "targetValue": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "remark": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -32098,13 +31302,9 @@
                           "type": "string"
                         },
                         "achievementPct": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         }
                       },
@@ -32200,13 +31400,9 @@
                     ]
                   },
                   "targetDefault": {
-                    "anyOf": [
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "parentKpiId": {
@@ -32508,13 +31704,9 @@
                                 "type": "string"
                               },
                               "dueOn": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "daysPastDue": {
@@ -32725,13 +31917,9 @@
                           },
                           "body": {},
                           "editedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "createdAt": {
@@ -33568,23 +32756,15 @@
                                 "type": "string"
                               },
                               "suppressedReason": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "sentAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "createdAt": {
@@ -34765,23 +33945,15 @@
                           "type": "string"
                         },
                         "startedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "endedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "facilitatorId": {
@@ -34790,23 +33962,15 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "stageKey": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "stageStartedAt": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "elapsed": {
@@ -35004,23 +34168,15 @@
                             "type": "string"
                           },
                           "startedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "endedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "facilitatorId": {
@@ -35029,23 +34185,15 @@
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
                           "stageKey": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "stageStartedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "elapsed": {
@@ -35236,26 +34384,18 @@
                             ]
                           },
                           "spaceName": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "isFacilitator": {
                             "type": "boolean"
                           },
                           "stageKey": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -35743,13 +34883,9 @@
                             "type": "number"
                           },
                           "revealedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -35853,23 +34989,15 @@
                             "type": "boolean"
                           },
                           "confirmedConfidence": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "number",
+                              "null"
                             ]
                           },
                           "whatChanged": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -36283,13 +35411,9 @@
                             ]
                           },
                           "description": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "ownerId": {
@@ -36307,13 +35431,9 @@
                             "type": "string"
                           },
                           "resolvedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "hoursOpen": {
@@ -36423,13 +35543,9 @@
                                 "type": "string"
                               },
                               "ownerName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "ageHours": {
@@ -36438,23 +35554,15 @@
                                 "maximum": 9007199254740991
                               },
                               "blockedTitle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "blockedHealth": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "escalation": {
@@ -36573,13 +35681,9 @@
                                     "type": "string"
                                   },
                                   "ownerName": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "ageHours": {
@@ -36588,23 +35692,15 @@
                                     "maximum": 9007199254740991
                                   },
                                   "blockedTitle": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "blockedHealth": {
-                                    "anyOf": [
-                                      {
-                                        "type": "string"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
+                                    "type": [
+                                      "string",
+                                      "null"
                                     ]
                                   },
                                   "escalation": {
@@ -36950,23 +36046,15 @@
                             ]
                           },
                           "delivered": {
-                            "anyOf": [
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "boolean",
+                              "null"
                             ]
                           },
                           "closedAt": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           }
                         },
@@ -37151,13 +36239,9 @@
                           "maximum": 9007199254740991
                         },
                         "lastSessionWeek": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         }
                       },
@@ -37518,13 +36602,9 @@
                               "type": "string"
                             },
                             "unit": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "frequency": {
@@ -37554,33 +36634,21 @@
                               ]
                             },
                             "targetDefault": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "healthyPct": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "watchPct": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "formula": {
@@ -37598,13 +36666,9 @@
                               }
                             },
                             "formulaRefused": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "why": {
@@ -38334,26 +37398,18 @@
                                 "type": "string"
                               },
                               "championName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "hasMic": {
                                 "type": "boolean"
                               },
                               "spokenAt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "body": {
@@ -38365,13 +37421,9 @@
                                 ]
                               },
                               "authorName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -39037,13 +38089,9 @@
                                       "type": "boolean"
                                     },
                                     "authorName": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     }
                                   },
@@ -39268,23 +38316,15 @@
                                 "type": "string"
                               },
                               "body": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "answeredByName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -39517,23 +38557,15 @@
                                 ]
                               },
                               "causeLabel": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "detail": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -39758,23 +38790,15 @@
                                 "type": "string"
                               },
                               "average": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "mine": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               }
                             },
@@ -39793,13 +38817,9 @@
                           "maximum": 9007199254740991
                         },
                         "rhythmScore": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "lowest": {
@@ -40005,23 +39025,15 @@
                       "type": "object",
                       "properties": {
                         "cycleScore": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "rhythmScore": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "verdict": {
@@ -40040,23 +39052,15 @@
                           ]
                         },
                         "diagnosis": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "prescription": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "recorded": {
@@ -40260,43 +39264,27 @@
                           "type": "object",
                           "properties": {
                             "verdict": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "diagnosis": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "prescription": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "narrative": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             }
                           },
@@ -40767,13 +39755,9 @@
                                 "type": "string"
                               },
                               "score": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "decision": {
@@ -40792,23 +39776,15 @@
                                 ]
                               },
                               "meaning": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "why": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -41334,13 +40310,9 @@
                                 "type": "string"
                               },
                               "authorName": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -41551,13 +40523,9 @@
                           "type": "string"
                         },
                         "heldOn": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "state": {
@@ -41567,23 +40535,15 @@
                           "type": "object",
                           "properties": {
                             "cycleScore": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "verdict": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             },
                             "objectivesReviewed": {
@@ -41605,13 +40565,9 @@
                               "type": "number"
                             },
                             "teamPulse": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "learningsCarried": {
@@ -41674,13 +40630,9 @@
                                 "type": "string"
                               },
                               "excerpt": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -41777,13 +40729,9 @@
                                 "type": "string"
                               },
                               "detail": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               }
                             },
@@ -42003,13 +40951,9 @@
                                 "type": "string"
                               },
                               "score": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "number",
+                                  "null"
                                 ]
                               },
                               "revealed": {
@@ -42038,63 +40982,39 @@
                                       "type": "number"
                                     },
                                     "baseline": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "target": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "current": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "unit": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     },
                                     "score": {
-                                      "anyOf": [
-                                        {
-                                          "type": "number"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "number",
+                                        "null"
                                       ]
                                     },
                                     "reason": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
+                                      "type": [
+                                        "string",
+                                        "null"
                                       ]
                                     }
                                   },
@@ -42126,13 +41046,9 @@
                           }
                         },
                         "cycleScore": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "verdict": {
@@ -42231,13 +41147,9 @@
                       "type": "object",
                       "properties": {
                         "average": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "number",
+                            "null"
                           ]
                         },
                         "band": {
@@ -42256,13 +41168,9 @@
                           ]
                         },
                         "read": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "given": {
@@ -42275,23 +41183,15 @@
                           "type": "object",
                           "properties": {
                             "pulse": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "number",
+                                "null"
                               ]
                             },
                             "word": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "null"
-                                }
+                              "type": [
+                                "string",
+                                "null"
                               ]
                             }
                           },
@@ -42795,13 +41695,9 @@
                       "type": "object",
                       "properties": {
                         "shifts": {
-                          "anyOf": [
-                            {
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
+                          "type": [
+                            "string",
+                            "null"
                           ]
                         },
                         "trends": {
@@ -42960,13 +41856,9 @@
                                 ]
                               },
                               "goalTitle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "keyResultId": {
@@ -42982,13 +41874,9 @@
                                 ]
                               },
                               "keyResultTitle": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
+                                "type": [
+                                  "string",
+                                  "null"
                                 ]
                               },
                               "sessionId": {
@@ -43130,13 +42018,9 @@
                             ]
                           },
                           "goalTitle": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "keyResultId": {
@@ -43152,13 +42036,9 @@
                             ]
                           },
                           "keyResultTitle": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "sessionId": {
@@ -43290,13 +42170,9 @@
                             ]
                           },
                           "goalTitle": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "keyResultId": {
@@ -43312,13 +42188,9 @@
                             ]
                           },
                           "keyResultTitle": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
+                            "type": [
+                              "string",
+                              "null"
                             ]
                           },
                           "sessionId": {
