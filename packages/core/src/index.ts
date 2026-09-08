@@ -863,6 +863,7 @@ export {
   isKnownTimezone,
   languageSchema,
   type ProvisioningContext,
+  primaryChannelSchema,
   resolveMemberSettings,
   resolveSpaceSettings,
   resolveSpaceSettingsFrom,

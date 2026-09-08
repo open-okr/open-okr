@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
+import { NudgeRuleCards } from "./rule-cards.tsx";
 
 /**
  * The nudge volume card (UIUX-PLAN.md §4 S-36, P4-T04c).
@@ -29,6 +30,24 @@ const REASON_LABEL: Record<string, string> = {
   ceiling: "Weekly ceiling reached",
 };
 
+/**
+ * The channels a rule can be routed to (P6-G21).
+ *
+ * The same set a member's own primary channel is chosen from, which is what
+ * makes an override substitutable for it. Built here rather than in the card:
+ * a client component that imports a value from `@openokr/core` pulls the
+ * database layer into its bundle and the build fails on `dns`, which is
+ * exactly what happened at P6-G13b.
+ */
+const NUDGE_CHANNELS = [
+  { value: "app", label: "in-app only" },
+  { value: "email", label: "email" },
+  { value: "slack", label: "Slack" },
+  { value: "teams", label: "Microsoft Teams" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+];
+
 export default async function NudgeVolumePage() {
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
@@ -54,15 +73,16 @@ export default async function NudgeVolumePage() {
     );
   }
 
-  const volume = await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "nudges.volume",
-    { days: 30 },
-  );
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  const [volume, rules] = await Promise.all([
+    callAction(context, "nudges.volume", { days: 30 }),
+    // Every §6.4 rule with what this workspace decided about it (P6-G21).
+    callAction(context, "nudges.rules", {}),
+  ]);
 
   const total = volume.rules.reduce(
     (sum, rule) => sum + rule.sent + rule.suppressed,
@@ -176,6 +196,11 @@ export default async function NudgeVolumePage() {
           )}
         </CardBody>
       </Card>
+      <NudgeRuleCards
+        rules={rules.rules}
+        quietMode={rules.quietMode}
+        channels={NUDGE_CHANNELS}
+      />
     </>
   );
 }

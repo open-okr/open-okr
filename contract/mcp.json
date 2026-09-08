@@ -4770,6 +4770,9 @@
               "strict"
             ]
           },
+          "quietMode": {
+            "type": "boolean"
+          },
           "overrides": {
             "type": "object",
             "propertyNames": {
@@ -9923,6 +9926,70 @@
         "idempotentHint": false
       },
       "example": {}
+    },
+    {
+      "name": "nudges.rules",
+      "description": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "nudges.setRule",
+      "description": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ruleKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "channelOverride": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "app",
+                  "email",
+                  "slack",
+                  "teams",
+                  "whatsapp",
+                  "telegram"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quietModeExempt": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ruleKey"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "ruleKey": "…"
+      }
     },
     {
       "name": "nudges.list",

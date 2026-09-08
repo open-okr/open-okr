@@ -628,6 +628,16 @@ export const updateRhythmSettings = defineWriteAction({
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).optional(),
     checkInAnchorDay: z.number().int().min(1).max(7).optional(),
     coachStrictness: z.enum(COACH_STRICTNESS).optional(),
+    /**
+     * Holds every non-exempt §6.4 rule quiet (P6-G21).
+     *
+     * `rhythm_settings.quiet_mode` has existed since P4-T04b and the
+     * suppression decision has read it since then; nothing could set it, so a
+     * workspace being drowned by its own product had a switch with no handle.
+     * Not a §11 threshold: it is an operational state a workspace turns on for
+     * a fortnight, not a number the practice is judged by.
+     */
+    quietMode: z.boolean().optional(),
     /** Sparse. A key set to null returns that threshold to the canon default. */
     overrides: z.record(z.string(), z.unknown()).optional(),
     labels: z.record(z.string(), z.unknown()).optional(),
@@ -666,6 +676,10 @@ export const updateRhythmSettings = defineWriteAction({
       }
       if (patch.coachStrictness !== undefined) {
         values.coachStrictness = patch.coachStrictness;
+      }
+      // Straight through rather than into the override map: it has a column.
+      if (input.quietMode !== undefined) {
+        values.quietMode = input.quietMode;
       }
       if (patch.overrides !== undefined) {
         values.overrides = mergeOverrides(

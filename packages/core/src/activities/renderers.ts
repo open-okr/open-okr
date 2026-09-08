@@ -60,6 +60,15 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     const words = (value: string) => value.replace(/_/g, " ");
     return `An agent moved from ${words(from)} to ${words(to)}`;
   },
+  "nudge.rule_changed": (payload) => {
+    const { ruleKey, configured } = payload as {
+      ruleKey: string;
+      configured: boolean;
+    };
+    return configured
+      ? `The ${ruleKey} rule was changed`
+      : `The ${ruleKey} rule went back to the canon`;
+  },
   "blob.reaped": (payload) => {
     const { discarded, bytesLeft } = payload as {
       discarded: number;

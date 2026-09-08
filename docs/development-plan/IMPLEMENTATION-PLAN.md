@@ -1757,12 +1757,29 @@ Deliverables: the rhythm and thresholds cards covering the §11 registry rather 
 Test plan: a card enumerates the registry rather than a fixed list, so a threshold added later appears without a code change here; resetting a card restores the canon defaults exactly; an out-of-range value is refused with the bound stated; a renamed term propagates to every surface that shows it.
 Acceptance: Given a workspace that changes its check-in grace, when a goal passes the new grace, then it flips to outdated on the new boundary and no other threshold moved.
 
+**P6-G21 was cut in two, and one of its deliverables was already done.**
+"Strictness with per-space overrides" landed at P6-G18b, which declared the
+space scope §4.14 asks for and made the override decide what the Coach refuses
+in that space and nowhere else. Of what is left, the ladder override is a
+different kind of work from the rest: enable, quiet-mode exemption and the
+channel override are read in one place each, and a per-rule ladder has to be
+threaded into the three separate places a canon ladder is consumed, which are
+the blocker board, the review action and the obligation reader. Split at
+P6-G21, 8 September 2026.
+
 ### P6-G21: Nudge rule cards [M]
 Depends on: P4-T04c, P5-T02c
 Goal: a workspace can turn a rule down (GAP-AUDIT G-04).
-Deliverables: per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode; strictness with per-space overrides; each row linking to the rule in METHOD.md and showing its recent volume from the card already there.
-Test plan: a disabled rule stops producing nudge rows and produces a suppression reason instead of silence; a channel override routes the next nudge; a quiet-mode exemption still respects the escalation ladder; every rule resolves to its provisioning default on a workspace that configured nothing.
+Deliverables: per-rule enable, channel override and quiet-mode exemption; workspace quiet mode, which `rhythm_settings` has held since P4-T04b with nothing able to set it; the channel override made to route, which is stored today and read by nothing; each row linking to the rule in METHOD.md and showing its recent volume from `nudges.volume`.
+Test plan: a disabled rule stops producing nudge rows and produces a suppression reason instead of silence; a channel override routes the next nudge; every rule resolves to its provisioning default on a workspace that configured nothing; turning workspace quiet mode on suppresses a rule that is not exempt and leaves an exempt one alone.
 Acceptance: Given an administrator who disables the noisiest rule, when its trigger next fires, then no nudge is sent, a suppressed row records why, and every other rule is unaffected.
+
+### P6-G21b: The per-rule escalation ladder [M]
+Depends on: P6-G21
+Goal: a workspace can widen or narrow one rule's ladder (GAP-AUDIT G-04).
+Deliverables: `nudge_rules.escalation_ladder` made to apply, which is stored today and read by nothing; the three places a canon ladder is consumed taught to prefer a rule's own, which are `blockers.board`, `review` and the obligation reader; the ladder editor on the rule card, validated against the same bounds §11 gives the canon ladder.
+Test plan: a rule with its own ladder escalates on its own numbers and every other rule on the canon's; a ladder that does not widen step by step is refused with the bound stated; clearing it returns the rule to §11's.
+Acceptance: Given a workspace that widens the blocker ladder for one rule, when a blocker passes the canon hour, then that rule has not escalated and every other rule has.
 
 ### P6-G22: The string catalogue and the locale [L]
 Depends on: P2-T10

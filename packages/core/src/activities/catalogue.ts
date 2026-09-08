@@ -95,6 +95,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "space.settingsChanged": z.object({ name: z.string() }),
   /** An agent's write policy was moved (P6-G13b). */
   "agent.autonomy_changed": z.object({ from: z.string(), to: z.string() }),
+  /** A workspace turned one §6.4 rule down, or back up (P6-G21). */
+  "nudge.rule_changed": z.object({
+    ruleKey: z.string(),
+    configured: z.boolean(),
+  }),
   /** The orphan reap's own row, so the removal is accountable (P6-G01c). */
   "blob.reaped": z.object({
     discarded: z.number().int(),

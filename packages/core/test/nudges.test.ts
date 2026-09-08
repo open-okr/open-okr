@@ -1,3 +1,4 @@
+import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -617,5 +618,91 @@ describe("a simulated month", () => {
         `${row.recipient_member_id} in week ${row.week}`,
       ).toBeLessThanOrEqual(ceiling + 5);
     }
+  });
+});
+
+describe("nudge rule cards (P6-G21)", () => {
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "nudges.rules", {});
+  };
+  const set = async (input: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.setRule",
+      input as never,
+    );
+  };
+
+  it("lists the whole catalogue on a workspace that configured nothing", async () => {
+    // Enumerated from `packages/method`, not from `nudge_rules`. A read that
+    // listed the table would show a fresh workspace nothing at all, and the
+    // table's own comment says the absence of a row is the canon default.
+    const answer = await read();
+    expect(answer.rules.length).toBe(TRIGGER_CATALOGUE.length);
+    expect(answer.quietMode).toBe(false);
+    for (const rule of answer.rules) {
+      expect(rule.enabled).toBe(true);
+      expect(rule.channelOverride).toBeNull();
+      expect(rule.quietModeExempt).toBe(false);
+      expect(rule.configured).toBe(false);
+    }
+  });
+
+  it("records a rule the workspace turned down, and only that one", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, enabled: false });
+
+    const answer = await read();
+    const changed = answer.rules.find((rule) => rule.key === key);
+    expect(changed?.enabled).toBe(false);
+    expect(changed?.configured).toBe(true);
+    // Every other rule is untouched, which is the acceptance sentence's own
+    // last clause.
+    for (const rule of answer.rules.filter((one) => one.key !== key)) {
+      expect(rule.enabled).toBe(true);
+      expect(rule.configured).toBe(false);
+    }
+  });
+
+  it("removes the row when a rule goes back to the canon", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, enabled: false });
+    expect((await set({ ruleKey: key, enabled: true })).configured).toBe(false);
+
+    // A stored row matching the canon would survive a change to the canon and
+    // quietly hold the old answer, which is the trap the §11 override map
+    // avoids by storing deviations rather than resolved values.
+    const answer = await read();
+    expect(answer.rules.find((rule) => rule.key === key)?.configured).toBe(
+      false,
+    );
+  });
+
+  it("refuses a rule the method package does not define", async () => {
+    await expect(
+      set({ ruleKey: "not.a.rule", enabled: false }),
+    ).rejects.toThrow(/not a rule the method package defines/i);
+  });
+
+  it("turns workspace quiet mode on, which nothing could do before", async () => {
+    const wb = await workerDb();
+    // `rhythm_settings.quiet_mode` has existed since P4-T04b and the
+    // suppression decision has read it all along; `rhythm.update` did not take
+    // it, so the switch had no handle.
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      quietMode: true,
+    });
+    expect((await read()).quietMode).toBe(true);
+  });
+
+  it("keeps a channel override and hands it back", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, channelOverride: "slack" });
+    const answer = await read();
+    expect(answer.rules.find((rule) => rule.key === key)?.channelOverride).toBe(
+      "slack",
+    );
   });
 });

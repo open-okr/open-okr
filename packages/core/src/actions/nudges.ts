@@ -1,12 +1,16 @@
 import {
   activeOnly,
+  nudgeRules,
   nudges,
   proposedChanges,
+  rhythmSettings,
   type WorkspaceTx,
   withContext,
+  withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, count, desc, eq, gte, isNotNull } from "drizzle-orm";
+import { isTriggerKey, TRIGGER_CATALOGUE } from "@openokr/method";
+import { and, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -14,6 +18,7 @@ import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/errors.ts";
+import { primaryChannelSchema } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /**
@@ -475,4 +480,237 @@ export const nudgeVolume = defineReadAction({
       },
     );
   },
+});
+
+/**
+ * Every §6.4 rule with what this workspace has decided about it (S-36,
+ * P6-G21).
+ *
+ * **Enumerated from the catalogue, not from the table.** `nudge_rules` holds
+ * one row per rule a workspace has changed its mind about, and its own comment
+ * says the absence of a row is the canon default. A read that listed the table
+ * would show a fresh workspace nothing at all, which is the opposite of what
+ * this card is for.
+ *
+ * The volume comes from the nudge rows themselves and is the argument for
+ * turning a rule down: "this one sent forty-one messages last week" is the
+ * sentence that makes the decision, not the rule's name.
+ */
+export const listNudgeRules = defineReadAction({
+  name: "nudges.rules",
+  summary:
+    "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+  input: z.object({}),
+  output: z.object({
+    /** Whether the workspace is holding every non-exempt rule quiet. */
+    quietMode: z.boolean(),
+    rules: z.array(
+      z.object({
+        key: z.string(),
+        /** §6.4's own words for when it fires and who hears it. */
+        fires: z.string(),
+        recipient: z.string(),
+        escalates: z.boolean(),
+        deterministic: z.boolean(),
+        enabled: z.boolean(),
+        channelOverride: z.string().nullable(),
+        quietModeExempt: z.boolean(),
+        /** Whether this workspace has changed anything about it. */
+        configured: z.boolean(),
+        /** Sent in the last seven days. */
+        sent: z.number().int(),
+        /** Suppressed in the last seven days, whatever the reason. */
+        suppressed: z.number().int(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (tx) => {
+      const [settings] = await tx
+        .select({ quietMode: rhythmSettings.quietMode })
+        .from(rhythmSettings)
+        .where(eq(rhythmSettings.workspaceId, context.workspaceId))
+        .limit(1);
+
+      const configured = await tx
+        .select({
+          ruleKey: nudgeRules.ruleKey,
+          enabled: nudgeRules.enabled,
+          channelOverride: nudgeRules.channelOverride,
+          quietModeExempt: nudgeRules.quietModeExempt,
+        })
+        .from(nudgeRules)
+        .where(
+          activeOnly(
+            nudgeRules,
+            eq(nudgeRules.workspaceId, context.workspaceId),
+          ),
+        );
+      const byKey = new Map(configured.map((row) => [row.ruleKey, row]));
+
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const volume = await tx
+        .select({
+          ruleKey: nudges.ruleKey,
+          sent: sql<number>`count(*) filter (where ${nudges.sentAt} is not null)::int`,
+          suppressed: sql<number>`count(*) filter (where ${nudges.suppressedReason} is not null)::int`,
+        })
+        .from(nudges)
+        .where(
+          activeOnly(
+            nudges,
+            eq(nudges.workspaceId, context.workspaceId),
+            gte(nudges.scheduledFor, weekAgo),
+          ),
+        )
+        .groupBy(nudges.ruleKey);
+      const counts = new Map(volume.map((row) => [row.ruleKey, row]));
+
+      return {
+        quietMode: settings?.quietMode ?? false,
+        rules: TRIGGER_CATALOGUE.map((trigger) => {
+          const row = byKey.get(trigger.key);
+          const seen = counts.get(trigger.key);
+          return {
+            key: trigger.key,
+            fires: trigger.fires,
+            recipient: trigger.recipient,
+            escalates: trigger.escalates,
+            deterministic: trigger.deterministic,
+            // No row is the canon default, which is enabled on the member's
+            // own channel with §11's ladder.
+            enabled: row?.enabled ?? true,
+            channelOverride: row?.channelOverride ?? null,
+            quietModeExempt: row?.quietModeExempt ?? false,
+            configured: row !== undefined,
+            sent: Number(seen?.sent ?? 0),
+            suppressed: Number(seen?.suppressed ?? 0),
+          };
+        }),
+      };
+    });
+  },
+});
+
+/**
+ * Turns one rule down, or back up (S-36, P6-G21).
+ *
+ * **A row is written only when the workspace differs from the canon**, and
+ * removed when it stops differing. `nudge_rules`' own comment is that the
+ * absence of a row is the default, and a row that matches the canon would
+ * survive a change to the canon and quietly hold the old answer, which is the
+ * same trap the §11 override map avoids.
+ */
+export const setNudgeRule = defineWriteAction({
+  name: "nudges.setRule",
+  summary: "Enables, mutes, re-routes or exempts one §6.4 rule.",
+  input: z.object({
+    ruleKey: z.string().min(1),
+    enabled: z.boolean().optional(),
+    /** Null returns this rule to the member's own primary channel. */
+    channelOverride: primaryChannelSchema.nullable().optional(),
+    quietModeExempt: z.boolean().optional(),
+  }),
+  output: z.object({ ruleKey: z.string(), configured: z.boolean() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      if (!isTriggerKey(input.ruleKey)) {
+        throw new OperationError(
+          "not_found",
+          `\`${input.ruleKey}\` is not a rule the method package defines.`,
+        );
+      }
+
+      const [existing] = await tx
+        .select({
+          id: nudgeRules.id,
+          enabled: nudgeRules.enabled,
+          channelOverride: nudgeRules.channelOverride,
+          quietModeExempt: nudgeRules.quietModeExempt,
+        })
+        .from(nudgeRules)
+        .where(
+          activeOnly(
+            nudgeRules,
+            eq(nudgeRules.workspaceId, workspaceId),
+            eq(nudgeRules.ruleKey, input.ruleKey),
+          ),
+        )
+        .limit(1);
+
+      const next = {
+        enabled: input.enabled ?? existing?.enabled ?? true,
+        channelOverride:
+          input.channelOverride !== undefined
+            ? input.channelOverride
+            : (existing?.channelOverride ?? null),
+        quietModeExempt:
+          input.quietModeExempt ?? existing?.quietModeExempt ?? false,
+      };
+
+      // Back to the canon in every respect: the row goes rather than being
+      // kept as a copy of the default.
+      const isCanon =
+        next.enabled && next.channelOverride === null && !next.quietModeExempt;
+
+      if (isCanon) {
+        if (existing) {
+          // openokr:allow-mutation: this is the operation's own execute.
+          await tx
+            .update(nudgeRules)
+            .set({ deletedAt: new Date() })
+            .where(activeOnly(nudgeRules, eq(nudgeRules.id, existing.id)));
+        }
+        return {
+          result: { ruleKey: input.ruleKey, configured: false },
+          activity: {
+            kind: "nudge.rule_changed",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: { ruleKey: input.ruleKey, configured: false },
+          },
+          audit: {
+            action: "nudges.setRule",
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: { ruleKey: input.ruleKey, ...next },
+          },
+        };
+      }
+
+      if (existing) {
+        // openokr:allow-mutation: this is the operation's own execute.
+        await tx
+          .update(nudgeRules)
+          .set({ ...next, updatedAt: new Date() })
+          .where(activeOnly(nudgeRules, eq(nudgeRules.id, existing.id)));
+      } else {
+        // openokr:allow-mutation: this is the operation's own execute.
+        await tx.insert(nudgeRules).values({
+          workspaceId,
+          ruleKey: input.ruleKey,
+          ...next,
+        });
+      }
+
+      return {
+        result: { ruleKey: input.ruleKey, configured: true },
+        activity: {
+          kind: "nudge.rule_changed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { ruleKey: input.ruleKey, configured: true },
+        },
+        audit: {
+          action: "nudges.setRule",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { ruleKey: input.ruleKey, ...next },
+        },
+      };
+    },
+  }),
 });

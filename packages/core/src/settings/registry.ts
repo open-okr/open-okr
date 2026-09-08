@@ -222,7 +222,14 @@ const orphanBlobMinutesSchema = z
   .min(60)
   .max(60 * 24 * 30);
 
-const primaryChannelSchema = z.enum([
+/**
+ * The channels a member can be reached on.
+ *
+ * Exported since P6-G21: a nudge rule's channel override picks from the same
+ * set, and a second copy of this list would drift the first time a provider
+ * is added.
+ */
+export const primaryChannelSchema = z.enum([
   "app",
   "email",
   "slack",

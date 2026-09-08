@@ -17493,6 +17493,9 @@
                       "strict"
                     ]
                   },
+                  "quietMode": {
+                    "type": "boolean"
+                  },
                   "overrides": {
                     "type": "object",
                     "propertyNames": {
@@ -35197,6 +35200,248 @@
                     "type": "string"
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nudges/rules": {
+      "get": {
+        "operationId": "nudges.rules",
+        "summary": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+        "tags": [
+          "nudges"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "quietMode": {
+                          "type": "boolean"
+                        },
+                        "rules": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "fires": {
+                                "type": "string"
+                              },
+                              "recipient": {
+                                "type": "string"
+                              },
+                              "escalates": {
+                                "type": "boolean"
+                              },
+                              "deterministic": {
+                                "type": "boolean"
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "channelOverride": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "quietModeExempt": {
+                                "type": "boolean"
+                              },
+                              "configured": {
+                                "type": "boolean"
+                              },
+                              "sent": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "suppressed": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "fires",
+                              "recipient",
+                              "escalates",
+                              "deterministic",
+                              "enabled",
+                              "channelOverride",
+                              "quietModeExempt",
+                              "configured",
+                              "sent",
+                              "suppressed"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "quietMode",
+                        "rules"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
+    "/nudges/setRule": {
+      "post": {
+        "operationId": "nudges.setRule",
+        "summary": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+        "tags": [
+          "nudges"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ruleKey": {
+                          "type": "string"
+                        },
+                        "configured": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleKey",
+                        "configured"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ruleKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "channelOverride": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "app",
+                          "email",
+                          "slack",
+                          "teams",
+                          "whatsapp",
+                          "telegram"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "quietModeExempt": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ruleKey"
+                ]
               }
             }
           }

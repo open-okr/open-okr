@@ -18,17 +18,19 @@
 import {
   activeOnly,
   notifications,
+  nudgeRules,
   nudges,
   type WorkspaceTx,
 } from "@openokr/db";
-import { asc, eq, isNull, lte } from "drizzle-orm";
+import { asc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { buildMessage } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
 import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
-import { resolveDelivery } from "../channels/routing.ts";
+import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
+import { primaryChannelSchema } from "../settings/registry.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
@@ -199,6 +201,35 @@ export async function deliverDueNudges(
   });
   const connected = await connectedProviders(tx, input.workspaceId);
 
+  // Every rule this workspace has re-routed (P6-G21). One read for the whole
+  // batch rather than one per nudge, and an absent key is the member's own
+  // channel, which is what no row means everywhere else in this table.
+  const overrideRows = await tx
+    .select({
+      ruleKey: nudgeRules.ruleKey,
+      channelOverride: nudgeRules.channelOverride,
+    })
+    .from(nudgeRules)
+    .where(
+      activeOnly(
+        nudgeRules,
+        eq(nudgeRules.workspaceId, input.workspaceId),
+        isNotNull(nudgeRules.channelOverride),
+      ),
+    );
+  // The column is free text in the table and the routing decision takes the
+  // same union a member's own channel does. Narrowed here, once, rather than
+  // at the call site: a value outside the set is a row written before the
+  // action that validates it existed, and the member's own channel is the
+  // right answer for one of those.
+  const overrides = new Map<string, PrimaryChannel>();
+  for (const row of overrideRows) {
+    const parsed = primaryChannelSchema.safeParse(row.channelOverride);
+    if (parsed.success) {
+      overrides.set(row.ruleKey, parsed.data);
+    }
+  }
+
   let toChannel = 0;
   const unreachable = new Set<string>();
 
@@ -221,6 +252,7 @@ export async function deliverDueNudges(
       // ladder position is what says so. Step 3 is where §6.3 widens.
       urgent: row.escalationStep >= 3,
       connectedProviders: connected,
+      channelOverride: overrides.get(row.ruleKey) ?? null,
       now: input.now,
     });
 

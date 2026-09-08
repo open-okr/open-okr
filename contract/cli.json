@@ -3352,6 +3352,12 @@
           ]
         },
         {
+          "name": "quiet-mode",
+          "field": "quietMode",
+          "type": "boolean",
+          "required": false
+        },
+        {
           "name": "overrides",
           "field": "overrides",
           "type": "object",
@@ -7239,6 +7245,51 @@
           "name": "now",
           "field": "now",
           "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "nudges rules",
+      "action": "nudges.rules",
+      "method": "GET",
+      "path": "/nudges/rules",
+      "scope": "read",
+      "summary": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "nudges setRule",
+      "action": "nudges.setRule",
+      "method": "POST",
+      "path": "/nudges/setRule",
+      "scope": "write",
+      "summary": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "flags": [
+        {
+          "name": "rule-key",
+          "field": "ruleKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "channel-override",
+          "field": "channelOverride",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "quiet-mode-exempt",
+          "field": "quietModeExempt",
+          "type": "boolean",
           "required": false
         }
       ],

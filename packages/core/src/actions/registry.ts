@@ -270,7 +270,14 @@ import {
   unreadNotificationCount,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
-import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
+import {
+  listNudgeRules,
+  listNudges,
+  nudgeVolume,
+  runNudges,
+  setNudgeRule,
+  snoozeNudge,
+} from "./nudges.ts";
 import { listMyConnections, revokeConnection } from "./oauth-connections.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
@@ -671,6 +678,8 @@ export const ACTION_MAP = {
   "comments.delete": deleteCommentAction,
   "comments.previewNotify": previewNotifyAction,
   "nudges.run": runNudges,
+  "nudges.rules": listNudgeRules,
+  "nudges.setRule": setNudgeRule,
   "nudges.list": listNudges,
   "nudges.snooze": snoozeNudge,
   "nudges.volume": nudgeVolume,
