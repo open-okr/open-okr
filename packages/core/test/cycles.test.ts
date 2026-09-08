@@ -722,3 +722,86 @@ describe("the annual frame", () => {
     expect(rows.rows[0]?.n).toBe(1);
   });
 });
+
+describe("the §11 registry beyond its scalars (P6-G20)", () => {
+  const call = async (overrides: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "rhythm.update",
+      { overrides },
+    );
+  };
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "rhythm.read",
+      {},
+    );
+  };
+
+  it("stores a ladder as a whole object", async () => {
+    // Every escalation ladder, every band set and every bounds pair is one of
+    // these, and the admin card rendered them read-only until P6-G20: a
+    // workspace could see its own ladder and not move it.
+    await call({
+      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+    });
+    const after = await read();
+    expect(after.thresholds["cadence.blockerLadderHours"]).toEqual({
+      owner: 12,
+      coordinator: 36,
+      sponsor: 60,
+    });
+  });
+
+  it("stores a list parameter as a list", async () => {
+    // Two §11 parameters are `z.array`, and a form that reassembles them from
+    // their indices has to send an array back. An object keyed "0", "1", "2"
+    // is refused by the schema, which is why the card names those fields
+    // differently.
+    await call({ "cadence.publicationCountdownDays": [21, 10, 2] });
+    const after = await read();
+    expect(after.thresholds["cadence.publicationCountdownDays"]).toEqual([
+      21, 10, 2,
+    ]);
+  });
+
+  it("refuses an out-of-range value and states the bound", async () => {
+    // The admin card swallowed this refusal until P6-G20: an impossible value
+    // looked exactly like a successful save.
+    await expect(call({ "cadence.stalenessGraceDays": 9999 })).rejects.toThrow(
+      /cadence\.stalenessGraceDays.*(less than or equal to|<=)\s*\d+/is,
+    );
+  });
+
+  it("returns a whole card to the canon in one call", async () => {
+    // What the card's reset button sends: every key in the group as null,
+    // rather than the canon's numbers. Storing today's default would keep it
+    // after the canon moved.
+    await call({
+      "cadence.stalenessGraceDays": 5,
+      "cadence.toleranceDays": 2,
+      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+    });
+    expect(Object.keys((await read()).overrides)).toHaveLength(3);
+
+    await call({
+      "cadence.stalenessGraceDays": null,
+      "cadence.toleranceDays": null,
+      "cadence.blockerLadderHours": null,
+    });
+
+    const after = await read();
+    expect(after.overrides).toEqual({});
+    expect(after.thresholds["cadence.stalenessGraceDays"]).toBe(3);
+    expect(after.thresholds["cadence.toleranceDays"]).toBe(1);
+    // And the canon's ladder is back, not the one that was stored.
+    expect(after.thresholds["cadence.blockerLadderHours"]).not.toEqual({
+      owner: 12,
+      coordinator: 36,
+      sponsor: 60,
+    });
+  });
+});
