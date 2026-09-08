@@ -51,7 +51,7 @@ function Sparkline({
   readonly thresholds: ResolvedThresholds;
 }) {
   return (
-    <ol className="flex items-end gap-1.5">
+    <ol data-testid="confidence-trend" className="flex items-end gap-1.5">
       {points.map((point) => {
         // A floor so a genuinely low week is still a visible bar rather than
         // nothing at all, which reads as missing data.

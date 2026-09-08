@@ -418,9 +418,13 @@ test("facilitator advances through remaining stages and closes", async () => {
 /**
  * The trend, the streak and the blockers (P6-G19b).
  *
- * Runs after the close, so the space has exactly one closed week behind it:
- * one trend point, and a streak of one. A twelve-point trend would need
- * twelve weeks of history the suite has no way to make honestly.
+ * Runs after the close, so the space has at least one closed week behind it.
+ *
+ * **How many is not this spec's business.** The first version asserted "One
+ * week so far.", which held when this file ran on its own and failed in the
+ * full suite: earlier specs close sessions in the same space, so the count is
+ * whatever they left. What is worth asserting is that the panel draws from the
+ * tables rather than from a placeholder, which is true at one point or twelve.
  */
 test("the weekly figures read the tables the placeholder used to name", async () => {
   await page.goto(`/session/${sessionId}`);
@@ -431,9 +435,12 @@ test("the weekly figures read the tables the placeholder used to name", async ()
   ).toBeVisible();
   await expect(page.getByText("week streak")).toBeVisible();
 
-  // One closed week, and the copy says so rather than drawing eleven empty
-  // columns beside it.
-  await expect(page.getByText("One week so far.")).toBeVisible();
+  // At least one bar, drawn from a digest rather than from nothing, and the
+  // empty state absent because a week has closed.
+  const trend = page.getByTestId("confidence-trend");
+  await expect(trend).toBeVisible();
+  expect(await trend.locator("li").count()).toBeGreaterThan(0);
+  await expect(page.getByText("No week has been closed yet")).toHaveCount(0);
 
   // The sentence that stood in for all of this is gone.
   await expect(page.getByText("arrive at P6-G19")).toHaveCount(0);

@@ -896,8 +896,19 @@ export const closeSession = defineWriteAction({
             ? confidences.reduce((s, v) => s + v, 0) / confidences.length
             : 0;
 
-        const HIGH = 0.7;
-        const LOW = 0.4;
+        // §3.2's boundaries, resolved for this workspace (P6-G19b).
+        //
+        // These were `const HIGH = 0.7` and `const LOW = 0.4`, the third and
+        // fourth copies of the same two numbers in this file. P6-G19a took the
+        // first two out of `advanceStage`; these decide the on-track and
+        // at-risk counts in the digest the room reads and the space home shows,
+        // so a workspace that moved its own bounds was being counted by the
+        // canon's.
+        const { thresholds: closeThresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+        const HIGH = closeThresholds["scoring.confidenceHigh"];
+        const LOW = closeThresholds["scoring.confidenceLow"];
         const onTrack = confidences.filter((c) => c >= HIGH).length;
         const atRisk = confidences.filter((c) => c < LOW).length;
 
@@ -2573,13 +2584,32 @@ export const confidenceTrend = defineReadAction({
           .orderBy(desc(digests.periodStart))
           .limit(input.weeks);
 
-        return rows
-          .filter((row) => typeof row.body.averageConfidence === "number")
-          .map((row) => ({
+        // **One point per period, latest first, then reversed.**
+        //
+        // `sessions.close` inserts a digest row every time it runs and stamps
+        // `period_start` with the day it ran, so a space that closes two
+        // sessions in one week holds two rows. The read is ordered newest
+        // first, so the first row seen for a period is the one to keep: two
+        // points for one week would draw a jump that never happened, and two
+        // identical `weekStart` values would collide as React keys in the
+        // sparkline. Found by the full end-to-end suite, where earlier specs
+        // had already closed a session in the same space.
+        const seen = new Set<string>();
+        const points: Array<{ weekStart: string; average: number }> = [];
+        for (const row of rows) {
+          if (typeof row.body.averageConfidence !== "number") {
+            continue;
+          }
+          if (seen.has(row.periodStart)) {
+            continue;
+          }
+          seen.add(row.periodStart);
+          points.push({
             weekStart: row.periodStart,
-            average: row.body.averageConfidence as number,
-          }))
-          .reverse();
+            average: row.body.averageConfidence,
+          });
+        }
+        return points.reverse();
       },
     );
   },
