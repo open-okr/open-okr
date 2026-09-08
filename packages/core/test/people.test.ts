@@ -421,6 +421,126 @@ describe("an ordinary member's own access", () => {
   });
 });
 
+describe("directory includeSuspended (P6-G09)", () => {
+  it("excludes a suspended member by default", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Soon Suspended");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const rows = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      {},
+    );
+    expect(rows.map((r) => r.id)).not.toContain(member);
+  });
+
+  it("includes a suspended member when includeSuspended is true", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Soon Suspended");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const rows = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { includeSuspended: true },
+    );
+    expect(rows.map((r) => r.id)).toContain(member);
+    const suspended = rows.find((r) => r.id === member);
+    expect(suspended?.status).toBe("suspended");
+  });
+});
+
+describe("readMember (P6-G09)", () => {
+  it("returns full profile for an active member", async () => {
+    const wb = await workerDb();
+    const profile = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(profile.id).toBe(ownerMemberId);
+    expect(profile.name).toBe("People Owner");
+    expect(profile).toHaveProperty("bio");
+    expect(profile).toHaveProperty("primaryChannel");
+    expect(profile).toHaveProperty("avatarBlobId");
+  });
+
+  it("returns not_found for a non-existent member", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "people.readMember", {
+        memberId: "00000000-0000-0000-0000-000000000000",
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("returns a suspended member to an admin caller", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Suspended for Profile");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const profile = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: member },
+    );
+    expect(profile.id).toBe(member);
+    expect(profile.status).toBe("suspended");
+  });
+
+  it("returns not_found for a suspended member when the caller is not admin", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Suspended Target");
+    await grantFullOnWorkspace(member);
+
+    // Create a non-admin user to act as caller.
+    const NON_ADMIN_USER = "people-reader";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [NON_ADMIN_USER, "Reader", "reader@example.com"],
+    );
+    const readerMember = await addMember("Reader");
+    // Bind the user to the member row so the handler can find the caller.
+    await wb.admin.query(
+      "update workspace_members set user_id = $1 where id = $2",
+      [NON_ADMIN_USER, readerMember],
+    );
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(NON_ADMIN_USER) },
+        "people.readMember",
+        { memberId: member },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("bio is validated as rich text (P2-T11)", () => {
   it("accepts a valid rich text document", () => {
     const result = updateOwnProfile.input.safeParse({

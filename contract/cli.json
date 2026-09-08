@@ -279,7 +279,31 @@
       "path": "/people/directory",
       "scope": "read",
       "summary": "Every active member of the workspace.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "include-suspended",
+          "field": "includeSuspended",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people readMember",
+      "action": "people.readMember",
+      "method": "GET",
+      "path": "/people/readMember",
+      "scope": "read",
+      "summary": "One member's profile.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "pages": false
     },
     {

@@ -14,13 +14,21 @@
  * restore, all refuse to act on the workspace's last full-access holder
  * (`isLastFullAccessHolder` in `../people/lifecycle.ts`).
  */
-import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
+import {
+  activeOnly,
+  withContext,
+  withWorkspace,
+  workspaceMembers,
+} from "@openokr/db";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { resolveSubjectContext } from "../access/reads.ts";
+import {
+  resolveMemberAccessLevel,
+  resolveSubjectContext,
+} from "../access/reads.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
@@ -522,13 +530,25 @@ export const eraseMember = defineWriteAction({
 export const directory = defineReadAction({
   name: "people.directory",
   summary: "Every active member of the workspace.",
-  input: z.object({}),
+  input: z.object({
+    /**
+     * Include suspended members in the result. The directory page passes this
+     * only when the signed-in member holds `full`, so the caller decides, not
+     * the action. Existing callers all pass `{}` and keep the active-only
+     * default (P6-G09).
+     */
+    includeSuspended: z.boolean().optional(),
+  }),
   output: z.array(memberSummary),
   access: ACCESS_LEVELS.view,
-  async handler(context) {
+  async handler(context, input) {
     const db = drizzle(context.pool);
-    return withWorkspace(db, context.workspaceId, (tx) =>
-      tx
+    return withWorkspace(db, context.workspaceId, (tx) => {
+      const filters = [eq(workspaceMembers.workspaceId, context.workspaceId)];
+      if (!input.includeSuspended) {
+        filters.push(eq(workspaceMembers.status, "active"));
+      }
+      return tx
         .select({
           id: workspaceMembers.id,
           name: workspaceMembers.name,
@@ -539,13 +559,121 @@ export const directory = defineReadAction({
           timezone: workspaceMembers.timezone,
         })
         .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.workspaceId, context.workspaceId),
-            eq(workspaceMembers.status, "active"),
-          ),
-        ),
+        .where(activeOnly(workspaceMembers, ...filters));
+    });
+  },
+});
+
+const memberProfile = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  title: z.string().nullable(),
+  kind: z.enum(["human", "guest", "agent", "placeholder"]),
+  status: z.enum(["active", "invited", "suspended"]),
+  managerId: z.uuid().nullable(),
+  timezone: z.string().nullable(),
+  bio: z.unknown().nullable(),
+  bioVersion: z.number().nullable(),
+  avatarBlobId: z.uuid().nullable(),
+  primaryChannel: z
+    .enum(["app", "email", "slack", "teams", "whatsapp", "telegram"])
+    .nullable(),
+});
+
+/**
+ * A single member's profile (P6-G09, screen S-33).
+ *
+ * The directory returns a summary per member. A profile page needs the bio,
+ * avatar and primary channel as well, so a separate read exists for one row.
+ *
+ * Suspended members are visible only to callers holding `full` on the
+ * workspace context. For anyone else the handler returns `not_found`, which
+ * is the same shape the access getter uses: revealing that a member exists
+ * but is suspended would be an oracle.
+ */
+export const readMember = defineReadAction({
+  name: "people.readMember",
+  summary: "One member's profile.",
+  input: z.object({ memberId: z.uuid() }),
+  output: memberProfile,
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: userId ?? "" },
+      async (tx) => {
+        const [row] = await tx
+          .select({
+            id: workspaceMembers.id,
+            name: workspaceMembers.name,
+            title: workspaceMembers.title,
+            kind: workspaceMembers.kind,
+            status: workspaceMembers.status,
+            managerId: workspaceMembers.managerId,
+            timezone: workspaceMembers.timezone,
+            bio: workspaceMembers.bio,
+            bioVersion: workspaceMembers.bioVersion,
+            avatarBlobId: workspaceMembers.avatarBlobId,
+            primaryChannel: workspaceMembers.primaryChannel,
+          })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.id, input.memberId),
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+            ),
+          )
+          .limit(1);
+
+        if (!row) {
+          throw new OperationError("not_found", "No such member.");
+        }
+
+        // A suspended member is visible only to an admin. Resolve the
+        // caller's level on the workspace context and hide when below full.
+        if (row.status === "suspended") {
+          if (!userId) {
+            throw new OperationError("not_found", "No such member.");
+          }
+          const [caller] = await tx
+            .select({ id: workspaceMembers.id })
+            .from(workspaceMembers)
+            .where(
+              activeOnly(
+                workspaceMembers,
+                eq(workspaceMembers.workspaceId, context.workspaceId),
+                eq(workspaceMembers.userId, userId),
+                eq(workspaceMembers.status, "active"),
+              ),
+            )
+            .limit(1);
+          if (!caller) {
+            throw new OperationError("not_found", "No such member.");
+          }
+          const wsContext = await resolveSubjectContext(
+            tx,
+            "workspace",
+            context.workspaceId,
+            context.workspaceId,
+          );
+          if (!wsContext) {
+            throw new OperationError("not_found", "No such member.");
+          }
+          const level = await resolveMemberAccessLevel(tx, {
+            workspaceId: context.workspaceId,
+            memberId: caller.id,
+            contextId: wsContext.contextId,
+          });
+          if (level < ACCESS_LEVELS.full) {
+            throw new OperationError("not_found", "No such member.");
+          }
+        }
+
+        return row;
+      },
     );
   },
 });
