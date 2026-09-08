@@ -7,6 +7,7 @@ import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
 import { updateMemberFields, updateProfile } from "../actions.ts";
+import { LifecycleControls } from "./lifecycle-controls.tsx";
 import { ProfileForm } from "./profile-form.tsx";
 
 /**
@@ -17,7 +18,9 @@ import { ProfileForm } from "./profile-form.tsx";
  * - Others' profile: read-only
  * - Admin viewing others: editable org fields (name, title, manager)
  *
- * Lifecycle controls (suspend, restore, convert, erase) are P6-G10.
+ * Lifecycle controls (suspend, restore, convert, erase) are P6-G10, and sit
+ * below the admin edit card: they are the rarer thing to want and the one it
+ * would be worse to press by accident.
  */
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -303,6 +306,23 @@ export default async function MemberProfilePage({
               </form>
             </CardBody>
           </Card>
+        ) : null}
+
+        {/* Admin only, and shown on your own profile as well.
+            `isLastFullAccessHolder` counts every other active member, and the
+            caller already holds full to be here, so the last-owner refusal can
+            only ever fire on yourself. Hiding this card on your own profile
+            would make that invariant unreachable from the product, which is
+            half of what B-08 was. A sole administrator leaving is exactly who
+            needs to be told to hand over first. */}
+        {isAdmin ? (
+          <LifecycleControls
+            memberId={id}
+            memberName={member.name}
+            status={member.status}
+            kind={member.kind}
+            isSelf={isSelf}
+          />
         ) : null}
 
         <p className="text-xs text-ink-4">

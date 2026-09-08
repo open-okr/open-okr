@@ -10,6 +10,12 @@
  * renders with editable fields, and the org chart tab shows them as a root
  * node. Multi-member scenarios (suspended visibility, manager cycle
  * prevention) are tested in `packages/core/test/people.test.ts`.
+ *
+ * The lifecycle controls are P6-G10, and the single-member instance is the
+ * right fixture for them rather than a limitation. The last-owner invariant
+ * can only ever refuse on your own profile: the caller holds full access to
+ * reach the card at all, so any other target already leaves a second
+ * full-access holder behind. One member and one owner is that case exactly.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
@@ -95,4 +101,64 @@ test("the profile has a timezone field", async () => {
   // Already on the profile page from the previous test.
   const timezone = page.locator("input[name='timezone']");
   await expect(timezone).toBeVisible();
+});
+
+test("the lifecycle card is on the admin's own profile", async () => {
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  await expect(page.getByRole("heading", { name: "Lifecycle" })).toBeVisible();
+  // The copy changes on your own profile, because everything here applies to
+  // you rather than to somebody who is leaving.
+  await expect(page.getByText("This is your own profile")).toBeVisible();
+});
+
+test("suspending the only owner is refused by name", async () => {
+  // The confirm is accepted, because what is under test is the refusal that
+  // comes after it rather than the dialog.
+  page.once("dialog", (dialog) => {
+    void dialog.accept();
+  });
+  await page.getByRole("button", { name: "Suspend" }).click();
+
+  await expect(
+    page.getByText(
+      "This is the only member with full access to the workspace.",
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Refused means nothing happened: no suspended chip, and the page still
+  // belongs to a signed-in member.
+  await expect(page.getByText("Suspended", { exact: true })).toHaveCount(0);
+});
+
+test("erasure asks for the name typed, and a wrong one erases nothing", async () => {
+  await page.getByRole("button", { name: "Erase this member" }).click();
+  await page.getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`).fill("not the name");
+  await page
+    .getByRole("button", { name: "Erase this member", exact: true })
+    .click();
+
+  await expect(
+    page.getByText(`Type ${INSTANCE_ACCOUNT.name} exactly to confirm`),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // Typed correctly, the domain refuses instead, for the same reason as the
+  // suspension: there is nobody else who could administer the workspace.
+  await page
+    .getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`)
+    .fill(INSTANCE_ACCOUNT.name);
+  await page
+    .getByRole("button", { name: "Erase this member", exact: true })
+    .click();
+
+  await expect(
+    page.getByText(
+      "This is the only member with full access to the workspace.",
+    ),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("erasure-export")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: INSTANCE_ACCOUNT.name }),
+  ).toBeVisible();
 });
