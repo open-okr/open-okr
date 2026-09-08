@@ -454,3 +454,31 @@ test("the coordinator's note reaches the digest once the session is closed", asy
     page.getByRole("button", { name: "Replace the note" }),
   ).toBeVisible({ timeout: 10_000 });
 });
+
+/**
+ * The space home answers "how is this team doing" (P6-G19c).
+ *
+ * Runs last, so the space has one closed week behind it: one trend point, a
+ * streak, and a digest to show as last week.
+ */
+test("the space home shows the trend, the streak and last week", async () => {
+  const space = (
+    await pool.query<{ id: string }>(
+      "select s.id from spaces s join workspace_members m on m.workspace_id = s.workspace_id join users u on u.id = m.user_id where u.email = $1 and s.deleted_at is null limit 1",
+      [EMAIL],
+    )
+  ).rows[0];
+  if (!space) throw new Error("Space not found.");
+
+  await page.goto(`/spaces/${space.id}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(
+    page.getByRole("heading", { name: "Confidence trend" }),
+  ).toBeVisible();
+  await expect(page.getByText("week streak")).toBeVisible();
+
+  // Last week is the closed session's digest, not the running one's figures.
+  await expect(page.getByText("Last week", { exact: true })).toBeVisible();
+  await expect(page.getByText("No week has closed in this space yet")).toHaveCount(0);
+});

@@ -3,8 +3,12 @@ import { confidenceBand } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 
 /**
- * The weekly session's read-only figures: the trend and the streak
- * (S-22, P6-G19b).
+ * A space's weekly figures: the confidence trend and the streak
+ * (S-22 and the space home, P6-G19b and P6-G19c).
+ *
+ * In `lib` rather than under a route because two screens ask the same
+ * question. The session screen shows it to the room that is about to meet; the
+ * space home shows it to anybody who opens the team.
  *
  * **These tables shipped at P4-T07b and P4-T08 and nothing read them.** The
  * screen carried a sentence saying the panels would arrive and naming the

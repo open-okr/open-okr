@@ -33,6 +33,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPool } from "../../../lib/auth";
+import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   closeSessionAction,
@@ -66,7 +67,6 @@ import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
-import { WeeklyFigures } from "./weekly-panels.tsx";
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;

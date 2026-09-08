@@ -32,7 +32,7 @@ const at = (path: string) =>
 const code = (source: string) =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
-const figures = at("../app/session/[id]/weekly-panels.tsx");
+const figures = at("../lib/weekly-figures.tsx");
 const blockers = at("../app/session/[id]/blocker-panel.tsx");
 const blockerActions = at("../app/session/[id]/blocker-actions.ts");
 const page = at("../app/session/[id]/page.tsx");

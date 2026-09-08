@@ -182,6 +182,42 @@ async function requireSessionAccess(
   return session;
 }
 
+/**
+ * The space access getter, on the way into a space-scoped read (P6-G19b,
+ * P6-G19c).
+ *
+ * This is the same call `spaces.read` makes and the same one
+ * `requireSessionAccess` makes once it has a session's space: one
+ * `getAccessScoped`, not-found on refusal.
+ *
+ * **The space-scoped session reads beside these two do not make it.**
+ * `sessions.readStreak`, `sessions.blockerStatus`, `sessions.listCommitments`
+ * and `blockers.board` check that the caller is an active member of the
+ * workspace and stop there. Whether that is reachable as a disclosure depends
+ * on the bindings a workspace has, and provisioning currently gives every
+ * member a workspace-wide binding that resolves on each space, so the default
+ * install shows nothing it should not. It is still the one enforcement point
+ * CLAUDE.md asks every protected read to go through, and four of them skip it.
+ * Recorded in STATUS: it is wider than either task that noticed it, and
+ * fixing four actions here without their own tests would be worse than saying
+ * so.
+ */
+async function requireSpaceRead(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+  spaceId: string,
+): Promise<void> {
+  const memberId = await actingMember(tx, workspaceId, userId);
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "space",
+    resourceId: spaceId,
+    requires: ACCESS_LEVELS.view as never,
+  });
+}
+
 async function resolveSpaceContextId(
   tx: OperationTx,
   workspaceId: string,
@@ -2442,6 +2478,12 @@ export const carriedCommitments = defineReadAction({
           // space, so this is reachable only by a row written another way.
           return [];
         }
+        await requireSpaceRead(
+          tx as unknown as OperationTx,
+          context.workspaceId,
+          context.actor.userId,
+          session.spaceId,
+        );
 
         const rows = await tx
           .select()
@@ -2506,6 +2548,13 @@ export const confidenceTrend = defineReadAction({
       db,
       { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
       async (tx) => {
+        await requireSpaceRead(
+          tx as unknown as OperationTx,
+          context.workspaceId,
+          context.actor.userId,
+          input.spaceId,
+        );
+
         const rows = await tx
           .select({
             periodStart: digests.periodStart,
