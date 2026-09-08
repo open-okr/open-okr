@@ -82,6 +82,7 @@ import {
   getBlobForDownload,
   prepareImport,
   prepareUpload,
+  reapOrphanedBlobs,
 } from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
@@ -452,6 +453,7 @@ export const ACTION_MAP = {
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
   "blobs.prepareUpload": prepareUpload,
+  "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.
   "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,

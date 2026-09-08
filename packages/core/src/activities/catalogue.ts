@@ -91,6 +91,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "blob.prepared": z.object({}),
   "blob.claimed": z.object({}).catchall(z.unknown()),
+  /** The orphan reap's own row, so the removal is accountable (P6-G01c). */
+  "blob.reaped": z.object({
+    discarded: z.number().int(),
+    bytesLeft: z.number().int(),
+    olderThanMinutes: z.number().int(),
+  }),
   "notification.read": z.object({}),
   "notification.snoozed": z.object({}),
   "notification_settings.updated": z.object({}),

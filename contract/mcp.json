@@ -1783,6 +1783,27 @@
       }
     },
     {
+      "name": "blobs.reapOrphans",
+      "description": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "olderThanMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "blobs.prepareImport",
       "description": "Reserves a storage key for a file an import found, keeping its uploader.",
       "inputSchema": {

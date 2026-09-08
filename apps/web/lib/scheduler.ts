@@ -45,6 +45,7 @@ import { callAction } from "@openokr/core";
 import { drafterFor } from "./drafter";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
+import { getStorage } from "./storage";
 
 const log = (message: string): void => {
   process.stdout.write(`scheduler: ${message}\n`);
@@ -91,7 +92,8 @@ export interface ScheduledRun {
   readonly action:
     | "agents.runChampion"
     | "agents.runCoach"
-    | "notifications.drainBatches";
+    | "notifications.drainBatches"
+    | "blobs.reapOrphans";
   readonly cadence?: "hourly" | "daily" | "weekly" | "cycle";
   readonly localHour?: number;
   /**
@@ -128,6 +130,24 @@ const NOTIFICATION_DRAIN_JOB = "notifications.drain";
 const NOTIFICATION_DRAIN_CRON = "*/5 * * * *";
 
 /**
+ * The job name the orphan-upload reap is registered under (P6-G01c).
+ *
+ * Not exported, for the same reason the drain's name is not: it has one
+ * reader, a few lines below.
+ */
+const ORPHAN_REAP_JOB = "blobs.reapOrphans";
+
+/**
+ * Once a day, at twenty past three in the morning UTC.
+ *
+ * The window this sweeps is a day wide by default, so running it more often
+ * would find nothing new; running it less often lets a bucket hold a week of
+ * abandoned bytes. The odd minute is so it does not start in the same second
+ * as every other daily job in every other product on the host.
+ */
+const ORPHAN_REAP_CRON = "20 3 * * *";
+
+/**
  * Every job this host subscribes a worker to.
  *
  * One entry for every name in `AGENT_SCHEDULES`, plus the runs this host
@@ -150,6 +170,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: NOTIFICATION_DRAIN_JOB,
     action: "notifications.drainBatches",
     cron: NOTIFICATION_DRAIN_CRON,
+  },
+  {
+    job: ORPHAN_REAP_JOB,
+    action: "blobs.reapOrphans",
+    cron: ORPHAN_REAP_CRON,
   },
 ];
 
@@ -272,10 +297,18 @@ async function runOne(
     workspaceId: workspace.id,
     actor: { kind: "system" as const },
     ring: getKeyRing(),
+    // The orphan reap deletes the bytes as well as the row (P6-G01c). Passed
+    // to every scheduled run rather than to that one: the seam is two methods
+    // and an action that does not use it does not notice it.
+    storage: getStorage(),
     ...(drafter ? { drafter } : {}),
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});
+    return;
+  }
+  if (run.action === "blobs.reapOrphans") {
+    await callAction(context, "blobs.reapOrphans", {});
     return;
   }
   if (run.action === "agents.runCoach") {

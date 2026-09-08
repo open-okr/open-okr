@@ -53,6 +53,19 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "Someone joined through a trusted email domain",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
+  "blob.reaped": (payload) => {
+    const { discarded, bytesLeft } = payload as {
+      discarded: number;
+      bytesLeft: number;
+    };
+    if (discarded === 0) {
+      return "No abandoned uploads to clear";
+    }
+    const files = `${discarded} abandoned upload${discarded === 1 ? "" : "s"}`;
+    return bytesLeft === 0
+      ? `Cleared ${files}`
+      : `Cleared ${files}, and ${bytesLeft} left bytes behind`;
+  },
   "notification.read": () => "A notification was read",
   "notification.snoozed": () => "A notification was snoozed",
   "notification_settings.updated": () => "Notification settings were updated",

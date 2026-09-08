@@ -1,5 +1,6 @@
 import { AGENT_SCHEDULES } from "@openokr/agents";
 import { resetEnvCache } from "@openokr/config";
+import { actionNames } from "@openokr/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   localHourIn,
@@ -83,12 +84,14 @@ describe("the run table", () => {
   });
 
   test("names a real action for every run", () => {
+    // Checked against the registry rather than against a list written here.
+    // The list was a second copy of the type union three lines away, so it
+    // could only ever fail when somebody had already updated the union, and
+    // it did exactly that when the orphan reap was added at P6-G01c. What is
+    // worth catching is a run naming an action that does not exist.
+    const registered = new Set<string>(actionNames());
     for (const run of SCHEDULED_RUNS) {
-      expect([
-        "agents.runChampion",
-        "agents.runCoach",
-        "notifications.drainBatches",
-      ]).toContain(run.action);
+      expect(registered).toContain(run.action);
     }
   });
 

@@ -1200,6 +1200,23 @@
       "pages": false
     },
     {
+      "name": "blobs reapOrphans",
+      "action": "blobs.reapOrphans",
+      "method": "POST",
+      "path": "/blobs/reapOrphans",
+      "scope": "write",
+      "summary": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "flags": [
+        {
+          "name": "older-than-minutes",
+          "field": "olderThanMinutes",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blobs prepareImport",
       "action": "blobs.prepareImport",
       "method": "POST",

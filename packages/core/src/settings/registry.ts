@@ -177,6 +177,30 @@ export const DEFAULT_AGENT_RUN_COST_CAP_USD = 2;
 /** How long a half-finished chat conversation waits to be resumed (P5-T06b). */
 export const DEFAULT_CHAT_CONVERSATION_MINUTES = 30;
 
+/**
+ * How long a prepared upload waits to be claimed before it is an orphan
+ * (P6-G01c).
+ *
+ * Twenty-four hours. A prepare that is never claimed is a browser that closed,
+ * an upload that failed, or a tab somebody abandoned, and none of those come
+ * back a day later. Short enough that a bucket does not fill with bytes nobody
+ * asked for, long enough that a slow upload over a bad connection is never
+ * reaped out from under itself. TECHNICAL-PLAN asks for the reap and names no
+ * figure; P6-G01c picked this one.
+ *
+ * Exported for the same reason the two above it are: a workspace provisioned
+ * before this setting existed has no key to read, and one constant keeps the
+ * stored default and the fallback from drifting apart.
+ */
+export const DEFAULT_ORPHAN_BLOB_MINUTES = 24 * 60;
+
+/** Minutes. An hour is the floor; a month is well past any use for one. */
+const orphanBlobMinutesSchema = z
+  .number()
+  .int()
+  .min(60)
+  .max(60 * 24 * 30);
+
 const primaryChannelSchema = z.enum([
   "app",
   "email",
@@ -289,6 +313,20 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "yet, so it has none here.",
     resolve: () => DEFAULT_IMPORT_ROW_LIMIT,
     schema: importRowLimitSchema,
+  },
+  {
+    key: "orphanBlobMinutes",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "A day. `findOrphanedBlobs` and `discardOrphanedBlob` were written at " +
+      "P2-T05 and nothing called them, so every prepare that was never " +
+      "claimed stayed in the table and its bytes stayed in the bucket for " +
+      "good. The reap is a scheduled run now (P6-G01c) and this is how old a " +
+      "pending row has to be before it takes it. No S-36 card names it yet, " +
+      "so it has none here.",
+    resolve: () => DEFAULT_ORPHAN_BLOB_MINUTES,
+    schema: orphanBlobMinutesSchema,
   },
   {
     key: "primaryChannel",

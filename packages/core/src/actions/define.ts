@@ -64,14 +64,23 @@ export interface ActionCallContext {
   readonly actor: ActorInput;
   readonly ring?: KeyRing;
   /**
-   * Reads a file's bytes, when the host has a storage port to give (P6-T05a).
+   * Reads and removes a file's bytes, when the host has a storage port to
+   * give (P6-T05a, widened at P6-G01c).
    *
-   * One method rather than the whole `FileStorage`, because `packages/core`
+   * Two methods rather than the whole `FileStorage`, because `packages/core`
    * does not depend on `packages/adapters`: the driver satisfies this
    * structurally and the app passes the one it already has. Absent means an
    * archive carries rows and no bytes, and says so in its manifest.
+   *
+   * `delete` is what the orphan reap needs. Soft-deleting the row without it
+   * would leave the bytes in the bucket with nothing left pointing at them,
+   * which is the state the reap exists to end rather than a smaller version
+   * of it.
    */
-  readonly storage?: { get(key: string): Promise<Buffer> };
+  readonly storage?: {
+    get(key: string): Promise<Buffer>;
+    delete(key: string): Promise<void>;
+  };
   /**
    * Language for the agents, when the host has a provider to give (P4-T05c-b).
    *
