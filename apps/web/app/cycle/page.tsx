@@ -13,6 +13,7 @@ import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { AnnualFrame } from "./annual-frame.tsx";
+import { AnnualObjectives } from "./annual-objectives.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
@@ -128,6 +129,13 @@ export default async function CyclePage({
   // make the drafting phase pay for two views nobody is looking at.
   const frame =
     viewing === 0 ? await callAction(context, "frame.read", {}) : null;
+
+  // The year's objectives under the strategy each serves (P6-G14b). Loaded
+  // with the frame, because the panel is the frame's other half.
+  const annualObjectives =
+    viewing === 0
+      ? await callAction(context, "frame.annualObjectives", {})
+      : [];
 
   // Phase 6 and phase 7 both read the cycle's key results: one for the
   // confidence trend, the other for the scores. One read serves both.
@@ -434,6 +442,21 @@ export default async function CyclePage({
 
           {viewing === 0 ? (
             <AnnualFrame frame={frame} canEdit={canPublish} />
+          ) : null}
+
+          {viewing === 0 ? (
+            <AnnualObjectives
+              strategies={frame?.strategies ?? []}
+              objectives={annualObjectives}
+              canEdit={canPublish}
+              // The reader champions and reviews what they send forward. A
+              // picker here would be a second drafting form on a phase that
+              // is not the drafting phase; the goal page is where either is
+              // changed.
+              championId={workspace.memberId}
+              reviewerId={workspace.memberId}
+              frameAgreed={frame?.agreed ?? false}
+            />
           ) : null}
 
           {viewing === 6 && cadence ? (

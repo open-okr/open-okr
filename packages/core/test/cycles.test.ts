@@ -805,3 +805,203 @@ describe("the §11 registry beyond its scalars (P6-G20)", () => {
     });
   });
 });
+
+describe("frame.annualObjectives (P6-G14b)", () => {
+  /** The workspace's own member id, which every goal here is championed by. */
+  async function ownerMemberId(): Promise<string> {
+    const wb = await workerDb();
+    const rows = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return rows.rows[0]?.id as string;
+  }
+
+  /**
+   * A cycle in annual mode.
+   *
+   * `cycles.ensureCurrent` takes no mode and answers the quarterly one
+   * provisioning already made; the cadence is what decides the mode, and
+   * `annual` is the only cadence that gives `mode: "annual"`. The first draft
+   * of this helper passed `{ mode: "annual" }` to `ensureCurrent`, which is
+   * not in its schema, and quietly got the quarter back.
+   */
+  async function annualCycleId(): Promise<string> {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-06-30", cadence: "annual", firstCycle: false },
+    );
+    return cycle.id;
+  }
+
+  it("answers nothing before anything is drafted", async () => {
+    const wb = await workerDb();
+    expect(
+      await callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "frame.annualObjectives",
+        {},
+      ),
+    ).toEqual([]);
+  });
+
+  it("lists an annual objective with the strategy it serves", async () => {
+    const wb = await workerDb();
+    const frame = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.set",
+      {
+        yearLabel: "2027",
+        agreed: true,
+        strategies: [{ text: "Win the mid-market" }, { text: "Self-serve" }],
+      },
+    );
+    const strategyId = frame.strategies[0]?.id as string;
+    const member = await ownerMemberId();
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "Land fifty mid-market accounts",
+      cycleId: await annualCycleId(),
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      strategyId,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.strategyId).toBe(strategyId);
+    expect(listed[0]?.sentForward).toBe(0);
+  });
+
+  it("reports an objective serving no strategy rather than hiding it", async () => {
+    // §2.1's whole point. A screen that files this under "other" is the screen
+    // not doing its job, and a read that omits it makes that screen possible.
+    const wb = await workerDb();
+    const member = await ownerMemberId();
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "Something nobody has placed",
+      cycleId: await annualCycleId(),
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.strategyId).toBeNull();
+  });
+
+  it("leaves a quarterly objective out, and counts it as sent forward", async () => {
+    const wb = await workerDb();
+    const member = await ownerMemberId();
+    const annual = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "goals.create",
+      {
+        title: "The year's objective",
+        cycleId: await annualCycleId(),
+        level: "company",
+        ownerKind: "workspace",
+        championId: member,
+        reviewerId: member,
+        weight: 1,
+      },
+    );
+    // Named, not inferred. `ensureCurrent` defaults to the most recent
+    // cycle's cadence, and the annual cycle above is now the most recent, so a
+    // bare call here builds the annual period containing today. That is what
+    // this test caught, and `sendForward` had the same bug.
+    const quarter = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.ensureCurrent",
+      { cadence: "quarterly" },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "This quarter's slice of it",
+      cycleId: quarter.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      parentGoalId: annual.id,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    // One row, not two: the quarterly objective is not an annual one.
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.title).toBe("The year's objective");
+    expect(listed[0]?.sentForward).toBe(1);
+  });
+
+  it("moves an objective from one strategy to another, and off both", async () => {
+    const wb = await workerDb();
+    const frame = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.set",
+      {
+        yearLabel: "2027",
+        agreed: true,
+        strategies: [{ text: "First" }, { text: "Second" }],
+      },
+    );
+    const first = frame.strategies[0]?.id as string;
+    const second = frame.strategies[1]?.id as string;
+    const member = await ownerMemberId();
+    const goal = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "goals.create",
+      {
+        title: "Moves around",
+        cycleId: await annualCycleId(),
+        level: "company",
+        ownerKind: "workspace",
+        championId: member,
+        reviewerId: member,
+        strategyId: first,
+        weight: 1,
+      },
+    );
+
+    const read = async () =>
+      (
+        (await callAction(
+          { pool: wb.appPool, ...context(OWNER) },
+          "frame.annualObjectives",
+          {},
+        )) as Array<{ strategyId: string | null }>
+      )[0]?.strategyId;
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.update", {
+      id: goal.id,
+      strategyId: second,
+    });
+    expect(await read()).toBe(second);
+
+    // Null is a real answer, not a failure to choose.
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.update", {
+      id: goal.id,
+      strategyId: null,
+    });
+    expect(await read()).toBeNull();
+  });
+});

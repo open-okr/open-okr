@@ -142,3 +142,103 @@ export async function runFeedForward(
   revalidatePath("/cycle");
   return NO_ERROR;
 }
+
+/**
+ * Opens a quarterly objective under an annual one (§2.1, P6-G14b).
+ *
+ * **Not a new action, and deliberately.** Sending an annual objective forward
+ * is creating a quarterly objective parented to it, which `goals.create`
+ * already does: the parent pointer is the link the alignment engine reads, and
+ * a second way to write it would be a second thing to keep correct.
+ *
+ * The title is copied and the champion carried over, because the room that
+ * agreed the annual objective is the room deciding this, and a blank form in
+ * front of them is a worse start than an editable copy.
+ *
+ * **The quarter is asked for by name.** `cycles.ensureCurrent` defaults to the
+ * most recent cycle's cadence, and a workspace that has just opened an annual
+ * cycle for its frame has an annual one as its most recent, so a bare call
+ * here built the annual period containing today and put "this quarter's
+ * objective" in it. Found by the test that counted what came back.
+ */
+export async function sendForward(
+  _previous: WriteState,
+  form: FormData,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  const goalId = String(form.get("goalId") ?? "");
+  const title = String(form.get("title") ?? "").trim();
+  const championId = String(form.get("championId") ?? "");
+  const reviewerId = String(form.get("reviewerId") ?? "");
+
+  if (title === "") {
+    return { error: "The quarterly objective needs a title." };
+  }
+
+  try {
+    const quarter = await callAction(context, "cycles.ensureCurrent", {
+      cadence: "quarterly",
+    });
+    await callAction(context, "goals.create", {
+      title,
+      cycleId: quarter.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId,
+      reviewerId,
+      parentGoalId: goalId,
+      weight: 1,
+    });
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/cycle");
+  return NO_ERROR;
+}
+
+/**
+ * Says which strategy an annual objective serves (§2.1, P6-G14b).
+ *
+ * On phase 0 rather than on the goal page, because the strategies are here:
+ * choosing one means reading them, and a picker on the goal page would show
+ * five sentences out of the context that makes them mean anything.
+ */
+export async function linkToStrategy(
+  _previous: WriteState,
+  form: FormData,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const chosen = String(form.get("strategyId") ?? "");
+
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "goals.update",
+      {
+        id: String(form.get("goalId") ?? ""),
+        // Empty means "serving nothing named", which is a real answer and the
+        // one §2.1 wants surfaced rather than quietly kept.
+        strategyId: chosen === "" ? null : chosen,
+      },
+    );
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/cycle");
+  return NO_ERROR;
+}

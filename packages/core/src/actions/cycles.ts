@@ -14,6 +14,7 @@ import {
   CYCLE_CADENCES,
   cycles,
   GOAL_LEVELS,
+  goals,
   performanceSnapshots,
   rhythmSettings,
   scorecardSettings,
@@ -26,8 +27,9 @@ import {
   THRESHOLD_KEYS,
   THRESHOLDS,
 } from "@openokr/method";
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
@@ -261,16 +263,30 @@ export const ensureCurrentCycle = defineWriteAction({
   name: "cycles.ensureCurrent",
   summary:
     "Creates the cycle containing today if the workspace has none. Idempotent.",
-  input: z.object({}),
+  input: z.object({
+    /**
+     * Which cadence's period to ensure, defaulting to the workspace's own
+     * (P6-G14b).
+     *
+     * **The default is the most recent cycle's cadence, and that surprised a
+     * caller.** A workspace that opens an annual cycle for §2.1's frame has an
+     * annual cycle as its most recent, so the next bare `ensureCurrent` builds
+     * the annual period containing today rather than the quarter. Phase 0's
+     * "send this into the quarter" wants a quarter whatever the frame did, and
+     * says so here instead of hoping.
+     */
+    cadence: z.enum(CYCLE_CADENCES).optional(),
+  }),
   output: cycleOutput.extend({ created: z.boolean() }),
   // Any human member may bring the current cycle into being. Refusing an
   // ordinary member would mean a workspace whose admin is on holiday cannot
   // check in, and the row it creates is one every surface needs.
   access: ACCESS_LEVELS.edit,
-  operation: () => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const timeZone = await workspaceTimeZone(tx, workspaceId);
       const ensured = await ensureCurrentCycleInTx(tx, {
+        ...(input.cadence ? { cadence: input.cadence } : {}),
         workspaceId,
         timeZone,
         now: new Date(),
@@ -821,6 +837,104 @@ export const readAnnualFrame = defineReadAction({
           .orderBy(asc(annualStrategies.position));
 
         return { ...frame, strategies };
+      },
+    );
+  },
+});
+
+/**
+ * This year's objectives, each naming the strategy it serves (§2.1, P6-G14b).
+ *
+ * **An annual objective is one in a cycle whose mode is `annual`.** There is no
+ * separate table and there should not be: §2.1's annual layer is a set of
+ * objectives on a longer clock, judged by the same scoring and the same checks
+ * as a quarterly one.
+ *
+ * `strategyId` is null for an objective nobody has linked yet, and the phase 0
+ * panel lists those under their own heading rather than hiding them. An
+ * objective serving no strategy is the thing §2.1 is trying to surface, not an
+ * error to swallow.
+ */
+export const readAnnualObjectives = defineReadAction({
+  name: "frame.annualObjectives",
+  summary:
+    "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+  input: z.object({}),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      strategyId: z.uuid().nullable(),
+      championName: z.string().nullable(),
+      keyResultCount: z.number().int(),
+      /** How many quarterly objectives already hang off this one. */
+      sentForward: z.number().int(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const children = alias(goals, "children");
+        const rows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            strategyId: goals.strategyId,
+            championName: workspaceMembers.name,
+            keyResultCount: sql<number>`(
+              select count(*)::int from key_results kr
+              where kr.goal_id = ${goals.id} and kr.deleted_at is null
+            )`,
+            sentForward: sql<number>`(
+              select count(*)::int from goals ${children}
+              where ${children}.parent_goal_id = ${goals.id}
+                and ${children}.deleted_at is null
+            )`,
+          })
+          // openokr:allow-raw-read: `getAccessScoped` above confirmed workspace
+          // access, which is what an annual objective is scoped by. The same
+          // shape `frame.read` uses two actions above.
+          .from(goals)
+          .innerJoin(cycles, eq(cycles.id, goals.cycleId))
+          .leftJoin(workspaceMembers, eq(workspaceMembers.id, goals.championId))
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              eq(cycles.mode, "annual"),
+            ),
+          )
+          .orderBy(goals.title);
+
+        return rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          strategyId: row.strategyId,
+          championName: row.championName,
+          keyResultCount: Number(row.keyResultCount),
+          sentForward: Number(row.sentForward),
+        }));
       },
     );
   },

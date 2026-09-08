@@ -2935,7 +2935,20 @@
       "path": "/cycles/ensureCurrent",
       "scope": "write",
       "summary": "Creates the cycle containing today if the workspace has none. Idempotent.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "cadence",
+          "field": "cadence",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "annual",
+            "semiannual",
+            "quarterly",
+            "monthly"
+          ]
+        }
+      ],
       "pages": false
     },
     {
@@ -3196,6 +3209,16 @@
           "required": false
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "frame annualObjectives",
+      "action": "frame.annualObjectives",
+      "method": "GET",
+      "path": "/frame/annualObjectives",
+      "scope": "read",
+      "summary": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "flags": [],
       "pages": false
     },
     {
@@ -5064,6 +5087,12 @@
           "required": false
         },
         {
+          "name": "strategy-id",
+          "field": "strategyId",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "weight",
           "field": "weight",
           "type": "number",
@@ -5149,6 +5178,12 @@
         {
           "name": "parent-key-result-id",
           "field": "parentKeyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy-id",
+          "field": "strategyId",
           "type": "string",
           "required": false
         },

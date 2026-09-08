@@ -4137,7 +4137,17 @@
       "description": "Creates the cycle containing today if the workspace has none. Idempotent.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "semiannual",
+              "quarterly",
+              "monthly"
+            ]
+          }
+        }
       },
       "scope": "write",
       "annotations": {
@@ -4523,6 +4533,21 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
+      "name": "frame.annualObjectives",
+      "description": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "example": {}
     },
@@ -6978,6 +7003,11 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "strategyId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "weight": {
             "default": 1,
             "type": "number"
@@ -7084,6 +7114,18 @@
             ]
           },
           "parentKeyResultId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategyId": {
             "anyOf": [
               {
                 "type": "string",
