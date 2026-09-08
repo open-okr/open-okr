@@ -3898,6 +3898,67 @@
       }
     },
     {
+      "name": "spaces.updateSettings",
+      "description": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "teamVoting": {
+            "type": "boolean"
+          },
+          "coachStrictness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "advisory",
+                  "warn",
+                  "strict"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "defaultCheckInFrequency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "biweekly",
+                  "monthly",
+                  "quarterly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "spaces.archive",
       "description": "Archives a space. Its goals and history stay readable.",
       "inputSchema": {

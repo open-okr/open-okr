@@ -10,6 +10,7 @@ import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { SpaceManagement } from "./manage.tsx";
 import { SpaceMembership } from "./space-membership";
+import { SpaceSettingsCard } from "./space-settings.tsx";
 
 /**
  * A space home (TECHNICAL-PLAN §4.2, P3-T01).
@@ -157,6 +158,16 @@ export default async function SpacePage({
             </div>
           </CardBody>
         </Card>
+
+        {/* §4.14's space scope (P6-G18b). Placed under the management card
+            because it is the same audience and the rarer thing to change. */}
+        <SpaceSettingsCard
+          spaceId={space.id}
+          settings={space.settings}
+          workspaceStrictness={rhythm.coachStrictness}
+          workspaceFrequency={rhythm.defaultCheckInFrequency}
+          canManage={canManage}
+        />
 
         <SpaceManagement
           spaceId={space.id}

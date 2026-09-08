@@ -94,6 +94,7 @@ import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { sessionChannel } from "../sessions/live.ts";
+import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 // ---------------------------------------------------------------------------
@@ -216,6 +217,46 @@ async function requireSpaceRead(
     resourceId: spaceId,
     requires: ACCESS_LEVELS.view as never,
   });
+}
+
+/**
+ * Refuses a vote in a space that turned team voting off (§4.14, P6-G18b).
+ *
+ * **In the action, not only on the screen.** CLAUDE.md's rule is that the
+ * interface never hides an authorisation, and a setting a space chose is worth
+ * the same treatment: a space that has switched voting off should not be
+ * votable through the API because the button is absent from the page.
+ *
+ * A session with no space cannot have the setting, so it votes.
+ */
+async function requireTeamVoting(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string | null,
+): Promise<void> {
+  if (!spaceId) {
+    return;
+  }
+  const [row] = await tx
+    .select({ settings: spaces.settings })
+    // openokr:allow-raw-read: the caller has already been through
+    // `requireSessionAccess`, which is what authorises touching this session;
+    // this reads one settings map to decide whether the stage exists here.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.id, spaceId),
+        eq(spaces.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!resolveSpaceSettingsFrom(row?.settings).teamVoting) {
+    throw new OperationError(
+      "forbidden",
+      "This space has turned team voting off.",
+    );
+  }
 }
 
 async function resolveSpaceContextId(
@@ -1469,6 +1510,7 @@ export const castSessionVote = defineWriteAction({
         input.sessionId,
         ACCESS_LEVELS.edit,
       );
+      await requireTeamVoting(tx, workspaceId, session.spaceId);
 
       // Verify the KR exists.
       const [kr] = await tx
@@ -4938,6 +4980,7 @@ export const castRetroVote = defineWriteAction({
         input.sessionId,
         ACCESS_LEVELS.edit,
       );
+      await requireTeamVoting(tx, workspaceId, session.spaceId);
 
       const [note] = await tx
         .select({ id: retroNotes.id })

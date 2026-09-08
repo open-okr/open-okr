@@ -176,6 +176,8 @@ Read and written through the same `app.instance_admin` transaction-local flag `s
 
 The two legacy columns and their unique partial index arrived at P6-T03a, seventeen migrations after the table: `spaces` was written before there was an importer to write them, and the FlowyTeam mapper is the first thing to map a source table onto it (§7.2, teams).
 
+`settings` holds §4.14's space scope, declared in the settings registry at P6-G18b and written when a space is created: `teamVoting` (default true), `coachStrictness` (default null) and `defaultCheckInFrequency` (default null). Null means the workspace's, not unset, and the two nullable ones store a deviation rather than a resolved value so a workspace that changes its own does not leave every space holding the old one. A space created before the scope existed holds `{}` and every key resolves from the registry, which is what makes the column readable without a backfill.
+
 ### space_members
 `space_id` to spaces, `member_id` to workspace_members, `role` (`member` / `manager` / `coordinator`).
 

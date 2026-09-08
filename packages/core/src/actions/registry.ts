@@ -372,6 +372,7 @@ import {
   removeSpaceMember,
   setSpaceMemberRole,
   updateSpace,
+  updateSpaceSettings,
 } from "./spaces.ts";
 import {
   addChecklistItem,
@@ -517,6 +518,7 @@ export const ACTION_MAP = {
   "spaces.read": readSpace,
   "spaces.create": createSpace,
   "spaces.update": updateSpace,
+  "spaces.updateSettings": updateSpaceSettings,
   "spaces.archive": archiveSpace,
   "spaces.addMember": addSpaceMember,
   "spaces.setMemberRole": setSpaceMemberRole,

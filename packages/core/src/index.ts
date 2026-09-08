@@ -864,6 +864,8 @@ export {
   languageSchema,
   type ProvisioningContext,
   resolveMemberSettings,
+  resolveSpaceSettings,
+  resolveSpaceSettingsFrom,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
   type SettingDefinition,

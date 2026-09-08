@@ -53,6 +53,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "Someone joined through a trusted email domain",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
+  "space.settingsChanged": (payload) =>
+    `${(payload as { name: string }).name} changed its own settings`,
   "blob.reaped": (payload) => {
     const { discarded, bytesLeft } = payload as {
       discarded: number;

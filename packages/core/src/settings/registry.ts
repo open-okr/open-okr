@@ -1,3 +1,5 @@
+import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
+import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { z } from "zod";
 
 /**
@@ -32,7 +34,7 @@ import { z } from "zod";
  */
 
 /** Who the setting belongs to: the whole workspace, or one person. */
-export type SettingScope = "workspace" | "member";
+export type SettingScope = "workspace" | "member" | "space";
 
 /**
  * Which table holds it (P6-G08).
@@ -49,7 +51,8 @@ export type SettingScope = "workspace" | "member";
 type SettingHome =
   | "workspaces.settings"
   | "workspace_members"
-  | "notification_settings";
+  | "notification_settings"
+  | "spaces.settings";
 
 /** What provisioning knows about the person and the request. */
 export interface ProvisioningContext {
@@ -98,6 +101,24 @@ export const DEFAULT_QUIET_HOURS = { start: "19:00", end: "08:00" } as const;
  */
 export const DEFAULT_BATCH_WINDOW_MINUTES = 30;
 export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
+
+/**
+ * §4.14's space scope (P6-G18b).
+ *
+ * **Team voting is on, and a space turns it off.** §8.1 gives the retro a
+ * voting stage with dots per member, so it is part of the practice as written
+ * and a fresh space does it. "Opt-in" in §4.14's row is about the space's
+ * choice to keep it, not about a product that ships the retro with a step
+ * missing.
+ *
+ * **The other two are null, and null means "the workspace's".** A space that
+ * has decided nothing is not a space that has decided to be lenient. Storing
+ * the workspace's current value instead would freeze it: changing the
+ * workspace's strictness would then leave every space holding the old one,
+ * which is the same trap the §11 override map avoids by storing deviations
+ * rather than resolved values.
+ */
+const DEFAULT_SPACE_TEAM_VOTING = true;
 
 /**
  * Is this a timezone the runtime actually knows?
@@ -329,6 +350,44 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: orphanBlobMinutesSchema,
   },
   {
+    key: "teamVoting",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "On. §8.1's retro has a voting stage, so a fresh space practises the " +
+      "method as written and a space that does not want it turns it off. The " +
+      "action refuses a vote in a space that has, rather than the screen " +
+      "merely hiding the control.",
+    resolve: () => DEFAULT_SPACE_TEAM_VOTING,
+    schema: z.boolean(),
+  },
+  {
+    key: "coachStrictness",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning the workspace's own. A space that has decided nothing " +
+      "has not decided to be lenient. Storing the workspace's current value " +
+      "would freeze it: changing the workspace's strictness would leave every " +
+      "space holding the old one, which is the trap the §11 override map " +
+      "avoids by storing deviations rather than resolved values.",
+    resolve: () => null,
+    schema: z.enum(COACH_STRICTNESS).nullable(),
+  },
+  {
+    key: "defaultCheckInFrequency",
+    scope: "space",
+    home: "spaces.settings",
+    why:
+      "Null, meaning the workspace's own §11 cadence. §4.14 calls this row " +
+      '"space defaults" without naming which; the check-in frequency is the ' +
+      "one default a space plausibly differs on, because a team shipping " +
+      "daily and a team shipping quarterly are the same workspace. Null " +
+      "inherits for the same reason the strictness override does.",
+    resolve: () => null,
+    schema: z.enum(CHECK_IN_FREQUENCIES).nullable(),
+  },
+  {
     key: "primaryChannel",
     scope: "member",
     home: "workspace_members",
@@ -486,6 +545,61 @@ export function resolveMemberSettings(context: ProvisioningContext): {
       (setting) => setting.home === "workspace_members",
     ).map((setting) => [setting.key, setting.resolve(context)]),
   ) as ReturnType<typeof resolveMemberSettings>;
+}
+
+/**
+ * Every space-scoped setting, resolved (P6-G18b).
+ *
+ * Written into `spaces.settings` when a space is created, and used as the
+ * fallback for a space created before this scope existed, whose settings map
+ * has no key to read. One function, so the default a new space stores and the
+ * default an old one falls back to cannot drift apart.
+ *
+ * Takes no provisioning context: none of the three depends on the browser or
+ * the instance. The parameter is there so the shape matches its two siblings
+ * and a setting that later does need one can have it without changing callers.
+ */
+export function resolveSpaceSettings(): {
+  readonly teamVoting: boolean;
+  readonly coachStrictness: CoachStrictness | null;
+  readonly defaultCheckInFrequency: CheckInFrequency | null;
+} {
+  return Object.fromEntries(
+    SETTINGS_REGISTRY.filter(
+      (setting) => setting.home === "spaces.settings",
+    ).map((setting) => [setting.key, setting.resolve({})]),
+  ) as ReturnType<typeof resolveSpaceSettings>;
+}
+
+/**
+ * One space's settings, with anything it has not chosen filled from the
+ * registry (P6-G18b).
+ *
+ * **A stored value wins only when the key is present.** A space created before
+ * this scope existed holds `{}`, and every key in it resolves to the registry
+ * default, which is what "a space that has configured nothing resolves each to
+ * its documented default" means.
+ */
+export function resolveSpaceSettingsFrom(
+  stored: Record<string, unknown> | null | undefined,
+): ReturnType<typeof resolveSpaceSettings> {
+  const defaults = resolveSpaceSettings() as Record<string, unknown>;
+  const resolved: Record<string, unknown> = { ...defaults };
+  for (const setting of SETTINGS_REGISTRY) {
+    if (setting.home !== "spaces.settings") {
+      continue;
+    }
+    if (stored && Object.hasOwn(stored, setting.key)) {
+      const parsed = setting.schema.safeParse(stored[setting.key]);
+      // A stored value that no longer parses means the schema tightened after
+      // it was written. The default always parses, and a setting that cannot
+      // be read has no business deciding what a team sees.
+      if (parsed.success) {
+        resolved[setting.key] = parsed.data;
+      }
+    }
+  }
+  return resolved as ReturnType<typeof resolveSpaceSettings>;
 }
 
 /**

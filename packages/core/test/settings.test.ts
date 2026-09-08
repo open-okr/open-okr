@@ -40,16 +40,43 @@ describe("the registry itself", () => {
 
   it("resolves every setting to a value with nothing supplied", () => {
     // The hard rule: registering must not require anyone to answer anything.
+    //
+    // **Null is a default when the setting is declared nullable, and never
+    // otherwise.** This read `not.toBeNull()` until P6-G18b added the space
+    // scope, where an override's default *is* null and null means "the
+    // workspace's": a space that has decided nothing inherits a real value,
+    // and storing the workspace's current one instead would freeze it. A
+    // setting that resolves to null without declaring it nullable is still
+    // the defect this guards against, and the schema is what says which is
+    // which.
     for (const setting of SETTINGS_REGISTRY) {
       const value = setting.resolve({});
       expect(value, `${setting.key} resolved to nothing`).toBeDefined();
-      expect(value, `${setting.key} resolved to null`).not.toBeNull();
+      if (value === null) {
+        expect(
+          setting.schema.safeParse(null).success,
+          `${setting.key} resolved to null without being nullable`,
+        ).toBe(true);
+      }
     }
   });
 
   it("scopes every setting to a storage home that exists today", () => {
+    // A scope with no table behind it is a setting nothing can store. Each
+    // scope is paired with the home that holds it, so adding a scope without
+    // deciding where it lives fails here rather than at the first write.
+    const homesByScope: Record<string, readonly string[]> = {
+      workspace: ["workspaces.settings"],
+      member: ["workspace_members", "notification_settings"],
+      space: ["spaces.settings"],
+    };
     for (const setting of SETTINGS_REGISTRY) {
-      expect(["workspace", "member"]).toContain(setting.scope);
+      const homes = homesByScope[setting.scope];
+      expect(homes, `${setting.key} has an unknown scope`).toBeDefined();
+      expect(
+        homes,
+        `${setting.key} is ${setting.scope}-scoped and stored in ${setting.home}`,
+      ).toContain(setting.home);
     }
   });
 

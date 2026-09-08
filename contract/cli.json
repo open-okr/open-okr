@@ -2756,6 +2756,41 @@
       "pages": false
     },
     {
+      "name": "spaces updateSettings",
+      "action": "spaces.updateSettings",
+      "method": "POST",
+      "path": "/spaces/updateSettings",
+      "scope": "write",
+      "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "team-voting",
+          "field": "teamVoting",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "coach-strictness",
+          "field": "coachStrictness",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "default-check-in-frequency",
+          "field": "defaultCheckInFrequency",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces archive",
       "action": "spaces.archive",
       "method": "POST",
