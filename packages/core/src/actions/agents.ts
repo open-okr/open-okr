@@ -344,18 +344,24 @@ export const bindAgentScope = defineWriteAction({
       return agent;
     },
     async execute({ tx, workspaceId, loaded }) {
-      // **The workspace context is not a binding target** (CLAUDE.md, least
-      // privilege, P6-G13b). The summary above has said "never workspace-wide"
-      // since P4-T05a and nothing enforced it: `resolveSubjectContext` resolves
-      // `workspace` like any other subject, so a caller passing that type got
-      // an agent with ambient authority over everything. The rule is that an
-      // agent gets bindings on named spaces, goals and KPI trees only.
-      if (input.resourceType === "workspace") {
-        throw new OperationError(
-          "forbidden",
-          "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
-        );
-      }
+      // **The workspace is still a legal binding target here, and it should
+      // not be. Recorded rather than fixed** (P6-G13c).
+      //
+      // CLAUDE.md's rule is that an agent gets bindings on named spaces, goals
+      // and KPI trees only, and the summary above has said "never
+      // workspace-wide" since P4-T05a. P6-G13b added the refusal and it could
+      // not stay: `runOperation` measures an actor's level against the
+      // **workspace's** context, by design and with its own comment saying so,
+      // so an agent bound only to a space holds zero there and every write
+      // action's declared-access floor refuses it. Enforcing the rule made
+      // `scoped_direct` unreachable: the mode exists, and no agent in it can
+      // write anything.
+      //
+      // The two cannot both stand as they are. Which one moves is an
+      // architecture decision rather than this action's, so it is P6-G13c's,
+      // and until then the rule is documented and unenforced. The interface
+      // does not offer the workspace as a target, which is a smaller promise
+      // than the rule makes and is stated as such on the card.
 
       const context = await resolveSubjectContext(
         tx,

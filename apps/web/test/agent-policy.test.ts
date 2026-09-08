@@ -64,9 +64,14 @@ describe("the agent policy card", () => {
     expect(card).not.toContain('{ type: "workspace"');
   });
 
-  test("and refuses it in the action as well, because a screen is not an authorisation", () => {
-    expect(actions).toContain('input.resourceType === "workspace"');
-    expect(actions).toContain("never to the whole workspace");
+  test("and says plainly that the picker is a default, not an authorisation", () => {
+    // P6-G13b tried to refuse a workspace binding and could not keep it:
+    // `runOperation` measures an actor's level against the workspace's own
+    // context, so enforcing the rule makes `scoped_direct` a mode no agent can
+    // act in. The conflict is P6-G13c. A refusal in this action alone would
+    // only make the screen and the API disagree.
+    expect(actions).not.toContain('input.resourceType === "workspace"');
+    expect(card).toContain("though nothing refuses one yet");
   });
 
   test("calls the action that did not exist before this task", () => {

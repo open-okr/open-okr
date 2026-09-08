@@ -1656,6 +1656,44 @@ Deliverables: `agents.setAutonomy`, which the registry has never had, so an agen
 Test plan: raising an agent to scoped direct is audited and takes effect on the next run; a binding on the workspace context is refused by name; a sandbox agent commits nothing whatever its bindings say; lowering the policy leaves existing proposals alone.
 Acceptance: Given an agent bound to one space in propose mode, when an administrator raises it to scoped direct on that space alone, then it writes there and nowhere else, and the audit names who raised it.
 
+### P6-G13c: An agent bound to a space can act in it [L]
+Depends on: P6-G13b
+Goal: settle the conflict between CLAUDE.md's least-privilege rule and the Operation pipeline's access floor.
+
+**Found at P6-G13b, by enforcing the rule and watching what broke.**
+`agents.bindScope` has said "never workspace-wide" in its own summary since
+P4-T05a and enforced nothing. P6-G13b added the refusal, and six of the
+thirty-four tests in `packages/agents` failed: four because their fixture bound
+the workspace, and two because binding a space is not enough to write. The
+second pair is the real finding.
+
+`runOperation` measures an actor's level against the **workspace's own
+context**, by design and with its own comment saying so: the declared `access`
+on a write action is a coarse floor, and per-resource authorisation happens
+inside through `getAccessScoped`. An agent bound only to a space therefore
+holds zero on the workspace and is refused by the floor before its own binding
+is ever consulted. Measured: an agent bound to a space at level 100 running
+`spaces.update` on that space is refused with "needs a higher access level than
+you hold".
+
+So the rule and the pipeline cannot both stand as they are. Enforced, the rule
+makes `scoped_direct` a mode no agent can act in; unenforced, "there is no
+service account with ambient authority" is a sentence the product does not
+keep. P6-G13b withdrew its refusal rather than ship a dead autonomy mode, and
+recorded this.
+
+Three ways out, and the choice is a human's:
+
+| Option | What it costs |
+|---|---|
+| Measure the floor against the task's subject context | Changes how every write in the product is authorised. Needs a design gate |
+| Let an agent hold a narrow workspace-level grant | Contradicts CLAUDE.md as written, so METHOD-level sign-off |
+| Define `scoped_direct` as proposals-only | Removes a mode AI-NATIVE-PLAN §6 describes |
+
+Deliverables: the decision, written into whichever document owns it; the implementation; `agents.bindScope` refusing the workspace once the refusal no longer kills the mode; `run-executor.test.ts` bound to a space, which is where it was pointed at before the revert.
+Test plan: an agent bound to one space performs a direct write inside it and is refused outside it; an agent bound to nothing writes nothing; the seeded Champion and Coach, which provisioning binds per space, are unaffected; the refusal on a workspace target has a test of its own.
+Acceptance: Given an agent in scoped direct bound to one space, when it runs a task against a goal in that space, then the write lands, and when it runs one against a goal in another space, then it is refused.
+
 ### P6-G14: Cycle phase 0, the annual frame, S-05 [M]
 Depends on: P3-T03, P4-T02
 Goal: the annual strategy has a surface (GAP-AUDIT B-03).

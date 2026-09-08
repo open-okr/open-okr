@@ -19,6 +19,20 @@ import { processNextTask, readRunState } from "../src/run-executor.ts";
 const OWNER = "run-executor-owner";
 
 let workspaceId: string;
+/**
+ * **This fixture binds the agent to the workspace, which the rule forbids.**
+ *
+ * CLAUDE.md says an agent gets bindings on named spaces, goals and KPI trees
+ * only. P6-G13b enforced that and this file was rewritten to bind a space
+ * instead, and four of its six tests passed; the two that exercise a direct
+ * write did not, because `runOperation` measures an actor's level against the
+ * workspace's own context and an agent bound only to a space holds zero there.
+ * So the rule, enforced, makes `scoped_direct` unreachable.
+ *
+ * The fixture is back as it was, and the conflict is P6-G13c. Recorded here
+ * rather than left as a surprise: these six tests pass today only because the
+ * binding they use is the one the rule forbids.
+ */
 let pool: Pool;
 
 const ownerContext = () => ({
