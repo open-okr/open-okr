@@ -134,7 +134,11 @@ describe("route segment boundaries", () => {
     const shallow = (await segments())
       .filter((segment) => !exempt(segment) && segment !== "")
       .filter((segment) => !segment.startsWith("("))
-      .filter((segment) => !segment.startsWith("setup"));
+      // `setup` and `join` render outside the shell, so the root boundary is
+      // already the right one for them: there is no sidebar to keep and
+      // nothing a nested card could sit inside. Everything else is in-shell.
+      .filter((segment) => !segment.startsWith("setup"))
+      .filter((segment) => !segment.startsWith("join"));
     for (const segment of shallow) {
       expect(resolvedFrom(segment, owners), segment).not.toBe("");
     }

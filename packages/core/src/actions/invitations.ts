@@ -17,6 +17,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { refuseReason } from "../invitations/preview.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
 import {
   emailDomain,
@@ -338,20 +339,14 @@ export const acceptLink = defineWriteAction({
       if (!link) {
         throw new OperationError("not_found", REFUSAL);
       }
-      if (link.revokedAt) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (link.mode === "personal" && link.memberId) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (
-        link.mode === "workspace" &&
-        link.maxUses !== null &&
-        link.useCount >= link.maxUses
-      ) {
+      // **One reader of these four states, shared with `previewInvite`**
+      // (P6-G06b). They were written out here and again in the preview, and
+      // two readers of one row is how a page comes to say "you can join this"
+      // about something acceptance then refuses. `max_uses` is checked
+      // whatever the mode now, which changes nothing: migration 0010 keeps
+      // that column as the ceiling on a reusable link and leaves it null on a
+      // personal one, whose single use is `member_id` being set.
+      if (refuseReason(link, new Date())) {
         throw new OperationError("forbidden", REFUSAL);
       }
 

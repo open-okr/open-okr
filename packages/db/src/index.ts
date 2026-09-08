@@ -554,6 +554,7 @@ export {
   withContext,
   withDeviceCode,
   withInstanceAdmin,
+  withInviteToken,
   withOAuthSecret,
   withProviderTeam,
   withUser,

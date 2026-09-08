@@ -21,12 +21,48 @@ import { APIError } from "better-auth/api";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { callAction } from "../actions/registry.ts";
+import {
+  cookieHeaderFrom,
+  inviteTokenFromCookies,
+} from "../invitations/pending.ts";
+import { previewInvite } from "../invitations/preview.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
-  isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
+  registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
+
+/**
+ * Accepts the invitation a freshly created account arrived with (P6-G06b).
+ *
+ * Two steps because they answer two questions. `previewInvite` runs in the
+ * pre-tenant transaction and says which workspace the token names;
+ * `invitations.acceptLink` then does the real work under that workspace, with
+ * its own checks, its use count, its activity row and an audit row naming who
+ * invited them. Going through the action rather than reimplementing it is what
+ * keeps one writer for this row.
+ */
+async function acceptPendingInvitation(
+  pool: Pool,
+  token: string,
+  userId: string,
+): Promise<void> {
+  const invitation = await previewInvite(pool, { token, now: new Date() });
+  if (invitation.kind !== "usable") {
+    return;
+  }
+  await callAction(
+    {
+      pool,
+      workspaceId: invitation.workspaceId,
+      actor: { kind: "human", userId },
+    },
+    "invitations.acceptLink",
+    { token },
+  );
+}
 
 export interface AuthOptions {
   /** The application-role pool. Authentication tables are global, so this is
@@ -171,12 +207,28 @@ export function createAuth(options: AuthOptions) {
            * future social or single-sign-on provider cannot quietly reopen
            * registration by not knowing about the rule.
            */
-          before: async () => {
-            if (!(await isRegistrationOpen(options.pool))) {
-              throw new APIError("FORBIDDEN", {
-                message: REGISTRATION_CLOSED_MESSAGE,
-              });
+          before: async (_user, hookContext) => {
+            // **An invitation is the exception, and the only one** (P6-G06b).
+            // A closed instance was closed to everybody, including the person
+            // an administrator had just invited, so every invitation issued
+            // since P6-G06a was unredeemable on exactly the instances that
+            // needed it.
+            //
+            // The same function the sign-up page asks, because the two
+            // disagreeing is its own bug: the page refused a form this hook
+            // would have accepted, so the invitation was redeemable and
+            // unreachable at once. Previewed, not accepted, so nothing is
+            // consumed by an attempt that may still fail on a taken address.
+            const allowed = await registrationOpenOrInvited(
+              options.pool,
+              cookieHeaderFrom(hookContext),
+            );
+            if (allowed) {
+              return;
             }
+            throw new APIError("FORBIDDEN", {
+              message: REGISTRATION_CLOSED_MESSAGE,
+            });
           },
           /**
            * Provisioning. Better Auth queues after-create hooks and drains
@@ -189,7 +241,25 @@ export function createAuth(options: AuthOptions) {
            * state on the next request instead of trusting this to be the only
            * path that ever runs.
            */
-          after: async (user) => {
+          after: async (user, hookContext) => {
+            // **The invitation is accepted before a workspace is created, and
+            // the order is the whole of it** (P6-G06b). An invitee belongs in
+            // the workspace that invited them;
+            // `provisionWorkspaceForUser` returns the membership it finds
+            // rather than making a second one, so accepting first leaves it a
+            // no-op and creating first would leave every invitee holding a
+            // stray empty workspace of their own.
+            //
+            // A failure here is swallowed on purpose. The account exists by
+            // now, and refusing to provision anything would leave somebody
+            // signed up with nowhere to go; `/join` still works afterwards,
+            // and the fall-through gives them their own workspace meanwhile.
+            const token = inviteTokenFromCookies(cookieHeaderFrom(hookContext));
+            if (token) {
+              await acceptPendingInvitation(options.pool, token, user.id).catch(
+                () => undefined,
+              );
+            }
             await provisionWorkspaceForUser(options.pool, {
               id: user.id,
               name: user.name,

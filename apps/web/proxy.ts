@@ -38,6 +38,16 @@ const PUBLIC_PREFIXES = [
   // behind a session. Its own layout refuses once the instance is configured,
   // which is a database question and therefore not one this file can ask.
   "/setup",
+  // **An invitation is a credential, and the visitor holding one has no
+  // account yet** (P6-G06b). Gating `/join` behind a cookie sent every invitee
+  // to sign in, which is the one thing they cannot do. The token in the
+  // address is what authorises the page, and the page refuses an invalid one
+  // with the same sentence for every reason rather than saying which.
+  //
+  // Found by the end-to-end spec on its first run: the invitee landed on the
+  // sign-in page, which is exactly the dead end this whole task existed to
+  // remove.
+  "/join",
   // The container health check has no session and must answer while the
   // instance is still starting.
   "/api/health",

@@ -11,13 +11,13 @@ import type { InviteResult } from "./actions";
  * because the table holds only the token's digest. This is the same shape the
  * API-token form takes at P5-T07a, and for the same reason.
  *
- * **The token, not a URL, until P6-G06b.** The address an invitee follows is
- * `/join`, and that route does not exist yet: resolving a token to its
- * workspace is a cross-tenant read, and `invite_links` carries row-level
- * security keyed on `workspace_id`, so it needs the second-key policy
- * `api_tokens` already has and a migration to add it. Handing out a URL that
- * answers 404 would be worse than handing out nothing, so this shows the token
- * and says where it will be usable.
+ * **The address, since P6-G06b.** This handed out a bare token until then,
+ * because `/join` did not exist: resolving a token to its workspace is a
+ * cross-tenant read and `invite_links` carried row-level security keyed on
+ * `workspace_id` alone. Migration 0075 gave it the second-key policy
+ * `api_tokens` has, so the route exists and the thing to send somebody is a
+ * link. The token is still shown beneath it, for the command line and for
+ * anybody pasting into a chat that mangles URLs.
  */
 export function InviteForm({
   action,
@@ -55,21 +55,22 @@ export function InviteForm({
             Copy this now. It is not shown again.
           </span>
           <code
-            data-testid="invite-token"
+            data-testid="invite-link"
             className="break-all font-mono text-sm font-bold"
           >
-            {state.link.token}
+            {state.link.url}
           </code>
+          <span className="text-xs">
+            The token on its own, for `okr` and the REST surface:{" "}
+            <code data-testid="invite-token" className="break-all font-mono">
+              {state.link.token}
+            </code>
+          </span>
           {state.link.email ? (
             <span>Only {state.link.email} may use it, once.</span>
           ) : (
             <span>Anyone holding it may join, within the limits you set.</span>
           )}
-          <span>
-            The address to send somebody arrives at P6-G06b, with the join
-            screen. Until then this token is redeemable through the command line
-            and the REST surface.
-          </span>
         </div>
       ) : state?.error ? (
         <p

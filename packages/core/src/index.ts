@@ -644,6 +644,19 @@ export {
   templateFor,
 } from "./imports/templates/index.ts";
 export {
+  cookieHeaderFrom,
+  INVITE_COOKIE,
+  INVITE_COOKIE_MAX_AGE_SECONDS,
+  inviteTokenFromCookies,
+} from "./invitations/pending.ts";
+export {
+  addressMayAccept,
+  type InvitePreview,
+  type InviteRefusal,
+  type InviteResolution,
+  previewInvite,
+} from "./invitations/preview.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,
@@ -915,4 +928,5 @@ export {
 export {
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
+  registrationOpenOrInvited,
 } from "./workspaces/registration.ts";
