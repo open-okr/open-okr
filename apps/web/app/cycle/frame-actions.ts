@@ -95,3 +95,50 @@ export async function setFrame(
   revalidatePath("/cycle");
   return NO_ERROR;
 }
+
+/**
+ * Carries this cycle's scores and flagged items into the next one (S-12,
+ * P6-G16).
+ *
+ * `cycles.feedForward` has been registered since P3-T15 with no caller. It
+ * takes both cycle ids, so the next one has to exist: `cycles.ensureCurrent`
+ * is what creates it when the calendar has moved on, and calling that first is
+ * why this action can be pressed without choosing anything.
+ *
+ * Idempotent, which the button's own copy promises. Running it twice changes
+ * nothing, so a facilitator unsure whether it worked can press it again rather
+ * than going to look in the database.
+ */
+export async function runFeedForward(
+  _previous: WriteState,
+  form: FormData,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  const fromCycleId = String(form.get("fromCycleId") ?? "");
+
+  try {
+    const next = await callAction(context, "cycles.ensureCurrent", {});
+    if (next.id === fromCycleId) {
+      return {
+        error:
+          "The next cycle has not started yet, so there is nowhere to carry these into.",
+      };
+    }
+    await callAction(context, "cycles.feedForward", {
+      fromCycleId,
+      toCycleId: next.id,
+    });
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/cycle");
+  return NO_ERROR;
+}

@@ -24,6 +24,7 @@ import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
 import { QualityPanel } from "./quality-panel.tsx";
+import { ReviewAndLearn } from "./review-and-learn.tsx";
 import { RunningCadence } from "./running-cadence.tsx";
 
 /**
@@ -128,9 +129,10 @@ export default async function CyclePage({
   const frame =
     viewing === 0 ? await callAction(context, "frame.read", {}) : null;
 
-  // Phase 6 reads the cycle's key results for the confidence trend.
+  // Phase 6 and phase 7 both read the cycle's key results: one for the
+  // confidence trend, the other for the scores. One read serves both.
   const cycleGoals =
-    viewing === 6
+    viewing === 6 || viewing === 7
       ? (
           await callAction(context, "goals.list", {
             cycleId: cycle.id,
@@ -140,6 +142,16 @@ export default async function CyclePage({
           })
         ).goals
       : [];
+
+  // Phase 7 reads this workspace's own band boundaries. Same cast and same
+  // reason as the phase 4 block below: `rhythm.read` types its thresholds as
+  // an open record at the contract boundary, and one `resolveThresholds`
+  // builds both sides of it.
+  const reviewThresholds =
+    viewing === 7
+      ? ((await callAction(context, "rhythm.read", {}))
+          .thresholds as unknown as ResolvedThresholds)
+      : null;
 
   const cadenceSpaces =
     viewing === 6 ? await callAction(context, "spaces.list", {}) : [];
@@ -452,16 +464,22 @@ export default async function CyclePage({
             />
           ) : null}
 
-          {viewing === 7 ? (
-            <Card>
-              <CardBody>
-                <p className="text-sm text-ink-3">
-                  Scoring every key result and writing the cycle retrospective
-                  arrive at P6-G16. The arithmetic behind the scores is already
-                  here.
-                </p>
-              </CardBody>
-            </Card>
+          {viewing === 7 && reviewThresholds ? (
+            <ReviewAndLearn
+              keyResults={cycleGoals.flatMap((goal) =>
+                goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  goalTitle: goal.title,
+                  score: keyResult.score,
+                  carryForward: keyResult.carryForward,
+                })),
+              )}
+              cycleName={workflow.name}
+              archivedAt={null}
+              canEdit={canPublish}
+              thresholds={reviewThresholds}
+            />
           ) : null}
         </div>
 
