@@ -8,6 +8,7 @@ import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { markRead, mute, snooze } from "./actions.ts";
+import { InboxLive } from "./inbox-live.tsx";
 import { SNOOZE_CHOICES } from "./snooze-choices.ts";
 import { REASON_LABELS, subjectLink, subjectName } from "./subject-link.ts";
 
@@ -126,6 +127,7 @@ export default async function InboxPage({
                 Grouped by what it is about, newest first. Review says what you
                 owe. This says what happened.
               </p>
+              <InboxLive />
             </div>
             <div className="flex flex-none items-center gap-3.5">
               <div className="flex flex-col items-end">

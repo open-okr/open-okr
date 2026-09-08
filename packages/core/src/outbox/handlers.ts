@@ -594,6 +594,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // The board tells every watcher to re-read (P5-T11). Identifiers only, like
   // every event on a realtime channel.
   "board.changed": publishEvent,
+  // One member's inbox is told a row landed, so an open screen re-reads
+  // instead of waiting for a navigation (P6-G07c). Identifiers only.
+  "inbox.added": publishEvent,
   "content.index": indexContent,
   // The large-export path (P5-T15). The row names a run; the worker rebuilds
   // the list as the member who asked, writes the file to storage and marks the

@@ -198,3 +198,80 @@ test("snoozing a row takes it off the list without deleting it", async () => {
   );
   expect(Number(remaining.rows[0]?.n ?? 0)).toBeGreaterThan(0);
 });
+
+test("a row arrives in an open inbox without a reload", async () => {
+  // **P6-G07b's acceptance sentence, owned by P6-G07c.** The inbox had a
+  // screen from P6-G07a and no way to learn that a row had landed.
+  //
+  // The whole chain runs here: an outbox row is drained by the relay inside
+  // this same server process, published on the recipient's own channel, read
+  // by `/api/inbox/live`, and answered by a `router.refresh()` that re-renders
+  // the list. The page is never navigated after it is opened, which is what
+  // "without a reload" means.
+  //
+  // The notification row and its outbox row are written directly, the way
+  // every other case in this file writes its row: what is under test is the
+  // arrival, not the fan-out. That `notifyRecipients` writes exactly this pair
+  // in one transaction is proved against a real database in
+  // `packages/core/test/notifications.test.ts`.
+  const member = (
+    await pool.query<{ id: string; workspace_id: string }>(
+      `select m.id, m.workspace_id
+         from workspace_members m
+         join users u on u.id = m.user_id
+        where u.email = $1 and m.deleted_at is null
+        limit 1`,
+      [EMAIL],
+    )
+  ).rows[0];
+  if (!member) {
+    throw new Error(`Member not found for ${EMAIL}`);
+  }
+
+  await page.goto("/inbox");
+  const list = page.getByRole("region", { name: "Notifications" });
+  await expect(list).toBeVisible({ timeout: 15_000 });
+  const before = await list.getByText("To review").count();
+
+  const inserted = (
+    await pool.query<{ id: string }>(
+      `insert into notifications
+         (id, workspace_id, recipient_member_id, reason, channel)
+       values (gen_random_uuid(), $1, $2, 'review', 'app')
+       returning id`,
+      [member.workspace_id, member.id],
+    )
+  ).rows[0];
+  if (!inserted) {
+    throw new Error("insert into notifications returned no row");
+  }
+
+  await pool.query(
+    `insert into outbox (topic, payload, idempotency_key, available_at)
+     values ('inbox.added', $1::jsonb, $2, now())`,
+    [
+      JSON.stringify({
+        channel: `workspace:${member.workspace_id}:member:${member.id}:inbox`,
+        workspaceId: member.workspace_id,
+        recipientMemberId: member.id,
+        notificationId: inserted.id,
+        subjectType: "notification",
+        subjectId: inserted.id,
+        reason: "review",
+      }),
+      `inbox.added:${inserted.id}`,
+    ],
+  );
+
+  // The line the component shows when it has refreshed, which is the signal
+  // that the stream reached the browser rather than that the row exists.
+  await expect(page.getByTestId("inbox-live")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(list.getByText("To review")).toHaveCount(before + 1, {
+    timeout: 15_000,
+  });
+
+  // And no navigation happened: the reader is on the same url they opened.
+  expect(new URL(page.url()).pathname).toBe("/inbox");
+});

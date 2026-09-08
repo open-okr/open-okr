@@ -703,6 +703,12 @@ export {
   subjectUrl,
 } from "./notifications/links.ts";
 export {
+  INBOX_ADDED_TOPIC,
+  type InboxAddedMessage,
+  inboxAddedEvent,
+  memberInboxChannel,
+} from "./notifications/live.ts";
+export {
   type Recipient,
   type ResolveRecipientsInput,
   resolveRecipients,
