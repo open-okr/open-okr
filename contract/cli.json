@@ -120,6 +120,18 @@
           ]
         },
         {
+          "name": "theme",
+          "field": "theme",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "density",
+          "field": "density",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "quiet-hours",
           "field": "quietHours",
           "type": "string",

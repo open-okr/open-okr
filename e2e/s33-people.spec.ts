@@ -255,3 +255,54 @@ test("a goal, a space and a profile each carry their own feed", async () => {
   ).toBeVisible();
   await expect(page.getByText("Not what was done to them")).toBeVisible();
 });
+
+/**
+ * Theme and density, kept on the member (S-33, P6-G23).
+ *
+ * `setTheme` and `setDensity` have existed on the provider since P2-T10 and
+ * nothing ever called them, so both lived in `localStorage` only: a property
+ * of a browser rather than of a person.
+ *
+ * The second context is the point of the task, not a flourish. A preference
+ * that survived only a reload would be the behaviour this replaces.
+ */
+test("a theme follows the member to another browser", async ({ browser }) => {
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+
+  await expect(
+    page.getByRole("heading", { name: "Appearance" }),
+  ).toBeVisible();
+  await page.getByTestId("theme-dark").first().click();
+  await expect(page.getByTestId("theme-dark").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  // A second context with the same session and its own empty storage, which
+  // is what "another machine" means here.
+  const second = await browser.newContext({
+    storageState: await context.storageState(),
+  });
+  const secondPage = await second.newPage();
+  await secondPage.goto("/");
+  await expect(secondPage.locator("html")).toHaveAttribute(
+    "data-theme",
+    "dark",
+    { timeout: 15_000 },
+  );
+  await second.close();
+
+  // Back to following the system, so every spec after this one meets the
+  // instance it expects.
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  await page.getByTestId("theme-system").first().click();
+  await expect(page.getByTestId("theme-system").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

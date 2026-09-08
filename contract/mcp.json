@@ -157,6 +157,35 @@
               "telegram"
             ]
           },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark",
+                  "system"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "density": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "comfortable",
+                  "compact"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quietHours": {
             "anyOf": [
               {

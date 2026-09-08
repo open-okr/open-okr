@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
+import { AppearanceControl } from "../../../lib/appearance.tsx";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -255,6 +256,24 @@ export default async function MemberProfilePage({
                   </li>
                 ))}
               </ul>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {/* How the product looks to this member (P6-G23). Their own profile
+            only: a theme is a preference, not something an admin sets for
+            somebody else. */}
+        {isSelf ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">Appearance</h2>
+              <p className="text-xs text-ink-3">
+                Kept on you rather than on this browser, so it follows you to
+                another machine. The same control is in the account menu.
+              </p>
+            </CardHeader>
+            <CardBody>
+              <AppearanceControl />
             </CardBody>
           </Card>
         ) : null}

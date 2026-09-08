@@ -577,3 +577,91 @@ describe("bio is validated as rich text (P2-T11)", () => {
     ).toBe(false);
   });
 });
+
+describe("a member's theme and density (P6-G23)", () => {
+  it("starts null, which the provider reads as follow the system", async () => {
+    const wb = await workerDb();
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Not "light". A product that picked one for somebody would be overriding
+    // a choice they already made in their operating system.
+    expect(me.theme).toBeNull();
+    expect(me.density).toBeNull();
+  });
+
+  it("keeps what the member chose, on the member", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", density: "compact" },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Stored per member rather than in a browser, which is the whole point:
+    // signing in on a second machine used to put somebody back on the default.
+    expect(me.theme).toBe("dark");
+    expect(me.density).toBe("compact");
+  });
+
+  it("takes one without disturbing the other", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", density: "compact" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "light" },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBe("light");
+    expect(me.density).toBe("compact");
+  });
+
+  it("goes back to following the system when set to null", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: null },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBeNull();
+  });
+
+  it("refuses a theme the design system has no tokens for", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateOwnProfile",
+        { theme: "solarized" } as never,
+      ),
+    ).rejects.toThrow();
+  });
+});

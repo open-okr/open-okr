@@ -1,5 +1,5 @@
 import { loadEnv } from "@openokr/config";
-import { navigationFor } from "@openokr/core";
+import { callAction, navigationFor } from "@openokr/core";
 import {
   AppShell,
   CycleStrip,
@@ -22,10 +22,12 @@ import { CommandPalette } from "../app/search/palette.tsx";
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
+import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
+import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { requireWorkspace } from "./workspace.ts";
@@ -98,6 +100,19 @@ export async function AppShellLayout({
   const sidebarItems = navigationFor("sidebar", level);
   const adminItems = navigationFor("admin", level);
   const accountItems = sidebarItems.filter((item) => item.group === "account");
+  // The member's own theme and density (P6-G23), applied to a browser that
+  // has never seen them. Read here rather than in the root layout, because
+  // the root wraps the signed-out screens too and they have no member.
+  const me = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "people.readMember",
+    { memberId: workspace.memberId },
+  );
+
   const strip = await loadCycleStrip(
     workspace.workspaceId,
     session.user.id,
@@ -165,6 +180,7 @@ export async function AppShellLayout({
 
   return (
     <KeyboardRegistryProvider>
+      <AppearanceSync theme={me.theme} density={me.density} />
       <AppShell
         sidebar={
           <Sidebar
@@ -193,6 +209,7 @@ export async function AppShellLayout({
                   href: item.href,
                   label: item.label,
                 }))}
+                appearance={<AppearanceControl compact />}
                 signOut={<SignOut />}
               />
             }

@@ -395,6 +395,29 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: z.enum(CHECK_IN_FREQUENCIES).nullable(),
   },
   {
+    key: "theme",
+    scope: "member",
+    home: "workspace_members",
+    why:
+      "Null, which the theme provider reads as follow the system. A product " +
+      "that picked light or dark for somebody would be overriding a choice " +
+      "they already made in their operating system. Stored per member from " +
+      "P6-G23 rather than only in the browser, so it follows them.",
+    resolve: () => null,
+    schema: z.enum(["light", "dark", "system"]).nullable(),
+  },
+  {
+    key: "density",
+    scope: "member",
+    home: "workspace_members",
+    why:
+      "Null, which the shell reads as comfortable. UIUX-PLAN §9 asks every " +
+      "interface task to verify both densities, and until P6-G23 neither was " +
+      "reachable from the product.",
+    resolve: () => null,
+    schema: z.enum(["comfortable", "compact"]).nullable(),
+  },
+  {
     key: "primaryChannel",
     scope: "member",
     home: "workspace_members",

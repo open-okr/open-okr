@@ -98,6 +98,17 @@ export const updateOwnProfile = defineWriteAction({
       .enum(["app", "email", "slack", "teams", "whatsapp", "telegram"])
       .optional(),
     /**
+     * How the product looks to this member (P6-G23).
+     *
+     * Here rather than in a control of its own, for the same reason the
+     * primary channel is: both are the member's own profile facts, and a
+     * second action would be a second place that can change them. Null is
+     * "follow the system", which is what the theme provider does with no
+     * stored value, and not an unanswered question.
+     */
+    theme: z.enum(["light", "dark", "system"]).nullable().optional(),
+    density: z.enum(["comfortable", "compact"]).nullable().optional(),
+    /**
      * When not to be messaged, in the member's own timezone.
      *
      * Null clears it. AI-NATIVE-PLAN §5.4 defers a nudge inside this window to
@@ -137,6 +148,12 @@ export const updateOwnProfile = defineWriteAction({
       }
       if (input.primaryChannel !== undefined) {
         patch.primaryChannel = input.primaryChannel;
+      }
+      if (input.theme !== undefined) {
+        patch.theme = input.theme;
+      }
+      if (input.density !== undefined) {
+        patch.density = input.density;
       }
       if (input.quietHours !== undefined) {
         patch.quietHours = input.quietHours;
@@ -578,6 +595,16 @@ const memberProfile = z.object({
   primaryChannel: z
     .enum(["app", "email", "slack", "teams", "whatsapp", "telegram"])
     .nullable(),
+  /**
+   * How the product looks to this member (P6-G23).
+   *
+   * Null is "follow the system", which is what the theme provider does with
+   * no stored value. Returned so the shell can apply a member's own choice on
+   * a browser that has never seen it, which is what makes the preference
+   * follow them rather than the machine.
+   */
+  theme: z.enum(["light", "dark", "system"]).nullable(),
+  density: z.enum(["comfortable", "compact"]).nullable(),
 });
 
 /**
@@ -617,6 +644,8 @@ export const readMember = defineReadAction({
             bioVersion: workspaceMembers.bioVersion,
             avatarBlobId: workspaceMembers.avatarBlobId,
             primaryChannel: workspaceMembers.primaryChannel,
+            theme: workspaceMembers.theme,
+            density: workspaceMembers.density,
           })
           .from(workspaceMembers)
           .where(
