@@ -1442,6 +1442,28 @@ Deliverables: the worker that finds batches whose `send_at` has arrived, renders
 Test plan: four notifications inside one window deliver as one digest listing four items, each deep-linked; a recipient who lost access after enqueue receives nothing; two hosts draining together send once; the summary fires at the member's local time across a daylight-saving boundary.
 Acceptance: Given a member with a ten-minute window, when four notifications arrive inside it, then they receive one digest listing four items and the batch is marked sent exactly once.
 
+**Where the send happens, and why not in the drain.** A write path may cause a
+side effect only by inserting an outbox row, so the drain claims the batch and
+enqueues; the `notification.digest` handler renders and sends. That split is
+what makes the claim and the enqueue atomic, and it is why `sent` on a batch
+means "handed to the outbox" rather than "an SMTP server accepted it": the
+outbox row carries the attempt count and the dead letter, which is where a
+delivery failure belongs.
+
+**The daily summary was already scheduled and already empty.** `digest.daily`
+has fired at each member's own local hour since P4-T05b, carrying `draftFor`'s
+one generic line for every rule. So the half of this task that looked like
+"build the daily summary" was really "give the daily summary its contents",
+through the same builder the batch digest uses. One builder, so the two cannot
+describe one event differently and the access filter is written once.
+
+**The drain's cron is declared by the host, not by `packages/agents`.** That
+package holds AI-NATIVE-PLAN §6.2's cadences, and a batch drain is plumbing
+rather than something the Champion does. `ScheduledRun` gained a `cron` field
+for runs the host owns, and the scheduler test's invariant widened from "the two
+lists are equal" to "nothing is registered without a worker and nothing waits
+on a cron that does not exist", which is the invariant that was always meant.
+
 ### P6-G01c: The orphan-blob reap [S]
 Depends on: P6-G01a, P2-T05
 Goal: an abandoned upload does not stay forever (GAP-AUDIT B-01).
@@ -1499,17 +1521,48 @@ Deliverables: a migration giving `invite_links` the second-key row-level securit
 Test plan: a valid token names its workspace without incrementing its use count; an invalid, revoked, expired or used-up token refuses identically; a closed instance refuses registration without a token and allows it with one; a personal token refuses an address it was not issued to; two visitors racing one single-use token produce one member.
 Acceptance: Given a closed instance and a personal invitation, when the invitee follows the address, then they create an account, land in the workspace with the provisioning defaults, and the audit names who invited them.
 
-### P6-G07: The in-app inbox, S-03 [L]
+### P6-G07a: The in-app inbox, S-03 [M]
 Depends on: P2-T06
 Goal: the notification spine gets its screen (GAP-AUDIT B-06).
-Deliverables: the inbox route with the live badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block, grouped and deep-linked rows, mark-read, mute and snooze, and the subscription toggle on every subject that has one; loading, empty, error and permission-denied states.
-Test plan: a notification a member may not see never appears; snoozing hides the row and never hides a review-inbox obligation; the badge is live and clears on read; muting a subject stops new rows without deleting old ones.
+Deliverables: the inbox route with the badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block with an icon of its own, `notifications.list` widened to carry the subject, the reason and the rule key so a row can be grouped and deep-linked and access-scoped so a subject the reader cannot reach is not listed, an unread count for the badge, mark-read, snooze and mute from the row; empty, error and permission-denied states.
+Test plan: a notification whose subject the member cannot reach never appears; snoozing hides the row and never hides a review-inbox obligation; the badge counts unread and clears on read; muting a subject stops new rows without deleting old ones; every reason in the table's own enum renders a chip, which is what catches the output schema listing four of the six.
 Acceptance: Given a member mentioned in a comment, when they open the inbox, then the notification is listed, deep-links to the comment, and the badge clears.
 
+### P6-G07b: The watch control on every subject [M]
+Depends on: P6-G07a
+Goal: `subscriptions.toggle` gets its surfaces, and the inbox row inserts live.
+Deliverables: a watch control on every subject that has a subscription list, which is the goal, initiative, task, document, KPI and space detail pages, each showing whether the reader is watching and why they were subscribed; the inbox subscribing to the realtime channel the board and the session already use, so a new row arrives without a navigation.
+Test plan: watching a goal from its own page produces a row in the inbox on the next check-in; unwatching stops new rows and keeps old ones; a watch control on a subject the reader may only view still works, because watching is not a write to the subject; the live insert arrives without a reload and is not duplicated by the next navigation.
+Acceptance: Given a member who watches an initiative from its page, when somebody checks it in, then the row appears in their open inbox without a reload.
+
+**Why P6-G07 was cut in two.** The screen and the read are one job. "The
+subscription toggle on every subject that has one" is a different job in six
+other files, and it needs the inbox to exist first to be worth anything, since
+watching something with nowhere to read the result is a control with no
+outcome. Live insert goes with it rather than with the screen, because the
+screen's own honest description is the one `review-badge.ts` already gives:
+recomputed on navigation and after the writes that move it.
+
 ### P6-G08: Member notification settings [M]
-Depends on: P6-G07
+Depends on: P6-G07a
 Goal: the member half of the settings map is reachable (GAP-AUDIT B-06).
-Deliverables: per-reason routing, the batching window, the daily summary time and the language, theme and density preferences on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks.
+Deliverables: per-reason routing, the batching window, the daily summary and its time on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks; each one declared in the §4.14 registry with the default it resolves to.
+
+**Language, theme and density moved out of this row**, to P6-G22 and P6-G23,
+which own their controls. No column exists for any of the three, so building
+their storage here and their controls there would split one setting across two
+tasks and leave it owned by nobody for a release. A setting arrives with the
+screen that sets it.
+
+**A setting's scope and its storage home are two different things**, and this
+is the task that separated them. `SETTINGS_REGISTRY` had two scopes and two
+tables, so scope implied the home; the notification preferences are
+member-scoped and live in `notification_settings`, created lazily on first
+read, which is not the same storage as a member column.
+`resolveMemberSettings` writes its answer into `workspace_members` at
+provisioning, so a notification key reaching it would name a column that does
+not exist. The registry declares the home, and both the existing spec and the
+new one enumerate per home.
 Test plan: every setting in the member scope resolves to its documented default on a member who has never opened the screen, enumerated from the registry rather than a fixed list; changing the summary time moves when it fires; a per-reason routing change takes effect on the next notification.
 Acceptance: Given a member who changes their batch window to ten minutes, when four notifications arrive inside it, then they receive one digest listing four items.
 
@@ -1660,12 +1713,23 @@ Deliverables: every user-facing string in the 47 routes moved into the catalogue
 Test plan: the pseudo-locale check runs over every route and fails on a deliberately hardcoded string; a member whose language is `ms` sees the stubbed catalogue; a key missing from `ms` falls back to `en` rather than rendering the key.
 Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language, and a new hardcoded string anywhere fails the build.
 
+**The member's language column arrives here**, with the control that sets it.
+§4.14 documents "Member language, theme, density" and no column exists for any
+of the three; P6-G08 deliberately left them rather than storing a preference
+whose screen was two rows away. So this row brings the migration, the §4.14
+registry entry with its default, and the control together.
+
 ### P6-G23: Theme and density control [S]
 Depends on: P2-T10
 Goal: the two states every UI task must verify are reachable (GAP-AUDIT G-09).
 Deliverables: a theme and density control on the member's settings surface and in the avatar menu, calling the `setTheme` and `setDensity` the provider has always exposed and nothing has ever called; the preference persisted per member rather than only in the browser, so it follows them; the pre-hydration script reading what the control writes.
 Test plan: switching theme survives a reload and a second device; compact density changes row heights on a virtualised table; reduced motion is still honoured in both themes.
 Acceptance: Given a member who chooses dark and compact, when they sign in on another browser, then the product renders dark and compact with no flash of the other.
+
+**The theme and density columns arrive here**, for the reason P6-G22 records
+about language: "persisted per member rather than only in the browser" is a
+migration and a §4.14 registry entry, and a setting arrives with the screen
+that sets it rather than two rows earlier.
 
 **P6-G24 was cut in two, and the seam is an architecture fact rather than a
 size judgement.** One clause of the row was "section-level error boundaries so
@@ -1760,6 +1824,39 @@ Over REST they are not. `invitations.list` was written at P6-G06a, found to
 have exactly this hole, and enforces its own level in the handler with the
 reason written above it; `imports.listRuns` and the nudge volume read are the
 two others already visible, and the sweep is what finds the rest.
+
+**What the sweep found, and where it landed.** 29 reads declare above `view`
+and 2 enforced it, so 27 were open. Enforcement went in the builder rather
+than read by read, because the shape did allow it: the level is one number
+compared against the member's level on the workspace's own context, and 27
+copies of that comparison is 27 chances to write it differently. The builder
+checks only when the declared level is above `view`, so a `view` read costs
+nothing extra, and `system` and `operator` actors are exempt exactly as
+`runOperation` exempts them. The two hand-rolled checks are dealt with
+differently: `invitations.list`'s is deleted, because it duplicated the
+builder's; `settings.readWorkspaceSettings` keeps its `getAccessScoped` call,
+because that is the access getter the hard rule requires for a protected
+aggregate and it is not the same check.
+
+**The refusal is `not_found`, in the access getter's own words.** The first
+version raised `forbidden` and named the action and the level, and two existing
+specs refused it: `settings-actions.test.ts` requires `not_found` for a member
+holding `edit`, and `import-table.test.ts` requires "No such workspace" for
+somebody who is not a member at all. Both are right. `forbidden` is defensible
+for a caller who is already a member and knows the workspace exists, and it is
+what the write actions beside these reads raise; it is not defensible for a
+caller with no member row, because "you hold too little access in this
+workspace" confirms the workspace. One check cannot separate the two without
+handing back the oracle it exists to close. So a read refuses the way
+`getAccessScoped` refuses, the message names neither the action nor the level,
+and `invitations.list`'s own spec was corrected from `forbidden` to `not_found`
+in the same change.
+
+**No REST route test, and that is the point of the design.** `route.ts` says
+"nothing here decides who may do what": it resolves the principal, checks the
+token scope, and hands the input to `callAction`. A test at `callAction` is
+therefore a test of the REST surface too, and one at the route would only prove
+that the route still calls the registry.
 
 **Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
 

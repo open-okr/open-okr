@@ -41,7 +41,7 @@ Six screens specified in UIUX-PLAN.md §6 have no route at all (S-03, S-31, S-33
 ## B-01: Nothing schedules the agents, so the product is never active
 
 - [x] Wire a job queue host and call `registerAgentSchedules` at boot. **Closed at P6-G01a.** `apps/web/lib/scheduler.ts` builds the pg-boss driver, subscribes a worker to every declared job and registers the schedules at boot, behind `OPENOKR_SCHEDULER` which defaults to on. The Coach gained the nightly cadence §6.1 gives it and had never had, fired at each workspace's own local hour. Proved by construction, not by observation: no run against a live pg-boss yet.
-- [ ] **P6-G01b** the notification batch drain. `renderDigest` has had no caller outside the barrel since P2-T06, so no batched notification has ever been delivered.
+- [x] **P6-G01b** the notification batch drain. Closed on 7 September 2026. `notifications.drainBatches` claims every batch whose window has closed and enqueues one digest per batch through the outbox; the `notification.digest` handler renders it and sends. The claim is a conditional update from `pending`, which is the whole of the idempotence under several hosts. The daily summary was a second finding inside this one: `digest.daily` had fired at each member's local hour since P4-T05b carrying the generic "you have a reminder waiting" line, so it was scheduled and summarised nothing; it now carries the member's own unread rows through the same builder as the batch digest.
 - [ ] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
 
 `registerAgentSchedules` declares four cron cadences for the Champion ([schedule.ts:69](../../packages/agents/src/schedule.ts#L69)). Nothing calls it. No file outside `packages/adapters` and `packages/agents` references `JobQueue` at all, and `apps/web` constructs no queue: [instrumentation.node.ts](../../apps/web/instrumentation.node.ts) starts the outbox relay and nothing else.
@@ -51,8 +51,8 @@ Consequences in a running instance:
 | What should happen on its own | What happens today |
 |---|---|
 | The Champion chases a due check-in on the hour | Nothing, unless an admin presses Run now on `/admin/agents` |
-| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Never sends |
-| Notification batches drain on their window | Never drain |
+| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Fires since P6-G01a, and says what happened since P6-G01b |
+| Notification batches drain on their window | Every five minutes, since P6-G01b |
 | Staleness flips to `outdated` past the grace | Only when somebody runs `pnpm cadence:sweep` by hand |
 | Orphan blobs are reaped, thumbnails generated (P2-T05) | Never |
 
@@ -123,7 +123,11 @@ Practical effect: an administrator cannot supply a provider key, route a tier, s
 
 ## B-06: The notification inbox does not exist
 
-- [ ] Build screen S-03
+- [x] **P6-G07a** built screen S-03 on 7 September 2026. The route, the Inbox entry in the primary block with its own icon, the sidebar badge beside Review's, subject grouping, reason chips, unread dots, deep links, mark-read, three snooze choices and mute. Mute is `subscriptions.toggle` with `subscribe: false`, which cancels rather than deletes, so muting a noisy subject keeps the history.
+- [ ] **P6-G07b** the watch control on the six subject pages, and live insert. Watching something is still only reachable through a mention or a check-in fan-out.
+- [ ] **P6-G08** the member half of §4.14: per-reason routing, the batch window and the daily summary time.
+
+**Two defects the screen could not be built on top of, both older than this row.** `notifyRecipients` takes the subject, resolves who is watching from it, and stored neither, so the only route back to what a row was about was `activity_id` — nullable, and null on two of the three producers, because the Operation pipeline writes the activity after `execute` returns. Migration **0074** stores `subject_type` and `subject_id` and all three producers set them. And `notifications.list` described four of the table's six reasons: `review` and `check_in` reached `NOTIFICATION_REASONS` at P3-T07 and P4-T04 and never reached the output schema, so the contract described an inbox that could not hold a reviewer's obligation or a nudge.
 
 P2-T06 is `done` and names "the in-app inbox with a live badge, mute and snooze" (IMPLEMENTATION-PLAN.md:169). There is no `/inbox` route and no notification UI anywhere in `apps/web`.
 
@@ -139,6 +143,8 @@ The member half of TECHNICAL-PLAN §4.14 is unreachable with it: per-reason rout
 - [ ] **P6-G06b** the redeeming half. `/join`, a cross-tenant token lookup behind the second-key policy `api_tokens` already has, and registration on a closed instance. Until it lands, a token issued on the card is redeemable through the command line and the REST surface and nowhere else, and the card says so rather than handing out an address that answers 404.
 
 **A security defect this task turned up, wider than invitations.** `defineReadAction` records `access` and nothing reads it back: not the builder, not `callAction`, not the REST, agent or chat transports, which take it only as a scope name. In the browser the admin layout refuses below `full` before a page renders, so the screens are safe; over REST an ordinary member's token reaches a read declaring `full`. `invitations.list` enforces its own level; `imports.listRuns` and the nudge volume read are the two others already visible. The sweep is **P6-G31**.
+
+- [x] **P6-G31** closed it on 7 September 2026, in `defineReadAction` rather than read by read. The sweep found **29 reads declaring above `view` and 2 enforcing it**, so 27 were open: the AI provider config, model catalogue, tier routing, feature settings, prompts, budgets and usage summary; every agent and agent run; the proposal queue; the channel connections, message log, templates and mappings; the import history; the nudge volume; and the workspace settings map. The hand-rolled check written at P6-G06a is gone from `invitations.list`, because a second one behind the builder's is a second one to keep in step. The refusal is `not_found` in the access getter's own words, which is what two existing specs required and the first version of the check got wrong.
 
 P2-T04 is `done`. The words "invite" and "invitation" appear in `apps/web/app` in three places only: the sign-up page, `not-found.tsx` and the setup account page. All five invitation actions have no caller: `invitations.createWorkspaceLink`, `invitations.createPersonalLink`, `invitations.revokeLink`, `invitations.acceptLink`, `invitations.joinByTrustedDomain`.
 
@@ -215,7 +221,7 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 | [/](../../apps/web/app/page.tsx) | S-01 | nav | yes | |
 | [/review](../../apps/web/app/review/page.tsx) | S-02 | nav | yes | **B-02** four of seven sources missing (closed at P6-G02). **G** "Your week" absent ([page.tsx:35](../../apps/web/app/review/page.tsx#L35)) |
 | [/search](../../apps/web/app/search/page.tsx) | S-32 | nav | yes | |
-| *missing* | S-03 Inbox | none | none | **B-06** |
+| [/inbox](../../apps/web/app/inbox/page.tsx) | S-03 | nav, badge | yes | closed at **P6-G07a** |
 | *missing* | S-31 Activity feed | none | none | **G-01**, below |
 | *missing* | S-33 People | none | none | **B-08** |
 | *missing* | S-34 Onboarding | none | none | **G-02**, below |
@@ -427,7 +433,7 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 ## Then, the screens that do not exist
 
 - [ ] **B-05** AI console (S-37). Largest of these; twenty-three actions and seven cards.
-- [ ] **B-06** inbox (S-03) plus member notification settings.
+- [x] **B-06** inbox (S-03). Closed at P6-G07a; the watch controls are P6-G07b and the member notification settings are P6-G08.
 - [ ] **B-07** invitations. Smallest of these and it unblocks every multi-person test.
 - [ ] **B-08** people directory and org chart (S-33).
 - [x] **G-01** activity feed (S-31). Workspace scope closed at P6-G11a; the other three scopes are P6-G11b.

@@ -136,6 +136,18 @@ export const notifications = pgTable("notifications", {
   activityId: uuid("activity_id").references(() => activities.id),
   /** No foreign key: nudges are P4-T04. */
   nudgeId: uuid("nudge_id"),
+  /**
+   * What this notification is about, so a row can be grouped and linked
+   * (migration 0074, P6-G07a).
+   *
+   * Set by every producer from the subject it already holds. Null only on a
+   * row written before the column existed, which the inbox read falls back to
+   * the activity's own subject for. No foreign key, for the same reason
+   * `activities.subject_id` has none: the subject is one of a dozen tables and
+   * a constraint would have to name all of them.
+   */
+  subjectType: text("subject_type"),
+  subjectId: uuid("subject_id"),
   batchId: uuid("batch_id").references(() => notificationBatches.id, {
     onDelete: "set null",
   }),

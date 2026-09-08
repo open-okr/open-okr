@@ -1275,6 +1275,29 @@
       "pages": false
     },
     {
+      "name": "notifications drainBatches",
+      "action": "notifications.drainBatches",
+      "method": "POST",
+      "path": "/notifications/drainBatches",
+      "scope": "write",
+      "summary": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "flags": [
+        {
+          "name": "now",
+          "field": "now",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "notifications list",
       "action": "notifications.list",
       "method": "GET",
@@ -1287,8 +1310,38 @@
           "field": "unreadOnly",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "invited",
+            "joined",
+            "mentioned",
+            "role",
+            "review",
+            "check_in"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
         }
       ],
+      "pages": true
+    },
+    {
+      "name": "notifications unreadCount",
+      "action": "notifications.unreadCount",
+      "method": "GET",
+      "path": "/notifications/unreadCount",
+      "scope": "read",
+      "summary": "How many unread, unsnoozed notifications the member has.",
+      "flags": [],
       "pages": false
     },
     {
@@ -1371,6 +1424,12 @@
           "name": "daily-summary-time",
           "field": "dailySummaryTime",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "routing",
+          "field": "routing",
+          "type": "object",
           "required": false
         }
       ],

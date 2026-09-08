@@ -23,6 +23,7 @@ import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
+import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { loadReviewBadge } from "./review-badge.ts";
@@ -107,6 +108,11 @@ export async function AppShellLayout({
     session.user.id,
     level,
   );
+  const inboxBadge = await loadInboxBadge(
+    workspace.workspaceId,
+    session.user.id,
+    level,
+  );
 
   // Read here rather than inside the panel so the first open needs no round
   // trip, and so a provider-off workspace renders its own state on the server
@@ -131,8 +137,14 @@ export async function AppShellLayout({
       href: item.href,
       icon: iconFor(item.id),
       active: item.id === active,
+      // Two badges in the primary block since P6-G07a. Named per item rather
+      // than looked up in a map, because each one comes from a different read
+      // and a map would hide which.
       ...(item.id === "review" && reviewBadge !== null
         ? { badge: reviewBadge }
+        : {}),
+      ...(item.id === "inbox" && inboxBadge !== null
+        ? { badge: inboxBadge }
         : {}),
     })),
   }));

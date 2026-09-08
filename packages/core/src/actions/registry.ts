@@ -251,12 +251,14 @@ import {
   updateKpi,
 } from "./kpis.ts";
 import {
+  drainNotificationBatches,
   getNotificationSettings,
   importWatcher,
   listNotifications,
   markNotificationRead,
   snoozeNotification,
   toggleSubscription,
+  unreadNotificationCount,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
 import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
@@ -450,7 +452,9 @@ export const ACTION_MAP = {
   "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
+  "notifications.drainBatches": drainNotificationBatches,
   "notifications.list": listNotifications,
+  "notifications.unreadCount": unreadNotificationCount,
   "notifications.markRead": markNotificationRead,
   "notifications.snooze": snoozeNotification,
   "notifications.getSettings": getNotificationSettings,

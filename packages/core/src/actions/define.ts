@@ -10,10 +10,13 @@
  * reach a handler with a shape the contract does not describe.
  */
 
+import { type WorkspaceTx, withWorkspace } from "@openokr/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { ZodType } from "zod";
 import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import {
@@ -160,6 +163,30 @@ export function defineReadAction<TInput, TOutput>(definition: {
     // rather than being replaced by it.
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
+      const required = definition.access ?? ACCESS_LEVELS.view;
+      // **The declared level is enforced here, once, for every read** (P6-G31).
+      // It used to be recorded and never checked: twenty-nine reads declared
+      // above `view` and two of them enforced it by hand, so over REST an
+      // ordinary member's token reached the AI budgets, the channel message
+      // log, every agent run, the nudge volume and the import history. In the
+      // browser the admin layout refuses first, which is why the screens looked
+      // right while the surface underneath did not.
+      //
+      // Only above `view`. A read at `view` is either open to every member of
+      // the workspace or scoped row by row through `getAccessScoped`, and
+      // opening a transaction to confirm that a member is a member would cost
+      // every read in the product a round trip for nothing.
+      if (required > ACCESS_LEVELS.view) {
+        const db = drizzle(context.pool);
+        await withWorkspace(db, context.workspaceId, (tx) =>
+          requireWorkspaceLevel(
+            tx as WorkspaceTx,
+            context.workspaceId,
+            context.actor,
+            required,
+          ),
+        );
+      }
       return definition.handler(context, input);
     },
   };

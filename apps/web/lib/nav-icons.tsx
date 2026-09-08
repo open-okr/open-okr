@@ -7,6 +7,7 @@ import {
   Columns3,
   Hammer,
   Home,
+  Inbox,
   KeyRound,
   Layers,
   MessageSquare,
@@ -37,6 +38,9 @@ import type { ReactNode } from "react";
  */
 const ICONS: Readonly<Record<string, ReactNode>> = {
   overview: <Home className="size-full" />,
+  // The envelope this map's own default used to hand out by accident now
+  // belongs to the screen it was always drawing (P6-G07a).
+  inbox: <Inbox className="size-full" />,
   review: <ClipboardCheck className="size-full" />,
   cycle: <RefreshCw className="size-full" />,
   goals: <Target className="size-full" />,

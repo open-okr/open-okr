@@ -1897,6 +1897,30 @@
       }
     },
     {
+      "name": "notifications.drainBatches",
+      "description": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "notifications.list",
       "description": "The signed-in member's own inbox.",
       "inputSchema": {
@@ -1904,8 +1928,51 @@
         "properties": {
           "unreadOnly": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "joined",
+              "mentioned",
+              "role",
+              "review",
+              "check_in"
+            ]
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "createdAt",
+              "id"
+            ]
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "notifications.unreadCount",
+      "description": "How many unread, unsnoozed notifications the member has.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {
@@ -2000,8 +2067,8 @@
           },
           "batchWindowMinutes": {
             "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "minimum": 1,
+            "maximum": 1440
           },
           "dailySummary": {
             "type": "boolean"
@@ -2009,6 +2076,31 @@
           "dailySummaryTime": {
             "type": "string",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "routing": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "invited",
+                "joined",
+                "mentioned",
+                "role",
+                "review",
+                "check_in"
+              ]
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "app",
+                "email",
+                "slack",
+                "teams",
+                "whatsapp",
+                "telegram"
+              ]
+            }
           }
         }
       },

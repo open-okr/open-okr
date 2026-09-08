@@ -97,6 +97,11 @@ export async function notifyRecipients<
         workspaceId: input.workspaceId,
         recipientMemberId: recipient.memberId,
         activityId: input.activityId ?? null,
+        // Stored rather than only used to find the recipients (migration
+        // 0074). Without it a row from a producer that has no activity id has
+        // no subject at all, which is two of the three (P6-G07a).
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
         reason: recipient.reason,
         channel,
       });
@@ -115,6 +120,9 @@ export async function notifyRecipients<
         recipientMemberId: recipient.memberId,
         activityId: input.activityId ?? null,
         batchId,
+        // Same as the immediate branch above.
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
         reason: recipient.reason,
         channel,
       });
