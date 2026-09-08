@@ -1572,6 +1572,75 @@
       "pages": false
     },
     {
+      "name": "activities goalFeed",
+      "action": "activities.goalFeed",
+      "method": "GET",
+      "path": "/activities/goalFeed",
+      "scope": "read",
+      "summary": "One goal's activity feed, with its key results and check-ins.",
+      "flags": [
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
+      "name": "activities profileFeed",
+      "action": "activities.profileFeed",
+      "method": "GET",
+      "path": "/activities/profileFeed",
+      "scope": "read",
+      "summary": "What one member did, newest first.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
+      "name": "activities spaceFeed",
+      "action": "activities.spaceFeed",
+      "method": "GET",
+      "path": "/activities/spaceFeed",
+      "scope": "read",
+      "summary": "One space's activity feed, newest first.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
       "name": "activities workspaceFeed",
       "action": "activities.workspaceFeed",
       "method": "GET",

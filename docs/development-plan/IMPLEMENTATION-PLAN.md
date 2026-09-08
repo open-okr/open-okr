@@ -1599,12 +1599,26 @@ Deliverables: the `/activity` route rendering `activities.workspaceFeed` with it
 Test plan: the route is reachable without a registry row, asserted by the existing reachability test; a system-authored row reads as the product acting rather than as an empty name; a half cursor from a hand-edited link is ignored rather than refused by the schema; an empty first page and an empty later page say different things.
 Acceptance: Given a workspace where anything has happened, when a member opens the feed, then they see the readable events they are allowed to see, newest first, with who did each one and when.
 
+**P6-G11b was cut in two.** Four deliverables, and the last two are a
+different kind of work from the first two: three reads and three panels are
+one commit, and a realtime channel plus a reaction surface on a feed row is
+another. Splitting also settles where the feed's live insert belongs, which is
+here rather than with the inbox's in P6-G07c: same port, different screen and
+different deduplication. Split at P6-G11b, 8 September 2026.
+
 ### P6-G11b: The feed at space, goal and profile scope [M]
 Depends on: P6-G11a
 Goal: the other three scopes S-31 names (GAP-AUDIT G-01).
-Deliverables: three read actions over `queryFeed` for the space, goal and profile scopes, each access-scoped by the same context resolver the workspace feed uses; the panel on each of those three surfaces; live inserts, which the realtime port already carries; the reactions and comments §6 also asks for on a feed row, or a recorded reason for leaving them off.
+Deliverables: three read actions over `queryFeed` for the space, goal and profile scopes, each access-scoped by the same context resolver the workspace feed uses; the panel on each of those three surfaces.
 Test plan: a private-space activity never appears in a non-member goal or profile feed; a goal feed carries its key results and check-ins and not its siblings; a profile feed carries what that member did and not what was done to them; each scope pages independently.
 Acceptance: Given a member without access to a space, when they read a goal feed inside it, then they get not-found rather than an empty feed.
+
+### P6-G11c: The feed's live insert, and reacting to a row [M]
+Depends on: P6-G11b
+Goal: a feed row arrives and can be replied to (GAP-AUDIT G-01).
+Deliverables: live inserts on all four feed scopes over the realtime port the board and the session already use, deduplicated against the next navigation; the reactions and comments §6 asks for on a feed row, over `reactions.add`, `reactions.list`, `reactions.remove` and `comments.create`, which all exist and none of which a feed row reaches; or a recorded reason for leaving either off.
+Test plan: a row inserted live is not drawn twice by the next navigation; a reaction is visible to a second reader of the same feed; a reader who may not see the row's subject may not react to it; the page works unchanged with no relay running.
+Acceptance: Given two members reading the same space feed, when one reacts to a row, then the other sees the reaction without a reload.
 
 ### P6-G12a: The AI console: provider, keys and models [L]
 Depends on: P2-T13, P2-T14

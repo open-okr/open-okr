@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -26,8 +27,11 @@ import { SpaceSettingsCard } from "./space-settings.tsx";
  */
 export default async function SpacePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
+  searchParams: Promise<{ at?: string; id?: string }>;
 }) {
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -38,6 +42,25 @@ export default async function SpacePage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // The feed for this surface (S-31, P6-G11b). Both halves of the cursor or
+  // neither: a half cursor is a link somebody edited by hand.
+  const feedParams = await searchParams;
+  const feedCursor =
+    feedParams.at && feedParams.id
+      ? { at: feedParams.at, id: feedParams.id }
+      : undefined;
+  const [feedItems, feedDirectory, feedSettings] = await Promise.all([
+    callAction(actor, "activities.spaceFeed", {
+      spaceId: id,
+      ...(feedCursor ? { cursor: feedCursor } : {}),
+    }),
+    callAction(actor, "people.directory", {}),
+    callAction(actor, "settings.readWorkspaceSettings", {}),
+  ]);
+  const feedNames = new Map(
+    feedDirectory.map((member) => [member.id, member.name]),
+  );
 
   // Whether this reader is watching this subject (P6-G07b). Read here rather
   // than in the control, because the control is a client component and the
@@ -309,6 +332,15 @@ export default async function SpacePage({
             )}
           </CardBody>
         </Card>
+        <FeedPanel
+          title="Activity"
+          explains="What has happened in this space, including its goals, initiatives and tasks."
+          items={feedItems}
+          names={feedNames}
+          timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+          basePath={`/spaces/${id}`}
+          paged={feedCursor !== undefined}
+        />
       </div>
     </AppShellLayout>
   );

@@ -12,7 +12,12 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
-import { workspaceFeed } from "./activities.ts";
+import {
+  goalFeed,
+  profileFeed,
+  spaceFeed,
+  workspaceFeed,
+} from "./activities.ts";
 import {
   bindAgentScope,
   bulkApplyProposedChanges,
@@ -473,6 +478,9 @@ export const ACTION_MAP = {
   "subscriptions.toggle": toggleSubscription,
   // P6-T04b. Restores a watcher an import found, by name.
   "subscriptions.importWatcher": importWatcher,
+  "activities.goalFeed": goalFeed,
+  "activities.profileFeed": profileFeed,
+  "activities.spaceFeed": spaceFeed,
   "activities.workspaceFeed": workspaceFeed,
   // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
   "workspace.exportArchive": exportArchive,

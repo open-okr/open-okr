@@ -10,6 +10,7 @@ import {
   ensureMemberGroup,
 } from "../src/access/contexts.ts";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
+import { callAction } from "../src/actions/registry.ts";
 import { aggregateFeed, queryFeed } from "../src/activities/feed.ts";
 import { renderActivity } from "../src/activities/renderers.ts";
 import {
@@ -475,5 +476,158 @@ describe("feed pagination", () => {
 
     const firstIds = new Set(firstPage.map((item) => item.id));
     expect(secondPage.some((item) => firstIds.has(item.id))).toBe(false);
+  });
+});
+
+describe("the feed at space, goal and profile scope (P6-G11b)", () => {
+  const ctx = (userId = OWNER) => ({
+    workspaceId,
+    actor: { kind: "human" as const, userId },
+  });
+
+  /** The default space provisioning made. */
+  async function defaultSpace(): Promise<string> {
+    const wb = await workerDb();
+    const spaces = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "spaces.list",
+      {},
+    );
+    return (spaces as Array<{ id: string }>)[0]?.id as string;
+  }
+
+  async function aGoal(title: string): Promise<string> {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "cycles.ensureCurrent",
+      {},
+    );
+    const goal = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "goals.create",
+      {
+        title,
+        cycleId: cycle.id,
+        level: "company",
+        ownerKind: "space",
+        spaceId: await defaultSpace(),
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      },
+    );
+    return goal.id;
+  }
+
+  it("carries a goal's own key results and not a sibling's", async () => {
+    const wb = await workerDb();
+    const mine = await aGoal("Land fifty mid-market accounts");
+    const sibling = await aGoal("Cut onboarding to a day");
+
+    await callAction({ pool: wb.appPool, ...ctx() }, "goals.addKeyResult", {
+      goalId: mine,
+      title: "Signed accounts from 10 to 50",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 10,
+      targetValue: 50,
+      weight: 1,
+    });
+
+    const feed = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.goalFeed",
+      { goalId: mine },
+    );
+
+    // A key result resolves to its goal's own context, which is what makes
+    // "this goal and everything under it" one context id rather than a list.
+    expect(feed.length).toBeGreaterThan(0);
+    expect(
+      feed.some((row) => row.subjectId === sibling),
+      "a sibling goal leaked into this feed",
+    ).toBe(false);
+  });
+
+  it("carries what a member did, not what was done to them", async () => {
+    const wb = await workerDb();
+    const other = await addMember("Somebody Else");
+    await aGoal("Something the owner did");
+
+    const mine = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.profileFeed",
+      { memberId: ownerMemberId },
+    );
+    expect(mine.length).toBeGreaterThan(0);
+    for (const row of mine) {
+      expect(row.actorMemberId).toBe(ownerMemberId);
+    }
+
+    // The other member has done nothing, though plenty has happened around
+    // them. A subject filter would have answered differently.
+    const theirs = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.profileFeed",
+      { memberId: other },
+    );
+    expect(theirs).toEqual([]);
+  });
+
+  it("refuses a member who is not in this workspace", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...ctx() }, "activities.profileFeed", {
+        memberId: "00000000-0000-4000-8000-000000000000",
+      }),
+    ).rejects.toThrow(/no such member/i);
+  });
+
+  it("carries a space's goals, not only the space's own rows", async () => {
+    const wb = await workerDb();
+    const goalId = await aGoal("Inside the space");
+
+    const feed = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.spaceFeed",
+      { spaceId: await defaultSpace() },
+    );
+
+    // The point of collecting the contexts: a goal owns its own, so a space
+    // feed filtered on the space's context alone would miss every goal in it.
+    expect(feed.some((row) => row.subjectId === goalId)).toBe(true);
+  });
+
+  it("refuses a space the reader cannot see, rather than answering empty", async () => {
+    const wb = await workerDb();
+    // An id that is not a space in this workspace. Not-found and empty are
+    // different answers: empty says the space exists and is quiet.
+    await expect(
+      callAction({ pool: wb.appPool, ...ctx() }, "activities.spaceFeed", {
+        spaceId: "00000000-0000-4000-8000-000000000000",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("pages each scope on its own cursor", async () => {
+    const wb = await workerDb();
+    const goalId = await aGoal("Paged");
+    const first = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.goalFeed",
+      { goalId },
+    );
+    expect(first.length).toBeGreaterThan(0);
+
+    const last = first[first.length - 1];
+    const next = await callAction(
+      { pool: wb.appPool, ...ctx() },
+      "activities.goalFeed",
+      { goalId, cursor: { at: last?.at as string, id: last?.id as string } },
+    );
+    // Everything before the oldest row of the first page, which for a goal
+    // this young is nothing. What matters is that it does not repeat page one.
+    expect(next.some((row) => row.id === first[0]?.id)).toBe(false);
   });
 });

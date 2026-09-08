@@ -210,3 +210,48 @@ test("watching a goal from its own page sticks", async () => {
     timeout: 15_000,
   });
 });
+
+/**
+ * The feed at the other three scopes (S-31, P6-G11b).
+ *
+ * P6-G11a built the workspace feed at `/activity`. `queryFeed` could already
+ * answer the space, goal and profile scopes and no read action reached them,
+ * so nothing could show one. What a browser adds here is that each panel is on
+ * the thing it is about and pages on its own url.
+ */
+test("a goal, a space and a profile each carry their own feed", async () => {
+  // The goal.
+  await goTo(page, "/goals");
+  const goalHref = await page
+    .locator("a[href^='/goals/']")
+    .evaluateAll((links) => {
+      const match = links
+        .map((link) => link.getAttribute("href") ?? "")
+        .find((href) => /^\/goals\/[0-9a-f-]{36}$/.test(href));
+      return match ?? "";
+    });
+  expect(goalHref, "no goal link on /goals").not.toBe("");
+  await goTo(page, goalHref);
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await expect(
+    page.getByText("its key results and its check-ins"),
+  ).toBeVisible();
+
+  // The space.
+  await goTo(page, "/spaces");
+  await page.locator("a[href^='/spaces/']").first().click();
+  await page.waitForURL(/\/spaces\/[0-9a-f-]{36}/);
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await expect(
+    page.getByText("its goals, initiatives and tasks"),
+  ).toBeVisible();
+
+  // The profile, which is about the actor and says so.
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  await expect(
+    page.getByRole("heading", { name: "What they did" }),
+  ).toBeVisible();
+  await expect(page.getByText("Not what was done to them")).toBeVisible();
+});

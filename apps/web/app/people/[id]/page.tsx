@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
+import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
 import { updateMemberFields, updateProfile } from "../actions.ts";
@@ -34,8 +35,11 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 export default async function MemberProfilePage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ id: string }>;
+  /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
+  searchParams: Promise<{ at?: string; id?: string }>;
 }) {
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -45,6 +49,25 @@ export default async function MemberProfilePage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // The feed for this surface (S-31, P6-G11b). Both halves of the cursor or
+  // neither: a half cursor is a link somebody edited by hand.
+  const feedParams = await searchParams;
+  const feedCursor =
+    feedParams.at && feedParams.id
+      ? { at: feedParams.at, id: feedParams.id }
+      : undefined;
+  const [feedItems, feedDirectory, feedSettings] = await Promise.all([
+    callAction(context, "activities.profileFeed", {
+      memberId: id,
+      ...(feedCursor ? { cursor: feedCursor } : {}),
+    }),
+    callAction(context, "people.directory", {}),
+    callAction(context, "settings.readWorkspaceSettings", {}),
+  ]);
+  const feedNames = new Map(
+    feedDirectory.map((member) => [member.id, member.name]),
+  );
 
   let member: Awaited<ReturnType<typeof callAction<"people.readMember">>>;
   try {
@@ -330,6 +353,15 @@ export default async function MemberProfilePage({
             Back to the directory
           </Link>
         </p>
+        <FeedPanel
+          title="What they did"
+          explains="This member's own activity, filtered to what you can see. Not what was done to them: being assigned a task is somebody else acting."
+          items={feedItems}
+          names={feedNames}
+          timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+          basePath={`/people/${id}`}
+          paged={feedCursor !== undefined}
+        />
       </div>
     </AppShellLayout>
   );
