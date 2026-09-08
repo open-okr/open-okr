@@ -56,6 +56,16 @@ export const accounts = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * Which authority vouched for this account, added by Better Auth 1.7.
+     *
+     * It namespaces an account so a provider id cannot collide across
+     * authentication methods: `local:credential` for a password, and
+     * `local:oauth:<provider>` for a social login. Better Auth builds it
+     * itself and treats it as required, so a missing column stops
+     * registration and sign-in outright rather than degrading.
+     */
+    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     /** Hashed by Better Auth. Null for social and passkey accounts. */
@@ -77,7 +87,14 @@ export const accounts = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [unique().on(table.providerId, table.accountId)],
+  (table) => [
+    // Better Auth 1.7 identifies an account by issuer and account id. The
+    // older pair is kept until the release after this one: a rolling upgrade
+    // still has 1.6 nodes reading it, and PLAN.md 5.1 spans a removal over
+    // two releases for exactly that reason.
+    unique().on(table.issuer, table.accountId),
+    unique().on(table.providerId, table.accountId),
+  ],
 );
 
 export const verifications = pgTable("verifications", {
