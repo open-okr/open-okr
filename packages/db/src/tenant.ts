@@ -127,6 +127,22 @@ const DEVICE_CODE_HASH_SETTING = "app.device_code_hash";
  */
 const OAUTH_SECRET_HASH_SETTING = "app.oauth_secret_hash";
 
+/**
+ * Names one invitation token's hash, for accepting an invitation (P6-G06b).
+ *
+ * A visitor following `/join/<token>` has no session, no member row and no
+ * workspace, and which workspace they were invited to is the question rather
+ * than the context. `invite_links` admits a row through the ordinary tenant
+ * setting or through this one matching its own `token_hash`, so a caller
+ * reaches exactly the invitation whose token they already hold and learns
+ * nothing about any other, including whether it exists.
+ *
+ * The fifth pre-tenant key and the sixth table to use one. Migration 0010
+ * assumed the URL would carry the workspace slug and nothing ever built it
+ * that way; 0075 is where that assumption was corrected.
+ */
+const INVITE_TOKEN_HASH_SETTING = "app.invite_token_hash";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -163,6 +179,14 @@ export interface TenantContext {
    * the database.
    */
   readonly oauthSecretHash?: string;
+  /**
+   * Names one invitation token's hash, for accepting an invitation only
+   * (P6-G06b).
+   *
+   * Reveals exactly the `invite_links` row whose `token_hash` equals it, and
+   * nothing else in the database.
+   */
+  readonly inviteTokenHash?: string;
 }
 
 /**
@@ -228,6 +252,25 @@ export async function withDeviceCode<
  * The row it reaches is the one the caller already named by hash, and the
  * ordinary tenant setting is applied afterwards for the work itself.
  */
+/**
+ * Opens a transaction that can resolve one invitation token (P6-G06b).
+ *
+ * Use it to answer what a token is for and to accept it, and nothing else. The
+ * row it reaches is the one the caller already named by hash; the ordinary
+ * tenant setting is applied afterwards, for the provisioning the acceptance
+ * actually does.
+ */
+export async function withInviteToken<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  tokenHash: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { inviteTokenHash: tokenHash }, fn);
+}
+
 export async function withOAuthSecret<
   T,
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -281,6 +324,7 @@ export async function withContext<
     apiTokenHash,
     deviceCodeHash,
     oauthSecretHash,
+    inviteTokenHash,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -316,16 +360,25 @@ export async function withContext<
     );
   }
   if (
+    inviteTokenHash !== undefined &&
+    !/^[0-9a-f]{64}$/.test(inviteTokenHash)
+  ) {
+    throw new Error(
+      "Invalid invitation token hash: expected a SHA-256 hex digest.",
+    );
+  }
+  if (
     workspaceId === undefined &&
     userId === undefined &&
     channelTeamId === undefined &&
     apiTokenHash === undefined &&
     deviceCodeHash === undefined &&
     oauthSecretHash === undefined &&
+    inviteTokenHash === undefined &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, or instance admin.",
     );
   }
 
@@ -365,6 +418,11 @@ export async function withContext<
     if (oauthSecretHash !== undefined) {
       await tx.execute(
         sql`select set_config(${OAUTH_SECRET_HASH_SETTING}, ${oauthSecretHash}, true)`,
+      );
+    }
+    if (inviteTokenHash !== undefined) {
+      await tx.execute(
+        sql`select set_config(${INVITE_TOKEN_HASH_SETTING}, ${inviteTokenHash}, true)`,
       );
     }
     return fn(tx);
