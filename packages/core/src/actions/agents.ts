@@ -239,6 +239,75 @@ export const setAgentEnabled = defineWriteAction({
   }),
 });
 
+/**
+ * Moves an agent's write policy after it was created (P6-G13b).
+ *
+ * **`agents.create` took an autonomy and nothing could change it.** The column
+ * has held `sandbox`, `propose` and `scoped_direct` since P4-T05a, and the
+ * only way to move an agent between them was a database session, so the
+ * propose-and-approve default was in practice permanent and the sandbox was a
+ * one-way door. AI-NATIVE-PLAN §6 asks for the policy to be a decision an
+ * administrator makes and revisits.
+ *
+ * **Raising autonomy is an administrator's act and is audited as one.**
+ * CLAUDE.md puts "raising an agent's autonomy beyond the propose-and-approve
+ * default" on the ask-the-human list, which is about the product's own
+ * default, not about forbidding the control: what the rule needs is that the
+ * change is deliberate, recorded, and never something the product does on its
+ * own. The action is `full` and writes an audit row naming both the old policy
+ * and the new one, because "who widened this and from what" is the question
+ * asked after something has already been written.
+ */
+export const setAgentAutonomy = defineWriteAction({
+  name: "agents.setAutonomy",
+  summary: "Moves an agent between sandbox, propose and scoped direct.",
+  input: z.object({ id: z.uuid(), autonomy: z.enum(AGENT_AUTONOMIES) }),
+  output: z.object({ id: z.uuid(), autonomy: z.enum(AGENT_AUTONOMIES) }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [existing] = await tx
+        .select({ id: agents.id, autonomy: agents.autonomy })
+        .from(agents)
+        .where(
+          activeOnly(
+            agents,
+            eq(agents.id, input.id),
+            eq(agents.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!existing) {
+        throw new OperationError("not_found", "No such agent.");
+      }
+
+      // openokr:allow-mutation: this is the operation's own execute.
+      await tx
+        .update(agents)
+        .set({ autonomy: input.autonomy, updatedAt: new Date() })
+        .where(activeOnly(agents, eq(agents.id, existing.id)));
+
+      return {
+        result: { id: existing.id, autonomy: input.autonomy },
+        activity: {
+          kind: "agent.autonomy_changed",
+          subjectType: "workspace_member",
+          subjectId: existing.id,
+          payload: { from: existing.autonomy, to: input.autonomy },
+        },
+        audit: {
+          action: "agents.setAutonomy",
+          targetType: "workspace_member",
+          targetId: existing.id,
+          // Both ends, because the question asked afterwards is "who widened
+          // this, and from what".
+          payload: { from: existing.autonomy, to: input.autonomy },
+        },
+      };
+    },
+  }),
+});
+
 export const bindAgentScope = defineWriteAction({
   name: "agents.bindScope",
   summary:
@@ -275,6 +344,19 @@ export const bindAgentScope = defineWriteAction({
       return agent;
     },
     async execute({ tx, workspaceId, loaded }) {
+      // **The workspace context is not a binding target** (CLAUDE.md, least
+      // privilege, P6-G13b). The summary above has said "never workspace-wide"
+      // since P4-T05a and nothing enforced it: `resolveSubjectContext` resolves
+      // `workspace` like any other subject, so a caller passing that type got
+      // an agent with ambient authority over everything. The rule is that an
+      // agent gets bindings on named spaces, goals and KPI trees only.
+      if (input.resourceType === "workspace") {
+        throw new OperationError(
+          "forbidden",
+          "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
+        );
+      }
+
       const context = await resolveSubjectContext(
         tx,
         input.resourceType,

@@ -93,6 +93,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "blob.claimed": z.object({}).catchall(z.unknown()),
   /** A space set its own §4.14 settings (P6-G18b). */
   "space.settingsChanged": z.object({ name: z.string() }),
+  /** An agent's write policy was moved (P6-G13b). */
+  "agent.autonomy_changed": z.object({ from: z.string(), to: z.string() }),
   /** The orphan reap's own row, so the removal is accountable (P6-G01c). */
   "blob.reaped": z.object({
     discarded: z.number().int(),

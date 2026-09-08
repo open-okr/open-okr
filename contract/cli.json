@@ -2448,6 +2448,34 @@
       "pages": false
     },
     {
+      "name": "agents setAutonomy",
+      "action": "agents.setAutonomy",
+      "method": "POST",
+      "path": "/agents/setAutonomy",
+      "scope": "write",
+      "summary": "Moves an agent between sandbox, propose and scoped direct.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "autonomy",
+          "field": "autonomy",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "sandbox",
+            "propose",
+            "scoped_direct"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "agents setEnabled",
       "action": "agents.setEnabled",
       "method": "POST",

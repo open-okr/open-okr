@@ -25,6 +25,7 @@ import {
   readAgents,
   runChampion,
   runCoach,
+  setAgentAutonomy,
   setAgentEnabled,
   startAgentRun,
 } from "./agents.ts";
@@ -505,6 +506,7 @@ export const ACTION_MAP = {
   "ai.readUsageSummary": readUsageSummary,
   "agents.list": readAgents,
   "agents.create": createAgent,
+  "agents.setAutonomy": setAgentAutonomy,
   "agents.setEnabled": setAgentEnabled,
   "agents.bindScope": bindAgentScope,
   "agents.startRun": startAgentRun,

@@ -1,8 +1,10 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { AGENT_AUTONOMIES } from "@openokr/db";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { requireWorkspace } from "../../../lib/workspace";
+import { AgentPolicy } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
 import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
@@ -46,6 +48,20 @@ const SCHEDULE_LABEL: Record<string, string> = {
   daily: "Once a day",
   weekly: "Once a week",
 };
+
+/**
+ * The four access levels a scope binding may carry (P6-G13b).
+ *
+ * Built here rather than in the card, because a client component that imports
+ * `ACCESS_LEVELS` from `@openokr/core` pulls the database layer into its
+ * bundle and the build fails on `dns` and `fs`.
+ */
+const BINDING_LEVELS = [
+  { value: ACCESS_LEVELS.view, label: "view" },
+  { value: ACCESS_LEVELS.comment, label: "comment" },
+  { value: ACCESS_LEVELS.edit, label: "edit" },
+  { value: ACCESS_LEVELS.full, label: "full" },
+];
 
 export default async function AgentsPage() {
   const { session, workspace } = await requireWorkspace();
@@ -152,6 +168,14 @@ export default async function AgentsPage() {
                   {agent.persona === "" ? null : (
                     <span className="text-xs text-ink-3">{agent.persona}</span>
                   )}
+                  {/* The write policy and the scope binder (P6-G13b). */}
+                  <AgentPolicy
+                    agentId={agent.id}
+                    autonomy={agent.autonomy}
+                    name={agent.name}
+                    autonomies={[...AGENT_AUTONOMIES]}
+                    levels={BINDING_LEVELS}
+                  />
                 </li>
               ))}
             </ul>

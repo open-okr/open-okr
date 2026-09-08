@@ -1,6 +1,6 @@
 "use server";
 
-import { callAction } from "@openokr/core";
+import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
@@ -155,4 +155,81 @@ export async function dismissProposalsAction(
   );
   revalidatePath("/admin/agents");
   return { dismissed: result.dismissed.length };
+}
+
+/**
+ * Moving an agent's write policy (P6-G13b).
+ *
+ * `agents.create` took an autonomy and nothing could change it afterwards, so
+ * the propose-and-approve default was in practice permanent and the sandbox a
+ * one-way door.
+ *
+ * The refusal is returned rather than thrown, because widening an agent is
+ * exactly the change somebody should see the reason for.
+ */
+export async function setAgentAutonomyAction(
+  id: string,
+  autonomy: "sandbox" | "propose" | "scoped_direct",
+): Promise<{ error: string | null }> {
+  const { session, workspace } = await requireWorkspace();
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "agents.setAutonomy",
+      { id, autonomy },
+    );
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/admin/agents");
+  return { error: null };
+}
+
+/**
+ * Binding an agent to one named resource (P6-G13b).
+ *
+ * **Never the workspace**, which the action refuses and the picker does not
+ * offer. Two layers for one rule, because CLAUDE.md's own wording is that
+ * there is no service account with ambient authority: an interface that
+ * merely omits the option is an interface, and the rule needs an answer for a
+ * caller that does not use one.
+ */
+export async function bindAgentScopeAction(input: {
+  agentId: string;
+  resourceType: string;
+  resourceId: string;
+  level: number;
+}): Promise<{ error: string | null }> {
+  const { session, workspace } = await requireWorkspace();
+  if (input.resourceType === "workspace") {
+    return {
+      error:
+        "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
+    };
+  }
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "agents.bindScope",
+      input,
+    );
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/admin/agents");
+  return { error: null };
 }

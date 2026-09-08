@@ -55,6 +55,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "blob.claimed": () => "A file was uploaded",
   "space.settingsChanged": (payload) =>
     `${(payload as { name: string }).name} changed its own settings`,
+  "agent.autonomy_changed": (payload) => {
+    const { from, to } = payload as { from: string; to: string };
+    const words = (value: string) => value.replace(/_/g, " ");
+    return `An agent moved from ${words(from)} to ${words(to)}`;
+  },
   "blob.reaped": (payload) => {
     const { discarded, bytesLeft } = payload as {
       discarded: number;

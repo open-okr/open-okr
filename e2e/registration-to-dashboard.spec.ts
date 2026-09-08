@@ -144,12 +144,16 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
     .filter({ hasText: "OKR Champion" });
   await expect(champion).toHaveCount(1);
   await expect(champion.getByText("On the hour")).toBeVisible();
-  await expect(champion.getByText("propose")).toBeVisible();
+  // **Exact, so it means the chip.** P6-G13b put a "Propose" button in each
+  // row, and `getByText` is case-insensitive by default, so the bare match
+  // resolved to two elements and Playwright refused it under strict mode. The
+  // chip is lower case and the button is not, which `exact` distinguishes.
+  await expect(champion.getByText("propose", { exact: true })).toBeVisible();
 
   const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
-  await expect(coach.getByText("propose")).toBeVisible();
+  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
 
   // Nothing schedules a run on this instance, and the page says so rather
   // than showing an empty list that reads like a bug.
@@ -176,6 +180,54 @@ test("an administrator can run an agent, and the page says whether it can draft"
   // button: a run happened because somebody asked for one.
   await expect(page.getByText(/No run yet/)).toBeHidden({ timeout: 15_000 });
   await expect(page.getByText("schedule.quality")).toBeVisible();
+});
+
+test("an agent's write policy can be moved, and the workspace cannot be bound", async () => {
+  // P6-G13b. `agents.create` took an autonomy and nothing could change it, so
+  // the propose-and-approve default was in practice permanent and the sandbox
+  // a one-way door.
+  await page.goto("/admin/agents");
+
+  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
+
+  // Into the sandbox, which commits nothing at all. Chosen rather than
+  // scoped direct because widening asks for a confirmation and this test is
+  // about the move, not about the dialog.
+  await coach.getByTestId("autonomy-sandbox").click();
+  await expect(coach.getByText("commits nothing at all")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.goto("/admin/agents");
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "OKR Coach" })
+      .getByText("sandbox", { exact: true }),
+  ).toBeVisible();
+
+  // The binder offers named things and not the workspace. CLAUDE.md's rule is
+  // that there is no service account with authority over everything, and the
+  // action refuses it too; this is the half a browser can see.
+  const restored = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await restored.getByRole("button", { name: "Bind a scope" }).click();
+  const kinds = restored.locator("select[name='resourceType'] option");
+  await expect(kinds).toHaveText(["Space", "Goal", "KPI tree"]);
+
+  // Put back, so every spec after this one meets the agent it expects.
+  await page.goto("/admin/agents");
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "OKR Coach" })
+    .getByTestId("autonomy-propose")
+    .click();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "OKR Coach" })
+      .getByText("into the review queue"),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("registration is closed once the instance has been claimed", async () => {
