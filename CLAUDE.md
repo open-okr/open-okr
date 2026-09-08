@@ -235,6 +235,25 @@ Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
 - `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs a Postgres, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs. **Docker is not required.** `pnpm db:up` is the easy way to get the Postgres, and `TEST_DB_PORT` points the suite at one you already run, exactly as it does for the unit suites: `TEST_DB_PORT=5432 pnpm build && TEST_DB_PORT=5432 pnpm test:e2e`. This line said `pnpm db:up` outright for eight tasks, and four end-to-end defects reached continuous integration behind the belief that the suite could not be run locally
+
+  **Warm the traced symlinks after a build, or the first run times out.** On
+  Windows `start-server.sh` rewrites about eighty traced pnpm links as
+  junctions before the server binds, inside Playwright's readiness window, and
+  it does it for both servers. After a fresh `pnpm build` that first start
+  can exceed the 240-second timeout, which reads as flakiness and is not:
+  `playwright.config.ts` says so in its own comment. Running the repair once
+  first moves the work out of the window and costs a quarter of a second when
+  there is nothing to do:
+
+  ```
+  TEST_DB_PORT=5432 pnpm build
+  node --experimental-strip-types --no-warnings     e2e/repair-standalone-links.ts apps/web/.next/standalone/node_modules
+  TEST_DB_PORT=5432 pnpm test:e2e
+  ```
+
+  Measured on 8 September 2026: without it, two consecutive attempts timed out
+  after four minutes each and the retry passed; with it, the suite ran clean
+  first time. That is roughly six minutes back on every batch
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - **`pnpm test` and `pnpm build` at the root honour `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT`, `TEST_MYSQL_PORT`, `TEST_MYSQL_HOST`, `TEST_MYSQL_USER`, `TEST_MYSQL_PASSWORD`, `TEST_DB_HOST` and `DATABASE_URL`** through `passThroughEnv` in `turbo.json`. The same two port variables now also drive the compose stack itself, so the database and the suite move together, and continuous integration gives each job its own pair. Without that entry Turbo filters them out and the harness looks for the Docker stack on port 55432, which fails with `ECONNREFUSED` after running two of its ten tasks. Add any new variable a test needs to that list, or the root command will quietly not see it
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes

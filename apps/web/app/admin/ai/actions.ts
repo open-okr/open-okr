@@ -16,7 +16,13 @@
  * is told why.
  */
 import { callAction, OperationError } from "@openokr/core";
-import type { AIProviderKind, ModelTier } from "@openokr/db";
+import type {
+  AIProviderKind,
+  BudgetMetric,
+  BudgetPeriod,
+  BudgetScope,
+  ModelTier,
+} from "@openokr/db";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
@@ -220,4 +226,95 @@ export async function clearTier(
     return { ok: false, message: reason(error) };
   }
   return done("Back to the seeded default.");
+}
+
+export async function saveFeature(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  const tier = String(form.get("tierOverride") ?? "").trim();
+  try {
+    await callAction(await context(), "ai.updateFeatureSetting", {
+      featureKey: String(form.get("featureKey") ?? ""),
+      enabled: form.get("enabled") !== null,
+      // Empty means "follow whatever the assist asks for", which is null
+      // rather than a tier chosen on the reader's behalf.
+      tierOverride: tier === "" ? null : (tier as Tier),
+    });
+  } catch (error) {
+    return { ok: false, message: reason(error) };
+  }
+  return done("Saved.");
+}
+
+/**
+ * Records a new version of one prompt.
+ *
+ * Versioned rather than overwritten, which is what makes the restore below
+ * possible: `ai_prompts` keeps every version a workspace has written and the
+ * built-in text lives in code, so "restore to default" is removing the
+ * overrides rather than writing a special row.
+ */
+export async function savePrompt(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  try {
+    const updated = await callAction(await context(), "ai.updatePrompt", {
+      promptKey: String(form.get("promptKey") ?? ""),
+      systemPrompt: String(form.get("systemPrompt") ?? ""),
+    });
+    return done(`Saved as version ${updated.version}.`);
+  } catch (error) {
+    return { ok: false, message: reason(error) };
+  }
+}
+
+export async function restoreDefaultPrompt(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  try {
+    await callAction(await context(), "ai.restorePrompt", {
+      promptKey: String(form.get("promptKey") ?? ""),
+    });
+  } catch (error) {
+    return { ok: false, message: reason(error) };
+  }
+  return done("Back to the built-in prompt.");
+}
+
+export async function saveBudget(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  const scopeRef = String(form.get("scopeRef") ?? "").trim();
+  try {
+    await callAction(await context(), "ai.setBudget", {
+      scope: String(form.get("scope") ?? "workspace") as BudgetScope,
+      // Workspace-wide budgets name nothing; a per-user or per-agent one
+      // names the one it bounds.
+      scopeRef: scopeRef === "" ? null : scopeRef,
+      metric: String(form.get("metric") ?? "cost") as BudgetMetric,
+      period: String(form.get("period") ?? "month") as BudgetPeriod,
+      limitValue: Number(form.get("limitValue") ?? 0),
+    });
+  } catch (error) {
+    return { ok: false, message: reason(error) };
+  }
+  return done("Set.");
+}
+
+export async function removeBudget(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
+  try {
+    await callAction(await context(), "ai.removeBudget", {
+      id: String(form.get("id") ?? ""),
+    });
+  } catch (error) {
+    return { ok: false, message: reason(error) };
+  }
+  return done("Removed.");
 }

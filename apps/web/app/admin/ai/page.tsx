@@ -1,4 +1,4 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, knownPromptKeys } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -16,6 +16,13 @@ import {
   saveWorkspaceKey,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
+import {
+  BudgetsCard,
+  FeaturesCard,
+  PrivacyCard,
+  PromptsCard,
+  UsageCard,
+} from "./governance.tsx";
 
 /**
  * The AI console: provider, keys and models (UIUX-PLAN.md §6 S-37, P6-G12a).
@@ -59,6 +66,14 @@ const PROVIDER_WORDS: Readonly<Record<string, string>> = {
   ollama: "Ollama",
   "openai-compatible": "OpenAI-compatible",
 };
+
+/**
+ * How far back the spend figures look.
+ *
+ * Thirty days, which is what a monthly budget is measured against and the
+ * shortest window that shows a trend rather than a morning.
+ */
+const USAGE_WINDOW_DAYS = 30;
 
 const STATUS_TONE: Readonly<Record<string, "ok" | "bad" | "warn">> = {
   verified: "ok",
@@ -104,11 +119,24 @@ export default async function AdminAIPage() {
     ring: getKeyRing(),
   };
 
-  const [providers, models, routes] = await Promise.all([
-    callAction(context, "ai.readProviderConfig", {}),
-    callAction(context, "ai.readModelCatalog", {}),
-    callAction(context, "ai.readTierRouting", {}),
-  ]);
+  const since = new Date(
+    Date.now() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const [providers, models, routes, features, budgets, usage, prompts] =
+    await Promise.all([
+      callAction(context, "ai.readProviderConfig", {}),
+      callAction(context, "ai.readModelCatalog", {}),
+      callAction(context, "ai.readTierRouting", {}),
+      callAction(context, "ai.readFeatureSettings", {}),
+      callAction(context, "ai.readBudgets", {}),
+      callAction(context, "ai.readUsageSummary", { since }),
+      Promise.all(
+        knownPromptKeys().map((promptKey) =>
+          callAction(context, "ai.readPrompt", { promptKey }),
+        ),
+      ),
+    ]);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
 
@@ -528,6 +556,16 @@ export default async function AdminAIPage() {
           ))}
         </CardBody>
       </Card>
+
+      {/* The second half of S-37 (P6-G12b): what it costs, what it is allowed
+          to cost, which assists are on, and what the prompts say. Its cards
+          live in `governance.tsx` because the console is one screen and one
+          file for it was getting long, not because it is a second screen. */}
+      <UsageCard usage={usage} days={USAGE_WINDOW_DAYS} />
+      <BudgetsCard budgets={budgets} />
+      <FeaturesCard features={features} />
+      <PromptsCard prompts={prompts} />
+      <PrivacyCard />
     </div>
   );
 }

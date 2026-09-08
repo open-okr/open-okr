@@ -25,9 +25,13 @@ const CONSOLE = fileURLToPath(
 const PAGE = fileURLToPath(
   new URL("../app/admin/ai/page.tsx", import.meta.url),
 );
+const GOVERNANCE = fileURLToPath(
+  new URL("../app/admin/ai/governance.tsx", import.meta.url),
+);
 
 const actionsSource = readFileSync(CONSOLE, "utf8");
 const pageSource = readFileSync(PAGE, "utf8");
+const governanceSource = readFileSync(GOVERNANCE, "utf8");
 
 describe("the AI console", () => {
   test("is in the admin navigation", () => {
@@ -87,5 +91,81 @@ describe("the AI console", () => {
     // the product has AI, and that nothing they need is waiting on it.
     expect(pageSource).toContain("ACCESS_LEVELS.full");
     expect(pageSource).toMatch(/works with AI off/);
+  });
+});
+
+describe("the AI console's second half (P6-G12b)", () => {
+  test("calls every feature, prompt, budget and usage action", () => {
+    const owned = [
+      "ai.readFeatureSettings",
+      "ai.updateFeatureSetting",
+      "ai.readPrompt",
+      "ai.updatePrompt",
+      "ai.restorePrompt",
+      "ai.readBudgets",
+      "ai.setBudget",
+      "ai.removeBudget",
+      "ai.readUsageSummary",
+    ];
+    const all = `${actionsSource}${pageSource}${governanceSource}`;
+    const missing = owned.filter((name) => !all.includes(name));
+    expect(missing).toEqual([]);
+  });
+
+  test("switches every assist the three key maps declare", async () => {
+    // Enumerated from the maps rather than written out, so an assist added
+    // next month gets a switch without anybody remembering this screen. The
+    // card builds its list the same way, which is what this asserts.
+    const { ASSIST_FEATURE_KEYS, REVIEW_ASSIST_KEYS, RHYTHM_ASSIST_KEYS } =
+      await import("@openokr/core");
+    const declared = [
+      ...Object.values(ASSIST_FEATURE_KEYS),
+      ...Object.values(REVIEW_ASSIST_KEYS),
+      ...Object.values(RHYTHM_ASSIST_KEYS),
+    ];
+    expect(declared.length).toBeGreaterThan(10);
+    for (const source of [
+      "ASSIST_FEATURE_KEYS",
+      "REVIEW_ASSIST_KEYS",
+      "RHYTHM_ASSIST_KEYS",
+    ]) {
+      expect(governanceSource, `${source} is not read`).toContain(source);
+    }
+  });
+
+  test("says a budget disables rather than breaks", () => {
+    // The product's own promise: crossing a cap stops the AI call and leaves
+    // every deterministic path untouched. A screen that implied otherwise
+    // would make an administrator afraid to set one.
+    expect(governanceSource).toMatch(/deterministic path/);
+    expect(governanceSource).toMatch(/halts with the reason/);
+  });
+
+  test("builds its budget choices from the schema, not from a copy", async () => {
+    // **This asserted the wrong thing first, and the card was right.** It
+    // looked for the literal "tokens" in the source, which only appears if
+    // somebody hand-copies the metric list; the card maps over
+    // `BUDGET_METRICS` instead, so the literal is correctly absent. A test
+    // that fails when the code does the right thing is worse than no test.
+    //
+    // What matters is that the three lists are read rather than restated, the
+    // same property the assist-keys test above checks.
+    const { BUDGET_SCOPES, BUDGET_METRICS, BUDGET_PERIODS } = await import(
+      "@openokr/db"
+    );
+    expect(
+      BUDGET_SCOPES.length + BUDGET_METRICS.length + BUDGET_PERIODS.length,
+    ).toBeGreaterThan(5);
+    for (const name of ["BUDGET_SCOPES", "BUDGET_METRICS", "BUDGET_PERIODS"]) {
+      expect(governanceSource, `${name} is not read`).toContain(
+        `{${name}.map(`,
+      );
+    }
+  });
+
+  test("reads every prompt the package ships a default for", () => {
+    // `knownPromptKeys` rather than a list here: the editor should grow with
+    // the catalogue, and a hard-coded pair would silently stop covering it.
+    expect(pageSource).toContain("knownPromptKeys()");
   });
 });
