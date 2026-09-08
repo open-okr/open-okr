@@ -81,7 +81,7 @@ catalog:
   # design-system deps. Every @tiptap/* package in v3 peer-pins its
   # siblings to the exact same version string, not a range, so all four
   # pin identically rather than each getting its own `^` range.
-  "@tiptap/core": 3.29.2
+  "@tiptap/core": 3.30.4
   "@tiptap/pm": 3.30.1
   "@tiptap/react": 3.29.2
   "@tiptap/starter-kit": 3.29.2
