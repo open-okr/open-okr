@@ -254,6 +254,38 @@ test("acceptance criterion: second context sees stage advance without reload", a
 });
 
 // ---------------------------------------------------------------------------
+// Step 5a: The diagnose stage's blockers (P6-G19b)
+// ---------------------------------------------------------------------------
+
+/**
+ * §7.2 step 2, which rendered nothing at all before P6-G19b.
+ *
+ * The rail is at "Diagnose what is low" when this starts, left there by the
+ * test above.
+ *
+ * **The raise is not exercised end to end here, and the fixture is why.** This
+ * spec inserts its session with no `cycle_id`, deliberately: a session inside
+ * a cycle puts every key result under the confidence gate and the rail walk
+ * below could not finish. No cycle means no key results, and a blocker names
+ * one. Raising, resolving and reassigning are covered against a real database
+ * in `packages/core/test/sessions.test.ts`. What is proved here is that the
+ * stage has a surface and offers the canon's taxonomy.
+ */
+test("the diagnose stage offers the blocker controls", async () => {
+  await page.goto(`/session/${sessionId}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(page.getByRole("heading", { name: "Blockers" })).toBeVisible();
+  await expect(page.getByText("Nothing raised in this session yet")).toBeVisible();
+
+  // §6.2's five types, from the method package rather than from a list typed
+  // into the component.
+  const types = page.locator("select[name='type'] option");
+  await expect(types).toHaveCount(6); // the five, plus "What kind"
+  await expect(page.getByRole("button", { name: "Raise a blocker" })).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
 // Step 5b: The commitment stage (P6-G19a)
 // ---------------------------------------------------------------------------
 
@@ -381,4 +413,44 @@ test("facilitator advances through remaining stages and closes", async () => {
 
   await expect(page.getByRole("button", { name: "Start session" })).not.toBeVisible();
   await expect(closeBtn).not.toBeVisible();
+});
+
+/**
+ * The trend, the streak and the blockers (P6-G19b).
+ *
+ * Runs after the close, so the space has exactly one closed week behind it:
+ * one trend point, and a streak of one. A twelve-point trend would need
+ * twelve weeks of history the suite has no way to make honestly.
+ */
+test("the weekly figures read the tables the placeholder used to name", async () => {
+  await page.goto(`/session/${sessionId}`);
+  await page.waitForLoadState("networkidle");
+
+  await expect(
+    page.getByRole("heading", { name: "Confidence trend" }),
+  ).toBeVisible();
+  await expect(page.getByText("week streak")).toBeVisible();
+
+  // One closed week, and the copy says so rather than drawing eleven empty
+  // columns beside it.
+  await expect(page.getByText("One week so far.")).toBeVisible();
+
+  // The sentence that stood in for all of this is gone.
+  await expect(page.getByText("arrive at P6-G19")).toHaveCount(0);
+});
+
+test("the coordinator's note reaches the digest once the session is closed", async () => {
+  const note = "Hiring is the constraint, not the roadmap.";
+  await expect(
+    page.getByRole("heading", { name: "The coordinator's note" }),
+  ).toBeVisible();
+
+  await page.locator("textarea[name='note']").fill(note);
+  await page.getByRole("button", { name: "Add the note" }).click();
+
+  // Written, and read back: the form now offers to replace it, which it can
+  // only know from the digest read carrying the note.
+  await expect(
+    page.getByRole("button", { name: "Replace the note" }),
+  ).toBeVisible({ timeout: 10_000 });
 });

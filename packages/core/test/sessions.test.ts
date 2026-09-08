@@ -1167,3 +1167,92 @@ describe("sessions.carriedCommitments (P6-G19a)", () => {
     ).rejects.toThrow(/no such session/i);
   });
 });
+
+/** Runs a whole weekly session and closes it, which writes the digest. */
+async function holdAWeek(confidence: number): Promise<string> {
+  const wb = await workerDb();
+  const sessionId = await openSessionAtConfidence();
+  await advanceToCommitments(sessionId, confidence);
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.setCommitments",
+    {
+      sessionId,
+      items: [
+        { text: "One", ownerId: facilitatorMemberId },
+        { text: "Two", ownerId: memberMemberId },
+      ],
+    },
+  );
+  await callAction(
+    { pool: wb.appPool, ...context() },
+    "sessions.advanceStage",
+    { id: sessionId },
+  );
+  await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+    id: sessionId,
+  });
+  return sessionId;
+}
+
+describe("sessions.confidenceTrend (P6-G19b)", () => {
+  it("answers nothing before a week has closed", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await openSessionAtConfidence();
+
+    const trend = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    );
+    // Not a row of zeroes. A space that has never closed a week has no trend,
+    // and drawing twelve empty columns would say something untrue about it.
+    expect(trend).toEqual([]);
+  });
+
+  it("takes the figure from the digest the room read, not a second sum", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdAWeek(0.6);
+
+    const trend = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    )) as Array<{ weekStart: string; average: number }>;
+
+    expect(trend).toHaveLength(1);
+    expect(trend[0]?.average).toBeCloseTo(0.6, 5);
+  });
+});
+
+describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
+  it("returns what setCoordinatorNote wrote", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    // **After the close.** The note is written onto the digest row and
+    // `sessions.close` is what creates it, so a note added on step 4 is
+    // refused with "No digest exists for this session yet". That is why the
+    // form sits after the close on the screen rather than on the stage §7.2
+    // names, and this test is where that was found.
+    const sessionId = await holdAWeek(0.6);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCoordinatorNote",
+      { sessionId, note: "Hiring is the constraint, not the roadmap." },
+    );
+
+    const digest = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.digest",
+      { sessionId },
+    )) as { note: string | null } | null;
+
+    // The digest builder has rendered this line since P4-T15b and the read did
+    // not return it, so a surface could show the note it had just written only
+    // by reloading somebody else's page.
+    expect(digest?.note).toBe("Hiring is the constraint, not the roadmap.");
+  });
+});

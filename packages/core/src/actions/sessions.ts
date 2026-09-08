@@ -2469,6 +2469,73 @@ export const carriedCommitments = defineReadAction({
   },
 });
 
+/**
+ * A space's weekly confidence, one point per held session (P6-G19b).
+ *
+ * **Read from the digests, because that is where the figure already lives.**
+ * `sessions.close` writes the week's average confidence into the digest body,
+ * so a trend is those rows in order rather than a second computation over the
+ * confidence table that could disagree with the digest the room read.
+ *
+ * **Twelve weeks is the window, and a shorter history is drawn short.** A
+ * space four weeks old has four points. Padding to twelve with zeroes would
+ * draw a collapse that never happened.
+ */
+export const confidenceTrend = defineReadAction({
+  name: "sessions.confidenceTrend",
+  summary: "A space's weekly average confidence, oldest first.",
+  input: z.object({
+    spaceId: z.uuid(),
+    /** How many weeks back. §7.2's trend is twelve. */
+    weeks: z.number().int().min(1).max(52).default(12),
+  }),
+  output: z.array(
+    z.object({
+      weekStart: z.string(),
+      /** 0 to 1, in §3.2's scale. */
+      average: z.number(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<Array<{ weekStart: string; average: number }>> {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const rows = await tx
+          .select({
+            periodStart: digests.periodStart,
+            body: digests.body,
+          })
+          .from(digests)
+          .where(
+            activeOnly(
+              digests,
+              eq(digests.workspaceId, context.workspaceId),
+              eq(digests.scope, "space"),
+              eq(digests.scopeId, input.spaceId),
+              eq(digests.period, "weekly"),
+            ),
+          )
+          .orderBy(desc(digests.periodStart))
+          .limit(input.weeks);
+
+        return rows
+          .filter((row) => typeof row.body.averageConfidence === "number")
+          .map((row) => ({
+            weekStart: row.periodStart,
+            average: row.body.averageConfidence as number,
+          }))
+          .reverse();
+      },
+    );
+  },
+});
+
 export const setCoordinatorNote = defineWriteAction({
   name: "sessions.setCoordinatorNote",
   summary: "Adds the coordinator's note to the session digest.",

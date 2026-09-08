@@ -7688,6 +7688,29 @@
       "pages": false
     },
     {
+      "name": "sessions confidenceTrend",
+      "action": "sessions.confidenceTrend",
+      "method": "GET",
+      "path": "/sessions/confidenceTrend",
+      "scope": "read",
+      "summary": "A space's weekly average confidence, oldest first.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "weeks",
+          "field": "weeks",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions listCommitments",
       "action": "sessions.listCommitments",
       "method": "GET",

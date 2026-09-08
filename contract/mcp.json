@@ -10542,6 +10542,38 @@
       }
     },
     {
+      "name": "sessions.confidenceTrend",
+      "description": "A space's weekly average confidence, oldest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "weeks": {
+            "default": 12,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "sessions.listCommitments",
       "description": "Commitments for a session.",
       "inputSchema": {

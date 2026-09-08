@@ -40,8 +40,10 @@ import {
   skipSessionAction,
 } from "./actions";
 import { AdvanceControl } from "./advance-control.tsx";
+import { BlockerPanel } from "./blocker-panel.tsx";
 import { Commitments } from "./commitments.tsx";
 import { ConfidenceRound } from "./confidence-round";
+import { CoordinatorNote } from "./coordinator-note.tsx";
 import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
 import { Digest } from "./digest";
 import { type Forward, ForwardPanel } from "./forward";
@@ -64,6 +66,7 @@ import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
+import { WeeklyFigures } from "./weekly-panels.tsx";
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;
@@ -128,6 +131,95 @@ export default async function SessionPage({ params }: SessionPageProps) {
     } catch {
       // No KRs in this space's cycle, or action not available.
     }
+  }
+
+  // The weekly figures (P6-G19b). Loaded for every weekly session, running or
+  // not: "how have we been doing" is the question a facilitator asks before
+  // opening one as much as during it.
+  const TREND_WEEKS = 12;
+  let weeklyFigures: {
+    trend: Array<{ weekStart: string; average: number }>;
+    streakWeeks: number;
+    thresholds: ResolvedThresholds;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.spaceId) {
+    const [trend, streak, rhythm] = await Promise.all([
+      callAction(context, "sessions.confidenceTrend", {
+        spaceId: sessionRow.spaceId,
+        weeks: TREND_WEEKS,
+      }),
+      callAction(context, "sessions.readStreak", {
+        spaceId: sessionRow.spaceId,
+      }),
+      callAction(context, "rhythm.read", {}),
+    ]);
+    weeklyFigures = {
+      trend: [...trend],
+      streakWeeks: streak.currentWeeks,
+      thresholds: rhythm.thresholds as unknown as ResolvedThresholds,
+    };
+  }
+
+  // §7.2 step 2's blockers, on their own stage (P6-G19b).
+  let diagnoseStage: {
+    blockers: Array<{
+      id: string;
+      type: string;
+      keyResultTitle: string | null;
+      ownerName: string;
+      nextAction: string;
+      hoursOpen: number;
+      overdue: boolean;
+      resolved: boolean;
+    }>;
+    owners: Array<{ id: string; label: string }>;
+    keyResults: Array<{ id: string; label: string }>;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.stageKey === "diagnose") {
+    const raised = await callAction(context, "sessions.blockerStatus", {
+      sessionId: id,
+    });
+    const cycleGoals =
+      sessionRow.spaceId && sessionRow.cycleId
+        ? (
+            await callAction(context, "goals.list", {
+              cycleId: sessionRow.cycleId,
+              spaceId: sessionRow.spaceId,
+              includeClosed: false,
+            })
+          ).goals
+        : [];
+    const titles = new Map<string, string>();
+    for (const goal of cycleGoals) {
+      for (const keyResult of goal.keyResults) {
+        titles.set(keyResult.id, keyResult.title);
+      }
+    }
+    const names = new Map(participants.map((one) => [one.memberId, one.name]));
+    diagnoseStage = {
+      blockers: raised.map((blocker) => ({
+        id: blocker.id,
+        type: blocker.type,
+        keyResultTitle: blocker.keyResultId
+          ? (titles.get(blocker.keyResultId) ?? null)
+          : null,
+        // An owner who has left the room since is reported rather than blanked.
+        ownerName:
+          names.get(blocker.ownerId) ?? "Someone no longer in this session",
+        nextAction: blocker.nextAction,
+        hoursOpen: blocker.hoursOpen,
+        overdue: blocker.overdue,
+        resolved: blocker.resolvedAt !== null,
+      })),
+      owners: participants.map((one) => ({
+        id: one.memberId,
+        label: one.name,
+      })),
+      keyResults: [...titles].map(([keyResultId, title]) => ({
+        id: keyResultId,
+        label: title,
+      })),
+    };
   }
 
   // §7.2 step 3 (P6-G19a). Loaded only on its own stage, like the confidence
@@ -223,12 +315,29 @@ export default async function SessionPage({ params }: SessionPageProps) {
 
   // The weekly digest (P4-T15b-a). Deterministic, so it loads with the page and
   // needs no provider; null before step 4 has produced one.
-  let weeklyDigest: { weekStart: string; lines: string[] } | null = null;
+  /**
+   * **The shape is named rather than written inline.**
+   *
+   * This was `let weeklyDigest: {...} | null = null` assigned with
+   * `as typeof weeklyDigest`, and `typeof` a `let` reads the type narrowed at
+   * that point, which is `null` immediately after the initialiser. The cast
+   * therefore said "null", the variable stayed `null` for the whole render as
+   * far as the compiler was concerned, and nothing caught it because the one
+   * place it was read accepts null. Found at P6-G19b, when a second reader
+   * asked for a field.
+   */
+  interface WeeklyDigestRead {
+    weekStart: string;
+    lines: string[];
+    /** What the coordinator added for leadership (P6-G19b). */
+    note: string | null;
+  }
+  let weeklyDigest: WeeklyDigestRead | null = null;
   let digestAssistAvailable = false;
   if (sessionRow.kind === "weekly") {
     weeklyDigest = (await callAction(context, "sessions.digest", {
       sessionId: id,
-    })) as typeof weeklyDigest;
+    })) as WeeklyDigestRead | null;
     const { drafterFor } = await import("../../../lib/drafter");
     digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
   }
@@ -589,6 +698,36 @@ export default async function SessionPage({ params }: SessionPageProps) {
         />
       )}
 
+      {weeklyFigures && (
+        <WeeklyFigures
+          trend={weeklyFigures.trend}
+          streakWeeks={weeklyFigures.streakWeeks}
+          weeks={TREND_WEEKS}
+          thresholds={weeklyFigures.thresholds}
+        />
+      )}
+
+      {isRunning && diagnoseStage && (
+        <BlockerPanel
+          sessionId={id}
+          blockers={diagnoseStage.blockers}
+          owners={diagnoseStage.owners}
+          keyResults={diagnoseStage.keyResults}
+          canWrite={isFacilitator}
+        />
+      )}
+
+      {/* **After the close, not on the digest stage.**
+          `sessions.setCoordinatorNote` writes onto the digest row, and
+          `sessions.close` is what creates it, so the same form on step 4
+          refused every press with "No digest exists for this session yet".
+          Found by the test that asserted the note came back. */}
+      {sessionRow.state === "closed" &&
+        isFacilitator &&
+        weeklyDigest !== null && (
+          <CoordinatorNote sessionId={id} note={weeklyDigest.note} />
+        )}
+
       {isRunning &&
         sessionRow.stageKey === "commitments" &&
         commitmentStage && (
@@ -803,18 +942,6 @@ export default async function SessionPage({ params }: SessionPageProps) {
             </ul>
           </CardBody>
         </Card>
-      )}
-
-      {/* The tables exist; the panels that read them do not yet. The line said
-          "appear once their tables exist" from P4-T07 until the gap audit of
-          7 September 2026 found all three tables shipped and the sentence still
-          standing, which is the kind of claim that stops anybody looking. */}
-      {isRunning && !isMonthly && !isQuarterly && (
-        <p className="text-xs text-ink-3">
-          The confidence trend, the open blockers with their ages and the streak
-          ribbon arrive at P6-G19b. Their tables are already here. The
-          commitment stage landed at P6-G19a and is on step 3.
-        </p>
       )}
     </div>
   );
