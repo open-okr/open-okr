@@ -405,3 +405,72 @@ async function addOtherMember(): Promise<string> {
   }
   return row.id;
 }
+
+describe("subscriptions.read (P6-G07b)", () => {
+  const SUBJECT = "77777777-7777-4777-8777-777777777777";
+
+  const read = async () =>
+    callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "subscriptions.read",
+      { subjectType: "blob", subjectId: SUBJECT },
+    );
+
+  const toggle = async (subscribe: boolean) =>
+    callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "subscriptions.toggle",
+      { subjectType: "blob", subjectId: SUBJECT, subscribe },
+    );
+
+  it("answers 'not watching' for a subject nobody has ever watched", async () => {
+    await grantOnNewBlob(ownerMemberId, SUBJECT);
+    // No list exists, which is not a missing row to repair: it means nobody
+    // has ever subscribed, and that is a complete answer. The control could
+    // not be built without one, because `subscriptions.toggle` alone can only
+    // guess its own state.
+    expect(await read()).toEqual({
+      watching: false,
+      reason: null,
+      watchers: 0,
+      everyone: false,
+    });
+  });
+
+  it("reports the watch, the reason and the count once one exists", async () => {
+    await grantOnNewBlob(ownerMemberId, SUBJECT);
+    await toggle(true);
+
+    const state = await read();
+    expect(state.watching).toBe(true);
+    expect(state.watchers).toBe(1);
+    // The reason is the half worth reading: a member added because they were
+    // mentioned chose to be there, and one added by their role did not.
+    expect(state.reason).not.toBeNull();
+  });
+
+  it("stops reporting a watch once it is turned off", async () => {
+    await grantOnNewBlob(ownerMemberId, SUBJECT);
+    await toggle(true);
+    await toggle(false);
+
+    const state = await read();
+    expect(state.watching).toBe(false);
+    expect(state.reason).toBeNull();
+  });
+
+  it("refuses a subject the reader may not see", async () => {
+    // No grant on this blob, so the reader has no access to it. Not-found,
+    // never "watching: false", which would confirm the subject exists.
+    await expect(
+      callAction(
+        { pool: await pool(), ...context(OWNER) },
+        "subscriptions.read",
+        {
+          subjectType: "blob",
+          subjectId: "88888888-8888-4888-8888-888888888888",
+        },
+      ),
+    ).rejects.toThrow(/no such subject/i);
+  });
+});

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { publishDocumentAction, updateDocumentAction } from "../actions.ts";
 import { DocumentEditor } from "../document-editor.tsx";
@@ -45,6 +46,14 @@ export default async function DocumentPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const { id } = await params;
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "document",
+    subjectId: id,
+  });
 
   const document = await callAction(context, "documents.read", { id }).catch(
     (error: unknown) => {
@@ -95,6 +104,11 @@ export default async function DocumentPage({
               <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
                 {document.state === "draft" ? "Draft" : "Published"}
               </Chip>
+              <WatchControl
+                subjectType="document"
+                subjectId={id}
+                initial={watch}
+              />
             </CardHeader>
             {document.state === "draft" ? (
               <CardBody>

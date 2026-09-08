@@ -1528,20 +1528,26 @@ Deliverables: the inbox route with the badge UIUX-PLAN §3 puts beside Home and 
 Test plan: a notification whose subject the member cannot reach never appears; snoozing hides the row and never hides a review-inbox obligation; the badge counts unread and clears on read; muting a subject stops new rows without deleting old ones; every reason in the table's own enum renders a chip, which is what catches the output schema listing four of the six.
 Acceptance: Given a member mentioned in a comment, when they open the inbox, then the notification is listed, deep-links to the comment, and the badge clears.
 
+**P6-G07b was cut in two.** Its two halves share nothing: one is a control on
+six detail pages, the other is a realtime subscription on the inbox. Building
+them together would mean six page wirings and a live channel in one commit,
+and the acceptance sentence ("the row appears in their open inbox without a
+reload") cannot be demonstrated until both are done, which is what makes the
+second half the one that owns it. Split at P6-G07b, 8 September 2026.
+
 ### P6-G07b: The watch control on every subject [M]
 Depends on: P6-G07a
-Goal: `subscriptions.toggle` gets its surfaces, and the inbox row inserts live.
-Deliverables: a watch control on every subject that has a subscription list, which is the goal, initiative, task, document, KPI and space detail pages, each showing whether the reader is watching and why they were subscribed; the inbox subscribing to the realtime channel the board and the session already use, so a new row arrives without a navigation.
-Test plan: watching a goal from its own page produces a row in the inbox on the next check-in; unwatching stops new rows and keeps old ones; a watch control on a subject the reader may only view still works, because watching is not a write to the subject; the live insert arrives without a reload and is not duplicated by the next navigation.
-Acceptance: Given a member who watches an initiative from its page, when somebody checks it in, then the row appears in their open inbox without a reload.
+Goal: `subscriptions.toggle` gets its surfaces.
+Deliverables: `subscriptions.read`, which did not exist, so a control could only guess its own state; a watch control on every subject that has a subscription list, which is the goal, initiative, task, document, KPI and space detail pages, each showing whether the reader is watching, how many others are, and why they were subscribed.
+Test plan: watching from a subject's own page records a subscription and unwatching removes it; a reader who may only view the subject can still watch it, because watching is not a write to the subject; a subject nobody has ever watched answers "not watching" rather than failing on a missing list; a member subscribed by their role is told so, because turning that off does not remove the obligation.
+Acceptance: Given a member reading an initiative they did not create, when they press Watch, then the page says they are watching and names how many others are.
 
-**Why P6-G07 was cut in two.** The screen and the read are one job. "The
-subscription toggle on every subject that has one" is a different job in six
-other files, and it needs the inbox to exist first to be worth anything, since
-watching something with nowhere to read the result is a control with no
-outcome. Live insert goes with it rather than with the screen, because the
-screen's own honest description is the one `review-badge.ts` already gives:
-recomputed on navigation and after the writes that move it.
+### P6-G07c: The inbox's live insert [M]
+Depends on: P6-G07b
+Goal: the inbox row arrives without a navigation.
+Deliverables: the inbox subscribing to the realtime channel the board and the session already use; the insert deduplicated against what the next navigation loads, so a row that arrived live is not drawn twice.
+Test plan: the live insert arrives without a reload and is not duplicated by the next navigation; a second browser watching the same inbox sees the same row; the page works unchanged when no relay is running, because a channel that never delivers must not be the difference between an inbox and no inbox.
+Acceptance: Given a member who watches an initiative from its page, when somebody checks it in, then the row appears in their open inbox without a reload.
 
 ### P6-G08: Member notification settings [M]
 Depends on: P6-G07a

@@ -618,6 +618,125 @@ export const updateOwnNotificationSettings = defineWriteAction({
   }),
 });
 
+/**
+ * Whether the reader is watching one subject, and why (S-03, P6-G07b).
+ *
+ * **`subscriptions.toggle` had no read beside it.** It shipped at P2-T06 and
+ * could subscribe or unsubscribe, and nothing could answer "am I watching
+ * this", so a control for it could only be a button that guessed its own
+ * state. That is why no page had one.
+ *
+ * **The reason is the half worth reading.** A member added because they were
+ * mentioned, and a member added because they are the reviewer, are both
+ * watching, and only one of them chose to be. A control that says "watching"
+ * and nothing else invites somebody to turn off an obligation without knowing
+ * it was one.
+ *
+ * A subject nobody has ever subscribed to has no list, which is not an error:
+ * nobody is watching it, and saying so is the answer.
+ */
+export const readSubscription = defineReadAction({
+  name: "subscriptions.read",
+  summary:
+    "Whether the signed-in member is watching a subject, why, and how many others are.",
+  input: z.object({
+    subjectType: z.string().min(1),
+    subjectId: z.uuid(),
+  }),
+  output: z.object({
+    watching: z.boolean(),
+    /** Why they were subscribed, or null when they are not. */
+    reason: z.enum(NOTIFICATION_REASONS).nullable(),
+    /** Everybody on the list, including the reader. */
+    watchers: z.number().int(),
+    /** Whether the list sends to the whole space rather than to a list. */
+    everyone: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
+        throw new OperationError("not_found", "No such subject.");
+      }
+
+      // The same visibility check the inbox makes. A subject the reader may
+      // not see answers not-found rather than confirming it exists.
+      const visible = await readerMaySeeSubject(
+        tx,
+        context.workspaceId,
+        memberId,
+        input.subjectType,
+        input.subjectId,
+      );
+      if (!visible) {
+        throw new OperationError("not_found", "No such subject.");
+      }
+
+      const [list] = await tx
+        .select({
+          id: subscriptionLists.id,
+          sendToEveryone: subscriptionLists.sendToEveryone,
+        })
+        .from(subscriptionLists)
+        .where(
+          activeOnly(
+            subscriptionLists,
+            eq(subscriptionLists.workspaceId, context.workspaceId),
+            eq(subscriptionLists.subjectType, input.subjectType),
+            eq(subscriptionLists.subjectId, input.subjectId),
+          ),
+        )
+        .limit(1);
+
+      if (!list) {
+        // No list is not a missing row to repair: it means nobody has ever
+        // subscribed, which is a complete answer.
+        return {
+          watching: false,
+          reason: null,
+          watchers: 0,
+          everyone: false,
+        };
+      }
+
+      const rows = await tx
+        .select({
+          memberId: subscriptions.memberId,
+          reason: subscriptions.reason,
+        })
+        .from(subscriptions)
+        .where(
+          activeOnly(
+            subscriptions,
+            eq(subscriptions.workspaceId, context.workspaceId),
+            eq(subscriptions.listId, list.id),
+            // **Cancelled, not deleted.** Unsubscribing sets `canceled` and
+            // keeps the row, so the history of who was ever on a list
+            // survives. A read that only asked `activeOnly` counted somebody
+            // who had muted the subject as still watching it, which is what
+            // the test for turning a watch off found.
+            eq(subscriptions.canceled, false),
+          ),
+        );
+
+      const mine = rows.find((row) => row.memberId === memberId);
+      return {
+        watching: mine !== undefined,
+        reason: mine?.reason ?? null,
+        watchers: rows.length,
+        everyone: list.sendToEveryone,
+      };
+    });
+  },
+});
+
 export const toggleSubscription = defineWriteAction({
   name: "subscriptions.toggle",
   summary: "Subscribes or unsubscribes the signed-in member from a subject.",

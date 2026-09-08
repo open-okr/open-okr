@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { FormulaBuilder } from "./formula-builder.tsx";
 
@@ -69,6 +70,14 @@ export default async function KpiDetailPage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "kpi",
+    subjectId: id,
+  });
 
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -157,6 +166,7 @@ export default async function KpiDetailPage({
                 {Math.round(kpi.watchPct)}%
               </span>
             </div>
+            <WatchControl subjectType="kpi" subjectId={id} initial={watch} />
           </CardHeader>
           {kpi.recoveryGoalId ? (
             <CardBody className="flex flex-wrap items-center gap-2">

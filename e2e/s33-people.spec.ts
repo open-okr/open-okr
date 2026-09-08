@@ -162,3 +162,51 @@ test("erasure asks for the name typed, and a wrong one erases nothing", async ()
     page.getByRole("heading", { name: INSTANCE_ACCOUNT.name }),
   ).toBeVisible();
 });
+
+/**
+ * The watch control (S-03, P6-G07b).
+ *
+ * `subscriptions.toggle` shipped at P2-T06 and no page ever called it, because
+ * nothing could answer "am I watching this" and a control that guessed its own
+ * state is worse than none. `subscriptions.read` is the other half.
+ *
+ * The goal page is the one exercised here. The control is the same component
+ * on all six subjects and a unit test holds that; what a browser adds is that
+ * pressing it changes what the page says on the next load, which is the part
+ * a source-reading test cannot see.
+ */
+test("watching a goal from its own page sticks", async () => {
+  await goTo(page, "/goals");
+  // The first `/goals/` link on this page is `/goals/studio`, the alignment
+  // studio, which is a tool and not a goal. The href is read for one that is
+  // actually an id rather than clicking whatever comes first.
+  const goalUrl = await page
+    .locator("a[href^='/goals/']")
+    .evaluateAll((links) => {
+      const match = links
+        .map((link) => link.getAttribute("href") ?? "")
+        .find((href) => /^\/goals\/[0-9a-f-]{36}$/.test(href));
+      return match ?? "";
+    });
+  expect(goalUrl, "no goal link on /goals").not.toBe("");
+  await goTo(page, goalUrl);
+
+  const watch = page.getByTestId("watch-control");
+  await expect(watch).toBeVisible();
+  await expect(watch).toHaveText("Watch this");
+
+  await watch.click();
+  await expect(watch).toHaveText("Watching", { timeout: 15_000 });
+
+  // Reloaded, because the point is that it was written and not just toggled
+  // in the browser's own memory.
+  await goTo(page, goalUrl);
+  await expect(page.getByTestId("watch-control")).toHaveText("Watching");
+
+  // And off again, so the instance is left as it was found for every spec
+  // after this one.
+  await page.getByTestId("watch-control").click();
+  await expect(page.getByTestId("watch-control")).toHaveText("Watch this", {
+    timeout: 15_000,
+  });
+});

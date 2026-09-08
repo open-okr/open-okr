@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { SpaceManagement } from "./manage.tsx";
@@ -37,6 +38,14 @@ export default async function SpacePage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(actor, "subscriptions.read", {
+    subjectType: "space",
+    subjectId: id,
+  });
 
   let space: Awaited<ReturnType<typeof callAction<"spaces.read">>>;
   try {
@@ -198,6 +207,7 @@ export default async function SpacePage({
                 week of {lastWeek.weekStart}
               </span>
             ) : null}
+            <WatchControl subjectType="space" subjectId={id} initial={watch} />
           </CardHeader>
           <CardBody>
             {lastWeek === null ? (

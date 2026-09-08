@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   addChecklistItemAction,
@@ -48,6 +49,14 @@ export default async function TaskPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const { id } = await params;
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "task",
+    subjectId: id,
+  });
 
   const task = await callAction(context, "tasks.read", { id }).catch(
     (error: unknown) => {
@@ -99,6 +108,7 @@ export default async function TaskPage({
                     ?.label ?? task.status}
                 </Chip>
               )}
+              <WatchControl subjectType="task" subjectId={id} initial={watch} />
             </CardHeader>
           </Card>
 

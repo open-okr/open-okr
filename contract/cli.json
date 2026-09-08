@@ -1477,6 +1477,29 @@
       "pages": false
     },
     {
+      "name": "subscriptions read",
+      "action": "subscriptions.read",
+      "method": "GET",
+      "path": "/subscriptions/read",
+      "scope": "read",
+      "summary": "Whether the signed-in member is watching a subject, why, and how many others are.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "subscriptions toggle",
       "action": "subscriptions.toggle",
       "method": "POST",

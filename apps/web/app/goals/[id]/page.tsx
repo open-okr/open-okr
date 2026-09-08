@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { SubjectDocuments } from "../../documents/subject-documents.tsx";
@@ -50,6 +51,14 @@ export default async function GoalPage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "goal",
+    subjectId: id,
+  });
 
   let goal: Awaited<ReturnType<typeof callAction<"goals.read">>>;
   try {
@@ -190,6 +199,7 @@ export default async function GoalPage({
                   ? `closed · ${goal.successStatus}`
                   : goal.health.replace("_", " ")}
               </Chip>
+              <WatchControl subjectType="goal" subjectId={id} initial={watch} />
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
               <div className="flex items-center gap-2.5">

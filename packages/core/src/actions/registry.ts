@@ -258,6 +258,7 @@ import {
   importWatcher,
   listNotifications,
   markNotificationRead,
+  readSubscription,
   snoozeNotification,
   toggleSubscription,
   unreadNotificationCount,
@@ -467,6 +468,7 @@ export const ACTION_MAP = {
   "notifications.snooze": snoozeNotification,
   "notifications.getSettings": getNotificationSettings,
   "notifications.updateSettings": updateOwnNotificationSettings,
+  "subscriptions.read": readSubscription,
   "subscriptions.toggle": toggleSubscription,
   // P6-T04b. Restores a watcher an import found, by name.
   "subscriptions.importWatcher": importWatcher,
