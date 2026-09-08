@@ -4546,6 +4546,38 @@
             "default": false,
             "type": "boolean"
           },
+          "mission": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vision": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategy": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notDoing": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
           "strategies": {
             "default": [],
             "maxItems": 20,

@@ -1643,6 +1643,21 @@ Deliverables: the frame editor for mission, vision, mid-term strategy, year and 
 Test plan: a quarterly cycle marks the phase not-applicable rather than to-do; the strategy count is bounded at both ends with the reason stated; an annual objective sent forward appears in drafting; the frame reads back exactly as written.
 Acceptance: Given an annual cycle with no frame, when a facilitator opens phase 0 and writes one, then the phase mark computes as complete and the drafting surface offers the annual objectives.
 
+### P6-G14b: The annual OKRs on phase 0 [M]
+Depends on: P6-G14
+Goal: the rest of S-05 (GAP-AUDIT B-03).
+Deliverables: the annual objectives listed against the strategy each serves, sending one forward into quarterly drafting, and the Coach's flag on a frame whose disagreement is unresolved.
+Test plan: an annual objective names one strategy and the list groups by it; sending one forward creates a quarterly draft that cites it and running it twice creates one; a frame with `agreed` false and strategies present raises the Coach's flag and clearing it clears the flag.
+Acceptance: Given an agreed frame with three strategies, when a facilitator sends an annual objective forward, then the quarterly drafting surface offers it with its serving strategy attached.
+
+**Why P6-G14 was cut.** The frame editor is the phase's own surface and it
+needed the action widened before it could exist at all: `annual_frames` has
+held mission, vision, strategy and not-doing since migration 0020 and
+`frame.read` exposed none of them. The annual OKRs are a different join, the
+send-forward is a write into the quarterly cycle, and the Coach's flag is a
+rule key and a nudge. Doing the four together would have been one commit
+nobody could review.
+
 ### P6-G15: Cycle phase 6, run the cadence, S-11 [M]
 Depends on: P3-T07, P4-T04, P4-T08
 Goal: the running cycle has a surface (GAP-AUDIT B-03).

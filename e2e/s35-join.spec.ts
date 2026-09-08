@@ -74,7 +74,21 @@ test("the owner issues a personal invitation and the card shows its address", as
     timeout: 15_000,
   });
 
-  await page.goto("/admin/invitations");
+  // **The navigation is retried rather than asserted after.** Signing in ends
+  // in `router.push("/")`, and the two waits above are satisfied while that
+  // transition is still committing: this spec failed on its third run with
+  // net::ERR_ABORTED here, and the saved page snapshot showed a fully
+  // rendered "/". A document navigation issued into a settling client
+  // transition is aborted by the browser, so retrying it is the fix rather
+  // than waiting for one more signal that is also already true. `toPass` is
+  // the suite's idiom for that, used in eight other specs.
+  await expect(async () => {
+    await page.goto("/admin/invitations");
+    await expect(page.getByLabel("Email address")).toBeVisible({
+      timeout: 5_000,
+    });
+  }).toPass({ timeout: 30_000 });
+
   await page.getByLabel("Email address").fill(GUEST_EMAIL);
   await page.getByRole("button", { name: "Create the invitation" }).click();
 

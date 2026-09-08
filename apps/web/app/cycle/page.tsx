@@ -12,6 +12,7 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
+import { AnnualFrame } from "./annual-frame.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
@@ -118,6 +119,13 @@ export default async function CyclePage({
     Number.isInteger(requested) && requested >= 0 && requested <= 7
       ? requested
       : workflow.phase;
+
+  // **Loaded per phase, not per page** (P6-G14, P6-G15, P6-G16). Phase 0 needs
+  // the annual frame, phase 6 the sessions and blockers across every space,
+  // phase 7 the scored key results. Fetching all three on every render would
+  // make the drafting phase pay for two views nobody is looking at.
+  const frame =
+    viewing === 0 ? await callAction(context, "frame.read", {}) : null;
 
   const phase = workflow.phases[viewing];
   const work = phaseWorkAllowed(viewing, workflow.phases);
@@ -333,15 +341,17 @@ export default async function CyclePage({
             />
           ) : null}
 
-          {viewing === 0 || viewing === 6 || viewing === 7 ? (
+          {viewing === 0 ? (
+            <AnnualFrame frame={frame} canEdit={canPublish} />
+          ) : null}
+
+          {viewing === 6 || viewing === 7 ? (
             <Card>
               <CardBody>
                 <p className="text-sm text-ink-3">
-                  {viewing === 0
-                    ? "The annual strategy surface arrives at P6-G14: the frame, the annual strategies and the year's not-doing list."
-                    : viewing === 6
-                      ? "The running cadence view arrives at P6-G15: sessions held and upcoming, the streak, confidence per key result and open blockers by age. The check-ins and sessions it reads already exist."
-                      : "Scoring every key result and writing the cycle retrospective arrive at P6-G16. The arithmetic behind the scores is already here."}
+                  {viewing === 6
+                    ? "The running cadence view arrives at P6-G15: sessions held and upcoming, the streak, confidence per key result and open blockers by age. The check-ins and sessions it reads already exist."
+                    : "Scoring every key result and writing the cycle retrospective arrive at P6-G16. The arithmetic behind the scores is already here."}
                 </p>
               </CardBody>
             </Card>

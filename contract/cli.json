@@ -3218,6 +3218,30 @@
           "required": false
         },
         {
+          "name": "mission",
+          "field": "mission",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "vision",
+          "field": "vision",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy",
+          "field": "strategy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "not-doing",
+          "field": "notDoing",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "strategies",
           "field": "strategies",
           "type": "array",

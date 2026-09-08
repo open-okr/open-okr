@@ -55,6 +55,8 @@ import {
 } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const cycleOutput = z.object({
@@ -705,11 +707,39 @@ export const updateRhythmSettings = defineWriteAction({
 
 // --- The annual frame -----------------------------------------------------
 
+/**
+ * Editor JSON for the current schema, or null (P6-G14).
+ *
+ * The frame's four prose fields are rich text with their own version columns,
+ * the same shape a task description takes, because METHOD.md §2.1 expects a
+ * mission somebody wrote in sentences rather than a single line.
+ */
+const frameProse = z
+  .unknown()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    { message: "not valid editor JSON for the current rich text schema" },
+  );
+
 const frameOutput = z.object({
   id: z.uuid(),
   yearLabel: z.string(),
   horizonLabel: z.string().nullable(),
   agreed: z.boolean(),
+  /**
+   * The prose §2.1 asks for, which migration 0020 has stored since P3-T02 and
+   * nothing ever read or wrote (P6-G14).
+   *
+   * The columns were there, with their version columns beside them, and this
+   * action returned four scalars and a list. So phase 0 had a table holding a
+   * mission and no way to put one in it, which is what made B-03 a blocker
+   * rather than a missing screen.
+   */
+  mission: z.unknown().nullable(),
+  vision: z.unknown().nullable(),
+  strategy: z.unknown().nullable(),
+  notDoing: z.unknown().nullable(),
   strategies: z.array(
     z.object({
       id: z.uuid(),
@@ -755,6 +785,10 @@ export const readAnnualFrame = defineReadAction({
             yearLabel: annualFrames.yearLabel,
             horizonLabel: annualFrames.horizonLabel,
             agreed: annualFrames.agreed,
+            mission: annualFrames.mission,
+            vision: annualFrames.vision,
+            strategy: annualFrames.strategy,
+            notDoing: annualFrames.notDoing,
           })
           .from(annualFrames)
           .where(
@@ -800,6 +834,15 @@ export const setAnnualFrame = defineWriteAction({
     yearLabel: z.string().trim().min(1).max(40),
     horizonLabel: z.string().trim().max(80).nullable().optional(),
     agreed: z.boolean().default(false),
+    /**
+     * The four prose fields (P6-G14). Absent leaves whatever the frame holds;
+     * an explicit null clears it, which is how "we have not written a vision
+     * yet" is said without inventing an empty document.
+     */
+    mission: frameProse.nullable().optional(),
+    vision: frameProse.nullable().optional(),
+    strategy: frameProse.nullable().optional(),
+    notDoing: frameProse.nullable().optional(),
     /** Replaces the whole list, which is how a two-to-five set is edited. */
     strategies: z
       .array(
@@ -816,7 +859,18 @@ export const setAnnualFrame = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [current] = await tx
-        .select({ id: annualFrames.id, yearLabel: annualFrames.yearLabel })
+        .select({
+          id: annualFrames.id,
+          yearLabel: annualFrames.yearLabel,
+          mission: annualFrames.mission,
+          missionVersion: annualFrames.missionVersion,
+          vision: annualFrames.vision,
+          visionVersion: annualFrames.visionVersion,
+          strategy: annualFrames.strategy,
+          strategyVersion: annualFrames.strategyVersion,
+          notDoing: annualFrames.notDoing,
+          notDoingVersion: annualFrames.notDoingVersion,
+        })
         .from(annualFrames)
         .where(
           activeOnly(
@@ -856,6 +910,30 @@ export const setAnnualFrame = defineWriteAction({
             yearLabel: input.yearLabel,
             horizonLabel: input.horizonLabel ?? null,
             agreed: input.agreed,
+            // Carried from the superseded frame when this call does not name
+            // one, so replacing a frame to add a strategy does not silently
+            // drop the mission somebody wrote in January. Each version column
+            // moves with its own field.
+            mission: input.mission ?? current?.mission ?? null,
+            missionVersion:
+              input.mission === undefined
+                ? (current?.missionVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            vision: input.vision ?? current?.vision ?? null,
+            visionVersion:
+              input.vision === undefined
+                ? (current?.visionVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            strategy: input.strategy ?? current?.strategy ?? null,
+            strategyVersion:
+              input.strategy === undefined
+                ? (current?.strategyVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            notDoing: input.notDoing ?? current?.notDoing ?? null,
+            notDoingVersion:
+              input.notDoing === undefined
+                ? (current?.notDoingVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
           })
           .returning({ id: annualFrames.id });
         if (!inserted) {
@@ -911,6 +989,10 @@ export const setAnnualFrame = defineWriteAction({
           yearLabel: input.yearLabel,
           horizonLabel: input.horizonLabel ?? null,
           agreed: input.agreed,
+          mission: input.mission ?? current?.mission ?? null,
+          vision: input.vision ?? current?.vision ?? null,
+          strategy: input.strategy ?? current?.strategy ?? null,
+          notDoing: input.notDoing ?? current?.notDoing ?? null,
           strategies,
         },
         activity: {

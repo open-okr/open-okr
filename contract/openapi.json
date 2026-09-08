@@ -16604,6 +16604,38 @@
                             "agreed": {
                               "type": "boolean"
                             },
+                            "mission": {
+                              "anyOf": [
+                                {},
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "vision": {
+                              "anyOf": [
+                                {},
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "strategy": {
+                              "anyOf": [
+                                {},
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "notDoing": {
+                              "anyOf": [
+                                {},
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "strategies": {
                               "type": "array",
                               "items": {
@@ -16648,6 +16680,10 @@
                             "yearLabel",
                             "horizonLabel",
                             "agreed",
+                            "mission",
+                            "vision",
+                            "strategy",
+                            "notDoing",
                             "strategies"
                           ],
                           "additionalProperties": false
@@ -16733,6 +16769,38 @@
                         "agreed": {
                           "type": "boolean"
                         },
+                        "mission": {
+                          "anyOf": [
+                            {},
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "vision": {
+                          "anyOf": [
+                            {},
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "strategy": {
+                          "anyOf": [
+                            {},
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "notDoing": {
+                          "anyOf": [
+                            {},
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "strategies": {
                           "type": "array",
                           "items": {
@@ -16777,6 +16845,10 @@
                         "yearLabel",
                         "horizonLabel",
                         "agreed",
+                        "mission",
+                        "vision",
+                        "strategy",
+                        "notDoing",
                         "strategies"
                       ],
                       "additionalProperties": false
@@ -16840,6 +16912,38 @@
                   "agreed": {
                     "default": false,
                     "type": "boolean"
+                  },
+                  "mission": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "vision": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "strategy": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "notDoing": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "strategies": {
                     "default": [],
