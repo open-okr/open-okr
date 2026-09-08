@@ -37,6 +37,20 @@ describe("the feed at every scope", () => {
     }
   });
 
+  test("the goal's panel sits inside the content column, not beside it", () => {
+    // The goal page is the one surface whose body is a two-column row:
+    // `lg:flex-row` holding a `min-w-0 flex-1` content column and an
+    // `lg:w-80` rail. P6-G11b placed the panel after the column's closing
+    // tag, which made it a third child taking its intrinsic width, and
+    // `min-w-0` let the content column give up every pixel of it. The
+    // objective's own heading collapsed towards zero width, and continuous
+    // integration reported it as "hidden" on a page the screenshot showed
+    // painted. Order in the source is what distinguishes the two placements.
+    const page = at("../app/goals/[id]/page.tsx");
+    expect(page.indexOf("<FeedPanel")).toBeGreaterThan(-1);
+    expect(page.indexOf("<FeedPanel")).toBeLessThan(page.indexOf("<aside"));
+  });
+
   test("the workspace scope still has its own screen", () => {
     // P6-G11a's page is untouched by this task, and a regression there would
     // be the easiest thing to miss.

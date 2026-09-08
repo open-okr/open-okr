@@ -664,20 +664,33 @@ export default async function GoalPage({
               />
             </CardBody>
           </Card>
+
+          {/*
+           * **Inside the content column, not beside it.** P6-G11b put this
+           * panel where the closing tags made it look like a sibling of the
+           * rail, and the row above is `lg:flex-row` with exactly two
+           * children by design: a content column that is `min-w-0 flex-1`
+           * and a rail that is `lg:w-80`. A third child takes its intrinsic
+           * width, and `min-w-0` lets the content column give up every pixel
+           * of it, so the objective's own heading collapsed towards zero
+           * width. Continuous integration caught it as an end-to-end failure
+           * reading "hidden" on a heading the screenshot plainly showed,
+           * because an element with an empty box is hidden.
+           */}
+          <FeedPanel
+            title="Activity"
+            explains="What has happened to this goal, its key results and its check-ins, newest first."
+            items={feedItems}
+            names={feedNames}
+            timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+            basePath={`/goals/${id}`}
+            paged={feedCursor !== undefined}
+          />
         </div>
 
         <aside className="w-full flex-none lg:w-80">
           <Rail relations={relations} level={goal.level} />
         </aside>
-        <FeedPanel
-          title="Activity"
-          explains="What has happened to this goal, its key results and its check-ins, newest first."
-          items={feedItems}
-          names={feedNames}
-          timeZone={String(feedSettings.settings.timezone ?? "UTC")}
-          basePath={`/goals/${id}`}
-          paged={feedCursor !== undefined}
-        />
       </div>
     </AppShellLayout>
   );

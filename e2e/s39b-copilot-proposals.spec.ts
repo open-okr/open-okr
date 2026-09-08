@@ -216,7 +216,18 @@ test("applying it creates the objective through the normal Operation", async () 
 
   // And it is really there, on the page the objective lives on.
   await page.goto(`/goals/${goal?.id}`);
-  await expect(page.getByText(TITLE).first()).toBeVisible({ timeout: 15_000 });
+  const heading = page.getByRole("heading", { name: TITLE, level: 1 });
+  await expect(heading).toBeVisible({ timeout: 15_000 });
+
+  // **The heading is wide, not merely present.** This assertion was
+  // `getByText(TITLE).first()` and it failed in continuous integration
+  // reading "hidden" on a heading the screenshot showed painted, which is
+  // what Playwright reports for an element whose box is empty. The cause was
+  // a third child in the two-column row above it, squeezing a `min-w-0`
+  // content column towards zero. A named heading with a real width fails
+  // pointing at the collapse rather than at a locator.
+  const box = await heading.boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan(240);
 });
 
 test("undoing it removes the objective and says so", async () => {
