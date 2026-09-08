@@ -164,10 +164,10 @@ describe("the number check on its own", () => {
 });
 
 describe("the deterministic digest", () => {
-  it("is null before step 4 has produced one", () => {
+  it("is null before step 4 has produced one", async () => {
     // A session that has not reached the digest stage has no digest, and saying
     // so is truer than rendering one full of zeroes.
-    expect(call("sessions.digest", { sessionId })).resolves.toBeNull();
+    await expect(call("sessions.digest", { sessionId })).resolves.toBeNull();
   });
 
   it("renders §7.2's six parts from the stored numbers", async () => {
