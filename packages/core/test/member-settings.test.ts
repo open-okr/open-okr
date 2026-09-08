@@ -108,7 +108,15 @@ describe("the member scope of the settings registry", () => {
     const columnKeys = SETTINGS_REGISTRY.filter(
       (setting) => setting.home === "workspace_members",
     ).map((setting) => setting.key);
-    expect(columnKeys.slice().sort()).toEqual(["primaryChannel", "quietHours"]);
+    // Enumerated rather than derived, so a key given this home without a
+    // column to land in fails here. `theme` and `density` joined the list at
+    // P6-G23, which is the migration that added both columns (0077).
+    expect(columnKeys.slice().sort()).toEqual([
+      "density",
+      "primaryChannel",
+      "quietHours",
+      "theme",
+    ]);
   });
 
   it("gives every setting a home", () => {
