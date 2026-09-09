@@ -5,5 +5,7 @@
   "shell.shortcuts.title": "Pintasan papan kekunci",
   "shell.shortcuts.empty": "Tiada pintasan didaftarkan pada skrin ini lagi.",
   "shell.shortcuts.close": "Tutup",
-  "shell.version.updateAvailable": "Versi baharu tersedia. Memuat semula…"
+  "shell.version.updateAvailable": "Versi baharu tersedia. Memuat semula…",
+  "admin.state.title": "Keadaan",
+  "admin.state.explains": "Sama ada ruang kerja ini menerima tulisan. Ahli melihat sebabnya pada setiap skrin, dan pentadbir sentiasa boleh mengubahnya semula dari sini."
 }

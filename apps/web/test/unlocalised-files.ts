@@ -16,6 +16,16 @@
  *
  * Generated once, at P6-G22b. Nothing regenerates it: adding a line is a
  * decision somebody has to make on purpose.
+ *
+ * **One line has been added since, and it exposed a limit in the gate itself**
+ * (P6-G25). `useTranslations` is a client hook and `TranslationsProvider` is a
+ * client provider, so a *server* component has no `t()` to call: every route
+ * here is one, which means the gate as it stands can only be satisfied by
+ * moving text into a client component or by adding a line below. That is not a
+ * reason to weaken it, and it is a reason P6-G22c's first job is a
+ * server-side reader for the catalogue rather than the strings themselves.
+ * Until then, a new server component's strings join the list with the task
+ * that added them named beside it.
  */
 export const UNLOCALISED_FILES: readonly string[] = [
   "app/(auth)/backup-code/page.tsx",

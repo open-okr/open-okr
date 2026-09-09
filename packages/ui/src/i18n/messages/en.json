@@ -5,5 +5,7 @@
   "shell.shortcuts.title": "Keyboard shortcuts",
   "shell.shortcuts.empty": "No shortcuts are registered on this screen yet.",
   "shell.shortcuts.close": "Close",
-  "shell.version.updateAvailable": "A new version is available. Reloading…"
+  "shell.version.updateAvailable": "A new version is available. Reloading…",
+  "admin.state.title": "State",
+  "admin.state.explains": "Whether this workspace is taking writes. Members see the reason on every screen, and an administrator can always change it back from here."
 }

@@ -1,5 +1,5 @@
 import { loadEnv } from "@openokr/config";
-import { callAction, navigationFor } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, navigationFor } from "@openokr/core";
 import {
   AppShell,
   CycleStrip,
@@ -31,6 +31,7 @@ import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { requireWorkspace } from "./workspace.ts";
+import { WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
  * The authenticated app shell (UIUX-PLAN.md §3, P2-T10). Every top-level
@@ -237,6 +238,20 @@ export async function AppShellLayout({
           />
         }
       >
+        {/*
+         * A workspace that is not taking writes says so on every screen
+         * (P6-G25). Above the content rather than around it: reads are
+         * unaffected by design and the admin recovery list has to stay
+         * reachable, so this explains rather than blocks.
+         */}
+        {workspace.state === "active" ? null : (
+          <div className="mb-4.5">
+            <WorkspaceStateBanner
+              state={workspace.state}
+              canRecover={level >= ACCESS_LEVELS.full}
+            />
+          </div>
+        )}
         {children}
       </AppShell>
       {/*
