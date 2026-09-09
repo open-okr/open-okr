@@ -1,7 +1,6 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { Snippet } from "./palette.tsx";
@@ -75,114 +74,112 @@ export default async function SearchPage({
   };
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Search</h1>
-              <p className="text-xs text-ink-3" data-testid="search-count">
-                {phrase === ""
-                  ? "Type a phrase. Only what you can already open is searched."
-                  : hits.length === 0
-                    ? `Nothing matches "${phrase}".`
-                    : `${hits.length} ${hits.length === 1 ? "result" : "results"} for "${phrase}".`}
-              </p>
-            </div>
-          </CardHeader>
+    <div className="flex w-full flex-col gap-3.5">
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">Search</h1>
+            <p className="text-xs text-ink-3" data-testid="search-count">
+              {phrase === ""
+                ? "Type a phrase. Only what you can already open is searched."
+                : hits.length === 0
+                  ? `Nothing matches "${phrase}".`
+                  : `${hits.length} ${hits.length === 1 ? "result" : "results"} for "${phrase}".`}
+            </p>
+          </div>
+        </CardHeader>
 
-          <CardBody className="flex flex-col gap-3">
-            <form action="/search" className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-                What are you looking for
-                <input
-                  name="q"
-                  defaultValue={phrase}
-                  placeholder="mid-market activation"
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                />
-              </label>
-              {type ? (
-                <input type="hidden" name="type" value={type.value} />
-              ) : null}
-              <button
-                type="submit"
-                className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
-              >
-                Search
-              </button>
-            </form>
+        <CardBody className="flex flex-col gap-3">
+          <form action="/search" className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
+              What are you looking for
+              <input
+                name="q"
+                defaultValue={phrase}
+                placeholder="mid-market activation"
+                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+              />
+            </label>
+            {type ? (
+              <input type="hidden" name="type" value={type.value} />
+            ) : null}
+            <button
+              type="submit"
+              className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+            >
+              Search
+            </button>
+          </form>
 
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link
+              href={href({ type: null })}
+              aria-current={type ? undefined : "true"}
+              className={
+                type
+                  ? "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
+                  : "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+              }
+            >
+              Everything
+            </Link>
+            {TYPES.map((one) => (
               <Link
-                href={href({ type: null })}
-                aria-current={type ? undefined : "true"}
+                key={one.value}
+                href={href({ type: one.value })}
+                aria-current={type?.value === one.value ? "true" : undefined}
                 className={
-                  type
-                    ? "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-                    : "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                  type?.value === one.value
+                    ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                    : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
                 }
               >
-                Everything
+                {one.label}
               </Link>
-              {TYPES.map((one) => (
-                <Link
-                  key={one.value}
-                  href={href({ type: one.value })}
-                  aria-current={type?.value === one.value ? "true" : undefined}
-                  className={
-                    type?.value === one.value
-                      ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                      : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-                  }
-                >
-                  {one.label}
-                </Link>
-              ))}
-            </div>
+            ))}
+          </div>
 
-            {hits.length === 0 ? (
-              <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
-                {phrase === ""
-                  ? "Goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions are all searchable."
-                  : "Nothing here. A draft nobody has published is not searchable, and neither is anything you could not already open."}
-              </p>
-            ) : (
-              <ul
-                className="flex flex-col divide-y divide-line"
-                data-testid="search-results"
-              >
-                {hits.map((hit) => (
-                  <li
-                    key={`${hit.entityType}:${hit.entityId}`}
-                    className="flex flex-col gap-1 py-2"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={hit.href}
-                        className="text-sm font-semibold text-ink hover:text-brand-text"
-                      >
-                        {hit.title}
-                      </Link>
-                      <Chip tone="neutral">
-                        {LABEL[hit.entityType] ?? hit.entityType}
-                      </Chip>
-                      {hit.semantic ? (
-                        // Marked, because a semantic hit answered a different
-                        // question from the one the words asked.
-                        <Chip tone="info">Related</Chip>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-ink-3">
-                      <Snippet text={hit.snippet} />
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </AppShellLayout>
+          {hits.length === 0 ? (
+            <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
+              {phrase === ""
+                ? "Goals, key results, KPIs, initiatives, tasks, documents, comments, check-ins and sessions are all searchable."
+                : "Nothing here. A draft nobody has published is not searchable, and neither is anything you could not already open."}
+            </p>
+          ) : (
+            <ul
+              className="flex flex-col divide-y divide-line"
+              data-testid="search-results"
+            >
+              {hits.map((hit) => (
+                <li
+                  key={`${hit.entityType}:${hit.entityId}`}
+                  className="flex flex-col gap-1 py-2"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={hit.href}
+                      className="text-sm font-semibold text-ink hover:text-brand-text"
+                    >
+                      {hit.title}
+                    </Link>
+                    <Chip tone="neutral">
+                      {LABEL[hit.entityType] ?? hit.entityType}
+                    </Chip>
+                    {hit.semantic ? (
+                      // Marked, because a semantic hit answered a different
+                      // question from the one the words asked.
+                      <Chip tone="info">Related</Chip>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-ink-3">
+                    <Snippet text={hit.snippet} />
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

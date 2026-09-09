@@ -5,7 +5,6 @@ import {
 } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { redirect } from "next/navigation";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -80,79 +79,75 @@ export default async function AuthorisePage({
   }
 
   return (
-    <AppShellLayout>
-      <div className="mx-auto flex max-w-xl flex-col gap-4.5">
-        <Card>
-          <CardHeader>
-            <h1 className="text-lg font-bold text-ink">Connect an agent</h1>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {bounced ? (
-              // What the decision handler could not do, said on the screen it
-              // sent the person back to.
-              <p
-                role="alert"
-                className="rounded-md bg-bad-bg px-2.5 py-2 text-sm text-bad"
-              >
-                {bounced}
+    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+      <Card>
+        <CardHeader>
+          <h1 className="text-lg font-bold text-ink">Connect an agent</h1>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          {bounced ? (
+            // What the decision handler could not do, said on the screen it
+            // sent the person back to.
+            <p
+              role="alert"
+              className="rounded-md bg-bad-bg px-2.5 py-2 text-sm text-bad"
+            >
+              {bounced}
+            </p>
+          ) : null}
+          {check.kind === "refused" ? (
+            <p
+              role="alert"
+              className="rounded-md bg-bad-bg px-2.5 py-2 text-sm text-bad"
+            >
+              {/* Only the "show" kind reaches here: the redirect kind left
+                  the page above. */}
+              {check.refusal.kind === "show"
+                ? check.refusal.message
+                : check.refusal.description}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-ink-3">
+                <span className="font-medium text-ink">{check.clientName}</span>{" "}
+                asked to act as you. It will get your own access, narrowed to
+                what is listed below, and nothing more. It never sees your
+                password.
               </p>
-            ) : null}
-            {check.kind === "refused" ? (
-              <p
-                role="alert"
-                className="rounded-md bg-bad-bg px-2.5 py-2 text-sm text-bad"
-              >
-                {/* Only the "show" kind reaches here: the redirect kind left
-                    the page above. */}
-                {check.refusal.kind === "show"
-                  ? check.refusal.message
-                  : check.refusal.description}
-              </p>
-            ) : (
-              <>
-                <p className="text-sm text-ink-3">
-                  <span className="font-medium text-ink">
-                    {check.clientName}
-                  </span>{" "}
-                  asked to act as you. It will get your own access, narrowed to
-                  what is listed below, and nothing more. It never sees your
-                  password.
-                </p>
 
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-ink-2">
-                    What it will be able to do
-                  </span>
-                  <ul className="flex flex-col gap-1">
-                    {check.scopes.map((scope) => (
-                      <li
-                        key={scope}
-                        className="flex items-center gap-2 text-sm text-ink"
-                        data-testid="consent-scope"
-                      >
-                        <Chip tone={scope === "read" ? "neutral" : "warn"}>
-                          {scope}
-                        </Chip>
-                        {SCOPE_DESCRIPTIONS[scope] ?? scope}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-ink-2">
+                  What it will be able to do
+                </span>
+                <ul className="flex flex-col gap-1">
+                  {check.scopes.map((scope) => (
+                    <li
+                      key={scope}
+                      className="flex items-center gap-2 text-sm text-ink"
+                      data-testid="consent-scope"
+                    >
+                      <Chip tone={scope === "read" ? "neutral" : "warn"}>
+                        {scope}
+                      </Chip>
+                      {SCOPE_DESCRIPTIONS[scope] ?? scope}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                <ConsentForm
-                  request={request}
-                  clientName={check.clientName}
-                  workspaces={memberships.map((membership) => ({
-                    id: membership.workspaceId,
-                    name: membership.name,
-                  }))}
-                  activeWorkspaceId={workspace.workspaceId}
-                />
-              </>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </AppShellLayout>
+              <ConsentForm
+                request={request}
+                clientName={check.clientName}
+                workspaces={memberships.map((membership) => ({
+                  id: membership.workspaceId,
+                  name: membership.name,
+                }))}
+                activeWorkspaceId={workspace.workspaceId}
+              />
+            </>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

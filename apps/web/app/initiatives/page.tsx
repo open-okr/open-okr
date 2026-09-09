@@ -2,7 +2,6 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -112,139 +111,137 @@ export default async function InitiativesPage({
   const filtered = Boolean(space || status || capacity);
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
+    <div className="flex w-full flex-col gap-3.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">Initiatives</h1>
+            <p className="text-xs text-ink-3" data-testid="initiative-count">
+              {initiatives.length === 0
+                ? filtered
+                  ? "No initiative matches these filters."
+                  : "No work is recorded against a key result yet."
+                : `${initiatives.length} ${
+                    initiatives.length === 1 ? "initiative" : "initiatives"
+                  }, each one work somebody owns.`}
+            </p>
+          </div>
+        </CardHeader>
+
+        <CardBody className="flex flex-col gap-3">
+          <Filters
+            href={href}
+            spaces={spaces}
+            activeSpace={space?.id ?? null}
+            activeStatus={status?.value ?? null}
+            activeCapacity={capacity?.value ?? null}
+          />
+
+          {initiatives.length === 0 ? (
+            <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
+              {filtered
+                ? "Clear a filter to see the rest."
+                : "METHOD.md §5.5 asks a facilitator to record the main initiatives that will move each key result. This is where they go."}
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-line">
+              {initiatives.map((initiative) => (
+                <Row
+                  key={initiative.id}
+                  initiative={initiative}
+                  canEdit={canEdit}
+                />
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      {canEdit ? (
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Initiatives</h1>
-              <p className="text-xs text-ink-3" data-testid="initiative-count">
-                {initiatives.length === 0
-                  ? filtered
-                    ? "No initiative matches these filters."
-                    : "No work is recorded against a key result yet."
-                  : `${initiatives.length} ${
-                      initiatives.length === 1 ? "initiative" : "initiatives"
-                    }, each one work somebody owns.`}
-              </p>
-            </div>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">Add an initiative</h2>
           </CardHeader>
+          <CardBody>
+            <ActionForm
+              action={createInitiativeAction}
+              className="flex flex-col gap-2"
+            >
+              <label
+                className="text-xs font-semibold text-ink-2"
+                htmlFor="title"
+              >
+                What work is this
+              </label>
+              <input
+                id="title"
+                name="title"
+                required
+                maxLength={500}
+                placeholder="Rebuild the activation flow"
+                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+              />
 
-          <CardBody className="flex flex-col gap-3">
-            <Filters
-              href={href}
-              spaces={spaces}
-              activeSpace={space?.id ?? null}
-              activeStatus={status?.value ?? null}
-              activeCapacity={capacity?.value ?? null}
-            />
+              <div className="flex flex-wrap gap-2">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
+                  Space
+                  <select
+                    name="spaceId"
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  >
+                    {spaces.map((one) => (
+                      <option key={one.id} value={one.id}>
+                        {one.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            {initiatives.length === 0 ? (
-              <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
-                {filtered
-                  ? "Clear a filter to see the rest."
-                  : "METHOD.md §5.5 asks a facilitator to record the main initiatives that will move each key result. This is where they go."}
-              </p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-line">
-                {initiatives.map((initiative) => (
-                  <Row
-                    key={initiative.id}
-                    initiative={initiative}
-                    canEdit={canEdit}
+                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
+                  Owner
+                  <select
+                    name="ownerId"
+                    defaultValue={workspace.memberId}
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  >
+                    {members.map((one) => (
+                      <option key={one.id} value={one.id}>
+                        {one.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
+                  Starts
+                  <input
+                    type="date"
+                    name="startsOn"
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                   />
-                ))}
-              </ul>
-            )}
+                </label>
+
+                <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
+                  Ends
+                  <input
+                    type="date"
+                    name="endsOn"
+                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+              >
+                Add
+              </button>
+            </ActionForm>
           </CardBody>
         </Card>
-
-        {canEdit ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Add an initiative</h2>
-            </CardHeader>
-            <CardBody>
-              <ActionForm
-                action={createInitiativeAction}
-                className="flex flex-col gap-2"
-              >
-                <label
-                  className="text-xs font-semibold text-ink-2"
-                  htmlFor="title"
-                >
-                  What work is this
-                </label>
-                <input
-                  id="title"
-                  name="title"
-                  required
-                  maxLength={500}
-                  placeholder="Rebuild the activation flow"
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                />
-
-                <div className="flex flex-wrap gap-2">
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Space
-                    <select
-                      name="spaceId"
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    >
-                      {spaces.map((one) => (
-                        <option key={one.id} value={one.id}>
-                          {one.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Owner
-                    <select
-                      name="ownerId"
-                      defaultValue={workspace.memberId}
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    >
-                      {members.map((one) => (
-                        <option key={one.id} value={one.id}>
-                          {one.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Starts
-                    <input
-                      type="date"
-                      name="startsOn"
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Ends
-                    <input
-                      type="date"
-                      name="endsOn"
-                      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                    />
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
-                >
-                  Add
-                </button>
-              </ActionForm>
-            </CardBody>
-          </Card>
-        ) : null}
-      </div>
-    </AppShellLayout>
+      ) : null}
+    </div>
   );
 }
 

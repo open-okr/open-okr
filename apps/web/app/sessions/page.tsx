@@ -1,7 +1,6 @@
 import { callAction } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 
@@ -101,53 +100,51 @@ export default async function SessionsPage({
   );
 
   return (
-    <AppShellLayout>
-      <div className="stagger flex flex-col gap-4.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Sessions</h1>
-              <p className="text-xs text-ink-3">
-                Every session in a space you can read. Anything in progress is
-                at the top.
-              </p>
-            </div>
-            <Link
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-              href={includeFinished ? "/sessions" : "/sessions?finished=1"}
-            >
-              {includeFinished ? "Hide finished" : "Show finished"}
-            </Link>
-          </CardHeader>
-        </Card>
+    <div className="stagger flex flex-col gap-4.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">Sessions</h1>
+            <p className="text-xs text-ink-3">
+              Every session in a space you can read. Anything in progress is at
+              the top.
+            </p>
+          </div>
+          <Link
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            href={includeFinished ? "/sessions" : "/sessions?finished=1"}
+          >
+            {includeFinished ? "Hide finished" : "Show finished"}
+          </Link>
+        </CardHeader>
+      </Card>
 
-        {rows.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-sm text-ink-2">
-                No sessions in the spaces you can read.
-              </p>
-              <p className="mt-1 text-xs text-ink-3">
-                A session is scheduled from a space. Open a space and start its
-                weekly one, or ask its coordinator to.
-              </p>
-              <Link
-                className={`${buttonVariants({ variant: "default", size: "sm" })} mt-3.5 w-fit`}
-                href="/spaces"
-              >
-                Go to spaces
-              </Link>
-            </CardBody>
-          </Card>
-        ) : (
-          <>
-            <Group label="In progress" rows={running} />
-            <Group label="Ahead" rows={ahead} />
-            {includeFinished ? <Group label="Finished" rows={over} /> : null}
-          </>
-        )}
-      </div>
-    </AppShellLayout>
+      {rows.length === 0 ? (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-2">
+              No sessions in the spaces you can read.
+            </p>
+            <p className="mt-1 text-xs text-ink-3">
+              A session is scheduled from a space. Open a space and start its
+              weekly one, or ask its coordinator to.
+            </p>
+            <Link
+              className={`${buttonVariants({ variant: "default", size: "sm" })} mt-3.5 w-fit`}
+              href="/spaces"
+            >
+              Go to spaces
+            </Link>
+          </CardBody>
+        </Card>
+      ) : (
+        <>
+          <Group label="In progress" rows={running} />
+          <Group label="Ahead" rows={ahead} />
+          {includeFinished ? <Group label="Finished" rows={over} /> : null}
+        </>
+      )}
+    </div>
   );
 }
 

@@ -114,7 +114,7 @@ export const UNLOCALISED_FILES: readonly string[] = [
   "app/not-found.tsx",
   "app/oauth/authorize/consent-form.tsx",
   "app/oauth/authorize/page.tsx",
-  "app/page.tsx",
+  "app/(home)/page.tsx",
   "app/people/[id]/lifecycle-controls.tsx",
   "app/people/[id]/not-found.tsx",
   "app/people/[id]/page.tsx",

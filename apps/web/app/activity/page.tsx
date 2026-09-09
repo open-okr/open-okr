@@ -1,7 +1,6 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { FeedLive } from "../../lib/feed-live.tsx";
 import { getPool } from "../../lib/pool";
 import { requireWorkspace } from "../../lib/workspace";
@@ -87,85 +86,83 @@ export default async function ActivityPage({
   const last = items.at(-1);
 
   return (
-    <AppShellLayout>
-      <div className="flex flex-col gap-4.5">
-        {/* The workspace scope's live insert (P6-G11c). Not on a paged view:
-            paging is a link, and refreshing a window the reader navigated
-            back to would move the boundary they are reading across. */}
-        {cursor ? null : <FeedLive scope="workspace" />}
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Activity</h1>
-              <p className="text-sm text-ink-3">
-                What has happened here, newest first, filtered to what you can
-                see. This is the readable record, not the audit log: the audit
-                chain is a separate, append-only one and is verified with{" "}
-                <code>pnpm audit:verify</code>.
-              </p>
-            </div>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-2.5">
-            {items.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                {cursor
-                  ? "Nothing further back than this."
-                  : "Nothing yet. Every check-in, goal, session and setting change lands here as it happens."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2.5">
-                {items.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 border-line border-b pb-2.5 last:border-0 last:pb-0"
-                  >
-                    <span className="flex min-w-0 flex-col">
-                      <span className="text-sm text-ink">{item.rendered}</span>
-                      <span className="text-xs text-ink-4">
-                        {item.actorMemberId
-                          ? (names.get(item.actorMemberId) ?? "A member")
-                          : "OpenOKR"}
-                        {" · "}
-                        {when(item.at, timeZone)}
-                      </span>
-                    </span>
-                    {item.aggregatedCount > 1 ? (
-                      <Chip tone="neutral">
-                        {item.aggregatedCount} edits together
-                      </Chip>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        <div className="flex items-center justify-between gap-3">
-          {cursor ? (
-            <Link
-              href="/activity"
-              className="text-xs font-semibold text-brand-text hover:underline"
-            >
-              Back to the newest
-            </Link>
+    <div className="flex flex-col gap-4.5">
+      {/* The workspace scope's live insert (P6-G11c). Not on a paged view:
+          paging is a link, and refreshing a window the reader navigated
+          back to would move the boundary they are reading across. */}
+      {cursor ? null : <FeedLive scope="workspace" />}
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">Activity</h1>
+            <p className="text-sm text-ink-3">
+              What has happened here, newest first, filtered to what you can
+              see. This is the readable record, not the audit log: the audit
+              chain is a separate, append-only one and is verified with{" "}
+              <code>pnpm audit:verify</code>.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-2.5">
+          {items.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              {cursor
+                ? "Nothing further back than this."
+                : "Nothing yet. Every check-in, goal, session and setting change lands here as it happens."}
+            </p>
           ) : (
-            <span />
+            <ul className="flex flex-col gap-2.5">
+              {items.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2 border-line border-b pb-2.5 last:border-0 last:pb-0"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-sm text-ink">{item.rendered}</span>
+                    <span className="text-xs text-ink-4">
+                      {item.actorMemberId
+                        ? (names.get(item.actorMemberId) ?? "A member")
+                        : "OpenOKR"}
+                      {" · "}
+                      {when(item.at, timeZone)}
+                    </span>
+                  </span>
+                  {item.aggregatedCount > 1 ? (
+                    <Chip tone="neutral">
+                      {item.aggregatedCount} edits together
+                    </Chip>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           )}
-          {/* The cursor is the last row's own key, which is what makes paging
-              stable while new rows arrive at the top (P2-T07). A page shorter
-              than the action's own size is the end, so there is nothing to
-              offer. */}
-          {last && items.length > 1 ? (
-            <Link
-              href={`/activity?at=${encodeURIComponent(last.at)}&id=${last.id}`}
-              className="text-xs font-semibold text-brand-text hover:underline"
-            >
-              Older
-            </Link>
-          ) : null}
-        </div>
+        </CardBody>
+      </Card>
+
+      <div className="flex items-center justify-between gap-3">
+        {cursor ? (
+          <Link
+            href="/activity"
+            className="text-xs font-semibold text-brand-text hover:underline"
+          >
+            Back to the newest
+          </Link>
+        ) : (
+          <span />
+        )}
+        {/* The cursor is the last row's own key, which is what makes paging
+            stable while new rows arrive at the top (P2-T07). A page shorter
+            than the action's own size is the end, so there is nothing to
+            offer. */}
+        {last && items.length > 1 ? (
+          <Link
+            href={`/activity?at=${encodeURIComponent(last.at)}&id=${last.id}`}
+            className="text-xs font-semibold text-brand-text hover:underline"
+          >
+            Older
+          </Link>
+        ) : null}
       </div>
-    </AppShellLayout>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import { callAction } from "@openokr/core";
 import { NOTIFICATION_REASONS } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
 import { saveCadence, saveDelivery, startLink, unlink } from "./actions.ts";
@@ -80,171 +79,164 @@ export default async function AccountChannelsPage() {
   const connected = new Set(settings.connected);
 
   return (
-    <AppShellLayout>
-      <div className="mx-auto flex max-w-xl flex-col gap-4.5">
-        <Card>
-          <CardHeader>
-            <h1 className="text-lg font-bold text-ink">Where to reach you</h1>
-          </CardHeader>
-          <CardBody>
-            <p className="text-sm text-ink-3">
-              Your reminders always appear in the product. This is where else
-              they go.
-            </p>
-          </CardBody>
-        </Card>
+    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+      <Card>
+        <CardHeader>
+          <h1 className="text-lg font-bold text-ink">Where to reach you</h1>
+        </CardHeader>
+        <CardBody>
+          <p className="text-sm text-ink-3">
+            Your reminders always appear in the product. This is where else they
+            go.
+          </p>
+        </CardBody>
+      </Card>
 
-        <Card>
-          <CardHeader>Delivery</CardHeader>
-          <CardBody>
-            <LinkForm action={saveDelivery} className="flex flex-col gap-3">
-              <fieldset className="flex flex-col gap-1.5">
-                <legend className="mb-1 text-xs font-semibold text-ink-2">
-                  Primary channel
-                </legend>
-                {CHOICES.map((choice) => {
-                  const unavailable =
-                    choice.needsLink &&
-                    (!connected.has(choice.id as never) ||
-                      !linked.has(choice.id as never));
-                  return (
-                    <label
-                      key={choice.id}
-                      className="flex items-center gap-2 text-sm text-ink"
-                    >
-                      <input
-                        type="radio"
-                        name="primaryChannel"
-                        value={choice.id}
-                        defaultChecked={settings.primaryChannel === choice.id}
-                        disabled={unavailable}
-                      />
-                      {choice.label}
-                      {unavailable ? (
-                        <span className="text-xs text-ink-3">
-                          {connected.has(choice.id as never)
-                            ? "link your account first"
-                            : "not connected for this workspace"}
-                        </span>
-                      ) : null}
-                    </label>
-                  );
-                })}
-              </fieldset>
-
-              <fieldset className="flex flex-col gap-1.5">
-                <legend className="mb-1 text-xs font-semibold text-ink-2">
-                  Quiet hours, in {settings.timezone}
-                </legend>
-                <p className="text-xs text-ink-3">
-                  A reminder due inside this window waits until it ends. An
-                  escalation past the person who owns the work still comes
-                  through.
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    name="quietStart"
-                    defaultValue={settings.quietHours?.start ?? ""}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                  />
-                  <span className="text-xs text-ink-3">to</span>
-                  <input
-                    type="time"
-                    name="quietEnd"
-                    defaultValue={settings.quietHours?.end ?? ""}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                  />
-                </div>
-              </fieldset>
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                className="w-fit"
-              >
-                Save
-              </Button>
-            </LinkForm>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>Linked accounts</CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {settings.connected.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                No chat provider is connected for this workspace yet, so there
-                is nothing to link. Email works without any of this.
-              </p>
-            ) : (
-              settings.connected.map((provider) => {
-                const identity = settings.identities.find(
-                  (row) => row.provider === provider,
-                );
+      <Card>
+        <CardHeader>Delivery</CardHeader>
+        <CardBody>
+          <LinkForm action={saveDelivery} className="flex flex-col gap-3">
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1 text-xs font-semibold text-ink-2">
+                Primary channel
+              </legend>
+              {CHOICES.map((choice) => {
+                const unavailable =
+                  choice.needsLink &&
+                  (!connected.has(choice.id as never) ||
+                    !linked.has(choice.id as never));
                 return (
-                  <div
-                    key={provider}
-                    className="flex flex-col gap-1.5 rounded-lg border border-line p-3"
+                  <label
+                    key={choice.id}
+                    className="flex items-center gap-2 text-sm text-ink"
                   >
-                    <span className="flex items-center gap-2 text-sm font-medium text-ink">
-                      {provider}
-                      {identity?.verifiedAt ? (
-                        <Chip tone="ok">linked</Chip>
-                      ) : (
-                        <Chip tone="neutral">not linked</Chip>
-                      )}
-                    </span>
-                    {identity?.verifiedAt ? (
-                      <LinkForm action={unlink}>
-                        <input type="hidden" name="provider" value={provider} />
-                        <Button type="submit" variant="ghost" size="sm">
-                          Unlink
-                        </Button>
-                      </LinkForm>
-                    ) : (
-                      <LinkForm action={startLink}>
-                        <input type="hidden" name="provider" value={provider} />
-                        <Button type="submit" variant="default" size="sm">
-                          Get a code
-                        </Button>
-                      </LinkForm>
-                    )}
-                  </div>
+                    <input
+                      type="radio"
+                      name="primaryChannel"
+                      value={choice.id}
+                      defaultChecked={settings.primaryChannel === choice.id}
+                      disabled={unavailable}
+                    />
+                    {choice.label}
+                    {unavailable ? (
+                      <span className="text-xs text-ink-3">
+                        {connected.has(choice.id as never)
+                          ? "link your account first"
+                          : "not connected for this workspace"}
+                      </span>
+                    ) : null}
+                  </label>
                 );
-              })
-            )}
-          </CardBody>
-        </Card>
+              })}
+            </fieldset>
 
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">How often</h2>
+            <fieldset className="flex flex-col gap-1.5">
+              <legend className="mb-1 text-xs font-semibold text-ink-2">
+                Quiet hours, in {settings.timezone}
+              </legend>
               <p className="text-xs text-ink-3">
-                The member half of the settings map, which had no surface until
-                P6-G08: the routing, the window and the summary were all stored
-                and read and none of them could be seen or changed.
+                A reminder due inside this window waits until it ends. An
+                escalation past the person who owns the work still comes
+                through.
               </p>
-            </div>
-          </CardHeader>
-          <CardBody>
-            <CadenceForm
-              action={saveCadence}
-              settings={cadence}
-              reasons={NOTIFICATION_REASONS.map((reason) => ({
-                id: reason,
-                label: REASON_LABELS[reason] ?? reason,
-              }))}
-              channels={CHOICES.map((choice) => ({
-                id: choice.id,
-                label: choice.label,
-              }))}
-            />
-          </CardBody>
-        </Card>
-      </div>
-    </AppShellLayout>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  name="quietStart"
+                  defaultValue={settings.quietHours?.start ?? ""}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+                />
+                <span className="text-xs text-ink-3">to</span>
+                <input
+                  type="time"
+                  name="quietEnd"
+                  defaultValue={settings.quietHours?.end ?? ""}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+                />
+              </div>
+            </fieldset>
+
+            <Button type="submit" variant="primary" size="sm" className="w-fit">
+              Save
+            </Button>
+          </LinkForm>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>Linked accounts</CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          {settings.connected.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              No chat provider is connected for this workspace yet, so there is
+              nothing to link. Email works without any of this.
+            </p>
+          ) : (
+            settings.connected.map((provider) => {
+              const identity = settings.identities.find(
+                (row) => row.provider === provider,
+              );
+              return (
+                <div
+                  key={provider}
+                  className="flex flex-col gap-1.5 rounded-lg border border-line p-3"
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                    {provider}
+                    {identity?.verifiedAt ? (
+                      <Chip tone="ok">linked</Chip>
+                    ) : (
+                      <Chip tone="neutral">not linked</Chip>
+                    )}
+                  </span>
+                  {identity?.verifiedAt ? (
+                    <LinkForm action={unlink}>
+                      <input type="hidden" name="provider" value={provider} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Unlink
+                      </Button>
+                    </LinkForm>
+                  ) : (
+                    <LinkForm action={startLink}>
+                      <input type="hidden" name="provider" value={provider} />
+                      <Button type="submit" variant="default" size="sm">
+                        Get a code
+                      </Button>
+                    </LinkForm>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h2 className="text-sm font-bold text-ink">How often</h2>
+            <p className="text-xs text-ink-3">
+              The member half of the settings map, which had no surface until
+              P6-G08: the routing, the window and the summary were all stored
+              and read and none of them could be seen or changed.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <CadenceForm
+            action={saveCadence}
+            settings={cadence}
+            reasons={NOTIFICATION_REASONS.map((reason) => ({
+              id: reason,
+              label: REASON_LABELS[reason] ?? reason,
+            }))}
+            channels={CHOICES.map((choice) => ({
+              id: choice.id,
+              label: choice.label,
+            }))}
+          />
+        </CardBody>
+      </Card>
+    </div>
   );
 }

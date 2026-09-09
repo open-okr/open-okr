@@ -2,7 +2,6 @@ import { callAction } from "@openokr/core";
 import { ALIGNMENT_LEVEL_ORDER } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { requireWorkspace } from "../../lib/workspace";
@@ -125,133 +124,129 @@ export default async function GoalsPage({
   };
 
   return (
-    <AppShellLayout>
-      <div className="flex flex-col gap-4.5">
-        <SectionTabs items={GOAL_TABS} active="/goals" />
-        <Card>
-          <CardHeader className="justify-between gap-4">
-            {/* Identity and state as one unit on the left, rather than a title
-             * with a sentence under it that repeated what the table below
-             * already says. The chip reports what is on screen; the table owns
-             * the empty state and its suggestion. */}
-            <div className="flex min-w-0 items-center gap-2.5">
-              <h1 className="flex-none text-lg font-bold text-ink">Goals</h1>
-              <Chip tone={filtered ? "brand" : "neutral"}>
-                {/* Never "nothing in this cycle" from a filtered count. The
-                 * cycle had two goals and the filters excluded both, and this
-                 * line claimed the cycle was empty while the table forty
-                 * pixels below correctly said no goals matched. One screen,
-                 * two answers, and the wrong one was the louder. */}
-                {goals.length === 0
-                  ? filtered
-                    ? "No match for these filters"
-                    : "No goals in this cycle yet"
-                  : `${goals.length} goal${goals.length === 1 ? "" : "s"}${
-                      filtered ? ", filtered" : ""
-                    }${tree ? ", as a tree" : ""}`}
-              </Chip>
-            </div>
-            {alignment?.score !== null && alignment !== null ? (
-              <a
-                href={`/cycle?phase=5`}
-                className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
-                  Alignment
+    <div className="flex flex-col gap-4.5">
+      <SectionTabs items={GOAL_TABS} active="/goals" />
+      <Card>
+        <CardHeader className="justify-between gap-4">
+          {/* Identity and state as one unit on the left, rather than a title
+           * with a sentence under it that repeated what the table below
+           * already says. The chip reports what is on screen; the table owns
+           * the empty state and its suggestion. */}
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="flex-none text-lg font-bold text-ink">Goals</h1>
+            <Chip tone={filtered ? "brand" : "neutral"}>
+              {/* Never "nothing in this cycle" from a filtered count. The
+               * cycle had two goals and the filters excluded both, and this
+               * line claimed the cycle was empty while the table forty
+               * pixels below correctly said no goals matched. One screen,
+               * two answers, and the wrong one was the louder. */}
+              {goals.length === 0
+                ? filtered
+                  ? "No match for these filters"
+                  : "No goals in this cycle yet"
+                : `${goals.length} goal${goals.length === 1 ? "" : "s"}${
+                    filtered ? ", filtered" : ""
+                  }${tree ? ", as a tree" : ""}`}
+            </Chip>
+          </div>
+          {alignment?.score !== null && alignment !== null ? (
+            <a
+              href={`/cycle?phase=5`}
+              className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+                Alignment
+              </span>
+              {/* With its denominator. "ALIGNMENT 100" on its own could be a
+               * percentage, a score out of a hundred, or a points total;
+               * `05-alignment-studio` writes "73 / 100". Only the value is
+               * coloured, because the total carries no verdict. */}
+              <span className="flex items-baseline gap-0.5">
+                <span
+                  className={
+                    alignment.healthy
+                      ? "text-lg font-bold tabular-nums text-ok"
+                      : "text-lg font-bold tabular-nums text-warn"
+                  }
+                >
+                  {alignment.score}
                 </span>
-                {/* With its denominator. "ALIGNMENT 100" on its own could be a
-                 * percentage, a score out of a hundred, or a points total;
-                 * `05-alignment-studio` writes "73 / 100". Only the value is
-                 * coloured, because the total carries no verdict. */}
-                <span className="flex items-baseline gap-0.5">
-                  <span
-                    className={
-                      alignment.healthy
-                        ? "text-lg font-bold tabular-nums text-ok"
-                        : "text-lg font-bold tabular-nums text-warn"
-                    }
-                  >
-                    {alignment.score}
-                  </span>
-                  {/* `--ink-3`, not `--ink-4`. The denominator is content, and
-                   * `--ink-4` measures 2.56:1 on this surface, which is the
-                   * violation the group labels above were just fixed for. */}
-                  <span className="text-xs font-semibold tabular-nums text-ink-3">
-                    / 100
-                  </span>
+                {/* `--ink-3`, not `--ink-4`. The denominator is content, and
+                 * `--ink-4` measures 2.56:1 on this surface, which is the
+                 * violation the group labels above were just fixed for. */}
+                <span className="text-xs font-semibold tabular-nums text-ink-3">
+                  / 100
                 </span>
-              </a>
-            ) : null}
-            {/*
-             * Taking the list away, beside the thing it is a list of (P5-T13).
-             * The file matches the rows and columns on screen, and every export
-             * writes an audit row: it is the one action that takes data out of
-             * the product.
-             */}
-            <ExportButton onExport={exportListAction.bind(null, "goals")} />
-          </CardHeader>
+              </span>
+            </a>
+          ) : null}
           {/*
-           * Where a queued export is collected (P5-T15). Renders nothing until
-           * somebody has one, so a person who only ever exports small lists
-           * never sees an empty heading.
+           * Taking the list away, beside the thing it is a list of (P5-T13).
+           * The file matches the rows and columns on screen, and every export
+           * writes an audit row: it is the one action that takes data out of
+           * the product.
            */}
-          <MyExports />
-          <CardBody className="flex flex-col gap-2.5">
-            <Filters
-              cycles={cycles}
-              cycleId={cycleId}
-              level={level ?? null}
-              health={health ?? null}
-              mine={mine}
-              filterAssist={
-                filterAssistAvailable ? <FilterAssist /> : undefined
-              }
-              tree={tree}
-              includeClosed={includeClosed}
-              href={href}
-            />
-          </CardBody>
-        </Card>
+          <ExportButton onExport={exportListAction.bind(null, "goals")} />
+        </CardHeader>
+        {/*
+         * Where a queued export is collected (P5-T15). Renders nothing until
+         * somebody has one, so a person who only ever exports small lists
+         * never sees an empty heading.
+         */}
+        <MyExports />
+        <CardBody className="flex flex-col gap-2.5">
+          <Filters
+            cycles={cycles}
+            cycleId={cycleId}
+            level={level ?? null}
+            health={health ?? null}
+            mine={mine}
+            filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
+            tree={tree}
+            includeClosed={includeClosed}
+            href={href}
+          />
+        </CardBody>
+      </Card>
 
-        {/* The same table the Work Map draws (`01-work-map`), not a card per
-         * goal. S-13 has no mockup, and §10 treats a detail only the mockups
-         * show as the proposed default, so the one drawing of a goal row this
-         * repository has is the one both screens use. The explorer's own tree
-         * ordering stays here: it walks what survived the filters and has to
-         * mark a goal whose parent did not. */}
-        <GoalTable
-          nodes={(tree
-            ? inTreeOrder(goals)
-            : goals.map((goal) => ({
-                goal,
-                depth: 0,
-                detached: false,
-              }))
-          ).flatMap(({ goal, depth, detached }) =>
-            mapNodesFor(
+      {/* The same table the Work Map draws (`01-work-map`), not a card per
+       * goal. S-13 has no mockup, and §10 treats a detail only the mockups
+       * show as the proposed default, so the one drawing of a goal row this
+       * repository has is the one both screens use. The explorer's own tree
+       * ordering stays here: it walks what survived the filters and has to
+       * mark a goal whose parent did not. */}
+      <GoalTable
+        nodes={(tree
+          ? inTreeOrder(goals)
+          : goals.map((goal) => ({
               goal,
-              depth,
-              detached ? "parent is outside this filter" : undefined,
-            ),
-          )}
-          selected={null}
-          rowHref={(node) => `/goals/${node.goalId}`}
-          empty={
-            <div className="flex flex-col gap-1.5 p-3">
-              <p className="text-sm text-ink-2">No goals match this view.</p>
-              <p className="text-xs text-ink-3">
-                Objectives are drafted in phase 4 of the cycle workspace, where
-                the rules are checked as they are written.{" "}
-                <a className="underline" href="/cycle?phase=4">
-                  Open drafting
-                </a>
-                .
-              </p>
-            </div>
-          }
-        />
-      </div>
-    </AppShellLayout>
+              depth: 0,
+              detached: false,
+            }))
+        ).flatMap(({ goal, depth, detached }) =>
+          mapNodesFor(
+            goal,
+            depth,
+            detached ? "parent is outside this filter" : undefined,
+          ),
+        )}
+        selected={null}
+        rowHref={(node) => `/goals/${node.goalId}`}
+        empty={
+          <div className="flex flex-col gap-1.5 p-3">
+            <p className="text-sm text-ink-2">No goals match this view.</p>
+            <p className="text-xs text-ink-3">
+              Objectives are drafted in phase 4 of the cycle workspace, where
+              the rules are checked as they are written.{" "}
+              <a className="underline" href="/cycle?phase=4">
+                Open drafting
+              </a>
+              .
+            </p>
+          </div>
+        }
+      />
+    </div>
   );
 }
 

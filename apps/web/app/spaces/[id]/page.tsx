@@ -4,7 +4,6 @@ import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -142,207 +141,199 @@ export default async function SpacePage({
     : [];
 
   return (
-    <AppShellLayout>
-      <div className="stagger flex flex-col gap-4.5">
-        <Card>
-          <CardHeader>
-            <h1 className="text-lg font-bold text-ink">{space.name}</h1>
-            {space.mission ? (
-              <p className="text-sm text-ink-3">{space.mission}</p>
+    <div className="stagger flex flex-col gap-4.5">
+      <Card>
+        <CardHeader>
+          <h1 className="text-lg font-bold text-ink">{space.name}</h1>
+          {space.mission ? (
+            <p className="text-sm text-ink-3">{space.mission}</p>
+          ) : null}
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3.5">
+          <SpaceMembership spaceId={space.id} ownRole={space.ownRole} />
+          <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-ink-2">
+              Members ({space.memberCount})
+            </h2>
+            <ul className="flex flex-col gap-1.5">
+              {space.members.map((member) => (
+                <li
+                  key={member.memberId}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="text-ink">{member.name}</span>
+                  <span className="flex items-center gap-2">
+                    <Chip tone={member.role === "member" ? "neutral" : "brand"}>
+                      {member.role}
+                    </Chip>
+                    {member.memberId === space.coordinatorMemberId ? (
+                      <Chip tone="info">runs the weekly session</Chip>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {space.coordinatorMemberId &&
+            !space.members.some(
+              (member) =>
+                member.memberId === space.coordinatorMemberId &&
+                member.role === "coordinator",
+            ) ? (
+              <p className="text-sm text-ink-3">
+                No coordinator is named, so a manager covers those duties.
+              </p>
             ) : null}
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3.5">
-            <SpaceMembership spaceId={space.id} ownRole={space.ownRole} />
-            <div className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold text-ink-2">
-                Members ({space.memberCount})
-              </h2>
-              <ul className="flex flex-col gap-1.5">
-                {space.members.map((member) => (
-                  <li
-                    key={member.memberId}
-                    className="flex items-center justify-between gap-3 text-sm"
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* §4.14's space scope (P6-G18b). Placed under the management card
+          because it is the same audience and the rarer thing to change. */}
+      <SpaceSettingsCard
+        spaceId={space.id}
+        settings={space.settings}
+        workspaceStrictness={rhythm.coachStrictness}
+        workspaceFrequency={rhythm.defaultCheckInFrequency}
+        canManage={canManage}
+      />
+
+      <SpaceManagement
+        spaceId={space.id}
+        name={space.name}
+        mission={space.mission}
+        members={space.members}
+        candidates={candidates.map((member) => ({
+          id: member.id,
+          name: member.name,
+        }))}
+        canManage={canManage}
+        canArchive={level >= ACCESS_LEVELS.full}
+      />
+
+      <WeeklyFigures
+        trend={[...trend]}
+        streakWeeks={streak.currentWeeks}
+        weeks={TREND_WEEKS}
+        thresholds={rhythm.thresholds as unknown as ResolvedThresholds}
+      />
+
+      {/* Last week's figures, as the digest recorded them (P6-G19c). */}
+      <Card>
+        <CardHeader className="justify-between">
+          <span>Last week</span>
+          {lastWeek ? (
+            <span className="text-xs text-ink-3">
+              week of {lastWeek.weekStart}
+            </span>
+          ) : null}
+          <WatchControl subjectType="space" subjectId={id} initial={watch} />
+        </CardHeader>
+        <CardBody>
+          {lastWeek === null ? (
+            <p className="text-sm text-ink-3">
+              No week has closed in this space yet. The first digest is written
+              when a weekly session closes.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {lastWeek.lines.map((line) => (
+                <li key={line} className="text-sm text-ink-2">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* P5-T01c: the door to S-22 to S-25, which nothing linked to. */}
+      <Card>
+        <CardHeader className="justify-between">
+          <span>Sessions</span>
+          <Link
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            href="/sessions"
+          >
+            All sessions
+          </Link>
+        </CardHeader>
+        <CardBody>
+          {liveOrAhead.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              Nothing scheduled in this space.
+            </p>
+          ) : (
+            <ul aria-label="Sessions" className="flex flex-col gap-1.5">
+              {liveOrAhead.map((row) => (
+                <li key={row.id}>
+                  <Link
+                    href={`/session/${row.id}`}
+                    className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 transition-colors hover:border-brand hover:bg-raised"
                   >
-                    <span className="text-ink">{member.name}</span>
-                    <span className="flex items-center gap-2">
-                      <Chip
-                        tone={member.role === "member" ? "neutral" : "brand"}
-                      >
-                        {member.role}
-                      </Chip>
-                      {member.memberId === space.coordinatorMemberId ? (
-                        <Chip tone="info">runs the weekly session</Chip>
-                      ) : null}
+                    <span className="truncate text-sm font-medium text-ink">
+                      {row.title}
                     </span>
-                  </li>
-                ))}
-              </ul>
-              {space.coordinatorMemberId &&
-              !space.members.some(
-                (member) =>
-                  member.memberId === space.coordinatorMemberId &&
-                  member.role === "coordinator",
-              ) ? (
-                <p className="text-sm text-ink-3">
-                  No coordinator is named, so a manager covers those duties.
-                </p>
-              ) : null}
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* §4.14's space scope (P6-G18b). Placed under the management card
-            because it is the same audience and the rarer thing to change. */}
-        <SpaceSettingsCard
-          spaceId={space.id}
-          settings={space.settings}
-          workspaceStrictness={rhythm.coachStrictness}
-          workspaceFrequency={rhythm.defaultCheckInFrequency}
-          canManage={canManage}
-        />
-
-        <SpaceManagement
-          spaceId={space.id}
-          name={space.name}
-          mission={space.mission}
-          members={space.members}
-          candidates={candidates.map((member) => ({
-            id: member.id,
-            name: member.name,
-          }))}
-          canManage={canManage}
-          canArchive={level >= ACCESS_LEVELS.full}
-        />
-
-        <WeeklyFigures
-          trend={[...trend]}
-          streakWeeks={streak.currentWeeks}
-          weeks={TREND_WEEKS}
-          thresholds={rhythm.thresholds as unknown as ResolvedThresholds}
-        />
-
-        {/* Last week's figures, as the digest recorded them (P6-G19c). */}
-        <Card>
-          <CardHeader className="justify-between">
-            <span>Last week</span>
-            {lastWeek ? (
-              <span className="text-xs text-ink-3">
-                week of {lastWeek.weekStart}
-              </span>
-            ) : null}
-            <WatchControl subjectType="space" subjectId={id} initial={watch} />
-          </CardHeader>
-          <CardBody>
-            {lastWeek === null ? (
-              <p className="text-sm text-ink-3">
-                No week has closed in this space yet. The first digest is
-                written when a weekly session closes.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {lastWeek.lines.map((line) => (
-                  <li key={line} className="text-sm text-ink-2">
-                    {line}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* P5-T01c: the door to S-22 to S-25, which nothing linked to. */}
-        <Card>
-          <CardHeader className="justify-between">
-            <span>Sessions</span>
-            <Link
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-              href="/sessions"
-            >
-              All sessions
-            </Link>
-          </CardHeader>
-          <CardBody>
-            {liveOrAhead.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                Nothing scheduled in this space.
-              </p>
-            ) : (
-              <ul aria-label="Sessions" className="flex flex-col gap-1.5">
-                {liveOrAhead.map((row) => (
-                  <li key={row.id}>
-                    <Link
-                      href={`/session/${row.id}`}
-                      className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 transition-colors hover:border-brand hover:bg-raised"
-                    >
-                      <span className="truncate text-sm font-medium text-ink">
-                        {row.title}
-                      </span>
-                      {row.state === "running" ? (
-                        <Chip tone="brand">In progress</Chip>
-                      ) : null}
-                      <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
-                        {row.state === "running" ? "Rejoin" : "Open"}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* P4-T15b-b: the open-blocker board REQUIREMENTS §7 asks for. */}
-        <Card>
-          <CardHeader>Open blockers</CardHeader>
-          <CardBody>
-            {board.blockers.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                Nothing is stuck in this space.
-              </p>
-            ) : (
-              <ol aria-label="Open blockers" className="flex flex-col gap-2.5">
-                {board.blockers.map((blocker) => (
-                  <li key={blocker.id} className="flex flex-col gap-1">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <Chip tone="neutral">
-                        {blocker.type.replace("_", " ")}
-                      </Chip>
-                      {blocker.pastTheClock ? (
-                        <Chip tone="bad">past the clock</Chip>
-                      ) : null}
-                      {blocker.escalation === "none" ? null : (
-                        <Chip tone="warn">
-                          escalated to {blocker.escalation}
-                        </Chip>
-                      )}
-                      <span className="text-xs text-ink-4">
-                        {blocker.ageHours}h
-                      </span>
+                    {row.state === "running" ? (
+                      <Chip tone="brand">In progress</Chip>
+                    ) : null}
+                    <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
+                      {row.state === "running" ? "Rejoin" : "Open"}
                     </span>
-                    <p className="text-sm text-ink">{blocker.nextAction}</p>
-                    <p className="text-xs text-ink-3">
-                      {blocker.ownerName ?? "No owner named"}
-                      {blocker.blockedTitle
-                        ? ` · blocks ${blocker.blockedTitle}`
-                        : ""}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardBody>
-        </Card>
-        <FeedPanel
-          title="Activity"
-          explains="What has happened in this space, including its goals, initiatives and tasks."
-          items={feedItems}
-          names={feedNames}
-          timeZone={String(feedSettings.settings.timezone ?? "UTC")}
-          basePath={`/spaces/${id}`}
-          paged={feedCursor !== undefined}
-          live={{ scope: "space", subjectId: id }}
-        />
-      </div>
-    </AppShellLayout>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* P4-T15b-b: the open-blocker board REQUIREMENTS §7 asks for. */}
+      <Card>
+        <CardHeader>Open blockers</CardHeader>
+        <CardBody>
+          {board.blockers.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              Nothing is stuck in this space.
+            </p>
+          ) : (
+            <ol aria-label="Open blockers" className="flex flex-col gap-2.5">
+              {board.blockers.map((blocker) => (
+                <li key={blocker.id} className="flex flex-col gap-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Chip tone="neutral">{blocker.type.replace("_", " ")}</Chip>
+                    {blocker.pastTheClock ? (
+                      <Chip tone="bad">past the clock</Chip>
+                    ) : null}
+                    {blocker.escalation === "none" ? null : (
+                      <Chip tone="warn">escalated to {blocker.escalation}</Chip>
+                    )}
+                    <span className="text-xs text-ink-4">
+                      {blocker.ageHours}h
+                    </span>
+                  </span>
+                  <p className="text-sm text-ink">{blocker.nextAction}</p>
+                  <p className="text-xs text-ink-3">
+                    {blocker.ownerName ?? "No owner named"}
+                    {blocker.blockedTitle
+                      ? ` · blocks ${blocker.blockedTitle}`
+                      : ""}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardBody>
+      </Card>
+      <FeedPanel
+        title="Activity"
+        explains="What has happened in this space, including its goals, initiatives and tasks."
+        items={feedItems}
+        names={feedNames}
+        timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+        basePath={`/spaces/${id}`}
+        paged={feedCursor !== undefined}
+        live={{ scope: "space", subjectId: id }}
+      />
+    </div>
   );
 }

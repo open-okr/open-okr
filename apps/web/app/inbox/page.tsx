@@ -3,7 +3,6 @@ import { trigger } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access.ts";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -76,20 +75,17 @@ export default async function InboxPage({
     // access was narrowed while they had the page open, and because a screen
     // with no denied state is a screen that trusts the sidebar to hide it.
     return (
-      <AppShellLayout>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">
-              You do not have access to this workspace.
-            </p>
-            <p className="mt-1 text-xs text-ink-3">
-              Ask a workspace administrator to restore it. Nothing was lost: the
-              notifications are still here and will be listed when your access
-              is.
-            </p>
-          </CardBody>
-        </Card>
-      </AppShellLayout>
+      <Card>
+        <CardBody>
+          <p className="text-sm text-ink-2">
+            You do not have access to this workspace.
+          </p>
+          <p className="mt-1 text-xs text-ink-3">
+            Ask a workspace administrator to restore it. Nothing was lost: the
+            notifications are still here and will be listed when your access is.
+          </p>
+        </CardBody>
+      </Card>
     );
   }
 
@@ -117,123 +113,121 @@ export default async function InboxPage({
   const unread = rows.filter((row) => row.readAt === null).length;
 
   return (
-    <AppShellLayout>
-      <div className="flex flex-col gap-4.5">
+    <div className="flex flex-col gap-4.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">What happened</h1>
+            <p className="text-xs text-ink-3">
+              Grouped by what it is about, newest first. Review says what you
+              owe. This says what happened.
+            </p>
+            <InboxLive />
+          </div>
+          <div className="flex flex-none items-center gap-3.5">
+            <div className="flex flex-col items-end">
+              <span className="text-lg font-bold tabular-nums text-ink">
+                {unread}
+              </span>
+              <span className="text-xs text-ink-3">Unread</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-wrap gap-1.5">
+          {FILTERS.map((one) => (
+            <Link
+              key={one.id || "all"}
+              href={one.id === "" ? "/inbox" : `/inbox?filter=${one.id}`}
+              className={
+                one.id === active
+                  ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                  : "rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-ink-3 hover:text-ink"
+              }
+            >
+              {one.label}
+            </Link>
+          ))}
+        </CardBody>
+      </Card>
+
+      {rows.length === 0 ? (
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">What happened</h1>
-              <p className="text-xs text-ink-3">
-                Grouped by what it is about, newest first. Review says what you
-                owe. This says what happened.
-              </p>
-              <InboxLive />
-            </div>
-            <div className="flex flex-none items-center gap-3.5">
-              <div className="flex flex-col items-end">
-                <span className="text-lg font-bold tabular-nums text-ink">
-                  {unread}
-                </span>
-                <span className="text-xs text-ink-3">Unread</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardBody className="flex flex-wrap gap-1.5">
-            {FILTERS.map((one) => (
-              <Link
-                key={one.id || "all"}
-                href={one.id === "" ? "/inbox" : `/inbox?filter=${one.id}`}
-                className={
-                  one.id === active
-                    ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                    : "rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-ink-3 hover:text-ink"
-                }
-              >
-                {one.label}
-              </Link>
-            ))}
+          <CardBody>
+            <p className="text-sm text-ink-2">
+              {active === ""
+                ? "Nothing new."
+                : "Nothing here under that filter."}
+            </p>
+            <p className="mt-1 text-xs text-ink-3">
+              A row appears when somebody mentions you, when a check-in you
+              review arrives, or when the Champion has a reminder for you. Watch
+              a goal from its own page to hear about its check-ins.
+            </p>
           </CardBody>
         </Card>
-
-        {rows.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-sm text-ink-2">
-                {active === ""
-                  ? "Nothing new."
-                  : "Nothing here under that filter."}
-              </p>
-              <p className="mt-1 text-xs text-ink-3">
-                A row appears when somebody mentions you, when a check-in you
-                review arrives, or when the Champion has a reminder for you.
-                Watch a goal from its own page to hear about its check-ins.
-              </p>
-            </CardBody>
-          </Card>
-        ) : (
-          /* A named region around the groups, so the list is addressable
-             separately from the filter row above it. The filter chips carry
-             the same words as the reason chips by design, which makes "is
-             there a Joined row" unanswerable without this: the end-to-end
-             spec asked exactly that and matched the filter link instead. A
-             labelled region is the right answer for a screen reader too,
-             which otherwise meets an unnamed run of sections. */
-          <section aria-label="Notifications" className="flex flex-col gap-4.5">
-            {[...groups.entries()].map(([key, held]) => {
-              const first = held[0];
-              if (!first) {
-                return null;
-              }
-              const href = subjectLink(first.subjectType, first.subjectId);
-              return (
-                <section key={key} className="flex flex-col gap-1.5">
-                  <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-                    {href ? (
-                      <Link href={href} className="hover:text-ink">
-                        {subjectName(first.subjectType)}
-                      </Link>
-                    ) : (
-                      subjectName(first.subjectType)
-                    )}
-                    <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
-                      {held.length}
-                    </span>
-                    {first.watching ? (
-                      <ActionForm action={mute}>
-                        <input
-                          type="hidden"
-                          name="subjectType"
-                          value={first.subjectType ?? ""}
-                        />
-                        <input
-                          type="hidden"
-                          name="subjectId"
-                          value={first.subjectId ?? ""}
-                        />
-                        <input type="hidden" name="subscribe" value="false" />
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 px-1.5 text-xs font-semibold normal-case"
-                        >
-                          Mute
-                        </Button>
-                      </ActionForm>
-                    ) : null}
-                  </h2>
-                  <div className="flex flex-col gap-1.5">
-                    {held.map((row) => (
-                      <NotificationRow key={row.id} row={row} href={href} />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </section>
-        )}
-      </div>
-    </AppShellLayout>
+      ) : (
+        /* A named region around the groups, so the list is addressable
+           separately from the filter row above it. The filter chips carry
+           the same words as the reason chips by design, which makes "is
+           there a Joined row" unanswerable without this: the end-to-end
+           spec asked exactly that and matched the filter link instead. A
+           labelled region is the right answer for a screen reader too,
+           which otherwise meets an unnamed run of sections. */
+        <section aria-label="Notifications" className="flex flex-col gap-4.5">
+          {[...groups.entries()].map(([key, held]) => {
+            const first = held[0];
+            if (!first) {
+              return null;
+            }
+            const href = subjectLink(first.subjectType, first.subjectId);
+            return (
+              <section key={key} className="flex flex-col gap-1.5">
+                <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
+                  {href ? (
+                    <Link href={href} className="hover:text-ink">
+                      {subjectName(first.subjectType)}
+                    </Link>
+                  ) : (
+                    subjectName(first.subjectType)
+                  )}
+                  <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
+                    {held.length}
+                  </span>
+                  {first.watching ? (
+                    <ActionForm action={mute}>
+                      <input
+                        type="hidden"
+                        name="subjectType"
+                        value={first.subjectType ?? ""}
+                      />
+                      <input
+                        type="hidden"
+                        name="subjectId"
+                        value={first.subjectId ?? ""}
+                      />
+                      <input type="hidden" name="subscribe" value="false" />
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-xs font-semibold normal-case"
+                      >
+                        Mute
+                      </Button>
+                    </ActionForm>
+                  ) : null}
+                </h2>
+                <div className="flex flex-col gap-1.5">
+                  {held.map((row) => (
+                    <NotificationRow key={row.id} row={row} href={href} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </section>
+      )}
+    </div>
   );
 }
 

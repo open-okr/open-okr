@@ -1,10 +1,9 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { resolveAccessLevelFor } from "../lib/access";
-import { AppShellLayout } from "../lib/app-shell.tsx";
-import { getPool } from "../lib/auth";
-import { requireWorkspace } from "../lib/workspace";
-import { mapNodesFor } from "./goal-nodes.ts";
-import { type MapNode, WorkMap } from "./work-map.tsx";
+import { resolveAccessLevelFor } from "../../lib/access";
+import { getPool } from "../../lib/auth";
+import { requireWorkspace } from "../../lib/workspace";
+import { mapNodesFor } from "../goal-nodes.ts";
+import { type MapNode, WorkMap } from "../work-map.tsx";
 import {
   type ScopeTab,
   type WorkMapContext,
@@ -12,7 +11,7 @@ import {
   WorkMapHeader,
   WorkMapScopeTabs,
   type WorkMapStats,
-} from "./work-map-header.tsx";
+} from "../work-map-header.tsx";
 
 /**
  * The Work Map, the front door (UIUX-PLAN.md §4 S-01, P3-T11).
@@ -172,65 +171,63 @@ export default async function HomePage({
       : (spaces.find((space) => space.id === scope)?.name ?? "One space");
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <WorkMapContextStrip
-          context={workMapContext}
-          cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
-        />
+    <div className="flex w-full flex-col gap-3.5">
+      <WorkMapContextStrip
+        context={workMapContext}
+        cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
+      />
 
-        <WorkMapHeader
-          workspaceName={workspace.name}
-          scopeLabel={scopeLabel}
-          stats={stats}
-        />
+      <WorkMapHeader
+        workspaceName={workspace.name}
+        scopeLabel={scopeLabel}
+        stats={stats}
+      />
 
-        <WorkMapScopeTabs
-          tabs={scopeTabs}
-          active={scope}
-          cycles={cycles}
-          activeCycleId={cycleId}
-          cycleHrefFor={(id) => linkTo({ cycle: id, node: null })}
-        />
+      <WorkMapScopeTabs
+        tabs={scopeTabs}
+        active={scope}
+        cycles={cycles}
+        activeCycleId={cycleId}
+        cycleHrefFor={(id) => linkTo({ cycle: id, node: null })}
+      />
 
-        <WorkMap
-          nodes={nodes}
-          selected={selected}
-          canEdit={canEdit}
-          hrefFor={hrefFor}
-        />
+      <WorkMap
+        nodes={nodes}
+        selected={selected}
+        canEdit={canEdit}
+        hrefFor={hrefFor}
+      />
 
-        <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
-          <a className="text-brand-text underline" href="/goals">
-            Filter and search in the explorer
-          </a>
-          <a className="text-brand-text underline" href="/goals/studio">
-            See the cascade
-          </a>
-          <a className="text-brand-text underline" href="/review">
-            What you owe
-          </a>
-          {/* P5-T01c. The sidebar carries it on every page; this is here
-              because the task asks for a door from the front door itself, and
-              a member who lands here should not have to know the product has
-              a sidebar item for the room they are late to. */}
-          <a className="text-brand-text underline" href="/sessions">
-            Sessions
-          </a>
-          {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
-              this is how it is reached. The engine has written a row on every
-              operation since P2-T07 and nothing has ever shown one. */}
-          <a className="text-brand-text underline" href="/activity">
-            What has happened here
-          </a>
-          {/* P6-G09. S-33 has a screen in §6 and no slot in §3's sidebar,
-              same pattern as Activity above. */}
-          <a className="text-brand-text underline" href="/people">
-            Who is here
-          </a>
-        </p>
-      </div>
-    </AppShellLayout>
+      <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
+        <a className="text-brand-text underline" href="/goals">
+          Filter and search in the explorer
+        </a>
+        <a className="text-brand-text underline" href="/goals/studio">
+          See the cascade
+        </a>
+        <a className="text-brand-text underline" href="/review">
+          What you owe
+        </a>
+        {/* P5-T01c. The sidebar carries it on every page; this is here
+            because the task asks for a door from the front door itself, and
+            a member who lands here should not have to know the product has
+            a sidebar item for the room they are late to. */}
+        <a className="text-brand-text underline" href="/sessions">
+          Sessions
+        </a>
+        {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
+            this is how it is reached. The engine has written a row on every
+            operation since P2-T07 and nothing has ever shown one. */}
+        <a className="text-brand-text underline" href="/activity">
+          What has happened here
+        </a>
+        {/* P6-G09. S-33 has a screen in §6 and no slot in §3's sidebar,
+            same pattern as Activity above. */}
+        <a className="text-brand-text underline" href="/people">
+          Who is here
+        </a>
+      </p>
+    </div>
   );
 }
 

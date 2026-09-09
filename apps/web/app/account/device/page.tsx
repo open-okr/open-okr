@@ -1,6 +1,5 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/pool";
 import { requireWorkspace } from "../../../lib/workspace";
 import { decide } from "./actions.ts";
@@ -44,81 +43,79 @@ export default async function DevicePage({
       : null;
 
   return (
-    <AppShellLayout>
-      <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+      <Card>
+        <CardHeader>
+          <h1 className="text-lg font-bold text-ink">Authorise a terminal</h1>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-2">
+          <p className="text-sm text-ink-3">
+            A terminal running <code className="font-mono text-xs">okr</code>{" "}
+            asked to act as you in{" "}
+            <span className="font-medium text-ink">{workspace.name}</span>. It
+            will get a token carrying your own access, narrowed to the scopes
+            below, and nothing more.
+          </p>
+        </CardBody>
+      </Card>
+
+      {request === null ? (
         <Card>
-          <CardHeader>
-            <h1 className="text-lg font-bold text-ink">Authorise a terminal</h1>
-          </CardHeader>
           <CardBody className="flex flex-col gap-2">
-            <p className="text-sm text-ink-3">
-              A terminal running <code className="font-mono text-xs">okr</code>{" "}
-              asked to act as you in{" "}
-              <span className="font-medium text-ink">{workspace.name}</span>. It
-              will get a token carrying your own access, narrowed to the scopes
-              below, and nothing more.
+            <p className="text-sm text-ink">
+              {code
+                ? "There is nothing to authorise for that code."
+                : "Open the link your terminal printed to authorise it."}
+            </p>
+            <p className="text-xs text-ink-3">
+              {code
+                ? "It may have expired, been answered already, or never existed. Run the login again in your terminal to get a new one."
+                : "Run okr login in a terminal and it will print a link and a code."}
             </p>
           </CardBody>
         </Card>
+      ) : (
+        <Card>
+          <CardHeader>What is asking</CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-ink-2">
+                The terminal calls itself
+              </span>
+              <span className="text-sm text-ink" data-testid="device-client">
+                {request.clientName}
+              </span>
+            </div>
 
-        {request === null ? (
-          <Card>
-            <CardBody className="flex flex-col gap-2">
-              <p className="text-sm text-ink">
-                {code
-                  ? "There is nothing to authorise for that code."
-                  : "Open the link your terminal printed to authorise it."}
-              </p>
-              <p className="text-xs text-ink-3">
-                {code
-                  ? "It may have expired, been answered already, or never existed. Run the login again in your terminal to get a new one."
-                  : "Run okr login in a terminal and it will print a link and a code."}
-              </p>
-            </CardBody>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>What is asking</CardHeader>
-            <CardBody className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-ink-2">
-                  The terminal calls itself
-                </span>
-                <span className="text-sm text-ink" data-testid="device-client">
-                  {request.clientName}
-                </span>
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-ink-2">
+                Scopes it asked for
+              </span>
+              <span className="flex flex-wrap gap-1.5">
+                {request.requestedScopes.map((scope) => (
+                  <Chip
+                    key={scope}
+                    tone={scope === "destructive" ? "bad" : "neutral"}
+                  >
+                    {scope}
+                  </Chip>
+                ))}
+              </span>
+              <span className="text-xs text-ink-3">
+                Read sees what you can see. Write creates and updates.
+                Destructive removes things other people can see.
+              </span>
+            </div>
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-ink-2">
-                  Scopes it asked for
-                </span>
-                <span className="flex flex-wrap gap-1.5">
-                  {request.requestedScopes.map((scope) => (
-                    <Chip
-                      key={scope}
-                      tone={scope === "destructive" ? "bad" : "neutral"}
-                    >
-                      {scope}
-                    </Chip>
-                  ))}
-                </span>
-                <span className="text-xs text-ink-3">
-                  Read sees what you can see. Write creates and updates.
-                  Destructive removes things other people can see.
-                </span>
-              </div>
+            <DecisionForm action={decide} userCode={code?.trim() ?? ""} />
 
-              <DecisionForm action={decide} userCode={code?.trim() ?? ""} />
-
-              <p className="text-xs text-ink-3">
-                If you did not start this, refuse it. Nothing is granted until
-                you press a button, and the request expires on its own.
-              </p>
-            </CardBody>
-          </Card>
-        )}
-      </div>
-    </AppShellLayout>
+            <p className="text-xs text-ink-3">
+              If you did not start this, refuse it. Nothing is granted until you
+              press a button, and the request expires on its own.
+            </p>
+          </CardBody>
+        </Card>
+      )}
+    </div>
   );
 }

@@ -31,9 +31,17 @@ describe("subjectLink", () => {
     const app = fileURLToPath(new URL("../app/", import.meta.url));
     const routes = new Set<string>();
     for await (const entry of glob("**/page.tsx", { cwd: app })) {
-      routes.add(
-        `/${entry.replaceAll("\\", "/").replace(/\/?page\.tsx$/, "")}`,
-      );
+      // **A route group is not a path segment**, which this copy of the
+      // derivation missed until P6-G24b moved `/` into `(home)`. It was latent
+      // rather than harmless: `(auth)` has existed since P1-T09 and every one
+      // of its routes has been in this set under the wrong name ever since.
+      // `reachability.test.ts` has always stripped them.
+      const segments = entry
+        .replaceAll("\\", "/")
+        .replace(/\/?page\.tsx$/, "")
+        .split("/")
+        .filter((segment) => segment !== "" && !segment.startsWith("("));
+      routes.add(`/${segments.join("/")}`);
     }
 
     const broken: string[] = [];
