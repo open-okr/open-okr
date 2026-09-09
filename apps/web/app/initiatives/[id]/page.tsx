@@ -78,6 +78,13 @@ export default async function InitiativePage({
 
   // The files on this subject (P6-G27b). Seven attachment actions shipped and
   // none of them had a caller anywhere.
+  // This initiative's own tasks (P6-G28). `tasks.list` gained the filter with
+  // this row: the board is per space and the other filters are per person or
+  // per date, so nothing could answer "the work this initiative is made of".
+  const initiativeTasks = await callAction(context, "tasks.list", {
+    initiativeId: id,
+  });
+
   const attachments = await callAction(context, "attachments.list", {
     subjectType: "initiative",
     subjectId: id,
@@ -260,21 +267,62 @@ export default async function InitiativePage({
         </CardBody>
       </Card>
 
+      {/*
+       * The tasks this initiative is made of (S-26, P6-G28).
+       *
+       * **The progress figure above is the share of these that are done.**
+       * `initiatives.progress_pct` exists as a column and nothing has ever
+       * written to it, so every initiative in the product read nought per
+       * cent; the read derives it from exactly this list now.
+       *
+       * An initiative with no tasks says so rather than drawing a zero bar:
+       * that is not nought per cent done, it is a plan nobody has broken
+       * down yet, and the two deserve different sentences.
+       */}
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">What is not here yet</h2>
+          <div className="flex min-w-0 flex-col">
+            <h2 className="text-sm font-bold text-ink">
+              Tasks ({initiative.tasks.done} of {initiative.tasks.total} done)
+            </h2>
+            <p className="text-xs text-ink-3">
+              The work this initiative is made of. Moving a card on the board
+              moves this figure.
+            </p>
+          </div>
         </CardHeader>
-        <CardBody>
-          <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-ink-3">
-            <li>
-              The tasks panel arrives at P6-G28. Until then this initiative's
-              progress reads zero for everybody, which is honest rather than
-              empty: progress is the share of its own tasks that are done, and
-              this page cannot yet read them. The tasks themselves exist, and
-              the board at <code>/board</code> shows them.
-            </li>
-            <li>Documents and attachments arrive at P6-G28 beside them.</li>
-          </ul>
+        <CardBody className="flex flex-col gap-2.5">
+          {initiativeTasks.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              No tasks yet. An initiative with none has not been broken down,
+              which is a different thing from one that has not started.
+            </p>
+          ) : (
+            <ul
+              className="flex flex-col gap-1.5"
+              data-testid="initiative-tasks"
+            >
+              {initiativeTasks.map((task) => (
+                <li
+                  key={task.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2"
+                >
+                  <Link
+                    href={`/tasks/${task.id}`}
+                    className="min-w-0 text-sm text-brand-text hover:underline"
+                  >
+                    {task.title}
+                  </Link>
+                  <span className="flex items-center gap-2.5 text-xs text-ink-4">
+                    <Chip tone={task.status === "done" ? "ok" : "neutral"}>
+                      {task.status.replace("_", " ")}
+                    </Chip>
+                    {task.dueOn ?? ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardBody>
       </Card>
       <Attachments

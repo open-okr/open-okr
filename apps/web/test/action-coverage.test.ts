@@ -98,8 +98,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "the pipeline calls it, after a drafted check-in is accepted",
   "comments.previewNotify":
     "a read the composer does not use: it names who would be notified and the composer shows that from the thread it already has",
-  "tasks.list":
-    "a read no page needs: the board and the initiative both read their own shape",
   "tasks.linkedWork":
     "a read no page needs: the goal page reads its initiatives directly",
   "goals.reviewDecision":

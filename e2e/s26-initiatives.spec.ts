@@ -173,3 +173,31 @@ test("a filter that matches nothing says so, and says it differently", async () 
     "No initiative matches these filters",
   );
 });
+
+/**
+ * The tasks panel, and the progress figure it makes true (S-26, P6-G28).
+ *
+ * **`initiatives.progress_pct` is a column nothing has ever written to**, so
+ * every initiative in the product read nought per cent from P5-T11 until this
+ * row, and the page carried a card saying so. The figure is derived from the
+ * initiative's own tasks now, and the panel lists the tasks it is derived
+ * from, which is what makes the number checkable rather than asserted.
+ */
+test("the initiative lists its tasks, and its progress matches them", async () => {
+  await goTo(page, "/initiatives");
+  await page.getByRole("link", { name: TITLE }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: TITLE }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // The card that said the panel had not been built is gone, and its promise
+  // is kept rather than restated.
+  await expect(page.getByText("What is not here yet")).toHaveCount(0);
+
+  // An initiative nobody has broken down says so rather than drawing a zero
+  // bar: that is not nought per cent done.
+  await expect(
+    page.getByRole("heading", { name: /^Tasks \(\d+ of \d+ done\)$/ }),
+  ).toBeVisible();
+  await expect(page.getByText("No tasks yet")).toBeVisible();
+});

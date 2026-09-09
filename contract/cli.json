@@ -4456,6 +4456,12 @@
             "in_progress",
             "done"
           ]
+        },
+        {
+          "name": "initiative-id",
+          "field": "initiativeId",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

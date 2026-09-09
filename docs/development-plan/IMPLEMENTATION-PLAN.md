@@ -1956,7 +1956,9 @@ Acceptance: Given a member with edit access on a goal, when they move it to the 
 ### P6-G28: The initiative's tasks and documents, S-26 [S]
 Depends on: P5-T11, P5-T12
 Goal: the two panels the initiative page still says are coming (GAP-AUDIT, the initiatives row).
-Deliverables: the tasks panel driven by `tasks.linkedWork`, so initiative progress reads as the share of its own tasks that are done rather than zero for everybody; the documents and attachments panel; the "What is not here yet" card removed.
+Deliverables: the tasks panel, so initiative progress reads as the share of its own tasks that are done rather than zero for everybody; the documents and attachments panel; the "What is not here yet" card removed.
+
+**Corrected at P6-G28, twice.** This row said the panel is driven by `tasks.linkedWork`; that action takes a `cycleId` and answers per key result, and nothing could answer "the work this initiative is made of" at all. `tasks.list` gained an `initiativeId` filter instead. And the zero was not caused by the missing panel: `initiatives.progress_pct` is a column nothing has ever written to, so the figure is derived in the read.
 Test plan: an initiative with three tasks, one done, reads 33 per cent; an initiative with no tasks renders an empty state rather than a zero bar; a document attached to the initiative appears and survives a reload.
 Acceptance: Given an initiative with tasks, when a member opens it, then the tasks are listed and the progress figure matches them.
 
