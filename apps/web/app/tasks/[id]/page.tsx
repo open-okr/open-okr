@@ -269,16 +269,21 @@ export default async function TaskPage({
             </Row>
           </CardBody>
         </Card>
+        {/*
+         * **Inside the rail, not beside it** (P6-G27b). The row above holds a
+         * `min-w-0 flex-1` content column and this `xl:w-80` rail; a child
+         * that is neither takes its intrinsic width and squeezes the column,
+         * which `two-column-rows.test.ts` now refuses.
+         */}
+        {level >= ACCESS_LEVELS.full ? (
+          <DeleteControl
+            subject="task"
+            id={id}
+            what="this task"
+            returnTo="/board"
+          />
+        ) : null}
       </div>
-
-      {level >= ACCESS_LEVELS.full ? (
-        <DeleteControl
-          subject="task"
-          id={id}
-          what="this task"
-          returnTo="/board"
-        />
-      ) : null}
     </div>
   );
 }

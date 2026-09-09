@@ -133,6 +133,14 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   await editor.getByLabel(`sponsor for ${OWNER}`).fill("12");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
 
+  // **Wait for the write, not for the click.** The button is disabled while
+  // the transition runs and this card has no success message of its own, so
+  // navigating straight after the click races the server action and the
+  // spec reads the canon back. It failed exactly that way once.
+  await expect(editor.getByTestId(`save-ladder-${OWNER}`)).toBeEnabled({
+    timeout: 15_000,
+  });
+
   await goTo(page, "/admin/nudges");
   await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
     `owner for ${OWNER}`,
@@ -145,6 +153,9 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
     await back.getByLabel(`${rung} for ${OWNER}`).fill("");
   }
   await back.getByTestId(`save-ladder-${OWNER}`).click();
+  await expect(back.getByTestId(`save-ladder-${OWNER}`)).toBeEnabled({
+    timeout: 15_000,
+  });
 
   await goTo(page, "/admin/nudges");
   await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(

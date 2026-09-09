@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -74,6 +75,13 @@ export default async function InitiativePage({
     workspace.workspaceId,
     workspace.memberId,
   );
+
+  // The files on this subject (P6-G27b). Seven attachment actions shipped and
+  // none of them had a caller anywhere.
+  const attachments = await callAction(context, "attachments.list", {
+    subjectType: "initiative",
+    subjectId: id,
+  });
   const canEdit = level >= ACCESS_LEVELS.edit;
 
   // Every key result the reader can see, so the link picker offers real
@@ -269,6 +277,13 @@ export default async function InitiativePage({
           </ul>
         </CardBody>
       </Card>
+      <Attachments
+        subjectType="initiative"
+        subjectId={id}
+        attachments={attachments}
+        canEdit={level >= ACCESS_LEVELS.edit}
+      />
+
       {level >= ACCESS_LEVELS.full ? (
         <DeleteControl
           subject="initiative"

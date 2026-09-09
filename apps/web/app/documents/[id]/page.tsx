@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -71,6 +72,13 @@ export default async function DocumentPage({
     workspace.workspaceId,
     workspace.memberId,
   );
+
+  // The files on this subject (P6-G27b). Seven attachment actions shipped and
+  // none of them had a caller anywhere.
+  const attachments = await callAction(context, "attachments.list", {
+    subjectType: "document",
+    subjectId: id,
+  });
   const canEdit = level >= ACCESS_LEVELS.edit;
   const back = SUBJECT_HREF[document.subjectType]?.(document.subjectId) ?? null;
 
@@ -216,15 +224,32 @@ export default async function DocumentPage({
             ) : null}
           </CardBody>
         </Card>
-      </div>
-      {level >= ACCESS_LEVELS.full ? (
-        <DeleteControl
-          subject="document"
-          id={id}
-          what="this document"
-          returnTo="/"
+        {/*
+         * **Inside the rail, not beside it** (P6-G27b). The row above is
+         * `xl:flex-row` with exactly two children: a `min-w-0 flex-1`
+         * content column and this `xl:w-80` rail. A third child takes its
+         * intrinsic width and `min-w-0` lets the content column give up
+         * every pixel of it, which is how the document's own heading
+         * collapsed to nothing. The same defect P6-G11b shipped on the goal
+         * page, twice more in one afternoon, and `two-column-rows.test.ts`
+         * now refuses a fourth.
+         */}
+        <Attachments
+          subjectType="document"
+          subjectId={id}
+          attachments={attachments}
+          canEdit={level >= ACCESS_LEVELS.edit}
         />
-      ) : null}
+
+        {level >= ACCESS_LEVELS.full ? (
+          <DeleteControl
+            subject="document"
+            id={id}
+            what="this document"
+            returnTo="/"
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

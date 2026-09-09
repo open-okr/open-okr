@@ -15,6 +15,7 @@ import { AnnualFrame } from "./annual-frame.tsx";
 import { AnnualObjectives } from "./annual-objectives.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
+import { CycleAdmin } from "./cycle-admin.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
@@ -80,11 +81,24 @@ export default async function CyclePage({
           </CardHeader>
           <CardBody>
             <p className="text-sm text-ink-3">
-              This workspace has no cycle to plan. An administrator can create
-              one from the rhythm settings.
+              This workspace has no cycle to plan.
             </p>
           </CardBody>
         </Card>
+        {/*
+         * **The sentence here used to point at a screen that could not do
+         * it** ("an administrator can create one from the rhythm settings"),
+         * because `cycles.create` had no browser caller at all. The control
+         * is here now, which is where somebody who has just been told there
+         * is no cycle already is (P6-G27b).
+         */}
+        {canPublish ? (
+          <CycleAdmin
+            currentCycleId={null}
+            currentName={null}
+            publicationDeadline={null}
+          />
+        ) : null}
       </div>
     );
   }
@@ -571,6 +585,20 @@ export default async function CyclePage({
           </Card>
         )}
         <GuidanceRail phase={viewing} mode={workflow.mode} />
+        {/*
+         * **Inside the rail, not beside it.** The row above is
+         * `xl:flex-row` with exactly two children: the content column and
+         * this rail. A third child takes its intrinsic width and overlaps
+         * the column beside it, which is the defect P6-G11b shipped on the
+         * goal page and P6-G24b's own suite caught here within the hour.
+         */}
+        {canPublish ? (
+          <CycleAdmin
+            currentCycleId={cycle.id}
+            currentName={cycle.name}
+            publicationDeadline={cycle.publicationDeadline ?? null}
+          />
+        ) : null}
       </div>
     </div>
   );

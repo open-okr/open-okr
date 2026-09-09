@@ -187,3 +187,69 @@ test("a second publish shows what changed between the two", async () => {
   await expect(difference).toContainText("version 1 and 2");
   await expect(difference).toContainText("Second draft.");
 });
+
+/**
+ * Files on a document, and the cycle controls (P6-G27b, GAP-AUDIT §5).
+ *
+ * Seven attachment actions and three cycle actions shipped and none of them
+ * was reachable from a screen. The upload goes through the storage port on the
+ * server rather than a presigned URL, because the port has two drivers and
+ * only one of them can sign anything: an instance on local disk has no object
+ * store to redirect to.
+ */
+test("a document carries files, and one survives a reload", async () => {
+  // **Reached from its goal, because there is no document index.** Every
+  // earlier case in this file navigates the same way: a document belongs to a
+  // subject and is linked from it.
+  await goTo(page, `/goals/${goalId}`);
+  await page.getByRole("link", { name: TITLE }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: TITLE }),
+  ).toBeVisible({ timeout: 15_000 });
+  const href = new URL(page.url()).pathname;
+
+  await expect(page.getByTestId("attachment-input")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByTestId("attachment-input").setInputFiles({
+    name: "brief.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("What this document is about."),
+  });
+  await page.getByTestId("attachment-upload").click();
+
+  const list = page.getByTestId("attachment-list");
+  await expect(list).toContainText("brief.txt", { timeout: 20_000 });
+
+  // It survives a reload, which is what "stored" means rather than "held in
+  // this page's state".
+  await goTo(page, href);
+  await expect(page.getByTestId("attachment-list")).toContainText("brief.txt", {
+    timeout: 15_000,
+  });
+
+  // And the bytes come back through the route that checks access first.
+  const link = page.getByRole("link", { name: "brief.txt" });
+  const target = await link.getAttribute("href");
+  expect(target).toMatch(/^\/api\/blobs\/[0-9a-f-]{36}$/);
+  const response = await page.request.get(target as string);
+  expect(response.status()).toBe(200);
+  expect(await response.text()).toBe("What this document is about.");
+});
+
+test("the cycle screen can reach the next quarter", async () => {
+  // `cycles.create`, `update` and `archive` had no browser caller, so a
+  // workspace could plan exactly one cycle: the one provisioning made. The
+  // controls are asserted rather than pressed: creating a second cycle here
+  // would move what every later spec reads.
+  await goTo(page, "/cycle");
+  await expect(page.getByTestId("create-cycle")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("set-publication-deadline")).toBeVisible();
+  await expect(page.getByTestId("archive-cycle")).toBeVisible();
+  // Create is refused until a date is chosen, because the action takes a day
+  // inside the period rather than a period.
+  await expect(page.getByTestId("create-cycle")).toBeDisabled();
+});
