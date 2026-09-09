@@ -115,12 +115,35 @@ describe("route segment boundaries", () => {
     expect(orphans).toEqual([]);
   });
 
-  test("no segment has a loading state yet, and that is on purpose", async () => {
-    // The inverse of the assertion this file was written with. Twenty-two
-    // `loading.tsx` files took the end-to-end suite from 184 passing to 75, so
-    // they came back out; putting one back before P6-G24c explains the
-    // duplicate render would break the suite again, quietly, from a file
-    // nobody reviewed twice.
+  test("no segment has a loading state yet, and now we know why", async () => {
+    // The inverse of the assertion this file was written with, and it stands
+    // for a measured reason rather than a suspicion.
+    //
+    // **The duplicate render P6-G24a could not explain is explained**, from a
+    // trace taken at P6-G24c with the loading states put back. A
+    // `loading.tsx` makes Next stream the segment behind a Suspense boundary,
+    // and React resolves an out-of-order boundary by putting the finished
+    // subtree in `<div hidden id="S:0">` at the end of the body, then running
+    // an inline script that moves it into place. Between those two steps the
+    // document holds the content twice. Playwright's strict mode counts every
+    // match including a hidden one, so an unscoped `getByText` resolves to
+    // two elements and fails. Measured: the visible copy in `main`, the second
+    // inside that hidden element.
+    //
+    // **It is not a defect in the product**, and P6-G24b removed the half that
+    // was: the shell is rendered once now, so a fallback no longer replaces
+    // the whole application frame. Nobody ever sees the staged copy.
+    //
+    // **What it costs is a suite-wide convention.** With the states back the
+    // suite ran 187 passing, 9 failing and 33 not run; a shared wait for the
+    // staging element to go, added to `goTo`, took that to 191 and 7. It does
+    // not close, because many specs navigate with `page.goto` directly and
+    // some assert after a client-side navigation. Every unscoped assertion in
+    // the suite becomes conditionally flaky, and the next person to write one
+    // would not know.
+    //
+    // That trade is Agung's to make, not this row's, so the states stay out
+    // and P6-G24c records the finding. See its STATUS row.
     const owners = await has("loading.tsx");
     expect([...owners]).toEqual([]);
   });

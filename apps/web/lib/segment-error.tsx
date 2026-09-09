@@ -18,11 +18,13 @@ import { TriangleAlert } from "lucide-react";
  * own correlation id: safe to show, and the only thing that ties a report here
  * to a line in the server log.
  *
- * **It does not draw the application shell, and that is a limit rather than a
- * choice.** Thirty-one pages render `AppShellLayout` inside themselves rather
- * than through a `layout.tsx`, so when a page throws the shell never rendered
- * and a boundary below it has no sidebar to keep. Moving the shell into
- * per-segment layouts is P6-G24b, and after that this card sits inside it.
+ * **It draws inside the application shell, since P6-G24b.** It did not at
+ * P6-G24a, and that was a limit rather than a choice: thirty-two pages
+ * rendered `AppShellLayout` inside themselves, so when a page threw, the shell
+ * had never rendered and a boundary below it had no sidebar to keep. The shell
+ * is a segment layout now, and Next renders a boundary inside its own
+ * segment's layout, so a reader who meets this card still has the navigation
+ * and can leave without the browser's back button.
  */
 export function SegmentError({
   error,
