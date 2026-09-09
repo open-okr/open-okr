@@ -1972,9 +1972,11 @@ Acceptance: every route in the module registry has at least one end-to-end path,
 ### P6-G30: The KPI grid's sparklines, subtotals and filters [M]
 Depends on: P3-T12, P3-T13
 Goal: finish S-20 (GAP-AUDIT, the `/kpis` row).
-Deliverables: the row sparkline and the category subtotal, both computed with the aggregate rules already in `packages/method`; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
+Deliverables: the row sparkline and the category subtotal; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
 Test plan: a subtotal matches the method function exactly rather than being summed here; a sparkline on a KPI with one record renders without a line and says so; a filter combination survives a reload through the URL; a calculated cell shows its formula and stays read-only.
-Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal matches `packages/method` and each row draws its own twelve-period sparkline.
+Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal says how the category is doing and each row draws its own twelve-period sparkline.
+
+**Corrected at P6-G30: there is no aggregate rule to match.** This row said the subtotal is computed with the rules already in `packages/method`. METHOD.md defines no aggregate for a category, and `aggregateForPeriod` folds one KPI across frequencies rather than several KPIs together. Summing a revenue figure and a response time would be a number nobody measured, so the subtotal is a tally of §6.4's corridor states.
 
 ### P6-G31: A read action's declared access level is enforced [M]
 Depends on: P2-T02, P5-T07a

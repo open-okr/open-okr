@@ -57,5 +57,11 @@
   "attachments.detach": "Detach",
   "attachments.field": "File to attach",
   "attachments.attach": "Attach",
-  "attachments.chooseFirst": "Choose a file first."
+  "attachments.chooseFirst": "Choose a file first.",
+  "kpi.subtotal.count": "KPIs",
+  "kpi.state.healthy": "healthy",
+  "kpi.state.watch": "watch",
+  "kpi.state.unhealthy": "unhealthy",
+  "kpi.state.recovering": "recovering",
+  "kpi.state.noData": "no data"
 }

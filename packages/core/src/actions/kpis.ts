@@ -25,6 +25,7 @@ import {
   kpis,
   kpiTrees,
   newId,
+  spaces,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
@@ -379,6 +380,23 @@ export const readKpiGrid = defineReadAction({
         healthyPct: z.number(),
         watchPct: z.number(),
         isCalculated: z.boolean(),
+        /**
+         * Who answers for this KPI, so the grid can filter by owner (P6-G30).
+         *
+         * S-20 asks for a filter by owner and the grid could not offer one: it
+         * returned no owner at all, and the KPI detail read is the only place
+         * that knew.
+         */
+        ownerId: z.uuid().nullable(),
+        ownerName: z.string().nullable(),
+        /**
+         * The expression behind a calculated cell (P6-G30).
+         *
+         * S-20 asks for a formula chip on a calculated cell, and a chip needs
+         * a formula to name. Returned as text rather than as the stored tree,
+         * because a reader wants to see the sum, not the shape of it.
+         */
+        formula: z.string().nullable(),
         records: z.array(
           z.object({
             periodStart: z.string(),
@@ -431,8 +449,20 @@ export const readKpiGrid = defineReadAction({
             healthyPct: kpis.healthyPct,
             watchPct: kpis.watchPct,
             isCalculated: kpis.isCalculated,
+            // **The owner is a kind and one of two columns**, not a single
+            // id: a KPI belongs to the workspace, a space or a member
+            // (P3-T12). The grid flattens the three into one label so S-20's
+            // owner filter has something to filter on.
+            ownerKind: kpis.ownerKind,
+            memberId: kpis.memberId,
+            memberName: workspaceMembers.name,
+            spaceId: kpis.spaceId,
+            spaceName: spaces.name,
+            formula: kpis.formula,
           })
           .from(kpis)
+          .leftJoin(workspaceMembers, eq(workspaceMembers.id, kpis.memberId))
+          .leftJoin(spaces, eq(spaces.id, kpis.spaceId))
           .where(activeOnly(kpis, eq(kpis.workspaceId, context.workspaceId)))
           .orderBy(asc(kpis.position), asc(kpis.title));
 
@@ -451,6 +481,21 @@ export const readKpiGrid = defineReadAction({
             targetDefault:
               kpi.targetDefault === null ? null : Number(kpi.targetDefault),
             healthyPct: Number(kpi.healthyPct),
+            ownerId: kpi.memberId ?? kpi.spaceId,
+            ownerName:
+              kpi.ownerKind === "member"
+                ? kpi.memberName
+                : kpi.ownerKind === "space"
+                  ? kpi.spaceName
+                  : null,
+            // Text, not the stored tree: a chip names the sum, it does not
+            // draw its shape (P6-G30).
+            formula:
+              kpi.formula === null || kpi.formula === undefined
+                ? null
+                : typeof kpi.formula === "string"
+                  ? kpi.formula
+                  : JSON.stringify(kpi.formula),
             watchPct: Number(kpi.watchPct),
             records: records.map((record) => ({
               periodStart: String(record.periodStart),

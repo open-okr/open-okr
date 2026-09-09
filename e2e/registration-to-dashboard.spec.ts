@@ -791,6 +791,60 @@ test("the tree draws the driver added under a node, and the detail reads it back
   await expect(page.getByText("Nothing recorded yet.")).toBeVisible();
 });
 
+/**
+ * The grid finishes S-20 (P6-G30).
+ *
+ * The page carried a "Not here yet" card naming three things and naming
+ * P3-T13 as the blocker; P3-T13 landed, which is how this row came to exist.
+ * By this point in the file one KPI has been created and given one value, so
+ * the sparkline's own refusal is the honest thing to assert: two points are
+ * the fewest a trend can be made of.
+ */
+test("the grid carries its subtotals, sparklines and filters", async () => {
+  await page.goto("/kpis");
+
+  // The card that promised all three is gone.
+  await expect(page.getByText("Not here yet")).toHaveCount(0);
+
+  // The subtotal is a tally of §6.4's corridor states, because METHOD.md
+  // defines no aggregate for a category and adding a revenue figure to a
+  // response time would be a number nobody measured.
+  const subtotal = page.getByTestId("category-subtotal").first();
+  await expect(subtotal).toBeVisible({ timeout: 15_000 });
+  await expect(subtotal).toContainText("KPI");
+
+  // One value so far, so no line is drawn and the row says why.
+  await expect(page.getByTestId("sparkline-too-short").first()).toBeVisible();
+
+  /*
+   * The filters are links, so a combination survives a reload and can be sent
+   * to somebody.
+   *
+   * **The value is read off the page rather than named here.** The choices are
+   * derived from the KPIs this instance actually holds, so naming one asserts
+   * something about the fixture instead of about the filter: the first draft
+   * picked `unhealthy`, and by this point in the file the recovery has flipped
+   * the only KPI that was.
+   */
+  const chosen = await page
+    .locator('[data-testid^="filter-frequency-"]')
+    .evaluateAll((links) => {
+      const first = links
+        .map((link) => link.getAttribute("data-testid") ?? "")
+        .find((id) => id !== "filter-frequency-all");
+      return first ?? "";
+    });
+  expect(chosen, "no frequency filter to follow").not.toBe("");
+  await page.getByTestId(chosen).click();
+  await expect(page).toHaveURL(/frequency=/, { timeout: 15_000 });
+  await page.reload();
+  await expect(page.getByTestId(chosen)).toBeVisible();
+
+  // And back, so the grid the later specs read is unfiltered.
+  await page.getByTestId("filter-frequency-all").click();
+  await expect(page).toHaveURL(/\/kpis$/, { timeout: 15_000 });
+});
+
 test("signing out ends the session", async () => {
   await page.goto("/");
   // The app shell (P2-T10) moved sign-out behind the topbar's avatar menu.

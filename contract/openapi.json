@@ -32501,6 +32501,38 @@
                               "isCalculated": {
                                 "type": "boolean"
                               },
+                              "ownerId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "ownerName": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "formula": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "records": {
                                 "type": "array",
                                 "items": {
@@ -32566,6 +32598,9 @@
                               "healthyPct",
                               "watchPct",
                               "isCalculated",
+                              "ownerId",
+                              "ownerName",
+                              "formula",
                               "records"
                             ],
                             "additionalProperties": false

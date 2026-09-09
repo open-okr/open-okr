@@ -57,5 +57,11 @@
   "attachments.detach": "Tanggalkan",
   "attachments.field": "Fail untuk dilampirkan",
   "attachments.attach": "Lampirkan",
-  "attachments.chooseFirst": "Pilih fail dahulu."
+  "attachments.chooseFirst": "Pilih fail dahulu.",
+  "kpi.subtotal.count": "KPI",
+  "kpi.state.healthy": "sihat",
+  "kpi.state.watch": "perhatian",
+  "kpi.state.unhealthy": "tidak sihat",
+  "kpi.state.recovering": "sedang pulih",
+  "kpi.state.noData": "tiada data"
 }
