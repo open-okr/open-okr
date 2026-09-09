@@ -32,6 +32,7 @@ import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 
@@ -92,8 +93,14 @@ async function boardFor(
       const tx = rawTx as unknown as OperationTx;
       await actingMember(tx, context.workspaceId, userId);
 
-      const { thresholds } = resolveRhythm(
-        await readRhythmRow(tx, context.workspaceId),
+      // The workspace's own blocker ladder when it has replaced §11's
+      // (P6-G21b). Substituted into the thresholds rather than read beside
+      // them, so `rankBlockers` below is unchanged and any later reader of a
+      // rung gets the same answer.
+      const thresholds = await resolveRhythmWithLadders(
+        tx,
+        context.workspaceId,
+        resolveRhythm(await readRhythmRow(tx, context.workspaceId)),
       );
 
       // A blocker belongs to a space through the goal or key result it blocks,

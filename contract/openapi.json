@@ -35325,6 +35325,62 @@
                               "quietModeExempt": {
                                 "type": "boolean"
                               },
+                              "ladder": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "rungs": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "canon": {
+                                        "type": "object",
+                                        "propertyNames": {
+                                          "type": "string"
+                                        },
+                                        "additionalProperties": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "own": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "propertyNames": {
+                                              "type": "string"
+                                            },
+                                            "additionalProperties": {
+                                              "type": "number"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "governs": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "rungs",
+                                      "canon",
+                                      "own",
+                                      "governs"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "configured": {
                                 "type": "boolean"
                               },
@@ -35348,6 +35404,7 @@
                               "enabled",
                               "channelOverride",
                               "quietModeExempt",
+                              "ladder",
                               "configured",
                               "sent",
                               "suppressed"
@@ -35497,6 +35554,22 @@
                   },
                   "quietModeExempt": {
                     "type": "boolean"
+                  },
+                  "escalationLadder": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "number"
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [

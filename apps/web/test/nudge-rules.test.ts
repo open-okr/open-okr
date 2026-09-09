@@ -74,4 +74,33 @@ describe("the nudge rule cards", () => {
     expect(cards).toContain("§6.3 puts an");
     expect(cards).toContain("Speaks through quiet mode");
   });
+
+  test("offer the ladder as one value, and only where a rule owns one", () => {
+    // P6-G21b. `nudge_rules.escalation_ladder` was stored from P4-T04b and
+    // read by nothing. §11 defines three ladders and §6.4 defines twenty-four
+    // triggers, so the editor renders nothing at all for the twenty-one that
+    // own none rather than an empty box.
+    expect(cards).toContain("function LadderEditor");
+    expect(cards).toContain("if (!ladder) {");
+
+    // Every rung submits together, because a ladder is one value: the rungs
+    // must increase, so a field saving on its own would refuse half the ways
+    // of getting from one valid ladder to another.
+    expect(cards).toContain("escalationLadder: ladder");
+    expect(cards).toContain("A ladder is one value");
+
+    // Empty means the canon, and the canon is the placeholder. Pre-filling
+    // §11's numbers would make a workspace that chose nothing look like one
+    // that chose the default, and store a copy that survives a change to §11.
+    expect(cards).toContain("placeholder={String(ladder.canon[rung]");
+    expect(cards).toContain("Use §11's");
+
+    // The card names what one ladder reaches, because a change here is not
+    // scoped to the rule it is set on.
+    expect(cards).toContain("ladder.governs.join");
+
+    expect(actions).toContain(
+      "escalationLadder?: Record<string, number> | null",
+    );
+  });
 });

@@ -96,3 +96,58 @@ test("the rule goes back to the canon, leaving the instance as it was", async ()
     timeout: 15_000,
   });
 });
+
+/**
+ * The per-rule escalation ladder (§11, P6-G21b).
+ *
+ * `nudge_rules.escalation_ladder` has been stored since P4-T04b and read by
+ * nothing, and no screen ever offered it. This is the round trip: set one,
+ * see it come back, and put it away again so the instance is as it was for
+ * whatever spec runs next.
+ */
+test("a ladder is set, refused when out of order, and returned to the canon", async () => {
+  const OWNER = "blocker.escalated";
+  await goTo(page, "/admin/nudges");
+
+  const editor = page.getByTestId(`ladder-${OWNER}`);
+  await expect(editor).toBeVisible({ timeout: 15_000 });
+  // It says what one ladder reaches, because the change is not scoped to the
+  // rule it is set on.
+  await expect(editor).toContainText("blocker.warning");
+
+  // Out of order first: the top rung fires before the ones below it, which is
+  // not a ladder. §11's schema types each rung and says nothing about order,
+  // so this refusal is the product's own.
+  await editor.getByLabel(`owner for ${OWNER}`).fill("30");
+  await editor.getByLabel(`coordinator for ${OWNER}`).fill("24");
+  await editor.getByLabel(`sponsor for ${OWNER}`).fill("48");
+  await editor.getByTestId(`save-ladder-${OWNER}`).click();
+  await expect(page.getByRole("alert").first()).toContainText(
+    "must come after",
+    { timeout: 15_000 },
+  );
+
+  // Then one §11 accepts.
+  await editor.getByLabel(`owner for ${OWNER}`).fill("4");
+  await editor.getByLabel(`coordinator for ${OWNER}`).fill("8");
+  await editor.getByLabel(`sponsor for ${OWNER}`).fill("12");
+  await editor.getByTestId(`save-ladder-${OWNER}`).click();
+
+  await goTo(page, "/admin/nudges");
+  await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
+    `owner for ${OWNER}`,
+  )).toHaveValue("4", { timeout: 15_000 });
+
+  // And away again. A row kept only to hold a copy of §11's numbers would
+  // survive a change to §11, so emptying every rung removes it.
+  const back = page.getByTestId(`ladder-${OWNER}`);
+  for (const rung of ["owner", "coordinator", "sponsor"]) {
+    await back.getByLabel(`${rung} for ${OWNER}`).fill("");
+  }
+  await back.getByTestId(`save-ladder-${OWNER}`).click();
+
+  await goTo(page, "/admin/nudges");
+  await expect(page.getByTestId(`ladder-${OWNER}`).getByLabel(
+    `owner for ${OWNER}`,
+  )).toHaveValue("", { timeout: 15_000 });
+});

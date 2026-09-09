@@ -10004,6 +10004,22 @@
           },
           "quietModeExempt": {
             "type": "boolean"
+          },
+          "escalationLadder": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

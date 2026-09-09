@@ -32,6 +32,18 @@ export interface RuleRow {
   readonly enabled: boolean;
   readonly channelOverride: string | null;
   readonly quietModeExempt: boolean;
+  /**
+   * The §11 ladder this rule owns, null on the twenty-one that own none
+   * (P6-G21b). `own` is null while the workspace is on the canon, which is
+   * what lets the fields show §11's numbers as placeholders rather than as
+   * something somebody typed.
+   */
+  readonly ladder: {
+    readonly rungs: readonly string[];
+    readonly canon: Readonly<Record<string, number>>;
+    readonly own: Readonly<Record<string, number>> | null;
+    readonly governs: readonly string[];
+  } | null;
   readonly configured: boolean;
   readonly sent: number;
   readonly suppressed: number;
@@ -41,6 +53,104 @@ export interface RuleRow {
 export interface ChannelChoice {
   readonly value: string;
   readonly label: string;
+}
+
+/**
+ * A workspace's own escalation ladder for one rule (§11, P6-G21b).
+ *
+ * **Every rung is submitted together, because a ladder is one value.** The
+ * rungs must increase, so a field that saved on its own would refuse half the
+ * ways of getting from one valid ladder to another: raising the coordinator
+ * above the sponsor is a legal intermediate state of typing and an illegal
+ * ladder to store.
+ *
+ * **Empty means the canon**, and the placeholder shows what the canon is. The
+ * alternative, pre-filling §11's numbers, makes a workspace that never chose
+ * anything look like one that chose exactly the default, and stores a copy
+ * that would survive a change to §11.
+ */
+function LadderEditor({
+  rule,
+  pending,
+  onSave,
+}: {
+  readonly rule: RuleRow;
+  readonly pending: boolean;
+  readonly onSave: (ladder: Record<string, number> | null) => void;
+}) {
+  const ladder = rule.ladder;
+  const [draft, setDraft] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      (ladder?.rungs ?? []).map((rung) => [
+        rung,
+        ladder?.own?.[rung] === undefined ? "" : String(ladder.own[rung]),
+      ]),
+    ),
+  );
+
+  if (!ladder) {
+    return null;
+  }
+
+  const filled = ladder.rungs.filter((rung) => draft[rung]?.trim() !== "");
+  const partial = filled.length > 0 && filled.length < ladder.rungs.length;
+
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-md bg-raised px-2.5 py-2"
+      data-testid={`ladder-${rule.key}`}
+    >
+      <span className="text-xs text-ink-3">
+        This rule owns §11&apos;s ladder for {ladder.governs.join(", ")}. Leave
+        every field empty to keep the canon.
+      </span>
+      <div className="flex flex-wrap items-end gap-2.5">
+        {ladder.rungs.map((rung) => (
+          <label
+            key={rung}
+            className="flex flex-col gap-0.5 text-xs text-ink-3"
+          >
+            {rung}
+            <input
+              type="number"
+              min={0}
+              value={draft[rung] ?? ""}
+              disabled={pending}
+              placeholder={String(ladder.canon[rung] ?? "")}
+              aria-label={`${rung} for ${rule.key}`}
+              onChange={(event) =>
+                setDraft((held) => ({ ...held, [rung]: event.target.value }))
+              }
+              className="w-20 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+            />
+          </label>
+        ))}
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || partial}
+          data-testid={`save-ladder-${rule.key}`}
+          onClick={() =>
+            onSave(
+              filled.length === 0
+                ? null
+                : Object.fromEntries(
+                    ladder.rungs.map((rung) => [rung, Number(draft[rung])]),
+                  ),
+            )
+          }
+        >
+          {filled.length === 0 ? "Use §11's" : "Save the ladder"}
+        </Button>
+      </div>
+      {partial ? (
+        <span className="text-xs text-warn">
+          A ladder is one value. Fill every rung, or empty them all to return to
+          §11&apos;s.
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function Rule({
@@ -140,6 +250,14 @@ function Rule({
           Speaks through quiet mode
         </label>
       </div>
+
+      <LadderEditor
+        rule={rule}
+        pending={pending}
+        onSave={(ladder) =>
+          change({ ruleKey: rule.key, escalationLadder: ladder })
+        }
+      />
 
       {rule.enabled ? null : (
         <span className="text-xs text-warn">

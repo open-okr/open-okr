@@ -706,3 +706,104 @@ describe("nudge rule cards (P6-G21)", () => {
     );
   });
 });
+
+/**
+ * A workspace's own escalation ladder (METHOD.md §11, P6-G21b).
+ *
+ * `nudge_rules.escalation_ladder` has been stored since P4-T04b and read by
+ * nothing: the column's comment, the table and the admin screen all said a
+ * workspace could replace §11's ladder for a rule, and every consumer read the
+ * canon. These prove the write refuses what §11 would not accept, that the
+ * read hands the ladder back, and that a consumer sees the workspace's numbers
+ * rather than the canon's.
+ */
+describe("the per-rule escalation ladder (P6-G21b)", () => {
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "nudges.rules", {});
+  };
+  const set = async (input: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.setRule",
+      input as never,
+    );
+  };
+
+  it("offers a ladder on the three rules that own one, and no others", async () => {
+    // §11 defines three ladders and §6.4 defines twenty-four triggers, so the
+    // mapping is many to one. Hanging the override on every rung would let a
+    // workspace store three answers to one question.
+    const answer = await read();
+    const owners = answer.rules.filter((rule) => rule.ladder !== null);
+    expect(owners.map((rule) => rule.key).sort()).toEqual([
+      "ack.overdue",
+      "blocker.escalated",
+      "checkin.overdue",
+    ]);
+    const blocker = owners.find((rule) => rule.key === "blocker.escalated");
+    expect(blocker?.ladder?.canon).toEqual({
+      owner: 20,
+      coordinator: 24,
+      sponsor: 48,
+    });
+    // Null while the workspace is on the canon, which is what lets the screen
+    // show §11's numbers as placeholders rather than as something typed.
+    expect(blocker?.ladder?.own).toBeNull();
+    expect(blocker?.ladder?.governs).toContain("blocker.warning");
+  });
+
+  it("refuses a ladder on a rule that owns none", async () => {
+    await expect(
+      set({
+        ruleKey: "digest.weekly",
+        escalationLadder: { owner: 1, coordinator: 2, sponsor: 3 },
+      }),
+    ).rejects.toThrow(/does not own a ladder/);
+  });
+
+  it("refuses rungs that do not increase", async () => {
+    // The registry types each rung and says nothing about their order, because
+    // a canon ladder is written in order by hand. A ladder whose rungs are out
+    // of order fires its top rung first and never reaches the ones below it.
+    await expect(
+      set({
+        ruleKey: "blocker.escalated",
+        escalationLadder: { owner: 30, coordinator: 24, sponsor: 48 },
+      }),
+    ).rejects.toThrow(/must come after/);
+  });
+
+  it("refuses a shape §11 would not recognise", async () => {
+    await expect(
+      set({
+        ruleKey: "blocker.escalated",
+        escalationLadder: { owner: 20, coordinator: 24 },
+      }),
+    ).rejects.toThrow(/§11 would recognise/);
+  });
+
+  it("stores one, hands it back, and returns to the canon when emptied", async () => {
+    await set({
+      ruleKey: "blocker.escalated",
+      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+    });
+    const stored = await read();
+    const rule = stored.rules.find((one) => one.key === "blocker.escalated");
+    expect(rule?.ladder?.own).toEqual({
+      owner: 4,
+      coordinator: 8,
+      sponsor: 12,
+    });
+    expect(rule?.configured).toBe(true);
+
+    // A row kept only to hold a copy of §11's numbers would survive a change
+    // to §11, so returning to the canon removes it.
+    await set({ ruleKey: "blocker.escalated", escalationLadder: null });
+    const back = await read();
+    const after = back.rules.find((one) => one.key === "blocker.escalated");
+    expect(after?.ladder?.own).toBeNull();
+    expect(after?.configured).toBe(false);
+  });
+});

@@ -1815,7 +1815,9 @@ Acceptance: Given an administrator who disables the noisiest rule, when its trig
 ### P6-G21b: The per-rule escalation ladder [M]
 Depends on: P6-G21
 Goal: a workspace can widen or narrow one rule's ladder (GAP-AUDIT G-04).
-Deliverables: `nudge_rules.escalation_ladder` made to apply, which is stored today and read by nothing; the three places a canon ladder is consumed taught to prefer a rule's own, which are `blockers.board`, `review` and the obligation reader; the ladder editor on the rule card, validated against the same bounds §11 gives the canon ladder.
+Deliverables: `nudge_rules.escalation_ladder` made to apply, which is stored today and read by nothing; every place a canon ladder is consumed taught to prefer a rule's own; the ladder editor on the rule card, validated against the same bounds §11 gives the canon ladder.
+
+**Corrected at P6-G21b: there are four consumers, not three.** This row named `blockers.board`, `review` and the obligation reader. `nudges/service.ts` reads the check-in ladder through `escalation()` and is the fourth, and it is the one that matters most, because it is the reader that produces the nudges. The obligation reader is pure and takes the rung as a parameter, so `review` covers it. All four are served by one substitution where the thresholds are built.
 Test plan: a rule with its own ladder escalates on its own numbers and every other rule on the canon's; a ladder that does not widen step by step is refused with the bound stated; clearing it returns the rule to §11's.
 Acceptance: Given a workspace that widens the blocker ladder for one rule, when a blocker passes the canon hour, then that rule has not escalated and every other rule has.
 

@@ -42,6 +42,12 @@ export async function setNudgeRuleAction(input: {
     | "telegram"
     | null;
   quietModeExempt?: boolean;
+  /**
+   * This workspace's own §11 ladder for the rule that owns one (P6-G21b).
+   * Null returns it to the canon, and the core action refuses a rule that
+   * owns no ladder and a ladder whose rungs do not increase.
+   */
+  escalationLadder?: Record<string, number> | null;
 }): Promise<RuleResult> {
   try {
     await callAction(await context(), "nudges.setRule", input);

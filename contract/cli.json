@@ -7303,6 +7303,12 @@
           "field": "quietModeExempt",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "escalation-ladder",
+          "field": "escalationLadder",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

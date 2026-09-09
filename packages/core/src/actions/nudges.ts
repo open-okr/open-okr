@@ -9,13 +9,22 @@ import {
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { isTriggerKey, TRIGGER_CATALOGUE } from "@openokr/method";
+import {
+  isTriggerKey,
+  type ResolvedThresholds,
+  TRIGGER_CATALOGUE,
+} from "@openokr/method";
 import { and, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import {
+  LADDER_OWNERS,
+  ladderOwnerFor,
+  ladderProblem,
+} from "../nudges/ladders.ts";
 import { runDueNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/errors.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
@@ -496,6 +505,43 @@ export const nudgeVolume = defineReadAction({
  * turning a rule down: "this one sent forty-one messages last week" is the
  * sentence that makes the decision, not the rule's name.
  */
+
+/**
+ * What the rules screen shows for a ladder (P6-G21b).
+ *
+ * Null for the twenty-one triggers that own no ladder, so the card renders
+ * nothing rather than an empty editor. `own` is what the workspace stored and
+ * is null when it stored nothing, which is what lets the screen say "§11's"
+ * instead of showing the canon as though somebody had typed it.
+ */
+function ladderFor(
+  ruleKey: string,
+  canon: ResolvedThresholds,
+  stored: Record<string, number> | null | undefined,
+): {
+  rungs: string[];
+  canon: Record<string, number>;
+  own: Record<string, number> | null;
+  governs: string[];
+} | null {
+  const owner = ladderOwnerFor(ruleKey);
+  if (!owner) {
+    return null;
+  }
+  return {
+    rungs: [...owner.rungs],
+    canon: canon[owner.threshold] as unknown as Record<string, number>,
+    // Shown only when it is readable. A row an older release wrote is one the
+    // reader is not being asked to confirm, and `resolveLadder` is already
+    // ignoring it everywhere else.
+    own:
+      stored && ladderProblem(owner, stored) === null
+        ? (stored as Record<string, number>)
+        : null,
+    governs: [...owner.governs],
+  };
+}
+
 export const listNudgeRules = defineReadAction({
   name: "nudges.rules",
   summary:
@@ -515,6 +561,22 @@ export const listNudgeRules = defineReadAction({
         enabled: z.boolean(),
         channelOverride: z.string().nullable(),
         quietModeExempt: z.boolean(),
+        /**
+         * The §11 ladder this rule owns, if it owns one (P6-G21b).
+         *
+         * Absent on the twenty-one rules that own none. Present on the three
+         * that do, carrying the canon, whatever the workspace has put in its
+         * place, and the other triggers the one ladder decides, so the card
+         * can say what a change here reaches.
+         */
+        ladder: z
+          .object({
+            rungs: z.array(z.string()),
+            canon: z.record(z.string(), z.number()),
+            own: z.record(z.string(), z.number()).nullable(),
+            governs: z.array(z.string()),
+          })
+          .nullable(),
         /** Whether this workspace has changed anything about it. */
         configured: z.boolean(),
         /** Sent in the last seven days. */
@@ -540,6 +602,7 @@ export const listNudgeRules = defineReadAction({
           enabled: nudgeRules.enabled,
           channelOverride: nudgeRules.channelOverride,
           quietModeExempt: nudgeRules.quietModeExempt,
+          escalationLadder: nudgeRules.escalationLadder,
         })
         .from(nudgeRules)
         .where(
@@ -549,6 +612,13 @@ export const listNudgeRules = defineReadAction({
           ),
         );
       const byKey = new Map(configured.map((row) => [row.ruleKey, row]));
+
+      // §11's own numbers, after any workspace override of the *thresholds*
+      // themselves (P6-G20). A ladder override sits on top of that, so a
+      // workspace that changed both sees its own answer in both places.
+      const canon = resolveRhythm(
+        await readRhythmRow(tx, context.workspaceId),
+      ).thresholds;
 
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const volume = await tx
@@ -584,6 +654,7 @@ export const listNudgeRules = defineReadAction({
             enabled: row?.enabled ?? true,
             channelOverride: row?.channelOverride ?? null,
             quietModeExempt: row?.quietModeExempt ?? false,
+            ladder: ladderFor(trigger.key, canon, row?.escalationLadder),
             configured: row !== undefined,
             sent: Number(seen?.sent ?? 0),
             suppressed: Number(seen?.suppressed ?? 0),
@@ -612,6 +683,16 @@ export const setNudgeRule = defineWriteAction({
     /** Null returns this rule to the member's own primary channel. */
     channelOverride: primaryChannelSchema.nullable().optional(),
     quietModeExempt: z.boolean().optional(),
+    /**
+     * This workspace's own §11 ladder, for the rule that owns one (P6-G21b).
+     *
+     * Null returns the rule to the canon. Typed loosely here and checked
+     * against the threshold registry's own schema in the handler, because the
+     * three ladders have three shapes and the registry is what defines them.
+     * A second copy of those shapes in this file is a second thing to keep in
+     * step with §11.
+     */
+    escalationLadder: z.record(z.string(), z.number()).nullable().optional(),
   }),
   output: z.object({ ruleKey: z.string(), configured: z.boolean() }),
   access: ACCESS_LEVELS.full,
@@ -624,12 +705,34 @@ export const setNudgeRule = defineWriteAction({
         );
       }
 
+      const ladderOwner = ladderOwnerFor(input.ruleKey);
+      if (input.escalationLadder !== undefined) {
+        if (!ladderOwner) {
+          throw new OperationError(
+            // The idiom `rhythm.update` set for a value §11 would not accept.
+            "forbidden",
+            input.ruleKey +
+              " does not own a ladder. §11 defines three, and each is set " +
+              "on the rule it escalates to: " +
+              LADDER_OWNERS.map((owner) => owner.ruleKey).join(", ") +
+              ".",
+          );
+        }
+        if (input.escalationLadder !== null) {
+          const problem = ladderProblem(ladderOwner, input.escalationLadder);
+          if (problem) {
+            throw new OperationError("forbidden", problem);
+          }
+        }
+      }
+
       const [existing] = await tx
         .select({
           id: nudgeRules.id,
           enabled: nudgeRules.enabled,
           channelOverride: nudgeRules.channelOverride,
           quietModeExempt: nudgeRules.quietModeExempt,
+          escalationLadder: nudgeRules.escalationLadder,
         })
         .from(nudgeRules)
         .where(
@@ -649,12 +752,21 @@ export const setNudgeRule = defineWriteAction({
             : (existing?.channelOverride ?? null),
         quietModeExempt:
           input.quietModeExempt ?? existing?.quietModeExempt ?? false,
+        escalationLadder:
+          input.escalationLadder !== undefined
+            ? input.escalationLadder
+            : (existing?.escalationLadder ?? null),
       };
 
       // Back to the canon in every respect: the row goes rather than being
       // kept as a copy of the default.
+      // Back to the canon in every respect includes the ladder: a row kept
+      // only to hold a copy of §11's numbers would survive a change to §11.
       const isCanon =
-        next.enabled && next.channelOverride === null && !next.quietModeExempt;
+        next.enabled &&
+        next.channelOverride === null &&
+        !next.quietModeExempt &&
+        next.escalationLadder === null;
 
       if (isCanon) {
         if (existing) {
