@@ -119,37 +119,32 @@ describe("route segment boundaries", () => {
     expect(orphans).toEqual([]);
   });
 
-  test("no segment has a loading state yet, and now we know why", async () => {
-    // The inverse of the assertion this file was written with, and it stands
-    // for a measured reason rather than a suspicion.
+  test("every segment has a loading state, and the staged copy is handled", async () => {
+    // **The inverse of what stood here between P6-G24a and P6-G24c.**
     //
-    // **The duplicate render P6-G24a could not explain is explained**, from a
-    // trace taken at P6-G24c with the loading states put back. A
-    // `loading.tsx` makes Next stream the segment behind a Suspense boundary,
-    // and React resolves an out-of-order boundary by putting the finished
-    // subtree in `<div hidden id="S:0">` at the end of the body, then running
-    // an inline script that moves it into place. Between those two steps the
-    // document holds the content twice. Playwright's strict mode counts every
-    // match including a hidden one, so an unscoped `getByText` resolves to
-    // two elements and fails. Measured: the visible copy in `main`, the second
-    // inside that hidden element.
+    // The duplicate render is explained, from a trace: a `loading.tsx` makes
+    // Next stream the segment, React holds the finished subtree in
+    // `<div hidden id="S:0">` until an inline script moves it into place, and
+    // Playwright counts every match under strict mode including the hidden
+    // one. It is not a defect, and nobody ever sees the staged copy.
     //
-    // **It is not a defect in the product**, and P6-G24b removed the half that
-    // was: the shell is rendered once now, so a fallback no longer replaces
-    // the whole application frame. Nobody ever sees the staged copy.
+    // `e2e/fixtures.ts` waits for that element to go on every `goto` and
+    // `reload`. A fixture rather than a rule people follow: the first attempt
+    // put the wait inside `goTo` and missed every spec that navigates
+    // directly, which took the run to 191 of 198 rather than closing it.
     //
-    // **What it costs is a suite-wide convention.** With the states back the
-    // suite ran 187 passing, 9 failing and 33 not run; a shared wait for the
-    // staging element to go, added to `goTo`, took that to 191 and 7. It does
-    // not close, because many specs navigate with `page.goto` directly and
-    // some assert after a client-side navigation. Every unscoped assertion in
-    // the suite becomes conditionally flaky, and the next person to write one
-    // would not know.
-    //
-    // That trade is Agung's to make, not this row's, so the states stay out
-    // and P6-G24c records the finding. See its STATUS row.
-    const owners = await has("loading.tsx");
-    expect([...owners]).toEqual([]);
+    // P6-G24b had to land first. With the shell inside each page, a fallback
+    // replaced the whole application frame rather than the panel in it.
+    const loading = await has("loading.tsx");
+    const errors = await has("error.tsx");
+    // The root is excluded, and deliberately: `app/error.tsx` is the
+    // document own boundary and renders outside the shell, so a root
+    // `loading.tsx` would be a fallback outside the shell too, which is the
+    // P6-G24a shape this row exists to avoid.
+    const missing = [...errors].filter(
+      (segment) => segment !== "" && !loading.has(segment),
+    );
+    expect(missing).toEqual([]);
   });
 
   test("no in-shell segment falls all the way back to the root boundary", async () => {

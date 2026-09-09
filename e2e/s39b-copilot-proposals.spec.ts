@@ -20,7 +20,7 @@
  * anything that signs in has to sort after `registration-`. `s39b` follows
  * `s39-copilot.spec.ts`.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";

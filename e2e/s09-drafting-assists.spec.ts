@@ -21,7 +21,7 @@
  *
  * The step is `?phase=4`, which is what `page.tsx` reads.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
 import { goTo, signIn } from "./instance-account.ts";
 

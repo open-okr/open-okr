@@ -21,7 +21,7 @@
  */
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 

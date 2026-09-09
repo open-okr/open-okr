@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 
 /**
  * The first-run wizard, in a browser (P1-T09).

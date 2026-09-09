@@ -20,7 +20,7 @@
  * rather than sticking at whatever was chosen.
  */
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
