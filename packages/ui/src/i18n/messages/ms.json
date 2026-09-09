@@ -27,5 +27,15 @@
   "welcome.continue": "Teruskan",
   "welcome.skip": "Langkau",
   "welcome.demo.build": "Bina contoh itu",
-  "welcome.demo.empty": "Mulakan kosong"
+  "welcome.demo.empty": "Mulakan kosong",
+  "goal.writes.title": "Pindah, putus pautan, padam",
+  "goal.writes.explains": "Perkara yang berlaku kepada matlamat sekali sahaja, bukan setiap minggu.",
+  "goal.writes.moveLabel": "Pindah ke satu kitaran",
+  "goal.writes.moveTarget": "Kitaran untuk memindahkan matlamat ini",
+  "goal.writes.move": "Pindah",
+  "goal.writes.moveHelp": "Skor dan sejarahnya berpindah sekali. Matlamat dalam kitaran yang salah dikira pada suku tahun yang salah.",
+  "goal.writes.unlinkLabel": "Putuskan pautan KPI",
+  "goal.writes.unlink": "Putus pautan",
+  "goal.writes.unlinkHelp": "Nilai terakhir yang dilaporkan KPI kekal, sebagai nilai manual. Memutuskan pautan menghentikan KPI menulis di sini; ia tidak menetapkan semula ukuran.",
+  "task.checklist.remove": "Buang"
 }

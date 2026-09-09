@@ -22,6 +22,7 @@ import {
 } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { GoalComments } from "./goal-comments.tsx";
+import { GoalWrites } from "./goal-writes.tsx";
 import { Rail } from "./rail.tsx";
 import { Sparkline } from "./sparkline.tsx";
 
@@ -178,7 +179,12 @@ export default async function GoalPage({
   // that is the moment to add one rather than now.
   const reactions = new Map<
     string,
-    { emoji: string; count: number; own: boolean }[]
+    {
+      emoji: string;
+      count: number;
+      own: boolean;
+      ownReactionId: string | null;
+    }[]
   >();
   for (const comment of comments) {
     const groups = await callAction(context, "reactions.list", {
@@ -191,6 +197,7 @@ export default async function GoalPage({
         emoji: group.emoji,
         count: group.count,
         own: group.own,
+        ownReactionId: group.ownReactionId,
       })),
     );
   }
@@ -654,6 +661,24 @@ export default async function GoalPage({
             />
           </CardBody>
         </Card>
+
+        {/*
+         * The writes P6-G27 gave a browser path. Last in the column, because
+         * moving or deleting a goal is the end of a conversation rather than
+         * part of one.
+         */}
+        <GoalWrites
+          goalId={id}
+          cycles={cycles.map((cycle) => ({ id: cycle.id, name: cycle.name }))}
+          currentCycleId={goal.cycleId ?? null}
+          linkedKeyResults={goal.keyResults
+            .filter((keyResult) => keyResult.kpiId !== null)
+            .map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+            }))}
+          canAdminister={canAdminister}
+        />
 
         {/*
          * **Inside the content column, not beside it.** P6-G11b put this

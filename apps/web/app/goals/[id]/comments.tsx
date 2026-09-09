@@ -17,6 +17,13 @@ interface ReactionGroupData {
   readonly emoji: string;
   readonly count: number;
   readonly own: boolean;
+  /**
+   * The reader's own reaction, so pressing the emoji again takes it back
+   * (P6-G27). Null when `own` is false. `reactions.remove` takes an id and
+   * nothing on this screen knew it, so a reaction could be given and never
+   * withdrawn.
+   */
+  readonly ownReactionId: string | null;
 }
 
 export interface CommentData {
@@ -41,6 +48,7 @@ interface CommentThreadProps {
     subjectType: string,
     subjectId: string,
     emoji: string,
+    ownReactionId: string | null,
   ) => Promise<void>;
 }
 
@@ -79,9 +87,14 @@ export function CommentThread({
   );
 
   const handleReact = useCallback(
-    (targetSubjectType: string, targetSubjectId: string, emoji: string) => {
+    (
+      targetSubjectType: string,
+      targetSubjectId: string,
+      emoji: string,
+      ownReactionId: string | null,
+    ) => {
       startTransition(async () => {
-        await onReact(targetSubjectType, targetSubjectId, emoji);
+        await onReact(targetSubjectType, targetSubjectId, emoji, ownReactionId);
       });
     },
     [onReact],
@@ -145,7 +158,14 @@ export function CommentThread({
                     ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
                     : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
                 }
-                onClick={() => handleReact("comment", comment.id, group.emoji)}
+                onClick={() =>
+                  handleReact(
+                    "comment",
+                    comment.id,
+                    group.emoji,
+                    group.ownReactionId,
+                  )
+                }
               >
                 {group.emoji} {group.count}
               </button>
@@ -153,7 +173,16 @@ export function CommentThread({
             <button
               type="button"
               className="text-xs text-ink-3 hover:text-ink-2"
-              onClick={() => handleReact("comment", comment.id, "\u{1F44D}")}
+              onClick={() =>
+                handleReact(
+                  "comment",
+                  comment.id,
+                  "\u{1F44D}",
+                  // The thumb always adds. A reader who already gave one sees
+                  // it in the row above and presses that to take it back.
+                  null,
+                )
+              }
             >
               +1
             </button>

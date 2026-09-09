@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { publishDocumentAction, updateDocumentAction } from "../actions.ts";
@@ -216,6 +217,14 @@ export default async function DocumentPage({
           </CardBody>
         </Card>
       </div>
+      {level >= ACCESS_LEVELS.full ? (
+        <DeleteControl
+          subject="document"
+          id={id}
+          what="this document"
+          returnTo="/"
+        />
+      ) : null}
     </div>
   );
 }

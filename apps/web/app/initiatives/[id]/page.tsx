@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
@@ -268,6 +269,14 @@ export default async function InitiativePage({
           </ul>
         </CardBody>
       </Card>
+      {level >= ACCESS_LEVELS.full ? (
+        <DeleteControl
+          subject="initiative"
+          id={id}
+          what="this initiative"
+          returnTo="/initiatives"
+        />
+      ) : null}
     </div>
   );
 }

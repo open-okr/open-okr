@@ -445,3 +445,50 @@ test("a member's language reaches the document", async () => {
     timeout: 15_000,
   });
 });
+
+/**
+ * The detail-page writes that had no browser caller (P6-G27, GAP-AUDIT §5).
+ *
+ * The acceptance criterion, end to end: given a member with edit access on a
+ * goal, when they move it to another cycle, then the move is audited and both
+ * cycles read correctly.
+ *
+ * `goals.moveToCycle`, `goals.unlinkKpi`, `goals.delete`, `tasks.delete`,
+ * `initiatives.delete`, `documents.delete`, `tasks.removeChecklistItem` and
+ * `reactions.remove` all shipped with their entities and none could be reached
+ * from a screen.
+ *
+ * **Only one cycle exists on this instance, so the move is proved by what the
+ * control offers rather than by performing it.** Creating a second cycle here
+ * would move the goal every later spec reads, and `cycles.create` is P6-G27b's
+ * own row. The write itself is proved against a real database in
+ * `packages/core`.
+ */
+test("a goal carries the writes that had no browser path", async () => {
+  await goTo(page, "/goals");
+  const goalHref = await page
+    .locator("a[href^='/goals/']")
+    .evaluateAll((links) => {
+      const match = links
+        .map((link) => link.getAttribute("href") ?? "")
+        .find((href) => /^\/goals\/[0-9a-f-]{36}$/.test(href));
+      return match ?? "";
+    });
+  expect(goalHref, "no goal link on /goals").not.toBe("");
+  await goTo(page, goalHref);
+
+  // The cycle picker, offering the cycle the goal is already in. Disabled,
+  // because moving a goal to the cycle it is in is not a move.
+  const target = page.getByLabel("Cycle to move this goal to");
+  await expect(target).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("move-to-cycle")).toBeDisabled();
+
+  // The delete, which arms before it acts and says what a delete is here.
+  await page.getByTestId("delete-goal-arm").click();
+  await expect(page.getByTestId("delete-goal")).toContainText(
+    "Nothing is destroyed",
+  );
+  // And is stepped back from, because this goal is what six later specs read.
+  await page.getByRole("button", { name: "Keep it" }).click();
+  await expect(page.getByTestId("delete-goal-arm")).toBeVisible();
+});

@@ -27,5 +27,15 @@
   "welcome.continue": "Continue",
   "welcome.skip": "Skip",
   "welcome.demo.build": "Build the example",
-  "welcome.demo.empty": "Start empty"
+  "welcome.demo.empty": "Start empty",
+  "goal.writes.title": "Move, unlink, delete",
+  "goal.writes.explains": "The things that happen to a goal once rather than every week.",
+  "goal.writes.moveLabel": "Move to a cycle",
+  "goal.writes.moveTarget": "Cycle to move this goal to",
+  "goal.writes.move": "Move",
+  "goal.writes.moveHelp": "The scores and the history move with it. A goal in the wrong cycle is counted in the wrong quarter.",
+  "goal.writes.unlinkLabel": "Unlink a KPI",
+  "goal.writes.unlink": "Unlink",
+  "goal.writes.unlinkHelp": "The last value the KPI reported stays, as a manual one. Unlinking stops the KPI writing here; it does not reset the measure.",
+  "task.checklist.remove": "Remove"
 }

@@ -1936,6 +1936,20 @@ Acceptance: Given a first sign-in as owner, when they skip every step, then they
 Depends on: none
 Goal: the registered actions with no browser caller either get one or get a reason (GAP-AUDIT §5).
 Deliverables: delete on goals, initiatives, tasks and documents with the soft-delete semantics stated on the confirmation; checklist item removal; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction can be taken back; `cycles.create`, `update` and `archive`, so a workspace reaches next quarter; the attachment flow on documents and initiatives, wiring the four `blobs.*` and three `attachments.*` actions that have no caller; `workspace.rename` and `workspace.overview` on the general card; a note in the audit for any action deliberately left without a browser path.
+
+**Cut in two at P6-G27a.** The row is marked [M] and its deliverable list is
+not: eleven writes on four detail pages is one commit, and the attachment flow
+is a feature. `blobs.prepareUpload`, `claimUpload`, `getForDownload` and
+`prepareImport` plus `attachments.list`, `attach` and `detach` are seven
+actions, a byte quota, an upload control and a download path, and none of them
+shares anything with a delete button.
+
+- **P6-G27a**: the writes that are one button. Delete on four entities,
+  checklist item removal, `goals.moveToCycle`, `goals.unlinkKpi` and
+  `reactions.remove`.
+- **P6-G27b**: `cycles.create`, `update` and `archive`, the attachment flow,
+  `workspace.overview` on the general card, and the written reason for every
+  action deliberately left without a browser path.
 Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a cycle created from the browser gets the §4.14 defaults; an attachment survives a page reload and respects the workspace byte quota.
 Acceptance: Given a member with edit access on a goal, when they move it to the next cycle, then the move is audited and both cycles read correctly.
 

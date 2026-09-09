@@ -4,11 +4,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   addChecklistItemAction,
   assignTaskAction,
+  removeChecklistItemAction,
   setChecklistItemAction,
   setDueOnAction,
   setTaskStatusAction,
@@ -131,6 +133,11 @@ export default async function TaskPage({
                     done={item.done}
                     disabled={!canEdit}
                     onToggle={setChecklistItemAction.bind(
+                      null,
+                      task.id,
+                      item.id,
+                    )}
+                    onRemove={removeChecklistItemAction.bind(
                       null,
                       task.id,
                       item.id,
@@ -263,6 +270,15 @@ export default async function TaskPage({
           </CardBody>
         </Card>
       </div>
+
+      {level >= ACCESS_LEVELS.full ? (
+        <DeleteControl
+          subject="task"
+          id={id}
+          what="this task"
+          returnTo="/board"
+        />
+      ) : null}
     </div>
   );
 }
