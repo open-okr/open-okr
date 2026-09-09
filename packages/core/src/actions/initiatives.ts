@@ -28,10 +28,11 @@ import {
   initiatives,
   keyResults,
   spaces,
+  tasks,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -74,8 +75,23 @@ const initiativeOutput = z.object({
   status: z.enum(INITIATIVE_STATUSES),
   confidence: z.number().nullable(),
   capacity: z.enum(CAPACITY_VERDICTS).nullable(),
-  /** Derived from the initiative's own tasks at P5-T11. Zero until then. */
+  /**
+   * The share of this initiative's own tasks that are done (P6-G28).
+   *
+   * **Computed here, not read from the column.** `initiatives.progress_pct`
+   * exists and nothing has ever written to it, so it answered zero for every
+   * initiative in the product since P5-T11. Deriving it in the read means
+   * there is one answer rather than a stored one that drifts, and it is the
+   * same query the tasks panel needs anyway.
+   */
   progressPct: z.number(),
+  /**
+   * The tasks behind that figure (P6-G28).
+   *
+   * Returned so a screen can tell "no tasks yet" from "no tasks done", which
+   * are the same zero and different sentences.
+   */
+  tasks: z.object({ done: z.number().int(), total: z.number().int() }),
   keyResultIds: z.array(z.uuid()),
 });
 
@@ -253,6 +269,26 @@ async function withLinks(
   if (rows.length === 0) {
     return [];
   }
+  // One grouped count for the whole page rather than a query per row.
+  const work = await tx
+    .select({
+      initiativeId: tasks.initiativeId,
+      total: count(tasks.id),
+      done: sql<number>`count(*) filter (where ${tasks.status} = 'done')::int`,
+    })
+    .from(tasks)
+    .where(
+      activeOnly(
+        tasks,
+        eq(tasks.workspaceId, workspaceId),
+        inArray(
+          tasks.initiativeId,
+          rows.map((row) => row.id),
+        ),
+      ),
+    )
+    .groupBy(tasks.initiativeId);
+
   const links = await tx
     .select({
       initiativeId: initiativeKeyResults.initiativeId,
@@ -270,23 +306,32 @@ async function withLinks(
       ),
     );
 
-  return rows.map((row) => ({
-    id: row.id,
-    spaceId: row.spaceId,
-    spaceName: row.spaceName,
-    title: row.title,
-    ownerId: row.ownerId,
-    ownerName: row.ownerName,
-    startsOn: row.startsOn,
-    endsOn: row.endsOn,
-    status: row.status,
-    confidence: asNumber(row.confidence),
-    capacity: row.capacity,
-    progressPct: asNumber(row.progressPct) ?? 0,
-    keyResultIds: links
-      .filter((link) => link.initiativeId === row.id)
-      .map((link) => link.keyResultId),
-  }));
+  return rows.map((row) => {
+    const counted = work.find((one) => one.initiativeId === row.id);
+    const total = Number(counted?.total ?? 0);
+    const done = Number(counted?.done ?? 0);
+    return {
+      id: row.id,
+      spaceId: row.spaceId,
+      spaceName: row.spaceName,
+      title: row.title,
+      ownerId: row.ownerId,
+      ownerName: row.ownerName,
+      startsOn: row.startsOn,
+      endsOn: row.endsOn,
+      status: row.status,
+      confidence: asNumber(row.confidence),
+      capacity: row.capacity,
+      // **Rounded, and zero when there is nothing to divide by.** An
+      // initiative with no tasks is not nought per cent done; it has not
+      // started being planned, and `tasks.total` is what says so.
+      progressPct: total === 0 ? 0 : Math.round((done / total) * 100),
+      tasks: { done, total },
+      keyResultIds: links
+        .filter((link) => link.initiativeId === row.id)
+        .map((link) => link.keyResultId),
+    };
+  });
 }
 
 const LIST_COLUMNS = {
@@ -570,6 +615,12 @@ export const updateInitiative = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "initiative", id: input.id },
     async load({ tx, workspaceId, actor }) {
       return requireInitiative(
         tx,

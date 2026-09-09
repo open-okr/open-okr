@@ -10,6 +10,7 @@ import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
 import { getStorage, storageDescription } from "../../lib/storage";
+import { getTranslations } from "../../lib/translations";
 import { CheckList } from "./check-list";
 
 /**
@@ -27,6 +28,8 @@ import { CheckList } from "./check-list";
 export const dynamic = "force-dynamic";
 
 export default async function SetupPage() {
+  const { t } = await getTranslations();
+
   const pool = getPool();
 
   // Mail is tested as it is actually resolved: an operator who set
@@ -61,14 +64,13 @@ export default async function SetupPage() {
 
   return (
     <>
-      <h1 className="text-lg font-bold text-ink">Set up OpenOKR</h1>
+      <h1 className="text-lg font-bold text-ink">{t("setup.setUpOpenokr")}</h1>
       <p className="text-sm text-ink-3">
-        Nothing here needs configuring. Every setting has a working default, so
-        you can create your account and start. You can change any of it later.
+        {t("setup.nothingHereNeedsConfiguring")}
       </p>
 
       <h2 className="mt-2 text-xs font-bold tracking-wide text-ink-4 uppercase">
-        This deployment
+        {t("setup.thisDeployment")}
       </h2>
       <CheckList tests={tests} />
 
@@ -76,7 +78,7 @@ export default async function SetupPage() {
         href="/setup/account"
         className={cn(buttonVariants({ variant: "primary" }), "self-start")}
       >
-        Create the first account
+        {t("common.createTheFirstAccount")}
       </Link>
     </>
   );

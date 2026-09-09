@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { createDocumentAction } from "./actions.ts";
 
@@ -23,7 +24,7 @@ export interface SubjectDocument {
   readonly updatedAt: string;
 }
 
-export function SubjectDocuments({
+export async function SubjectDocuments({
   subjectType,
   subjectId,
   documents,
@@ -34,10 +35,14 @@ export function SubjectDocuments({
   readonly documents: readonly SubjectDocument[];
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Documents</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("documents.subjectDocuments.documents")}
+        </h2>
         <span className="text-xs text-ink-3" data-testid="document-count">
           {documents.length === 0
             ? "None yet"
@@ -49,8 +54,7 @@ export function SubjectDocuments({
       <CardBody className="flex flex-col gap-3">
         {documents.length === 0 ? (
           <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-            Nothing written here yet. A document starts as a draft only you can
-            see.
+            {t("documents.subjectDocuments.nothingWrittenHereYet")}
           </p>
         ) : (
           <ul
@@ -96,11 +100,11 @@ export function SubjectDocuments({
             <input type="hidden" name="subjectType" value={subjectType} />
             <input type="hidden" name="subjectId" value={subjectId} />
             <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-              Start a document
+              {t("documents.subjectDocuments.startADocument")}
               <input
                 name="title"
                 maxLength={300}
-                placeholder="How we will win activation"
+                placeholder={t("documents.subjectDocuments.howWeWillWin")}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               />
             </label>
@@ -108,7 +112,7 @@ export function SubjectDocuments({
               type="submit"
               className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
             >
-              Start
+              {t("documents.subjectDocuments.start")}
             </button>
           </ActionForm>
         ) : null}

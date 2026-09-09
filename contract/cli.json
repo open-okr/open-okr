@@ -29,6 +29,16 @@
       "pages": false
     },
     {
+      "name": "workspace finishOnboarding",
+      "action": "workspace.finishOnboarding",
+      "method": "POST",
+      "path": "/workspace/finishOnboarding",
+      "scope": "write",
+      "summary": "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace setState",
       "action": "workspace.setState",
       "method": "POST",
@@ -118,6 +128,24 @@
             "whatsapp",
             "telegram"
           ]
+        },
+        {
+          "name": "theme",
+          "field": "theme",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "density",
+          "field": "density",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "language",
+          "field": "language",
+          "type": "string",
+          "required": false
         },
         {
           "name": "quiet-hours",
@@ -279,7 +307,31 @@
       "path": "/people/directory",
       "scope": "read",
       "summary": "Every active member of the workspace.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "include-suspended",
+          "field": "includeSuspended",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "people readMember",
+      "action": "people.readMember",
+      "method": "GET",
+      "path": "/people/readMember",
+      "scope": "read",
+      "summary": "One member's profile.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "pages": false
     },
     {
@@ -1176,6 +1228,23 @@
       "pages": false
     },
     {
+      "name": "blobs reapOrphans",
+      "action": "blobs.reapOrphans",
+      "method": "POST",
+      "path": "/blobs/reapOrphans",
+      "scope": "write",
+      "summary": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "flags": [
+        {
+          "name": "older-than-minutes",
+          "field": "olderThanMinutes",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blobs prepareImport",
       "action": "blobs.prepareImport",
       "method": "POST",
@@ -1275,6 +1344,29 @@
       "pages": false
     },
     {
+      "name": "notifications drainBatches",
+      "action": "notifications.drainBatches",
+      "method": "POST",
+      "path": "/notifications/drainBatches",
+      "scope": "write",
+      "summary": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "flags": [
+        {
+          "name": "now",
+          "field": "now",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "notifications list",
       "action": "notifications.list",
       "method": "GET",
@@ -1287,8 +1379,38 @@
           "field": "unreadOnly",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "reason",
+          "field": "reason",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "invited",
+            "joined",
+            "mentioned",
+            "role",
+            "review",
+            "check_in"
+          ]
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
         }
       ],
+      "pages": true
+    },
+    {
+      "name": "notifications unreadCount",
+      "action": "notifications.unreadCount",
+      "method": "GET",
+      "path": "/notifications/unreadCount",
+      "scope": "read",
+      "summary": "How many unread, unsnoozed notifications the member has.",
+      "flags": [],
       "pages": false
     },
     {
@@ -1372,6 +1494,35 @@
           "field": "dailySummaryTime",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "routing",
+          "field": "routing",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "subscriptions read",
+      "action": "subscriptions.read",
+      "method": "GET",
+      "path": "/subscriptions/read",
+      "scope": "read",
+      "summary": "Whether the signed-in member is watching a subject, why, and how many others are.",
+      "flags": [
+        {
+          "name": "subject-type",
+          "field": "subjectType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "subject-id",
+          "field": "subjectId",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -1449,6 +1600,75 @@
       "pages": false
     },
     {
+      "name": "activities goalFeed",
+      "action": "activities.goalFeed",
+      "method": "GET",
+      "path": "/activities/goalFeed",
+      "scope": "read",
+      "summary": "One goal's activity feed, with its key results and check-ins.",
+      "flags": [
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
+      "name": "activities profileFeed",
+      "action": "activities.profileFeed",
+      "method": "GET",
+      "path": "/activities/profileFeed",
+      "scope": "read",
+      "summary": "What one member did, newest first.",
+      "flags": [
+        {
+          "name": "member-id",
+          "field": "memberId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
+      "name": "activities spaceFeed",
+      "action": "activities.spaceFeed",
+      "method": "GET",
+      "path": "/activities/spaceFeed",
+      "scope": "read",
+      "summary": "One space's activity feed, newest first.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": true
+    },
+    {
       "name": "activities workspaceFeed",
       "action": "activities.workspaceFeed",
       "method": "GET",
@@ -1476,6 +1696,29 @@
         {
           "name": "include-files",
           "field": "includeFiles",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "workspace importArchive",
+      "action": "workspace.importArchive",
+      "method": "POST",
+      "path": "/workspace/importArchive",
+      "scope": "write",
+      "summary": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "flags": [
+        {
+          "name": "archive-base64",
+          "field": "archiveBase64",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "dry-run",
+          "field": "dryRun",
           "type": "boolean",
           "required": false
         }
@@ -2325,6 +2568,34 @@
       "pages": false
     },
     {
+      "name": "agents setAutonomy",
+      "action": "agents.setAutonomy",
+      "method": "POST",
+      "path": "/agents/setAutonomy",
+      "scope": "write",
+      "summary": "Moves an agent between sandbox, propose and scoped direct.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "autonomy",
+          "field": "autonomy",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "sandbox",
+            "propose",
+            "scoped_direct"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "agents setEnabled",
       "action": "agents.setEnabled",
       "method": "POST",
@@ -2656,6 +2927,41 @@
       "pages": false
     },
     {
+      "name": "spaces updateSettings",
+      "action": "spaces.updateSettings",
+      "method": "POST",
+      "path": "/spaces/updateSettings",
+      "scope": "write",
+      "summary": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "team-voting",
+          "field": "teamVoting",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "coach-strictness",
+          "field": "coachStrictness",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "default-check-in-frequency",
+          "field": "defaultCheckInFrequency",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "spaces archive",
       "action": "spaces.archive",
       "method": "POST",
@@ -2835,7 +3141,20 @@
       "path": "/cycles/ensureCurrent",
       "scope": "write",
       "summary": "Creates the cycle containing today if the workspace has none. Idempotent.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "cadence",
+          "field": "cadence",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "annual",
+            "semiannual",
+            "quarterly",
+            "monthly"
+          ]
+        }
+      ],
       "pages": false
     },
     {
@@ -3084,6 +3403,12 @@
           ]
         },
         {
+          "name": "quiet-mode",
+          "field": "quietMode",
+          "type": "boolean",
+          "required": false
+        },
+        {
           "name": "overrides",
           "field": "overrides",
           "type": "object",
@@ -3096,6 +3421,16 @@
           "required": false
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "frame annualObjectives",
+      "action": "frame.annualObjectives",
+      "method": "GET",
+      "path": "/frame/annualObjectives",
+      "scope": "read",
+      "summary": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "flags": [],
       "pages": false
     },
     {
@@ -3132,6 +3467,30 @@
           "name": "agreed",
           "field": "agreed",
           "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "mission",
+          "field": "mission",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "vision",
+          "field": "vision",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy",
+          "field": "strategy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "not-doing",
+          "field": "notDoing",
+          "type": "string",
           "required": false
         },
         {
@@ -4120,6 +4479,12 @@
             "in_progress",
             "done"
           ]
+        },
+        {
+          "name": "initiative-id",
+          "field": "initiativeId",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -4940,6 +5305,12 @@
           "required": false
         },
         {
+          "name": "strategy-id",
+          "field": "strategyId",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "weight",
           "field": "weight",
           "type": "number",
@@ -5025,6 +5396,12 @@
         {
           "name": "parent-key-result-id",
           "field": "parentKeyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "strategy-id",
+          "field": "strategyId",
           "type": "string",
           "required": false
         },
@@ -6931,6 +7308,57 @@
       "pages": false
     },
     {
+      "name": "nudges rules",
+      "action": "nudges.rules",
+      "method": "GET",
+      "path": "/nudges/rules",
+      "scope": "read",
+      "summary": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "nudges setRule",
+      "action": "nudges.setRule",
+      "method": "POST",
+      "path": "/nudges/setRule",
+      "scope": "write",
+      "summary": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "flags": [
+        {
+          "name": "rule-key",
+          "field": "ruleKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "channel-override",
+          "field": "channelOverride",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "quiet-mode-exempt",
+          "field": "quietModeExempt",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "escalation-ladder",
+          "field": "escalationLadder",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "nudges list",
       "action": "nudges.list",
       "method": "GET",
@@ -7559,6 +7987,46 @@
           "field": "items",
           "type": "array",
           "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions carriedCommitments",
+      "action": "sessions.carriedCommitments",
+      "method": "GET",
+      "path": "/sessions/carriedCommitments",
+      "scope": "read",
+      "summary": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions confidenceTrend",
+      "action": "sessions.confidenceTrend",
+      "method": "GET",
+      "path": "/sessions/confidenceTrend",
+      "scope": "read",
+      "summary": "A space's weekly average confidence, oldest first.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "weeks",
+          "field": "weeks",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false

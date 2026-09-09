@@ -50,6 +50,18 @@ describe("proxy", () => {
     }
   });
 
+  it("leaves an invitation reachable, because the invitee has no account", () => {
+    // **The one dead end this gate created.** `/join` was behind the session
+    // cookie until P6-G06b, so every invitee was sent to sign in, which is the
+    // single thing somebody without an account cannot do. The token in the
+    // address is the credential, the same way a bearer token is on the REST
+    // surface, and the page refuses an invalid one itself.
+    //
+    // Caught by the end-to-end spec on its first run rather than by reading.
+    const response = proxy(request("/join/some-token"));
+    expect(response.headers.get("location")).toBeNull();
+  });
+
   it("leaves the authentication endpoints reachable", () => {
     // Redirecting these would break sign-in itself.
     const response = proxy(request("/api/auth/sign-in/email"));

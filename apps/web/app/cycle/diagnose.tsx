@@ -1,4 +1,5 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { addIssue, rankIssue } from "./actions.ts";
 
@@ -32,7 +33,7 @@ const SOURCE_LABEL: Readonly<Record<string, string>> = {
   coach: "Proposed by the Coach",
 };
 
-export function Diagnose({
+export async function Diagnose({
   cycleId,
   issues,
   minimum,
@@ -43,19 +44,24 @@ export function Diagnose({
   readonly minimum: number;
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Strategic issues</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("cycle.diagnose.strategicIssues")}
+        </h2>
         <Chip tone={issues.length >= minimum ? "ok" : "warn"}>
-          {issues.length} ranked, {minimum} asked for
+          {issues.length} {t("cycle.diagnose.ranked")} {minimum}{" "}
+          {t("cycle.diagnose.askedFor")}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         {issues.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nothing is on the list yet. §2.3 asks for at least {minimum} ranked
-            issues before the diagnosis is done.
+            {t("cycle.diagnose.nothingIsOnThe")} {minimum}{" "}
+            {t("cycle.diagnose.rankedIssuesBeforeThe")}
           </p>
         ) : (
           <ol className="flex flex-col divide-y divide-line">
@@ -81,7 +87,7 @@ export function Diagnose({
                     <input type="hidden" name="cycleId" value={cycleId} />
                     <input type="hidden" name="issueId" value={issue.id} />
                     <label className="sr-only" htmlFor={`impact-${issue.id}`}>
-                      Impact for {issue.text}
+                      {t("cycle.diagnose.impactFor")} {issue.text}
                     </label>
                     <select
                       id={`impact-${issue.id}`}
@@ -91,7 +97,7 @@ export function Diagnose({
                     >
                       {[1, 2, 3, 4, 5].map((value) => (
                         <option key={value} value={value}>
-                          Impact {value}
+                          {t("common.impact")} {value}
                         </option>
                       ))}
                     </select>
@@ -100,11 +106,13 @@ export function Diagnose({
                       variant="ghost"
                       className="h-7 px-2 text-xs"
                     >
-                      Rank
+                      {t("cycle.diagnose.rank")}
                     </Button>
                   </ActionForm>
                 ) : (
-                  <Chip tone="neutral">Impact {issue.impact}</Chip>
+                  <Chip tone="neutral">
+                    {t("common.impact")} {issue.impact}
+                  </Chip>
                 )}
               </li>
             ))}
@@ -116,18 +124,18 @@ export function Diagnose({
             <input type="hidden" name="cycleId" value={cycleId} />
             <div className="flex items-center gap-1.5">
               <label className="sr-only" htmlFor="new-issue">
-                The issue
+                {t("cycle.diagnose.theIssue")}
               </label>
               <input
                 id="new-issue"
                 name="text"
                 required
                 maxLength={500}
-                placeholder="What is standing between us and the strategy?"
+                placeholder={t("cycle.diagnose.whatIsStandingBetween")}
                 className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
               />
               <label className="sr-only" htmlFor="new-issue-impact">
-                Impact
+                {t("common.impact")}
               </label>
               <select
                 id="new-issue-impact"
@@ -137,11 +145,11 @@ export function Diagnose({
               >
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
-                    Impact {value}
+                    {t("common.impact")} {value}
                   </option>
                 ))}
               </select>
-              <Button type="submit">Add</Button>
+              <Button type="submit">{t("common.add")}</Button>
             </div>
           </ActionForm>
         ) : null}

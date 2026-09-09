@@ -1,6 +1,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /** The branding admin card (screen S-36, P2-T08). One field today: the
@@ -48,16 +49,20 @@ async function reset(): Promise<void> {
   revalidatePath("/admin/branding");
 }
 
-export function BrandingSettingsForm({
+export async function BrandingSettingsForm({
   branding,
 }: {
   branding: Record<string, unknown>;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <>
       <form action={save}>
         <p>
-          <label htmlFor="primaryColor">Primary colour (hex)</label>
+          <label htmlFor="primaryColor">
+            {t("admin.branding.brandingSettingsForm.primaryColourHex")}
+          </label>
           <br />
           <input
             id="primaryColor"
@@ -66,10 +71,10 @@ export function BrandingSettingsForm({
             defaultValue={String(branding.primaryColor ?? "")}
           />
         </p>
-        <button type="submit">Save</button>
+        <button type="submit">{t("common.save")}</button>
       </form>
       <form action={reset}>
-        <button type="submit">Reset to defaults</button>
+        <button type="submit">{t("common.resetToDefaults")}</button>
       </form>
     </>
   );

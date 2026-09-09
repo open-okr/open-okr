@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import type { InviteResult } from "./actions";
 
@@ -11,13 +12,13 @@ import type { InviteResult } from "./actions";
  * because the table holds only the token's digest. This is the same shape the
  * API-token form takes at P5-T07a, and for the same reason.
  *
- * **The token, not a URL, until P6-G06b.** The address an invitee follows is
- * `/join`, and that route does not exist yet: resolving a token to its
- * workspace is a cross-tenant read, and `invite_links` carries row-level
- * security keyed on `workspace_id`, so it needs the second-key policy
- * `api_tokens` already has and a migration to add it. Handing out a URL that
- * answers 404 would be worse than handing out nothing, so this shows the token
- * and says where it will be usable.
+ * **The address, since P6-G06b.** This handed out a bare token until then,
+ * because `/join` did not exist: resolving a token to its workspace is a
+ * cross-tenant read and `invite_links` carried row-level security keyed on
+ * `workspace_id` alone. Migration 0075 gave it the second-key policy
+ * `api_tokens` has, so the route exists and the thing to send somebody is a
+ * link. The token is still shown beneath it, for the command line and for
+ * anybody pasting into a chat that mangles URLs.
  */
 export function InviteForm({
   action,
@@ -28,6 +29,8 @@ export function InviteForm({
   readonly submitLabel: string;
   readonly children: React.ReactNode;
 }) {
+  const { t } = useTranslations();
+
   const [state, formAction, pending] = useActionState(
     async (_previous: InviteResult | null, formData: FormData) =>
       action(formData),
@@ -52,24 +55,28 @@ export function InviteForm({
       {state?.link ? (
         <div className="flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
           <span className="font-semibold">
-            Copy this now. It is not shown again.
+            {t("admin.invitations.inviteForm.copyThisNowIt")}
           </span>
           <code
-            data-testid="invite-token"
+            data-testid="invite-link"
             className="break-all font-mono text-sm font-bold"
           >
-            {state.link.token}
+            {state.link.url}
           </code>
-          {state.link.email ? (
-            <span>Only {state.link.email} may use it, once.</span>
-          ) : (
-            <span>Anyone holding it may join, within the limits you set.</span>
-          )}
-          <span>
-            The address to send somebody arrives at P6-G06b, with the join
-            screen. Until then this token is redeemable through the command line
-            and the REST surface.
+          <span className="text-xs">
+            {t("admin.invitations.inviteForm.theTokenOnIts")}{" "}
+            <code data-testid="invite-token" className="break-all font-mono">
+              {state.link.token}
+            </code>
           </span>
+          {state.link.email ? (
+            <span>
+              {t("admin.invitations.inviteForm.only")} {state.link.email}{" "}
+              {t("admin.invitations.inviteForm.mayUseItOnce")}
+            </span>
+          ) : (
+            <span>{t("admin.invitations.inviteForm.anyoneHoldingItMay")}</span>
+          )}
         </div>
       ) : state?.error ? (
         <p

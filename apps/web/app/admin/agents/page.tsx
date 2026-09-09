@@ -1,8 +1,13 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { AGENT_AUTONOMIES } from "@openokr/db";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { AgentPolicy } from "./agent-policy.tsx";
+import { AgentSwitch, CancelRun } from "./agent-switch";
+import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
 
 /**
@@ -45,7 +50,23 @@ const SCHEDULE_LABEL: Record<string, string> = {
   weekly: "Once a week",
 };
 
+/**
+ * The four access levels a scope binding may carry (P6-G13b).
+ *
+ * Built here rather than in the card, because a client component that imports
+ * `ACCESS_LEVELS` from `@openokr/core` pulls the database layer into its
+ * bundle and the build fails on `dns` and `fs`.
+ */
+const BINDING_LEVELS = [
+  { value: ACCESS_LEVELS.view, label: "view" },
+  { value: ACCESS_LEVELS.comment, label: "comment" },
+  { value: ACCESS_LEVELS.edit, label: "edit" },
+  { value: ACCESS_LEVELS.full, label: "full" },
+];
+
 export default async function AgentsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -55,12 +76,11 @@ export default async function AgentsPage() {
   if (level < ACCESS_LEVELS.full) {
     return (
       <>
-        <h1>Agents and runs</h1>
+        <h1>{t("admin.agents.agentsAndRuns")}</h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              What the agents did, and to whom, is behind the coaching
-              permission. Ask a workspace administrator.
+              {t("admin.agents.whatTheAgentsDid")}
             </p>
           </CardBody>
         </Card>
@@ -75,6 +95,17 @@ export default async function AgentsPage() {
   };
   const agents = await callAction(context, "agents.list", {});
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
+  // The review queue (P6-G13a). Pending only: an applied or dismissed proposal
+  // is history, and the run log already carries it.
+  //
+  // Agent proposals only. A row with no `run_id` came from a copilot thread and
+  // belongs to the panel that asked for it: the person who typed the question
+  // is the one who decides, and putting it in a shared administrative queue
+  // would hand their conversation to somebody else. The same filter the review
+  // inbox applies at P6-G02.
+  const proposals = (
+    await callAction(context, "proposals.list", { status: "pending" })
+  ).filter((proposal) => proposal.runId !== null);
 
   // Whether a run could draft anything, asked of the stored configuration
   // rather than assumed. The control says which of the two products this
@@ -87,23 +118,26 @@ export default async function AgentsPage() {
 
   return (
     <>
-      <h1>Agents and runs</h1>
-      <p className="text-sm text-ink-3">
-        Every agent is a member of this workspace, accountable like anyone else.
-        None of them holds a workspace-wide grant.
-      </p>
+      <h1>{t("admin.agents.agentsAndRuns")}</h1>
+      <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
 
       <RunControls drafting={drafting} />
 
+      {/* Above the agents and the runs on purpose. A proposal is the one thing
+          on this screen that is waiting on the reader, and everything else is a
+          record of what already happened (P6-G13a). */}
+      <ProposalQueue proposals={proposals} />
+
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">The agents</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.agents.theAgents")}
+          </h2>
         </CardHeader>
         <CardBody className="p-0">
           {agents.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              This workspace has no agents. That is unusual: the Champion is
-              seeded at provisioning.
+              {t("admin.agents.thisWorkspaceHasNo")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -123,10 +157,25 @@ export default async function AgentsPage() {
                       {SCHEDULE_LABEL[agent.schedule] ?? agent.schedule}
                     </Chip>
                     <Chip tone="agent">{agent.autonomy}</Chip>
+                    <span className="ml-auto">
+                      <AgentSwitch
+                        id={agent.id}
+                        enabled={agent.enabled}
+                        name={agent.name}
+                      />
+                    </span>
                   </span>
                   {agent.persona === "" ? null : (
                     <span className="text-xs text-ink-3">{agent.persona}</span>
                   )}
+                  {/* The write policy and the scope binder (P6-G13b). */}
+                  <AgentPolicy
+                    agentId={agent.id}
+                    autonomy={agent.autonomy}
+                    name={agent.name}
+                    autonomies={[...AGENT_AUTONOMIES]}
+                    levels={BINDING_LEVELS}
+                  />
                 </li>
               ))}
             </ul>
@@ -136,14 +185,17 @@ export default async function AgentsPage() {
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Recent runs</h2>
-          <Chip tone="neutral">{runs.length} shown</Chip>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.recentRuns")}
+          </h2>
+          <Chip tone="neutral">
+            {runs.length} {t("admin.agents.shown")}
+          </Chip>
         </CardHeader>
         <CardBody className="p-0">
           {runs.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              No run yet. Nothing schedules one on this instance, so a run
-              happens when somebody asks for it.
+              {t("admin.agents.noRunYetNothing")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -170,6 +222,11 @@ export default async function AgentsPage() {
                           {run.finishedAt.slice(0, 16).replace("T", " ")}
                         </span>
                       ) : null}
+                      {/* Only a run that has not finished can be stopped, and
+                          the action refuses the rest anyway (P6-G13a). */}
+                      {run.status === "running" || run.status === "planning" ? (
+                        <CancelRun id={run.id} />
+                      ) : null}
                     </span>
                   </span>
                   {run.error ? (
@@ -177,7 +234,7 @@ export default async function AgentsPage() {
                   ) : null}
                   {run.log.length === 0 ? (
                     <span className="text-xs text-ink-4">
-                      Nothing was due. A quiet hour is a run too.
+                      {t("admin.agents.nothingWasDueA")}
                     </span>
                   ) : (
                     <ul className="flex flex-col gap-0.5">

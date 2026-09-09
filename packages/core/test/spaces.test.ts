@@ -9,6 +9,10 @@ import {
 } from "../src/access/reads.ts";
 import { callAction } from "../src/actions/registry.ts";
 import {
+  resolveSpaceSettings,
+  SETTINGS_REGISTRY,
+} from "../src/settings/registry.ts";
+import {
   resolveCoordinator,
   resolveManagers,
   wouldStrandSpace,
@@ -630,5 +634,114 @@ describe("the list", () => {
     );
     expect(listed).toHaveLength(1);
     expect(listed[0]?.ownRole).toBe(null);
+  });
+});
+
+describe("the §4.14 space scope (P6-G18b)", () => {
+  const read = async (spaceId: string) => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context(OWNER) }, "spaces.read", {
+      id: spaceId,
+    });
+  };
+  const write = async (input: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "spaces.updateSettings",
+      input as never,
+    );
+  };
+
+  it("resolves every space setting from the registry, not from a fixed list", async () => {
+    // Enumerated, so a fourth space setting added next month is covered here
+    // without anybody remembering to widen this test.
+    const declared = SETTINGS_REGISTRY.filter(
+      (setting) => setting.scope === "space",
+    ).map((setting) => setting.key);
+    expect(declared.length).toBeGreaterThan(0);
+
+    const space = await read(defaultSpaceId);
+    for (const key of declared) {
+      expect(Object.hasOwn(space.settings, key)).toBe(true);
+    }
+    expect(Object.keys(space.settings).sort()).toEqual([...declared].sort());
+  });
+
+  it("gives a space that configured nothing its documented defaults", async () => {
+    const wb = await workerDb();
+    // A space whose settings map is empty, which is every space created
+    // before this scope existed.
+    await wb.admin.query(
+      "update spaces set settings = '{}'::jsonb where id = $1",
+      [defaultSpaceId],
+    );
+    const space = await read(defaultSpaceId);
+    expect(space.settings).toEqual(resolveSpaceSettings());
+    // And the documented defaults are: voting on, both overrides inheriting.
+    expect(space.settings.teamVoting).toBe(true);
+    expect(space.settings.coachStrictness).toBeNull();
+    expect(space.settings.defaultCheckInFrequency).toBeNull();
+  });
+
+  it("writes the defaults into a space it creates", async () => {
+    const wb = await workerDb();
+    const created = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "spaces.create",
+      { name: "Platform" },
+    );
+    const stored = await wb.admin.query<{ settings: Record<string, unknown> }>(
+      "select settings from spaces where id = $1",
+      [created.id],
+    );
+    expect(stored.rows[0]?.settings).toEqual(resolveSpaceSettings());
+  });
+
+  it("merges one key at a time rather than replacing the map", async () => {
+    await write({ id: defaultSpaceId, coachStrictness: "strict" });
+    await write({ id: defaultSpaceId, teamVoting: false });
+    const space = await read(defaultSpaceId);
+    expect(space.settings.coachStrictness).toBe("strict");
+    expect(space.settings.teamVoting).toBe(false);
+  });
+
+  it("returns an override to the workspace's when it is set to null", async () => {
+    await write({ id: defaultSpaceId, coachStrictness: "advisory" });
+    expect((await read(defaultSpaceId)).settings.coachStrictness).toBe(
+      "advisory",
+    );
+    await write({ id: defaultSpaceId, coachStrictness: null });
+    // Null, not the workspace's current value: storing that would freeze it.
+    expect((await read(defaultSpaceId)).settings.coachStrictness).toBeNull();
+  });
+
+  it("refuses a vote in a space that turned team voting off", async () => {
+    const wb = await workerDb();
+    await write({ id: defaultSpaceId, teamVoting: false });
+
+    const session = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "sessions.create",
+      {
+        spaceId: defaultSpaceId,
+        kind: "weekly",
+        title: "Weekly",
+        scheduledFor: new Date(Date.now() + 3600_000).toISOString(),
+        facilitatorId: ownerMemberId,
+      },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "sessions.open", {
+      id: session.id,
+    });
+
+    // Refused by the action, not merely absent from a screen.
+    await expect(
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "sessions.castVote", {
+        sessionId: session.id,
+        keyResultId: "00000000-0000-4000-8000-000000000000",
+        confidence: 0.5,
+      }),
+    ).rejects.toThrow(/turned team voting off/i);
   });
 });

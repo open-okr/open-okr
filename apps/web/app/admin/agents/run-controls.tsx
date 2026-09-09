@@ -13,7 +13,14 @@
  * daily sweep and the cycle countdown is choosing what the agent will look at,
  * and "Run" would hide that.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { runChampionAction, runCoachAction } from "./actions";
@@ -28,6 +35,8 @@ const CHAMPION_RUNS: readonly { cadence: Cadence; label: string }[] = [
 ];
 
 export function RunControls({ drafting }: { drafting: boolean }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -55,11 +64,15 @@ export function RunControls({ drafting }: { drafting: boolean }) {
     <Card>
       <CardHeader>
         <span className="flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-bold text-ink">Run one now</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.agents.runControls.runOneNow")}
+          </h2>
           {drafting ? (
-            <Chip tone="agent">Drafting on</Chip>
+            <Chip tone="agent">{t("admin.agents.runControls.draftingOn")}</Chip>
           ) : (
-            <Chip tone="neutral">Deterministic only</Chip>
+            <Chip tone="neutral">
+              {t("admin.agents.runControls.deterministicOnly")}
+            </Chip>
           )}
         </span>
       </CardHeader>
@@ -88,7 +101,7 @@ export function RunControls({ drafting }: { drafting: boolean }) {
             disabled={pending}
             onClick={() => run(() => runCoachAction())}
           >
-            Quality pass
+            {t("admin.agents.runControls.qualityPass")}
           </Button>
         </span>
 

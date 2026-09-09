@@ -26,7 +26,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
 const execFileAsync = promisify(execFile);

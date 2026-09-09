@@ -1,5 +1,6 @@
 "use server";
 
+import { loadEnv } from "@openokr/config";
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
@@ -30,8 +31,27 @@ async function context() {
 interface IssuedLink {
   readonly id: string;
   readonly token: string;
+  /**
+   * The address to send somebody (P6-G06b).
+   *
+   * Built here rather than in the form, because the instance's own origin is
+   * server-side configuration and a client component guessing it from
+   * `window.location` would print whichever host the administrator happened to
+   * be using, including `localhost`.
+   */
+  readonly url: string;
   readonly mode: "workspace" | "personal";
   readonly email?: string;
+}
+
+/** `<origin>/join/<token>`, the address `sendInvitation` has always mailed. */
+function joinUrl(token: string): string {
+  const base = loadEnv().BETTER_AUTH_URL;
+  let end = base.length;
+  while (end > 0 && base.charCodeAt(end - 1) === 47) {
+    end--;
+  }
+  return `${base.slice(0, end)}/join/${token}`;
 }
 
 export interface InviteResult {
@@ -65,7 +85,14 @@ export async function createWorkspaceLinkAction(
       },
     );
     revalidatePath("/admin/invitations");
-    return { link: { id: link.id, token: link.token, mode: "workspace" } };
+    return {
+      link: {
+        id: link.id,
+        token: link.token,
+        url: joinUrl(link.token),
+        mode: "workspace",
+      },
+    };
   } catch (error) {
     return { error: reason(error) };
   }
@@ -92,7 +119,13 @@ export async function createPersonalLinkAction(
     );
     revalidatePath("/admin/invitations");
     return {
-      link: { id: link.id, token: link.token, mode: "personal", email },
+      link: {
+        id: link.id,
+        token: link.token,
+        url: joinUrl(link.token),
+        mode: "personal",
+        email,
+      },
     };
   } catch (error) {
     return { error: reason(error) };

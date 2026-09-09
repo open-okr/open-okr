@@ -10,10 +10,13 @@
  * reach a handler with a shape the contract does not describe.
  */
 
+import { type WorkspaceTx, withWorkspace } from "@openokr/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { ZodType } from "zod";
 import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import {
@@ -61,14 +64,23 @@ export interface ActionCallContext {
   readonly actor: ActorInput;
   readonly ring?: KeyRing;
   /**
-   * Reads a file's bytes, when the host has a storage port to give (P6-T05a).
+   * Reads and removes a file's bytes, when the host has a storage port to
+   * give (P6-T05a, widened at P6-G01c).
    *
-   * One method rather than the whole `FileStorage`, because `packages/core`
+   * Two methods rather than the whole `FileStorage`, because `packages/core`
    * does not depend on `packages/adapters`: the driver satisfies this
    * structurally and the app passes the one it already has. Absent means an
    * archive carries rows and no bytes, and says so in its manifest.
+   *
+   * `delete` is what the orphan reap needs. Soft-deleting the row without it
+   * would leave the bytes in the bucket with nothing left pointing at them,
+   * which is the state the reap exists to end rather than a smaller version
+   * of it.
    */
-  readonly storage?: { get(key: string): Promise<Buffer> };
+  readonly storage?: {
+    get(key: string): Promise<Buffer>;
+    delete(key: string): Promise<void>;
+  };
   /**
    * Language for the agents, when the host has a provider to give (P4-T05c-b).
    *
@@ -160,6 +172,30 @@ export function defineReadAction<TInput, TOutput>(definition: {
     // rather than being replaced by it.
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
+      const required = definition.access ?? ACCESS_LEVELS.view;
+      // **The declared level is enforced here, once, for every read** (P6-G31).
+      // It used to be recorded and never checked: twenty-nine reads declared
+      // above `view` and two of them enforced it by hand, so over REST an
+      // ordinary member's token reached the AI budgets, the channel message
+      // log, every agent run, the nudge volume and the import history. In the
+      // browser the admin layout refuses first, which is why the screens looked
+      // right while the surface underneath did not.
+      //
+      // Only above `view`. A read at `view` is either open to every member of
+      // the workspace or scoped row by row through `getAccessScoped`, and
+      // opening a transaction to confirm that a member is a member would cost
+      // every read in the product a round trip for nothing.
+      if (required > ACCESS_LEVELS.view) {
+        const db = drizzle(context.pool);
+        await withWorkspace(db, context.workspaceId, (tx) =>
+          requireWorkspaceLevel(
+            tx as WorkspaceTx,
+            context.workspaceId,
+            context.actor,
+            required,
+          ),
+        );
+      }
       return definition.handler(context, input);
     },
   };

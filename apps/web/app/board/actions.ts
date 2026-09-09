@@ -138,6 +138,24 @@ export async function addChecklistItemAction(
   );
 }
 
+/**
+ * Taking a checklist line off (P6-G27).
+ *
+ * `tasks.removeChecklistItem` shipped with the checklist and had no caller
+ * anywhere, so a line typed by mistake stayed for good. Ticking it is not the
+ * same as removing it: a ticked line says the work was done.
+ */
+export async function removeChecklistItemAction(
+  id: string,
+  itemId: string,
+): Promise<WriteState> {
+  return run(
+    (context) =>
+      callAction(context, "tasks.removeChecklistItem", { id, itemId }),
+    ["/board", `/tasks/${id}`],
+  );
+}
+
 export async function setChecklistItemAction(
   id: string,
   itemId: string,

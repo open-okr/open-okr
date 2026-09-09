@@ -20,7 +20,14 @@
  * disappears.
  */
 
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useState, useTransition } from "react";
 import {
   previewImportAction,
@@ -58,6 +65,8 @@ export function ImportWizard({
   readonly entities: readonly EntityChoice[];
   readonly aiOn: boolean;
 }) {
+  const { t } = useTranslations();
+
   const first = entities[0]?.entity ?? "goals";
   const [step, setStep] = useState<Step>("upload");
   const [entity, setEntity] = useState(first);
@@ -135,7 +144,9 @@ export function ImportWizard({
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Import a spreadsheet</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("admin.imports.wizard.importASpreadsheet")}
+        </h2>
         <StepTrail step={step} />
       </CardHeader>
       <CardBody className="flex flex-col gap-4" aria-busy={pending}>
@@ -152,7 +163,7 @@ export function ImportWizard({
         {step === "upload" ? (
           <form action={upload} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              What is in the file
+              {t("admin.imports.wizard.whatIsInThe")}
               <select
                 name="entity"
                 value={entity}
@@ -171,7 +182,7 @@ export function ImportWizard({
               <p className="text-xs text-ink-3">{template.describe}</p>
             ) : null}
             <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              The file
+              {t("admin.imports.wizard.theFile")}
               <input
                 type="file"
                 name="file"
@@ -182,8 +193,7 @@ export function ImportWizard({
               />
             </label>
             <p className="text-xs text-ink-3">
-              CSV or XLSX. Nothing is written until you have seen the preview
-              and asked for it.
+              {t("admin.imports.wizard.csvOrXlsxNothing")}
             </p>
             <div>
               <Button type="submit" variant="primary" disabled={pending}>
@@ -197,8 +207,8 @@ export function ImportWizard({
           <div className="flex flex-col gap-3">
             <p className="text-xs text-ink-3">
               {loaded.filename}, {loaded.rows.length}{" "}
-              {loaded.rows.length === 1 ? "row" : "rows"}. Say what each column
-              is. A column set to nothing is ignored.
+              {loaded.rows.length === 1 ? "row" : "rows"}
+              {t("admin.imports.wizard.sayWhatEachColumn")}
             </p>
             {aiOn && loaded.notes ? (
               <p
@@ -206,7 +216,7 @@ export function ImportWizard({
                 className="rounded-md border border-brand-line bg-surface px-2.5 py-2 text-xs text-ink-2"
               >
                 <span className="font-semibold text-brand-text">
-                  Proposed mapping:
+                  {t("admin.imports.wizard.proposedMapping")}
                 </span>{" "}
                 {loaded.notes}
               </p>
@@ -229,7 +239,9 @@ export function ImportWizard({
                     </p>
                   </div>
                   {aiOn && column.proposed ? (
-                    <Chip tone="brand">Proposed</Chip>
+                    <Chip tone="brand">
+                      {t("admin.imports.wizard.proposed")}
+                    </Chip>
                   ) : null}
                   <select
                     aria-label={`What ${column.header} is`}
@@ -250,7 +262,9 @@ export function ImportWizard({
                     }}
                     className="h-7.5 w-56 rounded-control border border-line-2 bg-surface px-2 text-sm text-ink"
                   >
-                    <option value="">Ignore this column</option>
+                    <option value="">
+                      {t("admin.imports.wizard.ignoreThisColumn")}
+                    </option>
                     {template.fields.map((field) => (
                       <option key={field.field} value={field.field}>
                         {field.field}
@@ -266,8 +280,10 @@ export function ImportWizard({
                 data-testid="import-missing"
                 className="rounded-md bg-warn-bg px-2.5 py-2 text-xs text-warn"
               >
-                Nothing carries {missing.join(", ")}, and{" "}
-                {missing.length === 1 ? "it is" : "they are"} required.
+                {t("admin.imports.wizard.nothingCarries")} {missing.join(", ")}
+                {t("admin.imports.wizard.and")}{" "}
+                {missing.length === 1 ? "it is" : "they are"}{" "}
+                {t("admin.imports.wizard.required")}
               </p>
             ) : null}
             <div className="flex gap-2">
@@ -280,7 +296,7 @@ export function ImportWizard({
                 {pending ? "Checking" : "Preview"}
               </Button>
               <Button onClick={restart} disabled={pending}>
-                Choose another file
+                {t("admin.imports.wizard.chooseAnotherFile")}
               </Button>
             </div>
           </div>
@@ -291,7 +307,8 @@ export function ImportWizard({
             <Counts report={report} />
             {report.unmappedHeaders.length > 0 ? (
               <p className="text-xs text-ink-3">
-                Not imported: {report.unmappedHeaders.join(", ")}.
+                {t("admin.imports.wizard.notImported")}{" "}
+                {report.unmappedHeaders.join(", ")}.
               </p>
             ) : null}
             <RowTable report={report} />
@@ -316,7 +333,7 @@ export function ImportWizard({
                   }}
                   disabled={pending}
                 >
-                  Back to the columns
+                  {t("admin.imports.wizard.backToTheColumns")}
                 </Button>
               </div>
             ) : (
@@ -325,9 +342,11 @@ export function ImportWizard({
                   data-testid="import-done"
                   className="rounded-md bg-ok-bg px-2.5 py-2 text-xs text-ok"
                 >
-                  Imported. Run the same file again and it writes nothing new.
+                  {t("admin.imports.wizard.importedRunTheSame")}
                 </p>
-                <Button onClick={restart}>Import another file</Button>
+                <Button onClick={restart}>
+                  {t("admin.imports.wizard.importAnotherFile")}
+                </Button>
               </div>
             )}
           </div>
@@ -363,6 +382,8 @@ function Counts({ report }: { readonly report: ReportView }) {
  * command's, which prints them the same way.
  */
 function RowTable({ report }: { readonly report: ReportView }) {
+  const { t } = useTranslations();
+
   const ordered = [...report.rows].sort((a, b) =>
     a.outcome === b.outcome
       ? a.line - b.line
@@ -375,9 +396,15 @@ function RowTable({ report }: { readonly report: ReportView }) {
       <table className="w-full text-left text-xs">
         <thead className="sticky top-0 bg-raised text-ink-3">
           <tr>
-            <th className="px-2.5 py-1.5 font-semibold">Line</th>
-            <th className="px-2.5 py-1.5 font-semibold">Identifier</th>
-            <th className="px-2.5 py-1.5 font-semibold">What happens</th>
+            <th className="px-2.5 py-1.5 font-semibold">
+              {t("admin.imports.wizard.line")}
+            </th>
+            <th className="px-2.5 py-1.5 font-semibold">
+              {t("admin.imports.wizard.identifier")}
+            </th>
+            <th className="px-2.5 py-1.5 font-semibold">
+              {t("common.whatHappens")}
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line" data-testid="import-rows">
@@ -389,7 +416,9 @@ function RowTable({ report }: { readonly report: ReportView }) {
               </td>
               <td className="px-2.5 py-1.5">
                 {row.outcome === "skipped" ? (
-                  <span className="text-bad">Skipped. {row.reason}</span>
+                  <span className="text-bad">
+                    {t("admin.imports.wizard.skipped")} {row.reason}
+                  </span>
                 ) : (
                   <span className="text-ink-2">
                     {row.outcome === "created" ? "Created" : "Updated"}

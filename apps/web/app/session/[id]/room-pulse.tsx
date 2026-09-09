@@ -13,7 +13,14 @@
  * objective score exists to prevent. The action refuses the read to anybody
  * else, so this component is not the thing keeping the secret.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { givePulseAction } from "./actions";
@@ -48,6 +55,8 @@ export function RoomPulsePanel({
   readonly pulse: RoomPulse;
   readonly canGive: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -81,16 +90,18 @@ export function RoomPulsePanel({
       <Card>
         <CardHeader>
           <span className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-bold text-ink">Your pulse</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("session.detail.roomPulse.yourPulse")}
+            </h2>
             <Chip tone="neutral">
-              {pulse.given} of {pulse.expected} given
+              {pulse.given} {t("common.of")} {pulse.expected}{" "}
+              {t("session.detail.roomPulse.given")}
             </Chip>
           </span>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <p className="text-xs text-ink-4">
-            One to five for the cycle just gone, and one word. Before the
-            numbers, the people.
+            {t("session.detail.roomPulse.oneToFiveFor")}
           </p>
           <span className="flex flex-wrap gap-1.5">
             {PULSES.map((value) => (
@@ -108,7 +119,7 @@ export function RoomPulsePanel({
           </span>
           <label className="flex flex-col gap-1" htmlFor="pulse-word">
             <span className="text-xs font-medium text-ink-3">
-              One word for the cycle
+              {t("session.detail.roomPulse.oneWordForThe")}
             </span>
             <input
               id="pulse-word"
@@ -116,7 +127,7 @@ export function RoomPulsePanel({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={word}
               disabled={!canGive}
-              placeholder="relieved"
+              placeholder={t("session.detail.roomPulse.relieved")}
               onChange={(event) => setWord(event.target.value)}
             />
           </label>
@@ -127,8 +138,7 @@ export function RoomPulsePanel({
               </Button>
               {pulse.mine.pulse === null ? null : (
                 <span className="text-xs text-ink-4">
-                  Yours is recorded. Changing it corrects your own, and nobody
-                  gets two voices.
+                  {t("session.detail.roomPulse.yoursIsRecordedChanging")}
                 </span>
               )}
             </span>
@@ -147,13 +157,15 @@ export function RoomPulsePanel({
                 id="room-pulse-heading"
                 className="text-sm font-bold text-ink"
               >
-                The room
+                {t("session.detail.roomPulse.theRoom")}
               </h2>
               <Chip tone={BAND_TONE[pulse.band ?? ""] ?? "neutral"}>
                 {/* One decimal, because §8.2's own bands are written to one. */}
-                {pulse.average?.toFixed(1)} of 5
+                {pulse.average?.toFixed(1)} {t("common.of5")}
               </Chip>
-              <Chip tone="neutral">yours to read</Chip>
+              <Chip tone="neutral">
+                {t("session.detail.roomPulse.yoursToRead")}
+              </Chip>
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
@@ -172,9 +184,7 @@ export function RoomPulsePanel({
               </span>
             )}
             <p className="text-xs text-ink-4">
-              Only you see this. The room seeing its own average before scoring
-              is an anchor, which is the thing the hidden objective score exists
-              to avoid.
+              {t("session.detail.roomPulse.onlyYouSeeThis")}
             </p>
           </CardBody>
         </Card>

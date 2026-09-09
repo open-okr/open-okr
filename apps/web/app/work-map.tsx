@@ -5,6 +5,7 @@ import {
 } from "@openokr/method";
 import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
+import { getTranslations } from "../lib/translations";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
 
@@ -107,7 +108,7 @@ export interface MapNode {
  * `empty` belongs to the caller: the two screens are empty for different
  * reasons and each one knows what to suggest next.
  */
-export function GoalTable({
+export async function GoalTable({
   nodes,
   selected,
   rowHref,
@@ -123,6 +124,8 @@ export function GoalTable({
   readonly rowHref: (node: MapNode) => string;
   readonly empty: ReactNode;
 }) {
+  const { t } = await getTranslations();
+
   const thresholds = canonThresholds();
 
   return (
@@ -138,37 +141,37 @@ export function GoalTable({
                   scope="col"
                   className="px-3 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
                 >
-                  Goal / key result
+                  {t("workMap.goalKeyResult")}
                 </th>
                 <th
                   scope="col"
                   className="px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase"
                 >
-                  Health
+                  {t("workMap.health")}
                 </th>
                 <th
                   scope="col"
                   className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase md:table-cell"
                 >
-                  Confidence
+                  {t("common.confidence")}
                 </th>
                 <th
                   scope="col"
                   className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase sm:table-cell"
                 >
-                  Progress
+                  {t("common.progress")}
                 </th>
                 <th
                   scope="col"
                   className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase lg:table-cell"
                 >
-                  Next step
+                  {t("workMap.nextStep")}
                 </th>
                 <th
                   scope="col"
                   className="px-3 py-2 text-right text-[10px] font-bold tracking-wider text-ink-4 uppercase"
                 >
-                  Champion
+                  {t("common.champion")}
                 </th>
               </tr>
             </thead>
@@ -246,7 +249,7 @@ export function GoalTable({
   );
 }
 
-export function WorkMap({
+export async function WorkMap({
   nodes,
   selected,
   canEdit,
@@ -258,6 +261,8 @@ export function WorkMap({
   /** Deep links every node, so a row is a URL somebody can send. */
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
       <div className="min-w-0 flex-1">
@@ -267,12 +272,13 @@ export function WorkMap({
           rowHref={(node) => hrefFor(node.id)}
           empty={
             <div className="flex flex-col gap-1.5 p-3">
-              <p className="text-sm text-ink-2">Nothing in this cycle yet.</p>
+              <p className="text-sm text-ink-2">
+                {t("workMap.nothingInThisCycle")}
+              </p>
               <p className="text-xs text-ink-3">
-                Objectives are drafted in phase 4 of the cycle workspace, where
-                every rule is checked as they are written.{" "}
+                {t("workMap.objectivesAreDraftedIn")}{" "}
                 <a className="underline" href="/cycle?phase=4">
-                  Start drafting
+                  {t("workMap.startDrafting")}
                 </a>
                 .
               </p>
@@ -289,7 +295,7 @@ export function WorkMap({
                 <h2 className="text-sm font-bold text-ink">{selected.title}</h2>
                 <a
                   href={hrefFor(null)}
-                  aria-label="Close the panel"
+                  aria-label={t("workMap.closeThePanel")}
                   className="text-xs text-ink-3 hover:text-ink"
                 >
                   ✕
@@ -324,7 +330,7 @@ export function WorkMap({
                 className="text-xs text-brand-text underline"
                 href={`/goals/${selected.goalId}`}
               >
-                Open the goal
+                {t("workMap.openTheGoal")}
               </a>
             </CardBody>
           </Card>

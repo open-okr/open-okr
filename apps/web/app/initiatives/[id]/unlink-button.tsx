@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -18,6 +19,8 @@ export function UnlinkButton({
   readonly label: string;
   readonly onUnlink: () => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
+
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -38,7 +41,7 @@ export function UnlinkButton({
           });
         }}
       >
-        Unlink
+        {t("common.unlink")}
       </button>
       {error ? (
         <span role="alert" className="text-xs text-bad">

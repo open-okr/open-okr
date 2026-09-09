@@ -78,6 +78,9 @@ export {
   queryFeed,
 } from "./activities/feed.ts";
 export {
+  FEED_ADDED_TOPIC,
+  type FeedAddedMessage,
+  feedAddedEvent,
   type LiveActivityEvent,
   toLiveActivityEvent,
   workspaceFeedChannel,
@@ -576,6 +579,11 @@ export {
   type Reversal,
   reversalFor,
 } from "./copilot/proposals.ts";
+export {
+  type BuildDemoResult,
+  buildDemoWorkspace,
+  type DemoContext,
+} from "./demo/builder.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
@@ -644,6 +652,19 @@ export {
   templateFor,
 } from "./imports/templates/index.ts";
 export {
+  cookieHeaderFrom,
+  INVITE_COOKIE,
+  INVITE_COOKIE_MAX_AGE_SECONDS,
+  inviteTokenFromCookies,
+} from "./invitations/pending.ts";
+export {
+  addressMayAccept,
+  type InvitePreview,
+  type InviteRefusal,
+  type InviteResolution,
+  previewInvite,
+} from "./invitations/preview.ts";
+export {
   type ProvisionedMember,
   type ProvisionMemberInput,
   provisionMemberForInvite,
@@ -673,6 +694,28 @@ export {
   type NotifyRecipientsResult,
   notifyRecipients,
 } from "./notifications/create.ts";
+export {
+  DIGEST_ITEM_LIMIT,
+  type DigestContents,
+  type DigestItemsInput,
+  digestItemsFor,
+} from "./notifications/digest.ts";
+export {
+  claimDueBatches,
+  DIGEST_TOPIC,
+  type DrainResult,
+} from "./notifications/drain.ts";
+export {
+  LINKED_SUBJECT_TYPES,
+  subjectPath,
+  subjectUrl,
+} from "./notifications/links.ts";
+export {
+  INBOX_ADDED_TOPIC,
+  type InboxAddedMessage,
+  inboxAddedEvent,
+  memberInboxChannel,
+} from "./notifications/live.ts";
 export {
   type Recipient,
   type ResolveRecipientsInput,
@@ -707,6 +750,7 @@ export {
   renderDigest,
   renderMentionNotification,
 } from "./notifications/templates.ts";
+export { readerMaySeeSubject } from "./notifications/visibility.ts";
 export {
   ageInWords,
   blockerDraft,
@@ -828,12 +872,15 @@ export {
   brandingSchema,
   DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,
-  findSetting,
+  findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   isKnownTimezone,
   languageSchema,
   type ProvisioningContext,
+  primaryChannelSchema,
   resolveMemberSettings,
+  resolveSpaceSettings,
+  resolveSpaceSettingsFrom,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
   type SettingDefinition,
@@ -898,4 +945,5 @@ export {
 export {
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
+  registrationOpenOrInvited,
 } from "./workspaces/registration.ts";

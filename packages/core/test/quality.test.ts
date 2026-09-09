@@ -375,3 +375,98 @@ describe("the panel and the stored flags", () => {
     expect(inBrowser).toEqual([...(stored?.quality_flags ?? [])].sort());
   });
 });
+
+describe("per-space strictness (P6-G18b)", () => {
+  /** The workspace's own default space, which provisioning made. */
+  const defaultSpace = async (): Promise<string> => {
+    const wb = await workerDb();
+    const spaces = await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.list",
+      {},
+    );
+    return (spaces as Array<{ id: string }>)[0]?.id as string;
+  };
+
+  it("changes what the Coach refuses in that space, and nowhere else", async () => {
+    const wb = await workerDb();
+    const spaceId = await defaultSpace();
+
+    // The same three-word title in two places: one inside the space, one
+    // owned by the workspace. OBJ-2 warns on the length in both.
+    const inSpace = (await createGoal({
+      title: "Become genuinely trusted",
+      ownerKind: "space",
+      spaceId,
+    })) as { id: string };
+    const outside = (await createGoal({
+      title: "Become genuinely trusted",
+    })) as { id: string };
+
+    const spaceBefore = await storedGoal(inSpace.id);
+    const outsideBefore = await storedGoal(outside.id);
+    expect(spaceBefore?.quality_score).toBe(outsideBefore?.quality_score);
+
+    // The space alone turns strict. The workspace is untouched.
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, coachStrictness: "strict" } as never,
+    );
+
+    // Any write rescores, so both are judged again.
+    for (const goal of [inSpace, outside]) {
+      await callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: goal.id,
+        title: "Become genuinely trusted",
+      } as never);
+    }
+
+    const spaceAfter = await storedGoal(inSpace.id);
+    const outsideAfter = await storedGoal(outside.id);
+
+    expect(spaceAfter?.quality_score as number).toBeLessThan(
+      spaceBefore?.quality_score as number,
+    );
+    // "and nowhere else" is the half worth testing: a space setting that
+    // leaked to the workspace would be a space setting nobody could use.
+    expect(outsideAfter?.quality_score).toBe(outsideBefore?.quality_score);
+  });
+
+  it("follows the workspace again once the override is cleared", async () => {
+    const wb = await workerDb();
+    const spaceId = await defaultSpace();
+    const goal = (await createGoal({
+      title: "Become genuinely trusted",
+      ownerKind: "space",
+      spaceId,
+    })) as { id: string };
+    const atWorkspace = await storedGoal(goal.id);
+
+    const rescore = () =>
+      callAction({ pool: wb.appPool, ...context() }, "goals.update", {
+        id: goal.id,
+        title: "Become genuinely trusted",
+      } as never);
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, coachStrictness: "strict" } as never,
+    );
+    await rescore();
+    expect((await storedGoal(goal.id))?.quality_score as number).toBeLessThan(
+      atWorkspace?.quality_score as number,
+    );
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "spaces.updateSettings",
+      { id: spaceId, coachStrictness: null } as never,
+    );
+    await rescore();
+    expect((await storedGoal(goal.id))?.quality_score).toBe(
+      atWorkspace?.quality_score,
+    );
+  });
+});

@@ -46,8 +46,12 @@ describe("navBlocks", () => {
     // failure here rather than a surprise in the sidebar. Search joined them at
     // P5-T13: every member searches and the index filters each row by access,
     // so it is a destination rather than a part of the practice.
+    // Inbox joined them at P6-G07a, between Overview and Review, which is
+    // where UIUX-PLAN §3 puts it: "Inbox in the primary sidebar block beside
+    // Home and Review".
     expect(first?.items.map((i) => i.id)).toEqual([
       "overview",
+      "inbox",
       "review",
       "search",
     ]);

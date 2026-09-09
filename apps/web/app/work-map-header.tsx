@@ -1,5 +1,6 @@
 import { Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../lib/translations";
 
 /**
  * The Work Map's context strip, title block and scope tabs (S-01, P3-T11).
@@ -41,13 +42,15 @@ export interface ScopeTab {
   readonly href: string;
 }
 
-export function WorkMapContextStrip({
+export async function WorkMapContextStrip({
   context,
   cycleHref,
 }: {
   readonly context: WorkMapContext | null;
   readonly cycleHref: string;
 }) {
+  const { t } = await getTranslations();
+
   if (!context) {
     return null;
   }
@@ -58,13 +61,15 @@ export function WorkMapContextStrip({
         href={cycleHref}
         className="rounded-full border border-line px-2.5 py-1 font-semibold text-ink-2 hover:border-brand"
       >
-        Phase {context.phase} · {context.phaseTitle}
+        {t("common.phase")} {context.phase} · {context.phaseTitle}
       </Link>
 
       {context.published ? (
-        <span className="text-ink-3">Published. The set is live.</span>
+        <span className="text-ink-3">
+          {t("workMapHeader.publishedTheSetIs")}
+        </span>
       ) : context.unmetGates.length === 0 ? (
-        <span className="text-ok">Every gate met.</span>
+        <span className="text-ok">{t("workMapHeader.everyGateMet")}</span>
       ) : (
         // The count, and the one gate's own words only when there is one of
         // them. A gate's title is a full sentence in this product, so naming
@@ -134,7 +139,7 @@ function Stat({
   );
 }
 
-export function WorkMapHeader({
+export async function WorkMapHeader({
   workspaceName,
   scopeLabel,
   stats,
@@ -143,6 +148,8 @@ export function WorkMapHeader({
   readonly scopeLabel: string;
   readonly stats: WorkMapStats;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -151,13 +158,14 @@ export function WorkMapHeader({
             block; the topbar is not this component's to change, so the page
             keeps its own name here rather than becoming an unnamed screen. */}
         <h1 className="text-[10px] font-bold tracking-wider text-ink-4 uppercase">
-          Work map
+          {t("workMapHeader.workMap")}
         </h1>
         <p className="truncate text-xl font-bold text-ink">{workspaceName}</p>
         <p className="text-xs text-ink-3">
-          {scopeLabel} · {stats.objectiveCount} objective
-          {stats.objectiveCount === 1 ? "" : "s"} · {stats.keyResultCount} key
-          result{stats.keyResultCount === 1 ? "" : "s"}
+          {scopeLabel} · {stats.objectiveCount} {t("common.objective")}
+          {stats.objectiveCount === 1 ? "" : "s"} · {stats.keyResultCount}{" "}
+          {t("workMapHeader.keyResult")}
+          {stats.keyResultCount === 1 ? "" : "s"}
         </p>
       </div>
 
@@ -205,7 +213,7 @@ export function WorkMapHeader({
   );
 }
 
-export function WorkMapScopeTabs({
+export async function WorkMapScopeTabs({
   tabs,
   active,
   cycles,
@@ -218,9 +226,14 @@ export function WorkMapScopeTabs({
   readonly activeCycleId: string | null;
   readonly cycleHrefFor: (cycleId: string) => string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <nav aria-label="Scope" className="flex flex-wrap items-center gap-1">
+      <nav
+        aria-label={t("common.scope")}
+        className="flex flex-wrap items-center gap-1"
+      >
         {tabs.map((tab) => (
           <Link
             key={tab.key}
@@ -239,7 +252,7 @@ export function WorkMapScopeTabs({
 
       <div className="flex flex-wrap items-center gap-1">
         {cycles.length === 0 ? (
-          <Chip tone="neutral">No cycle</Chip>
+          <Chip tone="neutral">{t("workMapHeader.noCycle")}</Chip>
         ) : (
           cycles.map((cycle) => (
             <Link

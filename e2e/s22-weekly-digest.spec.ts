@@ -22,7 +22,7 @@
  * instance and `registration-to-dashboard.spec.ts` claims it, so anything that
  * signs in sorts after `registration-`. `s22` is screen S-22.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";

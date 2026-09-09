@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +12,8 @@ import { AuthCard, Field, FormError } from "../auth-card";
  * when a second factor is enrolled.
  */
 export default function SignInPage() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -75,7 +77,7 @@ export default function SignInPage() {
   if (challenge) {
     return (
       <AuthCard
-        title="Enter your code"
+        title={t("auth.signIn.enterYourCode")}
         description="Open your authenticator app and enter the six-digit code."
       >
         <form onSubmit={verify} className="flex flex-col gap-3">
@@ -94,12 +96,12 @@ export default function SignInPage() {
         </form>
         <FormError>{error}</FormError>
         <p className="text-sm text-ink-3">
-          Lost your phone? Use a backup code on the{" "}
+          {t("auth.signIn.lostYourPhoneUse")}{" "}
           <Link
             href="/backup-code"
             className="font-medium text-brand-text hover:underline"
           >
-            backup code page
+            {t("auth.signIn.backupCodePage")}
           </Link>
           .
         </p>
@@ -109,21 +111,21 @@ export default function SignInPage() {
 
   return (
     <AuthCard
-      title="Sign in to OpenOKR"
+      title={t("auth.signIn.signInToOpenokr")}
       footer={
         <>
           <Link
             href="/forgot-password"
             className="font-medium text-brand-text hover:underline"
           >
-            Forgot your password?
+            {t("auth.signIn.forgotYourPassword")}
           </Link>
           {" · "}
           <Link
             href="/sign-up"
             className="font-medium text-brand-text hover:underline"
           >
-            Create an account
+            {t("common.createAnAccount")}
           </Link>
         </>
       }
@@ -149,7 +151,7 @@ export default function SignInPage() {
       </form>
 
       <Button type="button" variant="default" onClick={signInWithPasskey}>
-        Sign in with a passkey
+        {t("auth.signIn.signInWithA")}
       </Button>
 
       <FormError>{error}</FormError>

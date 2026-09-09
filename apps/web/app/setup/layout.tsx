@@ -3,6 +3,7 @@ import { buttonVariants, Card, CardBody, cn } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * The first-run wizard's shell, and its lock (P1-T09, restyled P2-T10 on
@@ -26,6 +27,8 @@ export default async function SetupLayout({
 }: {
   children: ReactNode;
 }) {
+  const { t } = await getTranslations();
+
   const state = await readSetupState(getPool());
   const refusal = setupRefusal(state);
 
@@ -36,7 +39,7 @@ export default async function SetupLayout({
           {refusal ? (
             <>
               <h1 className="text-lg font-bold text-ink">
-                Setup is already done
+                {t("setup.layout.setupIsAlreadyDone")}
               </h1>
               <p className="text-sm text-ink-3">{refusal}</p>
               <Link
@@ -46,7 +49,7 @@ export default async function SetupLayout({
                   "self-start",
                 )}
               >
-                Go to the instance
+                {t("setup.layout.goToTheInstance")}
               </Link>
             </>
           ) : (

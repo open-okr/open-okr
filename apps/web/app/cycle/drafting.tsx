@@ -1,5 +1,6 @@
 import type { ResolvedThresholds } from "@openokr/method";
 import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
   DraftFromAmbition,
@@ -60,7 +61,7 @@ const HEALTH_TONE: Readonly<
   missed: "bad",
 };
 
-export function Drafting({
+export async function Drafting({
   cycleId,
   goals,
   members,
@@ -92,6 +93,8 @@ export function Drafting({
    */
   readonly assistsAvailable: boolean;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-4.5">
       {assistsAvailable && canEdit ? (
@@ -102,8 +105,7 @@ export function Drafting({
         <Card>
           <CardBody>
             <p className="text-sm text-ink-3">
-              Nothing drafted yet. An objective states the change; its key
-              results are the proof it happened.
+              {t("cycle.drafting.nothingDraftedYetAn")}
             </p>
           </CardBody>
         </Card>
@@ -115,8 +117,8 @@ export function Drafting({
             <div className="flex min-w-0 flex-col">
               <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
               <p className="text-xs text-ink-3">
-                {goal.level} · {goal.champion.name} champions it,{" "}
-                {goal.reviewer.name} reviews it
+                {goal.level} · {goal.champion.name} {t("common.championsIt")}{" "}
+                {goal.reviewer.name} {t("cycle.drafting.reviewsIt")}
               </p>
             </div>
             <span className="flex flex-none items-center gap-2">
@@ -130,7 +132,7 @@ export function Drafting({
                 className="text-xs text-brand-text underline"
                 href={`/goals/${goal.id}`}
               >
-                Open
+                {t("cycle.drafting.open")}
               </a>
             </span>
           </CardHeader>
@@ -183,18 +185,17 @@ export function Drafting({
 
             {goal.contributionStatement ? (
               <p className="text-xs text-ink-3">
-                Contributes: {goal.contributionStatement}
+                {t("cycle.drafting.contributes")} {goal.contributionStatement}
               </p>
             ) : (
               <p className="text-xs text-warn">
-                No parent and no contribution statement, so publish gate 3 is
-                red.
+                {t("cycle.drafting.noParentAndNo")}
               </p>
             )}
 
             {goal.keyResults.length === 0 ? (
               <p className="text-sm text-ink-3">
-                No key results yet. Without one, nothing here is measurable.
+                {t("cycle.drafting.noKeyResultsYet")}
               </p>
             ) : (
               <ul className="flex flex-col divide-y divide-line">
@@ -210,9 +211,10 @@ export function Drafting({
                         </span>
                         <span className="text-xs text-ink-3">
                           {keyResult.direction} · {keyResult.indicatorType} ·{" "}
-                          {keyResult.baselineValue} to {keyResult.targetValue}
-                          {keyResult.unit ? ` ${keyResult.unit}` : ""} · weight{" "}
-                          {keyResult.weight}
+                          {keyResult.baselineValue} {t("common.to")}{" "}
+                          {keyResult.targetValue}
+                          {keyResult.unit ? ` ${keyResult.unit}` : ""}{" "}
+                          {t("common.weight")} {keyResult.weight}
                         </span>
                       </span>
                       <span className="flex-none text-sm font-bold text-ink">
@@ -230,7 +232,7 @@ export function Drafting({
                           className="sr-only"
                           htmlFor={`value-${keyResult.id}`}
                         >
-                          New value for {keyResult.title}
+                          {t("common.newValueFor")} {keyResult.title}
                         </label>
                         <input
                           id={`value-${keyResult.id}`}
@@ -238,7 +240,7 @@ export function Drafting({
                           type="number"
                           step="any"
                           required
-                          placeholder="Where is it now?"
+                          placeholder={t("cycle.drafting.whereIsItNow")}
                           className="w-36 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
                         />
                         <Button
@@ -246,14 +248,13 @@ export function Drafting({
                           variant="ghost"
                           className="h-7 px-2 text-xs"
                         >
-                          Record
+                          {t("common.record")}
                         </Button>
                       </ActionForm>
                     ) : null}
                     {keyResult.kpiId ? (
                       <p className="text-xs text-ink-3">
-                        Reads its value from a KPI. Manual entry is refused
-                        while the link holds.
+                        {t("cycle.drafting.readsItsValueFrom")}
                       </p>
                     ) : null}
                   </li>
@@ -268,19 +269,19 @@ export function Drafting({
               >
                 <input type="hidden" name="goalId" value={goal.id} />
                 <label className="sr-only" htmlFor={`kr-title-${goal.id}`}>
-                  The key result
+                  {t("cycle.drafting.theKeyResult")}
                 </label>
                 <input
                   id={`kr-title-${goal.id}`}
                   name="title"
                   required
                   maxLength={500}
-                  placeholder="What changes, measured how?"
+                  placeholder={t("cycle.drafting.whatChangesMeasuredHow")}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
                   <label className="sr-only" htmlFor={`kr-dir-${goal.id}`}>
-                    Direction
+                    {t("cycle.drafting.direction")}
                   </label>
                   <select
                     id={`kr-dir-${goal.id}`}
@@ -295,7 +296,7 @@ export function Drafting({
                     ))}
                   </select>
                   <label className="sr-only" htmlFor={`kr-ind-${goal.id}`}>
-                    Indicator
+                    {t("common.indicator")}
                   </label>
                   <select
                     id={`kr-ind-${goal.id}`}
@@ -310,7 +311,7 @@ export function Drafting({
                     ))}
                   </select>
                   <label className="sr-only" htmlFor={`kr-base-${goal.id}`}>
-                    Baseline
+                    {t("cycle.drafting.baseline")}
                   </label>
                   <input
                     id={`kr-base-${goal.id}`}
@@ -318,11 +319,11 @@ export function Drafting({
                     type="number"
                     step="any"
                     required
-                    placeholder="Baseline"
+                    placeholder={t("cycle.drafting.baseline")}
                     className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
                   <label className="sr-only" htmlFor={`kr-target-${goal.id}`}>
-                    Target
+                    {t("common.target")}
                   </label>
                   <input
                     id={`kr-target-${goal.id}`}
@@ -330,20 +331,22 @@ export function Drafting({
                     type="number"
                     step="any"
                     required
-                    placeholder="Target"
+                    placeholder={t("common.target")}
                     className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
                   <label className="sr-only" htmlFor={`kr-unit-${goal.id}`}>
-                    Unit
+                    {t("cycle.drafting.unit")}
                   </label>
                   <input
                     id={`kr-unit-${goal.id}`}
                     name="unit"
                     maxLength={60}
-                    placeholder="Unit"
+                    placeholder={t("cycle.drafting.unit")}
                     className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
-                  <Button type="submit">Add key result</Button>
+                  <Button type="submit">
+                    {t("cycle.drafting.addKeyResult")}
+                  </Button>
                 </div>
               </ActionForm>
             ) : null}
@@ -358,35 +361,37 @@ export function Drafting({
       {canEdit ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Draft an objective</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("cycle.drafting.draftAnObjective")}
+            </h2>
           </CardHeader>
           <CardBody>
             <ActionForm action={createGoal} className="flex flex-col gap-1.5">
               <input type="hidden" name="cycleId" value={cycleId} />
               <label className="sr-only" htmlFor="goal-title">
-                The objective
+                {t("common.theObjective")}
               </label>
               <input
                 id="goal-title"
                 name="title"
                 required
                 maxLength={500}
-                placeholder="What is different at the end of this cycle?"
+                placeholder={t("cycle.drafting.whatIsDifferentAt")}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
               />
               <label className="sr-only" htmlFor="goal-contribution">
-                What it contributes to
+                {t("common.whatItContributesTo")}
               </label>
               <input
                 id="goal-contribution"
                 name="contributionStatement"
                 maxLength={1000}
-                placeholder="The priority this moves forward"
+                placeholder={t("common.thePriorityThisMoves")}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
               />
               <div className="flex flex-wrap items-center gap-1.5">
                 <label className="sr-only" htmlFor="goal-level">
-                  Level
+                  {t("common.level")}
                 </label>
                 <select
                   id="goal-level"
@@ -403,7 +408,7 @@ export function Drafting({
                   )}
                 </select>
                 <label className="sr-only" htmlFor="goal-champion">
-                  Champion
+                  {t("common.champion")}
                 </label>
                 <select
                   id="goal-champion"
@@ -413,12 +418,12 @@ export function Drafting({
                 >
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
-                      Champion: {member.name}
+                      {t("cycle.drafting.champion2")} {member.name}
                     </option>
                   ))}
                 </select>
                 <label className="sr-only" htmlFor="goal-reviewer">
-                  Reviewer
+                  {t("common.reviewer")}
                 </label>
                 <select
                   id="goal-reviewer"
@@ -428,18 +433,16 @@ export function Drafting({
                 >
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
-                      Reviewer: {member.name}
+                      {t("cycle.drafting.reviewer2")} {member.name}
                     </option>
                   ))}
                 </select>
                 <Button type="submit" variant="primary">
-                  Add objective
+                  {t("cycle.drafting.addObjective")}
                 </Button>
               </div>
               <p className="text-xs text-ink-3">
-                METHOD.md §2.5 asks for one champion and one reviewer, and
-                prefers two different people. One person can hold both where a
-                team has nobody else.
+                {t("cycle.drafting.methodMd25")}
               </p>
             </ActionForm>
           </CardBody>

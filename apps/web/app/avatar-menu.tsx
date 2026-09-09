@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { Avatar } from "@openokr/ui";
+import { Avatar, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -27,6 +27,7 @@ export function AvatarMenu({
   name,
   items,
   signOut,
+  appearance,
 }: {
   readonly name: string;
   /**
@@ -39,11 +40,21 @@ export function AvatarMenu({
    */
   readonly items: readonly { readonly href: string; readonly label: string }[];
   readonly signOut: ReactNode;
+  /**
+   * The theme and density control (P6-G23).
+   *
+   * Passed in rather than imported, so this file stays a menu: the control
+   * writes to the member as well as to the browser, and the shell is where
+   * that reads its current value from.
+   */
+  readonly appearance: ReactNode;
 }) {
+  const { t } = useTranslations();
+
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label="Account menu"
+        aria-label={t("avatarMenu.accountMenu")}
         className="rounded-full outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
       >
         <Avatar name={name} />
@@ -60,6 +71,11 @@ export function AvatarMenu({
                 {item.label}
               </Menu.Item>
             ))}
+            <Menu.Separator className="my-1 h-px bg-line" />
+            {/* Not a Menu.Item either: these are buttons that stay on the
+             * page rather than rows that navigate, and item semantics would
+             * close the menu on the first click. */}
+            {appearance}
             <Menu.Separator className="my-1 h-px bg-line" />
             {/* Not a Menu.Item: signing out is a real form submission (a
              * Server Function), and Base UI's item semantics expect to be

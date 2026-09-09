@@ -47,6 +47,15 @@ export interface RoutingInput {
   readonly urgent: boolean;
   /** Providers the workspace has connected and that are not in `error`. */
   readonly connectedProviders: readonly ChannelProviderKey[];
+  /**
+   * The rule's own channel, when the workspace set one (P6-G21).
+   *
+   * `nudge_rules.channel_override` has been stored since P4-T04b and read by
+   * nothing, so a workspace that routed a rule to Slack was answered with the
+   * member's own primary channel and no error. Null is the member's choice,
+   * which is the default and the respectful answer.
+   */
+  readonly channelOverride?: PrimaryChannel | null;
   readonly now: Date;
 }
 
@@ -100,7 +109,11 @@ function primaryChannelProblem(input: RoutingInput): string | null {
  */
 export function resolveDelivery(input: RoutingInput): Delivery {
   const problem = primaryChannelProblem(input);
-  const primary = input.member.primaryChannel;
+  // The rule's channel when the workspace named one, the member's otherwise.
+  // A rule override is a routing decision about the message; the member's
+  // quiet hours below are a decision about the person, and the override does
+  // not touch those.
+  const primary = input.channelOverride ?? input.member.primaryChannel;
 
   const channel: DeliveryChannel =
     primary === "app"

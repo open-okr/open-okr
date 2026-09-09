@@ -288,6 +288,14 @@ export const readDigest = defineReadAction({
       lines: z.array(z.string()),
       /** Every number the digest states, so a narration can be checked. */
       numbers: z.array(z.number()),
+      /**
+       * What the coordinator added for leadership, or null (P6-G19b).
+       *
+       * The digest lines have carried this since P4-T15b and the read did not
+       * return it, so the surface that writes it could not show what was
+       * already there and offered "add" over an existing note.
+       */
+      note: z.string().nullable(),
     })
     .nullable(),
   access: ACCESS_LEVELS.view,
@@ -313,6 +321,7 @@ export const readDigest = defineReadAction({
           weekStart: assembled.weekStart,
           lines: [...weeklyDigestLines(assembled)],
           numbers: [...weeklyDigestNumbers(assembled)],
+          note: assembled.coordinatorNote,
         };
       },
     );

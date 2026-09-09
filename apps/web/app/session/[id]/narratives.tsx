@@ -19,7 +19,14 @@
  * action, the same path the check-in composer uses (P3-T07). A stage with nine
  * minutes of talking in it does not need a toolbar.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { passMicAction, setNarrativeAction } from "./actions";
@@ -56,6 +63,8 @@ function ObjectiveRow({
   readonly canPassMic: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -91,8 +100,12 @@ function ObjectiveRow({
           // to know who to look at.
           <Chip tone="neutral">{objective.championName}</Chip>
         ) : null}
-        {objective.hasMic ? <Chip tone="info">speaking</Chip> : null}
-        {objective.spokenAt === null ? null : <Chip tone="ok">spoken</Chip>}
+        {objective.hasMic ? (
+          <Chip tone="info">{t("session.detail.narratives.speaking")}</Chip>
+        ) : null}
+        {objective.spokenAt === null ? null : (
+          <Chip tone="ok">{t("session.detail.narratives.spoken")}</Chip>
+        )}
       </span>
 
       {objective.excerpt === null ? null : (
@@ -112,7 +125,7 @@ function ObjectiveRow({
               run(() => passMicAction(sessionId, objective.goalId))
             }
           >
-            Give them the mic
+            {t("session.detail.narratives.giveThemTheMic")}
           </Button>
         ) : null}
         {canPassMic && objective.hasMic ? (
@@ -123,7 +136,7 @@ function ObjectiveRow({
             disabled={pending}
             onClick={() => run(() => passMicAction(sessionId, null))}
           >
-            Put the mic down
+            {t("session.detail.narratives.putTheMicDown")}
           </Button>
         ) : null}
         {canWrite ? (
@@ -150,7 +163,7 @@ function ObjectiveRow({
             htmlFor={`narrative-${objective.goalId}`}
           >
             <span className="text-xs font-medium text-ink-3">
-              What the number does not show
+              {t("session.detail.narratives.whatTheNumberDoes")}
             </span>
             <textarea
               id={`narrative-${objective.goalId}`}
@@ -158,7 +171,7 @@ function ObjectiveRow({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={text}
               disabled={pending}
-              placeholder="The part the score cannot say"
+              placeholder={t("session.detail.narratives.thePartTheScore")}
               onChange={(event) => setText(event.target.value)}
             />
           </label>
@@ -178,13 +191,12 @@ function ObjectiveRow({
                 })
               }
             >
-              Save the note
+              {t("common.saveTheNote")}
             </Button>
             <span className="text-xs text-ink-4">
               {/* Clearing it is a real act, and it does not un-tell the story:
                   `spoken_at` stays where it is. */}
-              Saving an empty note removes it. It does not undo that the
-              objective was spoken for.
+              {t("session.detail.narratives.savingAnEmptyNote")}
             </span>
           </span>
         </>
@@ -204,6 +216,8 @@ export function NarrativesPanel({
   readonly canWrite: boolean;
   readonly canPassMic: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
@@ -219,18 +233,18 @@ export function NarrativesPanel({
             id="narratives-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Objective narratives
+            {t("common.objectiveNarratives")}
           </h2>
           <Chip tone={narratives.complete ? "ok" : "neutral"}>
-            {narratives.spoken} of {narratives.total} spoken for
+            {narratives.spoken} {t("common.of")} {narratives.total}{" "}
+            {t("session.detail.narratives.spokenFor")}
           </Chip>
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-2">
         {narratives.objectives.length === 0 ? (
           <p className="text-sm text-ink-3">
-            No open objectives in this space and cycle, so there is nothing to
-            talk through.
+            {t("session.detail.narratives.noOpenObjectivesIn")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">

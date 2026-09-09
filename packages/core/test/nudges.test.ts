@@ -1,3 +1,4 @@
+import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -617,5 +618,192 @@ describe("a simulated month", () => {
         `${row.recipient_member_id} in week ${row.week}`,
       ).toBeLessThanOrEqual(ceiling + 5);
     }
+  });
+});
+
+describe("nudge rule cards (P6-G21)", () => {
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "nudges.rules", {});
+  };
+  const set = async (input: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.setRule",
+      input as never,
+    );
+  };
+
+  it("lists the whole catalogue on a workspace that configured nothing", async () => {
+    // Enumerated from `packages/method`, not from `nudge_rules`. A read that
+    // listed the table would show a fresh workspace nothing at all, and the
+    // table's own comment says the absence of a row is the canon default.
+    const answer = await read();
+    expect(answer.rules.length).toBe(TRIGGER_CATALOGUE.length);
+    expect(answer.quietMode).toBe(false);
+    for (const rule of answer.rules) {
+      expect(rule.enabled).toBe(true);
+      expect(rule.channelOverride).toBeNull();
+      expect(rule.quietModeExempt).toBe(false);
+      expect(rule.configured).toBe(false);
+    }
+  });
+
+  it("records a rule the workspace turned down, and only that one", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, enabled: false });
+
+    const answer = await read();
+    const changed = answer.rules.find((rule) => rule.key === key);
+    expect(changed?.enabled).toBe(false);
+    expect(changed?.configured).toBe(true);
+    // Every other rule is untouched, which is the acceptance sentence's own
+    // last clause.
+    for (const rule of answer.rules.filter((one) => one.key !== key)) {
+      expect(rule.enabled).toBe(true);
+      expect(rule.configured).toBe(false);
+    }
+  });
+
+  it("removes the row when a rule goes back to the canon", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, enabled: false });
+    expect((await set({ ruleKey: key, enabled: true })).configured).toBe(false);
+
+    // A stored row matching the canon would survive a change to the canon and
+    // quietly hold the old answer, which is the trap the §11 override map
+    // avoids by storing deviations rather than resolved values.
+    const answer = await read();
+    expect(answer.rules.find((rule) => rule.key === key)?.configured).toBe(
+      false,
+    );
+  });
+
+  it("refuses a rule the method package does not define", async () => {
+    await expect(
+      set({ ruleKey: "not.a.rule", enabled: false }),
+    ).rejects.toThrow(/not a rule the method package defines/i);
+  });
+
+  it("turns workspace quiet mode on, which nothing could do before", async () => {
+    const wb = await workerDb();
+    // `rhythm_settings.quiet_mode` has existed since P4-T04b and the
+    // suppression decision has read it all along; `rhythm.update` did not take
+    // it, so the switch had no handle.
+    await callAction({ pool: wb.appPool, ...context() }, "rhythm.update", {
+      quietMode: true,
+    });
+    expect((await read()).quietMode).toBe(true);
+  });
+
+  it("keeps a channel override and hands it back", async () => {
+    const key = TRIGGER_CATALOGUE[0]?.key as string;
+    await set({ ruleKey: key, channelOverride: "slack" });
+    const answer = await read();
+    expect(answer.rules.find((rule) => rule.key === key)?.channelOverride).toBe(
+      "slack",
+    );
+  });
+});
+
+/**
+ * A workspace's own escalation ladder (METHOD.md §11, P6-G21b).
+ *
+ * `nudge_rules.escalation_ladder` has been stored since P4-T04b and read by
+ * nothing: the column's comment, the table and the admin screen all said a
+ * workspace could replace §11's ladder for a rule, and every consumer read the
+ * canon. These prove the write refuses what §11 would not accept, that the
+ * read hands the ladder back, and that a consumer sees the workspace's numbers
+ * rather than the canon's.
+ */
+describe("the per-rule escalation ladder (P6-G21b)", () => {
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction({ pool: wb.appPool, ...context() }, "nudges.rules", {});
+  };
+  const set = async (input: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "nudges.setRule",
+      input as never,
+    );
+  };
+
+  it("offers a ladder on the three rules that own one, and no others", async () => {
+    // §11 defines three ladders and §6.4 defines twenty-four triggers, so the
+    // mapping is many to one. Hanging the override on every rung would let a
+    // workspace store three answers to one question.
+    const answer = await read();
+    const owners = answer.rules.filter((rule) => rule.ladder !== null);
+    expect(owners.map((rule) => rule.key).sort()).toEqual([
+      "ack.overdue",
+      "blocker.escalated",
+      "checkin.overdue",
+    ]);
+    const blocker = owners.find((rule) => rule.key === "blocker.escalated");
+    expect(blocker?.ladder?.canon).toEqual({
+      owner: 20,
+      coordinator: 24,
+      sponsor: 48,
+    });
+    // Null while the workspace is on the canon, which is what lets the screen
+    // show §11's numbers as placeholders rather than as something typed.
+    expect(blocker?.ladder?.own).toBeNull();
+    expect(blocker?.ladder?.governs).toContain("blocker.warning");
+  });
+
+  it("refuses a ladder on a rule that owns none", async () => {
+    await expect(
+      set({
+        ruleKey: "digest.weekly",
+        escalationLadder: { owner: 1, coordinator: 2, sponsor: 3 },
+      }),
+    ).rejects.toThrow(/does not own a ladder/);
+  });
+
+  it("refuses rungs that do not increase", async () => {
+    // The registry types each rung and says nothing about their order, because
+    // a canon ladder is written in order by hand. A ladder whose rungs are out
+    // of order fires its top rung first and never reaches the ones below it.
+    await expect(
+      set({
+        ruleKey: "blocker.escalated",
+        escalationLadder: { owner: 30, coordinator: 24, sponsor: 48 },
+      }),
+    ).rejects.toThrow(/must come after/);
+  });
+
+  it("refuses a shape §11 would not recognise", async () => {
+    await expect(
+      set({
+        ruleKey: "blocker.escalated",
+        escalationLadder: { owner: 20, coordinator: 24 },
+      }),
+    ).rejects.toThrow(/§11 would recognise/);
+  });
+
+  it("stores one, hands it back, and returns to the canon when emptied", async () => {
+    await set({
+      ruleKey: "blocker.escalated",
+      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+    });
+    const stored = await read();
+    const rule = stored.rules.find((one) => one.key === "blocker.escalated");
+    expect(rule?.ladder?.own).toEqual({
+      owner: 4,
+      coordinator: 8,
+      sponsor: 12,
+    });
+    expect(rule?.configured).toBe(true);
+
+    // A row kept only to hold a copy of §11's numbers would survive a change
+    // to §11, so returning to the canon removes it.
+    await set({ ruleKey: "blocker.escalated", escalationLadder: null });
+    const back = await read();
+    const after = back.rules.find((one) => one.key === "blocker.escalated");
+    expect(after?.ladder?.own).toBeNull();
+    expect(after?.configured).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
   addDependency,
@@ -89,7 +90,7 @@ function stateOf(entry: RegisterEntry): {
   };
 }
 
-export function DependencyRegister({
+export async function DependencyRegister({
   entries,
   keyResults,
   members,
@@ -102,6 +103,8 @@ export function DependencyRegister({
   readonly spaces: readonly RegisterSpace[];
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   // Blocking first: this panel exists to be worked down, and a facilitator
   // scrolling past twelve settled rows to find the one red one is a panel that
   // does not know what it is for.
@@ -114,10 +117,11 @@ export function DependencyRegister({
     <Card id="dependency-register">
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Dependency register</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.dependencyRegister")}
+          </h2>
           <p className="text-xs text-ink-3">
-            What each key result needs from somebody else. METHOD.md §5.4, and
-            publish gate 4 reads it.
+            {t("cycle.dependencyRegister.whatEachKeyResult")}
           </p>
         </div>
         <Chip tone={blocking > 0 ? "bad" : "ok"}>
@@ -127,9 +131,7 @@ export function DependencyRegister({
       <CardBody className="flex flex-col gap-3">
         {entries.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nothing recorded. An empty register passes gate 4, and that is the
-            right answer for a cycle whose key results genuinely need nothing
-            from anybody. It is the wrong answer for one where nobody asked.
+            {t("cycle.dependencyRegister.nothingRecordedAnEmpty")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2.5">
@@ -149,7 +151,8 @@ export function DependencyRegister({
                         {entry.keyResultTitle}
                       </Link>
                       <span className="text-xs text-ink-4">
-                        {entry.goalTitle} · needs {entry.provider}
+                        {entry.goalTitle} {t("cycle.dependencyRegister.needs")}{" "}
+                        {entry.provider}
                       </span>
                     </div>
                     <Chip tone={state.tone}>{state.label}</Chip>
@@ -165,7 +168,7 @@ export function DependencyRegister({
                             type="submit"
                             className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-on-brand"
                           >
-                            Confirm
+                            {t("cycle.dependencyRegister.confirm")}
                           </button>
                         </ActionForm>
                       )}
@@ -176,13 +179,15 @@ export function DependencyRegister({
                       >
                         <input type="hidden" name="id" value={entry.id} />
                         <label className="text-xs text-ink-3">
-                          Risk owner
+                          {t("cycle.dependencyRegister.riskOwner")}
                           <select
                             name="memberId"
                             defaultValue={entry.riskOwnerId ?? ""}
                             className="ml-1.5 rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink"
                           >
-                            <option value="">Nobody</option>
+                            <option value="">
+                              {t("cycle.dependencyRegister.nobody")}
+                            </option>
                             {members.map((member) => (
                               <option key={member.id} value={member.id}>
                                 {member.name}
@@ -194,7 +199,7 @@ export function DependencyRegister({
                           type="submit"
                           className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
                         >
-                          Set
+                          {t("common.set")}
                         </button>
                       </ActionForm>
 
@@ -204,7 +209,7 @@ export function DependencyRegister({
                           type="submit"
                           className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-3"
                         >
-                          Remove
+                          {t("common.remove")}
                         </button>
                       </ActionForm>
                     </div>
@@ -221,10 +226,10 @@ export function DependencyRegister({
             className="flex flex-col gap-2 rounded-md bg-raised p-2.5"
           >
             <h3 className="text-xs font-bold text-ink-2">
-              Record a dependency
+              {t("cycle.dependencyRegister.recordADependency")}
             </h3>
             <label className="flex flex-col gap-1 text-xs text-ink-3">
-              Key result
+              {t("common.keyResult2")}
               <select
                 name="keyResultId"
                 required
@@ -239,12 +244,14 @@ export function DependencyRegister({
             </label>
             <div className="flex flex-wrap gap-2.5">
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Providing space
+                {t("cycle.dependencyRegister.providingSpace")}
                 <select
                   name="providerSpaceId"
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 >
-                  <option value="">Somebody outside this workspace</option>
+                  <option value="">
+                    {t("cycle.dependencyRegister.somebodyOutsideThisWorkspace")}
+                  </option>
                   {spaces.map((space) => (
                     <option key={space.id} value={space.id}>
                       {space.name}
@@ -253,19 +260,21 @@ export function DependencyRegister({
                 </select>
               </label>
               <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-ink-3">
-                Or name them
+                {t("cycle.dependencyRegister.orNameThem")}
                 <input
                   name="providerText"
-                  placeholder="The platform vendor, Legal, a partner"
+                  placeholder={t(
+                    "cycle.dependencyRegister.thePlatformVendorLegal",
+                  )}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
               </label>
             </div>
             <label className="flex flex-col gap-1 text-xs text-ink-3">
-              What is needed
+              {t("cycle.dependencyRegister.whatIsNeeded")}
               <input
                 name="note"
-                placeholder="The rate-limit change, by the end of week four"
+                placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
             </label>
@@ -273,12 +282,10 @@ export function DependencyRegister({
               type="submit"
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
             >
-              Add to the register
+              {t("cycle.dependencyRegister.addToTheRegister")}
             </button>
             <p className="text-xs text-ink-4">
-              A new entry is unsettled, which turns gate 4 red until somebody
-              confirms it or carries it. That is the point: §5.4 asks the room
-              to say out loud who is waiting on whom.
+              {t("cycle.dependencyRegister.aNewEntryIs")}
             </p>
           </ActionForm>
         ) : null}

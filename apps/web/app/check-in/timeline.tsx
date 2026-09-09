@@ -1,5 +1,6 @@
 import { excerptRichText } from "@openokr/core";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledgeCheckIn, deleteCheckIn, editCheckIn } from "./actions.ts";
 
@@ -53,26 +54,29 @@ function difference(value: number, previous: number | null): string {
   return `${previous} → ${value} (${sign}${Math.round(delta * 100) / 100})`;
 }
 
-export function Timeline({
+export async function Timeline({
   checkIns,
   canEdit,
 }: {
   readonly checkIns: readonly TimelineCheckIn[];
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const published = checkIns.filter((entry) => entry.state === "published");
 
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Check-in history</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("checkIn.timeline.checkInHistory")}
+        </h2>
         <Chip tone="neutral">{published.length}</Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         {published.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nothing published yet. The first check-in is what turns this goal
-            from a plan into something with a record.
+            {t("checkIn.timeline.nothingPublishedYetThe")}
           </p>
         ) : (
           published.map((entry) => (
@@ -96,9 +100,11 @@ export function Timeline({
                   </span>
                 </span>
                 {entry.acknowledgedAt ? (
-                  <Chip tone="ok">acknowledged</Chip>
+                  <Chip tone="ok">{t("checkIn.timeline.acknowledged")}</Chip>
                 ) : (
-                  <Chip tone="warn">awaiting the reviewer</Chip>
+                  <Chip tone="warn">
+                    {t("checkIn.timeline.awaitingTheReviewer")}
+                  </Chip>
                 )}
               </header>
 
@@ -132,7 +138,7 @@ export function Timeline({
                       variant="ghost"
                       className="h-7 px-2 text-xs"
                     >
-                      Acknowledge
+                      {t("checkIn.timeline.acknowledge")}
                     </Button>
                   </ActionForm>
                 )}
@@ -144,13 +150,13 @@ export function Timeline({
                       variant="ghost"
                       className="h-7 px-2 text-xs"
                     >
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </ActionForm>
                 ) : null}
                 {entry.editable ? null : (
                   <span className="text-xs text-ink-4">
-                    The window has closed; post a new one instead
+                    {t("checkIn.timeline.theWindowHasClosed")}
                   </span>
                 )}
               </footer>
@@ -169,7 +175,7 @@ export function Timeline({
                     className="text-xs text-ink-3"
                     htmlFor={`edit-status-${entry.id}`}
                   >
-                    Correct it
+                    {t("checkIn.timeline.correctIt")}
                   </label>
                   <select
                     id={`edit-status-${entry.id}`}
@@ -177,15 +183,15 @@ export function Timeline({
                     defaultValue={entry.status ?? "on_track"}
                     className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
                   >
-                    <option value="on_track">On track</option>
-                    <option value="caution">Caution</option>
-                    <option value="off_track">Off track</option>
+                    <option value="on_track">{t("common.onTrack")}</option>
+                    <option value="caution">{t("common.caution")}</option>
+                    <option value="off_track">{t("common.offTrack")}</option>
                   </select>
                   <label
                     className="sr-only"
                     htmlFor={`edit-confidence-${entry.id}`}
                   >
-                    Confidence
+                    {t("common.confidence")}
                   </label>
                   <input
                     id={`edit-confidence-${entry.id}`}
@@ -201,12 +207,12 @@ export function Timeline({
                     className="sr-only"
                     htmlFor={`edit-narrative-${entry.id}`}
                   >
-                    Replace the narrative
+                    {t("checkIn.timeline.replaceTheNarrative")}
                   </label>
                   <input
                     id={`edit-narrative-${entry.id}`}
                     name="narrative"
-                    placeholder="Leave blank to keep the narrative"
+                    placeholder={t("checkIn.timeline.leaveBlankToKeep")}
                     className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
                   />
                   <Button
@@ -214,7 +220,7 @@ export function Timeline({
                     variant="ghost"
                     className="h-7 px-2 text-xs"
                   >
-                    Save
+                    {t("common.save")}
                   </Button>
                 </ActionForm>
               ) : null}
@@ -222,10 +228,7 @@ export function Timeline({
           ))
         )}
         <p className="text-xs text-ink-4">
-          Only this goal's reviewer can acknowledge. Anyone else is refused, an
-          administrator included, and reassigning the reviewer is the audited
-          way to change that. Reactions and comments arrive with the discussion
-          wiring at P3-T16.
+          {t("checkIn.timeline.onlyThisGoalS")}
         </p>
         {/* P3-T07 announced the reviewer's raw id here, as a placeholder until
             P3-T08 built the inbox that lists the obligation. That inbox exists

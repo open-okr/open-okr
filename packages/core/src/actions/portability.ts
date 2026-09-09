@@ -28,15 +28,25 @@
  * an archive over its own memory ceiling by name, so the size of that result
  * is bounded rather than hopeful.
  */
-import { exportRuns } from "@openokr/db";
+import { createHash } from "node:crypto";
+import { activeOnly, exportRuns, workspaceImports } from "@openokr/db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
-import { ArchiveError, MAX_ARCHIVE_BYTES } from "../portability/archive.ts";
+import {
+  ArchiveError,
+  MAX_ARCHIVE_BYTES,
+  readArchive,
+} from "../portability/archive.ts";
 import {
   type ExportWorkspaceResult,
   exportWorkspace,
 } from "../portability/export.ts";
+import {
+  type ImportDifference,
+  importWorkspace,
+} from "../portability/import.ts";
 import { rootKeyFingerprint } from "../secrets/key-ring.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -206,6 +216,215 @@ export const exportArchive = defineWriteAction({
               files: built.manifest.blobs.count,
               missingFiles: built.missingBlobs.length,
               limit: MAX_ARCHIVE_BYTES,
+            },
+          },
+        };
+      },
+    };
+  },
+});
+
+// ── Import ────────────────────────────────────────────────────────────────
+
+const mergedMemberSchema = z.object({
+  email: z.string(),
+  name: z.string(),
+  archivedId: z.string(),
+  existingId: z.string(),
+});
+
+const importDifferenceSchema = z.object({
+  created: z.record(z.string(), z.number().int()),
+  merged: z.array(mergedMemberSchema),
+  skipped: z.record(z.string(), z.number().int()),
+  blobs: z.number().int(),
+});
+
+/**
+ * Imports a workspace archive (TECHNICAL-PLAN SS7.3, P6-T05b).
+ *
+ * **Dry run by default.** The difference report names what would be created
+ * and what would merge, before anything is written. The real run produces the
+ * same report through the same code path, so the two cannot disagree.
+ *
+ * **Idempotent.** A re-import of the same archive (identified by its SHA-256
+ * digest) returns the stored report from the first run.
+ */
+export const importArchive = defineWriteAction({
+  name: "workspace.importArchive",
+  summary:
+    "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+  input: z.object({
+    archiveBase64: z.string(),
+    dryRun: z.boolean().default(true),
+  }),
+  output: z.object({
+    importId: z.uuid(),
+    difference: importDifferenceSchema,
+    alreadyImported: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => {
+    let difference: ImportDifference | undefined;
+    let archiveDigest = "";
+    let manifest: unknown = {};
+    let existingImportId: string | undefined;
+
+    return {
+      requires: ACCESS_LEVELS.full,
+      async load({ tx, workspaceId, actor }) {
+        const ring = context.ring;
+        if (!ring) {
+          throw new OperationError(
+            "forbidden",
+            "This instance has no encryption key, so an archive cannot be opened. Set OPENOKR_ENCRYPTION_KEY.",
+          );
+        }
+
+        const archiveBytes = Buffer.from(input.archiveBase64, "base64");
+        archiveDigest = createHash("sha256").update(archiveBytes).digest("hex");
+
+        // Idempotency: check if this archive was already imported
+        if (!input.dryRun) {
+          const existing = await tx
+            .select({
+              id: workspaceImports.id,
+              report: workspaceImports.report,
+            })
+            .from(workspaceImports)
+            .where(
+              activeOnly(
+                workspaceImports,
+                eq(workspaceImports.archiveDigest, archiveDigest),
+                eq(workspaceImports.mode, "real"),
+              ),
+            )
+            .limit(1);
+          if (existing.length > 0 && existing[0]) {
+            difference = existing[0].report as ImportDifference;
+            manifest = {};
+            existingImportId = existing[0].id;
+            return undefined;
+          }
+        }
+
+        let archive: ReturnType<typeof readArchive> | undefined;
+        try {
+          archive = readArchive(ring, archiveBytes);
+        } catch (error) {
+          if (error instanceof ArchiveError) {
+            throw new OperationError("forbidden", error.message);
+          }
+          throw error;
+        }
+
+        manifest = archive.manifest;
+
+        if (!actor.memberId) {
+          throw new OperationError(
+            "forbidden",
+            "An import belongs to the member who asked for it.",
+          );
+        }
+
+        // Blob re-upload needs a full storage port (prepare, put, claim),
+        // which the action context does not carry. The admin cards (P6-T05c)
+        // wire the port in; until then, blobs are imported as rows only.
+        difference = await importWorkspace({
+          tx,
+          workspaceId,
+          archive,
+          dryRun: input.dryRun,
+          actorMemberId: actor.memberId,
+        });
+
+        return undefined;
+      },
+
+      async execute({ tx, workspaceId }) {
+        if (!difference) {
+          throw new OperationError(
+            "forbidden",
+            "The import did not produce a result.",
+          );
+        }
+
+        // Already imported: return the stored report, no new row.
+        if (existingImportId) {
+          return {
+            result: {
+              importId: existingImportId,
+              difference,
+              alreadyImported: true,
+            },
+            activity: {
+              kind: "import.archive",
+              subjectType: "workspace",
+              subjectId: workspaceId,
+              payload: {
+                mode: "real",
+                digest: archiveDigest,
+                alreadyImported: true,
+              },
+            },
+            audit: {
+              action: "workspace.importArchive",
+              targetType: "workspace",
+              targetId: workspaceId,
+              payload: {
+                importId: existingImportId,
+                mode: "real",
+                digest: archiveDigest,
+                alreadyImported: true,
+              },
+            },
+          };
+        }
+
+        // openokr:allow-mutation: the calling Operation's own transaction.
+        const [row] = await tx
+          .insert(workspaceImports)
+          .values({
+            workspaceId,
+            archiveDigest,
+            manifest,
+            mode: input.dryRun ? "dry_run" : "real",
+            status: "done",
+            report: difference,
+            finishedAt: new Date(),
+          })
+          .returning({ id: workspaceImports.id });
+
+        const importId = (row as { id: string }).id;
+
+        return {
+          result: {
+            importId,
+            difference,
+            alreadyImported: false,
+          },
+          activity: {
+            kind: "import.archive",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: {
+              mode: input.dryRun ? "dry_run" : "real",
+              digest: archiveDigest,
+            },
+          },
+          audit: {
+            action: "workspace.importArchive",
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: {
+              importId,
+              mode: input.dryRun ? "dry_run" : "real",
+              digest: archiveDigest,
+              created: Object.values(difference.created).reduce(
+                (sum, n) => sum + n,
+                0,
+              ),
+              merged: difference.merged.length,
             },
           },
         };

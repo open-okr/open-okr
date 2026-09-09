@@ -2,7 +2,10 @@ import { callAction, TEMPLATES } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { ArchiveImportCard } from "./archive-import-card.tsx";
+import { ExportCard } from "./export-card.tsx";
 import { ImportWizard } from "./wizard.tsx";
 
 /**
@@ -17,6 +20,8 @@ import { ImportWizard } from "./wizard.tsx";
  * so a member who may not import never reaches the wizard or the list.
  */
 export default async function ImportsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -41,13 +46,17 @@ export default async function ImportsPage() {
 
   return (
     <>
-      <h1 className="mb-4 text-lg font-bold text-ink">Import</h1>
+      <h1 className="mb-4 text-lg font-bold text-ink">
+        {t("admin.imports.import")}
+      </h1>
       <div className="flex flex-col gap-4">
         <ImportWizard entities={entities} aiOn={drafter !== null} />
 
         <Card>
           <CardHeader className="justify-between">
-            <h2 className="text-sm font-bold text-ink">Recent runs</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("common.recentRuns")}
+            </h2>
             <span className="text-xs text-ink-3">
               {runs.runs.length === 0
                 ? "None yet"
@@ -57,8 +66,7 @@ export default async function ImportsPage() {
           <CardBody>
             {runs.runs.length === 0 ? (
               <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-                Nothing has been imported into this workspace. A preview counts
-                as a run and appears here too.
+                {t("admin.imports.nothingHasBeenImported")}
               </p>
             ) : (
               <ul
@@ -78,7 +86,8 @@ export default async function ImportsPage() {
                       {run.entity ? ` · ${run.entity}` : ""}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {run.rowsWritten} written, {run.rowsSkipped} skipped
+                      {run.rowsWritten} {t("admin.imports.written")}{" "}
+                      {run.rowsSkipped} {t("admin.imports.skipped")}
                     </span>
                     <Chip
                       tone={
@@ -97,6 +106,12 @@ export default async function ImportsPage() {
             )}
           </CardBody>
         </Card>
+        {/* Workspace archive export and import (P6-T05c) */}
+        <h2 className="mt-2 text-base font-bold text-ink">
+          {t("admin.imports.workspaceArchive")}
+        </h2>
+        <ExportCard />
+        <ArchiveImportCard />
       </div>
     </>
   );

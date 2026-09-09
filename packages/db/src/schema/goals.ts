@@ -11,7 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
-import { cycles, GOAL_LEVELS } from "./cycles.ts";
+import { annualStrategies, cycles, GOAL_LEVELS } from "./cycles.ts";
 import { spaces } from "./spaces.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
@@ -118,6 +118,15 @@ export const goals = pgTable("goals", {
   reviewerId: uuid("reviewer_id")
     .notNull()
     .references(() => workspaceMembers.id),
+  /**
+   * The §2.1 annual strategy this objective serves (P6-G14b).
+   *
+   * Null for a quarterly objective, which serves its parent objective rather
+   * than a strategy directly: the strategy is the annual layer.
+   */
+  strategyId: uuid("strategy_id").references(() => annualStrategies.id, {
+    onDelete: "set null",
+  }),
   parentGoalId: uuid("parent_goal_id"),
   parentKeyResultId: uuid("parent_key_result_id"),
   /** `numeric` arrives from the driver as a string. Read it through a parse. */

@@ -1,6 +1,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -59,11 +60,13 @@ async function reset(): Promise<void> {
   revalidatePath("/admin/general");
 }
 
-export function GeneralSettingsForm({
+export async function GeneralSettingsForm({
   settings,
 }: {
   settings: Record<string, unknown>;
 }) {
+  const { t } = await getTranslations();
+
   const trustedEmailDomains = Array.isArray(settings.trustedEmailDomains)
     ? (settings.trustedEmailDomains as string[]).join(", ")
     : "";
@@ -72,7 +75,7 @@ export function GeneralSettingsForm({
     <>
       <form action={save}>
         <p>
-          <label htmlFor="timezone">Timezone</label>
+          <label htmlFor="timezone">{t("common.timezone")}</label>
           <br />
           <input
             id="timezone"
@@ -81,7 +84,9 @@ export function GeneralSettingsForm({
           />
         </p>
         <p>
-          <label htmlFor="language">Language</label>
+          <label htmlFor="language">
+            {t("admin.general.generalSettingsForm.language")}
+          </label>
           <br />
           <input
             id="language"
@@ -91,7 +96,7 @@ export function GeneralSettingsForm({
         </p>
         <p>
           <label htmlFor="trustedEmailDomains">
-            Trusted email domains (comma-separated)
+            {t("admin.general.generalSettingsForm.trustedEmailDomainsComma")}
           </label>
           <br />
           <input
@@ -100,10 +105,10 @@ export function GeneralSettingsForm({
             defaultValue={trustedEmailDomains}
           />
         </p>
-        <button type="submit">Save</button>
+        <button type="submit">{t("common.save")}</button>
       </form>
       <form action={reset}>
-        <button type="submit">Reset to defaults</button>
+        <button type="submit">{t("common.resetToDefaults")}</button>
       </form>
     </>
   );

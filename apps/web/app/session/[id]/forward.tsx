@@ -20,7 +20,14 @@
  * **An action needs an owner and a date, and the form will not submit without
  * both.** §8.1 stage 11: every action has a name and a date, or it is a wish.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
@@ -72,6 +79,8 @@ export function ForwardPanel({
   readonly forward: Forward;
   readonly canEdit: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -109,9 +118,11 @@ export function ForwardPanel({
             id="forward-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Learnings and what happens next
+            {t("session.detail.forward.learningsAndWhatHappens")}
           </h2>
-          <Chip tone="neutral">{forward.carried} carried</Chip>
+          <Chip tone="neutral">
+            {forward.carried} {t("common.carried")}
+          </Chip>
           <Chip tone={forward.actions.length === 0 ? "warn" : "ok"}>
             {forward.actions.length}{" "}
             {forward.actions.length === 1 ? "action" : "actions"}
@@ -120,10 +131,12 @@ export function ForwardPanel({
       </CardHeader>
       <CardBody className="flex flex-col gap-4">
         <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold text-ink-2">Learnings</h3>
+          <h3 className="text-xs font-semibold text-ink-2">
+            {t("common.learnings")}
+          </h3>
           {forward.learnings.length === 0 ? (
             <p className="text-xs text-ink-4">
-              Nothing captured yet. §8.9 asks for these as "we learned that…".
+              {t("session.detail.forward.nothingCapturedYet8")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -134,9 +147,13 @@ export function ForwardPanel({
                 >
                   <span className="flex-1 text-sm text-ink">{entry.text}</span>
                   {entry.source === "retro_theme" ? (
-                    <Chip tone="info">from the retro</Chip>
+                    <Chip tone="info">
+                      {t("session.detail.forward.fromTheRetro")}
+                    </Chip>
                   ) : null}
-                  {entry.carryForward ? <Chip tone="ok">carried</Chip> : null}
+                  {entry.carryForward ? (
+                    <Chip tone="ok">{t("common.carried")}</Chip>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -145,7 +162,7 @@ export function ForwardPanel({
           {canEdit && forward.promotable.length > 0 ? (
             <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
               <span className="text-xs font-medium text-ink-3">
-                Promote a retro theme, most voted first
+                {t("session.detail.forward.promoteARetroTheme")}
               </span>
               <ul className="flex flex-col gap-1.5">
                 {forward.promotable.slice(0, 5).map((note) => (
@@ -175,7 +192,7 @@ export function ForwardPanel({
                         )
                       }
                     >
-                      Promote it
+                      {t("session.detail.forward.promoteIt")}
                     </Button>
                   </li>
                 ))}
@@ -187,7 +204,7 @@ export function ForwardPanel({
             <div className="flex flex-col gap-1.5">
               <label className="flex flex-col gap-1" htmlFor="learning-text">
                 <span className="text-xs font-medium text-ink-3">
-                  What we now know
+                  {t("session.detail.forward.whatWeNowKnow")}
                 </span>
                 <input
                   id="learning-text"
@@ -195,7 +212,7 @@ export function ForwardPanel({
                   className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                   value={learning}
                   disabled={pending}
-                  placeholder="We learned that…"
+                  placeholder={t("session.detail.forward.weLearnedThat")}
                   onChange={(event) => setLearning(event.target.value)}
                 />
               </label>
@@ -220,7 +237,7 @@ export function ForwardPanel({
                     });
                   }}
                 >
-                  Capture it
+                  {t("session.detail.forward.captureIt")}
                 </Button>
                 <label className="flex items-center gap-1.5 text-xs text-ink-3">
                   <input
@@ -229,12 +246,11 @@ export function ForwardPanel({
                     disabled={pending}
                     onChange={(event) => setCarry(event.target.checked)}
                   />
-                  Carry it into the next cycle
+                  {t("session.detail.forward.carryItIntoThe")}
                 </label>
               </span>
               <p className="text-xs text-ink-4">
-                A carried item re-enters the next cycle as an issue. It has to
-                survive prioritisation on its merits.
+                {t("session.detail.forward.aCarriedItemRe")}
               </p>
             </div>
           ) : null}
@@ -242,10 +258,12 @@ export function ForwardPanel({
 
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold text-ink-2">
-            Next-cycle drafts
+            {t("common.nextCycleDrafts")}
           </h3>
           {forward.drafts.length === 0 ? (
-            <p className="text-xs text-ink-4">Nothing drafted yet.</p>
+            <p className="text-xs text-ink-4">
+              {t("session.detail.forward.nothingDraftedYet")}
+            </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {forward.drafts.map((draft) => (
@@ -264,7 +282,7 @@ export function ForwardPanel({
             <div className="flex flex-col gap-1.5">
               <label className="flex flex-col gap-1" htmlFor="draft-title">
                 <span className="text-xs font-medium text-ink-3">
-                  A candidate objective
+                  {t("session.detail.forward.aCandidateObjective")}
                 </span>
                 <input
                   id="draft-title"
@@ -276,14 +294,16 @@ export function ForwardPanel({
                 />
               </label>
               <label className="flex flex-col gap-1" htmlFor="draft-why">
-                <span className="text-xs font-medium text-ink-3">Why</span>
+                <span className="text-xs font-medium text-ink-3">
+                  {t("session.detail.forward.why")}
+                </span>
                 <input
                   id="draft-why"
                   type="text"
                   className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                   value={draftWhy}
                   disabled={pending}
-                  placeholder="What in this cycle makes the case"
+                  placeholder={t("session.detail.forward.whatInThisCycle")}
                   onChange={(event) => setDraftWhy(event.target.value)}
                 />
               </label>
@@ -313,7 +333,7 @@ export function ForwardPanel({
                     });
                   }}
                 >
-                  Draft it
+                  {t("common.draftIt")}
                 </Button>
               </span>
             </div>
@@ -322,12 +342,11 @@ export function ForwardPanel({
 
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold text-ink-2">
-            Decisions and actions
+            {t("session.detail.forward.decisionsAndActions")}
           </h3>
           {forward.actions.length === 0 ? (
             <p className="text-xs text-ink-4">
-              Nothing agreed yet. Every action has a name and a date, or it is a
-              wish.
+              {t("session.detail.forward.nothingAgreedYetEvery")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -371,7 +390,7 @@ export function ForwardPanel({
             <div className="flex flex-col gap-1.5">
               <label className="flex flex-col gap-1" htmlFor="action-what">
                 <span className="text-xs font-medium text-ink-3">
-                  What happens
+                  {t("common.whatHappens")}
                 </span>
                 <input
                   id="action-what"
@@ -384,7 +403,9 @@ export function ForwardPanel({
               </label>
               <span className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col gap-1" htmlFor="action-owner">
-                  <span className="text-xs font-medium text-ink-3">Owner</span>
+                  <span className="text-xs font-medium text-ink-3">
+                    {t("common.owner")}
+                  </span>
                   <select
                     id="action-owner"
                     className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
@@ -394,7 +415,7 @@ export function ForwardPanel({
                   >
                     {/* No default owner. An action assigned by the form is an
                         action nobody in the room accepted. */}
-                    <option value="">Choose somebody</option>
+                    <option value="">{t("common.chooseSomebody")}</option>
                     {forward.owners.map((person) => (
                       <option key={person.memberId} value={person.memberId}>
                         {person.name}
@@ -403,7 +424,9 @@ export function ForwardPanel({
                   </select>
                 </label>
                 <label className="flex flex-col gap-1" htmlFor="action-due">
-                  <span className="text-xs font-medium text-ink-3">By</span>
+                  <span className="text-xs font-medium text-ink-3">
+                    {t("session.detail.forward.by")}
+                  </span>
                   <input
                     id="action-due"
                     type="date"
@@ -441,7 +464,7 @@ export function ForwardPanel({
                     });
                   }}
                 >
-                  Agree it
+                  {t("session.detail.forward.agreeIt")}
                 </Button>
               </span>
             </div>
