@@ -802,6 +802,12 @@ export const updateTask = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "task", id: input.id },
     async load({ tx, workspaceId, actor }) {
       return requireTask(
         tx,

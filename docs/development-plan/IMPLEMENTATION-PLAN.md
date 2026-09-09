@@ -1682,13 +1682,20 @@ service account with ambient authority" is a sentence the product does not
 keep. P6-G13b withdrew its refusal rather than ship a dead autonomy mode, and
 recorded this.
 
-Three ways out, and the choice is a human's:
+Three ways out, and the choice was a human's:
 
 | Option | What it costs |
 |---|---|
-| Measure the floor against the task's subject context | Changes how every write in the product is authorised. Needs a design gate |
+| **Measure the floor against the task's subject context. Chosen by Agung, 9 September 2026** | Changes how every write in the product is authorised. Needs a design gate |
 | Let an agent hold a narrow workspace-level grant | Contradicts CLAUDE.md as written, so METHOD-level sign-off |
 | Define `scoped_direct` as proposals-only | Removes a mode AI-NATIVE-PLAN §6 describes |
+
+Designed in `docs/design/p6-g13c-subject-scoped-access-floor.md`. The floor
+takes the **higher** of the workspace level and the subject's rather than the
+subject's instead, which is the one deviation from the approved design and is
+argued in it: replacing one with the other narrows the floor for every actor
+who holds the workspace and nothing on the row in front of them, and turns a
+`not_found` from `getAccessScoped` into a `forbidden` from the floor.
 
 Deliverables: the decision, written into whichever document owns it; the implementation; `agents.bindScope` refusing the workspace once the refusal no longer kills the mode; `run-executor.test.ts` bound to a space, which is where it was pointed at before the revert.
 Test plan: an agent bound to one space performs a direct write inside it and is refused outside it; an agent bound to nothing writes nothing; the seeded Champion and Coach, which provisioning binds per space, are unaffected; the refusal on a workspace target has a test of its own.

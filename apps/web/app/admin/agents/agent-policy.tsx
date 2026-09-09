@@ -18,14 +18,14 @@ import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
  * screen that offers it as a bare label is a screen that gets it chosen by
  * accident.
  *
- * **The workspace is not in the picker, and that is all it is.**
+ * **The workspace is not in the picker, and the action refuses it too.**
  * CLAUDE.md's rule is that an agent gets bindings on named spaces, goals and
- * KPI trees only. `agents.bindScope` has said "never workspace-wide" in its
- * own summary since P4-T05a and enforces nothing, and P6-G13b's attempt to
- * enforce it made `scoped_direct` unreachable, because `runOperation` measures
- * an actor's level against the workspace's own context. That conflict is
- * P6-G13c. Until it is settled this picker is a default, not an
- * authorisation, and the card says so rather than implying otherwise.
+ * KPI trees only and that there is no service account with ambient authority.
+ * `agents.bindScope` said "never workspace-wide" in its own summary from
+ * P4-T05a and enforced nothing; both halves are here now, because an interface
+ * that merely omits an option is not an authorisation. P6-G13b wrote them and
+ * had to withdraw them, because the access floor left an agent bound to a
+ * space unable to write; P6-G13c fixed the floor and they are back.
  *
  * **The policy list and the access levels arrive as props.** Importing
  * `AGENT_AUTONOMIES` from `@openokr/db` and `ACCESS_LEVELS` from
@@ -210,8 +210,8 @@ export function AgentPolicy({
 
       <span className="text-xs text-ink-4">
         An agent is bound to named spaces, goals and KPI trees. The workspace is
-        not offered here, though nothing refuses one yet: an agent bound only to
-        a space cannot write at all today, which is P6-G13c.
+        not on this list and the action refuses it: there is no service account
+        with authority over everything.
       </span>
 
       {problem ? (

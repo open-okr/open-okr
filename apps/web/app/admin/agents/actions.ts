@@ -193,20 +193,19 @@ export async function setAgentAutonomyAction(
 }
 
 /**
- * Binding an agent to one named resource (P6-G13b).
+ * Binding an agent to one named resource (P6-G13b, restored at P6-G13c).
  *
- * **The picker does not offer the workspace, and nothing refuses it.**
+ * **Never the workspace**, which the action refuses and the picker does not
+ * offer. Two layers for one rule, because CLAUDE.md's own wording is that
+ * there is no service account with ambient authority: an interface that
+ * merely omits the option is an interface, and the rule needs an answer for a
+ * caller that does not use one.
  *
- * CLAUDE.md's rule is that an agent gets bindings on named spaces, goals and
- * KPI trees only. P6-G13b enforced that in `agents.bindScope` and it could not
- * stay: `runOperation` measures an actor's level against the workspace's own
- * context, so an agent bound only to a space is refused every write and
- * `scoped_direct` becomes a mode no agent can act in. The conflict is P6-G13c.
- *
- * A refusal here alone would only make this screen and the API disagree, which
- * is a worse answer than one honest one. So the picker offers what an agent
- * should hold and the card says plainly that the rule is not yet enforced
- * underneath it.
+ * P6-G13b wrote both layers and withdrew them within the day, because the
+ * access floor measured every actor against the workspace and an agent bound
+ * only to a space could then write nothing at all. P6-G13c made a level on
+ * the subject clear the floor as well, so the rule and the pipeline hold
+ * together and this refusal is back.
  */
 export async function bindAgentScopeAction(input: {
   agentId: string;
@@ -215,6 +214,12 @@ export async function bindAgentScopeAction(input: {
   level: number;
 }): Promise<{ error: string | null }> {
   const { session, workspace } = await requireWorkspace();
+  if (input.resourceType === "workspace") {
+    return {
+      error:
+        "An agent is bound to named spaces, goals and KPI trees, never to the whole workspace.",
+    };
+  }
   try {
     await callAction(
       {

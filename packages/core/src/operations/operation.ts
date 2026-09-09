@@ -47,6 +47,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import {
+  hasSubjectResolver,
   resolveMemberAccessLevel,
   resolveSubjectContext,
 } from "../access/reads.ts";
@@ -169,6 +170,43 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    */
   readonly bootstrap?: boolean;
   /**
+   * What this operation is about, when the action knows before it runs
+   * (P6-G13c).
+   *
+   * **A level on this clears the access floor, as a level on the workspace
+   * does.** `resolveActor` resolves a level on the workspace's own context,
+   * and the comment beside the floor says the floor is coarse because
+   * per-resource authorisation happens inside through `getAccessScoped`.
+   * Those two sentences disagreed: a level on the workspace is not a coarse
+   * version of "may this actor act on this thing", it is a different
+   * question. The floor now accepts an answer to either.
+   *
+   * It never bit a human. Every active member holds `edit` on the workspace's
+   * own context through `workspace_standard`, so the floor passed for
+   * everybody and the real check was the one inside. It bit agents, which get
+   * bindings on named spaces, goals and KPI trees only: an agent bound to one
+   * space at level 100 was refused `spaces.update` on that same space, which
+   * made `scoped_direct` a mode no agent could act in (P6-G13b).
+   *
+   * **A destructive action does not declare one, on purpose.** A delete asks
+   * two gates, `full` on the workspace and `full` on the row, and declaring
+   * the subject collapses the first into the second: the owner of a thing
+   * could then delete it without holding anything else. `initiatives.test.ts`
+   * has said so since P5-T10a, that owning a thing does not make somebody
+   * able to delete things, and loosening it is an access decision rather than
+   * a side effect of this field.
+   *
+   * **Optional, and the fallback is the old behaviour.** The floor is checked
+   * before `execute` runs and most subjects are only known after it returns,
+   * so an action declares this only when its own input already carries the
+   * answer. An action that does not is measured against the workspace exactly
+   * as before, which is why this change moves no existing test.
+   */
+  readonly subject?: {
+    readonly type: string;
+    readonly id: string;
+  };
+  /**
    * Where this write came from, when it did not come from the browser
    * (P5-T06a).
    *
@@ -229,6 +267,67 @@ export interface OperationDeps {
  * members are excluded here rather than at each call site, because that is the
  * kind of check that gets forgotten exactly once.
  */
+/**
+ * The level the floor compares against (P6-G13c).
+ *
+ * The actor's own resolved level is the workspace one and stays on
+ * `ResolvedActor`, because the activity and audit rows are about the actor
+ * rather than about this comparison. This is only the floor's input.
+ */
+async function floorLevel(
+  tx: OperationTx,
+  spec: {
+    readonly workspaceId: string;
+    readonly subject?: { readonly type: string; readonly id: string };
+  },
+  actor: ResolvedActor,
+): Promise<number> {
+  if (!spec.subject || actor.memberId === null) {
+    // No subject to measure against, or an actor with no member row: a
+    // system or bootstrap actor already holds `full` and a human without a
+    // member row was refused in `resolveActor`.
+    return actor.level;
+  }
+  if (!hasSubjectResolver(spec.subject.type)) {
+    return actor.level;
+  }
+
+  const context = await resolveSubjectContext(
+    tx,
+    spec.subject.type,
+    spec.subject.id,
+    spec.workspaceId,
+  );
+  if (!context) {
+    // The subject does not exist, or is not this workspace's. The action's own
+    // load or execute answers that with not-found, which is the right answer
+    // and a better message than the floor's.
+    return actor.level;
+  }
+
+  const onSubject = await resolveMemberAccessLevel(tx, {
+    workspaceId: spec.workspaceId,
+    memberId: actor.memberId,
+    contextId: context.contextId,
+  });
+
+  // **The higher of the two, not the subject's instead of the workspace's.**
+  //
+  // The design said "measure against the subject" and replacing one with the
+  // other is the wrong reading of it. Replacement narrows the floor for
+  // everybody who holds the workspace and not this row, and that answer is
+  // worse in two ways: it moves refusals that `getAccessScoped` answers with
+  // `not_found` to a `forbidden` from the floor, which tells a caller the row
+  // exists, and it changes how existing writes are authorised, which the
+  // design says it does not do.
+  //
+  // Taking the maximum adds a way to pass the floor and removes none. An
+  // agent bound to one space at 100 now clears it for a write in that space;
+  // every actor who cleared it before still does; and the real check inside
+  // is unchanged and remains the one that decides.
+  return Math.max(actor.level, onSubject);
+}
+
 async function resolveActor(
   tx: OperationTx,
   workspaceId: string,
@@ -404,7 +503,15 @@ export async function runOperation<TResult, TLoaded = undefined>(
         : (undefined as TLoaded);
 
       // 3. Authorise, before a single write.
-      if (actor.level < required) {
+      //
+      // Against the workspace, or against the subject when the action named
+      // one and its type has a resolver, whichever is higher (P6-G13c). A
+      // subject whose type nothing resolves falls back rather than refusing:
+      // the fallback is the behaviour every action had before this existed,
+      // and turning an unresolvable type into a refusal would break writes
+      // that have nothing to do with this change.
+      const level = await floorLevel(tx, spec, actor);
+      if (level < required) {
         throw new OperationError(
           "forbidden",
           `${spec.action} needs a higher access level than you hold.`,

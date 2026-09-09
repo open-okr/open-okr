@@ -20,19 +20,19 @@ const OWNER = "run-executor-owner";
 
 let workspaceId: string;
 /**
- * **This fixture binds the agent to the workspace, which the rule forbids.**
+ * The space every binding here names, and every task here acts on (P6-G13c).
  *
- * CLAUDE.md says an agent gets bindings on named spaces, goals and KPI trees
- * only. P6-G13b enforced that and this file was rewritten to bind a space
- * instead, and four of its six tests passed; the two that exercise a direct
- * write did not, because `runOperation` measures an actor's level against the
- * workspace's own context and an agent bound only to a space holds zero there.
- * So the rule, enforced, makes `scoped_direct` unreachable.
+ * This file bound the whole workspace for two tasks, which is the binding
+ * CLAUDE.md forbids. P6-G13b tried to point it at a space and two of the six
+ * tests failed: `runOperation` measured the floor against the workspace's own
+ * context, so an agent bound only to a space held zero and was refused before
+ * its binding was ever consulted. The refusal was withdrawn and this went back
+ * to the workspace, with a comment saying it passed only because of that.
  *
- * The fixture is back as it was, and the conflict is P6-G13c. Recorded here
- * rather than left as a surprise: these six tests pass today only because the
- * binding they use is the one the rule forbids.
+ * P6-G13c made a level on the subject clear the floor too, so the binding a
+ * real agent gets is the binding these tests use.
  */
+let spaceId: string;
 let pool: Pool;
 
 const ownerContext = () => ({
@@ -59,11 +59,11 @@ async function createAgent(autonomy: "sandbox" | "propose" | "scoped_direct") {
   });
 }
 
-async function bindToWorkspace(agentId: string, level: number) {
+async function bindToSpace(agentId: string, level: number) {
   await callAction(ownerContext(), "agents.bindScope", {
     agentId,
-    resourceType: "workspace",
-    resourceId: workspaceId,
+    resourceType: "space",
+    resourceId: spaceId,
     level,
   });
 }
@@ -73,19 +73,19 @@ async function startRenameRun(agentId: string, names: readonly string[]) {
     agentId,
     trigger: "test",
     tasks: names.map((name) => ({
-      action: "workspace.rename",
-      input: { name },
-      subjectType: "workspace",
-      subjectId: workspaceId,
+      action: "spaces.update",
+      input: { id: spaceId, name },
+      subjectType: "space",
+      subjectId: spaceId,
     })),
   });
 }
 
-async function workspaceName(): Promise<string> {
+async function spaceName(): Promise<string> {
   const wb = await workerDb();
   const result = await wb.admin.query<{ name: string }>(
-    "select name from workspaces where id = $1",
-    [workspaceId],
+    "select name from spaces where id = $1",
+    [spaceId],
   );
   return result.rows[0]?.name ?? "";
 }
@@ -103,6 +103,14 @@ beforeEach(async () => {
     name: "Run Executor Owner",
   });
   workspaceId = provisioned.workspaceId;
+
+  // Provisioning creates one space, and it is the only one here.
+  const spaces = await callAction(ownerContext(), "spaces.list", {});
+  const first = spaces[0];
+  if (!first) {
+    throw new Error("provisioning made no space to bind to");
+  }
+  spaceId = first.id;
 });
 
 afterAll(async () => {
@@ -113,8 +121,8 @@ afterAll(async () => {
 describe("sandbox mode", () => {
   it("simulates a task and commits nothing", async () => {
     const agent = await createAgent("sandbox");
-    await bindToWorkspace(agent.id, 10);
-    const originalName = await workspaceName();
+    await bindToSpace(agent.id, 10);
+    const originalName = await spaceName();
     const run = await startRenameRun(agent.id, ["Sandboxed"]);
 
     const wb = await workerDb();
@@ -126,7 +134,7 @@ describe("sandbox mode", () => {
     expect(result.finished).toBe(true);
     expect(result.status).toBe("completed");
     expect(result.logEntry.kind).toBe("simulated");
-    expect(await workspaceName()).toBe(originalName);
+    expect(await spaceName()).toBe(originalName);
 
     const proposals = await wb.admin.query(
       "select count(*)::int as n from proposed_changes",
@@ -138,8 +146,8 @@ describe("sandbox mode", () => {
 describe("propose mode", () => {
   it("commits nothing until a human applies the proposal", async () => {
     const agent = await createAgent("propose");
-    await bindToWorkspace(agent.id, 10);
-    const originalName = await workspaceName();
+    await bindToSpace(agent.id, 10);
+    const originalName = await spaceName();
     const run = await startRenameRun(agent.id, ["Proposed name"]);
 
     const wb = await workerDb();
@@ -148,7 +156,7 @@ describe("propose mode", () => {
       runId: run.id,
     });
     expect(result.logEntry.kind).toBe("proposed");
-    expect(await workspaceName()).toBe(originalName);
+    expect(await spaceName()).toBe(originalName);
 
     const proposals = await callAction(ownerContext(), "proposals.list", {
       status: "pending",
@@ -158,15 +166,15 @@ describe("propose mode", () => {
     if (!proposal) {
       throw new Error("expected one pending proposal");
     }
-    expect(proposal.action).toBe("workspace.rename");
+    expect(proposal.action).toBe("spaces.update");
 
     await callAction(ownerContext(), "proposals.bulkApply", {
       ids: [proposal.id],
     });
-    expect(await workspaceName()).toBe("Proposed name");
+    expect(await spaceName()).toBe("Proposed name");
 
     const audit = await wb.admin.query(
-      "select actor_kind from audit_events where action = 'workspace.rename'",
+      "select actor_kind from audit_events where action = 'spaces.update'",
     );
     expect(audit.rowCount).toBe(1);
   });
@@ -175,7 +183,7 @@ describe("propose mode", () => {
 describe("scoped_direct mode", () => {
   it("calls the real action immediately, within its bindings", async () => {
     const agent = await createAgent("scoped_direct");
-    await bindToWorkspace(agent.id, 100);
+    await bindToSpace(agent.id, 100);
     const run = await startRenameRun(agent.id, ["Direct name"]);
 
     const wb = await workerDb();
@@ -184,20 +192,20 @@ describe("scoped_direct mode", () => {
       runId: run.id,
     });
     expect(result.logEntry.kind).toBe("applied");
-    expect(await workspaceName()).toBe("Direct name");
+    expect(await spaceName()).toBe("Direct name");
 
     const audit = await wb.admin.query(
-      "select actor_kind from audit_events where action = 'workspace.rename'",
+      "select actor_kind from audit_events where action = 'spaces.update'",
     );
     expect(audit.rows[0]?.actor_kind).toBe("agent");
   });
 
   it("logs an error and keeps the run's own progress when the real action fails", async () => {
     const agent = await createAgent("scoped_direct");
-    // Bound only enough to pass the run-executor's own check, not enough
-    // for workspace.rename's own `full` requirement — so the dispatched
-    // action itself refuses, and the run still advances past it.
-    await bindToWorkspace(agent.id, 10);
+    // Bound at `view`, which is enough to pass the run-executor's own check
+    // and not enough for `spaces.update`, which declares `edit`. So the
+    // dispatched action itself refuses and the run still advances past it.
+    await bindToSpace(agent.id, 10);
     const run = await startRenameRun(agent.id, ["Refused name"]);
 
     const wb = await workerDb();
@@ -215,7 +223,7 @@ describe("bindings", () => {
     const agent = await createAgent("scoped_direct");
     // No binding at all: workspace_standard excludes agent-kind members by
     // design, so this agent reaches nothing.
-    const originalName = await workspaceName();
+    const originalName = await spaceName();
     const run = await startRenameRun(agent.id, ["Should never land"]);
 
     const wb = await workerDb();
@@ -224,14 +232,14 @@ describe("bindings", () => {
       runId: run.id,
     });
     expect(result.logEntry.kind).toBe("denied");
-    expect(await workspaceName()).toBe(originalName);
+    expect(await spaceName()).toBe(originalName);
   });
 });
 
 describe("resume after restart", () => {
   it("advances one task per call, purely from persisted state", async () => {
     const agent = await createAgent("scoped_direct");
-    await bindToWorkspace(agent.id, 100);
+    await bindToSpace(agent.id, 100);
     const run = await startRenameRun(agent.id, ["First", "Second"]);
 
     const wb = await workerDb();
@@ -242,7 +250,7 @@ describe("resume after restart", () => {
     });
     expect(first.finished).toBe(false);
     expect(first.status).toBe("running");
-    expect(await workspaceName()).toBe("First");
+    expect(await spaceName()).toBe("First");
 
     const afterFirst = await readRunState(wb.appPool, {
       workspaceId,
@@ -265,7 +273,7 @@ describe("resume after restart", () => {
     });
     expect(second.finished).toBe(true);
     expect(second.status).toBe("completed");
-    expect(await workspaceName()).toBe("Second");
+    expect(await spaceName()).toBe("Second");
 
     const afterSecond = await readRunState(wb.appPool, {
       workspaceId,
@@ -278,7 +286,7 @@ describe("resume after restart", () => {
 
   it("refuses to process a run that is not running", async () => {
     const agent = await createAgent("scoped_direct");
-    await bindToWorkspace(agent.id, 100);
+    await bindToSpace(agent.id, 100);
     const run = await startRenameRun(agent.id, ["Only task"]);
     await callAction(ownerContext(), "agents.cancelRun", { id: run.id });
 

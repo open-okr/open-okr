@@ -481,6 +481,15 @@ A first-class feature, not an operations script. Any workspace admin exports a v
 | 4. Surface | The browser, chat, MCP and the command line all call the same registry actions | One permission decision everywhere | An unregistered write path fails the lint |
 | 5. UI | Hides what layer 2 denies | Cosmetic only | Never load-bearing |
 
+**Layer 3's access floor takes the higher of two levels** (P6-G13c). An action
+declares a required level, and the pipeline compares it against the actor's
+level on the workspace's own context or, when the action names the subject it
+is about before it runs, the higher of that and the actor's level on the
+subject's context. The floor stays coarse either way; layer 2 is still the
+check that decides. Without the second reading an agent, which holds bindings
+on named spaces, goals and KPI trees and nothing on the workspace, is refused
+every write before its own binding is consulted.
+
 Operational discipline for the tenant floor: transaction-local settings only, a test proving an unset connection reads zero rows from every business table, a Phase 1 spike proving behaviour under transaction pooling, and a migration linter that fails any business table created without a policy in the same file.
 
 ### 8.2 Control checklist

@@ -534,6 +534,12 @@ export const updateSpace = defineWriteAction({
   // through requireSpaceAdmin. Declaring `full` here would lock managers out.
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "space", id: input.id },
     async execute({ tx, workspaceId, actor }) {
       const contextId = await requireSpaceAdmin(tx, {
         workspaceId,
