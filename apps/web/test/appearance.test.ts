@@ -44,7 +44,10 @@ describe("the appearance control", () => {
   test("is on both surfaces the task names", () => {
     expect(shell).toContain("<AppearanceControl compact />");
     expect(menu).toContain("{appearance}");
-    expect(profile).toContain("<AppearanceControl />");
+    // The profile passes the stored language in (P6-G22a): unlike the theme
+    // there is no provider holding it, because the catalogue is chosen while
+    // the page renders on the server.
+    expect(profile).toContain("<AppearanceControl language={member.language}");
   });
 
   test("applies a stored choice once, not on every render", () => {
@@ -70,9 +73,54 @@ describe("the appearance control", () => {
     }
   });
 
-  test("the action does not repaint the page it just changed", () => {
-    // The browser has already applied it. Revalidating would re-render every
-    // page to arrive at what the reader is already looking at.
-    expect(action).not.toContain("revalidatePath(");
+  test("repaints for the language and for nothing else", () => {
+    // **This assertion was `not.toContain("revalidatePath(")` until P6-G22a,
+    // and the language is what made it wrong.** A theme is applied by the
+    // provider in the browser, so revalidating would re-render every page to
+    // arrive at what the reader is already looking at. A language is not like
+    // that: the text is rendered on the server, so the screen does not change
+    // until the server renders it again.
+    expect(action).toContain("if (input.language !== undefined)");
+    expect(action).toContain('revalidatePath("/", "layout")');
+    // Called once and only inside that branch, which is the half of the
+    // original assertion that is still true.
+    expect(action.split("revalidatePath(").length - 1).toBe(1);
+  });
+
+  test("offer the language, and only where a choice can navigate", () => {
+    // P6-G22a. The catalogue has existed since P2-T10 and the root layout
+    // pinned `en`, so `TranslationsProvider` took a locale nothing selected.
+    expect(control).toContain("const LANGUAGES");
+    // The placeholder itself is left out of the needle: Biome refuses a template
+    // marker inside a plain string, and the prefix is what identifies the field.
+    expect(control).toContain("data-testid={`language-");
+
+    // Not in the compact menu. A theme applies the instant it is clicked; a
+    // language comes from the server, so choosing one navigates, and a control
+    // that navigates does not belong in a dropdown somebody opened to change
+    // something else.
+    expect(control).toContain("compact ? null : (");
+
+    // And the language is the one field that has to revalidate, because the
+    // text is rendered on the server.
+    expect(action).toContain("if (input.language !== undefined)");
+    expect(action).toContain('revalidatePath("/", "layout")');
+  });
+
+  test("the locale is resolved on the server and never throws", () => {
+    // The root layout wraps the signed-out screens, which have no member and
+    // often no workspace, so a locale resolved inline there would turn sign-in
+    // into an error page.
+    const locale = at("../lib/locale.ts");
+    expect(locale).toContain("} catch {");
+    expect(locale).toContain('return "en"');
+    // Member first, then the workspace: the more specific answer wins, and an
+    // organisation that set a language meant it for the people in it.
+    expect(locale.indexOf("people.readMember")).toBeLessThan(
+      locale.indexOf("settings.readWorkspaceSettings"),
+    );
+    const layout = at("../app/layout.tsx");
+    expect(layout).toContain("lang={locale}");
+    expect(layout).toContain("<TranslationsProvider locale={locale}>");
   });
 });

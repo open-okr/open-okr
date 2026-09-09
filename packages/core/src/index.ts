@@ -867,7 +867,7 @@ export {
   brandingSchema,
   DEFAULT_IMPORT_ROW_LIMIT,
   DEFAULT_QUIET_HOURS,
-  findSetting,
+  findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   isKnownTimezone,
   languageSchema,

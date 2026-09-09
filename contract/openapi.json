@@ -806,6 +806,20 @@
                       }
                     ]
                   },
+                  "language": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "en",
+                          "ms"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "quietHours": {
                     "anyOf": [
                       {
@@ -1849,6 +1863,20 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "en",
+                                "ms"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -1864,7 +1892,8 @@
                         "avatarBlobId",
                         "primaryChannel",
                         "theme",
-                        "density"
+                        "density",
+                        "language"
                       ],
                       "additionalProperties": false
                     }

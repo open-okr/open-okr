@@ -96,6 +96,15 @@ export const workspaceMembers = pgTable("workspace_members", {
    */
   theme: text("theme", { enum: ["light", "dark", "system"] }),
   density: text("density", { enum: ["comfortable", "compact"] }),
+  /**
+   * The member's own language (P6-G22a).
+   *
+   * Null means "follow the workspace", which is what a member who has never
+   * chosen gets and what every member had before this column existed. A closed
+   * set, because a locale with no catalogue would make `translate()` raise:
+   * a new locale is a new catalogue plus a value here, in that order.
+   */
+  language: text("language", { enum: ["en", "ms"] }),
   placeholderEmail: text("placeholder_email"),
   legacyId: text("legacy_id"),
   legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),

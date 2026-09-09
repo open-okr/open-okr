@@ -665,3 +665,81 @@ describe("a member's theme and density (P6-G23)", () => {
     ).rejects.toThrow();
   });
 });
+
+/**
+ * A member's own language (UIUX-PLAN §8, P6-G22a).
+ *
+ * The catalogue has existed since P2-T10 and the locale has been pinned to
+ * `en` in the root layout ever since, so the workspace's `language` setting
+ * was read by no renderer and a member had no language at all. These prove the
+ * column round-trips and that a locale with no catalogue is refused.
+ */
+describe("a member's language (P6-G22a)", () => {
+  it("starts null, which reads as follow the workspace", async () => {
+    const wb = await workerDb();
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Not "en". A member who has never chosen should get whatever their
+    // organisation chose, and null is the only value that can say so.
+    expect(me.language).toBeNull();
+  });
+
+  it("keeps what the member chose, and clears back to the workspace", async () => {
+    const wb = await workerDb();
+    const read = async () =>
+      (
+        await callAction(
+          { pool: wb.appPool, ...context(OWNER) },
+          "people.readMember",
+          { memberId: ownerMemberId },
+        )
+      ).language;
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { language: "ms" },
+    );
+    expect(await read()).toBe("ms");
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { language: null },
+    );
+    expect(await read()).toBeNull();
+  });
+
+  it("refuses a locale with no catalogue", async () => {
+    // `translate()` raises on a missing key by design rather than falling back
+    // to something that looks like content, so a locale with no catalogue
+    // would take out the first screen that rendered a key.
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateOwnProfile",
+        { language: "fr" } as never,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("leaves the theme and the density alone", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", language: "ms" },
+    );
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBe("dark");
+    expect(me.language).toBe("ms");
+  });
+});

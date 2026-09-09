@@ -65,11 +65,6 @@ export const LADDER_OWNERS: readonly LadderOwner[] = [
 export const ladderOwnerFor = (ruleKey: string): LadderOwner | undefined =>
   LADDER_OWNERS.find((owner) => owner.ruleKey === ruleKey);
 
-const ladderOwnerForThreshold = (
-  threshold: keyof ResolvedThresholds,
-): LadderOwner | undefined =>
-  LADDER_OWNERS.find((owner) => owner.threshold === threshold);
-
 /**
  * Whether a stored ladder is one §11 would accept.
  *

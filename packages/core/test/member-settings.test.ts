@@ -110,9 +110,11 @@ describe("the member scope of the settings registry", () => {
     ).map((setting) => setting.key);
     // Enumerated rather than derived, so a key given this home without a
     // column to land in fails here. `theme` and `density` joined the list at
-    // P6-G23, which is the migration that added both columns (0077).
+    // P6-G23 with migration 0077, and `language` at P6-G22a with 0078. It has
+    // caught both, which is the argument for the list being written out.
     expect(columnKeys.slice().sort()).toEqual([
       "density",
+      "language",
       "primaryChannel",
       "quietHours",
       "theme",

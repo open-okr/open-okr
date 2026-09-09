@@ -273,7 +273,7 @@ export default async function MemberProfilePage({
               </p>
             </CardHeader>
             <CardBody>
-              <AppearanceControl />
+              <AppearanceControl language={member.language} />
             </CardBody>
           </Card>
         ) : null}

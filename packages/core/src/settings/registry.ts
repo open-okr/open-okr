@@ -395,6 +395,18 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     schema: z.enum(CHECK_IN_FREQUENCIES).nullable(),
   },
   {
+    key: "language",
+    scope: "member",
+    home: "workspace_members",
+    why:
+      "Null, which reads as follow the workspace. A product that picked a " +
+      "language for somebody would be overriding the answer their " +
+      "organisation already gave. The workspace half of this setting has " +
+      "existed since P2-T10 and was read by no renderer until P6-G22a.",
+    resolve: () => null,
+    schema: z.enum(["en", "ms"]).nullable(),
+  },
+  {
     key: "theme",
     scope: "member",
     home: "workspace_members",
@@ -538,9 +550,26 @@ export function settingsByCard(card: string): readonly SettingDefinition[] {
   return SETTINGS_REGISTRY.filter((setting) => setting.card === card);
 }
 
-/** The one setting at this key, or undefined for a key outside the map. */
-export function findSetting(key: string): SettingDefinition | undefined {
-  return SETTINGS_REGISTRY.find((setting) => setting.key === key);
+/**
+ * The one **workspace** setting at this key, or undefined (P6-G22a).
+ *
+ * **Scoped, because a key is no longer unique on its own.** §4.14 has both a
+ * workspace language and a member language, and P6-G22a added the second, so
+ * `language` names two settings that are stored in two places. A lookup by key
+ * alone would return whichever the array happened to hold first, and its one
+ * caller is the reset path, which refuses anything but a workspace setting a
+ * line later. Filtering here makes that correct by construction rather than by
+ * the order somebody wrote the entries in.
+ *
+ * A member setting is never looked up this way: both resolvers filter by
+ * `home` and hand back the whole set.
+ */
+export function findWorkspaceSetting(
+  key: string,
+): SettingDefinition | undefined {
+  return SETTINGS_REGISTRY.find(
+    (setting) => setting.key === key && setting.scope === "workspace",
+  );
 }
 
 /** Every workspace-scoped setting, resolved. Stored in `workspaces.settings`. */

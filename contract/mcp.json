@@ -186,6 +186,20 @@
               }
             ]
           },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ms"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quietHours": {
             "anyOf": [
               {

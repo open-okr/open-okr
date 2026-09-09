@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  findSetting,
+  findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
   resolveMemberNotificationSettings,
   resolveMemberSettings,
@@ -24,9 +24,16 @@ describe("the registry itself", () => {
     expect(SETTINGS_REGISTRY.length).toBeGreaterThan(0);
   });
 
-  it("has no duplicate keys", () => {
-    const keys = SETTINGS_REGISTRY.map((setting) => setting.key);
-    expect(new Set(keys).size).toBe(keys.length);
+  it("has no duplicate setting, counted by where the value lives", () => {
+    // **The key alone stopped being unique at P6-G22a.** §4.14 has both a
+    // workspace language and a member language, and the two are different
+    // settings stored in different places: one in `workspaces.settings`, one
+    // in a `workspace_members` column. What must not repeat is a home and a
+    // key together, because that is the address a resolver writes to.
+    const addresses = SETTINGS_REGISTRY.map(
+      (setting) => `${setting.home}:${setting.key}`,
+    );
+    expect(new Set(addresses).size).toBe(addresses.length);
   });
 
   it("gives every setting a reason, so the map stays readable", () => {
@@ -103,13 +110,13 @@ describe("the registry itself", () => {
   });
 });
 
-describe("settingsByCard and findSetting (P2-T08)", () => {
+describe("settingsByCard and findWorkspaceSetting (P2-T08)", () => {
   it("finds a registered setting by key", () => {
-    expect(findSetting("timezone")?.scope).toBe("workspace");
+    expect(findWorkspaceSetting("timezone")?.scope).toBe("workspace");
   });
 
   it("returns nothing for a key outside the registry", () => {
-    expect(findSetting("doesNotExist")).toBeUndefined();
+    expect(findWorkspaceSetting("doesNotExist")).toBeUndefined();
   });
 
   it("groups the general card's settings", () => {

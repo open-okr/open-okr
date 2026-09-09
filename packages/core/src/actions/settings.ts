@@ -26,7 +26,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
   brandingSchema,
-  findSetting,
+  findWorkspaceSetting,
   languageSchema,
   settingsByCard,
   timezoneSchema,
@@ -242,8 +242,10 @@ const resetInput = z.union([
 /** Every workspace-scoped setting a reset request names, registry-validated. */
 function settingsToReset(input: z.infer<typeof resetInput>) {
   if ("key" in input) {
-    const setting = findSetting(input.key);
-    if (setting?.scope !== "workspace") {
+    // Undefined covers both an unknown key and a member key, and the two
+    // answer the same way on purpose: neither is a workspace setting.
+    const setting = findWorkspaceSetting(input.key);
+    if (setting === undefined) {
       throw new OperationError(
         "not_found",
         `"${input.key}" is not a workspace setting.`,

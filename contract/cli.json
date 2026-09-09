@@ -132,6 +132,12 @@
           "required": false
         },
         {
+          "name": "language",
+          "field": "language",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "quiet-hours",
           "field": "quietHours",
           "type": "string",

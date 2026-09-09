@@ -404,3 +404,44 @@ test("the workspace feed inserts a row without a reload", async () => {
   await expect(page.getByText(MARKER)).toBeVisible({ timeout: 30_000 });
   expect(new URL(page.url()).pathname).toBe("/activity");
 });
+
+/**
+ * The locale is the member's, not `en` (UIUX-PLAN §8, P6-G22a).
+ *
+ * The catalogue shipped at P2-T10 and the root layout pinned `en` for eight
+ * phases, so `TranslationsProvider` took a locale nothing could select. What
+ * is proved here is the round trip through the browser: choosing a language
+ * changes what the document says it is, and clearing it puts the member back
+ * on the workspace's.
+ *
+ * `html lang` is the assertion rather than a translated string, and
+ * deliberately: most screens are still English because their strings are not
+ * in the catalogue yet, which is P6-G22c. What changed at this row is that the
+ * choice reaches the renderer at all.
+ */
+test("a member's language reaches the document", async () => {
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  await page.getByTestId("language-ms").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ms", {
+    timeout: 15_000,
+  });
+
+  // It survives a navigation, which is what "stored on the member" means: the
+  // theme is applied by a provider in this browser, and this is not.
+  await goTo(page, "/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ms");
+
+  // And back, so the instance is as it was for whatever spec runs next.
+  await goTo(page, "/people");
+  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
+  await page.waitForURL(/\/people\//);
+  await page.getByTestId("language-en").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en", {
+    timeout: 15_000,
+  });
+});

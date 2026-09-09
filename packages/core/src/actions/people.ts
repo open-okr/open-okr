@@ -109,6 +109,14 @@ export const updateOwnProfile = defineWriteAction({
     theme: z.enum(["light", "dark", "system"]).nullable().optional(),
     density: z.enum(["comfortable", "compact"]).nullable().optional(),
     /**
+     * Which catalogue renders for this member (P6-G22a).
+     *
+     * Null is "follow the workspace", not an unanswered question. A closed
+     * set, because a locale with no catalogue would make `translate()` raise
+     * on the first key it met.
+     */
+    language: z.enum(["en", "ms"]).nullable().optional(),
+    /**
      * When not to be messaged, in the member's own timezone.
      *
      * Null clears it. AI-NATIVE-PLAN §5.4 defers a nudge inside this window to
@@ -154,6 +162,9 @@ export const updateOwnProfile = defineWriteAction({
       }
       if (input.density !== undefined) {
         patch.density = input.density;
+      }
+      if (input.language !== undefined) {
+        patch.language = input.language;
       }
       if (input.quietHours !== undefined) {
         patch.quietHours = input.quietHours;
@@ -605,6 +616,14 @@ const memberProfile = z.object({
    */
   theme: z.enum(["light", "dark", "system"]).nullable(),
   density: z.enum(["comfortable", "compact"]).nullable(),
+  /**
+   * Which catalogue renders for this member (P6-G22a).
+   *
+   * Null is "follow the workspace". Returned so the root layout can decide
+   * the locale on the server, which is the only place it can be decided: the
+   * text is rendered there.
+   */
+  language: z.enum(["en", "ms"]).nullable(),
 });
 
 /**
@@ -646,6 +665,7 @@ export const readMember = defineReadAction({
             primaryChannel: workspaceMembers.primaryChannel,
             theme: workspaceMembers.theme,
             density: workspaceMembers.density,
+            language: workspaceMembers.language,
           })
           .from(workspaceMembers)
           .where(

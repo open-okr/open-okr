@@ -1824,9 +1824,43 @@ Acceptance: Given a workspace that widens the blocker ladder for one rule, when 
 ### P6-G22: The string catalogue and the locale [L]
 Depends on: P2-T10
 Goal: UIUX-PLAN §9's catalogue line is true (GAP-AUDIT G-08).
-Deliverables: every user-facing string in the 47 routes moved into the catalogue, with the Bahasa Melayu keys stubbed; the locale wired from the member and workspace language settings rather than pinned to `en` in the root layout; the pseudo-locale check extended from the shell components to every route, so a hardcoded string fails the build.
-Test plan: the pseudo-locale check runs over every route and fails on a deliberately hardcoded string; a member whose language is `ms` sees the stubbed catalogue; a key missing from `ms` falls back to `en` rather than rendering the key.
-Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language, and a new hardcoded string anywhere fails the build.
+
+**Cut in three at P6-G22a, and the seam is machinery before content.** This row
+asked for three things at once: a locale that is chosen rather than pinned,
+a build gate that refuses a hardcoded string, and every user-facing string in
+53 route files moved into the catalogue. The third is not a working session:
+the catalogue holds seven keys today and the routes hold thousands of strings,
+so moving them is mechanical work measured in days, and doing it before the
+gate exists means doing it twice. The first two are each one commit and each
+leaves the product better on its own: after **P6-G22a** choosing a language
+changes something, and after **P6-G22b** a new hardcoded string cannot be added
+without a decision.
+
+- **P6-G22a**: the locale is the member's, not `en`.
+- **P6-G22b**: the pseudo-locale gate over every route, with the routes
+  exempted by name and the list only ever shrinking.
+- **P6-G22c**: the strings themselves, route by route, removing exemptions.
+
+### P6-G22a: The locale is the member's, not `en` [M]
+Depends on: P2-T10
+Goal: a language chosen in the product changes what renders.
+Deliverables: `workspace_members.language` with its check constraint and its §4.14 registry entry; `people.updateOwnProfile` and `people.readMember` carrying it; a `resolveLocale` that answers the member, then the workspace, then English and never throws; the root layout's `lang` and `TranslationsProvider` reading it instead of a literal; the control beside theme and density.
+Test plan: a member's language round-trips and clears back to the workspace; a locale with no catalogue is refused; a signed-out screen still renders; the layout takes the resolved locale rather than a literal.
+Acceptance: Given a member who chooses Bahasa Melayu, when any screen re-renders, then the catalogue keys resolve in that language and `html lang` says so.
+
+### P6-G22b: A hardcoded string fails the build [M]
+Depends on: P6-G22a
+Goal: the catalogue cannot be bypassed by accident.
+Deliverables: the pseudo-locale check extended from the shell components to every route; the 53 route files exempted by name, with the exemption list documented as a debt that only shrinks; a test that fails when an exemption names a file that no longer exists.
+Test plan: a deliberately hardcoded string in an unexempted file fails the check; removing a file from the exemption list without moving its strings fails; a stale exemption fails.
+Acceptance: Given a new user-facing string added outside the catalogue in an unexempted route, when the check runs, then it fails naming the file and the string.
+
+### P6-G22c: The strings themselves [L]
+Depends on: P6-G22b
+Goal: UIUX-PLAN §9's catalogue line is true for every route.
+Deliverables: every user-facing string in the 53 route files moved into the catalogue with its `ms` key stubbed, and its exemption removed as each file is done; the assertion that every catalogue key has a consumer, which P2-T10 deferred to here.
+Test plan: the exemption list is empty; every key has a consumer; a key missing from `ms` fails rather than rendering the key.
+Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language.
 
 **The member's language column arrives here**, with the control that sets it.
 §4.14 documents "Member language, theme, density" and no column exists for any

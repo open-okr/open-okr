@@ -14,12 +14,15 @@
  */
 
 import { callAction, OperationError } from "@openokr/core";
+import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
 import { requireWorkspace } from "./workspace";
 
 export async function setAppearance(input: {
   theme?: "light" | "dark" | "system";
   density?: "comfortable" | "compact";
+  /** Which catalogue renders for this member (P6-G22a). */
+  language?: "en" | "ms";
 }): Promise<{ error: string | null }> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -38,8 +41,14 @@ export async function setAppearance(input: {
     }
     throw error;
   }
-  // Deliberately no `revalidatePath`. The provider has already applied the
-  // change in the browser, and re-rendering the tree would repaint every page
-  // to arrive at what the reader is already looking at.
+  // **The theme and the density need no revalidation and the language does.**
+  // The provider has already applied a theme change in the browser, so
+  // re-rendering the tree would repaint every page to arrive at what the
+  // reader is already looking at. A language is not like that: the text is
+  // rendered on the server, so the screen does not change until the server
+  // renders it again (P6-G22a).
+  if (input.language !== undefined) {
+    revalidatePath("/", "layout");
+  }
   return { error: null };
 }
