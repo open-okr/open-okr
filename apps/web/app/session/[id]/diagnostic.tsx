@@ -17,7 +17,14 @@
  * diagnostic recomputed later would quietly change its verdict as scores were
  * corrected.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { narrateDiagnosticAction, recordDiagnosticAction } from "./actions";
@@ -56,6 +63,8 @@ export function DiagnosticPanel({
    */
   readonly assistAvailable?: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -100,7 +109,7 @@ export function DiagnosticPanel({
             id="diagnostic-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            The diagnostic
+            {t("session.detail.diagnostic.theDiagnostic")}
           </h2>
           {diagnostic.verdict === null ? null : (
             <Chip tone={VERDICT_TONE[diagnostic.verdict] ?? "neutral"}>
@@ -114,17 +123,17 @@ export function DiagnosticPanel({
           <>
             <p className="flex flex-wrap items-center gap-3">
               <span className="text-xs text-ink-3">
-                Cycle score{" "}
+                {t("session.detail.diagnostic.cycleScore")}{" "}
                 <span className="font-bold tabular-nums text-ink">
                   {diagnostic.cycleScore?.toFixed(2)}
                 </span>
               </span>
               <span className="text-xs text-ink-3">
-                Rhythm{" "}
+                {t("session.detail.diagnostic.rhythm")}{" "}
                 <span className="font-bold tabular-nums text-ink">
                   {diagnostic.rhythmScore?.toFixed(1)}
                 </span>{" "}
-                of 5
+                {t("common.of5")}
               </span>
             </p>
             <p className="text-sm font-medium text-ink">
@@ -134,18 +143,17 @@ export function DiagnosticPanel({
               {/* Said on the screen because it is the point of the design: the
                   deterministic path is the product, and AI adds specifics
                   rather than the verdict. */}
-              Computed from your own data. It is the same answer with AI
-              switched off.
+              {t("session.detail.diagnostic.computedFromYourOwn")}
             </p>
             {narrative ? (
               <section
-                aria-label="Diagnostic specifics"
+                aria-label={t("session.detail.diagnostic.diagnosticSpecifics")}
                 className="rounded-md border border-line bg-surface p-3"
               >
                 <span className="mb-1.5 flex items-center gap-2">
-                  <Chip tone="agent">AI</Chip>
+                  <Chip tone="agent">{t("common.ai")}</Chip>
                   <span className="text-xs text-ink-4">
-                    Specifics, under the verdict
+                    {t("session.detail.diagnostic.specificsUnderTheVerdict")}
                   </span>
                 </span>
                 <p className="text-sm text-ink">{narrative}</p>
@@ -160,7 +168,7 @@ export function DiagnosticPanel({
                   disabled={narrating}
                   onClick={() => void narrate()}
                 >
-                  Add the specifics
+                  {t("session.detail.diagnostic.addTheSpecifics")}
                 </Button>
               </span>
             ) : null}
@@ -168,9 +176,11 @@ export function DiagnosticPanel({
         ) : diagnostic.readable ? (
           <>
             <p className="text-sm text-ink-2">
-              Both numbers are in: a cycle score of{" "}
-              {diagnostic.cycleScore?.toFixed(2)} and a rhythm of{" "}
-              {diagnostic.rhythmScore?.toFixed(1)} of 5.
+              {t("session.detail.diagnostic.bothNumbersAreIn")}{" "}
+              {diagnostic.cycleScore?.toFixed(2)}{" "}
+              {t("session.detail.diagnostic.andARhythmOf")}{" "}
+              {diagnostic.rhythmScore?.toFixed(1)}{" "}
+              {t("session.detail.diagnostic.of52")}
             </p>
             {canRead ? (
               <span>
@@ -180,7 +190,7 @@ export function DiagnosticPanel({
                   disabled={pending}
                   onClick={read}
                 >
-                  Read the diagnostic
+                  {t("session.detail.diagnostic.readTheDiagnostic")}
                 </Button>
               </span>
             ) : null}
@@ -189,8 +199,7 @@ export function DiagnosticPanel({
           <p className="text-sm text-ink-3">
             {/* Two missing numbers, one sentence: §8.6 combines both and a
                 diagnostic built on a missing answer reads as evidence. */}
-            The diagnostic needs a cycle score and a rhythm score. Grade the key
-            results, then run the process-health survey.
+            {t("session.detail.diagnostic.theDiagnosticNeedsA")}
           </p>
         )}
 
@@ -207,7 +216,7 @@ export function DiagnosticPanel({
               disabled={pending}
               onClick={read}
             >
-              Read it again
+              {t("session.detail.diagnostic.readItAgain")}
             </Button>
           </span>
         ) : null}

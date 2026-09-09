@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Snippet } from "./palette.tsx";
 
@@ -39,6 +40,8 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<{ q?: string; type?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -78,7 +81,9 @@ export default async function SearchPage({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Search</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("shell.search.label")}
+            </h1>
             <p className="text-xs text-ink-3" data-testid="search-count">
               {phrase === ""
                 ? "Type a phrase. Only what you can already open is searched."
@@ -92,11 +97,11 @@ export default async function SearchPage({
         <CardBody className="flex flex-col gap-3">
           <form action="/search" className="flex flex-wrap items-end gap-2">
             <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-              What are you looking for
+              {t("search.whatAreYouLooking")}
               <input
                 name="q"
                 defaultValue={phrase}
-                placeholder="mid-market activation"
+                placeholder={t("search.midMarketActivation")}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               />
             </label>
@@ -107,7 +112,7 @@ export default async function SearchPage({
               type="submit"
               className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
             >
-              Search
+              {t("shell.search.label")}
             </button>
           </form>
 
@@ -121,7 +126,7 @@ export default async function SearchPage({
                   : "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
               }
             >
-              Everything
+              {t("search.everything")}
             </Link>
             {TYPES.map((one) => (
               <Link
@@ -168,7 +173,7 @@ export default async function SearchPage({
                     {hit.semantic ? (
                       // Marked, because a semantic hit answered a different
                       // question from the one the words asked.
-                      <Chip tone="info">Related</Chip>
+                      <Chip tone="info">{t("search.related")}</Chip>
                     ) : null}
                   </div>
                   <p className="text-xs text-ink-3">

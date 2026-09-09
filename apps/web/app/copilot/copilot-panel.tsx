@@ -22,7 +22,13 @@
  * offers the passages, which is §2.4's own degradation rather than a dead panel.
  * Capped is a budget or a switch, and it says which.
  */
-import { Button, Chip, Kbd, useKeyboardShortcut } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  Kbd,
+  useKeyboardShortcut,
+  useTranslations,
+} from "@openokr/ui";
 import {
   Check,
   Loader2,
@@ -134,6 +140,8 @@ function SourceList({
 }
 
 function Turn({ message }: { readonly message: Message }) {
+  const { t } = useTranslations();
+
   const mine = message.role === "member";
   return (
     <div className={mine ? "text-right" : ""}>
@@ -145,11 +153,16 @@ function Turn({ message }: { readonly message: Message }) {
         {message.content}
         {message.stopped ? (
           <span className="mt-1 block">
-            <Chip tone="warn">Stopped</Chip>
+            <Chip tone="warn">{t("copilot.copilotPanel.stopped")}</Chip>
           </span>
         ) : null}
       </div>
-      {mine ? null : <SourceList title="Sources" items={message.citations} />}
+      {mine ? null : (
+        <SourceList
+          title={t("copilot.copilotPanel.sources")}
+          items={message.citations}
+        />
+      )}
     </div>
   );
 }
@@ -189,13 +202,15 @@ function ProposalCard({
   readonly onDismiss: () => void;
   readonly onUndo: () => void;
 }) {
+  const { t } = useTranslations();
+
   return (
     <section
-      aria-label="Proposed change"
+      aria-label={t("copilot.copilotPanel.proposedChange")}
       className="rounded-lg border border-line bg-surface p-3"
     >
       <header className="flex items-center gap-2">
-        <Chip tone="agent">AI</Chip>
+        <Chip tone="agent">{t("common.ai")}</Chip>
         <span className="text-xs font-semibold text-ink-2">
           {proposal.action}
         </span>
@@ -205,7 +220,7 @@ function ProposalCard({
           </Chip>
         ) : null}
         {proposal.status === "dismissed" ? (
-          <Chip tone="neutral">Dismissed</Chip>
+          <Chip tone="neutral">{t("copilot.copilotPanel.dismissed")}</Chip>
         ) : null}
       </header>
       <p className="mt-2 text-xs text-ink-3">{proposal.why}</p>
@@ -222,10 +237,10 @@ function ProposalCard({
           <>
             <Button variant="primary" disabled={busy} onClick={onApply}>
               <Check className="size-4" />
-              Apply
+              {t("common.apply")}
             </Button>
             <Button variant="ghost" disabled={busy} onClick={onDismiss}>
-              Dismiss
+              {t("common.dismiss")}
             </Button>
           </>
         ) : null}
@@ -234,12 +249,12 @@ function ProposalCard({
         proposal.reversible ? (
           <Button variant="ghost" disabled={busy} onClick={onUndo}>
             <Undo2 className="size-4" />
-            Undo
+            {t("copilot.copilotPanel.undo")}
           </Button>
         ) : null}
         {proposal.status === "applied" && !proposal.reversible ? (
           <p className="text-xs text-ink-4">
-            This one cannot be undone: the action it applied has no reverse.
+            {t("copilot.copilotPanel.thisOneCannotBe")}
           </p>
         ) : null}
       </div>
@@ -253,6 +268,8 @@ export function CopilotPanel({
   /** Read on the server so the first open needs no round trip. */
   readonly initialAvailability: Availability;
 }) {
+  const { t } = useTranslations();
+
   const [open, setOpen] = useState(false);
   const [availability, setAvailability] = useState(initialAvailability);
   const [threads, setThreads] = useState<readonly ThreadSummary[]>([]);
@@ -459,10 +476,12 @@ export function CopilotPanel({
       <Button
         variant="ghost"
         onClick={() => setOpen(true)}
-        aria-label="Ask the copilot"
+        aria-label={t("copilot.copilotPanel.askTheCopilot")}
       >
         <MessageSquare className="size-4" />
-        <span className="hidden sm:inline">Ask</span>
+        <span className="hidden sm:inline">
+          {t("copilot.copilotPanel.ask")}
+        </span>
         <Kbd>⌘J</Kbd>
       </Button>
     );
@@ -475,10 +494,12 @@ export function CopilotPanel({
       <Button
         variant="ghost"
         onClick={() => setOpen(false)}
-        aria-label="Ask the copilot"
+        aria-label={t("copilot.copilotPanel.askTheCopilot")}
       >
         <MessageSquare className="size-4" />
-        <span className="hidden sm:inline">Ask</span>
+        <span className="hidden sm:inline">
+          {t("copilot.copilotPanel.ask")}
+        </span>
         <Kbd>⌘J</Kbd>
       </Button>
       {/* **Portalled to the body, and it has to be.** The trigger above lives in
@@ -492,19 +513,21 @@ export function CopilotPanel({
       {createPortal(
         <aside
           role="dialog"
-          aria-label="Copilot"
+          aria-label={t("copilot.copilotPanel.copilot")}
           className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
         >
           <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
-            <h2 className="text-sm font-medium text-ink">Copilot</h2>
+            <h2 className="text-sm font-medium text-ink">
+              {t("copilot.copilotPanel.copilot")}
+            </h2>
             {availability.providerConfigured ? null : (
-              <Chip tone="neutral">AI off</Chip>
+              <Chip tone="neutral">{t("copilot.copilotPanel.aiOff")}</Chip>
             )}
             <Button
               variant="ghost"
               className="ml-auto"
               onClick={() => setOpen(false)}
-              aria-label="Close the copilot"
+              aria-label={t("copilot.copilotPanel.closeTheCopilot")}
             >
               <X className="size-4" />
             </Button>
@@ -514,12 +537,13 @@ export function CopilotPanel({
             {messages.length === 0 && streaming === null ? (
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-ink-3">
-                  Ask about this workspace's goals, metrics and reviews. Answers
-                  cite what they came from, and only what you can already read.
+                  {t("copilot.copilotPanel.askAboutThisWorkspace")}
                 </p>
                 {threads.length > 0 ? (
                   <div>
-                    <p className="text-xs text-ink-4">Earlier conversations</p>
+                    <p className="text-xs text-ink-4">
+                      {t("copilot.copilotPanel.earlierConversations")}
+                    </p>
                     <ul className="mt-1 flex flex-col gap-1">
                       {threads.map((thread) => (
                         <li key={thread.id}>
@@ -562,7 +586,7 @@ export function CopilotPanel({
                     {streaming === "" ? (
                       <span className="flex items-center gap-2 text-ink-4">
                         <Loader2 className="size-3.5 animate-spin" />
-                        Reading your workspace
+                        {t("copilot.copilotPanel.readingYourWorkspace")}
                       </span>
                     ) : (
                       streaming
@@ -582,7 +606,10 @@ export function CopilotPanel({
             ) : null}
             {/* The passages, shown whether or not a model used them. With the
                 provider off this is the answer. */}
-            <SourceList title="Passages that match" items={sources} />
+            <SourceList
+              title={t("copilot.copilotPanel.passagesThatMatch")}
+              items={sources}
+            />
           </div>
 
           <footer className="flex-none border-t border-line px-4 py-3">
@@ -594,7 +621,9 @@ export function CopilotPanel({
             )}
             <div className="flex items-end gap-2">
               <label className="flex-1">
-                <span className="sr-only">Your question</span>
+                <span className="sr-only">
+                  {t("copilot.copilotPanel.yourQuestion")}
+                </span>
                 <textarea
                   ref={inputRef}
                   rows={2}
@@ -619,16 +648,16 @@ export function CopilotPanel({
                 <Button
                   variant="ghost"
                   onClick={stop}
-                  aria-label="Stop the answer"
+                  aria-label={t("copilot.copilotPanel.stopTheAnswer")}
                 >
                   <Square className="size-4" />
-                  Stop
+                  {t("copilot.copilotPanel.stop")}
                 </Button>
               ) : (
                 <Button
                   onClick={() => void send()}
                   disabled={busy || question.trim() === ""}
-                  aria-label="Send the question"
+                  aria-label={t("copilot.copilotPanel.sendTheQuestion")}
                 >
                   <Send className="size-4" />
                 </Button>

@@ -1,4 +1,5 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { publishCheckIn } from "./actions.ts";
 import { VotePanel, type VoteState } from "./vote-panel.tsx";
@@ -31,7 +32,7 @@ export interface ComposerKeyResult {
   readonly kpiId: string | null;
 }
 
-export function Composer({
+export async function Composer({
   checkInId,
   goalTitle,
   keyResults,
@@ -43,14 +44,16 @@ export function Composer({
   /** The goal the walker moves to after this one, when there is one. */
   readonly nextGoalId: string | null;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Check in</h2>
+          <h2 className="text-sm font-bold text-ink">{t("common.checkIn")}</h2>
           <p className="text-xs text-ink-3">{goalTitle}</p>
         </div>
-        <Chip tone="brand">draft</Chip>
+        <Chip tone="brand">{t("checkIn.composer.draft")}</Chip>
       </CardHeader>
       <CardBody>
         <ActionForm action={publishCheckIn} className="flex flex-col gap-3.5">
@@ -61,7 +64,7 @@ export function Composer({
               className="text-xs font-semibold text-ink-2"
               htmlFor="status"
             >
-              Status
+              {t("checkIn.composer.status")}
             </label>
             <select
               id="status"
@@ -69,16 +72,16 @@ export function Composer({
               defaultValue="on_track"
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2"
             >
-              <option value="on_track">On track</option>
-              <option value="caution">Caution</option>
-              <option value="off_track">Off track</option>
+              <option value="on_track">{t("common.onTrack")}</option>
+              <option value="caution">{t("common.caution")}</option>
+              <option value="off_track">{t("common.offTrack")}</option>
             </select>
 
             <label
               className="text-xs font-semibold text-ink-2"
               htmlFor="confidence"
             >
-              Confidence
+              {t("common.confidence")}
             </label>
             {/* A dial, as S-15 asks. 0.0 to 1.0 in tenths: METHOD.md §3.2 bands
                 are read at 0.3, 0.4 and 0.7, so tenths are fine enough to land on
@@ -94,13 +97,14 @@ export function Composer({
               defaultValue="0.5"
               className="w-40"
             />
-            <span className="text-xs text-ink-4">0 to 1</span>
+            <span className="text-xs text-ink-4">
+              {t("checkIn.composer.0To1")}
+            </span>
           </div>
 
           {keyResults.length === 0 ? (
             <p className="text-sm text-ink-3">
-              This goal has no key results, so there are no values to report. A
-              narrative on its own still records what happened.
+              {t("checkIn.composer.thisGoalHasNo")}
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-line">
@@ -115,25 +119,26 @@ export function Composer({
                         {keyResult.title}
                       </span>
                       <span className="text-xs text-ink-3">
-                        {keyResult.direction} · {keyResult.baselineValue} to{" "}
-                        {keyResult.targetValue}
+                        {keyResult.direction} · {keyResult.baselineValue}{" "}
+                        {t("common.to")} {keyResult.targetValue}
                         {keyResult.unit ? ` ${keyResult.unit}` : ""} ·{" "}
-                        {Math.round(keyResult.progressPct)}% now
+                        {Math.round(keyResult.progressPct)}
+                        {t("checkIn.composer.now")}
                       </span>
                     </span>
                     <span className="flex flex-none items-center gap-1.5">
                       <span className="text-xs text-ink-4">
-                        was {keyResult.currentValue}
+                        {t("checkIn.composer.was")} {keyResult.currentValue}
                       </span>
                       {keyResult.kpiId ? (
-                        <Chip tone="info">from a KPI</Chip>
+                        <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : (
                         <>
                           <label
                             className="sr-only"
                             htmlFor={`value-${keyResult.id}`}
                           >
-                            New value for {keyResult.title}
+                            {t("common.newValueFor")} {keyResult.title}
                           </label>
                           <input
                             id={`value-${keyResult.id}`}
@@ -152,7 +157,7 @@ export function Composer({
                       className="text-xs text-ink-3"
                       htmlFor={`confidence-${keyResult.id}`}
                     >
-                      Confidence
+                      {t("common.confidence")}
                     </label>
                     <input
                       id={`confidence-${keyResult.id}`}
@@ -175,25 +180,24 @@ export function Composer({
               className="text-xs font-semibold text-ink-2"
               htmlFor="narrative"
             >
-              What moved, what is in the way, what happens next
+              {t("checkIn.composer.whatMovedWhatIs")}
             </label>
             <textarea
               id="narrative"
               name="narrative"
               rows={5}
               required
-              placeholder="Status lives in the product. This is for the part a number cannot say."
+              placeholder={t("checkIn.composer.statusLivesInThe")}
               className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
             />
           </div>
 
           <div className="flex items-center gap-2.5">
             <Button type="submit" variant="primary">
-              Publish
+              {t("checkIn.composer.publish")}
             </Button>
             <span className="text-xs text-ink-4">
-              Publishing advances the cadence and asks the reviewer to
-              acknowledge.
+              {t("checkIn.composer.publishingAdvancesTheCadence")}
               {nextGoalId ? " The walker moves to your next due goal." : ""}
             </span>
           </div>
@@ -204,26 +208,28 @@ export function Composer({
 }
 
 /** The private votes on this goal's key results, and the reveal (§6.6). */
-export function Votes({
+export async function Votes({
   votes,
   canReveal,
 }: {
   readonly votes: readonly VoteState[];
   readonly canReveal: boolean;
 }) {
+  const { t } = await getTranslations();
+
   if (votes.length === 0) {
     return null;
   }
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">Team confidence</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("checkIn.composer.teamConfidence")}
+        </h2>
       </CardHeader>
       <CardBody className="flex flex-col gap-2.5">
         <p className="text-xs text-ink-3">
-          Private until the reveal. Before it you see the response count and
-          your own number, and nothing else, because the numbers are not sent to
-          the browser at all.
+          {t("checkIn.composer.privateUntilTheReveal")}
         </p>
         {votes.map((vote) => (
           <VotePanel key={vote.keyResultId} vote={vote} canReveal={canReveal} />

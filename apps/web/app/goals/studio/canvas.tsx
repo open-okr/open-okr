@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   CARD_HEIGHT,
@@ -78,6 +79,8 @@ export function Canvas({
   readonly linkMode: boolean;
   readonly onLink: (fromId: string, toId: string) => void;
 }) {
+  const { t } = useTranslations();
+
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 24, y: 24 });
   const [viewport, setViewport] = useState({ width: 1200, height: 700 });
@@ -275,8 +278,9 @@ export function Canvas({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-ink-3">
-          {nodes.length} node{nodes.length === 1 ? "" : "s"}, {visible.length}{" "}
-          drawn
+          {nodes.length} {t("goals.studio.canvas.node")}
+          {nodes.length === 1 ? "" : "s"}, {visible.length}{" "}
+          {t("goals.studio.canvas.drawn")}
         </span>
         <span className="flex items-center gap-1">
           <button
@@ -284,14 +288,14 @@ export function Canvas({
             onClick={() => setZoom((value) => Math.max(0.3, value - 0.15))}
             className="rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:bg-raised"
           >
-            Zoom out
+            {t("goals.studio.canvas.zoomOut")}
           </button>
           <button
             type="button"
             onClick={() => setZoom((value) => Math.min(1.6, value + 0.15))}
             className="rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:bg-raised"
           >
-            Zoom in
+            {t("goals.studio.canvas.zoomIn")}
           </button>
           <button
             type="button"
@@ -301,7 +305,7 @@ export function Canvas({
             }}
             className="rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:bg-raised"
           >
-            Reset
+            {t("goals.studio.canvas.reset")}
           </button>
           <span className="text-xs text-ink-4">{Math.round(zoom * 100)}%</span>
         </span>
@@ -321,7 +325,7 @@ export function Canvas({
       <div
         ref={measure}
         role="application"
-        aria-label="Alignment cascade"
+        aria-label={t("goals.studio.canvas.alignmentCascade")}
         onKeyDown={onKeyDown}
         onPointerDown={(event) => {
           dragging.current = {
@@ -359,7 +363,7 @@ export function Canvas({
             aria-hidden="true"
             className="pointer-events-none absolute top-0 left-0"
           >
-            <title>Connectors</title>
+            <title>{t("goals.studio.canvas.connectors")}</title>
             {placed.map((entry) => {
               const parent = entry.node.parentGoalId
                 ? positions.get(entry.node.parentGoalId)
@@ -450,14 +454,16 @@ export function Canvas({
                 </span>
                 <span className="flex items-center gap-1.5 text-[10.5px] text-ink-4">
                   <span>
-                    {entry.node.keyResultCount} KR
+                    {entry.node.keyResultCount} {t("goals.studio.canvas.kr")}
                     {entry.node.keyResultCount === 1 ? "" : "s"}
                   </span>
                   <span>·</span>
-                  <span>{entry.node.dependencyCount} dep</span>
+                  <span>
+                    {entry.node.dependencyCount} {t("goals.studio.canvas.dep")}
+                  </span>
                   {entry.node.unaligned ? (
                     <span className="rounded bg-bad-bg px-1 font-semibold text-bad">
-                      unaligned
+                      {t("goals.studio.canvas.unaligned")}
                     </span>
                   ) : null}
                 </span>
@@ -468,14 +474,12 @@ export function Canvas({
 
         {nodes.length === 0 ? (
           <p className="absolute inset-0 flex items-center justify-center text-sm text-ink-3">
-            No goals in this cycle yet.
+            {t("goals.studio.canvas.noGoalsInThis")}
           </p>
         ) : null}
       </div>
       <p className="text-xs text-ink-4">
-        Drag to pan. Arrow keys move between goals, Home and End jump to the
-        ends of the cascade. Every goal is reachable by keyboard, including the
-        ones currently off screen.
+        {t("goals.studio.canvas.dragToPanArrow")}
       </p>
     </div>
   );

@@ -122,7 +122,7 @@ export function CycleAdmin({
                     )
                   }
                 >
-                  {t("cycle.admin.save")}
+                  {t("common.save")}
                 </Button>
               </div>
               <span className="text-ink-4">
@@ -132,7 +132,7 @@ export function CycleAdmin({
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-ink-3">
-                {t("cycle.admin.archive")} {currentName ?? ""}
+                {t("common.archive")} {currentName ?? ""}
               </span>
               <div>
                 <Button
@@ -145,7 +145,7 @@ export function CycleAdmin({
                     run(() => archiveCycle({ id: currentCycleId }))
                   }
                 >
-                  {t("cycle.admin.archive")}
+                  {t("common.archive")}
                 </Button>
               </div>
               <span className="text-xs text-ink-4">

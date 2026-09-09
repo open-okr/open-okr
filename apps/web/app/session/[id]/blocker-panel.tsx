@@ -1,7 +1,14 @@
 "use client";
 
 import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import {
   raiseBlockerAction,
@@ -68,6 +75,8 @@ function OneBlocker({
   readonly owners: readonly Option[];
   readonly canWrite: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [resolveState, resolve, resolving] = useActionState(
     resolveBlockerAction,
     NO_ERROR,
@@ -120,7 +129,9 @@ function OneBlocker({
               aria-label={`Reassign ${blocker.keyResultTitle ?? "this blocker"}`}
               className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
             >
-              <option value="">Move it to</option>
+              <option value="">
+                {t("session.detail.blockerPanel.moveItTo")}
+              </option>
               {owners.map((owner) => (
                 <option key={owner.id} value={owner.id}>
                   {owner.label}
@@ -128,7 +139,7 @@ function OneBlocker({
               ))}
             </select>
             <Button type="submit" variant="ghost" size="sm" disabled={moving}>
-              Reassign
+              {t("common.reassign")}
             </Button>
           </form>
         </div>
@@ -148,6 +159,8 @@ function Raise({
   readonly owners: readonly Option[];
   readonly keyResults: readonly Option[];
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(raiseBlockerAction, NO_ERROR);
   return (
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
@@ -156,10 +169,12 @@ function Raise({
         <select
           name="keyResultId"
           defaultValue=""
-          aria-label="Key result"
+          aria-label={t("common.keyResult2")}
           className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         >
-          <option value="">Which key result</option>
+          <option value="">
+            {t("session.detail.blockerPanel.whichKeyResult")}
+          </option>
           {keyResults.map((keyResult) => (
             <option key={keyResult.id} value={keyResult.id}>
               {keyResult.label}
@@ -169,10 +184,10 @@ function Raise({
         <select
           name="type"
           defaultValue=""
-          aria-label="Blocker type"
+          aria-label={t("session.detail.blockerPanel.blockerType")}
           className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         >
-          <option value="">What kind</option>
+          <option value="">{t("session.detail.blockerPanel.whatKind")}</option>
           {BLOCKER_TYPE_DEFINITIONS.map((one) => (
             <option key={one.type} value={one.type}>
               {one.label}
@@ -182,10 +197,12 @@ function Raise({
         <select
           name="ownerId"
           defaultValue=""
-          aria-label="Owner"
+          aria-label={t("common.owner")}
           className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
         >
-          <option value="">Who owns clearing it</option>
+          <option value="">
+            {t("session.detail.blockerPanel.whoOwnsClearingIt")}
+          </option>
           {owners.map((owner) => (
             <option key={owner.id} value={owner.id}>
               {owner.label}
@@ -195,7 +212,7 @@ function Raise({
       </div>
       <input
         name="nextAction"
-        placeholder="The next action, and it happens within 24 hours"
+        placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
         className="w-full max-w-prose rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
       />
       <Button
@@ -225,16 +242,19 @@ export function BlockerPanel({
   readonly keyResults: readonly Option[];
   readonly canWrite: boolean;
 }) {
+  const { t } = useTranslations();
+
   const open = blockers.filter((one) => !one.resolved);
 
   return (
     <Card>
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Blockers</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("session.detail.blockerPanel.blockers")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Every key result below the low boundary needs one, with an owner and
-            a next action, before this session can move on.
+            {t("session.detail.blockerPanel.everyKeyResultBelow")}
           </p>
         </div>
         <Chip tone={open.length > 0 ? "warn" : "ok"}>
@@ -244,7 +264,7 @@ export function BlockerPanel({
       <CardBody className="flex flex-col gap-3">
         {blockers.length === 0 ? (
           <p className="text-xs text-ink-3">
-            Nothing raised in this session yet.
+            {t("session.detail.blockerPanel.nothingRaisedInThis")}
           </p>
         ) : (
           <div className="flex flex-col gap-2">

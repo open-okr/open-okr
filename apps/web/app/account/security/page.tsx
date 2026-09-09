@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { requireSession } from "../../../lib/session";
+import { getTranslations } from "../../../lib/translations";
 import { SecuritySettings } from "./security-settings";
 import { Sessions } from "./sessions";
 
@@ -8,17 +9,21 @@ import { Sessions } from "./sessions";
  * in rather than rendering a shell that assumes a user.
  */
 export default async function SecurityPage() {
+  const { t } = await getTranslations();
+
   const session = await requireSession();
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4.5">
       <Card>
         <CardHeader>
-          <h1 className="text-lg font-bold text-ink">Security</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {t("account.security.security")}
+          </h1>
         </CardHeader>
         <CardBody>
           <p className="text-sm text-ink-3">
-            Signed in as {session.user.email}
+            {t("account.security.signedInAs")} {session.user.email}
           </p>
         </CardBody>
       </Card>

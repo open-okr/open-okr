@@ -1,177 +1,21 @@
 /**
  * Every file whose user-facing strings are still hardcoded (P6-G22b).
  *
- * **A debt, written down, that only ever shrinks.** UIUX-PLAN §8 asks for every
- * user-facing string in the catalogue. The catalogue held seven keys when this
- * list was made and these 146 files held 1,546 strings between them, so
- * closing the gap is P6-G22c and it is measured in days rather than in one
- * commit. What this list buys in the meantime is that a *new* hardcoded string
- * anywhere else fails the build instead of quietly joining the pile.
+ * **The list is empty, and that is the finished state** (P6-G22c). It held 146
+ * files and 1,543 strings between them when P6-G22b wrote it down as a debt
+ * that only ever shrinks. Every one of them is in the catalogue now, so there
+ * is nothing left to excuse.
  *
- * **Three rules keep it honest**, all enforced by `catalogue-coverage.test.ts`:
- * a file not on this list must have none; a name on this list must be a file
- * that exists; and a file on this list must still have at least one, so an
- * exemption cannot outlive the work it excused. That last one is what makes
- * the list shrink by itself as P6-G22c proceeds.
+ * **The array stays, and so do its three rules**, all enforced by
+ * `catalogue-coverage.test.ts`: a file not on this list must have no hardcoded
+ * string, a name on this list must be a file that exists, and a file on this
+ * list must still have at least one. With the list empty the first rule covers
+ * every route in the application and the other two have nothing to say, which
+ * is exactly what an emptied debt looks like.
  *
- * Generated once, at P6-G22b. Nothing regenerates it: adding a line is a
- * decision somebody has to make on purpose.
- *
- * **One line has been added since, and it exposed a limit in the gate itself**
- * (P6-G25). `useTranslations` is a client hook and `TranslationsProvider` is a
- * client provider, so a *server* component has no `t()` to call: every route
- * here is one, which means the gate as it stands can only be satisfied by
- * moving text into a client component or by adding a line below. That is not a
- * reason to weaken it, and it is a reason P6-G22c's first job is a
- * server-side reader for the catalogue rather than the strings themselves.
- * Until then, a new server component's strings join the list with the task
- * that added them named beside it.
+ * **Adding a line here is a decision somebody has to make on purpose**, and
+ * now it is also a regression. The reason the list existed at all was that
+ * `useTranslations` is a client hook, so a server component had no `t()` to
+ * call; P6-G25 built `getTranslations()` and removed that excuse.
  */
-export const UNLOCALISED_FILES: readonly string[] = [
-  "app/(auth)/backup-code/page.tsx",
-  "app/(auth)/forgot-password/page.tsx",
-  "app/(auth)/reset-password/page.tsx",
-  "app/(auth)/sign-in/page.tsx",
-  "app/(auth)/sign-up/page.tsx",
-  "app/(auth)/sign-up/sign-up-form.tsx",
-  "app/account/api-tokens/page.tsx",
-  "app/account/channels/cadence-form.tsx",
-  "app/account/channels/page.tsx",
-  "app/account/connections/page.tsx",
-  "app/account/connections/revoke-form.tsx",
-  "app/account/device/decision-form.tsx",
-  "app/account/device/page.tsx",
-  "app/account/security/page.tsx",
-  "app/account/security/security-settings.tsx",
-  "app/account/security/sessions.tsx",
-  "app/activity/page.tsx",
-  "app/admin/agents/agent-policy.tsx",
-  "app/admin/agents/page.tsx",
-  "app/admin/agents/proposal-queue.tsx",
-  "app/admin/agents/run-controls.tsx",
-  "app/admin/ai/governance.tsx",
-  "app/admin/ai/page.tsx",
-  "app/admin/branding/branding-settings-form.tsx",
-  "app/admin/branding/page.tsx",
-  "app/admin/channels/page.tsx",
-  "app/admin/channels/template-mapping-form.tsx",
-  "app/admin/general/general-settings-form.tsx",
-  "app/admin/general/page.tsx",
-  "app/admin/imports/page.tsx",
-  "app/admin/imports/wizard.tsx",
-  "app/admin/invitations/invite-form.tsx",
-  "app/admin/invitations/page.tsx",
-  "app/admin/layout.tsx",
-  "app/admin/nudges/page.tsx",
-  "app/admin/nudges/rule-cards.tsx",
-  "app/admin/rhythm/page.tsx",
-  "app/admin/rhythm/rhythm-form.tsx",
-  "app/avatar-menu.tsx",
-  "app/board/board.tsx",
-  "app/board/page.tsx",
-  "app/check-in/composer.tsx",
-  "app/check-in/page.tsx",
-  "app/check-in/timeline.tsx",
-  "app/check-in/vote-panel.tsx",
-  "app/copilot/copilot-panel.tsx",
-  "app/cycle/annual-frame.tsx",
-  "app/cycle/annual-objectives.tsx",
-  "app/cycle/assists.tsx",
-  "app/cycle/capacity.tsx",
-  "app/cycle/dependency-register.tsx",
-  "app/cycle/diagnose.tsx",
-  "app/cycle/direction.tsx",
-  "app/cycle/draft-coach.tsx",
-  "app/cycle/drafting.tsx",
-  "app/cycle/gates.tsx",
-  "app/cycle/guidance-rail.tsx",
-  "app/cycle/input-pack.tsx",
-  "app/cycle/page.tsx",
-  "app/cycle/phase-rail.tsx",
-  "app/cycle/quality-panel.tsx",
-  "app/cycle/review-and-learn.tsx",
-  "app/cycle/rule-verdict.tsx",
-  "app/cycle/running-cadence.tsx",
-  "app/dev/components/page.tsx",
-  "app/dev/rich-text/page.tsx",
-  "app/documents/[id]/page.tsx",
-  "app/documents/document-editor.tsx",
-  "app/documents/subject-documents.tsx",
-  "app/error.tsx",
-  "app/global-error.tsx",
-  "app/goals/[id]/coach-strip.tsx",
-  "app/goals/[id]/comments.tsx",
-  "app/goals/[id]/page.tsx",
-  "app/goals/[id]/rail.tsx",
-  "app/goals/[id]/sparkline.tsx",
-  "app/goals/filter-assist.tsx",
-  "app/goals/page.tsx",
-  "app/goals/studio/canvas.tsx",
-  "app/goals/studio/page.tsx",
-  "app/goals/studio/studio.tsx",
-  "app/inbox/page.tsx",
-  "app/initiatives/[id]/page.tsx",
-  "app/initiatives/[id]/unlink-button.tsx",
-  "app/initiatives/page.tsx",
-  "app/join/[token]/page.tsx",
-  "app/kpis/[id]/formula-builder.tsx",
-  "app/kpis/[id]/page.tsx",
-  "app/kpis/grid.tsx",
-  "app/kpis/page.tsx",
-  "app/kpis/recovery/page.tsx",
-  "app/kpis/trees/page.tsx",
-  "app/method/[id]/page.tsx",
-  "app/not-found.tsx",
-  "app/oauth/authorize/consent-form.tsx",
-  "app/oauth/authorize/page.tsx",
-  "app/(home)/page.tsx",
-  "app/people/[id]/lifecycle-controls.tsx",
-  "app/people/[id]/not-found.tsx",
-  "app/people/[id]/page.tsx",
-  "app/people/[id]/profile-form.tsx",
-  "app/people/page.tsx",
-  "app/quick-check-in.tsx",
-  "app/review/nudge-provenance.tsx",
-  "app/review/page.tsx",
-  "app/scorecard/page.tsx",
-  "app/search/export-button.tsx",
-  "app/search/my-exports.tsx",
-  "app/search/page.tsx",
-  "app/search/palette.tsx",
-  "app/session/[id]/blocker-panel.tsx",
-  "app/session/[id]/commitments.tsx",
-  "app/session/[id]/confidence-round.tsx",
-  "app/session/[id]/coordinator-note.tsx",
-  "app/session/[id]/diagnostic.tsx",
-  "app/session/[id]/digest.tsx",
-  "app/session/[id]/forward.tsx",
-  "app/session/[id]/management-retro.tsx",
-  "app/session/[id]/minutes/page.tsx",
-  "app/session/[id]/monthly-review.tsx",
-  "app/session/[id]/narratives.tsx",
-  "app/session/[id]/page.tsx",
-  "app/session/[id]/process-health.tsx",
-  "app/session/[id]/quarterly-review.tsx",
-  "app/session/[id]/recognition.tsx",
-  "app/session/[id]/reset.tsx",
-  "app/session/[id]/room-pulse.tsx",
-  "app/session/[id]/root-cause.tsx",
-  "app/session/[id]/scoring.tsx",
-  "app/session/[id]/team-retro.tsx",
-  "app/sessions/page.tsx",
-  "app/setup/account/page.tsx",
-  "app/setup/account/setup-account-form.tsx",
-  "app/setup/layout.tsx",
-  "app/setup/page.tsx",
-  "app/sign-out.tsx",
-  "app/spaces/[id]/manage.tsx",
-  "app/spaces/[id]/page.tsx",
-  "app/spaces/[id]/space-membership.tsx",
-  "app/spaces/[id]/space-settings.tsx",
-  "app/spaces/page.tsx",
-  "app/tasks/[id]/controls.tsx",
-  "app/tasks/[id]/page.tsx",
-  "app/work-map-header.tsx",
-  "app/work-map.tsx",
-  "app/workspace-switcher.tsx",
-];
+export const UNLOCALISED_FILES: readonly string[] = [];

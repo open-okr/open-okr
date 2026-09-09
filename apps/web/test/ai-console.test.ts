@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * The AI console covers what the registry offers (S-37, P6-G12a).
@@ -29,9 +29,9 @@ const GOVERNANCE = fileURLToPath(
   new URL("../app/admin/ai/governance.tsx", import.meta.url),
 );
 
-const actionsSource = readFileSync(CONSOLE, "utf8");
-const pageSource = readFileSync(PAGE, "utf8");
-const governanceSource = readFileSync(GOVERNANCE, "utf8");
+const actionsSource = readScreen(CONSOLE);
+const pageSource = readScreen(PAGE);
+const governanceSource = readScreen(GOVERNANCE);
 
 describe("the AI console", () => {
   test("is in the admin navigation", () => {

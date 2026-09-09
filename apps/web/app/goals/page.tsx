@@ -4,6 +4,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { getPool } from "../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
 import { exportListAction } from "../search/actions.ts";
@@ -51,6 +52,8 @@ export default async function GoalsPage({
     mine?: string;
   }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -133,7 +136,9 @@ export default async function GoalsPage({
            * already says. The chip reports what is on screen; the table owns
            * the empty state and its suggestion. */}
           <div className="flex min-w-0 items-center gap-2.5">
-            <h1 className="flex-none text-lg font-bold text-ink">Goals</h1>
+            <h1 className="flex-none text-lg font-bold text-ink">
+              {t("goals.goals")}
+            </h1>
             <Chip tone={filtered ? "brand" : "neutral"}>
               {/* Never "nothing in this cycle" from a filtered count. The
                * cycle had two goals and the filters excluded both, and this
@@ -155,7 +160,7 @@ export default async function GoalsPage({
               className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
             >
               <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
-                Alignment
+                {t("goals.alignment")}
               </span>
               {/* With its denominator. "ALIGNMENT 100" on its own could be a
                * percentage, a score out of a hundred, or a points total;
@@ -234,12 +239,11 @@ export default async function GoalsPage({
         rowHref={(node) => `/goals/${node.goalId}`}
         empty={
           <div className="flex flex-col gap-1.5 p-3">
-            <p className="text-sm text-ink-2">No goals match this view.</p>
+            <p className="text-sm text-ink-2">{t("goals.noGoalsMatchThis")}</p>
             <p className="text-xs text-ink-3">
-              Objectives are drafted in phase 4 of the cycle workspace, where
-              the rules are checked as they are written.{" "}
+              {t("goals.objectivesAreDraftedIn")}{" "}
               <a className="underline" href="/cycle?phase=4">
-                Open drafting
+                {t("goals.openDrafting")}
               </a>
               .
             </p>
@@ -261,7 +265,7 @@ const GOAL_HEALTH_BANDS = [
   "missed",
 ] as const;
 
-function Filters({
+async function Filters({
   cycles,
   cycleId,
   level,
@@ -283,6 +287,8 @@ function Filters({
   /** The sentence-to-filter box, when a provider can answer. */
   readonly filterAssist?: ReactNode;
 }) {
+  const { t } = await getTranslations();
+
   return (
     // Two columns from `2xl` (1536px), not `xl`. Measured at 1280 the split
     // left only 536px for the groups, which pushed them from two rows to four
@@ -324,7 +330,7 @@ function Filters({
 
           <Group label="Level">
             <Tab href={href({ level: null })} active={level === null}>
-              All
+              {t("goals.all")}
             </Tab>
             {ALIGNMENT_LEVEL_ORDER.map((entry) => (
               <Tab
@@ -339,10 +345,10 @@ function Filters({
 
           <Group label="View">
             <Tab href={href({ view: null })} active={tree}>
-              Tree
+              {t("goals.tree")}
             </Tab>
             <Tab href={href({ view: "list" })} active={!tree}>
-              List
+              {t("goals.list")}
             </Tab>
           </Group>
         </div>
@@ -350,7 +356,7 @@ function Filters({
         <div className="-mx-0.5 flex flex-wrap items-start gap-x-7 gap-y-4 overflow-x-auto px-0.5">
           <Group label="Health">
             <Tab href={href({ health: null })} active={health === null}>
-              Any
+              {t("common.any")}
             </Tab>
             {GOAL_HEALTH_BANDS.map((band) => (
               <Tab
@@ -365,19 +371,19 @@ function Filters({
 
           <Group label="Whose">
             <Tab href={href({ mine: null })} active={!mine}>
-              Everyone's
+              {t("goals.everyoneS")}
             </Tab>
             <Tab href={href({ mine: "1" })} active={mine}>
-              Mine
+              {t("goals.mine")}
             </Tab>
           </Group>
 
           <Group label="Closed">
             <Tab href={href({ closed: null })} active={!includeClosed}>
-              Hidden
+              {t("goals.hidden")}
             </Tab>
             <Tab href={href({ closed: "1" })} active={includeClosed}>
-              Shown
+              {t("goals.shown")}
             </Tab>
           </Group>
         </div>

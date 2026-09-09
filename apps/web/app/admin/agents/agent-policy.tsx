@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { bindAgentScopeAction, setAgentAutonomyAction } from "./actions";
 
@@ -77,6 +77,8 @@ export function AgentPolicy({
     readonly label: string;
   }[];
 }) {
+  const { t } = useTranslations();
+
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -85,7 +87,7 @@ export function AgentPolicy({
     <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">
-          Write policy
+          {t("admin.agents.agentPolicy.writePolicy")}
         </span>
         <div className="flex flex-wrap gap-2">
           {autonomies.map((option) => {
@@ -150,7 +152,7 @@ export function AgentPolicy({
           }}
         >
           <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            What
+            {t("admin.agents.agentPolicy.what")}
             <select
               name="resourceType"
               className="rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
@@ -163,15 +165,15 @@ export function AgentPolicy({
             </select>
           </label>
           <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            Its id
+            {t("admin.agents.agentPolicy.itsId")}
             <input
               name="resourceId"
-              placeholder="paste the id from its own page"
+              placeholder={t("admin.agents.agentPolicy.pasteTheIdFrom")}
               className="w-80 rounded-md border border-line bg-bg px-2 py-1 text-sm text-ink"
             />
           </label>
           <label className="flex flex-col gap-0.5 text-xs text-ink-3">
-            Level
+            {t("common.level")}
             <select
               name="level"
               defaultValue={String(levels[2]?.value ?? 70)}
@@ -193,7 +195,7 @@ export function AgentPolicy({
             variant="ghost"
             onClick={() => setOpen(false)}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
         </form>
       ) : (
@@ -204,14 +206,12 @@ export function AgentPolicy({
           className="self-start"
           onClick={() => setOpen(true)}
         >
-          Bind a scope
+          {t("admin.agents.agentPolicy.bindAScope")}
         </Button>
       )}
 
       <span className="text-xs text-ink-4">
-        An agent is bound to named spaces, goals and KPI trees. The workspace is
-        not on this list and the action refuses it: there is no service account
-        with authority over everything.
+        {t("admin.agents.agentPolicy.anAgentIsBound")}
       </span>
 
       {problem ? (

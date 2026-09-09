@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { NOTIFICATION_REASONS } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { saveCadence, saveDelivery, startLink, unlink } from "./actions.ts";
 import { CadenceForm } from "./cadence-form.tsx";
@@ -50,6 +51,8 @@ const CHOICES = [
 ] as const;
 
 export default async function AccountChannelsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const settings = await callAction(
     {
@@ -82,23 +85,24 @@ export default async function AccountChannelsPage() {
     <div className="mx-auto flex max-w-xl flex-col gap-4.5">
       <Card>
         <CardHeader>
-          <h1 className="text-lg font-bold text-ink">Where to reach you</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {t("account.channels.whereToReachYou")}
+          </h1>
         </CardHeader>
         <CardBody>
           <p className="text-sm text-ink-3">
-            Your reminders always appear in the product. This is where else they
-            go.
+            {t("account.channels.yourRemindersAlwaysAppear")}
           </p>
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader>Delivery</CardHeader>
+        <CardHeader>{t("account.channels.delivery")}</CardHeader>
         <CardBody>
           <LinkForm action={saveDelivery} className="flex flex-col gap-3">
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1 text-xs font-semibold text-ink-2">
-                Primary channel
+                {t("common.primaryChannel")}
               </legend>
               {CHOICES.map((choice) => {
                 const unavailable =
@@ -132,12 +136,10 @@ export default async function AccountChannelsPage() {
 
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1 text-xs font-semibold text-ink-2">
-                Quiet hours, in {settings.timezone}
+                {t("account.channels.quietHoursIn")} {settings.timezone}
               </legend>
               <p className="text-xs text-ink-3">
-                A reminder due inside this window waits until it ends. An
-                escalation past the person who owns the work still comes
-                through.
+                {t("account.channels.aReminderDueInside")}
               </p>
               <div className="flex items-center gap-2">
                 <input
@@ -146,7 +148,7 @@ export default async function AccountChannelsPage() {
                   defaultValue={settings.quietHours?.start ?? ""}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
-                <span className="text-xs text-ink-3">to</span>
+                <span className="text-xs text-ink-3">{t("common.to")}</span>
                 <input
                   type="time"
                   name="quietEnd"
@@ -157,19 +159,18 @@ export default async function AccountChannelsPage() {
             </fieldset>
 
             <Button type="submit" variant="primary" size="sm" className="w-fit">
-              Save
+              {t("common.save")}
             </Button>
           </LinkForm>
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader>Linked accounts</CardHeader>
+        <CardHeader>{t("account.channels.linkedAccounts")}</CardHeader>
         <CardBody className="flex flex-col gap-3">
           {settings.connected.length === 0 ? (
             <p className="text-sm text-ink-3">
-              No chat provider is connected for this workspace yet, so there is
-              nothing to link. Email works without any of this.
+              {t("account.channels.noChatProviderIs")}
             </p>
           ) : (
             settings.connected.map((provider) => {
@@ -184,23 +185,25 @@ export default async function AccountChannelsPage() {
                   <span className="flex items-center gap-2 text-sm font-medium text-ink">
                     {provider}
                     {identity?.verifiedAt ? (
-                      <Chip tone="ok">linked</Chip>
+                      <Chip tone="ok">{t("account.channels.linked")}</Chip>
                     ) : (
-                      <Chip tone="neutral">not linked</Chip>
+                      <Chip tone="neutral">
+                        {t("account.channels.notLinked")}
+                      </Chip>
                     )}
                   </span>
                   {identity?.verifiedAt ? (
                     <LinkForm action={unlink}>
                       <input type="hidden" name="provider" value={provider} />
                       <Button type="submit" variant="ghost" size="sm">
-                        Unlink
+                        {t("common.unlink")}
                       </Button>
                     </LinkForm>
                   ) : (
                     <LinkForm action={startLink}>
                       <input type="hidden" name="provider" value={provider} />
                       <Button type="submit" variant="default" size="sm">
-                        Get a code
+                        {t("account.channels.getACode")}
                       </Button>
                     </LinkForm>
                   )}
@@ -214,11 +217,11 @@ export default async function AccountChannelsPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">How often</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("account.channels.howOften")}
+            </h2>
             <p className="text-xs text-ink-3">
-              The member half of the settings map, which had no surface until
-              P6-G08: the routing, the window and the summary were all stored
-              and read and none of them could be seen or changed.
+              {t("account.channels.theMemberHalfOf")}
             </p>
           </div>
         </CardHeader>

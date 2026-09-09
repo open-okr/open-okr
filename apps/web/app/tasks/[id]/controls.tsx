@@ -75,11 +75,11 @@ export function ChecklistLine({
           <button
             type="button"
             disabled={pending}
-            aria-label={`${t("task.checklist.remove")} "${title}"`}
+            aria-label={`${t("common.remove")} "${title}"`}
             onClick={() => run(onRemove)}
             className="ml-auto text-xs text-ink-4 hover:text-bad"
           >
-            {t("task.checklist.remove")}
+            {t("common.remove")}
           </button>
         ) : null}
       </label>
@@ -131,6 +131,8 @@ export function DueDateField({
   readonly disabled: boolean;
   readonly onSave: (dueOn: string) => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
+
   const [value, setValue] = useState(dueOn ?? "");
   const { error, pending, run } = useRun();
 
@@ -138,7 +140,7 @@ export function DueDateField({
     <span className="flex flex-col items-end gap-1">
       <input
         type="date"
-        aria-label="Due date"
+        aria-label={t("tasks.detail.controls.dueDate")}
         value={value}
         disabled={disabled || pending}
         onChange={(event) => {

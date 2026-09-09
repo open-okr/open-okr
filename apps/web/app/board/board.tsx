@@ -1,6 +1,6 @@
 "use client";
 
-import { Chip } from "@openokr/ui";
+import { Chip, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -70,6 +70,8 @@ export function Board({
     afterTaskId: string | null,
   ) => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [optimistic, setOptimistic] = useState<readonly BoardColumn[] | null>(
     null,
@@ -186,7 +188,7 @@ export function Board({
               ))}
               {column.cards.length === 0 ? (
                 <li className="rounded-md border border-line border-dashed px-2 py-4 text-center text-xs text-ink-3">
-                  Nothing here.
+                  {t("board.board.nothingHere")}
                 </li>
               ) : null}
             </ul>

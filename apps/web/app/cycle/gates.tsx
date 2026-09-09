@@ -6,6 +6,7 @@ import {
   Chip,
   VerdictDot,
 } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { publishCycle } from "./actions.ts";
 
@@ -58,7 +59,7 @@ export interface Gate {
   readonly blocked: string | null;
 }
 
-export function Gates({
+export async function Gates({
   cycleId,
   gates,
   publishable,
@@ -71,13 +72,19 @@ export function Gates({
   readonly publishedAt: string | null;
   readonly canPublish: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const green = gates.filter((gate) => gate.evaluable && gate.passed).length;
 
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Publish gates</h2>
-        <Chip tone={publishable ? "ok" : "warn"}>{green} of 6 green</Chip>
+        <h2 className="text-sm font-bold text-ink">
+          {t("cycle.gates.publishGates")}
+        </h2>
+        <Chip tone={publishable ? "ok" : "warn"}>
+          {green} {t("cycle.gates.of6Green")}
+        </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         <ul className="flex flex-col divide-y divide-line">
@@ -111,7 +118,7 @@ export function Gates({
                   ) : null
                 ) : (
                   <span className="text-xs text-ink-3">
-                    Cannot be judged yet: {gate.blocked}
+                    {t("cycle.gates.cannotBeJudgedYet")} {gate.blocked}
                   </span>
                 )}
                 {gate.evaluable && gate.passed ? null : (
@@ -129,18 +136,18 @@ export function Gates({
 
         {publishedAt ? (
           <p className="text-sm text-ok">
-            Published {new Date(publishedAt).toLocaleString()}.
+            {t("cycle.gates.published")}{" "}
+            {new Date(publishedAt).toLocaleString()}.
           </p>
         ) : canPublish ? (
           <ActionForm action={publishCycle} className="flex flex-col gap-1.5">
             <input type="hidden" name="cycleId" value={cycleId} />
             <Button type="submit" variant="primary" disabled={!publishable}>
-              Publish the set
+              {t("cycle.gates.publishTheSet")}
             </Button>
             {publishable ? null : (
               <p className="text-xs text-ink-3">
-                All six gates have to be green. A gate nobody can judge counts
-                against publication.
+                {t("cycle.gates.allSixGatesHave")}
               </p>
             )}
           </ActionForm>
@@ -149,7 +156,7 @@ export function Gates({
         {publishedAt || !canPublish || publishable ? null : (
           <details className="rounded-md border border-line p-2.5">
             <summary className="cursor-pointer text-xs font-semibold text-ink-2">
-              Publish anyway, past the red gates
+              {t("cycle.gates.publishAnywayPastThe")}
             </summary>
             <ActionForm
               action={publishCycle}
@@ -158,17 +165,17 @@ export function Gates({
               <input type="hidden" name="cycleId" value={cycleId} />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-2">
-                  Why is this set being published with{" "}
+                  {t("cycle.gates.whyIsThisSet")}{" "}
                   {
                     gates.filter((gate) => !gate.evaluable || !gate.passed)
                       .length
                   }{" "}
-                  gate
+                  {t("cycle.gates.gate")}
                   {gates.filter((gate) => !gate.evaluable || !gate.passed)
                     .length === 1
                     ? ""
                     : "s"}{" "}
-                  unmet?
+                  {t("cycle.gates.unmet")}
                 </span>
                 <textarea
                   name="override.reason"
@@ -176,14 +183,14 @@ export function Gates({
                   minLength={20}
                   rows={3}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                  placeholder="The reason somebody will read six months from now"
+                  placeholder={t("cycle.gates.theReasonSomebodyWill")}
                 />
               </label>
-              <Button type="submit">Override and publish</Button>
+              <Button type="submit">
+                {t("cycle.gates.overrideAndPublish")}
+              </Button>
               <p className="text-xs text-ink-4">
-                This writes an audit event naming you, the reason and every gate
-                that was unmet. Twenty characters minimum, because an override
-                with no reason is indistinguishable from a bug.
+                {t("cycle.gates.thisWritesAnAudit")}
               </p>
             </ActionForm>
           </details>
@@ -191,7 +198,7 @@ export function Gates({
 
         {publishedAt || canPublish ? null : (
           <p className="text-xs text-ink-3">
-            Publishing is a workspace administrator's call.
+            {t("cycle.gates.publishingIsAWorkspace")}
           </p>
         )}
       </CardBody>

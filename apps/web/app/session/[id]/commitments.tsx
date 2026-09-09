@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import {
   closeCommitmentsAction,
@@ -63,6 +70,8 @@ function LastWeek({
   readonly sessionId: string;
   readonly carried: readonly CarriedCommitment[];
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(
     closeCommitmentsAction,
     NO_ERROR,
@@ -71,8 +80,7 @@ function LastWeek({
   if (carried.length === 0) {
     return (
       <p className="text-xs text-ink-3">
-        Nothing is carried in. Either this is the space's first weekly session
-        or the last one's commitments are all closed.
+        {t("session.detail.commitments.nothingIsCarriedIn")}
       </p>
     );
   }
@@ -88,7 +96,8 @@ function LastWeek({
           <span className="min-w-0 text-ink">
             {one.text}
             <span className="ml-1.5 text-xs text-ink-3">
-              {one.ownerName} · week of {one.weekStart}
+              {one.ownerName} {t("session.detail.commitments.weekOf")}{" "}
+              {one.weekStart}
               {one.keyResultTitle ? ` · ${one.keyResultTitle}` : ""}
             </span>
           </span>
@@ -100,7 +109,7 @@ function LastWeek({
                 value={`${one.id}:yes`}
                 className="size-3.5"
               />
-              Delivered
+              {t("session.detail.commitments.delivered")}
             </label>
             <label className="flex items-center gap-1.5">
               <input
@@ -109,14 +118,13 @@ function LastWeek({
                 value={`${one.id}:no`}
                 className="size-3.5"
               />
-              Not delivered
+              {t("session.detail.commitments.notDelivered")}
             </label>
           </span>
         </div>
       ))}
       <p className="text-xs text-ink-4">
-        Leave one unanswered and it stays open, so it comes back next week
-        rather than being marked failed by the clock.
+        {t("session.detail.commitments.leaveOneUnansweredAnd")}
       </p>
       <Button
         type="submit"
@@ -147,6 +155,8 @@ function ThisWeek({
   readonly low: number;
   readonly high: number;
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(
     setCommitmentsAction,
     NO_ERROR,
@@ -188,10 +198,12 @@ function ThisWeek({
             <select
               name="ownerId"
               defaultValue=""
-              aria-label="Owner"
+              aria-label={t("common.owner")}
               className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             >
-              <option value="">Who owns it</option>
+              <option value="">
+                {t("session.detail.commitments.whoOwnsIt")}
+              </option>
               {owners.map((owner) => (
                 <option key={owner.id} value={owner.id}>
                   {owner.label}
@@ -201,10 +213,12 @@ function ThisWeek({
             <select
               name="keyResultId"
               defaultValue=""
-              aria-label="Key result"
+              aria-label={t("common.keyResult2")}
               className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             >
-              <option value="">No key result</option>
+              <option value="">
+                {t("session.detail.commitments.noKeyResult")}
+              </option>
               {keyResults.map((keyResult) => (
                 <option key={keyResult.id} value={keyResult.id}>
                   {keyResult.label}
@@ -230,8 +244,10 @@ function ThisWeek({
       </form>
 
       <p className="text-xs text-ink-3">
-        {low} to {high} a week. Fewer than {low} and the digest stage refuses to
-        open; more than {high} is a list nobody keeps.
+        {low} {t("common.to")} {high}{" "}
+        {t("session.detail.commitments.aWeekFewerThan")} {low}{" "}
+        {t("session.detail.commitments.andTheDigestStage")} {high}{" "}
+        {t("session.detail.commitments.isAListNobody")}
       </p>
     </div>
   );
@@ -256,14 +272,18 @@ export function Commitments({
   readonly high: number;
   readonly canWrite: boolean;
 }) {
+  const { t } = useTranslations();
+
   return (
     <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Last week</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("common.lastWeek")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Every commitment this space left open, whichever session set it.
+              {t("session.detail.commitments.everyCommitmentThisSpace")}
             </p>
           </div>
           <Chip tone={carried.length > 0 ? "warn" : "ok"}>
@@ -291,13 +311,15 @@ export function Commitments({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">This week</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("session.detail.commitments.thisWeek")}
+            </h2>
             <p className="text-xs text-ink-3">
-              What will move by the next session, one person against each.
+              {t("session.detail.commitments.whatWillMoveBy")}
             </p>
           </div>
           <Chip tone={already.length >= low ? "ok" : "neutral"}>
-            {already.length} set
+            {already.length} {t("session.detail.commitments.set")}
           </Chip>
         </CardHeader>
         <CardBody>
@@ -314,7 +336,7 @@ export function Commitments({
             <ul className="flex flex-col gap-1 text-sm text-ink-2">
               {already.length === 0 ? (
                 <li className="text-xs text-ink-3">
-                  Nothing set yet. The facilitator writes these with the room.
+                  {t("session.detail.commitments.nothingSetYetThe")}
                 </li>
               ) : (
                 already.map((one) => (

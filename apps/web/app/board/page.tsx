@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { createTaskAction, moveTaskAction } from "./actions.ts";
@@ -27,6 +28,8 @@ export default async function BoardPage({
 }: {
   searchParams: Promise<{ space?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -48,10 +51,7 @@ export default async function BoardPage({
     return (
       <Card className="w-full">
         <CardBody>
-          <p className="text-sm text-ink-3">
-            A board is a view over a space's work, and this workspace has no
-            space yet.
-          </p>
+          <p className="text-sm text-ink-3">{t("board.aBoardIsA")}</p>
         </CardBody>
       </Card>
     );
@@ -82,7 +82,7 @@ export default async function BoardPage({
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Board</h1>
+              <h1 className="text-lg font-bold text-ink">{t("board.board")}</h1>
               <p className="text-xs text-ink-3" data-testid="board-count">
                 {cards.length === 0
                   ? "No work on this board yet."
@@ -119,7 +119,9 @@ export default async function BoardPage({
         {canEdit ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Add a task</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("board.addATask")}
+              </h2>
             </CardHeader>
             <CardBody>
               <ActionForm
@@ -131,36 +133,38 @@ export default async function BoardPage({
                   className="text-xs font-semibold text-ink-2"
                   htmlFor="title"
                 >
-                  What has to happen
+                  {t("board.whatHasToHappen")}
                 </label>
                 <input
                   id="title"
                   name="title"
                   required
                   maxLength={500}
-                  placeholder="Rewrite the first-run screen"
+                  placeholder={t("board.rewriteTheFirstRun")}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
                 <div className="flex flex-wrap gap-2">
                   <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Column
+                    {t("board.column")}
                     <select
                       name="status"
                       className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     >
-                      <option value="backlog">Backlog</option>
-                      <option value="todo">To do</option>
-                      <option value="in_progress">In progress</option>
-                      <option value="done">Done</option>
+                      <option value="backlog">{t("board.backlog")}</option>
+                      <option value="todo">{t("board.toDo")}</option>
+                      <option value="in_progress">
+                        {t("common.inProgress")}
+                      </option>
+                      <option value="done">{t("board.done")}</option>
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Key result it moves
+                    {t("board.keyResultItMoves")}
                     <select
                       name="keyResultId"
                       className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     >
-                      <option value="">None yet</option>
+                      <option value="">{t("board.noneYet")}</option>
                       {keyResults.map((one) => (
                         <option key={one.id} value={one.id}>
                           {one.title}
@@ -169,7 +173,7 @@ export default async function BoardPage({
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Due
+                    {t("board.due")}
                     <input
                       type="date"
                       name="dueOn"
@@ -181,7 +185,7 @@ export default async function BoardPage({
                   type="submit"
                   className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
                 >
-                  Add
+                  {t("common.add")}
                 </button>
               </ActionForm>
             </CardBody>
@@ -193,14 +197,13 @@ export default async function BoardPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              What this work is meant to move
+              {t("board.whatThisWorkIs")}
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             {board.rail.length === 0 ? (
               <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
-                No card on this board names a key result yet. Work that serves
-                no measure is work nobody can tell the value of.
+                {t("board.noCardOnThis")}
               </p>
             ) : (
               board.rail.map((entry) => (
@@ -221,10 +224,10 @@ export default async function BoardPage({
                      * replaces the first.
                      */}
                     <Chip tone="neutral">
-                      Progress {Math.round(entry.progressPct)}%
+                      {t("common.progress")} {Math.round(entry.progressPct)}%
                     </Chip>
                     <Chip tone="neutral">
-                      Linked work {entry.linkedWork.done}/
+                      {t("board.linkedWork")} {entry.linkedWork.done}/
                       {entry.linkedWork.total}
                     </Chip>
                   </div>

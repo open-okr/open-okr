@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
 import { Timeline } from "./timeline.tsx";
@@ -27,6 +28,8 @@ export default async function CheckInPage({
 }: {
   searchParams: Promise<{ goal?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -59,14 +62,18 @@ export default async function CheckInPage({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex flex-col">
-            <h1 className="text-lg font-bold text-ink">Check in</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("common.checkIn")}
+            </h1>
             <p className="text-xs text-ink-3">
               {due.length === 0
                 ? "Nothing of yours is due."
                 : `${due.length} of your goals ${due.length === 1 ? "is" : "are"} due or nearly due, soonest first.`}
             </p>
           </div>
-          <Chip tone={due.length === 0 ? "ok" : "brand"}>{due.length} due</Chip>
+          <Chip tone={due.length === 0 ? "ok" : "brand"}>
+            {due.length} {t("checkIn.due")}
+          </Chip>
         </CardHeader>
         {due.length > 0 ? (
           <CardBody className="flex flex-col gap-1 p-2">
@@ -94,7 +101,8 @@ export default async function CheckInPage({
                       {goal.title}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {goal.level} · {goal.keyResultCount} key result
+                      {goal.level} · {goal.keyResultCount}{" "}
+                      {t("common.keyResult")}
                       {goal.keyResultCount === 1 ? "" : "s"} ·{" "}
                       {goal.daysPastDue !== null && goal.daysPastDue > 0
                         ? `${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
@@ -130,19 +138,13 @@ export default async function CheckInPage({
       ) : due.length > 0 ? (
         <Card>
           <CardBody>
-            <p className="text-sm text-ink-3">
-              Pick a goal above to start. The walker keeps your place: a draft
-              is reopened rather than started again.
-            </p>
+            <p className="text-sm text-ink-3">{t("checkIn.pickAGoalAbove")}</p>
           </CardBody>
         </Card>
       ) : (
         <Card>
           <CardBody>
-            <p className="text-sm text-ink-3">
-              Nothing to do here today. A goal appears in this list when its
-              next check-in is due, or within two days of it.
-            </p>
+            <p className="text-sm text-ink-3">{t("checkIn.nothingToDoHere")}</p>
           </CardBody>
         </Card>
       )}
@@ -174,6 +176,8 @@ async function CheckInForGoal({
   /** False once this goal's cadence has moved past today, which publishing does. */
   readonly stillDue: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const goal = await callAction(context, "goals.read", { id: goalId });
   const timeline = await callAction(context, "goals.checkIns", {
     goalId,
@@ -222,7 +226,7 @@ async function CheckInForGoal({
             {nextGoalId ? (
               <p className="text-xs text-ink-3">
                 <a className="underline" href={`/check-in?goal=${nextGoalId}`}>
-                  Continue to your next due goal
+                  {t("checkIn.continueToYourNext")}
                 </a>
               </p>
             ) : null}

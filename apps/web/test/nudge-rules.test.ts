@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * A workspace can turn a rule down (S-36, P6-G21, GAP-AUDIT G-04).
@@ -20,7 +20,7 @@ import { describe, expect, test } from "vitest";
  */
 
 const at = (path: string) =>
-  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  readScreen(fileURLToPath(new URL(path, import.meta.url)));
 
 const cards = at("../app/admin/nudges/rule-cards.tsx");
 const actions = at("../app/admin/nudges/rule-actions.ts");
@@ -60,7 +60,10 @@ describe("the nudge rule cards", () => {
   });
 
   test("show the volume beside the switch, because that is the argument", () => {
-    expect(cards).toContain("sent, ");
+    // "sent," and "held" now come from the catalogue on either side of the two
+    // counts, so the trailing space that used to follow "sent," is a JSX gap
+    // rather than part of the string.
+    expect(cards).toContain("sent,");
     expect(cards).toContain("held");
   });
 

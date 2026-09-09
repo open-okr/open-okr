@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState, useState } from "react";
 import {
   convertToGuestAction,
@@ -122,6 +128,8 @@ function EraseControl({
   readonly memberId: string;
   readonly memberName: string;
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(eraseMemberAction, IDLE);
   const [open, setOpen] = useState(false);
   const exported = state.kind === "done" ? state.export : null;
@@ -130,13 +138,10 @@ function EraseControl({
     <div className="flex flex-col gap-2 rounded-lg border border-bad-dot bg-bad-bg p-3">
       <div className="flex flex-col gap-0.5">
         <h3 className="text-xs font-bold uppercase tracking-wide text-bad">
-          Erase
+          {t("people.detail.lifecycleControls.erase")}
         </h3>
         <p className="text-xs text-ink-3">
-          Removes their name, title, bio, avatar, timezone and quiet hours, and
-          unlinks the sign-in account. Everything they wrote stays and reads
-          under a placeholder identity, so a decision log does not develop
-          holes. The audit names who ran it. This cannot be undone.
+          {t("people.detail.lifecycleControls.removesTheirNameTitle")}
         </p>
       </div>
 
@@ -148,7 +153,8 @@ function EraseControl({
         >
           <input type="hidden" name="memberId" value={memberId} />
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Type {memberName} to confirm
+            {t("common.type")} {memberName}{" "}
+            {t("people.detail.lifecycleControls.toConfirm")}
             <input
               name="confirmName"
               autoComplete="off"
@@ -170,7 +176,7 @@ function EraseControl({
               size="sm"
               onClick={() => setOpen(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </form>
@@ -181,7 +187,7 @@ function EraseControl({
           size="sm"
           onClick={() => setOpen(true)}
         >
-          Erase this member
+          {t("people.detail.lifecycleControls.eraseThisMember")}
         </Button>
       )}
 
@@ -194,7 +200,7 @@ function EraseControl({
           )}`}
           className="text-xs font-semibold text-brand-text hover:underline"
         >
-          Download the erasure export
+          {t("people.detail.lifecycleControls.downloadTheErasureExport")}
         </a>
       ) : null}
 
@@ -216,11 +222,15 @@ export function LifecycleControls({
   readonly kind: string;
   readonly isSelf: boolean;
 }) {
+  const { t } = useTranslations();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Lifecycle</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("people.detail.lifecycleControls.lifecycle")}
+          </h2>
           <p className="text-xs text-ink-3">
             {isSelf
               ? "This is your own profile. Anything here applies to you, and the workspace refuses whatever would leave it without an owner."
@@ -251,7 +261,7 @@ export function LifecycleControls({
 
         {kind === "guest" ? (
           <p className="text-xs text-ink-3">
-            Already a guest, so there is nothing to convert.
+            {t("people.detail.lifecycleControls.alreadyAGuestSo")}
           </p>
         ) : (
           <ConfirmedControl

@@ -6,6 +6,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
@@ -44,6 +45,8 @@ export default async function InitiativePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -134,11 +137,12 @@ export default async function InitiativePage({
               href="/initiatives"
               className="text-xs text-ink-3 hover:text-brand-text"
             >
-              Initiatives
+              {t("common.initiatives")}
             </Link>
             <h1 className="text-lg font-bold text-ink">{initiative.title}</h1>
             <p className="text-xs text-ink-3">
-              {initiative.spaceName} · owned by {initiative.ownerName}
+              {initiative.spaceName} {t("initiatives.detail.ownedBy")}{" "}
+              {initiative.ownerName}
               {initiative.startsOn || initiative.endsOn
                 ? ` · ${[initiative.startsOn, initiative.endsOn]
                     .filter(Boolean)
@@ -183,10 +187,7 @@ export default async function InitiativePage({
         {initiative.capacity === "exceeds" ? (
           <CardBody>
             <p className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad">
-              This is over capacity, so publish gate five refuses the cycles its
-              key results belong to. METHOD.md §5.5: nothing may remain at
-              "exceeds" when the set is published, and what was cut has to be
-              recorded.
+              {t("initiatives.detail.thisIsOverCapacity")}
             </p>
           </CardBody>
         ) : null}
@@ -195,14 +196,13 @@ export default async function InitiativePage({
       <Card>
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
-            The key results this work will move
+            {t("initiatives.detail.theKeyResultsThis")}
           </h2>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           {linked.length === 0 ? (
             <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-              Nothing yet. An initiative behind no measure is work nobody can
-              tell the value of.
+              {t("initiatives.detail.nothingYetAnInitiative")}
             </p>
           ) : (
             <ul
@@ -243,10 +243,10 @@ export default async function InitiativePage({
             >
               <input type="hidden" name="id" value={initiative.id} />
               <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-                Record this work against a key result
+                {t("initiatives.detail.recordThisWorkAgainst")}
                 <select
                   name="keyResultId"
-                  aria-label="Key result to link"
+                  aria-label={t("initiatives.detail.keyResultToLink")}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 >
                   {linkable.map((one) => (
@@ -260,7 +260,7 @@ export default async function InitiativePage({
                 type="submit"
                 className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
               >
-                Link
+                {t("common.link")}
               </button>
             </ActionForm>
           ) : null}
@@ -283,19 +283,19 @@ export default async function InitiativePage({
         <CardHeader>
           <div className="flex min-w-0 flex-col">
             <h2 className="text-sm font-bold text-ink">
-              Tasks ({initiative.tasks.done} of {initiative.tasks.total} done)
+              {t("initiatives.detail.tasks")}
+              {initiative.tasks.done} {t("common.of")} {initiative.tasks.total}{" "}
+              {t("initiatives.detail.done")}
             </h2>
             <p className="text-xs text-ink-3">
-              The work this initiative is made of. Moving a card on the board
-              moves this figure.
+              {t("initiatives.detail.theWorkThisInitiative")}
             </p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
           {initiativeTasks.length === 0 ? (
             <p className="text-sm text-ink-3">
-              No tasks yet. An initiative with none has not been broken down,
-              which is a different thing from one that has not started.
+              {t("initiatives.detail.noTasksYetAn")}
             </p>
           ) : (
             <ul

@@ -8,19 +8,37 @@
  * keys exist and resolve to something today rather than falling back
  * silently, which is a different, larger failure than a wrong word choice.
  *
- * Scope today: only the strings `ShortcutOverlay`, `TopbarSearch` and the
- * stale-deployment watcher actually render. §8 wants every user-facing string
- * in a catalogue and the gap audit of 7 September 2026 found that all
- * forty-seven routes still hardcode theirs; closing that is P6-G22, which also
- * wires the locale, since the root layout pins `en` and the language setting
- * therefore does nothing.
+ * **Scope: every user-facing string in the application** (P6-G22c). It was
+ * seven keys and three components until 9 September 2026, when the 1,543
+ * strings the gap audit found hardcoded across 146 route files moved in. §8
+ * asks for exactly that, and `apps/web/test/catalogue-coverage.test.ts`
+ * refuses a new one written outside it.
  *
  * **Four keys were removed on 7 September 2026 because nothing read them.**
  * `shell.mobile.home`, `.review`, `.inbox` and `.search` were written for the
  * mobile tab bar, which takes its labels from the module registry instead, and
  * `.inbox` named a screen that has never existed. A key with no consumer is a
- * translation somebody pays for and nobody sees; P6-G22 is where the assertion
- * that every key has one belongs, once the catalogue is the real one.
+ * translation somebody pays for and nobody sees. That is a test now, in
+ * `catalogue-coverage.test.ts`, and the first thing it found was
+ * `shell.version.updateAvailable`: written at P2-T10 for UIUX-PLAN §3's "one
+ * reload with a clear message" and never rendered, because the watcher threw
+ * away the `stale` its own hook returned.
+ *
+ * **A key is named after the screen that says it, and `common.` is what two
+ * screens share.** The move generated a key per string from its own file's
+ * path, which is right until a second screen says the same words: "Save" would
+ * otherwise be `cycle.admin.save` and read by fifteen files. 124 keys used in
+ * more than one place moved to `common.`, and the file is sorted, because a
+ * catalogue of 1,354 entries that nobody can find a key in is a catalogue
+ * nobody maintains.
+ *
+ * **187 of the 1,354 values are sentence fragments, and that is a known
+ * defect** (P6-G22d). A sentence with a number or a name in the middle of it
+ * became several keys on either side of the interpolation, so a catalogue now
+ * holds entries like "at" and "minutes. A shorter window means…". Word order
+ * differs between languages and a translator cannot put those back together.
+ * Fixing it needs parameters in a message, which `translate` does not have and
+ * which is a design decision rather than a mechanical one.
  */
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";

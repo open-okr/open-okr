@@ -4,6 +4,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { LaunchRecovery } from "./launch.tsx";
 
@@ -31,6 +32,8 @@ const percent = (value: number | null) =>
   value === null ? "no data" : `${Math.round(value)}%`;
 
 export default async function RecoveryBoardPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -51,7 +54,9 @@ export default async function RecoveryBoardPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Recovery board</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("kpis.recovery.recoveryBoard")}
+            </h1>
             <p className="text-xs text-ink-3">
               {board.cards.length === 0
                 ? "All KPIs healthy."
@@ -66,10 +71,11 @@ export default async function RecoveryBoardPage() {
       {board.cards.length === 0 ? (
         <Card>
           <CardBody>
-            <p className="text-sm text-ink-2">All KPIs healthy.</p>
+            <p className="text-sm text-ink-2">
+              {t("kpis.recovery.allKpisHealthy")}
+            </p>
             <p className="mt-1 text-xs text-ink-4">
-              A KPI joins this board the moment its achievement falls below the
-              watch floor, and leaves it when the real number comes back.
+              {t("kpis.recovery.aKpiJoinsThis")}
             </p>
           </CardBody>
         </Card>
@@ -96,7 +102,7 @@ export default async function RecoveryBoardPage() {
                 {percent(card.achievementPct)}
               </span>
               <span className="text-xs text-ink-4">
-                healthy at {Math.round(card.healthyPct)}%
+                {t("common.healthyAt")} {Math.round(card.healthyPct)}%
               </span>
             </div>
           </CardHeader>
@@ -118,7 +124,7 @@ export default async function RecoveryBoardPage() {
                 </div>
                 <Bar value={card.recovery.progressPct} />
                 <p className="text-xs text-ink-3">
-                  {card.recovery.keyResults} key result
+                  {card.recovery.keyResults} {t("common.keyResult")}
                   {card.recovery.keyResults === 1 ? "" : "s"}
                   {card.recovery.startedPct === null
                     ? ""
@@ -131,22 +137,20 @@ export default async function RecoveryBoardPage() {
                 </p>
                 {card.recovery.closeProposed && !card.recovery.closed ? (
                   <p className="text-xs font-semibold text-ok">
-                    The real number is back inside the corridor. Close the
-                    objective when the team agrees it is done.
+                    {t("kpis.recovery.theRealNumberIs")}
                   </p>
                 ) : null}
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-ink-3">
-                  No recovery objective yet. The draft comes from the leading
-                  drivers under this KPI.
+                  {t("kpis.recovery.noRecoveryObjectiveYet")}
                 </p>
                 {canEdit ? (
                   <LaunchRecovery kpiId={card.kpiId} />
                 ) : (
                   <span className="text-xs text-ink-4">
-                    You can read this board but not launch a recovery.
+                    {t("kpis.recovery.youCanReadThis")}
                   </span>
                 )}
               </div>

@@ -1,7 +1,14 @@
 "use client";
 
 import type { callAction } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState, useState, useTransition } from "react";
 import { resetGroup, saveRhythm } from "./rhythm-actions.ts";
 import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
@@ -94,6 +101,8 @@ function Parameter({
   readonly override: unknown;
   readonly canManage: boolean;
 }) {
+  const { t } = useTranslations();
+
   const parts = numericParts(resolved);
   // A list's fields carry a different prefix, so the save can put an array
   // back together as an array.
@@ -108,8 +117,12 @@ function Parameter({
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-medium text-ink">{entry.label}</span>
         <span className="flex items-center gap-2">
-          <Chip tone="neutral">METHOD {entry.section}</Chip>
-          {override === undefined ? null : <Chip tone="brand">changed</Chip>}
+          <Chip tone="neutral">
+            {t("admin.rhythm.rhythmForm.method")} {entry.section}
+          </Chip>
+          {override === undefined ? null : (
+            <Chip tone="brand">{t("common.changed")}</Chip>
+          )}
         </span>
       </div>
       <p className="text-sm text-ink-3">{entry.why}</p>
@@ -126,7 +139,8 @@ function Parameter({
             className="w-28 rounded-md border border-line bg-bg px-2 py-1 tabular"
           />
           <span className="text-ink-3">
-            in force: {String(resolved)}. Leave blank for the canon.
+            {t("admin.rhythm.rhythmForm.inForce")} {String(resolved)}
+            {t("admin.rhythm.rhythmForm.leaveBlankForThe")}
           </span>
         </label>
       ) : parts ? (
@@ -155,14 +169,14 @@ function Parameter({
             ))}
           </div>
           <span className="text-xs text-ink-4">
-            Fill in every part or leave them all blank. A set is written whole.
+            {t("admin.rhythm.rhythmForm.fillInEveryPart")}
           </span>
         </div>
       ) : (
         <p className="tabular text-sm text-ink-3">
-          in force: {JSON.stringify(resolved)}
+          {t("admin.rhythm.rhythmForm.inForce")} {JSON.stringify(resolved)}
           <span className="ml-1.5 text-ink-4">
-            Shown as it stands: this one is a list of words, not numbers.
+            {t("admin.rhythm.rhythmForm.shownAsItStands")}
           </span>
         </p>
       )}
@@ -230,6 +244,8 @@ export function RhythmForm({
    */
   readonly canManage: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(saveRhythm, NOTHING_SAVED);
   const groups = [...new Set(rhythm.registry.map((entry) => entry.group))];
 
@@ -239,8 +255,7 @@ export function RhythmForm({
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              You can read every threshold your goals are judged against, and
-              changing one needs the coaching permission. Ask a workspace admin.
+              {t("admin.rhythm.rhythmForm.youCanReadEvery")}
             </p>
           </CardBody>
         </Card>
@@ -248,15 +263,18 @@ export function RhythmForm({
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-ink">The check-in rhythm</h2>
+          <h2 className="font-semibold text-ink">
+            {t("admin.rhythm.rhythmForm.theCheckInRhythm")}
+          </h2>
           <p className="text-sm text-ink-3">
-            These three have their own home rather than living in the override
-            map, so they are set here and nowhere else.
+            {t("admin.rhythm.rhythmForm.theseThreeHaveTheir")}
           </p>
         </CardHeader>
         <CardBody className="flex flex-col gap-3 text-sm">
           <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">Check-in frequency</span>
+            <span className="text-ink-2">
+              {t("admin.rhythm.rhythmForm.checkInFrequency")}
+            </span>
             <select
               name="defaultCheckInFrequency"
               disabled={!canManage}
@@ -273,7 +291,9 @@ export function RhythmForm({
             </select>
           </label>
           <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">Anchor day</span>
+            <span className="text-ink-2">
+              {t("admin.rhythm.rhythmForm.anchorDay")}
+            </span>
             <select
               name="checkInAnchorDay"
               disabled={!canManage}
@@ -288,7 +308,9 @@ export function RhythmForm({
             </select>
           </label>
           <label className="flex items-center justify-between gap-3">
-            <span className="text-ink-2">Coach strictness</span>
+            <span className="text-ink-2">
+              {t("admin.rhythm.rhythmForm.coachStrictness")}
+            </span>
             <select
               name="coachStrictness"
               disabled={!canManage}
@@ -303,7 +325,7 @@ export function RhythmForm({
             </select>
           </label>
           <p className="text-sm text-ink-3">
-            The six publish gates stay hard whatever strictness says.
+            {t("admin.rhythm.rhythmForm.theSixPublishGates")}
           </p>
         </CardBody>
       </Card>
@@ -340,10 +362,11 @@ export function RhythmForm({
 
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-ink">Terminology</h2>
+          <h2 className="font-semibold text-ink">
+            {t("admin.rhythm.rhythmForm.terminology")}
+          </h2>
           <p className="text-sm text-ink-3">
-            Rename a concept the method already has. Both forms are needed, or
-            the rename is left alone.
+            {t("admin.rhythm.rhythmForm.renameAConceptThe")}
           </p>
         </CardHeader>
         <CardBody className="flex flex-col gap-2 text-sm">

@@ -3,6 +3,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { addCategory, addKpi } from "./actions.ts";
@@ -36,6 +37,8 @@ export default async function KpisPage({
     state?: string;
   }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -95,7 +98,7 @@ export default async function KpisPage({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">KPIs</h1>
+            <h1 className="text-lg font-bold text-ink">{t("common.count")}</h1>
             <p className="text-xs text-ink-3">
               {grid.kpis.length === 0
                 ? "Nothing measured yet."
@@ -164,12 +167,10 @@ export default async function KpisPage({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">By category</h2>
-            <p className="text-xs text-ink-3">
-              A tally of §6.4&apos;s corridor states, not a sum of values:
-              adding a revenue figure to a response time would be a number
-              nobody measured.
-            </p>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.byCategory")}
+            </h2>
+            <p className="text-xs text-ink-3">{t("kpis.aTallyOf6")}</p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
@@ -225,7 +226,9 @@ export default async function KpisPage({
         <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
           <Card className="flex-1">
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Add a KPI</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("kpis.addAKpi")}
+              </h2>
             </CardHeader>
             <CardBody>
               <ActionForm action={addKpi} className="flex flex-col gap-2">
@@ -233,18 +236,18 @@ export default async function KpisPage({
                   className="text-xs font-semibold text-ink-2"
                   htmlFor="title"
                 >
-                  What is being measured
+                  {t("kpis.whatIsBeingMeasured")}
                 </label>
                 <input
                   id="title"
                   name="title"
                   required
-                  placeholder="Mobile activation rate"
+                  placeholder={t("kpis.mobileActivationRate")}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-2.5">
                   <label className="text-xs text-ink-3" htmlFor="frequency">
-                    Frequency
+                    {t("common.frequency")}
                   </label>
                   <select
                     id="frequency"
@@ -252,14 +255,14 @@ export default async function KpisPage({
                     defaultValue="monthly"
                     className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                   >
-                    <option value="daily">daily</option>
-                    <option value="weekly">weekly</option>
-                    <option value="monthly">monthly</option>
-                    <option value="quarterly">quarterly</option>
-                    <option value="yearly">yearly</option>
+                    <option value="daily">{t("common.daily")}</option>
+                    <option value="weekly">{t("common.weekly")}</option>
+                    <option value="monthly">{t("common.monthly")}</option>
+                    <option value="quarterly">{t("common.quarterly")}</option>
+                    <option value="yearly">{t("common.yearly")}</option>
                   </select>
                   <label className="text-xs text-ink-3" htmlFor="direction">
-                    Better when
+                    {t("common.betterWhen")}
                   </label>
                   <select
                     id="direction"
@@ -267,11 +270,11 @@ export default async function KpisPage({
                     defaultValue="higher_better"
                     className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                   >
-                    <option value="higher_better">higher</option>
-                    <option value="lower_better">lower</option>
+                    <option value="higher_better">{t("common.higher")}</option>
+                    <option value="lower_better">{t("common.lower")}</option>
                   </select>
                   <label className="text-xs text-ink-3" htmlFor="targetDefault">
-                    Standing target
+                    {t("common.standingTarget")}
                   </label>
                   <input
                     id="targetDefault"
@@ -282,13 +285,10 @@ export default async function KpisPage({
                   />
                 </div>
                 <Button type="submit" variant="primary" className="self-start">
-                  Add
+                  {t("common.add")}
                 </Button>
                 <p className="text-xs text-ink-4">
-                  The corridor defaults to the §11 registry, 90 and 70. A
-                  calculated KPI is added from its own detail screen, where the
-                  formula builder is: this form has no way to ask for a formula,
-                  and one that read no_data forever would be worse than none.
+                  {t("kpis.theCorridorDefaultsTo")}
                 </p>
               </ActionForm>
             </CardBody>
@@ -296,26 +296,27 @@ export default async function KpisPage({
 
           <Card className="w-full lg:w-72">
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Add a category</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("kpis.addACategory")}
+              </h2>
             </CardHeader>
             <CardBody>
               <ActionForm action={addCategory} className="flex flex-col gap-2">
                 <label className="sr-only" htmlFor="name">
-                  Category name
+                  {t("kpis.categoryName")}
                 </label>
                 <input
                   id="name"
                   name="name"
                   required
-                  placeholder="Revenue"
+                  placeholder={t("kpis.revenue")}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
                 <Button type="submit" className="self-start">
-                  Add
+                  {t("common.add")}
                 </Button>
                 <p className="text-xs text-ink-4">
-                  Categories are how the grid groups its rows. A KPI without one
-                  still has a group.
+                  {t("kpis.categoriesAreHowThe")}
                 </p>
               </ActionForm>
             </CardBody>

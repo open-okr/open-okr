@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NudgeRuleCards } from "./rule-cards.tsx";
 
@@ -49,6 +50,8 @@ const NUDGE_CHANNELS = [
 ];
 
 export default async function NudgeVolumePage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -60,12 +63,11 @@ export default async function NudgeVolumePage() {
     // exists and who to ask, which is what a permission-denied state is for.
     return (
       <>
-        <h1>Nudge volume</h1>
+        <h1>{t("admin.nudges.nudgeVolume")}</h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              How often the product speaks, and to whom, is behind the coaching
-              permission. Ask a workspace administrator.
+              {t("admin.nudges.howOftenTheProduct")}
             </p>
           </CardBody>
         </Card>
@@ -91,22 +93,25 @@ export default async function NudgeVolumePage() {
 
   return (
     <>
-      <h1>Nudge volume</h1>
+      <h1>{t("admin.nudges.nudgeVolume")}</h1>
       <p className="text-sm text-ink-3">
-        The last {volume.windowDays} days. Noise is bounded and measurable
-        rather than emergent, and this is where it is measured.
+        {t("admin.nudges.theLast")} {volume.windowDays}{" "}
+        {t("admin.nudges.daysNoiseIsBounded")}
       </p>
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">The noisiest rules</h2>
-          <Chip tone="neutral">{total} in the window</Chip>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.nudges.theNoisiestRules")}
+          </h2>
+          <Chip tone="neutral">
+            {total} {t("admin.nudges.inTheWindow")}
+          </Chip>
         </CardHeader>
         <CardBody className="p-0">
           {volume.rules.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              Nothing has fired yet. A workspace with no goals under a cadence
-              has nothing to be nudged about.
+              {t("admin.nudges.nothingHasFiredYet")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -122,9 +127,13 @@ export default async function NudgeVolumePage() {
                     {rule.ruleKey}
                   </a>
                   <span className="flex items-center gap-2 text-xs tabular-nums">
-                    <span className="text-ink">{rule.sent} sent</span>
+                    <span className="text-ink">
+                      {rule.sent} {t("admin.nudges.sent")}
+                    </span>
                     {rule.suppressed > 0 ? (
-                      <span className="text-ink-3">{rule.suppressed} held</span>
+                      <span className="text-ink-3">
+                        {rule.suppressed} {t("common.held")}
+                      </span>
                     ) : null}
                   </span>
                 </li>
@@ -136,13 +145,14 @@ export default async function NudgeVolumePage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Why it stayed quiet</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.nudges.whyItStayedQuiet")}
+          </h2>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {volume.suppressionReasons.length === 0 ? (
             <p className="text-sm text-ink-3">
-              Nothing has been held back. Every nudge the product decided on was
-              delivered.
+              {t("admin.nudges.nothingHasBeenHeld")}
             </p>
           ) : (
             volume.suppressionReasons.map((reason) => (
@@ -158,8 +168,7 @@ export default async function NudgeVolumePage() {
             ))
           )}
           <p className="text-xs text-ink-4">
-            A rule that fires often and is held most of the time is not a quiet
-            rule. It is one that would be unbearable if a guard were relaxed.
+            {t("admin.nudges.aRuleThatFires")}
           </p>
         </CardBody>
       </Card>
@@ -167,17 +176,16 @@ export default async function NudgeVolumePage() {
       <Card>
         <CardHeader className="justify-between">
           <h2 className="text-sm font-bold text-ink">
-            Over the weekly ceiling
+            {t("admin.nudges.overTheWeeklyCeiling")}
           </h2>
           <Chip tone={volume.loudestMembers.length > 0 ? "warn" : "ok"}>
-            {volume.ceilingPerWeek} per member per week
+            {volume.ceilingPerWeek} {t("admin.nudges.perMemberPerWeek")}
           </Chip>
         </CardHeader>
         <CardBody>
           {volume.loudestMembers.length === 0 ? (
             <p className="text-sm text-ok">
-              Nobody is over the ceiling. The §11 limit is doing its job before
-              anybody has to notice.
+              {t("admin.nudges.nobodyIsOverThe")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -188,7 +196,7 @@ export default async function NudgeVolumePage() {
                 >
                   <span className="text-ink">{member.name}</span>
                   <span className="tabular-nums text-bad">
-                    {member.sentThisWeek} this week
+                    {member.sentThisWeek} {t("admin.nudges.thisWeek")}
                   </span>
                 </li>
               ))}

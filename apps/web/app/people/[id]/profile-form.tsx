@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import type { ProfileResult } from "../actions.ts";
 
@@ -28,46 +34,62 @@ export function ProfileForm({
     form: FormData,
   ) => Promise<ProfileResult>;
 }) {
+  const { t } = useTranslations();
+
   const [state, action, pending] = useActionState(updateProfile, null);
 
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">Edit your profile</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("people.detail.profileForm.editYourProfile")}
+        </h2>
       </CardHeader>
       <CardBody>
         <form action={action} className="flex flex-col gap-2">
           <input type="hidden" name="memberId" value={memberId} />
 
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Timezone
+            {t("common.timezone")}
             <input
               name="timezone"
               defaultValue={timezone ?? ""}
-              placeholder="e.g. Asia/Kuala_Lumpur"
+              placeholder={t("people.detail.profileForm.eGAsiaKuala")}
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Primary channel
+            {t("common.primaryChannel")}
             <select
               name="primaryChannel"
               defaultValue={primaryChannel ?? "app"}
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             >
-              <option value="app">In-app</option>
-              <option value="email">Email</option>
-              <option value="slack">Slack</option>
-              <option value="teams">Teams</option>
-              <option value="whatsapp">WhatsApp</option>
-              <option value="telegram">Telegram</option>
+              <option value="app">
+                {t("people.detail.profileForm.inApp")}
+              </option>
+              <option value="email">
+                {t("people.detail.profileForm.email")}
+              </option>
+              <option value="slack">
+                {t("people.detail.profileForm.slack")}
+              </option>
+              <option value="teams">
+                {t("people.detail.profileForm.teams")}
+              </option>
+              <option value="whatsapp">
+                {t("people.detail.profileForm.whatsapp")}
+              </option>
+              <option value="telegram">
+                {t("people.detail.profileForm.telegram")}
+              </option>
             </select>
           </label>
 
           <fieldset className="flex flex-col gap-1">
             <legend className="text-xs text-ink-3">
-              Quiet hours (leave empty to clear)
+              {t("people.detail.profileForm.quietHoursLeaveEmpty")}
             </legend>
             <div className="flex gap-2">
               <input
@@ -75,7 +97,9 @@ export function ProfileForm({
                 type="time"
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
               />
-              <span className="self-center text-xs text-ink-3">to</span>
+              <span className="self-center text-xs text-ink-3">
+                {t("common.to")}
+              </span>
               <input
                 name="quietEnd"
                 type="time"

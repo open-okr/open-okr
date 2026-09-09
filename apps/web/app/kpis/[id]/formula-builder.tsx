@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { setFormula } from "./actions.ts";
 
@@ -35,6 +35,8 @@ export function FormulaBuilder({
   readonly today: string;
   readonly current: readonly string[];
 }) {
+  const { t } = useTranslations();
+
   const [operator, setOperator] = useState<"add" | "sub" | "mul" | "div">(
     "add",
   );
@@ -58,7 +60,9 @@ export function FormulaBuilder({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-ink-3">Combine the sources as a</span>
+        <span className="text-xs text-ink-3">
+          {t("kpis.detail.formulaBuilder.combineTheSourcesAs")}
+        </span>
         {OPERATORS.map((entry) => (
           <button
             key={entry.key}
@@ -81,7 +85,7 @@ export function FormulaBuilder({
       <ul className="flex max-h-56 flex-col overflow-y-auto rounded-md border border-line">
         {candidates.length === 0 ? (
           <li className="p-2.5 text-xs text-ink-3">
-            There is no other KPI to calculate from yet.
+            {t("kpis.detail.formulaBuilder.thereIsNoOther")}
           </li>
         ) : null}
         {candidates.map((candidate) => (
@@ -139,15 +143,13 @@ export function FormulaBuilder({
         </Button>
         {saved ? (
           <span className="text-xs text-ok">
-            Saved and evaluated for this period.
+            {t("kpis.detail.formulaBuilder.savedAndEvaluatedFor")}
           </span>
         ) : null}
       </div>
       {error ? <p className="text-xs text-bad">{error}</p> : null}
       <p className="text-xs text-ink-4">
-        A source measured more often than this KPI rolls up with its own
-        aggregate. A cycle or a self-reference is refused when you save, not
-        after it has been stored.
+        {t("kpis.detail.formulaBuilder.aSourceMeasuredMore")}
       </p>
     </div>
   );

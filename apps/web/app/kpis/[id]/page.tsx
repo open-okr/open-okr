@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { FormulaBuilder } from "./formula-builder.tsx";
@@ -62,6 +63,8 @@ export default async function KpiDetailPage({
 }: {
   readonly params: Promise<{ readonly id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -160,8 +163,8 @@ export default async function KpiDetailPage({
                 : `${Math.round(kpi.achievementPct)}%`}
             </span>
             <span className="text-xs text-ink-4">
-              healthy at {Math.round(kpi.healthyPct)}%, watch at{" "}
-              {Math.round(kpi.watchPct)}%
+              {t("common.healthyAt")} {Math.round(kpi.healthyPct)}
+              {t("kpis.detail.watchAt")} {Math.round(kpi.watchPct)}%
             </span>
           </div>
           <WatchControl subjectType="kpi" subjectId={id} initial={watch} />
@@ -172,10 +175,10 @@ export default async function KpiDetailPage({
               href={`/goals/${kpi.recoveryGoalId}`}
               className="text-xs font-semibold text-brand-text hover:underline"
             >
-              Recovery objective
+              {t("kpis.detail.recoveryObjective")}
             </Link>
             <span className="text-xs text-ink-3">
-              launched at{" "}
+              {t("kpis.detail.launchedAt")}{" "}
               {kpi.recoveryStartedPct === null
                 ? "an unknown point"
                 : `${Math.round(kpi.recoveryStartedPct)}%`}
@@ -190,13 +193,13 @@ export default async function KpiDetailPage({
       <Card>
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
-            The periods, against the corridor
+            {t("kpis.detail.thePeriodsAgainstThe")}
           </h2>
         </CardHeader>
         <CardBody className="overflow-x-auto">
           {series.length === 0 ? (
             <p className="text-sm text-ink-3">
-              No periods recorded yet. The grid is where values are typed.
+              {t("kpis.detail.noPeriodsRecordedYet")}
             </p>
           ) : (
             <svg
@@ -255,23 +258,25 @@ export default async function KpiDetailPage({
       <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
         <Card className="flex-1">
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Records</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.detail.records")}
+            </h2>
           </CardHeader>
           <CardBody className="p-0">
             <table className="w-full text-sm">
               <caption className="sr-only">
-                Every recorded period, newest first
+                {t("kpis.detail.everyRecordedPeriodNewest")}
               </caption>
               <thead>
                 <tr className="border-line border-b text-xs text-ink-3">
                   <th className="px-3 py-1.5 text-left font-semibold">
-                    Period
+                    {t("common.period")}
                   </th>
                   <th className="px-3 py-1.5 text-right font-semibold">
-                    Actual
+                    {t("kpis.detail.actual")}
                   </th>
                   <th className="px-3 py-1.5 text-right font-semibold">
-                    Target
+                    {t("common.target")}
                   </th>
                 </tr>
               </thead>
@@ -279,7 +284,7 @@ export default async function KpiDetailPage({
                 {detail.records.length === 0 ? (
                   <tr>
                     <td className="px-3 py-2 text-ink-3" colSpan={3}>
-                      Nothing recorded yet.
+                      {t("kpis.detail.nothingRecordedYet")}
                     </td>
                   </tr>
                 ) : null}
@@ -302,19 +307,22 @@ export default async function KpiDetailPage({
               </tbody>
             </table>
             <p className="p-3 text-xs text-ink-4">
-              Values are typed in the grid, which is where the keyboard entry
-              lives. This table reads them.
+              {t("kpis.detail.valuesAreTypedIn")}
             </p>
           </CardBody>
         </Card>
 
         <Card className="w-full lg:w-80">
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">In the tree</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.detail.inTheTree")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
             <div>
-              <p className="text-xs font-semibold text-ink-3">Drives</p>
+              <p className="text-xs font-semibold text-ink-3">
+                {t("kpis.detail.drives")}
+              </p>
               {detail.parent ? (
                 <Link
                   href={`/kpis/${detail.parent.id}`}
@@ -324,16 +332,17 @@ export default async function KpiDetailPage({
                 </Link>
               ) : (
                 <p className="text-sm text-ink-3">
-                  Nothing. This is a root, or it has not been placed yet.
+                  {t("kpis.detail.nothingThisIsA")}
                 </p>
               )}
             </div>
             <div>
-              <p className="text-xs font-semibold text-ink-3">Driven by</p>
+              <p className="text-xs font-semibold text-ink-3">
+                {t("kpis.detail.drivenBy")}
+              </p>
               {detail.children.length === 0 ? (
                 <p className="text-sm text-ink-3">
-                  No drivers. A KPI with no leading driver under it has nothing
-                  a team can act on this week.
+                  {t("kpis.detail.noDriversAKpi")}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-1">
@@ -364,7 +373,7 @@ export default async function KpiDetailPage({
             {detail.linkedKeyResults.length > 0 ? (
               <div>
                 <p className="text-xs font-semibold text-ink-3">
-                  Measures these key results
+                  {t("kpis.detail.measuresTheseKeyResults")}
                 </p>
                 <ul className="flex flex-col gap-1">
                   {detail.linkedKeyResults.map((keyResult) => (
@@ -387,7 +396,9 @@ export default async function KpiDetailPage({
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Formula</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("kpis.detail.formula")}
+          </h2>
         </CardHeader>
         <CardBody>
           {canEdit ? (

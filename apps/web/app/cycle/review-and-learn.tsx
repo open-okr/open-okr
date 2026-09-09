@@ -1,6 +1,7 @@
 import type { ResolvedThresholds } from "@openokr/method";
 import { scoreBand } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { runFeedForward } from "./frame-actions.ts";
 
@@ -40,7 +41,7 @@ const BAND_WORDS: Readonly<Record<string, string>> = {
   little: "Little movement",
 };
 
-export function ReviewAndLearn({
+export async function ReviewAndLearn({
   keyResults,
   cycleName,
   archivedAt,
@@ -61,6 +62,8 @@ export function ReviewAndLearn({
    */
   readonly thresholds: ResolvedThresholds;
 }) {
+  const { t } = await getTranslations();
+
   const scored = keyResults.filter((one) => one.score !== null);
   const average =
     scored.length === 0
@@ -90,17 +93,20 @@ export function ReviewAndLearn({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Review and learn</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("cycle.reviewAndLearn.reviewAndLearn")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Closing {cycleName}. Every key result carries a score, the
-              portfolio average lands in a band, and what is unfinished is
-              flagged to carry.
+              {t("cycle.reviewAndLearn.closing")} {cycleName}
+              {t("cycle.reviewAndLearn.everyKeyResultCarries")}
             </p>
           </div>
           {archivedAt ? (
-            <Chip tone="ok">archived {archivedAt.slice(0, 10)}</Chip>
+            <Chip tone="ok">
+              {t("cycle.reviewAndLearn.archived")} {archivedAt.slice(0, 10)}
+            </Chip>
           ) : (
-            <Chip tone="neutral">open</Chip>
+            <Chip tone="neutral">{t("common.open")}</Chip>
           )}
         </CardHeader>
         <CardBody className="flex flex-wrap items-end gap-6">
@@ -108,13 +114,17 @@ export function ReviewAndLearn({
             <span className="text-lg font-bold tabular-nums text-ink">
               {average === null ? "—" : average.toFixed(2)}
             </span>
-            <span className="text-xs text-ink-3">portfolio average</span>
+            <span className="text-xs text-ink-3">
+              {t("cycle.reviewAndLearn.portfolioAverage")}
+            </span>
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tabular-nums text-ink">
-              {scored.length} of {keyResults.length}
+              {scored.length} {t("common.of")} {keyResults.length}
             </span>
-            <span className="text-xs text-ink-3">scored</span>
+            <span className="text-xs text-ink-3">
+              {t("cycle.reviewAndLearn.scored")}
+            </span>
           </div>
           {band ? <Chip tone="info">{BAND_WORDS[band] ?? band}</Chip> : null}
         </CardBody>
@@ -122,7 +132,9 @@ export function ReviewAndLearn({
 
       <Card>
         <CardHeader>
-          <h3 className="text-sm font-bold text-ink">The bands</h3>
+          <h3 className="text-sm font-bold text-ink">
+            {t("cycle.reviewAndLearn.theBands")}
+          </h3>
         </CardHeader>
         <CardBody className="flex flex-col gap-1">
           {table.map(([name, range]) => {
@@ -146,15 +158,17 @@ export function ReviewAndLearn({
 
       <Card>
         <CardHeader className="justify-between">
-          <h3 className="text-sm font-bold text-ink">Key results</h3>
+          <h3 className="text-sm font-bold text-ink">
+            {t("cycle.reviewAndLearn.keyResults")}
+          </h3>
           <span className="text-xs text-ink-3">
-            Scoring happens on the goal, so this is the account of it
+            {t("cycle.reviewAndLearn.scoringHappensOnThe")}
           </span>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {keyResults.length === 0 ? (
             <p className="text-xs text-ink-3">
-              Nothing to score: this cycle has no key results.
+              {t("cycle.reviewAndLearn.nothingToScoreThis")}
             </p>
           ) : (
             keyResults.map((row) => (
@@ -169,7 +183,9 @@ export function ReviewAndLearn({
                   </span>
                 </span>
                 <span className="flex flex-none items-center gap-2">
-                  {row.carryForward ? <Chip tone="warn">carry</Chip> : null}
+                  {row.carryForward ? (
+                    <Chip tone="warn">{t("cycle.reviewAndLearn.carry")}</Chip>
+                  ) : null}
                   <span className="tabular-nums text-ink-2">
                     {row.score === null ? "not scored" : row.score.toFixed(2)}
                   </span>
@@ -184,18 +200,18 @@ export function ReviewAndLearn({
         <Card>
           <CardHeader>
             <div className="flex min-w-0 flex-col">
-              <h3 className="text-sm font-bold text-ink">Feed forward</h3>
+              <h3 className="text-sm font-bold text-ink">
+                {t("cycle.reviewAndLearn.feedForward")}
+              </h3>
               <p className="text-xs text-ink-3">
-                Opens the next cycle carrying these scores and every flagged
-                item. Idempotent: running it twice changes nothing, so pressing
-                it again when you are unsure is safe.
+                {t("cycle.reviewAndLearn.opensTheNextCycle")}
               </p>
             </div>
           </CardHeader>
           <CardBody>
             <ActionForm action={runFeedForward}>
               <Button type="submit" variant="default" size="sm">
-                Carry into the next cycle
+                {t("cycle.reviewAndLearn.carryIntoTheNext")}
               </Button>
             </ActionForm>
           </CardBody>

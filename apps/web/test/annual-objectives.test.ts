@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * Phase 0 lists the year's objectives under the strategy each serves
@@ -19,7 +19,7 @@ import { describe, expect, test } from "vitest";
  */
 
 const at = (path: string) =>
-  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  readScreen(fileURLToPath(new URL(path, import.meta.url)));
 
 const panel = at("../app/cycle/annual-objectives.tsx");
 const actions = at("../app/cycle/frame-actions.ts");

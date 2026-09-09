@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
 import { type MapNode, WorkMap } from "../work-map.tsx";
@@ -36,6 +37,8 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ node?: string; cycle?: string; scope?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -220,31 +223,31 @@ export default async function HomePage({
 
       <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
         <a className="text-brand-text underline" href="/goals">
-          Filter and search in the explorer
+          {t("home.filterAndSearchIn")}
         </a>
         <a className="text-brand-text underline" href="/goals/studio">
-          See the cascade
+          {t("home.seeTheCascade")}
         </a>
         <a className="text-brand-text underline" href="/review">
-          What you owe
+          {t("common.whatYouOwe")}
         </a>
         {/* P5-T01c. The sidebar carries it on every page; this is here
             because the task asks for a door from the front door itself, and
             a member who lands here should not have to know the product has
             a sidebar item for the room they are late to. */}
         <a className="text-brand-text underline" href="/sessions">
-          Sessions
+          {t("common.sessions")}
         </a>
         {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
             this is how it is reached. The engine has written a row on every
             operation since P2-T07 and nothing has ever shown one. */}
         <a className="text-brand-text underline" href="/activity">
-          What has happened here
+          {t("home.whatHasHappenedHere")}
         </a>
         {/* P6-G09. S-33 has a screen in §6 and no slot in §3's sidebar,
             same pattern as Activity above. */}
         <a className="text-brand-text underline" href="/people">
-          Who is here
+          {t("home.whoIsHere")}
         </a>
       </p>
     </div>

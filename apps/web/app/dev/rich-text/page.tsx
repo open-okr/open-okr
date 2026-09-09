@@ -1,6 +1,6 @@
 "use client";
 
-import { RichTextEditor } from "@openokr/ui";
+import { RichTextEditor, useTranslations } from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { useCallback, useState } from "react";
 import { validateRichTextPreview } from "./actions.ts";
@@ -62,6 +62,8 @@ function searchEntities(query: string) {
 }
 
 export default function RichTextEditorPreviewPage() {
+  const { t } = useTranslations();
+
   if (process.env.NODE_ENV === "production") {
     notFound();
   }
@@ -79,11 +81,13 @@ export default function RichTextEditorPreviewPage() {
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold text-ink">Rich text editor</h1>
+      <h1 className="text-2xl font-bold text-ink">
+        {t("dev.richText.richTextEditor")}
+      </h1>
       <p className="text-sm text-ink-3">
-        Type <code>@</code> for a member, <code>#</code> for an entity, or{" "}
-        <code>/</code> at the start of a line for block commands. Paste or drop
-        a file to try the attachment upload flow.
+        {t("common.type")} <code>@</code> {t("dev.richText.forAMember")}{" "}
+        <code>#</code> {t("dev.richText.forAnEntityOr")} <code>/</code>{" "}
+        {t("dev.richText.atTheStartOf")}
       </p>
       <div className="rounded-lg border border-line-2 bg-surface p-3">
         <RichTextEditor
@@ -96,7 +100,7 @@ export default function RichTextEditorPreviewPage() {
         />
       </div>
       <p className="text-xs text-ink-4">
-        Last update validated as: <strong>{validity}</strong>
+        {t("dev.richText.lastUpdateValidatedAs")} <strong>{validity}</strong>
       </p>
       <pre className="max-h-64 overflow-auto rounded-lg bg-raised p-3 text-xs text-ink-2">
         {JSON.stringify(lastJson, null, 2)}

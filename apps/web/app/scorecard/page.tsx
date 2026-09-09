@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -20,6 +21,8 @@ import { handOver, recordPerformance } from "./actions.ts";
  * answer different questions.
  */
 export default async function ScorecardPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -77,7 +80,9 @@ export default async function ScorecardPage() {
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Scorecard</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("scorecard.scorecard")}
+            </h1>
             <p className="text-xs text-ink-3">
               {scorecard.rows.length === 0
                 ? "No cycle has been archived yet."
@@ -92,7 +97,7 @@ export default async function ScorecardPage() {
               download="scorecard.csv"
               className="text-xs font-semibold text-brand-text hover:underline"
             >
-              Export as CSV
+              {t("scorecard.exportAsCsv")}
             </a>
           ) : null}
         </CardHeader>
@@ -104,7 +109,7 @@ export default async function ScorecardPage() {
               role="img"
               aria-label={`The result across ${points.length} scored cycles, from ${points[0]?.value.toFixed(2)} to ${points[points.length - 1]?.value.toFixed(2)}`}
             >
-              <title>Result across cycles</title>
+              <title>{t("scorecard.resultAcrossCycles")}</title>
               <polyline
                 points={trend}
                 fill="none"
@@ -117,34 +122,33 @@ export default async function ScorecardPage() {
         <CardBody className="p-0">
           {scorecard.rows.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              A cycle joins this table when it is archived at the close of its
-              review. Nothing is written before then, because a score is a
-              judgement somebody makes rather than a number the product
-              computes.
+              {t("scorecard.aCycleJoinsThis")}
             </p>
           ) : (
             <table className="w-full text-sm">
               <caption className="sr-only">
-                Every archived cycle with its result, verdict and band counts
+                {t("scorecard.everyArchivedCycleWith")}
               </caption>
               <thead>
                 <tr className="border-line border-b text-xs text-ink-3">
-                  <th className="px-3 py-1.5 text-left font-semibold">Cycle</th>
                   <th className="px-3 py-1.5 text-left font-semibold">
-                    Result
+                    {t("scorecard.cycle")}
                   </th>
                   <th className="px-3 py-1.5 text-left font-semibold">
-                    Verdict
+                    {t("scorecard.result")}
+                  </th>
+                  <th className="px-3 py-1.5 text-left font-semibold">
+                    {t("scorecard.verdict")}
                   </th>
                   <th className="px-3 py-1.5 text-right font-semibold">1.0</th>
                   <th className="px-3 py-1.5 text-right font-semibold">
-                    strong
+                    {t("scorecard.strong")}
                   </th>
                   <th className="px-3 py-1.5 text-right font-semibold">
-                    partial
+                    {t("scorecard.partial")}
                   </th>
                   <th className="px-3 py-1.5 text-right font-semibold">
-                    little
+                    {t("scorecard.little")}
                   </th>
                 </tr>
               </thead>
@@ -201,7 +205,9 @@ export default async function ScorecardPage() {
       {canEdit ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Close a cycle out</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("scorecard.closeACycleOut")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <ActionForm
@@ -209,7 +215,7 @@ export default async function ScorecardPage() {
               className="flex flex-wrap items-center gap-2"
             >
               <label className="text-xs text-ink-3" htmlFor="cycleId">
-                Record the result of
+                {t("scorecard.recordTheResultOf")}
               </label>
               <select
                 id="cycleId"
@@ -227,7 +233,7 @@ export default async function ScorecardPage() {
                 type="submit"
                 className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                Record
+                {t("common.record")}
               </button>
             </ActionForm>
 
@@ -236,7 +242,7 @@ export default async function ScorecardPage() {
               className="flex flex-wrap items-center gap-2"
             >
               <label className="text-xs text-ink-3" htmlFor="fromCycleId">
-                Hand over from
+                {t("scorecard.handOverFrom")}
               </label>
               <select
                 id="fromCycleId"
@@ -251,7 +257,7 @@ export default async function ScorecardPage() {
                 ))}
               </select>
               <label className="text-xs text-ink-3" htmlFor="toCycleId">
-                into
+                {t("scorecard.into")}
               </label>
               <select
                 id="toCycleId"
@@ -269,15 +275,12 @@ export default async function ScorecardPage() {
                 type="submit"
                 className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                Hand over
+                {t("scorecard.handOver")}
               </button>
             </ActionForm>
 
             <p className="text-xs text-ink-4">
-              Both belong to the quarterly review's own close, which exists now,
-              and to cycle phase 7, which arrives at P6-G16. They stay here as
-              well, because an action nobody can reach is an action nobody can
-              check. Running either twice changes nothing.
+              {t("scorecard.bothBelongToThe")}
             </p>
           </CardBody>
         </Card>
@@ -285,7 +288,9 @@ export default async function ScorecardPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Points</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("scorecard.points")}
+          </h2>
         </CardHeader>
         <CardBody>
           <p className="text-sm text-ink-3">

@@ -6,6 +6,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppearanceControl } from "../../../lib/appearance.tsx";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { updateMemberFields, updateProfile } from "../actions.ts";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
@@ -41,6 +42,8 @@ export default async function MemberProfilePage({
   /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
   searchParams: Promise<{ at?: string; id?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const pool = getPool();
@@ -117,13 +120,13 @@ export default async function MemberProfilePage({
             </div>
             <div className="ml-auto flex items-center gap-2">
               {member.kind === "guest" ? (
-                <Chip tone="neutral">Guest</Chip>
+                <Chip tone="neutral">{t("common.guest")}</Chip>
               ) : null}
               {member.kind === "placeholder" ? (
-                <Chip tone="neutral">Placeholder</Chip>
+                <Chip tone="neutral">{t("common.placeholder")}</Chip>
               ) : null}
               {member.status === "suspended" ? (
-                <Chip tone="warn">Suspended</Chip>
+                <Chip tone="warn">{t("common.suspended")}</Chip>
               ) : null}
             </div>
           </div>
@@ -133,25 +136,27 @@ export default async function MemberProfilePage({
       {/* Profile details */}
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Profile</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("people.detail.profile")}
+          </h2>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
             {member.timezone ? (
               <>
-                <dt className="text-ink-3">Timezone</dt>
+                <dt className="text-ink-3">{t("common.timezone")}</dt>
                 <dd className="text-ink">{member.timezone}</dd>
               </>
             ) : null}
 
-            <dt className="text-ink-3">Prefers</dt>
+            <dt className="text-ink-3">{t("people.detail.prefers")}</dt>
             <dd className="text-ink">
               {CHANNEL_LABELS[member.primaryChannel ?? "app"] ?? "In-app"}
             </dd>
 
             {manager ? (
               <>
-                <dt className="text-ink-3">Manager</dt>
+                <dt className="text-ink-3">{t("common.manager")}</dt>
                 <dd>
                   <Link
                     href={`/people/${manager.id}`}
@@ -166,7 +171,9 @@ export default async function MemberProfilePage({
 
           {bioHtml ? (
             <div className="mt-2 border-line border-t pt-3">
-              <h3 className="mb-1 text-xs font-semibold text-ink-3">Bio</h3>
+              <h3 className="mb-1 text-xs font-semibold text-ink-3">
+                {t("people.detail.bio")}
+              </h3>
               <div
                 className="prose prose-sm max-w-none text-ink"
                 // The HTML is produced by renderRichTextToHtml, which is a
@@ -183,7 +190,7 @@ export default async function MemberProfilePage({
                 href="/account/channels"
                 className="text-xs font-semibold text-brand-text hover:underline"
               >
-                Manage your channels and notification preferences
+                {t("people.detail.manageYourChannelsAnd")}
               </Link>
             </div>
           ) : null}
@@ -195,7 +202,8 @@ export default async function MemberProfilePage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Direct reports ({directReports.length})
+              {t("people.detail.directReports")}
+              {directReports.length})
             </h2>
           </CardHeader>
           <CardBody>
@@ -223,7 +231,8 @@ export default async function MemberProfilePage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Goals championed ({championed.length})
+              {t("people.detail.goalsChampioned")}
+              {championed.length})
             </h2>
           </CardHeader>
           <CardBody>
@@ -260,10 +269,11 @@ export default async function MemberProfilePage({
       {isSelf ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Appearance</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("people.detail.appearance")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Kept on you rather than on this browser, so it follows you to
-              another machine. The same control is in the account menu.
+              {t("people.detail.keptOnYouRather")}
             </p>
           </CardHeader>
           <CardBody>
@@ -286,7 +296,9 @@ export default async function MemberProfilePage({
       {isAdmin && !isSelf ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Edit member (admin)</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("people.detail.editMemberAdmin")}
+            </h2>
           </CardHeader>
           <CardBody>
             <form
@@ -298,7 +310,7 @@ export default async function MemberProfilePage({
             >
               <input type="hidden" name="memberId" value={id} />
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Name
+                {t("common.name")}
                 <input
                   name="name"
                   defaultValue={member.name}
@@ -308,7 +320,7 @@ export default async function MemberProfilePage({
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Title
+                {t("people.detail.title")}
                 <input
                   name="title"
                   defaultValue={member.title ?? ""}
@@ -317,13 +329,13 @@ export default async function MemberProfilePage({
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Manager
+                {t("common.manager")}
                 <select
                   name="managerId"
                   defaultValue={member.managerId ?? ""}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 >
-                  <option value="">No manager</option>
+                  <option value="">{t("people.detail.noManager")}</option>
                   {possibleManagers.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
@@ -335,7 +347,7 @@ export default async function MemberProfilePage({
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                Save
+                {t("common.save")}
               </button>
             </form>
           </CardBody>
@@ -361,11 +373,11 @@ export default async function MemberProfilePage({
 
       <p className="text-xs text-ink-4">
         <Link href="/people" className="text-brand-text hover:underline">
-          Back to the directory
+          {t("common.backToTheDirectory")}
         </Link>
       </p>
       <FeedPanel
-        title="What they did"
+        title={t("common.whatTheyDid")}
         explains="This member's own activity, filtered to what you can see. Not what was done to them: being assigned a task is somebody else acting."
         items={feedItems}
         names={feedNames}

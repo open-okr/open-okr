@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
@@ -43,6 +44,8 @@ export default async function TaskPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -114,15 +117,18 @@ export default async function TaskPage({
 
         <Card>
           <CardHeader className="justify-between">
-            <h2 className="text-sm font-bold text-ink">Checklist</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.checklist")}
+            </h2>
             <span className="text-xs text-ink-3">
-              {task.checklist.done} of {task.checklist.total} done
+              {task.checklist.done} {t("common.of")} {task.checklist.total}{" "}
+              {t("common.done")}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
             {task.items.length === 0 ? (
               <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
-                Nothing broken down yet.
+                {t("tasks.detail.nothingBrokenDownYet")}
               </p>
             ) : (
               <ul className="flex flex-col gap-1" data-testid="task-checklist">
@@ -154,11 +160,11 @@ export default async function TaskPage({
               >
                 <input type="hidden" name="id" value={task.id} />
                 <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Add a line
+                  {t("tasks.detail.addALine")}
                   <input
                     name="title"
                     maxLength={300}
-                    placeholder="Draft the copy"
+                    placeholder={t("tasks.detail.draftTheCopy")}
                     className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                   />
                 </label>
@@ -166,7 +172,7 @@ export default async function TaskPage({
                   type="submit"
                   className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
                 >
-                  Add
+                  {t("common.add")}
                 </button>
               </ActionForm>
             ) : null}
@@ -175,13 +181,13 @@ export default async function TaskPage({
 
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">What is not here yet</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.whatIsNotHere")}
+            </h2>
           </CardHeader>
           <CardBody>
             <p className="text-sm text-ink-3">
-              Comments and the activity list are P3-T16's surface, and hanging
-              it on a task is its own change. Documents and attachments arrive
-              at P5-T12.
+              {t("tasks.detail.commentsAndTheActivity")}
             </p>
           </CardBody>
         </Card>
@@ -190,11 +196,15 @@ export default async function TaskPage({
       <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Assignees</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.assignees")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
             {task.assignees.length === 0 ? (
-              <p className="text-xs text-ink-3">Nobody yet.</p>
+              <p className="text-xs text-ink-3">
+                {t("tasks.detail.nobodyYet")}
+              </p>
             ) : (
               <ul className="flex flex-col gap-1" data-testid="task-assignees">
                 {task.assignees.map((one) => (
@@ -234,7 +244,9 @@ export default async function TaskPage({
 
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Where it sits</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.whereItSits")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 text-sm">
             <Row label="Due">
@@ -257,14 +269,14 @@ export default async function TaskPage({
                   {task.initiativeTitle ?? "An initiative"}
                 </Link>
               ) : (
-                <span className="text-ink-3">None</span>
+                <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
             </Row>
             <Row label="Key result">
               {task.keyResultTitle ? (
                 <span className="text-ink-2">{task.keyResultTitle}</span>
               ) : (
-                <span className="text-ink-3">None</span>
+                <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
             </Row>
           </CardBody>

@@ -124,13 +124,11 @@ export function GoalWrites({
                     run(() => unlinkKeyResultKpi({ id: keyResult.id }))
                   }
                 >
-                  {t("goal.writes.unlink")}
+                  {t("common.unlink")}
                 </Button>
               </div>
             ))}
-            <span className="text-xs text-ink-4">
-              {t("goal.writes.unlinkHelp")}
-            </span>
+            <span className="text-xs text-ink-4">{t("common.unlinkHelp")}</span>
           </div>
         ) : null}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -8,6 +8,8 @@ import { authClient } from "../../../lib/auth-client";
 import { AuthCard, Field, FormError } from "../auth-card";
 
 function ResetPasswordForm() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const token = useSearchParams().get("token");
   const [error, setError] = useState("");
@@ -16,14 +18,14 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <AuthCard
-        title="That link has expired"
+        title={t("auth.resetPassword.thatLinkHasExpired")}
         description="Reset links last an hour and can be used once."
         footer={
           <Link
             href="/forgot-password"
             className="font-medium text-brand-text hover:underline"
           >
-            Ask for a new link
+            {t("auth.resetPassword.askForANew")}
           </Link>
         }
       >
@@ -52,7 +54,7 @@ function ResetPasswordForm() {
   };
 
   return (
-    <AuthCard title="Choose a new password">
+    <AuthCard title={t("auth.resetPassword.chooseANewPassword")}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label="New password"
@@ -72,9 +74,15 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslations();
+
   // useSearchParams needs a Suspense boundary to keep the route static.
   return (
-    <Suspense fallback={<AuthCard title="Loading…">{null}</AuthCard>}>
+    <Suspense
+      fallback={
+        <AuthCard title={t("auth.resetPassword.loading")}>{null}</AuthCard>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );

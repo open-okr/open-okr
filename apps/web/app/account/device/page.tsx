@@ -1,6 +1,7 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { decide } from "./actions.ts";
 import { DecisionForm } from "./decision-form.tsx";
@@ -26,6 +27,8 @@ export default async function DevicePage({
 }: {
   searchParams: Promise<{ code?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { code } = await searchParams;
   const { session, workspace } = await requireWorkspace();
 
@@ -46,15 +49,17 @@ export default async function DevicePage({
     <div className="mx-auto flex max-w-xl flex-col gap-4.5">
       <Card>
         <CardHeader>
-          <h1 className="text-lg font-bold text-ink">Authorise a terminal</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {t("account.device.authoriseATerminal")}
+          </h1>
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
           <p className="text-sm text-ink-3">
-            A terminal running <code className="font-mono text-xs">okr</code>{" "}
-            asked to act as you in{" "}
-            <span className="font-medium text-ink">{workspace.name}</span>. It
-            will get a token carrying your own access, narrowed to the scopes
-            below, and nothing more.
+            {t("account.device.aTerminalRunning")}{" "}
+            <code className="font-mono text-xs">{t("account.device.okr")}</code>{" "}
+            {t("account.device.askedToActAs")}{" "}
+            <span className="font-medium text-ink">{workspace.name}</span>
+            {t("account.device.itWillGetA")}
           </p>
         </CardBody>
       </Card>
@@ -76,11 +81,11 @@ export default async function DevicePage({
         </Card>
       ) : (
         <Card>
-          <CardHeader>What is asking</CardHeader>
+          <CardHeader>{t("account.device.whatIsAsking")}</CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <span className="text-xs font-semibold text-ink-2">
-                The terminal calls itself
+                {t("account.device.theTerminalCallsItself")}
               </span>
               <span className="text-sm text-ink" data-testid="device-client">
                 {request.clientName}
@@ -89,7 +94,7 @@ export default async function DevicePage({
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold text-ink-2">
-                Scopes it asked for
+                {t("account.device.scopesItAskedFor")}
               </span>
               <span className="flex flex-wrap gap-1.5">
                 {request.requestedScopes.map((scope) => (
@@ -102,16 +107,14 @@ export default async function DevicePage({
                 ))}
               </span>
               <span className="text-xs text-ink-3">
-                Read sees what you can see. Write creates and updates.
-                Destructive removes things other people can see.
+                {t("account.device.readSeesWhatYou")}
               </span>
             </div>
 
             <DecisionForm action={decide} userCode={code?.trim() ?? ""} />
 
             <p className="text-xs text-ink-3">
-              If you did not start this, refuse it. Nothing is granted until you
-              press a button, and the request expires on its own.
+              {t("account.device.ifYouDidNot")}
             </p>
           </CardBody>
         </Card>

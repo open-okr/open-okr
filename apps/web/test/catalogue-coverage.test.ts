@@ -1,6 +1,7 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CATALOGUES, missingKeys } from "@openokr/ui";
 import { describe, expect, test } from "vitest";
 import {
   findUnlocalisedIn,
@@ -15,7 +16,7 @@ import { UNLOCALISED_FILES } from "./unlocalised-files.ts";
  * it and the pseudo-locale check that proves a rendered component sources its
  * text from it, and that check covered three shell components. The gap audit of
  * 7 September 2026 found every route hardcoding its strings; measured here, 146
- * files hold 1,546 of them.
+ * files held 1,543 of them.
  *
  * **A render check cannot be extended to a route.** The existing one in
  * `packages/ui` renders a component under a pseudo catalogue and looks for text
@@ -25,8 +26,16 @@ import { UNLOCALISED_FILES } from "./unlocalised-files.ts";
  * source, and it answers the question that matters: was this string ever given
  * to the catalogue.
  *
- * **This does not fix the 146 files.** It stops the 147th, and makes the pile
- * visible and countable. Emptying it is P6-G22c.
+ * **The pile is empty** (P6-G22c). What was a debt counter is now a floor: the
+ * exemption list is `[]`, so the first rule covers every route in the
+ * application rather than the handful nobody had got to yet.
+ *
+ * **Two rules were added when it emptied.** Every key has a consumer, deferred
+ * from P2-T10 and worth having: the first thing it found was
+ * `shell.version.updateAvailable`, written for UIUX-PLAN §3's "one reload with
+ * a clear message" and rendered by nothing since P2-T10. And every key the
+ * source has, Bahasa Melayu has too, so a key added without a stub fails in
+ * the change that added it.
  */
 
 const appDir = fileURLToPath(new URL("../app", import.meta.url));
@@ -57,6 +66,7 @@ const relative = (path: string): string =>
 
 const exempt = new Set(UNLOCALISED_FILES);
 const files = everyTsx(appDir).sort();
+const EN_CATALOGUE = CATALOGUES.en;
 
 describe("the detector", () => {
   test("sees text between tags, and not a class name or a route", () => {
@@ -91,7 +101,7 @@ describe("the detector", () => {
   });
 
   test("passes a string that came from the catalogue", () => {
-    // `{t("...")}` is a JSX expression rather than a string literal, so it is
+    // `{t("…")}` is a JSX expression rather than a string literal, so it is
     // excluded by the shape of the check rather than by a special case.
     const source = `
       export const A = () => <span aria-label={t("shell.search.label")}>{t("shell.search.label")}</span>;
@@ -144,13 +154,68 @@ describe("the catalogue gate", () => {
     expect(clean).toEqual([]);
   });
 
-  test("the debt is counted, so it can be seen going down", () => {
+  test("the debt is zero, and the list that held it is empty", () => {
+    // 146 files and 1,543 strings at P6-G22b, all of them in the catalogue at
+    // P6-G22c. The counter stays so that a re-exempted file has to raise a
+    // number somebody set to nothing on purpose.
     const total = UNLOCALISED_FILES.reduce(
       (sum, name) => sum + findUnlocalisedIn(join(appDir, "..", name)).length,
       0,
     );
-    // Measured at P6-G22b. Lower it as P6-G22c proceeds; it must never rise,
-    // because a file on the list is one nobody should be adding strings to.
-    expect(total).toBeLessThanOrEqual(1546);
+    expect(UNLOCALISED_FILES).toEqual([]);
+    expect(total).toBe(0);
+  });
+});
+
+describe("the catalogue itself", () => {
+  /**
+   * Every place a key can be read from: the routes, the shared library beside
+   * them, and the components in `packages/ui` that own the shell's own keys.
+   */
+  const consumerRoots = [
+    appDir,
+    join(appDir, "..", "lib"),
+    join(appDir, "..", "..", "..", "packages", "ui", "src"),
+  ];
+
+  function everySource(dir: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === ".next" || entry.name === "node_modules") {
+          continue;
+        }
+        found.push(...everySource(path));
+      } else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) {
+        found.push(path);
+      }
+    }
+    return found;
+  }
+
+  const sources = consumerRoots
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) => everySource(dir))
+    .map((path) => readFileSync(path, "utf8"))
+    .join("\n");
+
+  test("every key has a consumer", () => {
+    // Deferred from P2-T10 to here, in the module's own words: "a key with no
+    // consumer is a translation somebody pays for and nobody sees". Four keys
+    // were deleted on 7 September 2026 for exactly that, found by reading
+    // rather than by a test. This is the test.
+    const orphans = Object.keys(EN_CATALOGUE).filter(
+      (key) => !sources.includes(`"${key}"`),
+    );
+    expect(orphans).toEqual([]);
+  });
+
+  test("every key the source has, Bahasa Melayu has too", () => {
+    // `missingKeys` in packages/ui says the same thing about the catalogues as
+    // data. This says it about the catalogues this application actually ships,
+    // so a key added here without a stub fails in the change that added it
+    // rather than in somebody else's.
+    expect(missingKeys("ms")).toEqual([]);
   });
 });

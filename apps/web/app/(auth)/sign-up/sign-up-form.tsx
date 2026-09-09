@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -9,6 +9,8 @@ import { AuthCard, Field, FormError } from "../auth-card";
 
 /** The registration form (screen S-35). Rendered only when registration is open. */
 export function SignUpForm() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -38,13 +40,13 @@ export function SignUpForm() {
 
   return (
     <AuthCard
-      title="Create your account"
+      title={t("auth.signUp.signUpForm.createYourAccount")}
       footer={
         <Link
           href="/sign-in"
           className="font-medium text-brand-text hover:underline"
         >
-          Already have an account? Sign in
+          {t("auth.signUp.signUpForm.alreadyHaveAnAccount")}
         </Link>
       }
     >
@@ -67,8 +69,7 @@ export function SignUpForm() {
             required
           />
           <p className="text-xs text-ink-3">
-            At least 12 characters. A phrase you can remember beats a short
-            password you cannot.
+            {t("auth.signUp.signUpForm.atLeast12Characters")}
           </p>
         </div>
         <Button type="submit" variant="primary" disabled={pending}>

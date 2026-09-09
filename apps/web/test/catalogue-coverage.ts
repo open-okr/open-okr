@@ -13,7 +13,7 @@ import ts from "typescript";
  *
  * **Two positions count.** Text between tags, which is the body of a screen,
  * and the four attributes whose value a person reads: `placeholder`,
- * `aria-label`, `title` and `alt`. An attribute written as `{t("...")}` is a
+ * `aria-label`, `title` and `alt`. An attribute written as `{t("…")}` is a
  * JSX expression rather than a string literal, so it is excluded by the shape
  * of the check rather than by a special case.
  *

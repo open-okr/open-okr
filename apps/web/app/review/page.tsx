@@ -8,6 +8,7 @@ import {
   Chip,
 } from "@openokr/ui";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge } from "./actions.ts";
@@ -55,6 +56,8 @@ type Obligation = Awaited<
 >["obligations"][number];
 
 export default async function ReviewPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const inbox = await callAction(
     {
@@ -84,10 +87,11 @@ export default async function ReviewPage() {
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">What you owe</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("common.whatYouOwe")}
+            </h1>
             <p className="text-xs text-ink-3">
-              Computed on the server, overdue first. Notifications say what
-              happened. This says what you owe.
+              {t("review.computedOnTheServer")}
             </p>
           </div>
           <div className="flex flex-none items-center gap-3.5">
@@ -101,10 +105,9 @@ export default async function ReviewPage() {
       {inbox.obligations.length === 0 ? (
         <Card>
           <CardBody>
-            <p className="text-sm text-ink-2">You are all caught up.</p>
+            <p className="text-sm text-ink-2">{t("review.youAreAllCaught")}</p>
             <p className="mt-1 text-xs text-ink-3">
-              A row appears here when a goal you champion is due a check-in, or
-              when a check-in you review is waiting on you.
+              {t("review.aRowAppearsHere")}
             </p>
           </CardBody>
         </Card>
@@ -143,13 +146,13 @@ export default async function ReviewPage() {
       {inbox.pending.length > 0 ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Not here yet</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("common.notHereYet")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-1.5">
             <p className="text-xs text-ink-3">
-              These sources of obligation are named here rather than left out,
-              so this page cannot look complete while quietly failing to tell
-              you about something you own.
+              {t("review.theseSourcesOfObligation")}
             </p>
             <ul className="flex flex-col gap-1">
               {inbox.pending.map((source) => (
@@ -169,10 +172,11 @@ export default async function ReviewPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Why you got nudged</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("review.whyYouGotNudged")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Every message the product sent you, and every one it decided to
-              hold, with the rule behind it.
+              {t("review.everyMessageTheProduct")}
             </p>
           </div>
         </CardHeader>

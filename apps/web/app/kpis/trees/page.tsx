@@ -4,6 +4,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { LaunchRecovery } from "../recovery/launch.tsx";
@@ -84,6 +85,8 @@ export default async function KpiTreesPage({
     readonly under?: string;
   }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -119,10 +122,11 @@ export default async function KpiTreesPage({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">KPI trees</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("kpis.trees.kpiTrees")}
+            </h1>
             <p className="text-xs text-ink-3">
-              Each child drives its parent. To move the root, find the unhealthy
-              branch and then its leading drivers.
+              {t("kpis.trees.eachChildDrivesIts")}
             </p>
           </div>
         </CardHeader>
@@ -149,7 +153,7 @@ export default async function KpiTreesPage({
                   : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
               }
             >
-              No tree
+              {t("kpis.trees.noTree")}
             </Link>
           </CardBody>
         ) : null}
@@ -167,8 +171,7 @@ export default async function KpiTreesPage({
         <CardBody className="p-0">
           {rows.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              Nothing in this tree yet. A KPI joins one by being filed into it;
-              its parent decides where it hangs.
+              {t("kpis.trees.nothingInThisTree")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -201,7 +204,8 @@ export default async function KpiTreesPage({
                       href={`/goals/${node.recoveryGoalId}`}
                       className="text-xs font-semibold text-brand-text hover:underline"
                     >
-                      recovery {Math.round(node.recoveryProgressPct ?? 0)}%
+                      {t("kpis.trees.recovery")}{" "}
+                      {Math.round(node.recoveryProgressPct ?? 0)}%
                     </Link>
                   ) : node.state === "unhealthy" && canEdit ? (
                     <LaunchRecovery kpiId={node.id} />
@@ -210,7 +214,7 @@ export default async function KpiTreesPage({
                     href={`/kpis/${node.id}`}
                     className="text-xs text-ink-3 hover:underline"
                   >
-                    open
+                    {t("common.open")}
                   </Link>
                   {canEdit ? (
                     <Link
@@ -222,7 +226,7 @@ export default async function KpiTreesPage({
                       }).toString()}`}
                       className="text-xs font-semibold text-brand-text hover:underline"
                     >
-                      add driver
+                      {t("kpis.trees.addDriver")}
                     </Link>
                   ) : null}
                 </li>
@@ -236,7 +240,7 @@ export default async function KpiTreesPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Add a driver under{" "}
+              {t("kpis.trees.addADriverUnder")}{" "}
               {tree.nodes.find((node) => node.id === params.under)?.title ??
                 "this KPI"}
             </h2>
@@ -246,18 +250,18 @@ export default async function KpiTreesPage({
               <input type="hidden" name="parentKpiId" value={params.under} />
               <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
               <label className="sr-only" htmlFor="driver-title">
-                What the driver measures
+                {t("kpis.trees.whatTheDriverMeasures")}
               </label>
               <input
                 id="driver-title"
                 name="title"
                 required
-                placeholder="Qualified leads"
+                placeholder={t("kpis.trees.qualifiedLeads")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
               />
               <div className="flex flex-wrap items-center gap-2.5">
                 <label className="text-xs text-ink-3" htmlFor="indicatorType">
-                  Indicator
+                  {t("common.indicator")}
                 </label>
                 <select
                   id="indicatorType"
@@ -265,11 +269,11 @@ export default async function KpiTreesPage({
                   defaultValue="leading"
                   className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                 >
-                  <option value="leading">leading</option>
-                  <option value="lagging">lagging</option>
+                  <option value="leading">{t("kpis.trees.leading")}</option>
+                  <option value="lagging">{t("kpis.trees.lagging")}</option>
                 </select>
                 <label className="text-xs text-ink-3" htmlFor="driver-freq">
-                  Frequency
+                  {t("common.frequency")}
                 </label>
                 <select
                   id="driver-freq"
@@ -277,14 +281,14 @@ export default async function KpiTreesPage({
                   defaultValue="monthly"
                   className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                 >
-                  <option value="daily">daily</option>
-                  <option value="weekly">weekly</option>
-                  <option value="monthly">monthly</option>
-                  <option value="quarterly">quarterly</option>
-                  <option value="yearly">yearly</option>
+                  <option value="daily">{t("common.daily")}</option>
+                  <option value="weekly">{t("common.weekly")}</option>
+                  <option value="monthly">{t("common.monthly")}</option>
+                  <option value="quarterly">{t("common.quarterly")}</option>
+                  <option value="yearly">{t("common.yearly")}</option>
                 </select>
                 <label className="text-xs text-ink-3" htmlFor="driver-dir">
-                  Better when
+                  {t("common.betterWhen")}
                 </label>
                 <select
                   id="driver-dir"
@@ -292,11 +296,11 @@ export default async function KpiTreesPage({
                   defaultValue="higher_better"
                   className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                 >
-                  <option value="higher_better">higher</option>
-                  <option value="lower_better">lower</option>
+                  <option value="higher_better">{t("common.higher")}</option>
+                  <option value="lower_better">{t("common.lower")}</option>
                 </select>
                 <label className="text-xs text-ink-3" htmlFor="driver-target">
-                  Standing target
+                  {t("common.standingTarget")}
                 </label>
                 <input
                   id="driver-target"
@@ -311,19 +315,17 @@ export default async function KpiTreesPage({
                   type="submit"
                   className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
                 >
-                  Add the driver
+                  {t("kpis.trees.addTheDriver")}
                 </button>
                 <Link
                   href={`/kpis/trees?tree=${tree.treeId ?? "none"}`}
                   className="text-xs text-ink-3 hover:underline"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Link>
               </div>
               <p className="text-xs text-ink-4">
-                A leading driver is something a team can act on this week, which
-                is what makes it a candidate for a recovery key result. It joins
-                this tree automatically.
+                {t("kpis.trees.aLeadingDriverIs")}
               </p>
             </ActionForm>
           </CardBody>
@@ -334,14 +336,14 @@ export default async function KpiTreesPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              File a KPI into this tree
+              {t("kpis.trees.fileAKpiInto")}
             </h2>
           </CardHeader>
           <CardBody>
             <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
               <input type="hidden" name="treeId" value={tree.treeId} />
               <label className="sr-only" htmlFor="kpiId">
-                Which KPI
+                {t("kpis.trees.whichKpi")}
               </label>
               <select
                 id="kpiId"
@@ -359,11 +361,10 @@ export default async function KpiTreesPage({
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                File it
+                {t("kpis.trees.fileIt")}
               </button>
               <p className="text-xs text-ink-4">
-                The root goes in first. Everything under it joins as its drivers
-                are added.
+                {t("kpis.trees.theRootGoesIn")}
               </p>
             </ActionForm>
           </CardBody>
@@ -373,29 +374,30 @@ export default async function KpiTreesPage({
       {canEdit ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Name a tree</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.trees.nameATree")}
+            </h2>
           </CardHeader>
           <CardBody>
             <ActionForm action={addTree} className="flex flex-col gap-2">
               <label className="sr-only" htmlFor="name">
-                Tree name
+                {t("kpis.trees.treeName")}
               </label>
               <input
                 id="name"
                 name="name"
                 required
-                placeholder="Operating margin"
+                placeholder={t("kpis.trees.operatingMargin")}
                 className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
               />
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
-                Name it
+                {t("common.nameIt")}
               </button>
               <p className="text-xs text-ink-4">
-                A workspace may have several trees. The parent pointers shape
-                one; this names it.
+                {t("kpis.trees.aWorkspaceMayHave")}
               </p>
             </ActionForm>
           </CardBody>
@@ -404,20 +406,14 @@ export default async function KpiTreesPage({
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Not here yet</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.notHereYet")}
+          </h2>
         </CardHeader>
         <CardBody>
           <ul className="flex flex-col gap-1 text-xs text-ink-3">
-            <li>
-              The right-hand panel S-18 describes, which edits the selected KPI
-              in place. The fields are all editable through the KPI detail, so
-              this is a second surface for the same action rather than missing
-              capability.
-            </li>
-            <li>
-              Dragging a node onto a new parent. Re-parenting works through the
-              detail page; the canvas gesture does not exist.
-            </li>
+            <li>{t("kpis.trees.theRightHandPanel")}</li>
+            <li>{t("kpis.trees.draggingANodeOnto")}</li>
           </ul>
         </CardBody>
       </Card>

@@ -1,4 +1,5 @@
 import { type KeyResultDirection, trendForecast } from "@openokr/method";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * A key result's value history, drawn small, with the §3.6 forecast beside it
@@ -22,7 +23,7 @@ export interface HistoryPoint {
 const WIDTH = 120;
 const HEIGHT = 28;
 
-export function Sparkline({
+export async function Sparkline({
   history,
   direction,
   baseline,
@@ -41,6 +42,8 @@ export function Sparkline({
    */
   readonly horizonAt: number | null;
 }) {
+  const { t } = await getTranslations();
+
   if (history.length < 2) {
     return (
       <span className="text-xs text-ink-4">
@@ -105,7 +108,7 @@ export function Sparkline({
           values[values.length - 1]
         }`}
       >
-        <title>Value history</title>
+        <title>{t("goals.detail.sparkline.valueHistory")}</title>
         <path
           d={path}
           fill="none"
@@ -129,8 +132,7 @@ export function Sparkline({
         </span>
       ) : (
         <span className="text-xs text-ink-4">
-          No deadline to project to, or not enough distinct dates to fit a
-          trend.
+          {t("goals.detail.sparkline.noDeadlineToProject")}
         </span>
       )}
     </span>

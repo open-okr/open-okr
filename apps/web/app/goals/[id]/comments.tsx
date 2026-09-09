@@ -6,7 +6,7 @@
  * Shows comments, a composer with mention support, and reactions per comment.
  * Each comment is deep-linkable via #comment-{id}.
  */
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 // Rich text editor and mention extensions will be wired in once the
 // comment thread component uses the full TipTap editor. For now the
 // composer uses a plain textarea that wraps input into editor JSON.
@@ -64,6 +64,8 @@ export function CommentThread({
   onDelete,
   onReact,
 }: CommentThreadProps) {
+  const { t } = useTranslations();
+
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -103,12 +105,13 @@ export function CommentThread({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium text-ink-2">
-        Discussion ({comments.length})
+        {t("goals.detail.comments.discussion")}
+        {comments.length})
       </h3>
 
       {comments.length === 0 && (
         <p className="text-sm text-ink-3">
-          No comments yet. Start the conversation.
+          {t("goals.detail.comments.noCommentsYetStart")}
         </p>
       )}
 
@@ -194,14 +197,14 @@ export function CommentThread({
                     className="text-xs text-ink-3 hover:text-ink-2"
                     onClick={() => setEditingId(comment.id)}
                   >
-                    Edit
+                    {t("common.edit")}
                   </button>
                   <button
                     type="button"
                     className="text-xs text-ink-3 hover:text-bad"
                     onClick={() => handleDelete(comment.id)}
                   >
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </>
               )}
@@ -218,7 +221,7 @@ export function CommentThread({
             });
           }}
           saving={isPending}
-          placeholder="Write a comment..."
+          placeholder={t("goals.detail.comments.writeAComment")}
         />
       </div>
     </div>
@@ -226,15 +229,25 @@ export function CommentThread({
 }
 
 function CommentBody({ body }: { body: unknown }) {
+  const { t } = useTranslations();
+
   if (!body || typeof body !== "object") {
-    return <p className="text-ink-3 italic">Empty comment</p>;
+    return (
+      <p className="text-ink-3 italic">
+        {t("goals.detail.comments.emptyComment")}
+      </p>
+    );
   }
   // Render rich text content as paragraphs for now.
   // The full rich-text renderer from packages/core will be used once
   // the sanitising allow-list render is wired to a React component.
   const doc = body as { content?: unknown[] };
   if (!doc.content || !Array.isArray(doc.content)) {
-    return <p className="text-ink-3 italic">Empty comment</p>;
+    return (
+      <p className="text-ink-3 italic">
+        {t("goals.detail.comments.emptyComment")}
+      </p>
+    );
   }
   return (
     <>
@@ -282,6 +295,8 @@ function CommentEditor({
   saving,
   placeholder,
 }: CommentEditorProps) {
+  const { t } = useTranslations();
+
   const [body, setBody] = useState<unknown>(initialBody ?? null);
 
   return (
@@ -315,7 +330,7 @@ function CommentEditor({
         </Button>
         {onCancel && (
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         )}
       </div>

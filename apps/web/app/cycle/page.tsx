@@ -10,6 +10,7 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { AnnualFrame } from "./annual-frame.tsx";
 import { AnnualObjectives } from "./annual-objectives.tsx";
@@ -51,6 +52,8 @@ export default async function CyclePage({
 }: {
   searchParams: Promise<{ phase?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -77,11 +80,13 @@ export default async function CyclePage({
       <div className="flex flex-col gap-4.5">
         <Card>
           <CardHeader>
-            <h1 className="text-lg font-bold text-ink">No cycle yet</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("cycle.noCycleYet")}
+            </h1>
           </CardHeader>
           <CardBody>
             <p className="text-sm text-ink-3">
-              This workspace has no cycle to plan.
+              {t("cycle.thisWorkspaceHasNo")}
             </p>
           </CardBody>
         </Card>
@@ -318,20 +323,20 @@ export default async function CyclePage({
           <CardHeader className="justify-between">
             <div className="flex flex-col">
               <h1 className="text-base font-bold text-ink">
-                Phase {viewing} · {PHASE_TITLES[viewing]}
+                {t("common.phase")} {viewing} · {PHASE_TITLES[viewing]}
               </h1>
               <p className="text-xs text-ink-3">
-                {workflow.name} · completion is computed, never self-reported
+                {workflow.name} {t("cycle.completionIsComputedNever")}
               </p>
             </div>
             <Chip tone={workflow.mode === "annual" ? "brand" : "neutral"}>
-              {workflow.mode} mode
+              {workflow.mode} {t("common.mode")}
             </Chip>
           </CardHeader>
           {work.allowed ? null : (
             <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
               <p className="text-sm font-bold text-warn">
-                This phase is blocked by earlier work
+                {t("cycle.thisPhaseIsBlocked")}
               </p>
               <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
                 {work.because.map((reason) => (
@@ -340,7 +345,7 @@ export default async function CyclePage({
               </ul>
               <p className="text-xs text-warn">
                 <a className="underline" href="/cycle?phase=1">
-                  Go and gather what is missing
+                  {t("cycle.goAndGatherWhat")}
                 </a>
               </p>
             </CardBody>
@@ -349,7 +354,9 @@ export default async function CyclePage({
             <CardBody className="border-line border-t">
               <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
                 {phase.blocked.map((reason) => (
-                  <li key={reason}>Not yet checkable: {reason}</li>
+                  <li key={reason}>
+                    {t("cycle.notYetCheckable")} {reason}
+                  </li>
                 ))}
               </ul>
             </CardBody>
@@ -357,7 +364,7 @@ export default async function CyclePage({
           {phase && phase.missing.length > 0 ? (
             <CardBody className="border-line border-t">
               <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
-                Still needed here
+                {t("cycle.stillNeededHere")}
               </p>
               <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
                 {phase.missing.map((reason) => (
@@ -552,7 +559,7 @@ export default async function CyclePage({
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
-                Decisions this cycle
+                {t("cycle.decisionsThisCycle")}
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
@@ -578,8 +585,7 @@ export default async function CyclePage({
                 ))}
               </ul>
               <p className="text-xs text-ink-4">
-                Recorded in the monthly reviews. Each one names the key result
-                or the objective it affects.
+                {t("cycle.recordedInTheMonthly")}
               </p>
             </CardBody>
           </Card>

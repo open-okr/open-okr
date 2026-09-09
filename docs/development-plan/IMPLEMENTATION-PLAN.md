@@ -1847,6 +1847,9 @@ without a decision.
 - **P6-G22b**: the pseudo-locale gate over every route, with the routes
   exempted by name and the list only ever shrinking.
 - **P6-G22c**: the strings themselves, route by route, removing exemptions.
+- **P6-G22d**: a message can carry a value. Added by P6-G22c, which found that
+  moving a sentence with a number in it produces fragments no translator can
+  reassemble.
 
 ### P6-G22a: The locale is the member's, not `en` [M]
 Depends on: P2-T10
@@ -1874,6 +1877,26 @@ Acceptance: Given a member who sets their language, when they reload any screen,
 of the three; P6-G08 deliberately left them rather than storing a preference
 whose screen was two rows away. So this row brings the migration, the §4.14
 registry entry with its default, and the control together.
+
+### P6-G22d: A message can carry a value [M]
+Depends on: P6-G22c
+Goal: a sentence with a number in it is one catalogue entry, not three.
+
+**Found by doing P6-G22c, and measured.** Moving 1,543 strings into the
+catalogue split every sentence that interleaves with an expression. `{low} to
+{high} a week` became the pieces "to" and "a week. Fewer than" on either side
+of two values, and 187 of the 1,354 entries now start mid-sentence. Word order
+is not the same in every language, so a translator cannot reassemble them: a
+Malay reader of "at" has no way to know what it attaches to.
+
+`translate(catalogue, key)` takes no parameters, which is why the codemod had
+nothing better to do. Giving it some is a design decision about the message
+format, not a mechanical change, which is why this is its own row rather than
+part of the one that found it.
+
+Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the 187 fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
+Test plan: a message with a placeholder renders with the value substituted; a missing parameter fails rather than rendering the placeholder; the fragment count is zero and stays there.
+Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
 
 ### P6-G23: Theme and density control [S]
 Depends on: P2-T10

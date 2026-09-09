@@ -1,6 +1,7 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { revoke } from "./actions.ts";
 import { RevokeForm } from "./revoke-form.tsx";
@@ -19,6 +20,8 @@ import { RevokeForm } from "./revoke-form.tsx";
  * colleague.
  */
 export default async function ConnectionsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const { connections } = await callAction(
     {
@@ -37,21 +40,20 @@ export default async function ConnectionsPage() {
       <Card>
         <CardHeader>
           <span className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-ink">Connected agents</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("account.connections.connectedAgents")}
+            </h1>
             <Chip tone="neutral">{live.length}</Chip>
           </span>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <p className="text-sm text-ink-3">
-            External agents you allowed to act as you. Each one holds your own
-            access, narrowed to what you granted it, in the one workspace you
-            picked.
+            {t("account.connections.externalAgentsYouAllowed")}
           </p>
 
           {connections.length === 0 ? (
             <p className="text-xs text-ink-3">
-              Nothing connected. An agent starts this itself, by sending you
-              here.
+              {t("account.connections.nothingConnectedAnAgent")}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -64,9 +66,9 @@ export default async function ConnectionsPage() {
                   <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
                     {connection.clientName}
                     {connection.revokedAt ? (
-                      <Chip tone="bad">revoked</Chip>
+                      <Chip tone="bad">{t("common.revoked")}</Chip>
                     ) : (
-                      <Chip tone="ok">active</Chip>
+                      <Chip tone="ok">{t("common.active")}</Chip>
                     )}
                     {connection.scopes.map((scope) => (
                       <Chip key={scope} tone="neutral">

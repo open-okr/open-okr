@@ -1,7 +1,14 @@
 "use client";
 
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import { updateSpaceSettings } from "../actions.ts";
 import { NO_SPACE_ERROR } from "../write-state.ts";
@@ -52,6 +59,8 @@ export function SpaceSettingsCard({
   readonly workspaceFrequency: string;
   readonly canManage: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(
     updateSpaceSettings,
     NO_SPACE_ERROR,
@@ -61,24 +70,26 @@ export function SpaceSettingsCard({
     return (
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="font-semibold text-ink">Space settings</h2>
+          <h2 className="font-semibold text-ink">
+            {t("spaces.detail.spaceSettings.spaceSettings")}
+          </h2>
           <Chip tone={settings.teamVoting ? "ok" : "neutral"}>
             {settings.teamVoting ? "team voting on" : "team voting off"}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1 text-sm text-ink-2">
           <p>
-            Coaching strictness:{" "}
+            {t("spaces.detail.spaceSettings.coachingStrictness")}{" "}
             {settings.coachStrictness ??
               `the workspace's (${workspaceStrictness})`}
           </p>
           <p>
-            Default check-in frequency:{" "}
+            {t("spaces.detail.spaceSettings.defaultCheckInFrequency")}{" "}
             {settings.defaultCheckInFrequency ??
               `the workspace's (${workspaceFrequency})`}
           </p>
           <p className="text-xs text-ink-3">
-            Changing these is the space manager's.
+            {t("spaces.detail.spaceSettings.changingTheseIsThe")}
           </p>
         </CardBody>
       </Card>
@@ -88,10 +99,11 @@ export function SpaceSettingsCard({
   return (
     <Card>
       <CardHeader>
-        <h2 className="font-semibold text-ink">Space settings</h2>
+        <h2 className="font-semibold text-ink">
+          {t("spaces.detail.spaceSettings.spaceSettings")}
+        </h2>
         <p className="text-sm text-ink-3">
-          What this team does differently. Everything left as the workspace's
-          follows the workspace, including when the workspace changes it.
+          {t("spaces.detail.spaceSettings.whatThisTeamDoes")}
         </p>
       </CardHeader>
       <CardBody>
@@ -110,23 +122,28 @@ export function SpaceSettingsCard({
               className="mt-0.5 size-4"
             />
             <span className="flex flex-col">
-              <span className="text-ink">Team voting</span>
+              <span className="text-ink">
+                {t("spaces.detail.spaceSettings.teamVoting")}
+              </span>
               <span className="text-xs text-ink-3">
-                The retro's voting stage, which METHOD.md §8.1 gives every
-                space. Turned off here, a vote is refused rather than merely
-                hidden.
+                {t("spaces.detail.spaceSettings.theRetroSVoting")}
               </span>
             </span>
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-ink">Coaching strictness</span>
+            <span className="text-ink">
+              {t("spaces.detail.spaceSettings.coachingStrictness2")}
+            </span>
             <select
               name="coachStrictness"
               defaultValue={settings.coachStrictness ?? ""}
               className="w-72 rounded-md border border-line bg-bg px-2 py-1"
             >
-              <option value="">The workspace's ({workspaceStrictness})</option>
+              <option value="">
+                {t("spaces.detail.spaceSettings.theWorkspaceS")}
+                {workspaceStrictness})
+              </option>
               {COACH_STRICTNESS.map((option) => (
                 <option key={option} value={option}>
                   {option}: {STRICTNESS_MEANING[option] ?? ""}
@@ -134,19 +151,23 @@ export function SpaceSettingsCard({
               ))}
             </select>
             <span className="text-xs text-ink-3">
-              Applies to this space's goals and to no others. The six publish
-              gates stay hard whatever this says.
+              {t("spaces.detail.spaceSettings.appliesToThisSpace")}
             </span>
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-ink">Default check-in frequency</span>
+            <span className="text-ink">
+              {t("spaces.detail.spaceSettings.defaultCheckInFrequency2")}
+            </span>
             <select
               name="defaultCheckInFrequency"
               defaultValue={settings.defaultCheckInFrequency ?? ""}
               className="w-72 rounded-md border border-line bg-bg px-2 py-1"
             >
-              <option value="">The workspace's ({workspaceFrequency})</option>
+              <option value="">
+                {t("spaces.detail.spaceSettings.theWorkspaceS")}
+                {workspaceFrequency})
+              </option>
               {CHECK_IN_FREQUENCIES.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -154,8 +175,7 @@ export function SpaceSettingsCard({
               ))}
             </select>
             <span className="text-xs text-ink-3">
-              A team shipping daily and a team shipping quarterly are the same
-              workspace.
+              {t("spaces.detail.spaceSettings.aTeamShippingDaily")}
             </span>
           </label>
 
@@ -177,7 +197,7 @@ export function SpaceSettingsCard({
                 data-testid="space-settings-saved"
                 className="text-xs text-ok"
               >
-                Saved. Anything left as the workspace's still follows it.
+                {t("spaces.detail.spaceSettings.savedAnythingLeftAs")}
               </p>
             ) : null}
           </div>

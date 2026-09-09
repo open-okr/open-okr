@@ -6,6 +6,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { publishDocumentAction, updateDocumentAction } from "../actions.ts";
@@ -40,6 +41,8 @@ export default async function DocumentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -93,11 +96,13 @@ export default async function DocumentPage({
                   href={back}
                   className="text-xs text-ink-3 hover:text-brand-text"
                 >
-                  Back to the {document.subjectType.replace("_", " ")}
+                  {t("documents.detail.backToThe")}{" "}
+                  {document.subjectType.replace("_", " ")}
                 </Link>
               ) : (
                 <span className="text-xs text-ink-3">
-                  On a {document.subjectType.replace("_", " ")}
+                  {t("documents.detail.onA")}{" "}
+                  {document.subjectType.replace("_", " ")}
                 </span>
               )}
               <h1 className="text-lg font-bold text-ink">{document.title}</h1>
@@ -120,8 +125,7 @@ export default async function DocumentPage({
           {document.state === "draft" ? (
             <CardBody>
               <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-xs text-warn">
-                Only you can see this. Nobody has been told about it, and it is
-                in nobody's feed. Publishing is what changes both.
+                {t("documents.detail.onlyYouCanSee")}
               </p>
             </CardBody>
           ) : null}
@@ -150,7 +154,9 @@ export default async function DocumentPage({
       <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
         <Card>
           <CardHeader className="justify-between">
-            <h2 className="text-sm font-bold text-ink">History</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("documents.detail.history")}
+            </h2>
             <span className="text-xs text-ink-3">
               {document.versionCount === 0
                 ? "Never published"
@@ -162,8 +168,7 @@ export default async function DocumentPage({
           <CardBody className="flex flex-col gap-3">
             {document.versions.length === 0 ? (
               <p className="text-xs text-ink-3">
-                Nothing yet. A version is written when you publish, because a
-                version is a thing you decided to show other people.
+                {t("documents.detail.nothingYetAVersion")}
               </p>
             ) : (
               <ul className="flex flex-col gap-1" data-testid="doc-versions">
@@ -173,7 +178,7 @@ export default async function DocumentPage({
                     className="flex items-center justify-between gap-2 text-xs"
                   >
                     <span className="text-ink-2">
-                      Version {version.version}
+                      {t("documents.detail.version")} {version.version}
                     </span>
                     <span className="truncate text-ink-3">
                       {version.authorName} · {version.createdAt.slice(0, 10)}
@@ -186,16 +191,16 @@ export default async function DocumentPage({
             {difference.to !== null && difference.from !== null ? (
               <div className="flex flex-col gap-1" data-testid="doc-difference">
                 <p className="text-xs font-semibold text-ink-2">
-                  What changed between version {difference.from} and{" "}
-                  {difference.to}
+                  {t("documents.detail.whatChangedBetweenVersion")}{" "}
+                  {difference.from} {t("documents.detail.and")} {difference.to}
                 </p>
                 <p className="text-xs text-ink-3">
-                  {difference.added} added, {difference.removed} removed
+                  {difference.added} {t("documents.detail.added")}{" "}
+                  {difference.removed} {t("documents.detail.removed")}
                 </p>
                 {difference.truncated ? (
                   <p className="text-xs text-ink-3">
-                    Too long to compare line by line, so this is the current
-                    text rather than a difference.
+                    {t("documents.detail.tooLongToCompare")}
                   </p>
                 ) : null}
                 <ul className="flex flex-col gap-0.5 font-mono text-xs">

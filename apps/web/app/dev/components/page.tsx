@@ -11,6 +11,7 @@ import {
   VerdictDot,
 } from "@openokr/ui";
 import { notFound } from "next/navigation";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * The core component preview page (UIUX-PLAN.md §5: "Each gets a preview
@@ -23,54 +24,64 @@ import { notFound } from "next/navigation";
  * now, `?theme=dark` and `?density=compact` on this URL work too, since
  * they just set the same `data-*` attributes the theme provider does.
  */
-export default function ComponentsPreviewPage() {
+export default async function ComponentsPreviewPage() {
+  const { t } = await getTranslations();
+
   if (process.env.NODE_ENV === "production") {
     notFound();
   }
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <h1 className="text-2xl font-bold text-ink">Core components</h1>
+      <h1 className="text-2xl font-bold text-ink">
+        {t("dev.components.coreComponents")}
+      </h1>
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Buttons</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.buttons")}
+          </h2>
         </CardHeader>
         <CardBody className="flex flex-wrap items-center gap-3">
-          <Button>Default</Button>
-          <Button variant="primary">Primary</Button>
-          <Button variant="ai">✨ AI</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button size="sm">Small</Button>
-          <Button disabled>Disabled</Button>
+          <Button>{t("dev.components.default")}</Button>
+          <Button variant="primary">{t("dev.components.primary")}</Button>
+          <Button variant="ai">{t("dev.components.ai")}</Button>
+          <Button variant="ghost">{t("dev.components.ghost")}</Button>
+          <Button size="sm">{t("dev.components.small")}</Button>
+          <Button disabled>{t("dev.components.disabled")}</Button>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Chips</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.chips")}
+          </h2>
         </CardHeader>
         <CardBody className="flex flex-wrap items-center gap-2">
-          <Chip>Neutral</Chip>
+          <Chip>{t("dev.components.neutral")}</Chip>
           <Chip tone="ok" dot>
-            On track
+            {t("common.onTrack")}
           </Chip>
           <Chip tone="warn" dot>
-            At risk
+            {t("dev.components.atRisk")}
           </Chip>
           <Chip tone="bad" dot>
-            Off track
+            {t("common.offTrack")}
           </Chip>
           <Chip tone="info" dot>
-            Info
+            {t("dev.components.info")}
           </Chip>
-          <Chip tone="brand">Brand</Chip>
+          <Chip tone="brand">{t("dev.components.brand")}</Chip>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Bars</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.bars")}
+          </h2>
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
           {/*
@@ -101,27 +112,31 @@ export default function ComponentsPreviewPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Verdict dots</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.verdictDots")}
+          </h2>
         </CardHeader>
         <CardBody className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
-            <VerdictDot state="pass" /> Pass
+            <VerdictDot state="pass" /> {t("dev.components.pass")}
           </span>
           <span className="flex items-center gap-1.5">
-            <VerdictDot state="warn" /> Warning
+            <VerdictDot state="warn" /> {t("dev.components.warning")}
           </span>
           <span className="flex items-center gap-1.5">
-            <VerdictDot state="fail" /> Fail
+            <VerdictDot state="fail" /> {t("dev.components.fail")}
           </span>
           <span className="flex items-center gap-1.5">
-            <VerdictDot state="todo" /> Not checked
+            <VerdictDot state="todo" /> {t("dev.components.notChecked")}
           </span>
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Avatars</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.avatars")}
+          </h2>
         </CardHeader>
         <CardBody className="flex items-center gap-4">
           <Avatar name="Ada Lovelace" size="sm" />
@@ -137,12 +152,14 @@ export default function ComponentsPreviewPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-base font-bold text-ink">Keys</h2>
+          <h2 className="text-base font-bold text-ink">
+            {t("dev.components.keys")}
+          </h2>
         </CardHeader>
         <CardBody className="flex items-center gap-2">
           <Kbd>⌘K</Kbd>
           <Kbd>?</Kbd>
-          <Kbd>Esc</Kbd>
+          <Kbd>{t("common.esc")}</Kbd>
         </CardBody>
       </Card>
     </div>

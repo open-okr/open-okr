@@ -3,6 +3,7 @@ import { Button, Card, CardBody } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../../lib/pool";
 import { currentSession } from "../../../lib/session";
+import { getTranslations } from "../../../lib/translations";
 import { acceptInvitation, startSignUp } from "./actions.ts";
 import { JoinButton } from "./join-button.tsx";
 
@@ -32,23 +33,22 @@ import { JoinButton } from "./join-button.tsx";
 
 export const dynamic = "force-dynamic";
 
-function Refusal() {
+async function Refusal() {
+  const { t } = await getTranslations();
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-md items-center px-4">
       <Card className="w-full">
         <CardBody className="flex flex-col gap-3">
           <h1 className="text-lg font-bold text-ink">
-            That invitation cannot be used
+            {t("join.detail.thatInvitationCannotBe")}
           </h1>
-          <p className="text-sm text-ink-2">
-            It may have been withdrawn, already used, or it may have expired.
-            Ask whoever invited you for a fresh one.
-          </p>
+          <p className="text-sm text-ink-2">{t("join.detail.itMayHaveBeen")}</p>
           <Link
             href="/sign-in"
             className="text-sm font-medium text-brand-text hover:underline"
           >
-            Sign in instead
+            {t("join.detail.signInInstead")}
           </Link>
         </CardBody>
       </Card>
@@ -61,6 +61,8 @@ export default async function JoinPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { token } = await params;
   const invitation = await previewInvite(getPool(), {
     token,
@@ -88,7 +90,7 @@ export default async function JoinPage({
         <Card className="w-full">
           <CardBody className="flex flex-col gap-3.5">
             <h1 className="text-lg font-bold text-ink">
-              You have been invited to {invitation.workspaceName}
+              {t("join.detail.youHaveBeenInvited")} {invitation.workspaceName}
             </h1>
             <p className="text-sm text-ink-2">
               {invitation.email
@@ -98,19 +100,18 @@ export default async function JoinPage({
             <div className="flex items-center gap-2.5">
               <JoinButton action={startSignUp} token={token}>
                 <Button type="submit" variant="default" size="sm">
-                  Create an account
+                  {t("common.createAnAccount")}
                 </Button>
               </JoinButton>
               <Link
                 href={`/sign-in?next=${encodeURIComponent(`/join/${token}`)}`}
                 className="text-sm font-medium text-brand-text hover:underline"
               >
-                I already have one
+                {t("join.detail.iAlreadyHaveOne")}
               </Link>
             </div>
             <p className="text-xs text-ink-3">
-              Signing in with an existing account brings you back here to
-              accept.
+              {t("join.detail.signingInWithAn")}
             </p>
           </CardBody>
         </Card>
@@ -123,17 +124,17 @@ export default async function JoinPage({
       <Card className="w-full">
         <CardBody className="flex flex-col gap-3.5">
           <h1 className="text-lg font-bold text-ink">
-            Join {invitation.workspaceName}
+            {t("common.join")} {invitation.workspaceName}
           </h1>
           <p className="text-sm text-ink-2">
-            You are signed in as {session.user.email}.
+            {t("join.detail.youAreSignedIn")} {session.user.email}.
             {invitation.email && invitation.email !== session.user.email
               ? " This invitation was issued to a different address, so it will be refused. Sign in as that person, or ask for one of your own."
               : ""}
           </p>
           <JoinButton action={acceptInvitation} token={token}>
             <Button type="submit" variant="default" size="sm">
-              Join {invitation.workspaceName}
+              {t("common.join")} {invitation.workspaceName}
             </Button>
           </JoinButton>
         </CardBody>

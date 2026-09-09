@@ -19,6 +19,7 @@
  * listed as "no data yet" placeholders rather than faked. P4-T07a owns the
  * session record and the live sync; the subsequent tasks fill the panels.
  */
+
 import { callAction, excerptRichText } from "@openokr/core";
 import {
   REVIEW_STAGE_KEYS,
@@ -33,6 +34,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
@@ -73,6 +75,8 @@ interface SessionPageProps {
 }
 
 export default async function SessionPage({ params }: SessionPageProps) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const pool = getPool();
@@ -612,7 +616,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             }}
           >
             <Button type="submit" variant="primary">
-              Start session
+              {t("session.detail.startSession")}
             </Button>
           </form>
           <form
@@ -622,7 +626,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             }}
           >
             <Button type="submit" variant="default">
-              Skip
+              {t("common.skip")}
             </Button>
           </form>
         </div>
@@ -631,7 +635,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Step rail */}
       {sessionRow.kind === "weekly" && (
         <Card>
-          <CardHeader>Steps</CardHeader>
+          <CardHeader>{t("session.detail.steps")}</CardHeader>
           <CardBody>
             <ol className="space-y-3">
               {WEEKLY_STEPS.map((step: WeeklyStep, index: number) => {
@@ -756,7 +760,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
               }}
             >
               <Button type="submit" variant="primary">
-                Close session
+                {t("session.detail.closeSession")}
               </Button>
             </form>
           )}
@@ -859,8 +863,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
         <Card>
           <CardBody>
             <p className="text-sm text-ink-3">
-              This stage is the four questions leadership answers. It is read by
-              this space's managers and its coordinator.
+              {t("session.detail.thisStageIsThe")}
             </p>
           </CardBody>
         </Card>
@@ -893,10 +896,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {isQuarterly ? (
         <p className="text-xs text-ink-4">
           <Link className="underline" href={`/session/${id}/minutes`}>
-            The minutes
+            {t("session.detail.theMinutes")}
           </Link>{" "}
-          are generated from whatever the review has recorded so far, and say so
-          while it is still running.
+          {t("session.detail.areGeneratedFromWhatever")}
         </p>
       ) : null}
 
@@ -931,7 +933,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Participant list */}
       {participants.length > 0 && (
         <Card>
-          <CardHeader>Participants</CardHeader>
+          <CardHeader>{t("session.detail.participants")}</CardHeader>
           <CardBody>
             <ul className="space-y-1">
               {participants.map((p) => (

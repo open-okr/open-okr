@@ -22,7 +22,14 @@
  * JavaScript count-up would keep counting straight through that override, which
  * is the trap this note exists to mark.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { verdictLabel, verdictTone } from "../../../lib/verdict";
@@ -81,6 +88,8 @@ function ScoreRow({
   readonly canScore: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Nought when ungraded, because a slider has to sit somewhere. The stored
@@ -121,10 +130,12 @@ function ScoreRow({
         {keyResult.weight === 1 ? null : (
           // The weight is visible because it changes what the objective score
           // will be, and a room that cannot see it cannot argue with it.
-          <Chip tone="neutral">weight {keyResult.weight}</Chip>
+          <Chip tone="neutral">
+            {t("session.detail.scoring.weight")} {keyResult.weight}
+          </Chip>
         )}
         {keyResult.score === null ? (
-          <Chip tone="warn">not graded</Chip>
+          <Chip tone="warn">{t("session.detail.scoring.notGraded")}</Chip>
         ) : (
           <Chip tone="ok">{keyResult.score.toFixed(1)}</Chip>
         )}
@@ -139,7 +150,9 @@ function ScoreRow({
             className="flex flex-wrap items-center gap-2"
             htmlFor={`score-${keyResult.keyResultId}`}
           >
-            <span className="text-xs font-medium text-ink-3">Score</span>
+            <span className="text-xs font-medium text-ink-3">
+              {t("session.detail.scoring.score")}
+            </span>
             <input
               id={`score-${keyResult.keyResultId}`}
               type="range"
@@ -160,7 +173,7 @@ function ScoreRow({
             htmlFor={`reason-${keyResult.keyResultId}`}
           >
             <span className="text-xs font-medium text-ink-3">
-              One line on why
+              {t("common.oneLineOnWhy")}
             </span>
             <input
               id={`reason-${keyResult.keyResultId}`}
@@ -168,7 +181,7 @@ function ScoreRow({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={reason}
               disabled={pending}
-              placeholder="Facts, not feelings"
+              placeholder={t("common.factsNotFeelings")}
               onChange={(event) => setReason(event.target.value)}
             />
           </label>
@@ -201,6 +214,8 @@ function Reveal({
   readonly canReveal: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -230,7 +245,7 @@ function Reveal({
           {objective.score.toFixed(2)}
         </span>
         <span className="text-xs text-ink-3">
-          this objective's score, weighted by each key result's weight
+          {t("session.detail.scoring.thisObjectiveSScore")}
         </span>
       </p>
     );
@@ -245,7 +260,7 @@ function Reveal({
       </span>
       {canReveal && objective.scored > 0 ? (
         <Button type="button" size="sm" disabled={pending} onClick={reveal}>
-          Reveal the score
+          {t("session.detail.scoring.revealTheScore")}
         </Button>
       ) : null}
     </span>
@@ -263,6 +278,8 @@ export function Scoring({
   readonly canScore: boolean;
   readonly canReveal: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
@@ -271,13 +288,12 @@ export function Scoring({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Score the key results
+              {t("session.detail.scoring.scoreTheKeyResults")}
             </h2>
           </CardHeader>
           <CardBody>
             <p className="text-sm text-ink-3">
-              No open objectives in this space and cycle, so there is nothing to
-              grade.
+              {t("session.detail.scoring.noOpenObjectivesIn")}
             </p>
           </CardBody>
         </Card>
@@ -293,9 +309,12 @@ export function Scoring({
               <Chip
                 tone={objective.scored === objective.total ? "ok" : "neutral"}
               >
-                {objective.scored} of {objective.total} graded
+                {objective.scored} {t("common.of")} {objective.total}{" "}
+                {t("session.detail.scoring.graded")}
               </Chip>
-              {objective.revealed ? <Chip tone="info">revealed</Chip> : null}
+              {objective.revealed ? (
+                <Chip tone="info">{t("session.detail.scoring.revealed")}</Chip>
+              ) : null}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
@@ -330,14 +349,12 @@ export function Scoring({
               objective and even weights the two figures are the same. */}
           {status.cycleScore === null ? (
             <p className="text-xs text-ink-4">
-              The cycle score appears as objectives are revealed. It averages
-              the key results of what the room has put out, so nothing reaches
-              it early.
+              {t("session.detail.scoring.theCycleScoreAppears")}
             </p>
           ) : (
             <p className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-ink-3">
-                Cycle score so far
+                {t("session.detail.scoring.cycleScoreSoFar")}
               </span>
               <span
                 key={status.cycleScore}
@@ -354,7 +371,7 @@ export function Scoring({
             {status.complete
               ? "Every key result is graded. The stage can end."
               : "Every key result needs a grade and one line on why before the stage ends."}{" "}
-            Grades land on the key results when the review closes, not before.
+            {t("session.detail.scoring.gradesLandOnThe")}
           </p>
         </>
       )}

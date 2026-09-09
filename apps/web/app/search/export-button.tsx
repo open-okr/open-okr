@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 
 /**
@@ -49,6 +50,8 @@ export function ExportButton({
   readonly label?: string;
   readonly onExport: (format: ExportFormat) => Promise<ExportOutcome>;
 }) {
+  const { t } = useTranslations();
+
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function ExportButton({
     <span className="flex flex-col items-start gap-1">
       <span className="flex items-center gap-1.5">
         <label className="sr-only" htmlFor="export-format">
-          Export format
+          {t("search.exportButton.exportFormat")}
         </label>
         <select
           id="export-format"

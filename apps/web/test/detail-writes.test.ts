@@ -82,7 +82,7 @@ describe("the goal writes", () => {
     // And say what unlinking keeps, because the alternative reading is that
     // the measure is reset. The sentence is in the catalogue (P6-G22b), so
     // the card carries its key.
-    expect(card).toContain('t("goal.writes.unlinkHelp")');
+    expect(card).toContain('t("common.unlinkHelp")');
   });
 });
 

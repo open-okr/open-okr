@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 /**
@@ -39,7 +40,9 @@ function whenLabel(iso: string): string {
   });
 }
 
-function SessionRow({ row }: { readonly row: Row }) {
+async function SessionRow({ row }: { readonly row: Row }) {
+  const { t } = await getTranslations();
+
   const running = row.state === "running";
   return (
     <Link
@@ -54,10 +57,10 @@ function SessionRow({ row }: { readonly row: Row }) {
           {running ? (
             // The one state that changes what a reader should do next, so it is
             // the one that gets a chip rather than a word in a line of text.
-            <Chip tone="brand">In progress</Chip>
+            <Chip tone="brand">{t("common.inProgress")}</Chip>
           ) : null}
           {row.isFacilitator ? (
-            <Chip tone="neutral">You facilitate</Chip>
+            <Chip tone="neutral">{t("sessions.youFacilitate")}</Chip>
           ) : null}
         </div>
         <p className="truncate text-xs text-ink-3">
@@ -79,6 +82,8 @@ export default async function SessionsPage({
 }: {
   searchParams: Promise<{ finished?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { finished } = await searchParams;
   const { session, workspace } = await requireWorkspace();
   const includeFinished = finished === "1";
@@ -104,10 +109,11 @@ export default async function SessionsPage({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Sessions</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("common.sessions")}
+            </h1>
             <p className="text-xs text-ink-3">
-              Every session in a space you can read. Anything in progress is at
-              the top.
+              {t("sessions.everySessionInA")}
             </p>
           </div>
           <Link
@@ -123,17 +129,16 @@ export default async function SessionsPage({
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              No sessions in the spaces you can read.
+              {t("sessions.noSessionsInThe")}
             </p>
             <p className="mt-1 text-xs text-ink-3">
-              A session is scheduled from a space. Open a space and start its
-              weekly one, or ask its coordinator to.
+              {t("sessions.aSessionIsScheduled")}
             </p>
             <Link
               className={`${buttonVariants({ variant: "default", size: "sm" })} mt-3.5 w-fit`}
               href="/spaces"
             >
-              Go to spaces
+              {t("sessions.goToSpaces")}
             </Link>
           </CardBody>
         </Card>

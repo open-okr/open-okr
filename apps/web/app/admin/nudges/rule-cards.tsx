@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { setNudgeRuleAction, setQuietModeAction } from "./rule-actions";
 
@@ -78,6 +85,8 @@ function LadderEditor({
   readonly pending: boolean;
   readonly onSave: (ladder: Record<string, number> | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const ladder = rule.ladder;
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -101,8 +110,8 @@ function LadderEditor({
       data-testid={`ladder-${rule.key}`}
     >
       <span className="text-xs text-ink-3">
-        This rule owns §11&apos;s ladder for {ladder.governs.join(", ")}. Leave
-        every field empty to keep the canon.
+        {t("admin.nudges.ruleCards.thisRuleOwns11")} {ladder.governs.join(", ")}
+        {t("admin.nudges.ruleCards.leaveEveryFieldEmpty")}
       </span>
       <div className="flex flex-wrap items-end gap-2.5">
         {ladder.rungs.map((rung) => (
@@ -145,8 +154,7 @@ function LadderEditor({
       </div>
       {partial ? (
         <span className="text-xs text-warn">
-          A ladder is one value. Fill every rung, or empty them all to return to
-          §11&apos;s.
+          {t("admin.nudges.ruleCards.aLadderIsOne")}
         </span>
       ) : null}
     </div>
@@ -160,6 +168,8 @@ function Rule({
   readonly rule: RuleRow;
   readonly channels: readonly ChannelChoice[];
 }) {
+  const { t } = useTranslations();
+
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -177,9 +187,17 @@ function Rule({
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-center gap-2">
             <code className="text-sm text-ink">{rule.key}</code>
-            {rule.configured ? <Chip tone="brand">changed</Chip> : null}
-            {rule.escalates ? <Chip tone="neutral">escalates</Chip> : null}
-            {rule.deterministic ? null : <Chip tone="agent">needs AI</Chip>}
+            {rule.configured ? (
+              <Chip tone="brand">{t("common.changed")}</Chip>
+            ) : null}
+            {rule.escalates ? (
+              <Chip tone="neutral">
+                {t("admin.nudges.ruleCards.escalates")}
+              </Chip>
+            ) : null}
+            {rule.deterministic ? null : (
+              <Chip tone="agent">{t("admin.nudges.ruleCards.needsAi")}</Chip>
+            )}
           </span>
           <span className="text-xs text-ink-3">
             {rule.fires}. {rule.recipient}.
@@ -187,7 +205,8 @@ function Rule({
         </span>
         <span className="flex flex-none items-center gap-2 text-xs text-ink-3">
           <span data-testid={`volume-${rule.key}`}>
-            {rule.sent} sent, {rule.suppressed} held
+            {rule.sent} {t("admin.nudges.ruleCards.sent")} {rule.suppressed}{" "}
+            {t("common.held")}
           </span>
         </span>
       </div>
@@ -205,7 +224,7 @@ function Rule({
         </Button>
 
         <label className="flex items-center gap-1.5 text-xs text-ink-3">
-          Send on
+          {t("admin.nudges.ruleCards.sendOn")}
           <select
             value={rule.channelOverride ?? ""}
             disabled={pending}
@@ -225,7 +244,9 @@ function Rule({
             }
             className="rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
           >
-            <option value="">each member&apos;s own channel</option>
+            <option value="">
+              {t("admin.nudges.ruleCards.eachMemberSOwn")}
+            </option>
             {channels.map((channel) => (
               <option key={channel.value} value={channel.value}>
                 {channel.label}
@@ -247,7 +268,7 @@ function Rule({
             }
             className="size-3.5"
           />
-          Speaks through quiet mode
+          {t("admin.nudges.ruleCards.speaksThroughQuietMode")}
         </label>
       </div>
 
@@ -261,8 +282,7 @@ function Rule({
 
       {rule.enabled ? null : (
         <span className="text-xs text-warn">
-          Held. The run still records each one with its reason, so this page
-          keeps saying what the product decided.
+          {t("admin.nudges.ruleCards.heldTheRunStill")}
         </span>
       )}
 
@@ -284,6 +304,8 @@ export function NudgeRuleCards({
   readonly quietMode: boolean;
   readonly channels: readonly ChannelChoice[];
 }) {
+  const { t } = useTranslations();
+
   const [pending, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -292,11 +314,11 @@ export function NudgeRuleCards({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="font-semibold text-ink">Workspace quiet mode</h2>
+            <h2 className="font-semibold text-ink">
+              {t("admin.nudges.ruleCards.workspaceQuietMode")}
+            </h2>
             <p className="text-sm text-ink-3">
-              Holds every rule that is not exempt. METHOD.md §6.3 puts an
-              escalation through regardless, because the ladder widening past
-              the person who owns the work is the case quiet mode is not for.
+              {t("admin.nudges.ruleCards.holdsEveryRuleThat")}
             </p>
           </div>
           <Button
@@ -328,12 +350,12 @@ export function NudgeRuleCards({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="font-semibold text-ink">Rules ({rules.length})</h2>
+            <h2 className="font-semibold text-ink">
+              {t("admin.nudges.ruleCards.rules")}
+              {rules.length})
+            </h2>
             <p className="text-sm text-ink-3">
-              Every trigger METHOD.md §6.4 defines, with what this workspace has
-              decided about it and what it sent in the last seven days. A rule
-              nobody has touched follows the canon, and the absence of a stored
-              row is what says so.
+              {t("admin.nudges.ruleCards.everyTriggerMethodMd")}
             </p>
           </div>
         </CardHeader>

@@ -1,5 +1,6 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { linkToStrategy, sendForward } from "./frame-actions.ts";
 
@@ -37,7 +38,7 @@ export interface Strategy {
   readonly note: string | null;
 }
 
-function Objective({
+async function Objective({
   objective,
   strategies,
   canEdit,
@@ -50,6 +51,8 @@ function Objective({
   readonly championId: string;
   readonly reviewerId: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-1.5 border-t border-line pt-2 first:border-0 first:pt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5">
@@ -70,7 +73,8 @@ function Objective({
           </Chip>
           {objective.sentForward > 0 ? (
             <Chip tone="ok">
-              in {objective.sentForward} quarter
+              {t("cycle.annualObjectives.in")} {objective.sentForward}{" "}
+              {t("cycle.annualObjectives.quarter")}
               {objective.sentForward === 1 ? "" : "s"}
             </Chip>
           ) : null}
@@ -89,7 +93,9 @@ function Objective({
             aria-label={`The strategy ${objective.title} serves`}
             className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
           >
-            <option value="">Serving no strategy</option>
+            <option value="">
+              {t("cycle.annualObjectives.servingNoStrategy")}
+            </option>
             {strategies.map((strategy) => (
               <option key={strategy.id} value={strategy.id}>
                 {strategy.text}
@@ -97,7 +103,7 @@ function Objective({
             ))}
           </select>
           <Button type="submit" variant="ghost" size="sm">
-            Link
+            {t("common.link")}
           </Button>
         </ActionForm>
       ) : null}
@@ -117,7 +123,7 @@ function Objective({
             className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
           />
           <Button type="submit" variant="default" size="sm">
-            Send into this quarter
+            {t("cycle.annualObjectives.sendIntoThisQuarter")}
           </Button>
         </ActionForm>
       ) : null}
@@ -125,7 +131,7 @@ function Objective({
   );
 }
 
-export function AnnualObjectives({
+export async function AnnualObjectives({
   strategies,
   objectives,
   canEdit,
@@ -150,34 +156,35 @@ export function AnnualObjectives({
    */
   readonly frameAgreed: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const unlinked = objectives.filter((one) => one.strategyId === null);
 
   return (
     <Card>
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">The year's objectives</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("cycle.annualObjectives.theYearSObjectives")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Each under the strategy it serves. Sending one into this quarter
-            opens a quarterly objective beneath it, which is the link the
-            alignment score reads.
+            {t("cycle.annualObjectives.eachUnderTheStrategy")}
           </p>
         </div>
-        {frameAgreed ? null : <Chip tone="warn">frame not agreed</Chip>}
+        {frameAgreed ? null : (
+          <Chip tone="warn">{t("cycle.annualObjectives.frameNotAgreed")}</Chip>
+        )}
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         {frameAgreed ? null : (
           <p className="text-xs text-warn">
-            Leadership agreement on the frame is not recorded, and the annual
-            planning gate will not pass until it is. Objectives written under an
-            unagreed frame are drafts of a decision nobody has taken.
+            {t("cycle.annualObjectives.leadershipAgreementOnThe")}
           </p>
         )}
 
         {objectives.length === 0 ? (
           <p className="text-xs text-ink-3">
-            No annual objectives yet. They live in a cycle whose mode is annual,
-            and they are drafted the same way a quarterly set is.
+            {t("cycle.annualObjectives.noAnnualObjectivesYet")}
           </p>
         ) : null}
 
@@ -197,8 +204,7 @@ export function AnnualObjectives({
               </div>
               {serving.length === 0 ? (
                 <p className="text-xs text-ink-3">
-                  Nothing is moving this strategy. §2.1's point is that a
-                  strategy with no objective under it is a sentence, not a plan.
+                  {t("cycle.annualObjectives.nothingIsMovingThis")}
                 </p>
               ) : (
                 serving.map((objective) => (
@@ -219,11 +225,10 @@ export function AnnualObjectives({
         {unlinked.length > 0 ? (
           <div className="flex flex-col gap-1.5 rounded-lg border border-warn-dot bg-warn-bg p-3">
             <span className="text-xs font-semibold text-warn">
-              Serving no strategy
+              {t("cycle.annualObjectives.servingNoStrategy")}
             </span>
             <p className="text-xs text-ink-3">
-              These are the ones §2.1 is asking about. Name the strategy each
-              serves, or ask what it is for.
+              {t("cycle.annualObjectives.theseAreTheOnes")}
             </p>
             {unlinked.map((objective) => (
               <Objective

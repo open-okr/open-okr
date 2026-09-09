@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * Phase 6, run the cadence (UIUX-PLAN.md §6 S-11, P6-G15).
@@ -76,7 +77,7 @@ function trend(row: ConfidenceRow): {
   return { word: "flat", tone: "neutral" };
 }
 
-export function RunningCadence({
+export async function RunningCadence({
   sessions,
   blockers,
   decisions,
@@ -91,6 +92,8 @@ export function RunningCadence({
   readonly streak: number;
   readonly calibratedAt: string | null;
 }) {
+  const { t } = await getTranslations();
+
   const held = sessions.filter((one) => one.closed);
   const upcoming = sessions.filter((one) => !one.closed);
 
@@ -99,11 +102,11 @@ export function RunningCadence({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Running the cadence</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("cycle.runningCadence.runningTheCadence")}
+            </h2>
             <p className="text-xs text-ink-3">
-              How the quarter is actually going, assembled from the check-ins,
-              sessions and blockers already recorded. Nothing on this phase
-              writes.
+              {t("cycle.runningCadence.howTheQuarterIs")}
             </p>
           </div>
           <div className="flex flex-none items-center gap-3.5">
@@ -111,7 +114,9 @@ export function RunningCadence({
               <span className="text-lg font-bold tabular-nums text-ink">
                 {streak}
               </span>
-              <span className="text-xs text-ink-3">week streak</span>
+              <span className="text-xs text-ink-3">
+                {t("cycle.runningCadence.weekStreak")}
+              </span>
             </div>
           </div>
         </CardHeader>
@@ -119,16 +124,16 @@ export function RunningCadence({
 
       <Card>
         <CardHeader className="justify-between">
-          <h3 className="text-sm font-bold text-ink">Sessions</h3>
+          <h3 className="text-sm font-bold text-ink">{t("common.sessions")}</h3>
           <Chip tone={held.length > 0 ? "ok" : "neutral"}>
-            {held.length} held, {upcoming.length} to come
+            {held.length} {t("cycle.runningCadence.held")} {upcoming.length}{" "}
+            {t("cycle.runningCadence.toCome")}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {sessions.length === 0 ? (
             <p className="text-xs text-ink-3">
-              None scheduled in this cycle yet. The Champion opens one on the
-              rhythm the workspace set.
+              {t("cycle.runningCadence.noneScheduledInThis")}
             </p>
           ) : (
             sessions.map((session) => (
@@ -159,16 +164,17 @@ export function RunningCadence({
 
       <Card>
         <CardHeader className="justify-between">
-          <h3 className="text-sm font-bold text-ink">Confidence</h3>
+          <h3 className="text-sm font-bold text-ink">
+            {t("common.confidence")}
+          </h3>
           <span className="text-xs text-ink-3">
-            Against the last check-in, per key result
+            {t("cycle.runningCadence.againstTheLastCheck")}
           </span>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {confidence.length === 0 ? (
             <p className="text-xs text-ink-3">
-              No key results with a confidence yet. It arrives with the first
-              check-in.
+              {t("cycle.runningCadence.noKeyResultsWith")}
             </p>
           ) : (
             confidence.map((row) => {
@@ -199,7 +205,9 @@ export function RunningCadence({
 
       <Card>
         <CardHeader className="justify-between">
-          <h3 className="text-sm font-bold text-ink">Open blockers</h3>
+          <h3 className="text-sm font-bold text-ink">
+            {t("common.openBlockers")}
+          </h3>
           <Chip tone={blockers.length > 0 ? "warn" : "ok"}>
             {blockers.length === 0 ? "none open" : `${blockers.length} open`}
           </Chip>
@@ -207,7 +215,7 @@ export function RunningCadence({
         <CardBody className="flex flex-col gap-1.5">
           {blockers.length === 0 ? (
             <p className="text-xs text-ink-3">
-              Nothing is blocked. The board is where one is raised.
+              {t("cycle.runningCadence.nothingIsBlockedThe")}
             </p>
           ) : (
             blockers.map((blocker) => (
@@ -223,7 +231,7 @@ export function RunningCadence({
                   </span>
                 </span>
                 <Chip tone={blocker.ageDays >= 14 ? "bad" : "warn"}>
-                  {blocker.ageDays} days old
+                  {blocker.ageDays} {t("cycle.runningCadence.daysOld")}
                 </Chip>
               </div>
             ))
@@ -234,23 +242,25 @@ export function RunningCadence({
       <Card>
         <CardHeader className="justify-between">
           <h3 className="text-sm font-bold text-ink">
-            Decisions and calibration
+            {t("cycle.runningCadence.decisionsAndCalibration")}
           </h3>
           {calibratedAt ? (
-            <Chip tone="ok">calibrated {calibratedAt.slice(0, 10)}</Chip>
+            <Chip tone="ok">
+              {t("cycle.runningCadence.calibrated")} {calibratedAt.slice(0, 10)}
+            </Chip>
           ) : (
-            <Chip tone="neutral">not calibrated</Chip>
+            <Chip tone="neutral">
+              {t("cycle.runningCadence.notCalibrated")}
+            </Chip>
           )}
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           <p className="text-xs text-ink-3">
-            One mid-cycle calibration is allowed, which is §7.6's rule and the
-            reason this says whether it has been used rather than offering it
-            again.
+            {t("cycle.runningCadence.oneMidCycleCalibration")}
           </p>
           {decisions.length === 0 ? (
             <p className="text-xs text-ink-3">
-              No decisions recorded against this cycle yet.
+              {t("cycle.runningCadence.noDecisionsRecordedAgainst")}
             </p>
           ) : (
             decisions.map((decision) => (

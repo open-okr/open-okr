@@ -4,6 +4,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access.ts";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { markRead, mute, snooze } from "./actions.ts";
@@ -56,6 +57,8 @@ export default async function InboxPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -77,12 +80,9 @@ export default async function InboxPage({
     return (
       <Card>
         <CardBody>
-          <p className="text-sm text-ink-2">
-            You do not have access to this workspace.
-          </p>
+          <p className="text-sm text-ink-2">{t("inbox.youDoNotHave")}</p>
           <p className="mt-1 text-xs text-ink-3">
-            Ask a workspace administrator to restore it. Nothing was lost: the
-            notifications are still here and will be listed when your access is.
+            {t("inbox.askAWorkspaceAdministrator")}
           </p>
         </CardBody>
       </Card>
@@ -117,11 +117,10 @@ export default async function InboxPage({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">What happened</h1>
-            <p className="text-xs text-ink-3">
-              Grouped by what it is about, newest first. Review says what you
-              owe. This says what happened.
-            </p>
+            <h1 className="text-lg font-bold text-ink">
+              {t("inbox.whatHappened")}
+            </h1>
+            <p className="text-xs text-ink-3">{t("inbox.groupedByWhatIt")}</p>
             <InboxLive />
           </div>
           <div className="flex flex-none items-center gap-3.5">
@@ -129,7 +128,7 @@ export default async function InboxPage({
               <span className="text-lg font-bold tabular-nums text-ink">
                 {unread}
               </span>
-              <span className="text-xs text-ink-3">Unread</span>
+              <span className="text-xs text-ink-3">{t("inbox.unread")}</span>
             </div>
           </div>
         </CardHeader>
@@ -159,9 +158,7 @@ export default async function InboxPage({
                 : "Nothing here under that filter."}
             </p>
             <p className="mt-1 text-xs text-ink-3">
-              A row appears when somebody mentions you, when a check-in you
-              review arrives, or when the Champion has a reminder for you. Watch
-              a goal from its own page to hear about its check-ins.
+              {t("inbox.aRowAppearsWhen")}
             </p>
           </CardBody>
         </Card>
@@ -173,7 +170,10 @@ export default async function InboxPage({
            spec asked exactly that and matched the filter link instead. A
            labelled region is the right answer for a screen reader too,
            which otherwise meets an unnamed run of sections. */
-        <section aria-label="Notifications" className="flex flex-col gap-4.5">
+        <section
+          aria-label={t("inbox.notifications")}
+          className="flex flex-col gap-4.5"
+        >
           {[...groups.entries()].map(([key, held]) => {
             const first = held[0];
             if (!first) {
@@ -212,7 +212,7 @@ export default async function InboxPage({
                         size="sm"
                         className="h-5 px-1.5 text-xs font-semibold normal-case"
                       >
-                        Mute
+                        {t("inbox.mute")}
                       </Button>
                     </ActionForm>
                   ) : null}
@@ -241,13 +241,15 @@ function reasonTone(reason: Row["reason"]): "info" | "warn" | "neutral" {
   return "neutral";
 }
 
-function NotificationRow({
+async function NotificationRow({
   row,
   href,
 }: {
   readonly row: Row;
   readonly href: string | null;
 }) {
+  const { t } = await getTranslations();
+
   // The rule's own condition, in METHOD.md's words, for a nudge row. The
   // nudge's channel message is deliberately one generic line for every rule
   // (see `draftFor` in packages/core/src/nudges/deliver.ts), so this is where
@@ -273,7 +275,9 @@ function NotificationRow({
           <Chip tone={reasonTone(row.reason)}>
             {REASON_LABELS[row.reason] ?? row.reason}
           </Chip>
-          {row.readAt === null ? <span className="sr-only">Unread</span> : null}
+          {row.readAt === null ? (
+            <span className="sr-only">{t("inbox.unread")}</span>
+          ) : null}
           {row.ruleKey ? <Chip tone="agent">{row.ruleKey}</Chip> : null}
           <span className="text-xs text-ink-3">
             {new Date(row.createdAt)
@@ -295,7 +299,7 @@ function NotificationRow({
           <ActionForm action={markRead}>
             <input type="hidden" name="notificationId" value={row.id} />
             <Button type="submit" variant="ghost" size="sm">
-              Mark read
+              {t("inbox.markRead")}
             </Button>
           </ActionForm>
         ) : null}

@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { FeedLive } from "../../lib/feed-live.tsx";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 /**
@@ -63,6 +64,8 @@ export default async function ActivityPage({
 }: {
   readonly searchParams: Promise<{ at?: string; id?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -94,12 +97,12 @@ export default async function ActivityPage({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Activity</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("common.activity")}
+            </h1>
             <p className="text-sm text-ink-3">
-              What has happened here, newest first, filtered to what you can
-              see. This is the readable record, not the audit log: the audit
-              chain is a separate, append-only one and is verified with{" "}
-              <code>pnpm audit:verify</code>.
+              {t("activity.whatHasHappenedHere")}{" "}
+              <code>{t("activity.pnpmAuditVerify")}</code>.
             </p>
           </div>
         </CardHeader>
@@ -129,7 +132,7 @@ export default async function ActivityPage({
                   </span>
                   {item.aggregatedCount > 1 ? (
                     <Chip tone="neutral">
-                      {item.aggregatedCount} edits together
+                      {item.aggregatedCount} {t("activity.editsTogether")}
                     </Chip>
                   ) : null}
                 </li>
@@ -145,7 +148,7 @@ export default async function ActivityPage({
             href="/activity"
             className="text-xs font-semibold text-brand-text hover:underline"
           >
-            Back to the newest
+            {t("activity.backToTheNewest")}
           </Link>
         ) : (
           <span />
@@ -159,7 +162,7 @@ export default async function ActivityPage({
             href={`/activity?at=${encodeURIComponent(last.at)}&id=${last.id}`}
             className="text-xs font-semibold text-brand-text hover:underline"
           >
-            Older
+            {t("activity.older")}
           </Link>
         ) : null}
       </div>

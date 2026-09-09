@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
@@ -48,6 +49,8 @@ export default async function GoalPage({
   /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
   searchParams: Promise<{ at?: string; id?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -218,8 +221,9 @@ export default async function GoalPage({
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
-                {goal.level} · {goal.champion.name} champions it,{" "}
-                {goal.reviewer.name} reviews it · weight {goal.weight}
+                {goal.level} · {goal.champion.name} {t("common.championsIt")}{" "}
+                {goal.reviewer.name} {t("goals.detail.reviewsItWeight")}{" "}
+                {goal.weight}
               </p>
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
@@ -238,14 +242,14 @@ export default async function GoalPage({
             </div>
             {goal.nextCheckInOn ? (
               <p className="text-xs text-ink-3">
-                Next check-in due {goal.nextCheckInOn}
+                {t("goals.detail.nextCheckInDue")} {goal.nextCheckInOn}
                 {goal.daysPastDue !== null && goal.daysPastDue > 0
                   ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
                   : ""}
               </p>
             ) : (
               <p className="text-xs text-ink-3">
-                No check-in is due. A closed goal never is.
+                {t("goals.detail.noCheckInIs")}
               </p>
             )}
             <p className="text-xs text-ink-3">
@@ -254,9 +258,7 @@ export default async function GoalPage({
             </p>
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
-                Nothing has moved yet. Progress is the weighted average of the
-                key results, recomputed on every write, and health follows the
-                §3.5 precedence rather than a formula over progress.
+                {t("goals.detail.nothingHasMovedYet")}
               </p>
             ) : null}
           </CardBody>
@@ -278,14 +280,14 @@ export default async function GoalPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Key results ({goal.keyResults.length})
+              {t("goals.detail.keyResults")}
+              {goal.keyResults.length})
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2.5">
             {goal.keyResults.length === 0 ? (
               <p className="text-sm text-ink-3">
-                None yet. Without one, nothing about this objective is
-                measurable.
+                {t("goals.detail.noneYetWithoutOne")}
               </p>
             ) : (
               <ul className="flex flex-col divide-y divide-line">
@@ -308,9 +310,10 @@ export default async function GoalPage({
                       </span>
                       <span className="text-xs text-ink-3">
                         {keyResult.direction} · {keyResult.indicatorType} ·{" "}
-                        {keyResult.baselineValue} to {keyResult.targetValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""} · weight{" "}
-                        {keyResult.weight}
+                        {keyResult.baselineValue} {t("common.to")}{" "}
+                        {keyResult.targetValue}
+                        {keyResult.unit ? ` ${keyResult.unit}` : ""}{" "}
+                        {t("common.weight")} {keyResult.weight}
                       </span>
                       <Sparkline
                         history={histories.get(keyResult.id) ?? []}
@@ -343,7 +346,7 @@ export default async function GoalPage({
                             className="sr-only"
                             htmlFor={`value-${keyResult.id}`}
                           >
-                            New value for {keyResult.title}
+                            {t("common.newValueFor")} {keyResult.title}
                           </label>
                           <input
                             id={`value-${keyResult.id}`}
@@ -357,7 +360,7 @@ export default async function GoalPage({
                             className="sr-only"
                             htmlFor={`confidence-${keyResult.id}`}
                           >
-                            Confidence for {keyResult.title}
+                            {t("goals.detail.confidenceFor")} {keyResult.title}
                           </label>
                           <input
                             id={`confidence-${keyResult.id}`}
@@ -370,11 +373,11 @@ export default async function GoalPage({
                             className="w-20"
                           />
                           <Button type="submit" size="sm">
-                            Save
+                            {t("common.save")}
                           </Button>
                         </ActionForm>
                       ) : keyResult.kpiId ? (
-                        <Chip tone="info">from a KPI</Chip>
+                        <Chip tone="info">{t("common.fromAKpi")}</Chip>
                       ) : null}
                     </span>
                   </li>
@@ -382,9 +385,9 @@ export default async function GoalPage({
               </ul>
             )}
             <p className="text-xs text-ink-4">
-              Key results are added and moved on the drafting surface, at{" "}
+              {t("goals.detail.keyResultsAreAdded")}{" "}
               <a className="underline" href="/cycle?phase=4">
-                phase 4 of the cycle
+                {t("goals.detail.phase4OfThe")}
               </a>
               .
             </p>
@@ -394,13 +397,13 @@ export default async function GoalPage({
         {canEdit && !closed ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Edit</h2>
+              <h2 className="text-sm font-bold text-ink">{t("common.edit")}</h2>
             </CardHeader>
             <CardBody>
               <ActionForm action={editGoal} className="flex flex-col gap-1.5">
                 <input type="hidden" name="id" value={goal.id} />
                 <label className="sr-only" htmlFor="edit-title">
-                  The objective
+                  {t("common.theObjective")}
                 </label>
                 <input
                   id="edit-title"
@@ -411,19 +414,19 @@ export default async function GoalPage({
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
                 <label className="sr-only" htmlFor="edit-contribution">
-                  What it contributes to
+                  {t("common.whatItContributesTo")}
                 </label>
                 <input
                   id="edit-contribution"
                   name="contributionStatement"
                   maxLength={1000}
                   defaultValue={goal.contributionStatement ?? ""}
-                  placeholder="The priority this moves forward"
+                  placeholder={t("common.thePriorityThisMoves")}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                 />
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs text-ink-3" htmlFor="edit-weight">
-                    Weight
+                    {t("goals.detail.weight")}
                   </label>
                   <input
                     id="edit-weight"
@@ -436,10 +439,10 @@ export default async function GoalPage({
                     className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink"
                   />
                   <span className="text-xs text-ink-4">
-                    0 means tracked but not counted
+                    {t("goals.detail.0MeansTrackedBut")}
                   </span>
                   <Button type="submit" className="ml-auto">
-                    Save
+                    {t("common.save")}
                   </Button>
                 </div>
               </ActionForm>
@@ -450,12 +453,13 @@ export default async function GoalPage({
         {canAdminister ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Roles</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("common.roles")}
+              </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2.5">
               <p className="text-xs text-ink-3">
-                Both roles are access-bearing, so moving one rebinds access with
-                it rather than only changing a name.
+                {t("goals.detail.bothRolesAreAccess")}
               </p>
               <ActionForm
                 action={reassignRole}
@@ -463,7 +467,7 @@ export default async function GoalPage({
               >
                 <input type="hidden" name="id" value={goal.id} />
                 <label className="sr-only" htmlFor="reassign-role">
-                  Role
+                  {t("goals.detail.role")}
                 </label>
                 <select
                   id="reassign-role"
@@ -471,11 +475,11 @@ export default async function GoalPage({
                   defaultValue="champion"
                   className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                 >
-                  <option value="champion">Champion</option>
-                  <option value="reviewer">Reviewer</option>
+                  <option value="champion">{t("common.champion")}</option>
+                  <option value="reviewer">{t("common.reviewer")}</option>
                 </select>
                 <label className="sr-only" htmlFor="reassign-member">
-                  Member
+                  {t("goals.detail.member")}
                 </label>
                 <select
                   id="reassign-member"
@@ -490,7 +494,7 @@ export default async function GoalPage({
                   ))}
                 </select>
                 <Button type="submit" variant="ghost">
-                  Reassign
+                  {t("common.reassign")}
                 </Button>
               </ActionForm>
             </CardBody>
@@ -506,7 +510,7 @@ export default async function GoalPage({
                 id="goal-decisions-heading"
                 className="text-sm font-bold text-ink"
               >
-                Decisions
+                {t("common.decisions")}
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2">
@@ -531,8 +535,7 @@ export default async function GoalPage({
                 ))}
               </ul>
               <p className="text-xs text-ink-4">
-                Recorded in a monthly review. Kept whether the goal is open or
-                closed.
+                {t("goals.detail.recordedInAMonthly")}
               </p>
             </CardBody>
           </Card>
@@ -541,7 +544,9 @@ export default async function GoalPage({
         {goal.retrospective ? (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Retrospective</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("goals.detail.retrospective")}
+              </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-1.5">
               <p className="text-sm text-ink-2">
@@ -549,8 +554,7 @@ export default async function GoalPage({
                   "Written, but empty."}
               </p>
               <p className="text-xs text-ink-4">
-                Kept whether the goal is open or closed. Reopening does not
-                erase what happened.
+                {t("goals.detail.keptWhetherTheGoal")}
               </p>
             </CardBody>
           </Card>
@@ -571,11 +575,10 @@ export default async function GoalPage({
                 >
                   <input type="hidden" name="id" value={goal.id} />
                   <p className="text-sm text-ink-3">
-                    Reopening clears the outcome and the decision, and keeps the
-                    retrospective. Health goes back to pending.
+                    {t("goals.detail.reopeningClearsTheOutcome")}
                   </p>
                   <Button type="submit" variant="ghost" className="self-start">
-                    Reopen this goal
+                    {t("goals.detail.reopenThisGoal")}
                   </Button>
                 </ActionForm>
               ) : (
@@ -586,7 +589,7 @@ export default async function GoalPage({
                   <input type="hidden" name="id" value={goal.id} />
                   <div className="flex flex-wrap items-center gap-1.5">
                     <label className="sr-only" htmlFor="close-outcome">
-                      Outcome
+                      {t("goals.detail.outcome")}
                     </label>
                     <select
                       id="close-outcome"
@@ -594,11 +597,13 @@ export default async function GoalPage({
                       defaultValue="achieved"
                       className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                     >
-                      <option value="achieved">Achieved</option>
-                      <option value="missed">Missed</option>
+                      <option value="achieved">
+                        {t("goals.detail.achieved")}
+                      </option>
+                      <option value="missed">{t("goals.detail.missed")}</option>
                     </select>
                     <label className="sr-only" htmlFor="close-decision">
-                      Decision
+                      {t("goals.detail.decision")}
                     </label>
                     <select
                       id="close-decision"
@@ -606,27 +611,29 @@ export default async function GoalPage({
                       defaultValue="keep"
                       className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
                     >
-                      <option value="keep">Keep</option>
-                      <option value="modify">Modify</option>
-                      <option value="abandon">Abandon</option>
+                      <option value="keep">{t("goals.detail.keep")}</option>
+                      <option value="modify">{t("goals.detail.modify")}</option>
+                      <option value="abandon">
+                        {t("goals.detail.abandon")}
+                      </option>
                     </select>
                     <input
                       name="closeReason"
                       maxLength={2000}
-                      placeholder="Why that decision?"
-                      aria-label="Why that decision?"
+                      placeholder={t("goals.detail.whyThatDecision")}
+                      aria-label={t("goals.detail.whyThatDecision")}
                       className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                     />
                   </div>
                   <label className="sr-only" htmlFor="close-retrospective">
-                    The retrospective
+                    {t("goals.detail.theRetrospective")}
                   </label>
                   <textarea
                     id="close-retrospective"
                     name="retrospective"
                     rows={4}
                     required
-                    placeholder="What happened, and what would you do differently?"
+                    placeholder={t("goals.detail.whatHappenedAndWhat")}
                     className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
                   />
                   <Button
@@ -634,7 +641,7 @@ export default async function GoalPage({
                     variant="primary"
                     className="self-start"
                   >
-                    Close this goal
+                    {t("goals.detail.closeThisGoal")}
                   </Button>
                 </ActionForm>
               )}
@@ -693,7 +700,7 @@ export default async function GoalPage({
          * because an element with an empty box is hidden.
          */}
         <FeedPanel
-          title="Activity"
+          title={t("common.activity")}
           explains="What has happened to this goal, its key results and its check-ins, newest first."
           items={feedItems}
           names={feedNames}

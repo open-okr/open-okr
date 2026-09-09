@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { redirect } from "next/navigation";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ConsentForm } from "./consent-form.tsx";
 
@@ -38,6 +39,8 @@ export default async function AuthorisePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getTranslations();
+
   const params = await searchParams;
   const one = (key: string): string => {
     const value = params[key];
@@ -82,7 +85,9 @@ export default async function AuthorisePage({
     <div className="mx-auto flex max-w-xl flex-col gap-4.5">
       <Card>
         <CardHeader>
-          <h1 className="text-lg font-bold text-ink">Connect an agent</h1>
+          <h1 className="text-lg font-bold text-ink">
+            {t("oauth.authorize.connectAnAgent")}
+          </h1>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           {bounced ? (
@@ -110,14 +115,12 @@ export default async function AuthorisePage({
             <>
               <p className="text-sm text-ink-3">
                 <span className="font-medium text-ink">{check.clientName}</span>{" "}
-                asked to act as you. It will get your own access, narrowed to
-                what is listed below, and nothing more. It never sees your
-                password.
+                {t("oauth.authorize.askedToActAs")}
               </p>
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-ink-2">
-                  What it will be able to do
+                  {t("oauth.authorize.whatItWillBe")}
                 </span>
                 <ul className="flex flex-col gap-1">
                   {check.scopes.map((scope) => (

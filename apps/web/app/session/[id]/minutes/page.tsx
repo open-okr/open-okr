@@ -10,11 +10,13 @@
  * already absent from the payload for a reader who may not see it, and the
  * facilitator's private notes are absent for everybody.
  */
+
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPool } from "../../../../lib/auth";
+import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
 import type { Minutes } from "./minutes-document";
 
@@ -56,6 +58,8 @@ export default async function MinutesPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -84,30 +88,31 @@ export default async function MinutesPage({
             className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2"
             href={`/session/${id}/minutes/export`}
           >
-            Download Markdown
+            {t("session.detail.minutes.downloadMarkdown")}
           </Link>
           <Link
             className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2"
             href={`/session/${id}/minutes/pdf`}
           >
-            Download PDF
+            {t("session.detail.minutes.downloadPdf")}
           </Link>
           <Link
             className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2"
             href={`/session/${id}`}
           >
-            Back to the review
+            {t("session.detail.minutes.backToTheReview")}
           </Link>
         </span>
         {minutes.state === "closed" ? (
           <p className="text-xs text-ink-4">
-            Held {minutes.heldOn?.slice(0, 10) ?? "recently"}.
+            {t("session.detail.minutes.held")}{" "}
+            {minutes.heldOn?.slice(0, 10) ?? "recently"}.
           </p>
         ) : (
           <p className="text-xs text-warn">
             {/* Said plainly: a draft that does not say so gets quoted as a
                 record. */}
-            This review is still running. These minutes are a draft.
+            {t("session.detail.minutes.thisReviewIsStill")}
           </p>
         )}
       </header>
@@ -119,7 +124,7 @@ export default async function MinutesPage({
               id="minutes-summary-heading"
               className="flex-1 text-sm font-bold text-ink"
             >
-              Executive summary
+              {t("session.detail.minutes.executiveSummary")}
             </h2>
             {summary.verdict === null ? null : (
               <Chip
@@ -173,7 +178,10 @@ export default async function MinutesPage({
 
       <Card>
         <CardBody className="flex flex-col gap-4">
-          <Section title="Scores" count={minutes.scores.length}>
+          <Section
+            title={t("session.detail.minutes.scores")}
+            count={minutes.scores.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.scores.map((row) => (
                 <li
@@ -191,7 +199,7 @@ export default async function MinutesPage({
           </Section>
 
           <Section
-            title="Objective narratives"
+            title={t("common.objectiveNarratives")}
             count={minutes.narratives.filter((row) => row.excerpt).length}
           >
             <ul className="flex flex-col gap-1">
@@ -206,13 +214,16 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Recognition" count={minutes.recognition.length}>
+          <Section
+            title={t("session.detail.minutes.recognition")}
+            count={minutes.recognition.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.recognition.map((row) => (
                 <li key={row.text} className="text-sm text-ink">
                   <span className="font-medium">{row.toName}</span>{" "}
                   <span className="text-xs text-ink-4">
-                    named by {row.fromName}
+                    {t("common.namedBy")} {row.fromName}
                   </span>
                   <span className="block text-ink-2">{row.text}</span>
                 </li>
@@ -220,7 +231,7 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Team retro" count={minutes.retro.length}>
+          <Section title={t("common.teamRetro")} count={minutes.retro.length}>
             <ul className="flex flex-col gap-1">
               {minutes.retro.map((row) => (
                 <li
@@ -240,7 +251,7 @@ export default async function MinutesPage({
           </Section>
 
           <Section
-            title="Management retro"
+            title={t("common.managementRetro")}
             count={minutes.management?.length ?? 0}
           >
             <ul className="flex flex-col gap-1.5">
@@ -253,7 +264,10 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Root causes" count={minutes.rootCauses.length}>
+          <Section
+            title={t("session.detail.minutes.rootCauses")}
+            count={minutes.rootCauses.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.rootCauses.map((row) => (
                 <li key={row.keyResultTitle} className="text-sm text-ink">
@@ -267,7 +281,10 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Process health" count={minutes.processHealth.length}>
+          <Section
+            title={t("session.detail.minutes.processHealth")}
+            count={minutes.processHealth.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.processHealth.map((row) => (
                 <li
@@ -284,7 +301,7 @@ export default async function MinutesPage({
           </Section>
 
           <Section
-            title="Keep, modify or abandon"
+            title={t("common.keepModifyOrAbandon")}
             count={minutes.decisions.length}
           >
             <ul className="flex flex-col gap-1">
@@ -298,7 +315,10 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Learnings" count={minutes.learnings.length}>
+          <Section
+            title={t("common.learnings")}
+            count={minutes.learnings.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.learnings.map((row) => (
                 <li
@@ -306,13 +326,18 @@ export default async function MinutesPage({
                   className="flex flex-wrap items-baseline gap-2 text-sm"
                 >
                   <span className="flex-1 text-ink">{row.text}</span>
-                  {row.carryForward ? <Chip tone="ok">carried</Chip> : null}
+                  {row.carryForward ? (
+                    <Chip tone="ok">{t("common.carried")}</Chip>
+                  ) : null}
                 </li>
               ))}
             </ul>
           </Section>
 
-          <Section title="Next-cycle drafts" count={minutes.drafts.length}>
+          <Section
+            title={t("common.nextCycleDrafts")}
+            count={minutes.drafts.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.drafts.map((row) => (
                 <li key={row.title} className="text-sm text-ink">
@@ -323,7 +348,10 @@ export default async function MinutesPage({
             </ul>
           </Section>
 
-          <Section title="Actions" count={minutes.actions.length}>
+          <Section
+            title={t("session.detail.minutes.actions")}
+            count={minutes.actions.length}
+          >
             <ul className="flex flex-col gap-1">
               {minutes.actions.map((row) => (
                 <li
@@ -345,8 +373,7 @@ export default async function MinutesPage({
           minutes.actions.length === 0 &&
           minutes.learnings.length === 0 ? (
             <p className="text-sm text-ink-3">
-              This review has not recorded anything yet, so there is nothing to
-              minute.
+              {t("session.detail.minutes.thisReviewHasNot")}
             </p>
           ) : null}
         </CardBody>

@@ -11,6 +11,7 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * One rule, as METHOD.md defines it (P4-T02b).
@@ -52,6 +53,8 @@ export default async function RulePage({
 }: {
   readonly params: Promise<{ readonly id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const wanted = decodeURIComponent(id).toLowerCase();
   const check = ALL.find((entry) => entry.id.toLowerCase() === wanted);
@@ -91,7 +94,7 @@ export default async function RulePage({
       <Card>
         <CardHeader>
           <h2 className="text-sm font-bold text-ink">
-            How it judges, in order
+            {t("method.detail.howItJudgesIn")}
           </h2>
         </CardHeader>
         <CardBody className="p-0">
@@ -120,7 +123,7 @@ export default async function RulePage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              Weak and strong (METHOD.md §4.6)
+              {t("method.detail.weakAndStrongMethod")}
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
@@ -129,13 +132,13 @@ export default async function RulePage({
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
                     <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
-                      Weak
+                      {t("common.weak")}
                     </p>
                     <p className="text-sm text-ink">{pair.weak}</p>
                   </div>
                   <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
                     <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
-                      Strong
+                      {t("common.strong")}
                     </p>
                     <p className="text-sm text-ink">{pair.strong}</p>
                   </div>
@@ -150,15 +153,13 @@ export default async function RulePage({
       <Card>
         <CardBody>
           <p className="text-xs text-ink-3">
-            First match wins: the conditions are tested in the order above and
-            the first that holds is the verdict. Every rule in this catalogue is
-            METHOD.md §4, and a build fails when the two disagree.
+            {t("method.detail.firstMatchWinsThe")}
           </p>
           <Link
             href="/cycle"
             className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
           >
-            Back to the cycle
+            {t("method.detail.backToTheCycle")}
           </Link>
         </CardBody>
       </Card>
@@ -174,7 +175,9 @@ export default async function RulePage({
  * and a trigger has a condition, a recipient and whether it survives the AI
  * provider being off.
  */
-function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
+async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex w-full flex-col gap-3.5">
       <Card>
@@ -182,7 +185,7 @@ function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
           <div className="flex min-w-0 flex-col">
             <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
             <p className="text-xs text-ink-3">
-              Proactive message (AI-NATIVE-PLAN.md §6.4), owned by the{" "}
+              {t("method.detail.proactiveMessageAiNative")}{" "}
               {trigger.owner === "coach" ? "OKR Coach" : "OKR Champion"}
             </p>
           </div>
@@ -192,11 +195,15 @@ function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
           <p className="text-sm text-ink">
-            <span className="font-semibold text-ink-2">Fires. </span>
+            <span className="font-semibold text-ink-2">
+              {t("method.detail.fires")}{" "}
+            </span>
             {trigger.fires}
           </p>
           <p className="text-sm text-ink">
-            <span className="font-semibold text-ink-2">Goes to. </span>
+            <span className="font-semibold text-ink-2">
+              {t("method.detail.goesTo")}{" "}
+            </span>
             {trigger.recipient}
           </p>
           <p className="text-xs text-ink-3">
@@ -210,15 +217,13 @@ function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
       <Card>
         <CardBody>
           <p className="text-xs text-ink-3">
-            Every proactive message the product sends is a recorded row citing a
-            rule key, and a message citing a key the method package does not
-            define fails the build.
+            {t("method.detail.everyProactiveMessageThe")}
           </p>
           <Link
             href="/review"
             className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
           >
-            Back to what you owe
+            {t("method.detail.backToWhatYou")}
           </Link>
         </CardBody>
       </Card>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireAccessLevel } from "../../lib/access.ts";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * The admin shell (screen S-36 skeleton, P2-T08, restyled P2-T10).
@@ -27,6 +28,8 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
+  const { t } = await getTranslations();
+
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
   const sections = navigationFor("admin", access.level);
 
@@ -39,9 +42,12 @@ export default async function AdminLayout({
        * screen in the product, a 160px nav and 580px of content on a 1920px
        * display. */}
       <div className="flex gap-8">
-        <nav aria-label="Admin sections" className="w-52 flex-none">
+        <nav
+          aria-label={t("admin.layout.adminSections")}
+          className="w-52 flex-none"
+        >
           <h2 className="mb-2 text-xs font-bold tracking-wider text-ink-4 uppercase">
-            Admin
+            {t("admin.layout.admin")}
           </h2>
           <ul className="flex flex-col gap-0.5">
             {sections.map((item) => (

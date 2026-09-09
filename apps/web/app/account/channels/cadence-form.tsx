@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import type { LinkResult } from "./link-state.ts";
 
@@ -44,6 +44,8 @@ export function CadenceForm({
   readonly reasons: readonly { readonly id: string; readonly label: string }[];
   readonly channels: readonly { readonly id: string; readonly label: string }[];
 }) {
+  const { t } = useTranslations();
+
   const [state, formAction, pending] = useActionState(action, null);
 
   return (
@@ -61,15 +63,17 @@ export function CadenceForm({
             className="size-4"
           />
           <span>
-            Tell me the moment somebody mentions me
+            {t("account.channels.cadenceForm.tellMeTheMoment")}
             <span className="ml-1.5 text-xs text-ink-3">
-              Everything else waits for the window below.
+              {t("account.channels.cadenceForm.everythingElseWaitsFor")}
             </span>
           </span>
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-ink">
-          <span>Group everything else into one message every</span>
+          <span>
+            {t("account.channels.cadenceForm.groupEverythingElseInto")}
+          </span>
           <span className="flex items-center gap-2">
             <input
               type="number"
@@ -80,7 +84,7 @@ export function CadenceForm({
               className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-sm"
             />
             <span className="text-xs text-ink-3">
-              minutes. A shorter window means more messages, not more news.
+              {t("account.channels.cadenceForm.minutesAShorterWindow")}
             </span>
           </span>
         </label>
@@ -92,11 +96,11 @@ export function CadenceForm({
             defaultChecked={settings.dailySummary}
             className="size-4"
           />
-          <span>Send me a summary each morning</span>
+          <span>{t("account.channels.cadenceForm.sendMeASummary")}</span>
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-ink">
-          <span>at</span>
+          <span>{t("account.channels.cadenceForm.at")}</span>
           <span className="flex items-center gap-2">
             <input
               type="time"
@@ -105,8 +109,7 @@ export function CadenceForm({
               className="w-28 rounded-md border border-line bg-surface px-2 py-1 text-sm"
             />
             <span className="text-xs text-ink-3">
-              in your own timezone. The sweep runs hourly, so the hour is what
-              it reads.
+              {t("account.channels.cadenceForm.inYourOwnTimezone")}
             </span>
           </span>
         </label>
@@ -114,11 +117,10 @@ export function CadenceForm({
 
       <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
         <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-3">
-          Where each kind goes
+          {t("account.channels.cadenceForm.whereEachKindGoes")}
         </legend>
         <p className="text-xs text-ink-3">
-          Leave one on "wherever I said" and it follows your primary channel
-          above. The in-app inbox always gets a copy whatever you choose here.
+          {t("account.channels.cadenceForm.leaveOneOnWherever")}
         </p>
         {reasons.map((reason) => (
           <label
@@ -131,7 +133,9 @@ export function CadenceForm({
               defaultValue={settings.routing[reason.id] ?? ""}
               className="rounded-md border border-line bg-surface px-2 py-1 text-sm"
             >
-              <option value="">wherever I said</option>
+              <option value="">
+                {t("account.channels.cadenceForm.whereverISaid")}
+              </option>
               {channels.map((channel) => (
                 <option key={channel.id} value={channel.id}>
                   {channel.label}
@@ -144,7 +148,7 @@ export function CadenceForm({
 
       <div className="flex items-center gap-2.5">
         <Button type="submit" variant="default" size="sm">
-          Save
+          {t("common.save")}
         </Button>
         {state ? (
           <p

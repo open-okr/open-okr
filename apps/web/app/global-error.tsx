@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "@openokr/ui";
 
 /**
  * The last boundary (P6-G24a).
@@ -25,6 +26,8 @@ export default function GlobalError({
   readonly error: Error & { digest?: string };
   readonly reset: () => void;
 }) {
+  const { t } = useTranslations();
+
   return (
     <html lang="en">
       <body
@@ -50,11 +53,10 @@ export default function GlobalError({
           }}
         >
           <h1 style={{ fontSize: "1.125rem", margin: "0 0 0.5rem" }}>
-            OpenOKR could not start
+            {t("globalError.openokrCouldNotStart")}
           </h1>
           <p style={{ fontSize: "0.875rem", margin: "0 0 1rem" }}>
-            Something failed before any screen could be drawn. This is a fault
-            in the deployment, not in anything you did.
+            {t("globalError.somethingFailedBeforeAny")}
           </p>
           <button
             type="button"
@@ -70,7 +72,7 @@ export default function GlobalError({
               cursor: "pointer",
             }}
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           {error.digest ? (
             <p
@@ -80,7 +82,7 @@ export default function GlobalError({
                 color: "#5c6b80",
               }}
             >
-              Reference: {error.digest}
+              {t("common.reference")} {error.digest}
             </p>
           ) : null}
         </main>

@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * The lifecycle controls reach every action the registry already offered
@@ -19,7 +19,7 @@ import { describe, expect, test } from "vitest";
  */
 
 const at = (path: string) =>
-  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  readScreen(fileURLToPath(new URL(path, import.meta.url)));
 
 /**
  * Source with its line wrapping taken out.

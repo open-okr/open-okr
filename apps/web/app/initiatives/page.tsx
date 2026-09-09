@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import {
@@ -47,6 +48,8 @@ export default async function InitiativesPage({
     keyResult?: string;
   }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -115,7 +118,9 @@ export default async function InitiativesPage({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">Initiatives</h1>
+            <h1 className="text-lg font-bold text-ink">
+              {t("common.initiatives")}
+            </h1>
             <p className="text-xs text-ink-3" data-testid="initiative-count">
               {initiatives.length === 0
                 ? filtered
@@ -160,7 +165,9 @@ export default async function InitiativesPage({
       {canEdit ? (
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Add an initiative</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("initiatives.addAnInitiative")}
+            </h2>
           </CardHeader>
           <CardBody>
             <ActionForm
@@ -171,20 +178,20 @@ export default async function InitiativesPage({
                 className="text-xs font-semibold text-ink-2"
                 htmlFor="title"
               >
-                What work is this
+                {t("initiatives.whatWorkIsThis")}
               </label>
               <input
                 id="title"
                 name="title"
                 required
                 maxLength={500}
-                placeholder="Rebuild the activation flow"
+                placeholder={t("initiatives.rebuildTheActivationFlow")}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               />
 
               <div className="flex flex-wrap gap-2">
                 <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Space
+                  {t("initiatives.space")}
                   <select
                     name="spaceId"
                     className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
@@ -198,7 +205,7 @@ export default async function InitiativesPage({
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Owner
+                  {t("common.owner")}
                   <select
                     name="ownerId"
                     defaultValue={workspace.memberId}
@@ -213,7 +220,7 @@ export default async function InitiativesPage({
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Starts
+                  {t("initiatives.starts")}
                   <input
                     type="date"
                     name="startsOn"
@@ -222,7 +229,7 @@ export default async function InitiativesPage({
                 </label>
 
                 <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Ends
+                  {t("initiatives.ends")}
                   <input
                     type="date"
                     name="endsOn"
@@ -235,7 +242,7 @@ export default async function InitiativesPage({
                 type="submit"
                 className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
               >
-                Add
+                {t("common.add")}
               </button>
             </ActionForm>
           </CardBody>
@@ -245,7 +252,7 @@ export default async function InitiativesPage({
   );
 }
 
-function Filters({
+async function Filters({
   href,
   spaces,
   activeSpace,
@@ -258,11 +265,13 @@ function Filters({
   readonly activeStatus: string | null;
   readonly activeCapacity: string | null;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-2">
       <FilterRow label="Space">
         <FilterLink href={href({ space: null })} active={activeSpace === null}>
-          Every space
+          {t("initiatives.everySpace")}
         </FilterLink>
         {spaces.map((space) => (
           <FilterLink
@@ -280,7 +289,7 @@ function Filters({
           href={href({ status: null })}
           active={activeStatus === null}
         >
-          Any
+          {t("common.any")}
         </FilterLink>
         {STATUS_OPTIONS.map((option) => (
           <FilterLink
@@ -298,7 +307,7 @@ function Filters({
           href={href({ capacity: null })}
           active={activeCapacity === null}
         >
-          Any
+          {t("common.any")}
         </FilterLink>
         {CAPACITY_OPTIONS.filter((option) => option.value !== "").map(
           (option) => (

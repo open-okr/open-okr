@@ -100,7 +100,7 @@ export function Wizard({
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h1 className="text-lg font-bold text-ink">{t("welcome.title")}</h1>
+          <h1 className="text-lg font-bold text-ink">{t("common.title")}</h1>
           <p className="text-xs text-ink-3">{t("welcome.explains")}</p>
           {/* The counter is digits and a slash, which is the same in every
               language; the catalogue names it for a screen reader instead. */}
@@ -224,7 +224,7 @@ export function Wizard({
             data-testid="welcome-skip"
             onClick={skip}
           >
-            {step === "demo" ? t("welcome.demo.empty") : t("welcome.skip")}
+            {step === "demo" ? t("welcome.demo.empty") : t("common.skip")}
           </Button>
         </div>
       </CardBody>

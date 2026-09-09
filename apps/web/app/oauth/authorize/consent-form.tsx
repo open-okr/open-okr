@@ -1,4 +1,5 @@
 import { Button } from "@openokr/ui";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * Approve or deny, and pick which workspace (screen S-40, P5-T08c).
@@ -34,7 +35,7 @@ export interface ConsentRequest {
 const FIELD =
   "rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink";
 
-export function ConsentForm({
+export async function ConsentForm({
   request,
   clientName,
   workspaces,
@@ -45,6 +46,8 @@ export function ConsentForm({
   readonly workspaces: readonly { id: string; name: string }[];
   readonly activeWorkspaceId: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <form
       method="post"
@@ -65,7 +68,7 @@ export function ConsentForm({
 
       {workspaces.length > 1 ? (
         <label className="flex flex-col gap-1 text-xs text-ink-2">
-          Which workspace
+          {t("oauth.authorize.consentForm.whichWorkspace")}
           <select
             name="workspaceId"
             className={FIELD}
@@ -78,8 +81,7 @@ export function ConsentForm({
             ))}
           </select>
           <span className="text-ink-3">
-            {clientName} will reach this one, and no other. Connect it again to
-            give it a second.
+            {clientName} {t("oauth.authorize.consentForm.willReachThisOne")}
           </span>
         </label>
       ) : (
@@ -94,7 +96,7 @@ export function ConsentForm({
           variant="primary"
           size="sm"
         >
-          Connect
+          {t("common.connect")}
         </Button>
         <Button
           type="submit"
@@ -103,7 +105,7 @@ export function ConsentForm({
           variant="ghost"
           size="sm"
         >
-          Refuse
+          {t("common.refuse")}
         </Button>
       </div>
     </form>

@@ -83,7 +83,7 @@ describe("the four steps", () => {
   test("read their text from the catalogue", () => {
     // The first screen fully in it, which is the pattern P6-G22c follows.
     expect(wizard).toContain("useTranslations");
-    expect(wizard).toContain('t("welcome.title")');
+    expect(wizard).toContain('t("common.title")');
   });
 });
 

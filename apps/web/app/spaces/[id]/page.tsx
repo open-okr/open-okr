@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -32,6 +33,8 @@ export default async function SpacePage({
   /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
   searchParams: Promise<{ at?: string; id?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   // Built once. It was written out at each call site, and P6-G19c would have
@@ -153,7 +156,8 @@ export default async function SpacePage({
           <SpaceMembership spaceId={space.id} ownRole={space.ownRole} />
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-ink-2">
-              Members ({space.memberCount})
+              {t("spaces.detail.members")}
+              {space.memberCount})
             </h2>
             <ul className="flex flex-col gap-1.5">
               {space.members.map((member) => (
@@ -167,7 +171,9 @@ export default async function SpacePage({
                       {member.role}
                     </Chip>
                     {member.memberId === space.coordinatorMemberId ? (
-                      <Chip tone="info">runs the weekly session</Chip>
+                      <Chip tone="info">
+                        {t("spaces.detail.runsTheWeeklySession")}
+                      </Chip>
                     ) : null}
                   </span>
                 </li>
@@ -180,7 +186,7 @@ export default async function SpacePage({
                 member.role === "coordinator",
             ) ? (
               <p className="text-sm text-ink-3">
-                No coordinator is named, so a manager covers those duties.
+                {t("spaces.detail.noCoordinatorIsNamed")}
               </p>
             ) : null}
           </div>
@@ -220,10 +226,10 @@ export default async function SpacePage({
       {/* Last week's figures, as the digest recorded them (P6-G19c). */}
       <Card>
         <CardHeader className="justify-between">
-          <span>Last week</span>
+          <span>{t("common.lastWeek")}</span>
           {lastWeek ? (
             <span className="text-xs text-ink-3">
-              week of {lastWeek.weekStart}
+              {t("spaces.detail.weekOf")} {lastWeek.weekStart}
             </span>
           ) : null}
           <WatchControl subjectType="space" subjectId={id} initial={watch} />
@@ -231,8 +237,7 @@ export default async function SpacePage({
         <CardBody>
           {lastWeek === null ? (
             <p className="text-sm text-ink-3">
-              No week has closed in this space yet. The first digest is written
-              when a weekly session closes.
+              {t("spaces.detail.noWeekHasClosed")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -249,21 +254,24 @@ export default async function SpacePage({
       {/* P5-T01c: the door to S-22 to S-25, which nothing linked to. */}
       <Card>
         <CardHeader className="justify-between">
-          <span>Sessions</span>
+          <span>{t("common.sessions")}</span>
           <Link
             className={buttonVariants({ variant: "ghost", size: "sm" })}
             href="/sessions"
           >
-            All sessions
+            {t("spaces.detail.allSessions")}
           </Link>
         </CardHeader>
         <CardBody>
           {liveOrAhead.length === 0 ? (
             <p className="text-sm text-ink-3">
-              Nothing scheduled in this space.
+              {t("spaces.detail.nothingScheduledInThis")}
             </p>
           ) : (
-            <ul aria-label="Sessions" className="flex flex-col gap-1.5">
+            <ul
+              aria-label={t("common.sessions")}
+              className="flex flex-col gap-1.5"
+            >
               {liveOrAhead.map((row) => (
                 <li key={row.id}>
                   <Link
@@ -274,7 +282,7 @@ export default async function SpacePage({
                       {row.title}
                     </span>
                     {row.state === "running" ? (
-                      <Chip tone="brand">In progress</Chip>
+                      <Chip tone="brand">{t("common.inProgress")}</Chip>
                     ) : null}
                     <span className="ml-auto flex-none text-xs font-semibold text-brand-text">
                       {row.state === "running" ? "Rejoin" : "Open"}
@@ -289,23 +297,28 @@ export default async function SpacePage({
 
       {/* P4-T15b-b: the open-blocker board REQUIREMENTS §7 asks for. */}
       <Card>
-        <CardHeader>Open blockers</CardHeader>
+        <CardHeader>{t("common.openBlockers")}</CardHeader>
         <CardBody>
           {board.blockers.length === 0 ? (
             <p className="text-sm text-ink-3">
-              Nothing is stuck in this space.
+              {t("spaces.detail.nothingIsStuckIn")}
             </p>
           ) : (
-            <ol aria-label="Open blockers" className="flex flex-col gap-2.5">
+            <ol
+              aria-label={t("common.openBlockers")}
+              className="flex flex-col gap-2.5"
+            >
               {board.blockers.map((blocker) => (
                 <li key={blocker.id} className="flex flex-col gap-1">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <Chip tone="neutral">{blocker.type.replace("_", " ")}</Chip>
                     {blocker.pastTheClock ? (
-                      <Chip tone="bad">past the clock</Chip>
+                      <Chip tone="bad">{t("spaces.detail.pastTheClock")}</Chip>
                     ) : null}
                     {blocker.escalation === "none" ? null : (
-                      <Chip tone="warn">escalated to {blocker.escalation}</Chip>
+                      <Chip tone="warn">
+                        {t("spaces.detail.escalatedTo")} {blocker.escalation}
+                      </Chip>
                     )}
                     <span className="text-xs text-ink-4">
                       {blocker.ageHours}h
@@ -325,7 +338,7 @@ export default async function SpacePage({
         </CardBody>
       </Card>
       <FeedPanel
-        title="Activity"
+        title={t("common.activity")}
         explains="What has happened in this space, including its goals, initiatives and tasks."
         items={feedItems}
         names={feedNames}

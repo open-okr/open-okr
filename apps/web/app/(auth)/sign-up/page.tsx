@@ -5,6 +5,7 @@ import {
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
 import { SignUpForm } from "./sign-up-form";
 
@@ -23,6 +24,8 @@ import { SignUpForm } from "./sign-up-form";
 export const dynamic = "force-dynamic";
 
 export default async function SignUpPage() {
+  const { t } = await getTranslations();
+
   // **The invitation counts here too, and it did not until P6-G06b.** This
   // asked `isRegistrationOpen`, which is the narrower question, so a closed
   // instance told an invitee "Registration is closed" and never rendered a
@@ -34,13 +37,13 @@ export default async function SignUpPage() {
   if (!(await registrationOpenOrInvited(getPool(), cookieHeader))) {
     return (
       <AuthCard
-        title="Registration is closed"
+        title={t("auth.signUp.registrationIsClosed")}
         footer={
           <Link
             href="/sign-in"
             className="font-medium text-brand-text hover:underline"
           >
-            Back to sign in
+            {t("common.backToSignIn")}
           </Link>
         }
       >

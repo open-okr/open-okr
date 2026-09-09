@@ -1,6 +1,12 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  useTranslations,
+} from "@openokr/ui";
 import { useActionState } from "react";
 import { setCoordinatorNoteAction } from "./blocker-actions.ts";
 import { NO_ERROR } from "./commitment-state.ts";
@@ -27,6 +33,8 @@ export function CoordinatorNote({
   /** What is stored, or null before anybody wrote one. */
   readonly note: string | null;
 }) {
+  const { t } = useTranslations();
+
   const [state, submit, pending] = useActionState(
     setCoordinatorNoteAction,
     NO_ERROR,
@@ -36,11 +44,11 @@ export function CoordinatorNote({
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">The coordinator's note</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("session.detail.coordinatorNote.theCoordinatorSNote")}
+          </h2>
           <p className="text-xs text-ink-3">
-            One paragraph for leadership, added to the digest that leaves this
-            room. The figures above are the product's; this is yours. It can be
-            written once the session has closed and the digest exists.
+            {t("session.detail.coordinatorNote.oneParagraphForLeadership")}
           </p>
         </div>
       </CardHeader>

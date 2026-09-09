@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { applyProposalsAction, dismissProposalsAction } from "./actions";
@@ -69,6 +76,8 @@ export function ProposalQueue({
 }: {
   readonly proposals: readonly QueuedProposal[];
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
@@ -114,23 +123,21 @@ export function ProposalQueue({
     <Card>
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Proposals waiting</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.agents.proposalQueue.proposalsWaiting")}
+          </h2>
           <p className="text-xs text-ink-3">
-            An agent in the default write policy changes nothing until somebody
-            here says so. Applying one is a write in your name, audited to both
-            of you.
+            {t("admin.agents.proposalQueue.anAgentInThe")}
           </p>
         </div>
         <Chip tone={proposals.length > 0 ? "warn" : "ok"}>
-          {proposals.length} pending
+          {proposals.length} {t("admin.agents.proposalQueue.pending")}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         {proposals.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nothing waiting. An agent proposes when it has something to say and
-            the write policy stops it acting alone; an empty queue means it has
-            nothing, not that it is off.
+            {t("admin.agents.proposalQueue.nothingWaitingAnAgent")}
           </p>
         ) : (
           <>
@@ -179,7 +186,7 @@ export function ProposalQueue({
                   })
                 }
               >
-                Apply {ids.length > 0 ? ids.length : ""}
+                {t("common.apply")} {ids.length > 0 ? ids.length : ""}
               </Button>
               <Button
                 disabled={pending || ids.length === 0}
@@ -190,11 +197,10 @@ export function ProposalQueue({
                   })
                 }
               >
-                Dismiss
+                {t("common.dismiss")}
               </Button>
               <span className="text-xs text-ink-4">
-                Nothing is chosen for you. A queue that arrives ticked is the
-                automatic approval this policy exists to prevent.
+                {t("admin.agents.proposalQueue.nothingIsChosenFor")}
               </span>
             </div>
           </>

@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 /**
@@ -58,6 +59,8 @@ export default async function PeoplePage({
 }: {
   readonly searchParams: Promise<{ view?: string; q?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const pool = getPool();
   const context = {
@@ -101,8 +104,10 @@ export default async function PeoplePage({
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">People</h1>
-            <p className="text-sm text-ink-3">Everyone in this workspace.</p>
+            <h1 className="text-lg font-bold text-ink">{t("people.people")}</h1>
+            <p className="text-sm text-ink-3">
+              {t("people.everyoneInThisWorkspace")}
+            </p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
@@ -116,7 +121,7 @@ export default async function PeoplePage({
                   : "text-ink-3 hover:bg-bg-2 hover:text-ink"
               }`}
             >
-              Directory
+              {t("people.directory")}
             </Link>
             <Link
               href="/people?view=chart"
@@ -126,7 +131,7 @@ export default async function PeoplePage({
                   : "text-ink-3 hover:bg-bg-2 hover:text-ink"
               }`}
             >
-              Org chart
+              {t("people.orgChart")}
             </Link>
           </div>
 
@@ -138,14 +143,14 @@ export default async function PeoplePage({
                   name="q"
                   type="search"
                   defaultValue={query}
-                  placeholder="Search by name or title"
+                  placeholder={t("people.searchByNameOr")}
                   className="flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
                 <button
                   type="submit"
                   className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
                 >
-                  Search
+                  {t("shell.search.label")}
                 </button>
               </form>
 
@@ -181,13 +186,15 @@ export default async function PeoplePage({
                             </span>
                           ) : null}
                           {member.kind === "guest" ? (
-                            <Chip tone="neutral">Guest</Chip>
+                            <Chip tone="neutral">{t("common.guest")}</Chip>
                           ) : null}
                           {member.kind === "placeholder" ? (
-                            <Chip tone="neutral">Placeholder</Chip>
+                            <Chip tone="neutral">
+                              {t("common.placeholder")}
+                            </Chip>
                           ) : null}
                           {isAdmin && member.status === "suspended" ? (
-                            <Chip tone="warn">Suspended</Chip>
+                            <Chip tone="warn">{t("common.suspended")}</Chip>
                           ) : null}
                         </span>
                       </Link>
@@ -199,7 +206,7 @@ export default async function PeoplePage({
           ) : /* Org chart */
           (chart as OrgChartNode[]).length === 0 ? (
             <p className="text-sm text-ink-3">
-              No manager relationships set yet.
+              {t("people.noManagerRelationshipsSet")}
             </p>
           ) : (
             <OrgTree nodes={chart as OrgChartNode[]} depth={0} />

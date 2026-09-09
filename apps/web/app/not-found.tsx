@@ -1,6 +1,7 @@
 import { buttonVariants, Card, CardBody } from "@openokr/ui";
 import { SearchX } from "lucide-react";
 import Link from "next/link";
+import { getTranslations } from "../lib/translations";
 
 /**
  * The permission-denied state, wearing not-found's clothes (UIUX-PLAN.md
@@ -15,19 +16,20 @@ import Link from "next/link";
  * `error.tsx`: the thing that resolved not-found may itself have been a
  * workspace lookup, so there is nothing to assume a shell around.
  */
-export default function NotFound() {
+export default async function NotFound() {
+  const { t } = await getTranslations();
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-4.5">
       <Card className="max-w-sm">
         <CardBody className="flex flex-col items-center gap-3 text-center">
           <SearchX className="size-8 text-ink-4" aria-hidden="true" />
-          <h1 className="text-lg font-bold text-ink">Not found</h1>
-          <p className="text-sm text-ink-3">
-            We could not find that, or it is not yours to see. If you were
-            expecting access, ask a workspace admin to invite you.
-          </p>
+          <h1 className="text-lg font-bold text-ink">
+            {t("notFound.notFound")}
+          </h1>
+          <p className="text-sm text-ink-3">{t("notFound.weCouldNotFind")}</p>
           <Link href="/" className={buttonVariants({ variant: "primary" })}>
-            Back to your workspace
+            {t("notFound.backToYourWorkspace")}
           </Link>
         </CardBody>
       </Card>

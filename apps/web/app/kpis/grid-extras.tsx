@@ -119,7 +119,7 @@ export async function CategorySubtotal({
       data-testid="category-subtotal"
     >
       <span className="text-ink-3">
-        {states.length} {t("kpi.subtotal.count")}
+        {states.length} {t("common.count")}
       </span>
       {counted.healthy > 0 ? (
         <Chip tone="ok">

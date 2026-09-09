@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolveSpaceSettings, SETTINGS_REGISTRY } from "@openokr/core";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * §4.14's space scope has a surface (P6-G18b, GAP-AUDIT B-09).
@@ -18,7 +18,7 @@ import { describe, expect, test } from "vitest";
  */
 
 const at = (path: string) =>
-  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  readScreen(fileURLToPath(new URL(path, import.meta.url)));
 
 const card = at("../app/spaces/[id]/space-settings.tsx");
 const actions = at("../app/spaces/actions.ts");

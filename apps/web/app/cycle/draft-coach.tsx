@@ -11,6 +11,7 @@ import {
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
+import { useTranslations } from "@openokr/ui";
 import { useMemo, useState } from "react";
 import {
   RuleVerdict,
@@ -96,6 +97,8 @@ export function DraftCoach({
     readonly title: string;
   }[];
 }) {
+  const { t } = useTranslations();
+
   const [title, setTitle] = useState(objective.title);
   const titles = useMemo(
     () => new Map(checkTitles.map((entry) => [entry.id, entry.title])),
@@ -172,7 +175,7 @@ export function DraftCoach({
           htmlFor="draft-coach-objective"
           className="text-xs font-semibold text-ink-2"
         >
-          Objective, checked as you type
+          {t("cycle.draftCoach.objectiveCheckedAsYou")}
         </label>
         {/* `.field` from `03b-rule-card`: the worst verdict as a dot on the
          * left, the sentence at the size somebody is actually writing at, and
@@ -197,8 +200,7 @@ export function DraftCoach({
           ) : null}
         </span>
         <span className="text-xs text-ink-4">
-          Nothing is saved by typing here. Warnings never block writing, which
-          is §4's own rule.
+          {t("cycle.draftCoach.nothingIsSavedBy")}
         </span>
       </div>
 
@@ -218,7 +220,7 @@ export function DraftCoach({
 
       {views.every((view) => view.status === "pass") ? (
         <p className="text-xs text-ok">
-          Every check passes. Read it aloud once more, then publish.
+          {t("cycle.draftCoach.everyCheckPassesRead")}
         </p>
       ) : null}
     </div>

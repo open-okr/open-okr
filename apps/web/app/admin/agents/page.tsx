@@ -3,6 +3,7 @@ import { AGENT_AUTONOMIES } from "@openokr/db";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { AgentPolicy } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
@@ -64,6 +65,8 @@ const BINDING_LEVELS = [
 ];
 
 export default async function AgentsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -73,12 +76,11 @@ export default async function AgentsPage() {
   if (level < ACCESS_LEVELS.full) {
     return (
       <>
-        <h1>Agents and runs</h1>
+        <h1>{t("admin.agents.agentsAndRuns")}</h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              What the agents did, and to whom, is behind the coaching
-              permission. Ask a workspace administrator.
+              {t("admin.agents.whatTheAgentsDid")}
             </p>
           </CardBody>
         </Card>
@@ -116,11 +118,8 @@ export default async function AgentsPage() {
 
   return (
     <>
-      <h1>Agents and runs</h1>
-      <p className="text-sm text-ink-3">
-        Every agent is a member of this workspace, accountable like anyone else.
-        None of them holds a workspace-wide grant.
-      </p>
+      <h1>{t("admin.agents.agentsAndRuns")}</h1>
+      <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
 
       <RunControls drafting={drafting} />
 
@@ -131,13 +130,14 @@ export default async function AgentsPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">The agents</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.agents.theAgents")}
+          </h2>
         </CardHeader>
         <CardBody className="p-0">
           {agents.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              This workspace has no agents. That is unusual: the Champion is
-              seeded at provisioning.
+              {t("admin.agents.thisWorkspaceHasNo")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -185,14 +185,17 @@ export default async function AgentsPage() {
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Recent runs</h2>
-          <Chip tone="neutral">{runs.length} shown</Chip>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.recentRuns")}
+          </h2>
+          <Chip tone="neutral">
+            {runs.length} {t("admin.agents.shown")}
+          </Chip>
         </CardHeader>
         <CardBody className="p-0">
           {runs.length === 0 ? (
             <p className="p-3 text-sm text-ink-3">
-              No run yet. Nothing schedules one on this instance, so a run
-              happens when somebody asks for it.
+              {t("admin.agents.noRunYetNothing")}
             </p>
           ) : (
             <ul className="flex flex-col">
@@ -231,7 +234,7 @@ export default async function AgentsPage() {
                   ) : null}
                   {run.log.length === 0 ? (
                     <span className="text-xs text-ink-4">
-                      Nothing was due. A quiet hour is a run too.
+                      {t("admin.agents.nothingWasDueA")}
                     </span>
                   ) : (
                     <ul className="flex flex-col gap-0.5">

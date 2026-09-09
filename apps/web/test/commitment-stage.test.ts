@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolveThresholds } from "@openokr/method";
 import { describe, expect, test } from "vitest";
+import { readScreen } from "./screen-text.ts";
 
 /**
  * §7.2 step 3 has a surface, and its numbers are the registry's (P6-G19a).
@@ -19,7 +19,7 @@ import { describe, expect, test } from "vitest";
  */
 
 const at = (path: string) =>
-  readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+  readScreen(fileURLToPath(new URL(path, import.meta.url)));
 
 const actions = at("../app/session/[id]/commitment-actions.ts");
 const panel = at("../app/session/[id]/commitments.tsx");
@@ -40,7 +40,12 @@ describe("the commitment stage", () => {
     const bounds = resolveThresholds()["sessions.weeklyCommitmentBounds"];
     expect(bounds).toEqual({ low: 2, high: 3 });
     expect(panel).not.toContain(`${bounds.low} to ${bounds.high} a week`);
-    expect(panel).toContain("{low} to {high} a week");
+    // The sentence is assembled from catalogue pieces since P6-G22c, so the
+    // whole of it is no longer one literal to match. What the test is actually
+    // about survives that: the bounds arrive as values and are interpolated.
+    expect(panel).toContain("{low}");
+    expect(panel).toContain("{high}");
+    expect(panel).toContain("a week");
     expect(page).toContain('"sessions.weeklyCommitmentBounds"');
   });
 

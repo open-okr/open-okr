@@ -4,6 +4,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   addModel,
@@ -82,6 +83,8 @@ const STATUS_TONE: Readonly<Record<string, "ok" | "bad" | "warn">> = {
 };
 
 export default async function AdminAIPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -94,17 +97,14 @@ export default async function AdminAIPage() {
     // has AI and who to ask for it.
     return (
       <>
-        <h1 className="text-lg font-bold text-ink">AI</h1>
+        <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              Configuring the AI provider is behind workspace administration,
-              because a key here books spend for everybody. Ask an
-              administrator.
+              {t("admin.ai.configuringTheAiProvider")}
             </p>
             <p className="mt-1 text-xs text-ink-3">
-              Every check-in, score, gate and nudge works with AI off, so
-              nothing you need is waiting on this.
+              {t("admin.ai.everyCheckInScore")}
             </p>
           </CardBody>
         </Card>
@@ -145,11 +145,9 @@ export default async function AdminAIPage() {
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">AI</h1>
+            <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
             <p className="text-xs text-ink-3">
-              Every rule, score, gate, corridor and nudge in this product works
-              with AI off. What a provider adds is drafting, rewriting and
-              language, never the decision itself.
+              {t("admin.ai.everyRuleScoreGate")}
             </p>
           </div>
           <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
@@ -160,9 +158,12 @@ export default async function AdminAIPage() {
         </CardHeader>
       </Card>
 
-      <section aria-label="Providers" className="flex flex-col gap-1.5">
+      <section
+        aria-label={t("admin.ai.providers")}
+        className="flex flex-col gap-1.5"
+      >
         <h2 className="px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-          Providers and keys
+          {t("admin.ai.providersAndKeys")}
         </h2>
         {AI_PROVIDER_KINDS.map((kind) => {
           const config = providers.find((one) => one.provider === kind);
@@ -172,9 +173,9 @@ export default async function AdminAIPage() {
                 <span className="flex items-center gap-2 text-sm font-medium text-ink">
                   {PROVIDER_WORDS[kind] ?? kind}
                   {config?.enabled ? (
-                    <Chip tone="ok">on</Chip>
+                    <Chip tone="ok">{t("admin.ai.on")}</Chip>
                   ) : (
-                    <Chip tone="neutral">off</Chip>
+                    <Chip tone="neutral">{t("admin.ai.off")}</Chip>
                   )}
                   {config?.hasWorkspaceCredential &&
                   config.workspaceKeyStatus ? (
@@ -201,7 +202,7 @@ export default async function AdminAIPage() {
                       defaultChecked={config?.enabled ?? false}
                       className="size-4"
                     />
-                    Use this provider
+                    {t("admin.ai.useThisProvider")}
                   </label>
                   <label className="flex items-center gap-2 text-sm text-ink">
                     <input
@@ -210,19 +211,19 @@ export default async function AdminAIPage() {
                       defaultChecked={config?.allowUserKeys ?? false}
                       className="size-4"
                     />
-                    Let members supply their own key
+                    {t("admin.ai.letMembersSupplyTheir")}
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    Base URL, for a self-hosted or proxied endpoint
+                    {t("admin.ai.baseUrlForA")}
                     <input
                       name="baseUrl"
                       defaultValue={config?.baseUrl ?? ""}
-                      placeholder="leave empty for the provider's own"
+                      placeholder={t("admin.ai.leaveEmptyForThe")}
                       className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     />
                   </label>
                   <Button type="submit" variant="ghost" size="sm">
-                    Save
+                    {t("common.save")}
                   </Button>
                 </AIForm>
 
@@ -252,7 +253,7 @@ export default async function AdminAIPage() {
                   <AIForm action={removeWorkspaceKey}>
                     <input type="hidden" name="provider" value={kind} />
                     <Button type="submit" variant="ghost" size="sm">
-                      Remove the key
+                      {t("admin.ai.removeTheKey")}
                     </Button>
                   </AIForm>
                 ) : null}
@@ -265,17 +266,18 @@ export default async function AdminAIPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Rotation</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("admin.ai.rotation")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Re-wraps every stored key onto the current root key. Nothing loses
-              access and no key is decrypted outside the server.
+              {t("admin.ai.reWrapsEveryStored")}
             </p>
           </div>
         </CardHeader>
         <CardBody>
           <AIForm action={rotateKeys}>
             <Button type="submit" variant="ghost" size="sm">
-              Rotate now
+              {t("admin.ai.rotateNow")}
             </Button>
           </AIForm>
         </CardBody>
@@ -284,10 +286,11 @@ export default async function AdminAIPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Models</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("admin.ai.models")}
+            </h2>
             <p className="text-xs text-ink-3">
-              The seeded catalogue, plus anything this workspace added. A custom
-              entry meters cost from its own figures rather than a guess.
+              {t("admin.ai.theSeededCataloguePlus")}
             </p>
           </div>
         </CardHeader>
@@ -296,12 +299,22 @@ export default async function AdminAIPage() {
             <table className="w-full text-left text-xs">
               <thead className="text-ink-3">
                 <tr>
-                  <th className="py-1 pr-3 font-semibold">Model</th>
-                  <th className="py-1 pr-3 font-semibold">Provider</th>
-                  <th className="py-1 pr-3 font-semibold">Context</th>
-                  <th className="py-1 pr-3 font-semibold">In / out per M</th>
-                  <th className="py-1 pr-3 font-semibold">Tiers</th>
-                  <th className="py-1 font-semibold">Source</th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.model")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.provider")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.context")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.inOutPerM")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.tiers")}
+                  </th>
+                  <th className="py-1 font-semibold">{t("admin.ai.source")}</th>
                 </tr>
               </thead>
               <tbody className="text-ink-2">
@@ -337,11 +350,11 @@ export default async function AdminAIPage() {
                         <AIForm action={removeModel}>
                           <input type="hidden" name="id" value={model.id} />
                           <Button type="submit" variant="ghost" size="sm">
-                            Remove
+                            {t("common.remove")}
                           </Button>
                         </AIForm>
                       ) : (
-                        <Chip tone="neutral">seeded</Chip>
+                        <Chip tone="neutral">{t("admin.ai.seeded")}</Chip>
                       )}
                     </td>
                   </tr>
@@ -355,11 +368,11 @@ export default async function AdminAIPage() {
             className="flex flex-col gap-2 border-t border-line pt-3"
           >
             <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
-              Add a model
+              {t("admin.ai.addAModel")}
             </h3>
             <div className="flex flex-wrap gap-2">
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Provider
+                {t("admin.ai.provider")}
                 <select
                   name="provider"
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
@@ -372,7 +385,7 @@ export default async function AdminAIPage() {
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Model id
+                {t("admin.ai.modelId")}
                 <input
                   name="modelId"
                   required
@@ -380,7 +393,7 @@ export default async function AdminAIPage() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Name
+                {t("common.name")}
                 <input
                   name="displayName"
                   required
@@ -388,7 +401,7 @@ export default async function AdminAIPage() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Context window
+                {t("admin.ai.contextWindow")}
                 <input
                   name="contextWindow"
                   type="number"
@@ -398,7 +411,7 @@ export default async function AdminAIPage() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Cost in, per million
+                {t("admin.ai.costInPerMillion")}
                 <input
                   name="costInPerMillion"
                   type="number"
@@ -409,7 +422,7 @@ export default async function AdminAIPage() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Cost out, per million
+                {t("admin.ai.costOutPerMillion")}
                 <input
                   name="costOutPerMillion"
                   type="number"
@@ -434,7 +447,7 @@ export default async function AdminAIPage() {
                   {label}
                 </label>
               ))}
-              <span className="text-ink-3">Tiers:</span>
+              <span className="text-ink-3">{t("admin.ai.tiers2")}</span>
               {MODEL_TIERS.map((tier) => (
                 <label key={tier} className="flex items-center gap-1.5">
                   <input
@@ -448,7 +461,7 @@ export default async function AdminAIPage() {
               ))}
             </div>
             <Button type="submit" variant="default" size="sm">
-              Add
+              {t("common.add")}
             </Button>
           </AIForm>
         </CardBody>
@@ -457,11 +470,11 @@ export default async function AdminAIPage() {
       <Card>
         <CardHeader>
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">Tier routing</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("admin.ai.tierRouting")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Which model answers each tier. A tier with no policy follows the
-              driver's seeded default for whatever provider is on, so this is an
-              override rather than a requirement.
+              {t("admin.ai.whichModelAnswersEach")}
             </p>
           </div>
         </CardHeader>
@@ -493,7 +506,7 @@ export default async function AdminAIPage() {
                 >
                   <input type="hidden" name="tier" value={route.tier} />
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    Provider
+                    {t("admin.ai.provider")}
                     <select
                       name="provider"
                       defaultValue={route.provider ?? AI_PROVIDER_KINDS[0]}
@@ -507,7 +520,7 @@ export default async function AdminAIPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    Model id
+                    {t("admin.ai.modelId")}
                     <input
                       name="modelId"
                       defaultValue={route.modelId ?? ""}
@@ -516,7 +529,7 @@ export default async function AdminAIPage() {
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    Temperature
+                    {t("admin.ai.temperature")}
                     <input
                       name="temperature"
                       type="number"
@@ -524,30 +537,30 @@ export default async function AdminAIPage() {
                       max={2}
                       step="0.1"
                       defaultValue={route.temperature ?? ""}
-                      placeholder="driver's own"
+                      placeholder={t("admin.ai.driverSOwn")}
                       className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-xs text-ink-3">
-                    Max tokens
+                    {t("admin.ai.maxTokens")}
                     <input
                       name="maxTokens"
                       type="number"
                       min={1}
                       defaultValue={route.maxTokens ?? ""}
-                      placeholder="driver's own"
+                      placeholder={t("admin.ai.driverSOwn")}
                       className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     />
                   </label>
                   <Button type="submit" variant="ghost" size="sm">
-                    Route
+                    {t("admin.ai.route")}
                   </Button>
                 </AIForm>
                 {route.source === "policy" ? (
                   <AIForm action={clearTier}>
                     <input type="hidden" name="tier" value={route.tier} />
                     <Button type="submit" variant="ghost" size="sm">
-                      Back to the default
+                      {t("admin.ai.backToTheDefault")}
                     </Button>
                   </AIForm>
                 ) : null}

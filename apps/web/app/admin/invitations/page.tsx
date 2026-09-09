@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { createPersonalLinkAction, createWorkspaceLinkAction } from "./actions";
 import { InviteForm } from "./invite-form";
@@ -59,6 +60,8 @@ function stateOf(link: {
 }
 
 export default async function InvitationsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -70,12 +73,13 @@ export default async function InvitationsPage() {
   if (level < ACCESS_LEVELS.full) {
     return (
       <>
-        <h1 className="mb-4 text-lg font-bold text-ink">Invitations</h1>
+        <h1 className="mb-4 text-lg font-bold text-ink">
+          {t("admin.invitations.invitations")}
+        </h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-3">
-              Only a workspace administrator can invite people. Ask one of yours
-              to add you to this screen.
+              {t("admin.invitations.onlyAWorkspaceAdministrator")}
             </p>
           </CardBody>
         </Card>
@@ -95,15 +99,18 @@ export default async function InvitationsPage() {
 
   return (
     <>
-      <h1 className="mb-4 text-lg font-bold text-ink">Invitations</h1>
+      <h1 className="mb-4 text-lg font-bold text-ink">
+        {t("admin.invitations.invitations")}
+      </h1>
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">Invite one person</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("admin.invitations.inviteOnePerson")}
+              </h2>
               <p className="text-xs text-ink-3">
-                One address, one use. They join with the workspace defaults and
-                the audit names you.
+                {t("admin.invitations.oneAddressOneUse")}
               </p>
             </div>
           </CardHeader>
@@ -113,17 +120,17 @@ export default async function InvitationsPage() {
               submitLabel="Create the invitation"
             >
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Email address
+                {t("admin.invitations.emailAddress")}
                 <input
                   name="email"
                   type="email"
                   required
-                  placeholder="name@example.com"
+                  placeholder={t("admin.invitations.nameExampleCom")}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Expires in days
+                {t("admin.invitations.expiresInDays")}
                 <input
                   name="expiresInDays"
                   type="number"
@@ -140,11 +147,10 @@ export default async function InvitationsPage() {
           <CardHeader>
             <div className="flex min-w-0 flex-col">
               <h2 className="text-sm font-bold text-ink">
-                Create a link to share
+                {t("admin.invitations.createALinkTo")}
               </h2>
               <p className="text-xs text-ink-3">
-                For a channel or a document. Bound it with a use count, an
-                expiry, or the domains you will accept.
+                {t("admin.invitations.forAChannelOr")}
               </p>
             </div>
           </CardHeader>
@@ -155,17 +161,17 @@ export default async function InvitationsPage() {
             >
               <div className="flex flex-wrap gap-2.5">
                 <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  Maximum uses
+                  {t("admin.invitations.maximumUses")}
                   <input
                     name="maxUses"
                     type="number"
                     min={1}
-                    placeholder="No limit"
+                    placeholder={t("admin.invitations.noLimit")}
                     className="w-28 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  Expires in days
+                  {t("admin.invitations.expiresInDays")}
                   <input
                     name="expiresInDays"
                     type="number"
@@ -176,15 +182,14 @@ export default async function InvitationsPage() {
                 </label>
               </div>
               <label className="flex flex-col gap-1 text-xs text-ink-3">
-                Allowed domains
+                {t("admin.invitations.allowedDomains")}
                 <input
                   name="allowedDomains"
-                  placeholder="example.com, example.org"
+                  placeholder={t("admin.invitations.exampleComExampleOrg")}
                   className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                 />
                 <span className="text-ink-4">
-                  Leave empty to accept any address. A domain list refuses
-                  everyone else at the moment they try to join.
+                  {t("admin.invitations.leaveEmptyToAccept")}
                 </span>
               </label>
             </InviteForm>
@@ -194,18 +199,18 @@ export default async function InvitationsPage() {
         <Card>
           <CardHeader>
             <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">Issued</h2>
+              <h2 className="text-sm font-bold text-ink">
+                {t("admin.invitations.issued")}
+              </h2>
               <p className="text-xs text-ink-3">
-                Revoked and expired links stay here. Whether you already invited
-                somebody is a question about history.
+                {t("admin.invitations.revokedAndExpiredLinks")}
               </p>
             </div>
           </CardHeader>
           <CardBody>
             {links.length === 0 ? (
               <p className="text-sm text-ink-3">
-                Nothing issued yet. Everybody in this workspace either created
-                it or was added from the command line.
+                {t("admin.invitations.nothingIssuedYetEverybody")}
               </p>
             ) : (
               <ul className="flex flex-col gap-2">

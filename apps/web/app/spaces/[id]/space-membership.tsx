@@ -2,6 +2,7 @@ import { callAction, OperationError } from "@openokr/core";
 import { Button } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -71,19 +72,23 @@ async function leave(formData: FormData): Promise<void> {
   revalidatePath("/spaces");
 }
 
-export function SpaceMembership({
+export async function SpaceMembership({
   spaceId,
   ownRole,
 }: {
   readonly spaceId: string;
   readonly ownRole: "member" | "manager" | "coordinator" | null;
 }) {
+  const { t } = await getTranslations();
+
   if (!ownRole) {
     return (
       <form action={join} className="flex items-center gap-3">
         <input type="hidden" name="spaceId" value={spaceId} />
-        <p className="text-sm text-ink-3">You are not in this space.</p>
-        <Button type="submit">Join</Button>
+        <p className="text-sm text-ink-3">
+          {t("spaces.detail.spaceMembership.youAreNotIn")}
+        </p>
+        <Button type="submit">{t("common.join")}</Button>
       </form>
     );
   }
@@ -92,13 +97,13 @@ export function SpaceMembership({
     <form action={leave} className="flex items-center gap-3">
       <input type="hidden" name="spaceId" value={spaceId} />
       <p className="text-sm text-ink-3">
-        You are in this space as {ownRole}.
+        {t("spaces.detail.spaceMembership.youAreInThis")} {ownRole}.
         {ownRole === "manager"
           ? " Appoint another manager before you leave."
           : ""}
       </p>
       <Button type="submit" variant="ghost">
-        Leave
+        {t("spaces.detail.spaceMembership.leave")}
       </Button>
     </form>
   );

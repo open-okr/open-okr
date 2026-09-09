@@ -10,6 +10,7 @@ import {
   MODEL_TIERS,
 } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../../lib/translations";
 import {
   removeBudget,
   restoreDefaultPrompt,
@@ -94,13 +95,15 @@ export interface PromptRow {
   }[];
 }
 
-export function UsageCard({
+export async function UsageCard({
   usage,
   days,
 }: {
   readonly usage: UsageSummary;
   readonly days: number;
 }) {
+  const { t } = await getTranslations();
+
   const figures: readonly (readonly [string, string])[] = [
     ["Calls", usage.totalCalls.toLocaleString("en-GB")],
     ["Tokens in", usage.totalInputTokens.toLocaleString("en-GB")],
@@ -112,17 +115,19 @@ export function UsageCard({
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
-            Spend, last {days} days
+            {t("admin.ai.governance.spendLast")} {days}{" "}
+            {t("admin.ai.governance.days")}
           </h2>
           <p className="text-xs text-ink-3">
-            Metered from the event each call writes, so these are what was
-            billed rather than an estimate of it.
+            {t("admin.ai.governance.meteredFromTheEvent")}
           </p>
         </div>
         {usage.flaggedCalls > 0 ? (
-          <Chip tone="warn">{usage.flaggedCalls} flagged</Chip>
+          <Chip tone="warn">
+            {usage.flaggedCalls} {t("admin.ai.governance.flagged")}
+          </Chip>
         ) : (
-          <Chip tone="ok">nothing flagged</Chip>
+          <Chip tone="ok">{t("admin.ai.governance.nothingFlagged")}</Chip>
         )}
       </CardHeader>
       <CardBody className="flex flex-wrap gap-6">
@@ -139,38 +144,47 @@ export function UsageCard({
   );
 }
 
-export function BudgetsCard({
+export async function BudgetsCard({
   budgets,
 }: {
   readonly budgets: readonly Budget[];
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Budgets and caps</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.ai.governance.budgetsAndCaps")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Crossing one stops the AI call and leaves every deterministic path
-            untouched. A run already going halts with the reason in its own log,
-            rather than stopping for no stated cause.
+            {t("admin.ai.governance.crossingOneStopsThe")}
           </p>
         </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-2.5">
         {budgets.length === 0 ? (
           <p className="text-xs text-ink-3">
-            None set, so nothing here bounds the spend. Until one is, the
-            provider's own limits are the only ceiling.
+            {t("admin.ai.governance.noneSetSoNothing")}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="text-ink-3">
                 <tr>
-                  <th className="py-1 pr-3 font-semibold">Scope</th>
-                  <th className="py-1 pr-3 font-semibold">Metric</th>
-                  <th className="py-1 pr-3 font-semibold">Period</th>
-                  <th className="py-1 pr-3 font-semibold">Limit</th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("common.scope")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.governance.metric")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("common.period")}
+                  </th>
+                  <th className="py-1 pr-3 font-semibold">
+                    {t("admin.ai.governance.limit")}
+                  </th>
                   <th className="py-1 font-semibold" />
                 </tr>
               </thead>
@@ -194,7 +208,7 @@ export function BudgetsCard({
                       <AIForm action={removeBudget}>
                         <input type="hidden" name="id" value={budget.id} />
                         <Button type="submit" variant="ghost" size="sm">
-                          Remove
+                          {t("common.remove")}
                         </Button>
                       </AIForm>
                     </td>
@@ -210,7 +224,7 @@ export function BudgetsCard({
           className="flex flex-wrap items-end gap-2 border-t border-line pt-3"
         >
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Scope
+            {t("common.scope")}
             <select
               name="scope"
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
@@ -223,15 +237,15 @@ export function BudgetsCard({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Whose, for a user or an agent
+            {t("admin.ai.governance.whoseForAUser")}
             <input
               name="scopeRef"
-              placeholder="leave empty for the whole workspace"
+              placeholder={t("admin.ai.governance.leaveEmptyForThe")}
               className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Metric
+            {t("admin.ai.governance.metric")}
             <select
               name="metric"
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
@@ -244,7 +258,7 @@ export function BudgetsCard({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Period
+            {t("common.period")}
             <select
               name="period"
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
@@ -257,7 +271,7 @@ export function BudgetsCard({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Limit
+            {t("admin.ai.governance.limit")}
             <input
               name="limitValue"
               type="number"
@@ -268,7 +282,7 @@ export function BudgetsCard({
             />
           </label>
           <Button type="submit" variant="default" size="sm">
-            Set
+            {t("common.set")}
           </Button>
         </AIForm>
       </CardBody>
@@ -276,20 +290,22 @@ export function BudgetsCard({
   );
 }
 
-export function FeaturesCard({
+export async function FeaturesCard({
   features,
 }: {
   readonly features: readonly FeatureSetting[];
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Features</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.ai.governance.features")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Each assist on its own switch. Turning one off leaves the path it
-            drafts for exactly as it was, because that path is the product and
-            the assist is the wording.
+            {t("admin.ai.governance.eachAssistOnIts")}
           </p>
         </div>
       </CardHeader>
@@ -313,13 +329,15 @@ export function FeaturesCard({
                 <code className="font-mono text-xs">{featureKey}</code>
               </label>
               <label className="flex items-center gap-1.5 text-xs text-ink-3">
-                Tier
+                {t("admin.ai.governance.tier")}
                 <select
                   name="tierOverride"
                   defaultValue={setting?.tierOverride ?? ""}
                   className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
                 >
-                  <option value="">whatever the assist asks for</option>
+                  <option value="">
+                    {t("admin.ai.governance.whateverTheAssistAsks")}
+                  </option>
                   {MODEL_TIERS.map((tier) => (
                     <option key={tier} value={tier}>
                       {TIER_WORDS[tier] ?? tier}
@@ -328,7 +346,7 @@ export function FeaturesCard({
                 </select>
               </label>
               <Button type="submit" variant="ghost" size="sm">
-                Save
+                {t("common.save")}
               </Button>
             </AIForm>
           );
@@ -338,20 +356,22 @@ export function FeaturesCard({
   );
 }
 
-export function PromptsCard({
+export async function PromptsCard({
   prompts,
 }: {
   readonly prompts: readonly PromptRow[];
 }) {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Prompts</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.ai.governance.prompts")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Every edit is a new version, and the built-in text stays in code, so
-            restoring the default removes the overrides rather than writing
-            another row on top of them.
+            {t("admin.ai.governance.everyEditIsA")}
           </p>
         </div>
       </CardHeader>
@@ -364,9 +384,11 @@ export function PromptsCard({
             <span className="flex items-center gap-2 text-sm text-ink">
               <code className="font-mono text-xs">{prompt.promptKey}</code>
               {prompt.isDefault ? (
-                <Chip tone="neutral">built in</Chip>
+                <Chip tone="neutral">{t("admin.ai.governance.builtIn")}</Chip>
               ) : (
-                <Chip tone="info">version {prompt.version}</Chip>
+                <Chip tone="info">
+                  {t("admin.ai.governance.version")} {prompt.version}
+                </Chip>
               )}
             </span>
             <AIForm action={savePrompt} className="flex flex-col gap-1.5">
@@ -378,7 +400,7 @@ export function PromptsCard({
                 className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
               />
               <Button type="submit" variant="ghost" size="sm">
-                Save a new version
+                {t("admin.ai.governance.saveANewVersion")}
               </Button>
             </AIForm>
             {prompt.isDefault ? null : (
@@ -389,14 +411,15 @@ export function PromptsCard({
                   value={prompt.promptKey}
                 />
                 <Button type="submit" variant="ghost" size="sm">
-                  Restore the built-in
+                  {t("admin.ai.governance.restoreTheBuiltIn")}
                 </Button>
               </AIForm>
             )}
             {prompt.history.length > 0 ? (
               <details className="text-xs text-ink-3">
                 <summary className="cursor-pointer">
-                  {prompt.history.length} earlier version(s)
+                  {prompt.history.length}{" "}
+                  {t("admin.ai.governance.earlierVersionS")}
                 </summary>
                 <ul className="mt-1 flex flex-col gap-1">
                   {prompt.history.map((entry) => (
@@ -414,29 +437,20 @@ export function PromptsCard({
   );
 }
 
-export function PrivacyCard() {
+export async function PrivacyCard() {
+  const { t } = await getTranslations();
+
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">Privacy and egress</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("admin.ai.governance.privacyAndEgress")}
+        </h2>
       </CardHeader>
       <CardBody className="flex flex-col gap-1.5 text-xs text-ink-3">
-        <p>
-          With no provider configured, nothing in this workspace leaves this
-          instance for an AI service, and every rule, score, gate, corridor and
-          nudge still runs.
-        </p>
-        <p>
-          With one configured, an assist sends what that assist needs: the text
-          it is drafting from and the rule it is drafting against. Keys are
-          encrypted at rest, decrypted server-side only, and never written to a
-          log.
-        </p>
-        <p>
-          A base URL on a provider above points its calls at a host you choose,
-          which is how a self-hosted model keeps the traffic inside your own
-          network.
-        </p>
+        <p>{t("admin.ai.governance.withNoProviderConfigured")}</p>
+        <p>{t("admin.ai.governance.withOneConfiguredAn")}</p>
+        <p>{t("admin.ai.governance.aBaseUrlOn")}</p>
       </CardBody>
     </Card>
   );

@@ -1,4 +1,5 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { setFrame } from "./frame-actions.ts";
 
@@ -68,13 +69,15 @@ export interface Frame {
   }[];
 }
 
-export function AnnualFrame({
+export async function AnnualFrame({
   frame,
   canEdit,
 }: {
   readonly frame: Frame | null;
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const strategies = frame?.strategies ?? [];
 
   return (
@@ -82,11 +85,11 @@ export function AnnualFrame({
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">The annual frame</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("cycle.annualFrame.theAnnualFrame")}
+            </h2>
             <p className="text-xs text-ink-3">
-              Where the year is going, in the words the organisation uses. Every
-              quarter's set is drafted against this, and the alignment score
-              reads it.
+              {t("cycle.annualFrame.whereTheYearIs")}
             </p>
           </div>
           {frame ? (
@@ -94,14 +97,13 @@ export function AnnualFrame({
               {frame.agreed ? "agreed" : "not agreed yet"}
             </Chip>
           ) : (
-            <Chip tone="neutral">not written</Chip>
+            <Chip tone="neutral">{t("cycle.annualFrame.notWritten")}</Chip>
           )}
         </CardHeader>
         <CardBody>
           {frame === null ? (
             <p className="text-sm text-ink-2">
-              Nothing written for this year yet. A frame is what phase 0 is for,
-              and the drafting phase reads it.
+              {t("cycle.annualFrame.nothingWrittenForThis")}
             </p>
           ) : null}
 
@@ -109,7 +111,7 @@ export function AnnualFrame({
             <ActionForm action={setFrame} className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
                 <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  Year
+                  {t("cycle.annualFrame.year")}
                   <input
                     name="yearLabel"
                     required
@@ -120,11 +122,11 @@ export function AnnualFrame({
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  Horizon, the mid-term this year serves
+                  {t("cycle.annualFrame.horizonTheMidTerm")}
                   <input
                     name="horizonLabel"
                     defaultValue={frame?.horizonLabel ?? ""}
-                    placeholder="three years out, say"
+                    placeholder={t("cycle.annualFrame.threeYearsOutSay")}
                     className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                   />
                 </label>
@@ -135,7 +137,7 @@ export function AnnualFrame({
                     defaultChecked={frame?.agreed ?? false}
                     className="size-4"
                   />
-                  Agreed
+                  {t("cycle.annualFrame.agreed")}
                 </label>
               </div>
 
@@ -172,11 +174,10 @@ export function AnnualFrame({
 
               <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
                 <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-3">
-                  Strategies
+                  {t("cycle.annualFrame.strategies")}
                 </legend>
                 <p className="text-xs text-ink-3">
-                  Two to five, each with what it means in practice. Saving
-                  replaces the whole list, which is how a set is edited.
+                  {t("cycle.annualFrame.twoToFiveEach")}
                 </p>
                 {[0, 1, 2, 3, 4].map((index) => (
                   <div key={index} className="flex flex-wrap gap-2">
@@ -189,7 +190,7 @@ export function AnnualFrame({
                     <input
                       name="strategyNote"
                       defaultValue={strategies[index]?.note ?? ""}
-                      placeholder="what it means in practice"
+                      placeholder={t("cycle.annualFrame.whatItMeansIn")}
                       className="w-96 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                     />
                   </div>
@@ -209,12 +210,13 @@ export function AnnualFrame({
   );
 }
 
-function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
+async function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
+  const { t } = await getTranslations();
+
   if (!frame) {
     return (
       <p className="text-xs text-ink-3">
-        Writing the frame is the facilitator's, so this is what there is until
-        they do.
+        {t("cycle.annualFrame.writingTheFrameIs")}
       </p>
     );
   }
@@ -236,7 +238,9 @@ function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
       ))}
       {frame.strategies.length > 0 ? (
         <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-ink-3">Strategies</span>
+          <span className="text-xs font-semibold text-ink-3">
+            {t("cycle.annualFrame.strategies")}
+          </span>
           <ul className="flex flex-col gap-1">
             {frame.strategies.map((one) => (
               <li key={one.id} className="text-sm text-ink-2">

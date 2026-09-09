@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { Avatar } from "@openokr/ui";
+import { Avatar, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -49,10 +49,12 @@ export function AvatarMenu({
    */
   readonly appearance: ReactNode;
 }) {
+  const { t } = useTranslations();
+
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label="Account menu"
+        aria-label={t("avatarMenu.accountMenu")}
         className="rounded-full outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
       >
         <Avatar name={name} />
