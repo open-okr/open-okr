@@ -9,6 +9,7 @@ import { TRIGGER_CATALOGUE } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   connectProvider,
@@ -87,6 +88,8 @@ const when = (iso: string | null): string =>
     : "never";
 
 export default async function ChannelsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -99,17 +102,15 @@ export default async function ChannelsPage() {
     return (
       <>
         <h1 className="text-lg font-bold text-ink">
-          Notifications and channels
+          {t("admin.channels.notificationsAndChannels")}
         </h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
-              Connecting a chat provider is behind workspace administration,
-              because a bot reaches everybody here. Ask an administrator.
+              {t("admin.channels.connectingAChatProvider")}
             </p>
             <p className="mt-1 text-xs text-ink-3">
-              Your own channel and quiet hours are yours to change, in your
-              account settings.
+              {t("admin.channels.yourOwnChannelAnd")}
             </p>
           </CardBody>
         </Card>
@@ -156,38 +157,35 @@ export default async function ChannelsPage() {
 
   return (
     <>
-      <h1 className="text-lg font-bold text-ink">Notifications and channels</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.channels.notificationsAndChannels")}
+      </h1>
       <p className="text-xs text-ink-3">
-        Email always works and needs nothing here. A chat provider is installed
-        once per workspace; each member then links their own account.
+        {t("admin.channels.emailAlwaysWorksAnd")}
       </p>
 
       {whatsAppConnected ? (
         <Card>
           <CardHeader>
             <span className="flex flex-wrap items-center gap-2">
-              WhatsApp templates
+              {t("admin.channels.whatsappTemplates")}
               <Chip tone="neutral">{templates.length}</Chip>
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <p className="text-sm text-ink-3">
-              WhatsApp will only carry a message you send first if Meta approved
-              the words in advance. These are the templates this workspace has,
-              read from Meta rather than written here: the words are yours, the
-              approval is theirs.
+              {t("admin.channels.whatsappWillOnlyCarry")}
             </p>
 
             <ChannelForm action={syncTemplates}>
               <Button type="submit" variant="default" size="sm">
-                Sync from Meta
+                {t("admin.channels.syncFromMeta")}
               </Button>
             </ChannelForm>
 
             {templates.length === 0 ? (
               <p className="text-xs text-ink-3">
-                Nothing synced yet. Press the button, or submit a template in
-                the Meta console first.
+                {t("admin.channels.nothingSyncedYetPress")}
               </p>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -215,7 +213,7 @@ export default async function ChannelsPage() {
                       </span>
                       {template.variables > 0 ? (
                         <Chip tone="neutral">
-                          {template.variables} variable
+                          {template.variables} {t("admin.channels.variable")}
                           {template.variables === 1 ? "" : "s"}
                         </Chip>
                       ) : null}
@@ -232,18 +230,17 @@ export default async function ChannelsPage() {
 
             <div className="flex flex-col gap-2 border-t border-line pt-3">
               <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                Which template answers which reminder
+                {t("admin.channels.whichTemplateAnswersWhich")}
                 <Chip tone="neutral">{mappings.length}</Chip>
               </span>
               <p className="text-xs text-ink-3">
-                Outside the twenty-four hours after somebody last writes to you,
-                WhatsApp carries only an approved template. A reminder with no
-                template mapped still reaches the member's inbox here; it just
-                does not reach their phone.
+                {t("admin.channels.outsideTheTwentyFour")}
               </p>
 
               {mappings.length === 0 ? (
-                <p className="text-xs text-ink-3">Nothing mapped yet.</p>
+                <p className="text-xs text-ink-3">
+                  {t("admin.channels.nothingMappedYet")}
+                </p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {mappings.map((mapping) => (
@@ -254,12 +251,14 @@ export default async function ChannelsPage() {
                     >
                       <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
                         <span className="font-medium">{mapping.ruleKey}</span>
-                        uses
+                        {t("admin.channels.uses")}
                         <span className="font-medium">
                           {mapping.templateName}
                         </span>
                         {mapping.withdrawn ? (
-                          <Chip tone="bad">Meta no longer lists it</Chip>
+                          <Chip tone="bad">
+                            {t("admin.channels.metaNoLongerLists")}
+                          </Chip>
                         ) : mapping.templateStatus.toUpperCase() ===
                           "APPROVED" ? null : (
                           <Chip tone="warn">
@@ -287,7 +286,7 @@ export default async function ChannelsPage() {
                           value={mapping.ruleKey}
                         />
                         <Button type="submit" variant="ghost" size="sm">
-                          Remove
+                          {t("common.remove")}
                         </Button>
                       </ChannelForm>
                     </li>
@@ -331,19 +330,17 @@ export default async function ChannelsPage() {
                     {connection.state}
                   </Chip>
                 ) : (
-                  <Chip tone="neutral">not connected</Chip>
+                  <Chip tone="neutral">{t("admin.channels.notConnected")}</Chip>
                 )}
                 {connection && !connection.lastVerifiedAt ? (
-                  <Chip tone="warn">never verified</Chip>
+                  <Chip tone="warn">{t("admin.channels.neverVerified")}</Chip>
                 ) : null}
               </span>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
               {!provider.ready ? (
                 <p className="text-sm text-ink-3">
-                  No driver yet. The tables and the routing are ready for it, so
-                  connecting one before its driver exists would store a
-                  credential nothing can use.
+                  {t("admin.channels.noDriverYetThe")}
                 </p>
               ) : connection ? (
                 <>
@@ -355,22 +352,27 @@ export default async function ChannelsPage() {
                       connection, not about the request. */}
                   {connection.lastVerifiedAt ? null : (
                     <p className="rounded-md bg-warn-bg px-2.5 py-1.5 text-xs text-warn">
-                      Stored, and connected rather than verified: nothing has
-                      called the provider with it yet. Send yourself a test.
+                      {t("admin.channels.storedAndConnectedRather")}
                     </p>
                   )}
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1 text-xs">
-                    <dt className="text-ink-3">Last verified</dt>
+                    <dt className="text-ink-3">
+                      {t("admin.channels.lastVerified")}
+                    </dt>
                     <dd className="text-ink-2">
                       {when(connection.lastVerifiedAt)}
                     </dd>
-                    <dt className="text-ink-3">Workspace id</dt>
+                    <dt className="text-ink-3">
+                      {t("admin.channels.workspaceId")}
+                    </dt>
                     <dd className="text-ink-2">
                       {String(connection.config.teamId ?? "not set")}
                     </dd>
                     {connection.error ? (
                       <>
-                        <dt className="text-ink-3">Last complaint</dt>
+                        <dt className="text-ink-3">
+                          {t("admin.channels.lastComplaint")}
+                        </dt>
                         <dd className="text-bad">{connection.error}</dd>
                       </>
                     ) : null}
@@ -380,7 +382,7 @@ export default async function ChannelsPage() {
                     <ChannelForm action={sendTest}>
                       <input type="hidden" name="attempt" value={attempt} />
                       <Button type="submit" variant="default" size="sm">
-                        Send me a test
+                        {t("admin.channels.sendMeATest")}
                       </Button>
                     </ChannelForm>
                     <ChannelForm action={disconnectProvider}>
@@ -390,14 +392,14 @@ export default async function ChannelsPage() {
                         value={provider.id}
                       />
                       <Button type="submit" variant="ghost" size="sm">
-                        Disconnect
+                        {t("admin.channels.disconnect")}
                       </Button>
                     </ChannelForm>
                   </div>
 
                   <details className="text-xs">
                     <summary className="cursor-pointer text-ink-3">
-                      Replace the credentials
+                      {t("admin.channels.replaceTheCredentials")}
                     </summary>
                     <ConnectFields
                       provider={provider.id}
@@ -414,12 +416,11 @@ export default async function ChannelsPage() {
       })}
 
       <Card>
-        <CardHeader>Recent messages</CardHeader>
+        <CardHeader>{t("admin.channels.recentMessages")}</CardHeader>
         <CardBody>
           {messages.length === 0 ? (
             <p className="text-sm text-ink-3">
-              Nothing has been sent yet. A nudge or a test appears here with
-              what the provider said about it.
+              {t("admin.channels.nothingHasBeenSent")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -461,18 +462,20 @@ export default async function ChannelsPage() {
  * credential went in once and the product cannot read it back, so neither can
  * this screen.
  */
-function ConnectFields({
+async function ConnectFields({
   provider,
   hint,
 }: {
   readonly provider: string;
   readonly hint: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <ChannelForm action={connectProvider} className="mt-2 flex flex-col gap-2">
       <input type="hidden" name="provider" value={provider} />
       <label className="flex flex-col gap-1 text-xs text-ink-2">
-        Bot token
+        {t("admin.channels.botToken")}
         <input
           name="botToken"
           type="password"
@@ -484,7 +487,7 @@ function ConnectFields({
         {/* Slack signs the body; Telegram echoes a secret it was given. Two
             different claims, one field, because both are a string the
             product compares an inbound request against. */}
-        Signing or webhook secret
+        {t("admin.channels.signingOrWebhookSecret")}
         <input
           name="signingSecret"
           type="password"
@@ -493,7 +496,7 @@ function ConnectFields({
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-2">
-        Provider workspace id
+        {t("admin.channels.providerWorkspaceId")}
         <input
           name="teamId"
           type="text"
@@ -503,7 +506,7 @@ function ConnectFields({
       </label>
       {hint ? <p className="text-xs text-ink-3">{hint}</p> : null}
       <Button type="submit" variant="primary" size="sm" className="w-fit">
-        Connect
+        {t("common.connect")}
       </Button>
     </ChannelForm>
   );

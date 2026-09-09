@@ -258,3 +258,76 @@ async function carry(
     return refusal(error);
   }
 }
+
+// ── Workspace archive export and import (P6-T05c) ────────────────────────
+
+export interface ExportResult {
+  readonly filename: string;
+  readonly archiveBase64: string;
+  readonly bytes: number;
+  readonly digest: string;
+  readonly counts: Record<string, number>;
+  readonly blobs: { count: number; bytes: number };
+  readonly missingFiles: readonly { id: string; filename: string }[];
+}
+
+export async function exportWorkspaceArchive(
+  includeFiles: boolean,
+): Promise<Answer<ExportResult>> {
+  try {
+    const result = await callAction(
+      await context(),
+      "workspace.exportArchive",
+      { includeFiles },
+    );
+    return {
+      ok: true,
+      value: {
+        filename: result.filename,
+        archiveBase64: result.archiveBase64,
+        bytes: result.bytes,
+        digest: result.digest,
+        counts: result.counts,
+        blobs: result.blobs,
+        missingFiles: [...result.missingFiles],
+      },
+    };
+  } catch (error) {
+    return refusal(error);
+  }
+}
+
+export interface ImportResult {
+  readonly importId: string;
+  readonly difference: {
+    readonly created: Record<string, number>;
+    readonly merged: readonly {
+      email: string;
+      name: string;
+      archivedId: string;
+      existingId: string;
+    }[];
+    readonly skipped: Record<string, number>;
+    readonly blobs: number;
+  };
+  readonly alreadyImported: boolean;
+}
+
+export async function importWorkspaceArchive(
+  archiveBase64: string,
+  dryRun: boolean,
+): Promise<Answer<ImportResult>> {
+  try {
+    const result = await callAction(
+      await context(),
+      "workspace.importArchive",
+      { archiveBase64, dryRun },
+    );
+    if (!dryRun) {
+      revalidatePath("/admin/imports");
+    }
+    return { ok: true, value: result };
+  } catch (error) {
+    return refusal(error);
+  }
+}

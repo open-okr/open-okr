@@ -1,6 +1,7 @@
 "use client";
 
 import { type KpiFrequency, normalisePeriod } from "@openokr/method";
+import { useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { recordCell } from "./actions.ts";
 
@@ -138,6 +139,8 @@ export function KpiGrid({
    */
   readonly today: string;
 }) {
+  const { t } = useTranslations();
+
   const columns = columnsFor(kpis, today);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -208,10 +211,7 @@ export function KpiGrid({
 
   if (kpis.length === 0) {
     return (
-      <p className="p-3 text-sm text-ink-3">
-        No KPIs yet. A KPI is a measure that runs continuously, unlike a key
-        result, which lives inside one cycle.
-      </p>
+      <p className="p-3 text-sm text-ink-3">{t("kpis.grid.noKpisYetA")}</p>
     );
   }
 
@@ -227,16 +227,15 @@ export function KpiGrid({
       ) : null}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
-          <caption className="sr-only">
-            KPIs as rows and periods as columns. Enter commits a cell and moves
-            down; the arrow keys move without committing.
-          </caption>
+          <caption className="sr-only">{t("kpis.grid.kpisAsRowsAnd")}</caption>
           <thead>
             <tr>
               <th className="sticky left-0 z-10 bg-surface p-2 text-left font-bold text-ink-2">
-                KPI
+                {t("kpis.grid.kpi")}
               </th>
-              <th className="p-2 text-right font-bold text-ink-2">Now</th>
+              <th className="p-2 text-right font-bold text-ink-2">
+                {t("kpis.grid.now")}
+              </th>
               {columns.map((column) => (
                 <th
                   key={column}
@@ -340,8 +339,7 @@ export function KpiGrid({
       </div>
       <p className="text-xs text-ink-4">
         {pending ? "Saving…" : "Enter commits and moves down. Arrows move."}{" "}
-        Calculated KPIs are read-only, because their values come from a formula
-        and a typed figure would be replaced by the next evaluation.
+        {t("kpis.grid.calculatedKpisAreRead")}
       </p>
     </div>
   );

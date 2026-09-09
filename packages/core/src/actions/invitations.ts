@@ -12,20 +12,12 @@
  * That comment is widened alongside this file rather than left describing
  * only the first of its two callers.
  */
-import {
-  activeOnly,
-  inviteLinks,
-  type WorkspaceTx,
-  withWorkspace,
-} from "@openokr/db";
+import { activeOnly, inviteLinks, withWorkspace } from "@openokr/db";
 import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import {
-  resolveMemberAccessLevel,
-  resolveSubjectContext,
-} from "../access/reads.ts";
+import { refuseReason } from "../invitations/preview.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
 import {
   emailDomain,
@@ -33,7 +25,6 @@ import {
   hashInviteToken,
 } from "../invitations/tokens.ts";
 import { OperationError } from "../operations/operation.ts";
-import { actingMemberId } from "./api-tokens.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const linkSummary = z.object({
@@ -80,44 +71,17 @@ export const listInvitations = defineReadAction({
   async handler(context) {
     const db = drizzle(context.pool);
     return withWorkspace(db, context.workspaceId, async (tx) => {
-      // **The level is enforced here, not by the `access` field above.**
-      // `defineReadAction` records `access` and nothing checks it: not the
-      // builder, not `callAction`, not the REST or agent transports. For a read
-      // whose rows are already access-scoped that is fine, because the getter
-      // does the work. This read is not one of those: `invite_links` is scoped
-      // by tenant and by nothing else, so without this any member of the
-      // workspace could list every address anybody has ever invited, over REST
-      // with an ordinary token. Found at P6-G06a; the general sweep is P6-G31.
+      // **`full` above is what refuses an ordinary member, and the builder is
+      // what enforces it** (P6-G31). This read needs that enforcement more than
+      // most: `invite_links` is scoped by tenant and by nothing else, so with
+      // nothing checking the declared level any member of the workspace could
+      // list every address anybody has ever invited, over REST with an ordinary
+      // token.
       //
-      // `forbidden` rather than the getter's usual `not_found`: the caller is
-      // already a member of this workspace and knows it exists, so there is no
-      // existence oracle to protect here, and the write actions beside this one
-      // refuse the same way.
-      const memberId = await actingMemberId(
-        tx as WorkspaceTx,
-        context.workspaceId,
-        context.actor.userId,
-      );
-      const workspaceContext = await resolveSubjectContext(
-        tx,
-        "workspace",
-        context.workspaceId,
-        context.workspaceId,
-      );
-      const level = workspaceContext
-        ? await resolveMemberAccessLevel(tx, {
-            workspaceId: context.workspaceId,
-            memberId,
-            contextId: workspaceContext.contextId,
-          })
-        : 0;
-      if (level < ACCESS_LEVELS.full) {
-        throw new OperationError(
-          "forbidden",
-          "Only a workspace administrator can read the invitations.",
-        );
-      }
-
+      // Written by hand here first, at P6-G06a, because at that point the field
+      // was recorded and never read. Finding that led to the sweep, so the
+      // twenty-five lines that used to sit on this spot now sit in
+      // `defineReadAction` and cover all twenty-nine of them.
       const rows = await tx
         .select({
           id: inviteLinks.id,
@@ -375,20 +339,14 @@ export const acceptLink = defineWriteAction({
       if (!link) {
         throw new OperationError("not_found", REFUSAL);
       }
-      if (link.revokedAt) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (link.expiresAt && link.expiresAt.getTime() < Date.now()) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (link.mode === "personal" && link.memberId) {
-        throw new OperationError("forbidden", REFUSAL);
-      }
-      if (
-        link.mode === "workspace" &&
-        link.maxUses !== null &&
-        link.useCount >= link.maxUses
-      ) {
+      // **One reader of these four states, shared with `previewInvite`**
+      // (P6-G06b). They were written out here and again in the preview, and
+      // two readers of one row is how a page comes to say "you can join this"
+      // about something acceptance then refuses. `max_uses` is checked
+      // whatever the mode now, which changes nothing: migration 0010 keeps
+      // that column as the ceiling on a reusable link and leaves it null on a
+      // personal one, whose single use is `member_id` being set.
+      if (refuseReason(link, new Date())) {
         throw new OperationError("forbidden", REFUSAL);
       }
 

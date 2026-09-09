@@ -18,7 +18,7 @@
  * `packages/core/test/oauth-discovery.test.ts`.
  */
 import type { APIRequestContext } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 
 let api: APIRequestContext;
 let base: string;

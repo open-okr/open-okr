@@ -22,7 +22,16 @@ import {
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, isNull, lt, notInArray, or } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  notInArray,
+  or,
+} from "drizzle-orm";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { accessScopeFilter } from "../access/reads.ts";
 import { PRIVATE_ACTIVITY_KINDS } from "./catalogue.ts";
@@ -45,9 +54,33 @@ export interface QueryFeedInput {
   readonly workspaceId: string;
   readonly memberId: string;
   readonly minLevel?: AccessLevel;
-  /** Restricts to one subject, for the profile scope ("everything about this person"). */
+  /** Restricts to one subject ("everything about this thing"). */
   readonly subjectType?: string;
   readonly subjectId?: string;
+  /**
+   * Restricts to what one member did (P6-G11b).
+   *
+   * §6's profile feed is "what this person did", which is the actor and not
+   * the subject: a member who was assigned a task is the subject of that row
+   * and did nothing. `subjectId` answers the other question and both are
+   * needed, so they are separate filters rather than one.
+   */
+  readonly actorMemberId?: string;
+  /**
+   * Restricts to a set of access contexts (P6-G11b).
+   *
+   * How the space and goal scopes are expressed. A goal's key results and its
+   * check-ins resolve to the goal's own context, so one context id is "this
+   * goal and everything under it" without listing anything; a space is the
+   * context of the space plus the contexts of the goals, initiatives and
+   * tasks in it, which the caller collects.
+   *
+   * **Not `activities.space_id`,** which exists and is set by nine activity
+   * blocks out of several hundred. A space feed built on that column would be
+   * empty for almost everything that happens in a space, which is worse than
+   * no feed.
+   */
+  readonly contextIds?: readonly string[];
   /** The last item of the previous page, for key pagination. */
   readonly cursor?: { readonly at: Date; readonly id: string };
   readonly limit?: number;
@@ -124,6 +157,18 @@ export async function queryFeed<
   }
   if (input.subjectId) {
     conditions.push(eq(activities.subjectId, input.subjectId));
+  }
+  if (input.actorMemberId) {
+    conditions.push(eq(activities.actorMemberId, input.actorMemberId));
+  }
+  if (input.contextIds) {
+    // An empty set is "no contexts", which is a real answer and must return
+    // nothing rather than everything. `inArray` with an empty list is a
+    // syntax error in some drivers, so it is refused here explicitly.
+    if (input.contextIds.length === 0) {
+      return [];
+    }
+    conditions.push(inArray(activities.contextId, [...input.contextIds]));
   }
   if (input.cursor) {
     conditions.push(lt(activities.at, input.cursor.at));

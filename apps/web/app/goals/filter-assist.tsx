@@ -14,13 +14,15 @@
  * the four filters cannot express comes back with the reason, and the reader is
  * left exactly where they were with their manual filters intact.
  */
-import { Button, Chip } from "@openokr/ui";
+import { Button, Chip, useTranslations } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { parseFilterAction } from "./filter-actions.ts";
 
 export function FilterAssist() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [sentence, setSentence] = useState("");
   const [busy, setBusy] = useState(false);
@@ -78,10 +80,12 @@ export function FilterAssist() {
       <div className="flex items-center gap-2">
         <Chip tone="agent">
           <Sparkles className="size-3" />
-          AI
+          {t("common.ai")}
         </Chip>
         <label className="min-w-0 flex-1">
-          <span className="sr-only">Describe the list you want</span>
+          <span className="sr-only">
+            {t("goals.filterAssist.describeTheListYou")}
+          </span>
           <input
             value={sentence}
             disabled={busy}
@@ -93,7 +97,7 @@ export function FilterAssist() {
                 void run();
               }
             }}
-            placeholder="my off-track goals this quarter"
+            placeholder={t("goals.filterAssist.myOffTrackGoals")}
             className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
           />
         </label>
@@ -102,14 +106,14 @@ export function FilterAssist() {
           disabled={busy || sentence.trim() === ""}
           onClick={() => void run()}
         >
-          Filter
+          {t("goals.filterAssist.filter")}
         </Button>
       </div>
       {refusal ? (
         /* A section, not a paragraph: `aria-label` needs a role that supports
            it, and a refusal is worth being a named region a reader can find. */
         <section
-          aria-label="Why that cannot be filtered"
+          aria-label={t("goals.filterAssist.whyThatCannotBe")}
           className="text-xs text-ink-3"
         >
           {refusal}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { FormError } from "../../(auth)/auth-card";
@@ -16,6 +17,8 @@ export function SecuritySettings({
 }: {
   twoFactorEnabled: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [totpUri, setTotpUri] = useState("");
@@ -64,33 +67,24 @@ export function SecuritySettings({
 
   return (
     <section style={{ fontFamily: "system-ui, sans-serif" }}>
-      <h2>Passkeys</h2>
-      <p>
-        A passkey signs you in with your device instead of a password, and
-        cannot be phished.
-      </p>
+      <h2>{t("account.security.securitySettings.passkeys")}</h2>
+      <p>{t("account.security.securitySettings.aPasskeySignsYou")}</p>
       <button type="button" onClick={addPasskey}>
-        Add a passkey
+        {t("account.security.securitySettings.addAPasskey")}
       </button>
 
-      <h2>One-time codes</h2>
+      <h2>{t("account.security.securitySettings.oneTimeCodes")}</h2>
       {twoFactorEnabled ? (
-        <p>One-time codes are on for this account.</p>
+        <p>{t("account.security.securitySettings.oneTimeCodesAre")}</p>
       ) : totpUri ? (
         <>
-          <p>
-            Add this to your authenticator app, then enter the code it shows to
-            switch it on.
-          </p>
+          <p>{t("account.security.securitySettings.addThisToYour")}</p>
           <code style={{ wordBreak: "break-all" }}>{totpUri}</code>
 
           {backupCodes.length > 0 ? (
             <>
-              <h3>Backup codes</h3>
-              <p>
-                Save these now. Each works once, and this is the only time they
-                are shown.
-              </p>
+              <h3>{t("account.security.securitySettings.backupCodes")}</h3>
+              <p>{t("account.security.securitySettings.saveTheseNowEach")}</p>
               <ul>
                 {backupCodes.map((backupCode) => (
                   <li key={backupCode}>
@@ -102,7 +96,9 @@ export function SecuritySettings({
           ) : null}
 
           <form onSubmit={confirmTwoFactor}>
-            <label htmlFor="totp-code">Code from your app</label>
+            <label htmlFor="totp-code">
+              {t("account.security.securitySettings.codeFromYourApp")}
+            </label>
             <input
               id="totp-code"
               inputMode="numeric"
@@ -111,12 +107,16 @@ export function SecuritySettings({
               value={code}
               onChange={(event) => setCode(event.target.value)}
             />
-            <button type="submit">Turn on</button>
+            <button type="submit">
+              {t("account.security.securitySettings.turnOn")}
+            </button>
           </form>
         </>
       ) : (
         <form onSubmit={startTwoFactor}>
-          <label htmlFor="confirm-password">Confirm your password</label>
+          <label htmlFor="confirm-password">
+            {t("account.security.securitySettings.confirmYourPassword")}
+          </label>
           <input
             id="confirm-password"
             type="password"
@@ -125,7 +125,9 @@ export function SecuritySettings({
             value={password}
             onChange={(event) => setPassword(event.target.value)}
           />
-          <button type="submit">Set up one-time codes</button>
+          <button type="submit">
+            {t("account.security.securitySettings.setUpOneTime")}
+          </button>
         </form>
       )}
 

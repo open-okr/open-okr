@@ -20,6 +20,15 @@ export interface Membership {
   /** The workspace's name, for the switcher. */
   readonly name: string;
   readonly slug: string;
+  /**
+   * Whether the workspace is taking writes (TECHNICAL-PLAN §4.1, P6-G25).
+   *
+   * Read here rather than through an action of its own, because every signed-in
+   * page already resolves its membership and none of them could see this. The
+   * permission layer has collapsed a non-active workspace to view-only since
+   * P2-T09 and nothing told a reader why their save was refused.
+   */
+  readonly state: "active" | "read_only" | "frozen";
 }
 
 /**
@@ -43,6 +52,7 @@ export async function listMembershipsForUser(
         memberId: workspaceMembers.id,
         name: workspaces.name,
         slug: workspaces.slug,
+        state: workspaces.state,
       })
       .from(workspaceMembers)
       .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))

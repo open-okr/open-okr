@@ -19,7 +19,7 @@
  * `fullyParallel: false`, so that order holds.
  */
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 import pg from "pg";

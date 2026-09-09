@@ -187,3 +187,17 @@ affinity: {}
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+
+# Scheduled encrypted backups (P6-T06). Off by default: an operator enables it
+# and points it at a volume or an existing PVC.
+backup:
+  enabled: false
+  # Cron schedule. Default: 02:00 UTC daily.
+  schedule: "0 2 * * *"
+  # How many completed jobs Kubernetes keeps.
+  historyLimit: 3
+  # How many backup directories to keep inside the volume.
+  retention: 7
+  # An existing PVC for the backups. When empty, the CronJob uses an emptyDir,
+  # which loses everything on pod restart and is not a backup.
+  existingClaim: ""

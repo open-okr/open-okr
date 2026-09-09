@@ -20,7 +20,14 @@
  * number is what `sessions.castRetroVote` enforces and two places counting it is
  * one place to get it wrong.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
@@ -69,6 +76,8 @@ function NoteRow({
   readonly dotsLeft: number;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -121,7 +130,7 @@ function NoteRow({
           disabled={pending}
           onClick={() => run(() => removeRetroNoteAction(sessionId, note.id))}
         >
-          Remove
+          {t("common.remove")}
         </Button>
       </span>
     </li>
@@ -145,6 +154,8 @@ function Column({
   readonly dotsLeft: number;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState("");
@@ -189,7 +200,7 @@ function Column({
       </span>
 
       {notes.length === 0 ? (
-        <p className="text-xs text-ink-4">Nothing here yet.</p>
+        <p className="text-xs text-ink-4">{t("common.nothingHereYet")}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {notes.map((note) => (
@@ -217,13 +228,13 @@ function Column({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={text}
               disabled={pending}
-              placeholder="One thing, in one line"
+              placeholder={t("session.detail.teamRetro.oneThingInOne")}
               onChange={(event) => setText(event.target.value)}
             />
           </label>
           <span className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" disabled={pending} onClick={add}>
-              Add it
+              {t("session.detail.teamRetro.addIt")}
             </Button>
             <label className="flex items-center gap-1.5 text-xs text-ink-3">
               <input
@@ -232,7 +243,7 @@ function Column({
                 disabled={pending}
                 onChange={(event) => setAnonymous(event.target.checked)}
               />
-              Without my name
+              {t("session.detail.teamRetro.withoutMyName")}
             </label>
           </span>
         </div>
@@ -261,6 +272,8 @@ export function TeamRetroPanel({
    */
   readonly assistAvailable?: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
   const [themes, setThemes] = useState<
     readonly { title: string; noteIds: readonly string[] }[] | null
@@ -300,10 +313,11 @@ export function TeamRetroPanel({
             id="team-retro-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Team retro
+            {t("common.teamRetro")}
           </h2>
           <Chip tone={retro.dotsLeft === 0 ? "warn" : "neutral"}>
-            {retro.dotsLeft} of {retro.dotsPerMember} dots left
+            {retro.dotsLeft} {t("common.of")} {retro.dotsPerMember}{" "}
+            {t("session.detail.teamRetro.dotsLeft")}
           </Chip>
         </span>
       </CardHeader>
@@ -325,13 +339,13 @@ export function TeamRetroPanel({
 
         {themes ? (
           <section
-            aria-label="Retro themes"
+            aria-label={t("session.detail.teamRetro.retroThemes")}
             className="rounded-md border border-line bg-surface p-3"
           >
             <span className="mb-2 flex items-center gap-2">
-              <Chip tone="agent">AI</Chip>
+              <Chip tone="agent">{t("common.ai")}</Chip>
               <span className="text-xs text-ink-4">
-                A lens over the board. The vote is still per note.
+                {t("session.detail.teamRetro.aLensOverThe")}
               </span>
             </span>
             <ul className="flex flex-col gap-2">
@@ -361,7 +375,7 @@ export function TeamRetroPanel({
               disabled={clustering}
               onClick={() => void cluster()}
             >
-              Find the themes
+              {t("session.detail.teamRetro.findTheThemes")}
             </Button>
           </span>
         ) : null}
@@ -373,8 +387,8 @@ export function TeamRetroPanel({
         <p className="text-xs text-ink-4">
           {/* One dot per note is what makes the vote about spread rather than
               volume, so it is worth saying out loud on the screen. */}
-          One dot per note, {retro.dotsPerMember} in total. Spending a second
-          dot on the same note takes the first one back.
+          {t("session.detail.teamRetro.oneDotPerNote")} {retro.dotsPerMember}{" "}
+          {t("session.detail.teamRetro.inTotalSpendingA")}
         </p>
       </CardBody>
     </Card>

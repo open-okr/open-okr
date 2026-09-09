@@ -95,6 +95,8 @@ export interface CreateGoalInput {
   readonly reviewerId: string;
   readonly parentGoalId?: string | null;
   readonly parentKeyResultId?: string | null;
+  /** The §2.1 annual strategy this objective serves, or null (P6-G14b). */
+  readonly strategyId?: string | null;
   readonly weight?: number;
   readonly contributionStatement?: string | null;
   /** True when a model wrote the words (P4-T15a). */
@@ -266,6 +268,7 @@ export async function createGoalInTx<
       reviewerId: input.reviewerId,
       parentGoalId: input.parentGoalId ?? null,
       parentKeyResultId: input.parentKeyResultId ?? null,
+      strategyId: input.strategyId ?? null,
       weight: String(clampWeight(input.weight ?? 1)),
       contributionStatement: input.contributionStatement?.trim() || null,
       // Provenance (P4-T15a). False unless the caller says a model wrote the

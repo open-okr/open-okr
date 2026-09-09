@@ -45,6 +45,7 @@ import { bindChampionToSpaceInTx } from "../agents/champion.ts";
 import { bindCoachToSpaceInTx } from "../agents/coach.ts";
 import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
+import { resolveSpaceSettings } from "../settings/registry.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -98,6 +99,12 @@ export async function createSpaceInTx<
       workspaceId: input.workspaceId,
       name,
       mission: input.mission?.trim() || null,
+      // §4.14's space scope, written at creation the same way the workspace
+      // and member scopes are written at provisioning (P6-G18b). A space with
+      // no settings resolves them anyway, so this is not what makes the
+      // product work; it is what makes the stored row say what the space
+      // decided rather than nothing at all.
+      settings: resolveSpaceSettings(),
       ...(input.legacy
         ? { legacyType: input.legacy.type, legacyId: input.legacy.id }
         : {}),

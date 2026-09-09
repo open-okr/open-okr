@@ -16,6 +16,7 @@
  * would spend a request every few seconds on every open goals page for a state
  * that changes once.
  */
+import { getTranslations } from "../../lib/translations";
 import { myExportsAction } from "./actions.ts";
 
 const STATE_TEXT = {
@@ -26,6 +27,8 @@ const STATE_TEXT = {
 } as const;
 
 export async function MyExports() {
+  const { t } = await getTranslations();
+
   const runs = await myExportsAction();
   const queuedOrDone = runs.filter(
     (run) => run.state !== "ready" || run.blobId,
@@ -39,7 +42,9 @@ export async function MyExports() {
 
   return (
     <section className="flex flex-col gap-1.5" data-testid="my-exports">
-      <h2 className="text-xs font-medium text-ink-3">Your exports</h2>
+      <h2 className="text-xs font-medium text-ink-3">
+        {t("search.myExports.yourExports")}
+      </h2>
       <ul className="flex flex-col gap-1">
         {queuedOrDone.map((run) => (
           <li
@@ -59,7 +64,7 @@ export async function MyExports() {
                 href={`/api/exports/${run.id}/download`}
                 className="text-brand hover:underline"
               >
-                Download
+                {t("search.myExports.download")}
               </a>
             ) : null}
             {run.error ? (

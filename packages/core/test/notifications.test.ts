@@ -11,6 +11,7 @@ import {
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import { ensurePendingBatch } from "../src/notifications/batching.ts";
 import { notifyRecipients } from "../src/notifications/create.ts";
+import { memberInboxChannel } from "../src/notifications/live.ts";
 import { resolveRecipients } from "../src/notifications/recipients.ts";
 import { getOrCreateNotificationSettings } from "../src/notifications/settings.ts";
 import {
@@ -500,5 +501,151 @@ describe("auto-subscribe excludes suspended, placeholder and agent members", () 
       listSubscribers(tx, workspaceId, listId),
     );
     expect(subscribers).toEqual([]);
+  });
+});
+
+/**
+ * The live insert the inbox waited nine tasks for (P6-G07c).
+ *
+ * `notifications.list` had a screen from P6-G07a and no way to learn that a
+ * row had landed. What is proved here is the producing half: a notification
+ * row leaves an outbox row addressed to that one member's channel, inside the
+ * same transaction, so nothing announces a row that rolls back. The consuming
+ * half is a stream route and a browser, and it is proved end to end.
+ */
+describe("a notification announces itself to its own recipient", () => {
+  it("enqueues one outbox row per notification, on the recipient's channel", async () => {
+    const member = await addMember("Watcher");
+    const other = await addMember("Nobody");
+    const doc = randomUUID();
+    await grantViewOnNewContext(member, doc);
+
+    const wb = await workerDb();
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.notify",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        async execute({ tx }) {
+          const listId = await ensureSubscriptionList(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+          });
+          await subscribeMember(tx, {
+            workspaceId,
+            listId,
+            memberId: member,
+            reason: "mentioned",
+          });
+          const recipients = await resolveRecipients(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+          });
+          const outcome = await notifyRecipients(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+            recipients,
+          });
+          return {
+            result: outcome,
+            activity: {
+              kind: "test.notify",
+              subjectType: "blob",
+              subjectId: doc,
+            },
+            audit: { action: "test.notify", targetType: "blob" },
+          };
+        },
+      },
+    );
+
+    const notification = await wb.admin.query<{ id: string }>(
+      "select id from notifications where recipient_member_id = $1",
+      [member],
+    );
+    expect(notification.rows).toHaveLength(1);
+    const notificationId = notification.rows[0]?.id as string;
+
+    const enqueued = await wb.admin.query<{
+      payload: Record<string, unknown>;
+      idempotency_key: string;
+    }>("select payload, idempotency_key from outbox where topic = $1", [
+      "inbox.added",
+    ]);
+    expect(enqueued.rows).toHaveLength(1);
+    const row = enqueued.rows[0];
+    expect(row?.payload.channel).toBe(memberInboxChannel(workspaceId, member));
+    expect(row?.payload.notificationId).toBe(notificationId);
+    expect(row?.payload.subjectId).toBe(doc);
+    // Keyed on the notification, so a retried delivery publishes once.
+    expect(row?.idempotency_key).toBe(`inbox.added:${notificationId}`);
+    // The channel names the recipient, so nobody else's stream carries it.
+    expect(row?.payload.channel).not.toContain(other);
+  });
+
+  it("says nothing when the write suppressed its notifications", async () => {
+    // A bulk operation writes no notification row, so there is nothing to
+    // announce. Proved separately because the suppression flag returns before
+    // the loop the announcement lives in.
+    const member = await addMember("Silent");
+    const doc = randomUUID();
+    await grantViewOnNewContext(member, doc);
+
+    const wb = await workerDb();
+    await wb.admin.query("delete from outbox where topic = $1", [
+      "inbox.added",
+    ]);
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.notify",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        async execute({ tx }) {
+          const listId = await ensureSubscriptionList(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+          });
+          await subscribeMember(tx, {
+            workspaceId,
+            listId,
+            memberId: member,
+            reason: "mentioned",
+          });
+          const recipients = await resolveRecipients(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+          });
+          const outcome = await notifyRecipients(tx, {
+            workspaceId,
+            subjectType: "blob",
+            subjectId: doc,
+            recipients,
+            suppress: true,
+          });
+          return {
+            result: outcome,
+            activity: {
+              kind: "test.notify",
+              subjectType: "blob",
+              subjectId: doc,
+            },
+            audit: { action: "test.notify", targetType: "blob" },
+          };
+        },
+      },
+    );
+
+    const enqueued = await wb.admin.query(
+      "select id from outbox where topic = $1",
+      ["inbox.added"],
+    );
+    expect(enqueued.rows).toHaveLength(0);
   });
 });

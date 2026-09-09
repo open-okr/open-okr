@@ -17,7 +17,14 @@
  * that vanished would leave a writer wondering whether the product had one; the
  * strip says the rules still apply and only the suggestion needs a provider.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import Link from "next/link";
 import { useCallback, useState, useTransition } from "react";
 import { applyRewrite, rewriteKeyResultAction } from "./actions";
@@ -51,6 +58,8 @@ export function CoachStrip({
   readonly drafting: boolean;
   readonly canEdit: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [pending, startTransition] = useTransition();
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -109,7 +118,7 @@ export function CoachStrip({
       <CardHeader>
         <span className="flex flex-wrap items-center gap-2">
           <h2 id="coach-strip-heading" className="text-sm font-bold text-ink">
-            What the Coach sees
+            {t("goals.detail.coachStrip.whatTheCoachSees")}
           </h2>
           {score === null ? null : (
             <Chip tone={score >= 75 ? "ok" : score < 45 ? "bad" : "warn"}>
@@ -122,7 +131,7 @@ export function CoachStrip({
         {flags.length === 0 ? null : (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-ink-3">
-              This objective
+              {t("goals.detail.coachStrip.thisObjective")}
             </span>
             <span className="flex flex-wrap gap-1.5">
               {flags.map((rule) => (
@@ -154,7 +163,7 @@ export function CoachStrip({
                       disabled={pending}
                       onClick={() => ask(kr.id, rule)}
                     >
-                      Suggest a fix
+                      {t("goals.detail.coachStrip.suggestAFix")}
                     </Button>
                   ) : null}
                 </span>
@@ -165,8 +174,7 @@ export function CoachStrip({
 
         {drafting ? null : (
           <p className="text-xs text-ink-4">
-            The rules above are checked with or without an AI provider. A
-            suggested rewrite needs one, and none is configured.
+            {t("goals.detail.coachStrip.theRulesAboveAre")}
           </p>
         )}
 
@@ -177,12 +185,12 @@ export function CoachStrip({
         {suggestion === null ? null : (
           <div className="flex flex-col gap-1.5 rounded-md border border-line bg-raised p-2">
             <span className="text-xs font-medium text-ink-3">
-              Suggested for {suggestion.ruleId}
+              {t("goals.detail.coachStrip.suggestedFor")} {suggestion.ruleId}
             </span>
             <span className="text-sm text-ink">{suggestion.text}</span>
             {suggestion.fixesTheRule ? (
               <span className="text-xs text-ok">
-                Checked against the catalogue: this now passes{" "}
+                {t("goals.detail.coachStrip.checkedAgainstTheCatalogue")}{" "}
                 {suggestion.nowPassing.join(", ")}.
               </span>
             ) : (
@@ -190,8 +198,9 @@ export function CoachStrip({
               // the suggestion and disagreed, and saying so is the honest
               // outcome rather than presenting it as a fix.
               <span className="text-xs text-warn">
-                Checked against the catalogue: this still does not satisfy{" "}
-                {suggestion.ruleId}. Use it as a starting point if it helps.
+                {t("goals.detail.coachStrip.checkedAgainstTheCatalogue2")}{" "}
+                {suggestion.ruleId}
+                {t("goals.detail.coachStrip.useItAsA")}
               </span>
             )}
             {canEdit ? (
@@ -201,15 +210,15 @@ export function CoachStrip({
                   disabled={pending}
                   onClick={() => apply(suggestion)}
                 >
-                  Use this wording
+                  {t("goals.detail.coachStrip.useThisWording")}
                 </Button>
                 <span className="text-xs text-ink-4">
-                  Nothing is saved until you press it.
+                  {t("goals.detail.coachStrip.nothingIsSavedUntil")}
                 </span>
               </span>
             ) : (
               <span className="text-xs text-ink-4">
-                Nothing has been saved, and this goal is not yours to edit.
+                {t("goals.detail.coachStrip.nothingHasBeenSaved")}
               </span>
             )}
           </div>

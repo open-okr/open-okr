@@ -496,3 +496,75 @@ describe("the list, filtered the way S-26 asks for it", () => {
     expect(row?.progressPct).toBe(0);
   });
 });
+
+/**
+ * An initiative's progress is the share of its own tasks that are done
+ * (S-26, P6-G28).
+ *
+ * **`initiatives.progress_pct` exists as a column and nothing has ever written
+ * to it.** Every initiative in the product answered nought per cent from
+ * P5-T11 until this row, and the page said so in a card explaining that the
+ * tasks panel had not been built. The figure is derived in the read now, from
+ * the same count the panel needs.
+ */
+describe("initiative progress (P6-G28)", () => {
+  it("is zero with no tasks, and says the total is zero rather than none done", async () => {
+    const initiative = await createInitiative({ title: "Nothing planned yet" });
+    const read = (await call("initiatives.read", { id: initiative.id })) as {
+      progressPct: number;
+      tasks: { done: number; total: number };
+    };
+    // Not "nought per cent done": an initiative with no tasks has not been
+    // broken down, and `total` is the only thing that can say so.
+    expect(read.progressPct).toBe(0);
+    expect(read.tasks).toEqual({ done: 0, total: 0 });
+  });
+
+  it("is the rounded share of the ones that are done", async () => {
+    const initiative = await createInitiative({
+      title: "Three tasks, one done",
+    });
+    for (const [title, status] of [
+      ["Write the brief", "done"],
+      ["Draft the screens", "todo"],
+      ["Ship it", "in_progress"],
+    ] as const) {
+      await call("tasks.create", {
+        spaceId,
+        title,
+        initiativeId: initiative.id,
+        status,
+      });
+    }
+
+    const read = (await call("initiatives.read", { id: initiative.id })) as {
+      progressPct: number;
+      tasks: { done: number; total: number };
+    };
+    expect(read.tasks).toEqual({ done: 1, total: 3 });
+    // The test plan's own figure.
+    expect(read.progressPct).toBe(33);
+  });
+
+  it("lists only that initiative's tasks", async () => {
+    // `tasks.list` had no way to answer this: the board is per space, and the
+    // other filters are per person or per date.
+    const mine = await createInitiative({ title: "Mine" });
+    const theirs = await createInitiative({ title: "Theirs" });
+    await call("tasks.create", {
+      spaceId,
+      title: "Belongs to mine",
+      initiativeId: mine.id,
+    });
+    await call("tasks.create", {
+      spaceId,
+      title: "Belongs to theirs",
+      initiativeId: theirs.id,
+    });
+
+    const listed = (await call("tasks.list", {
+      initiativeId: mine.id,
+    })) as { title: string }[];
+    expect(listed.map((task) => task.title)).toEqual(["Belongs to mine"]);
+  });
+});

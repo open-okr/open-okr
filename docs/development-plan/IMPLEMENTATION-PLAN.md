@@ -1401,7 +1401,7 @@ Acceptance: the rehearsal runs the runbook end to end, reconciliation is clean, 
 
 # Gap closure: between Phase 6 and Phase 7
 
-Not a phase. Thirty-five tasks closing `GAP-AUDIT.md`, which audited all 47
+Not a phase. Thirty-nine tasks closing `GAP-AUDIT.md`, which audited all 47
 routes and all 10 packages against the scope whose task was already `done` or
 `in_review` on 7 September 2026. Every row below cites the audit finding it
 closes, so the evidence for why the task exists is one file away.
@@ -1441,6 +1441,28 @@ Goal: a batched notification is actually delivered (GAP-AUDIT B-01).
 Deliverables: the worker that finds batches whose `send_at` has arrived, renders them through `renderDigest`, which has had no caller since P2-T06, sends through the mail port and marks them sent; the member's daily summary at their own local time; idempotence under two hosts; the recurring job registered beside the agent cadences.
 Test plan: four notifications inside one window deliver as one digest listing four items, each deep-linked; a recipient who lost access after enqueue receives nothing; two hosts draining together send once; the summary fires at the member's local time across a daylight-saving boundary.
 Acceptance: Given a member with a ten-minute window, when four notifications arrive inside it, then they receive one digest listing four items and the batch is marked sent exactly once.
+
+**Where the send happens, and why not in the drain.** A write path may cause a
+side effect only by inserting an outbox row, so the drain claims the batch and
+enqueues; the `notification.digest` handler renders and sends. That split is
+what makes the claim and the enqueue atomic, and it is why `sent` on a batch
+means "handed to the outbox" rather than "an SMTP server accepted it": the
+outbox row carries the attempt count and the dead letter, which is where a
+delivery failure belongs.
+
+**The daily summary was already scheduled and already empty.** `digest.daily`
+has fired at each member's own local hour since P4-T05b, carrying `draftFor`'s
+one generic line for every rule. So the half of this task that looked like
+"build the daily summary" was really "give the daily summary its contents",
+through the same builder the batch digest uses. One builder, so the two cannot
+describe one event differently and the access filter is written once.
+
+**The drain's cron is declared by the host, not by `packages/agents`.** That
+package holds AI-NATIVE-PLAN §6.2's cadences, and a batch drain is plumbing
+rather than something the Champion does. `ScheduledRun` gained a `cron` field
+for runs the host owns, and the scheduler test's invariant widened from "the two
+lists are equal" to "nothing is registered without a worker and nothing waits
+on a cron that does not exist", which is the invariant that was always meant.
 
 ### P6-G01c: The orphan-blob reap [S]
 Depends on: P6-G01a, P2-T05
@@ -1499,17 +1521,54 @@ Deliverables: a migration giving `invite_links` the second-key row-level securit
 Test plan: a valid token names its workspace without incrementing its use count; an invalid, revoked, expired or used-up token refuses identically; a closed instance refuses registration without a token and allows it with one; a personal token refuses an address it was not issued to; two visitors racing one single-use token produce one member.
 Acceptance: Given a closed instance and a personal invitation, when the invitee follows the address, then they create an account, land in the workspace with the provisioning defaults, and the audit names who invited them.
 
-### P6-G07: The in-app inbox, S-03 [L]
+### P6-G07a: The in-app inbox, S-03 [M]
 Depends on: P2-T06
 Goal: the notification spine gets its screen (GAP-AUDIT B-06).
-Deliverables: the inbox route with the live badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block, grouped and deep-linked rows, mark-read, mute and snooze, and the subscription toggle on every subject that has one; loading, empty, error and permission-denied states.
-Test plan: a notification a member may not see never appears; snoozing hides the row and never hides a review-inbox obligation; the badge is live and clears on read; muting a subject stops new rows without deleting old ones.
+Deliverables: the inbox route with the badge UIUX-PLAN §3 puts beside Home and Review, an Inbox entry in the module registry's primary block with an icon of its own, `notifications.list` widened to carry the subject, the reason and the rule key so a row can be grouped and deep-linked and access-scoped so a subject the reader cannot reach is not listed, an unread count for the badge, mark-read, snooze and mute from the row; empty, error and permission-denied states.
+Test plan: a notification whose subject the member cannot reach never appears; snoozing hides the row and never hides a review-inbox obligation; the badge counts unread and clears on read; muting a subject stops new rows without deleting old ones; every reason in the table's own enum renders a chip, which is what catches the output schema listing four of the six.
 Acceptance: Given a member mentioned in a comment, when they open the inbox, then the notification is listed, deep-links to the comment, and the badge clears.
 
+**P6-G07b was cut in two.** Its two halves share nothing: one is a control on
+six detail pages, the other is a realtime subscription on the inbox. Building
+them together would mean six page wirings and a live channel in one commit,
+and the acceptance sentence ("the row appears in their open inbox without a
+reload") cannot be demonstrated until both are done, which is what makes the
+second half the one that owns it. Split at P6-G07b, 8 September 2026.
+
+### P6-G07b: The watch control on every subject [M]
+Depends on: P6-G07a
+Goal: `subscriptions.toggle` gets its surfaces.
+Deliverables: `subscriptions.read`, which did not exist, so a control could only guess its own state; a watch control on every subject that has a subscription list, which is the goal, initiative, task, document, KPI and space detail pages, each showing whether the reader is watching, how many others are, and why they were subscribed.
+Test plan: watching from a subject's own page records a subscription and unwatching removes it; a reader who may only view the subject can still watch it, because watching is not a write to the subject; a subject nobody has ever watched answers "not watching" rather than failing on a missing list; a member subscribed by their role is told so, because turning that off does not remove the obligation.
+Acceptance: Given a member reading an initiative they did not create, when they press Watch, then the page says they are watching and names how many others are.
+
+### P6-G07c: The inbox's live insert [M]
+Depends on: P6-G07b
+Goal: the inbox row arrives without a navigation.
+Deliverables: the inbox subscribing to the realtime channel the board and the session already use; the insert deduplicated against what the next navigation loads, so a row that arrived live is not drawn twice.
+Test plan: the live insert arrives without a reload and is not duplicated by the next navigation; a second browser watching the same inbox sees the same row; the page works unchanged when no relay is running, because a channel that never delivers must not be the difference between an inbox and no inbox.
+Acceptance: Given a member who watches an initiative from its page, when somebody checks it in, then the row appears in their open inbox without a reload.
+
 ### P6-G08: Member notification settings [M]
-Depends on: P6-G07
+Depends on: P6-G07a
 Goal: the member half of the settings map is reachable (GAP-AUDIT B-06).
-Deliverables: per-reason routing, the batching window, the daily summary time and the language, theme and density preferences on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks.
+Deliverables: per-reason routing, the batching window, the daily summary and its time on the member's own settings surface beside the primary channel and quiet hours already there; every field defaulted so the screen never blocks; each one declared in the §4.14 registry with the default it resolves to.
+
+**Language, theme and density moved out of this row**, to P6-G22 and P6-G23,
+which own their controls. No column exists for any of the three, so building
+their storage here and their controls there would split one setting across two
+tasks and leave it owned by nobody for a release. A setting arrives with the
+screen that sets it.
+
+**A setting's scope and its storage home are two different things**, and this
+is the task that separated them. `SETTINGS_REGISTRY` had two scopes and two
+tables, so scope implied the home; the notification preferences are
+member-scoped and live in `notification_settings`, created lazily on first
+read, which is not the same storage as a member column.
+`resolveMemberSettings` writes its answer into `workspace_members` at
+provisioning, so a notification key reaching it would name a column that does
+not exist. The registry declares the home, and both the existing spec and the
+new one enumerate per home.
 Test plan: every setting in the member scope resolves to its documented default on a member who has never opened the screen, enumerated from the registry rather than a fixed list; changing the summary time moves when it fires; a per-reason routing change takes effect on the next notification.
 Acceptance: Given a member who changes their batch window to ten minutes, when four notifications arrive inside it, then they receive one digest listing four items.
 
@@ -1527,12 +1586,39 @@ Deliverables: suspend, restore, convert-to-guest and erasure on the profile scre
 Test plan: suspending removes every access and restoring returns it; converting to guest leaves no stale binding; erasure keeps authorship readable under the placeholder identity and produces the export; removing the last owner is refused by name.
 Acceptance: Given an administrator erasing a member, when it completes, then that member's comments still read with an anonymised author, an export is produced, and the audit names who ran it.
 
-### P6-G11: The activity feed, S-31 [M]
+**P6-G11 was cut in two.** S-31 asks for the feed at four scopes: workspace,
+space, goal and profile. Only the workspace scope is a registered action.
+`queryFeed` in `packages/core` takes a context and can answer all four, and
+three more read actions have to exist before a panel on a goal, a space or a
+profile can ask for one. The workspace screen needs none of that.
+
+### P6-G11a: The workspace activity feed, S-31 [M]
 Depends on: P2-T07
-Goal: the typed event log gets its screen (GAP-AUDIT G-01).
-Deliverables: the per-kind renderer registry rendered at workspace, space, goal and profile scope; the feed on each of those surfaces; live inserts; key-based pagination; the aggregation rules already in the engine respected on screen.
-Test plan: a private-space activity never appears in a non-member's workspace feed; five consecutive field edits collapse into one row and a check-in never does; a soft-deleted subject drops out; a live insert appears without a reload.
-Acceptance: Given a member without access to a space, when they read the workspace feed, then no activity from it appears, while a member of that space sees typed, readable entries.
+Goal: the typed event log is readable at last (GAP-AUDIT G-01).
+Deliverables: the `/activity` route rendering `activities.workspaceFeed` with its own cursor paging; the actor named by joining `actorMemberId` against the directory, because a renderer describes the subject and never the actor; the aggregate count shown where consecutive edits collapsed; the distinction from the audit log stated on the screen; a link from the work map, because §6 gives S-31 a screen and §3 gives it no sidebar slot.
+Test plan: the route is reachable without a registry row, asserted by the existing reachability test; a system-authored row reads as the product acting rather than as an empty name; a half cursor from a hand-edited link is ignored rather than refused by the schema; an empty first page and an empty later page say different things.
+Acceptance: Given a workspace where anything has happened, when a member opens the feed, then they see the readable events they are allowed to see, newest first, with who did each one and when.
+
+**P6-G11b was cut in two.** Four deliverables, and the last two are a
+different kind of work from the first two: three reads and three panels are
+one commit, and a realtime channel plus a reaction surface on a feed row is
+another. Splitting also settles where the feed's live insert belongs, which is
+here rather than with the inbox's in P6-G07c: same port, different screen and
+different deduplication. Split at P6-G11b, 8 September 2026.
+
+### P6-G11b: The feed at space, goal and profile scope [M]
+Depends on: P6-G11a
+Goal: the other three scopes S-31 names (GAP-AUDIT G-01).
+Deliverables: three read actions over `queryFeed` for the space, goal and profile scopes, each access-scoped by the same context resolver the workspace feed uses; the panel on each of those three surfaces.
+Test plan: a private-space activity never appears in a non-member goal or profile feed; a goal feed carries its key results and check-ins and not its siblings; a profile feed carries what that member did and not what was done to them; each scope pages independently.
+Acceptance: Given a member without access to a space, when they read a goal feed inside it, then they get not-found rather than an empty feed.
+
+### P6-G11c: The feed's live insert, and reacting to a row [M]
+Depends on: P6-G11b
+Goal: a feed row arrives and can be replied to (GAP-AUDIT G-01).
+Deliverables: live inserts on all four feed scopes over the realtime port the board and the session already use, deduplicated against the next navigation; the reactions and comments §6 asks for on a feed row, over `reactions.add`, `reactions.list`, `reactions.remove` and `comments.create`, which all exist and none of which a feed row reaches; or a recorded reason for leaving either off.
+Test plan: a row inserted live is not drawn twice by the next navigation; a reaction is visible to a second reader of the same feed; a reader who may not see the row's subject may not react to it; the page works unchanged with no relay running.
+Acceptance: Given two members reading the same space feed, when one reacts to a row, then the other sees the reaction without a reload.
 
 ### P6-G12a: The AI console: provider, keys and models [L]
 Depends on: P2-T13, P2-T14
@@ -1548,12 +1634,72 @@ Deliverables: the feature switches, the versioned prompt editor with restore, th
 Test plan: crossing a quota disables the feature with a clear message and every manual path still works; a prompt version change is recorded and reversible; a hard cap halts a running agent with the reason in its log; the usage figures match the metered events.
 Acceptance: Given a workspace at its hard cap, when an agent run is in progress, then the console shows it halted with the reason, and every deterministic path is unaffected.
 
-### P6-G13: Agent configuration and the proposal review queue [L]
+**P6-G13 was cut in two, along what the registry already offers.** Enable,
+disable, cancel and the three proposal actions all exist and needed only a
+surface. The write policy does not: `agents.create` takes an autonomy and
+nothing changes it afterwards, so `agents.setAutonomy` has to exist first. The
+scope binder is the other half: `agents.bindScope` exists, and a picker over
+three resource types with a level each is its own piece of interface rather
+than a control to bolt onto a list row.
+
+### P6-G13a: The proposal review queue, and turning an agent off [M]
 Depends on: P2-T17, P4-T05a, P4-T06a
 Goal: the propose-and-approve default has a surface (GAP-AUDIT G-05).
-Deliverables: agent detail on S-38 gaining enable and disable, the write policy of sandbox, propose or scoped direct, and least-privilege binding on named spaces, goals and KPI trees; run cancellation; the proposal review queue with the envelope rendered as what would change, bulk apply and bulk dismiss, and the same queue reachable from the review inbox.
-Test plan: an agent in propose mode commits nothing until a proposal is applied, and applying goes through the Operation pipeline with audit; a binding cannot be widened to the workspace; cancelling a run stops it and says so in its log; a dismissed proposal cannot be applied afterwards.
+Deliverables: the review queue on S-38 with the action and its payload shown as what would change, nothing preselected, bulk apply and bulk dismiss, and each refusal kept on screen beside the successes; copilot proposals excluded, because they belong to the thread that asked; enable and disable per agent, with the confirmation saying that disabling keeps the scope, the persona and the run log; cancelling a run that is still planning or running.
+Test plan: a proposal that refuses does not stop the others in the same batch and its reason is shown; a dismissed proposal cannot then be applied; disabling an agent stops it speaking and leaves its bindings; only a planning or running run offers a stop.
 Acceptance: Given an agent proposal, when a member applies it from the queue, then the change lands through the pipeline, the audit names both the agent and the member, and the proposal cannot be applied twice.
+
+### P6-G13b: The write policy and the scope binder [M]
+Depends on: P6-G13a
+Goal: least privilege is set from the product, not from the command line (GAP-AUDIT G-05).
+Deliverables: `agents.setAutonomy`, which the registry has never had, so an agent's write policy can move between sandbox, propose and scoped direct after it is created; the control for it, with what each policy does written beside it rather than three words to guess between; the scope binder over `agents.bindScope`, a picker across named spaces, goals and KPI trees with a level each; the workspace context refused as a binding target, in the interface as well as in the action.
+Test plan: raising an agent to scoped direct is audited and takes effect on the next run; a binding on the workspace context is refused by name; a sandbox agent commits nothing whatever its bindings say; lowering the policy leaves existing proposals alone.
+Acceptance: Given an agent bound to one space in propose mode, when an administrator raises it to scoped direct on that space alone, then it writes there and nowhere else, and the audit names who raised it.
+
+### P6-G13c: An agent bound to a space can act in it [L]
+Depends on: P6-G13b
+Goal: settle the conflict between CLAUDE.md's least-privilege rule and the Operation pipeline's access floor.
+
+**Found at P6-G13b, by enforcing the rule and watching what broke.**
+`agents.bindScope` has said "never workspace-wide" in its own summary since
+P4-T05a and enforced nothing. P6-G13b added the refusal, and six of the
+thirty-four tests in `packages/agents` failed: four because their fixture bound
+the workspace, and two because binding a space is not enough to write. The
+second pair is the real finding.
+
+`runOperation` measures an actor's level against the **workspace's own
+context**, by design and with its own comment saying so: the declared `access`
+on a write action is a coarse floor, and per-resource authorisation happens
+inside through `getAccessScoped`. An agent bound only to a space therefore
+holds zero on the workspace and is refused by the floor before its own binding
+is ever consulted. Measured: an agent bound to a space at level 100 running
+`spaces.update` on that space is refused with "needs a higher access level than
+you hold".
+
+So the rule and the pipeline cannot both stand as they are. Enforced, the rule
+makes `scoped_direct` a mode no agent can act in; unenforced, "there is no
+service account with ambient authority" is a sentence the product does not
+keep. P6-G13b withdrew its refusal rather than ship a dead autonomy mode, and
+recorded this.
+
+Three ways out, and the choice was a human's:
+
+| Option | What it costs |
+|---|---|
+| **Measure the floor against the task's subject context. Chosen by Agung, 9 September 2026** | Changes how every write in the product is authorised. Needs a design gate |
+| Let an agent hold a narrow workspace-level grant | Contradicts CLAUDE.md as written, so METHOD-level sign-off |
+| Define `scoped_direct` as proposals-only | Removes a mode AI-NATIVE-PLAN §6 describes |
+
+Designed in `docs/design/p6-g13c-subject-scoped-access-floor.md`. The floor
+takes the **higher** of the workspace level and the subject's rather than the
+subject's instead, which is the one deviation from the approved design and is
+argued in it: replacing one with the other narrows the floor for every actor
+who holds the workspace and nothing on the row in front of them, and turns a
+`not_found` from `getAccessScoped` into a `forbidden` from the floor.
+
+Deliverables: the decision, written into whichever document owns it; the implementation; `agents.bindScope` refusing the workspace once the refusal no longer kills the mode; `run-executor.test.ts` bound to a space, which is where it was pointed at before the revert.
+Test plan: an agent bound to one space performs a direct write inside it and is refused outside it; an agent bound to nothing writes nothing; the seeded Champion and Coach, which provisioning binds per space, are unaffected; the refusal on a workspace target has a test of its own.
+Acceptance: Given an agent in scoped direct bound to one space, when it runs a task against a goal in that space, then the write lands, and when it runs one against a goal in another space, then it is refused.
 
 ### P6-G14: Cycle phase 0, the annual frame, S-05 [M]
 Depends on: P3-T03, P4-T02
@@ -1561,6 +1707,21 @@ Goal: the annual strategy has a surface (GAP-AUDIT B-03).
 Deliverables: the frame editor for mission, vision, mid-term strategy, year and horizon; the two to five annual strategies with what each means in practice; the annual OKRs with their serving strategy; the year's not-doing list; sending an annual objective forward into drafting; the Coach's flag on a frame with unresolved disagreement.
 Test plan: a quarterly cycle marks the phase not-applicable rather than to-do; the strategy count is bounded at both ends with the reason stated; an annual objective sent forward appears in drafting; the frame reads back exactly as written.
 Acceptance: Given an annual cycle with no frame, when a facilitator opens phase 0 and writes one, then the phase mark computes as complete and the drafting surface offers the annual objectives.
+
+### P6-G14b: The annual OKRs on phase 0 [M]
+Depends on: P6-G14
+Goal: the rest of S-05 (GAP-AUDIT B-03).
+Deliverables: the annual objectives listed against the strategy each serves, sending one forward into quarterly drafting, and the Coach's flag on a frame whose disagreement is unresolved.
+Test plan: an annual objective names one strategy and the list groups by it; sending one forward creates a quarterly draft that cites it and running it twice creates one; a frame with `agreed` false and strategies present raises the Coach's flag and clearing it clears the flag.
+Acceptance: Given an agreed frame with three strategies, when a facilitator sends an annual objective forward, then the quarterly drafting surface offers it with its serving strategy attached.
+
+**Why P6-G14 was cut.** The frame editor is the phase's own surface and it
+needed the action widened before it could exist at all: `annual_frames` has
+held mission, vision, strategy and not-doing since migration 0020 and
+`frame.read` exposed none of them. The annual OKRs are a different join, the
+send-forward is a write into the quarterly cycle, and the Coach's flag is a
+rule key and a nudge. Doing the four together would have been one commit
+nobody could review.
 
 ### P6-G15: Cycle phase 6, run the cadence, S-11 [M]
 Depends on: P3-T07, P4-T04, P4-T08
@@ -1604,12 +1765,35 @@ Deliverables: the three settings §4.14 names for a space declared in the settin
 Test plan: every space setting resolves to its documented default on a space where nothing was configured, enumerated from the registry rather than a fixed list; a strictness override changes what the Coach refuses in that space and nowhere else; resetting restores the defaults exactly.
 Acceptance: Given a space that has configured nothing, when every space setting is read, then each returns its documented default, and a space that turns team voting off stops offering it.
 
-### P6-G19: The weekly session's trend, blockers, streak and commitments [L]
-Depends on: P4-T07b, P4-T07c, P4-T08
-Goal: S-22 shows the data its tables already hold (GAP-AUDIT B-10).
-Deliverables: the twelve-week confidence trend, the streak ribbon, the open blockers with ages and last week's scores on the space home; the commitment stage with the previous week closed as delivered or not and the new week set with owner and linked key result; the commitment rollover at session open that P4-T08 deferred; the coordinator note rendered in the digest; the blocker controls of raise, resolve and reassign; the placeholder card removed.
-Test plan: closing a session rolls this week's commitments into next week's list to close; a skipped week breaks the streak and a held one extends it; the digest content matches the session record exactly; the stage gate refusing fewer than two commitments is reachable and its message is readable.
-Acceptance: Given a completed session, when it closes, then the digest is generated with correct figures, the streak advances, last week's commitments are closed, this week's are open, and the space home shows all of it.
+**P6-G19 was cut in three.** It carried six deliverables across two screens
+plus one behaviour the weekly ritual does not have yet, which is three working
+sessions and not one. The seam is what each part cannot be finished without:
+the commitment stage needs the rollover, because a stage that closes last
+week's commitments cannot be built while last week's commitments are not
+reachable from this session; the trend, the streak and the blockers are
+read-only panels on a stage that already exists; the space home is a different
+screen with a different reader. Split at P6-G19, 8 September 2026.
+
+### P6-G19a: The weekly commitment stage, and the rollover [M]
+Depends on: P4-T08
+Goal: stage 3 of §7.2 exists, with last week in it (GAP-AUDIT B-10).
+Deliverables: the commitment stage on the weekly session, closing each of last week's commitments as delivered or not and setting this week's with an owner and an optional key result; the rollover P4-T08 deferred, so a session opened this week can see the commitments the last one set; the §11 commitment bounds stated from the registry rather than restated; the stage gate refusing fewer than two commitments surfaced with its own message.
+Test plan: a session opened after another in the same space lists that one's unclosed commitments and no others; closing one records the verdict and takes it off next week's list; a space with no previous session shows the stage without an empty accusation; advancing to the digest with one commitment is refused and the refusal names the bound; the bounds come from the resolved thresholds, so a workspace that changed them sees its own numbers.
+Acceptance: Given a session opened a week after the last one, when the facilitator reaches the commitment stage, then last week's commitments are listed to close and this week's can be set with an owner each.
+
+### P6-G19b: The weekly session's trend, streak, blockers and coordinator note [M]
+Depends on: P6-G19a
+Goal: the weekly session shows what its own tables hold (GAP-AUDIT B-10).
+Deliverables: the twelve-week confidence trend, the streak ribbon, the open blockers with their ages on the 24-hour clock and the controls to raise, resolve and reassign one; the coordinator's note on the digest stage, which has an action and no caller; the placeholder line naming P6-G19 removed.
+Test plan: a space with fewer than twelve weeks of history draws what it has rather than padding; a resolved blocker leaves the open list and stays in the record; reassigning names the new owner in the activity; the note reaches the digest lines and an empty note leaves them unchanged; the streak figure matches what `sessions.readStreak` answers.
+Acceptance: Given a space that has held four weekly sessions, when the facilitator opens the fifth, then the trend shows four points, the streak reads four, and every blocker still open is listed with its age.
+
+### P6-G19c: The space home [M]
+Depends on: P6-G19b
+Goal: the space home answers "how is this team doing" (GAP-AUDIT B-10).
+Deliverables: the twelve-week trend, the streak ribbon, the open blockers with ages and last week's scores on the space home; each reachable by a member of that space and refused as not-found to anybody else.
+Test plan: a member of another space gets not-found rather than an empty page; a space that has never held a session says so rather than drawing zeroes; last week's scores are the closed session's and not the running one's.
+Acceptance: Given a space with a held session behind it, when a member opens the space home, then the trend, the streak, the open blockers and last week's scores are all there.
 
 ### P6-G20: Rhythm and threshold cards [M]
 Depends on: P2-T08, P4-T01
@@ -1618,19 +1802,101 @@ Deliverables: the rhythm and thresholds cards covering the §11 registry rather 
 Test plan: a card enumerates the registry rather than a fixed list, so a threshold added later appears without a code change here; resetting a card restores the canon defaults exactly; an out-of-range value is refused with the bound stated; a renamed term propagates to every surface that shows it.
 Acceptance: Given a workspace that changes its check-in grace, when a goal passes the new grace, then it flips to outdated on the new boundary and no other threshold moved.
 
+**P6-G21 was cut in two, and one of its deliverables was already done.**
+"Strictness with per-space overrides" landed at P6-G18b, which declared the
+space scope §4.14 asks for and made the override decide what the Coach refuses
+in that space and nowhere else. Of what is left, the ladder override is a
+different kind of work from the rest: enable, quiet-mode exemption and the
+channel override are read in one place each, and a per-rule ladder has to be
+threaded into the three separate places a canon ladder is consumed, which are
+the blocker board, the review action and the obligation reader. Split at
+P6-G21, 8 September 2026.
+
 ### P6-G21: Nudge rule cards [M]
 Depends on: P4-T04c, P5-T02c
 Goal: a workspace can turn a rule down (GAP-AUDIT G-04).
-Deliverables: per-rule enable, channel override, ladder override and quiet-mode exemption; workspace quiet mode; strictness with per-space overrides; each row linking to the rule in METHOD.md and showing its recent volume from the card already there.
-Test plan: a disabled rule stops producing nudge rows and produces a suppression reason instead of silence; a channel override routes the next nudge; a quiet-mode exemption still respects the escalation ladder; every rule resolves to its provisioning default on a workspace that configured nothing.
+Deliverables: per-rule enable, channel override and quiet-mode exemption; workspace quiet mode, which `rhythm_settings` has held since P4-T04b with nothing able to set it; the channel override made to route, which is stored today and read by nothing; each row linking to the rule in METHOD.md and showing its recent volume from `nudges.volume`.
+Test plan: a disabled rule stops producing nudge rows and produces a suppression reason instead of silence; a channel override routes the next nudge; every rule resolves to its provisioning default on a workspace that configured nothing; turning workspace quiet mode on suppresses a rule that is not exempt and leaves an exempt one alone.
 Acceptance: Given an administrator who disables the noisiest rule, when its trigger next fires, then no nudge is sent, a suppressed row records why, and every other rule is unaffected.
+
+### P6-G21b: The per-rule escalation ladder [M]
+Depends on: P6-G21
+Goal: a workspace can widen or narrow one rule's ladder (GAP-AUDIT G-04).
+Deliverables: `nudge_rules.escalation_ladder` made to apply, which is stored today and read by nothing; every place a canon ladder is consumed taught to prefer a rule's own; the ladder editor on the rule card, validated against the same bounds §11 gives the canon ladder.
+
+**Corrected at P6-G21b: there are four consumers, not three.** This row named `blockers.board`, `review` and the obligation reader. `nudges/service.ts` reads the check-in ladder through `escalation()` and is the fourth, and it is the one that matters most, because it is the reader that produces the nudges. The obligation reader is pure and takes the rung as a parameter, so `review` covers it. All four are served by one substitution where the thresholds are built.
+Test plan: a rule with its own ladder escalates on its own numbers and every other rule on the canon's; a ladder that does not widen step by step is refused with the bound stated; clearing it returns the rule to §11's.
+Acceptance: Given a workspace that widens the blocker ladder for one rule, when a blocker passes the canon hour, then that rule has not escalated and every other rule has.
 
 ### P6-G22: The string catalogue and the locale [L]
 Depends on: P2-T10
 Goal: UIUX-PLAN §9's catalogue line is true (GAP-AUDIT G-08).
-Deliverables: every user-facing string in the 47 routes moved into the catalogue, with the Bahasa Melayu keys stubbed; the locale wired from the member and workspace language settings rather than pinned to `en` in the root layout; the pseudo-locale check extended from the shell components to every route, so a hardcoded string fails the build.
-Test plan: the pseudo-locale check runs over every route and fails on a deliberately hardcoded string; a member whose language is `ms` sees the stubbed catalogue; a key missing from `ms` falls back to `en` rather than rendering the key.
-Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language, and a new hardcoded string anywhere fails the build.
+
+**Cut in three at P6-G22a, and the seam is machinery before content.** This row
+asked for three things at once: a locale that is chosen rather than pinned,
+a build gate that refuses a hardcoded string, and every user-facing string in
+53 route files moved into the catalogue. The third is not a working session:
+the catalogue holds seven keys today and the routes hold thousands of strings,
+so moving them is mechanical work measured in days, and doing it before the
+gate exists means doing it twice. The first two are each one commit and each
+leaves the product better on its own: after **P6-G22a** choosing a language
+changes something, and after **P6-G22b** a new hardcoded string cannot be added
+without a decision.
+
+- **P6-G22a**: the locale is the member's, not `en`.
+- **P6-G22b**: the pseudo-locale gate over every route, with the routes
+  exempted by name and the list only ever shrinking.
+- **P6-G22c**: the strings themselves, route by route, removing exemptions.
+- **P6-G22d**: a message can carry a value. Added by P6-G22c, which found that
+  moving a sentence with a number in it produces fragments no translator can
+  reassemble.
+
+### P6-G22a: The locale is the member's, not `en` [M]
+Depends on: P2-T10
+Goal: a language chosen in the product changes what renders.
+Deliverables: `workspace_members.language` with its check constraint and its §4.14 registry entry; `people.updateOwnProfile` and `people.readMember` carrying it; a `resolveLocale` that answers the member, then the workspace, then English and never throws; the root layout's `lang` and `TranslationsProvider` reading it instead of a literal; the control beside theme and density.
+Test plan: a member's language round-trips and clears back to the workspace; a locale with no catalogue is refused; a signed-out screen still renders; the layout takes the resolved locale rather than a literal.
+Acceptance: Given a member who chooses Bahasa Melayu, when any screen re-renders, then the catalogue keys resolve in that language and `html lang` says so.
+
+### P6-G22b: A hardcoded string fails the build [M]
+Depends on: P6-G22a
+Goal: the catalogue cannot be bypassed by accident.
+Deliverables: the pseudo-locale check extended from the shell components to every route; the 53 route files exempted by name, with the exemption list documented as a debt that only shrinks; a test that fails when an exemption names a file that no longer exists.
+Test plan: a deliberately hardcoded string in an unexempted file fails the check; removing a file from the exemption list without moving its strings fails; a stale exemption fails.
+Acceptance: Given a new user-facing string added outside the catalogue in an unexempted route, when the check runs, then it fails naming the file and the string.
+
+### P6-G22c: The strings themselves [L]
+Depends on: P6-G22b
+Goal: UIUX-PLAN §9's catalogue line is true for every route.
+Deliverables: every user-facing string in the 53 route files moved into the catalogue with its `ms` key stubbed, and its exemption removed as each file is done; the assertion that every catalogue key has a consumer, which P2-T10 deferred to here.
+Test plan: the exemption list is empty; every key has a consumer; a key missing from `ms` fails rather than rendering the key.
+Acceptance: Given a member who sets their language, when they reload any screen, then it renders in that language.
+
+**The member's language column arrives here**, with the control that sets it.
+§4.14 documents "Member language, theme, density" and no column exists for any
+of the three; P6-G08 deliberately left them rather than storing a preference
+whose screen was two rows away. So this row brings the migration, the §4.14
+registry entry with its default, and the control together.
+
+### P6-G22d: A message can carry a value [M]
+Depends on: P6-G22c
+Goal: a sentence with a number in it is one catalogue entry, not three.
+
+**Found by doing P6-G22c, and measured.** Moving 1,543 strings into the
+catalogue split every sentence that interleaves with an expression. `{low} to
+{high} a week` became the pieces "to" and "a week. Fewer than" on either side
+of two values, and 187 of the 1,354 entries now start mid-sentence. Word order
+is not the same in every language, so a translator cannot reassemble them: a
+Malay reader of "at" has no way to know what it attaches to.
+
+`translate(catalogue, key)` takes no parameters, which is why the codemod had
+nothing better to do. Giving it some is a design decision about the message
+format, not a mechanical change, which is why this is its own row rather than
+part of the one that found it.
+
+Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the 187 fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
+Test plan: a message with a placeholder renders with the value substituted; a missing parameter fails rather than rendering the placeholder; the fragment count is zero and stays there.
+Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
 
 ### P6-G23: Theme and density control [S]
 Depends on: P2-T10
@@ -1639,12 +1905,46 @@ Deliverables: a theme and density control on the member's settings surface and i
 Test plan: switching theme survives a reload and a second device; compact density changes row heights on a virtualised table; reduced motion is still honoured in both themes.
 Acceptance: Given a member who chooses dark and compact, when they sign in on another browser, then the product renders dark and compact with no flash of the other.
 
-### P6-G24: Loading and error boundaries [M]
+**The theme and density columns arrive here**, for the reason P6-G22 records
+about language: "persisted per member rather than only in the browser" is a
+migration and a §4.14 registry entry, and a setting arrives with the screen
+that sets it rather than two rows earlier.
+
+**P6-G24 was cut in two, and the seam is an architecture fact rather than a
+size judgement.** One clause of the row was "section-level error boundaries so
+a failure in one card does not replace the shell", and that cannot be built as
+written: thirty-one pages render `AppShellLayout` inside themselves rather than
+through a `layout.tsx`, so when a page throws the shell never rendered and a
+boundary below it has no sidebar to keep. Moving the shell into per-segment
+layouts is a change to every one of those pages and belongs on its own row.
+
+### P6-G24a: Per-segment error boundaries [M]
 Depends on: none
-Goal: a slow read and a failed read both look like themselves (GAP-AUDIT G-06, G-07).
-Deliverables: a loading state on every route whose reads are not instant, through `loading.tsx` or a Suspense boundary around the slow region rather than the whole page; section-level error boundaries so a failure in one card does not replace the shell; a `global-error.tsx`; a not-found path on every dynamic route.
-Test plan: a deliberately slow read renders the loading state and then the content; a thrown read inside one card leaves the sidebar standing; every dynamic route returns not-found for an id that does not exist; the permission-denied state is distinct from not-found only where an existence oracle is acceptable.
-Acceptance: Given a route whose read takes two seconds, when a member navigates to it, then they see a loading state immediately and the content when it arrives.
+Goal: a failed read looks like itself rather than like a broken instance (GAP-AUDIT G-07).
+Deliverables: an `error.tsx` per segment naming the screen that failed and nothing else about the failure; a `global-error.tsx`, for a root layout that throws before any screen can be drawn; a test that enumerates the segments and fails when one resolves no boundary. **The loading half was built here, broke the end-to-end suite, and was removed the same day: it is P6-G24c and the row above says why.**
+Test plan: every segment holding a `page.tsx` resolves an error boundary, walked the way Next resolves them rather than by a fixed list; no in-shell segment falls all the way back to the root boundary, which renders standalone on purpose; `global-error.tsx` exists; an exemption naming a prefix that matches no segment fails.
+Acceptance: Given a segment added with no boundary of its own and no ancestor that has one, when the suite runs, then it fails naming that segment.
+
+### P6-G24c: Loading states, once the duplicate render is explained [M]
+Depends on: P6-G24a
+Goal: a slow read looks like itself, without taking the end-to-end suite down (GAP-AUDIT G-06).
+Deliverables: the explanation first, because the symptom may be a real defect rather than a test artefact: a `loading.tsx` per segment took the end-to-end suite from 184 passing to 75 passing and 86 not run, and the first failure caught **two copies of the same chip in the DOM at once** on `/admin/agents`; a Suspense boundary makes `page.goto` resolve once the fallback is painted, so a spec that asserts immediately races the streamed content, but streaming inserts one copy of the content beside one fallback and does not explain two copies of the content; then the boundaries themselves, announced with `role="status"` the way `segment-skeleton.tsx` did before it was removed; then whatever the specs need, which is a wait for content rather than a trust in `goto`, applied once in a helper rather than in twenty specs.
+Test plan: the full end-to-end suite passes with every boundary in place, run three times rather than once, because these specs are serial and a timing failure moves between them; a deliberately slow read renders the fallback and then the content; the duplicate render is reproduced in a test that fails without the fix.
+Acceptance: Given every segment carrying a loading state, when the end-to-end suite runs three times, then it passes every time, and the duplicate render has a named cause written down.
+
+**Why this is a row and not a retry.** P6-G24a shipped these boundaries and
+they were removed the same day, with the suite as the evidence. The temptation
+is to make the twenty specs wait and call it done. That would be bending the
+tests around an unexplained symptom: two identical elements in one DOM is not
+something streaming does, and if it happens to a spec it can happen to a
+person. The explanation comes first.
+
+### P6-G24b: The application shell as a layout [M]
+Depends on: P6-G24a
+Goal: an error boundary renders inside the product rather than instead of it (GAP-AUDIT G-07).
+Deliverables: `AppShellLayout` moved out of the thirty-one pages that call it and into the segment layouts, so the shell renders above every boundary and a failed read leaves the sidebar, the cycle strip and the search standing; the root `error.tsx` left standalone, because whatever threw there may have been the shell's own read; the per-segment cards from P6-G24a unchanged, since they already draw as a card in a column.
+Test plan: a page that throws renders its boundary with the sidebar present; the root boundary still renders with no shell; a signed-out visitor still reaches the auth screens, which are outside the shell; no page renders the shell twice.
+Acceptance: Given a page whose read throws, when a member is on it, then the sidebar, the workspace switcher and the search are still there and only the content area shows the error.
 
 ### P6-G25: Workspace state and the freeze overlay [M]
 Depends on: P2-T09
@@ -1656,7 +1956,9 @@ Acceptance: Given a frozen workspace, when a member tries to write, then the ove
 ### P6-G26: Onboarding, S-34 [L]
 Depends on: P3-T17
 Goal: a first sign-in as owner leads somewhere (GAP-AUDIT G-02).
-Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice P3-T17 built the action for and the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
+Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
+
+**Corrected at P6-G26: P3-T17 built no action.** This row said "the demo-data choice P3-T17 built the action for". P3-T17 built `buildDemoWorkspace` and a seed command; there is no registry action for the demo and P6-G26 did not add one, because the wizard calls the function and the pipeline is still what writes.
 Test plan: skipping every step leaves a working workspace practising the full method; choosing demo data seeds it idempotently; onboarding does not reappear once finished; a second owner does not see it.
 Acceptance: Given a first sign-in as owner, when they skip every step, then they land on a working workspace with every setting at its documented default.
 
@@ -1664,13 +1966,29 @@ Acceptance: Given a first sign-in as owner, when they skip every step, then they
 Depends on: none
 Goal: the registered actions with no browser caller either get one or get a reason (GAP-AUDIT §5).
 Deliverables: delete on goals, initiatives, tasks and documents with the soft-delete semantics stated on the confirmation; checklist item removal; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction can be taken back; `cycles.create`, `update` and `archive`, so a workspace reaches next quarter; the attachment flow on documents and initiatives, wiring the four `blobs.*` and three `attachments.*` actions that have no caller; `workspace.rename` and `workspace.overview` on the general card; a note in the audit for any action deliberately left without a browser path.
+
+**Cut in two at P6-G27a.** The row is marked [M] and its deliverable list is
+not: eleven writes on four detail pages is one commit, and the attachment flow
+is a feature. `blobs.prepareUpload`, `claimUpload`, `getForDownload` and
+`prepareImport` plus `attachments.list`, `attach` and `detach` are seven
+actions, a byte quota, an upload control and a download path, and none of them
+shares anything with a delete button.
+
+- **P6-G27a**: the writes that are one button. Delete on four entities,
+  checklist item removal, `goals.moveToCycle`, `goals.unlinkKpi` and
+  `reactions.remove`.
+- **P6-G27b**: `cycles.create`, `update` and `archive`, the attachment flow,
+  `workspace.overview` on the general card, and the written reason for every
+  action deliberately left without a browser path.
 Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a cycle created from the browser gets the §4.14 defaults; an attachment survives a page reload and respects the workspace byte quota.
 Acceptance: Given a member with edit access on a goal, when they move it to the next cycle, then the move is audited and both cycles read correctly.
 
 ### P6-G28: The initiative's tasks and documents, S-26 [S]
 Depends on: P5-T11, P5-T12
 Goal: the two panels the initiative page still says are coming (GAP-AUDIT, the initiatives row).
-Deliverables: the tasks panel driven by `tasks.linkedWork`, so initiative progress reads as the share of its own tasks that are done rather than zero for everybody; the documents and attachments panel; the "What is not here yet" card removed.
+Deliverables: the tasks panel, so initiative progress reads as the share of its own tasks that are done rather than zero for everybody; the documents and attachments panel; the "What is not here yet" card removed.
+
+**Corrected at P6-G28, twice.** This row said the panel is driven by `tasks.linkedWork`; that action takes a `cycleId` and answers per key result, and nothing could answer "the work this initiative is made of" at all. `tasks.list` gained an `initiativeId` filter instead. And the zero was not caused by the missing panel: `initiatives.progress_pct` is a column nothing has ever written to, so the figure is derived in the read.
 Test plan: an initiative with three tasks, one done, reads 33 per cent; an initiative with no tasks renders an empty state rather than a zero bar; a document attached to the initiative appears and survives a reload.
 Acceptance: Given an initiative with tasks, when a member opens it, then the tasks are listed and the progress figure matches them.
 
@@ -1684,9 +2002,11 @@ Acceptance: every route in the module registry has at least one end-to-end path,
 ### P6-G30: The KPI grid's sparklines, subtotals and filters [M]
 Depends on: P3-T12, P3-T13
 Goal: finish S-20 (GAP-AUDIT, the `/kpis` row).
-Deliverables: the row sparkline and the category subtotal, both computed with the aggregate rules already in `packages/method`; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
+Deliverables: the row sparkline and the category subtotal; filters by frequency, owner, category and state following the goals explorer's pattern; the formula chip on a calculated cell; the "Not here yet" card removed.
 Test plan: a subtotal matches the method function exactly rather than being summed here; a sparkline on a KPI with one record renders without a line and says so; a filter combination survives a reload through the URL; a calculated cell shows its formula and stays read-only.
-Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal matches `packages/method` and each row draws its own twelve-period sparkline.
+Acceptance: Given a category with three KPIs, when a member opens the grid, then the subtotal says how the category is doing and each row draws its own twelve-period sparkline.
+
+**Corrected at P6-G30: there is no aggregate rule to match.** This row said the subtotal is computed with the rules already in `packages/method`. METHOD.md defines no aggregate for a category, and `aggregateForPeriod` folds one KPI across frequencies rather than several KPIs together. Summing a revenue figure and a response time would be a number nobody measured, so the subtotal is a tally of §6.4's corridor states.
 
 ### P6-G31: A read action's declared access level is enforced [M]
 Depends on: P2-T02, P5-T07a
@@ -1703,6 +2023,39 @@ Over REST they are not. `invitations.list` was written at P6-G06a, found to
 have exactly this hole, and enforces its own level in the handler with the
 reason written above it; `imports.listRuns` and the nudge volume read are the
 two others already visible, and the sweep is what finds the rest.
+
+**What the sweep found, and where it landed.** 29 reads declare above `view`
+and 2 enforced it, so 27 were open. Enforcement went in the builder rather
+than read by read, because the shape did allow it: the level is one number
+compared against the member's level on the workspace's own context, and 27
+copies of that comparison is 27 chances to write it differently. The builder
+checks only when the declared level is above `view`, so a `view` read costs
+nothing extra, and `system` and `operator` actors are exempt exactly as
+`runOperation` exempts them. The two hand-rolled checks are dealt with
+differently: `invitations.list`'s is deleted, because it duplicated the
+builder's; `settings.readWorkspaceSettings` keeps its `getAccessScoped` call,
+because that is the access getter the hard rule requires for a protected
+aggregate and it is not the same check.
+
+**The refusal is `not_found`, in the access getter's own words.** The first
+version raised `forbidden` and named the action and the level, and two existing
+specs refused it: `settings-actions.test.ts` requires `not_found` for a member
+holding `edit`, and `import-table.test.ts` requires "No such workspace" for
+somebody who is not a member at all. Both are right. `forbidden` is defensible
+for a caller who is already a member and knows the workspace exists, and it is
+what the write actions beside these reads raise; it is not defensible for a
+caller with no member row, because "you hold too little access in this
+workspace" confirms the workspace. One check cannot separate the two without
+handing back the oracle it exists to close. So a read refuses the way
+`getAccessScoped` refuses, the message names neither the action nor the level,
+and `invitations.list`'s own spec was corrected from `forbidden` to `not_found`
+in the same change.
+
+**No REST route test, and that is the point of the design.** `route.ts` says
+"nothing here decides who may do what": it resolves the principal, checks the
+token scope, and hands the input to `callAction`. A test at `callAction` is
+therefore a test of the REST surface too, and one at the route would only prove
+that the route still calls the registry.
 
 **Gap closure exit:** the scheduler running, S-02 complete, six screens built, the cycle whole across all eight phases, publish gate 4 satisfiable, spaces manageable, the session showing its own data, storage safe by default, the catalogue real, and an end-to-end path per screen.
 

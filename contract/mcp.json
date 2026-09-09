@@ -43,6 +43,21 @@
       }
     },
     {
+      "name": "workspace.finishOnboarding",
+      "description": "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.setState",
       "description": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
       "inputSchema": {
@@ -155,6 +170,49 @@
               "teams",
               "whatsapp",
               "telegram"
+            ]
+          },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "light",
+                  "dark",
+                  "system"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "density": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "comfortable",
+                  "compact"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ms"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "quietHours": {
@@ -419,7 +477,11 @@
       "description": "Every active member of the workspace.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "includeSuspended": {
+            "type": "boolean"
+          }
+        }
       },
       "scope": "read",
       "annotations": {
@@ -428,6 +490,32 @@
         "idempotentHint": true
       },
       "example": {}
+    },
+    {
+      "name": "people.readMember",
+      "description": "One member's profile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "memberId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "people.orgChart",
@@ -1753,6 +1841,27 @@
       }
     },
     {
+      "name": "blobs.reapOrphans",
+      "description": "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "olderThanMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "blobs.prepareImport",
       "description": "Reserves a storage key for a file an import found, keeping its uploader.",
       "inputSchema": {
@@ -1897,6 +2006,30 @@
       }
     },
     {
+      "name": "notifications.drainBatches",
+      "description": "Claims every notification batch whose window has closed and enqueues its digest.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "notifications.list",
       "description": "The signed-in member's own inbox.",
       "inputSchema": {
@@ -1904,8 +2037,51 @@
         "properties": {
           "unreadOnly": {
             "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "joined",
+              "mentioned",
+              "role",
+              "review",
+              "check_in"
+            ]
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "createdAt": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "createdAt",
+              "id"
+            ]
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "notifications.unreadCount",
+      "description": "How many unread, unsnoozed notifications the member has.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {
@@ -2000,8 +2176,8 @@
           },
           "batchWindowMinutes": {
             "type": "integer",
-            "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "minimum": 1,
+            "maximum": 1440
           },
           "dailySummary": {
             "type": "boolean"
@@ -2009,6 +2185,31 @@
           "dailySummaryTime": {
             "type": "string",
             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "routing": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "invited",
+                "joined",
+                "mentioned",
+                "role",
+                "review",
+                "check_in"
+              ]
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "app",
+                "email",
+                "slack",
+                "teams",
+                "whatsapp",
+                "telegram"
+              ]
+            }
           }
         }
       },
@@ -2019,6 +2220,38 @@
         "idempotentHint": false
       },
       "example": {}
+    },
+    {
+      "name": "subscriptions.read",
+      "description": "Whether the signed-in member is watching a subject, why, and how many others are.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "subjectType",
+          "subjectId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "subjectType": "…",
+        "subjectId": "00000000-0000-4000-8000-000000000000"
+      }
     },
     {
       "name": "subscriptions.toggle",
@@ -2109,6 +2342,135 @@
       }
     },
     {
+      "name": "activities.goalFeed",
+      "description": "One goal's activity feed, with its key results and check-ins.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goalId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "at",
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "goalId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "goalId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "activities.profileFeed",
+      "description": "What one member did, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "at",
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "memberId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "memberId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "activities.spaceFeed",
+      "description": "One space's activity feed, newest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "at",
+              "id"
+            ]
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "activities.workspaceFeed",
       "description": "The workspace-scoped activity feed, newest first.",
       "inputSchema": {
@@ -2160,6 +2522,34 @@
         "idempotentHint": false
       },
       "example": {}
+    },
+    {
+      "name": "workspace.importArchive",
+      "description": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archiveBase64": {
+            "type": "string"
+          },
+          "dryRun": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archiveBase64"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "archiveBase64": "…"
+      }
     },
     {
       "name": "settings.readWorkspaceSettings",
@@ -3268,6 +3658,42 @@
       }
     },
     {
+      "name": "agents.setAutonomy",
+      "description": "Moves an agent between sandbox, propose and scoped direct.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "autonomy": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "propose",
+              "scoped_direct"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "autonomy"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "autonomy": "sandbox"
+      }
+    },
+    {
       "name": "agents.setEnabled",
       "description": "Turns an agent on or off.",
       "inputSchema": {
@@ -3755,6 +4181,67 @@
       }
     },
     {
+      "name": "spaces.updateSettings",
+      "description": "Sets one space's team voting, strictness override and default check-in frequency.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "teamVoting": {
+            "type": "boolean"
+          },
+          "coachStrictness": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "advisory",
+                  "warn",
+                  "strict"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "defaultCheckInFrequency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "daily",
+                  "weekly",
+                  "biweekly",
+                  "monthly",
+                  "quarterly"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "spaces.archive",
       "description": "Archives a space. Its goals and history stay readable.",
       "inputSchema": {
@@ -3994,7 +4481,17 @@
       "description": "Creates the cycle containing today if the workspace has none. Idempotent.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "annual",
+              "semiannual",
+              "quarterly",
+              "monthly"
+            ]
+          }
+        }
       },
       "scope": "write",
       "annotations": {
@@ -4359,6 +4856,9 @@
               "strict"
             ]
           },
+          "quietMode": {
+            "type": "boolean"
+          },
           "overrides": {
             "type": "object",
             "propertyNames": {
@@ -4380,6 +4880,21 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
+      "name": "frame.annualObjectives",
+      "description": "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
       },
       "example": {}
     },
@@ -4423,6 +4938,38 @@
           "agreed": {
             "default": false,
             "type": "boolean"
+          },
+          "mission": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vision": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategy": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notDoing": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
           },
           "strategies": {
             "default": [],
@@ -5771,6 +6318,11 @@
               "in_progress",
               "done"
             ]
+          },
+          "initiativeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         }
       },
@@ -6803,6 +7355,11 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
+          "strategyId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
           "weight": {
             "default": 1,
             "type": "number"
@@ -6909,6 +7466,18 @@
             ]
           },
           "parentKeyResultId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strategyId": {
             "anyOf": [
               {
                 "type": "string",
@@ -9450,6 +10019,86 @@
       "example": {}
     },
     {
+      "name": "nudges.rules",
+      "description": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "nudges.setRule",
+      "description": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ruleKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "channelOverride": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "app",
+                  "email",
+                  "slack",
+                  "teams",
+                  "whatsapp",
+                  "telegram"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quietModeExempt": {
+            "type": "boolean"
+          },
+          "escalationLadder": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ruleKey"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "ruleKey": "…"
+      }
+    },
+    {
       "name": "nudges.list",
       "description": "This member's nudges, newest first, with the rule that caused each one.",
       "inputSchema": {
@@ -10359,6 +11008,64 @@
       },
       "example": {
         "items": []
+      }
+    },
+    {
+      "name": "sessions.carriedCommitments",
+      "description": "Commitments set by earlier sessions in this session's space and not yet closed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "sessions.confidenceTrend",
+      "description": "A space's weekly average confidence, oldest first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "weeks": {
+            "default": 12,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 52
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000"
       }
     },
     {

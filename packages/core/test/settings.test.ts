@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  findSetting,
+  findWorkspaceSetting,
   INSTANCE_DEFAULT_LANGUAGE,
+  resolveMemberNotificationSettings,
   resolveMemberSettings,
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
@@ -23,9 +24,16 @@ describe("the registry itself", () => {
     expect(SETTINGS_REGISTRY.length).toBeGreaterThan(0);
   });
 
-  it("has no duplicate keys", () => {
-    const keys = SETTINGS_REGISTRY.map((setting) => setting.key);
-    expect(new Set(keys).size).toBe(keys.length);
+  it("has no duplicate setting, counted by where the value lives", () => {
+    // **The key alone stopped being unique at P6-G22a.** §4.14 has both a
+    // workspace language and a member language, and the two are different
+    // settings stored in different places: one in `workspaces.settings`, one
+    // in a `workspace_members` column. What must not repeat is a home and a
+    // key together, because that is the address a resolver writes to.
+    const addresses = SETTINGS_REGISTRY.map(
+      (setting) => `${setting.home}:${setting.key}`,
+    );
+    expect(new Set(addresses).size).toBe(addresses.length);
   });
 
   it("gives every setting a reason, so the map stays readable", () => {
@@ -39,16 +47,43 @@ describe("the registry itself", () => {
 
   it("resolves every setting to a value with nothing supplied", () => {
     // The hard rule: registering must not require anyone to answer anything.
+    //
+    // **Null is a default when the setting is declared nullable, and never
+    // otherwise.** This read `not.toBeNull()` until P6-G18b added the space
+    // scope, where an override's default *is* null and null means "the
+    // workspace's": a space that has decided nothing inherits a real value,
+    // and storing the workspace's current one instead would freeze it. A
+    // setting that resolves to null without declaring it nullable is still
+    // the defect this guards against, and the schema is what says which is
+    // which.
     for (const setting of SETTINGS_REGISTRY) {
       const value = setting.resolve({});
       expect(value, `${setting.key} resolved to nothing`).toBeDefined();
-      expect(value, `${setting.key} resolved to null`).not.toBeNull();
+      if (value === null) {
+        expect(
+          setting.schema.safeParse(null).success,
+          `${setting.key} resolved to null without being nullable`,
+        ).toBe(true);
+      }
     }
   });
 
   it("scopes every setting to a storage home that exists today", () => {
+    // A scope with no table behind it is a setting nothing can store. Each
+    // scope is paired with the home that holds it, so adding a scope without
+    // deciding where it lives fails here rather than at the first write.
+    const homesByScope: Record<string, readonly string[]> = {
+      workspace: ["workspaces.settings"],
+      member: ["workspace_members", "notification_settings"],
+      space: ["spaces.settings"],
+    };
     for (const setting of SETTINGS_REGISTRY) {
-      expect(["workspace", "member"]).toContain(setting.scope);
+      const homes = homesByScope[setting.scope];
+      expect(homes, `${setting.key} has an unknown scope`).toBeDefined();
+      expect(
+        homes,
+        `${setting.key} is ${setting.scope}-scoped and stored in ${setting.home}`,
+      ).toContain(setting.home);
     }
   });
 
@@ -75,13 +110,13 @@ describe("the registry itself", () => {
   });
 });
 
-describe("settingsByCard and findSetting (P2-T08)", () => {
+describe("settingsByCard and findWorkspaceSetting (P2-T08)", () => {
   it("finds a registered setting by key", () => {
-    expect(findSetting("timezone")?.scope).toBe("workspace");
+    expect(findWorkspaceSetting("timezone")?.scope).toBe("workspace");
   });
 
   it("returns nothing for a key outside the registry", () => {
-    expect(findSetting("doesNotExist")).toBeUndefined();
+    expect(findWorkspaceSetting("doesNotExist")).toBeUndefined();
   });
 
   it("groups the general card's settings", () => {
@@ -136,13 +171,41 @@ describe("workspace settings", () => {
 });
 
 describe("member settings", () => {
-  it("covers every member-scoped key in the registry", () => {
+  it("covers every key stored as a member column", () => {
+    // **Filtered on the home, not the scope, since P6-G08.** This asserted
+    // that `resolveMemberSettings` covered every member-scoped key, which was
+    // the same statement while every member setting was a member column. The
+    // notification preferences are member-scoped too and live in
+    // `notification_settings`, created lazily on first read, so including them
+    // here would demand that provisioning write keys to columns that do not
+    // exist. Their own coverage is the assertion below.
     const resolved = resolveMemberSettings({});
     for (const setting of SETTINGS_REGISTRY.filter(
-      (entry) => entry.scope === "member",
+      (entry) => entry.home === "workspace_members",
     )) {
       expect(Object.hasOwn(resolved, setting.key)).toBe(true);
     }
+  });
+
+  it("covers every key stored in the notification settings row", () => {
+    const resolved = resolveMemberNotificationSettings({});
+    for (const setting of SETTINGS_REGISTRY.filter(
+      (entry) => entry.home === "notification_settings",
+    )) {
+      expect(Object.hasOwn(resolved, setting.key)).toBe(true);
+    }
+  });
+
+  it("leaves no member-scoped setting without a resolver", () => {
+    // The invariant the split could have lost: a member setting whose home is
+    // neither of the two above would be declared and resolved by nothing.
+    const orphans = SETTINGS_REGISTRY.filter(
+      (entry) =>
+        entry.scope === "member" &&
+        entry.home !== "workspace_members" &&
+        entry.home !== "notification_settings",
+    ).map((entry) => entry.key);
+    expect(orphans).toEqual([]);
   });
 
   it("defaults the primary channel to email beside the in-app inbox", () => {

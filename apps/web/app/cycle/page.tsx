@@ -9,11 +9,14 @@ import {
 } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
-import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import { AnnualFrame } from "./annual-frame.tsx";
+import { AnnualObjectives } from "./annual-objectives.tsx";
 import { assistsAvailableAction } from "./assist-actions.ts";
 import { Capacity } from "./capacity.tsx";
+import { CycleAdmin } from "./cycle-admin.tsx";
 import { DependencyRegister } from "./dependency-register.tsx";
 import { Diagnose } from "./diagnose.tsx";
 import { Direction } from "./direction.tsx";
@@ -23,6 +26,8 @@ import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
 import { PhaseRail } from "./phase-rail.tsx";
 import { QualityPanel } from "./quality-panel.tsx";
+import { ReviewAndLearn } from "./review-and-learn.tsx";
+import { RunningCadence } from "./running-cadence.tsx";
 
 /**
  * The cycle workspace (UIUX-PLAN.md §4 S-04, S-06 to S-08, P3-T03).
@@ -47,6 +52,8 @@ export default async function CyclePage({
 }: {
   searchParams: Promise<{ phase?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -70,21 +77,34 @@ export default async function CyclePage({
 
   if (!cycle) {
     return (
-      <AppShellLayout>
-        <div className="flex flex-col gap-4.5">
-          <Card>
-            <CardHeader>
-              <h1 className="text-lg font-bold text-ink">No cycle yet</h1>
-            </CardHeader>
-            <CardBody>
-              <p className="text-sm text-ink-3">
-                This workspace has no cycle to plan. An administrator can create
-                one from the rhythm settings.
-              </p>
-            </CardBody>
-          </Card>
-        </div>
-      </AppShellLayout>
+      <div className="flex flex-col gap-4.5">
+        <Card>
+          <CardHeader>
+            <h1 className="text-lg font-bold text-ink">
+              {t("cycle.noCycleYet")}
+            </h1>
+          </CardHeader>
+          <CardBody>
+            <p className="text-sm text-ink-3">
+              {t("cycle.thisWorkspaceHasNo")}
+            </p>
+          </CardBody>
+        </Card>
+        {/*
+         * **The sentence here used to point at a screen that could not do
+         * it** ("an administrator can create one from the rhythm settings"),
+         * because `cycles.create` had no browser caller at all. The control
+         * is here now, which is where somebody who has just been told there
+         * is no cycle already is (P6-G27b).
+         */}
+        {canPublish ? (
+          <CycleAdmin
+            currentCycleId={null}
+            currentName={null}
+            publicationDeadline={null}
+          />
+        ) : null}
+      </div>
     );
   }
 
@@ -118,6 +138,109 @@ export default async function CyclePage({
     Number.isInteger(requested) && requested >= 0 && requested <= 7
       ? requested
       : workflow.phase;
+
+  // **Loaded per phase, not per page** (P6-G14, P6-G15, P6-G16). Phase 0 needs
+  // the annual frame, phase 6 the sessions and blockers across every space,
+  // phase 7 the scored key results. Fetching all three on every render would
+  // make the drafting phase pay for two views nobody is looking at.
+  const frame =
+    viewing === 0 ? await callAction(context, "frame.read", {}) : null;
+
+  // The year's objectives under the strategy each serves (P6-G14b). Loaded
+  // with the frame, because the panel is the frame's other half.
+  const annualObjectives =
+    viewing === 0
+      ? await callAction(context, "frame.annualObjectives", {})
+      : [];
+
+  // Phase 6 and phase 7 both read the cycle's key results: one for the
+  // confidence trend, the other for the scores. One read serves both.
+  const cycleGoals =
+    viewing === 6 || viewing === 7
+      ? (
+          await callAction(context, "goals.list", {
+            cycleId: cycle.id,
+            // Closed goals count at the close: §8 scores the set as it was
+            // committed, not as it survived.
+            includeClosed: true,
+          })
+        ).goals
+      : [];
+
+  // Phase 7 reads this workspace's own band boundaries. Same cast and same
+  // reason as the phase 4 block below: `rhythm.read` types its thresholds as
+  // an open record at the contract boundary, and one `resolveThresholds`
+  // builds both sides of it.
+  const reviewThresholds =
+    viewing === 7
+      ? ((await callAction(context, "rhythm.read", {}))
+          .thresholds as unknown as ResolvedThresholds)
+      : null;
+
+  const cadenceSpaces =
+    viewing === 6 ? await callAction(context, "spaces.list", {}) : [];
+  const cadence =
+    viewing === 6
+      ? {
+          sessions: (
+            await Promise.all(
+              cadenceSpaces.map(async (space) =>
+                (
+                  await callAction(context, "sessions.list", {
+                    spaceId: space.id,
+                  })
+                ).map((session) => ({
+                  id: session.id,
+                  kind: session.kind,
+                  // Closed is "has ended", which is the field the read
+                  // carries. There is no status column on a session.
+                  closed: session.endedAt !== null,
+                  scheduledFor: session.scheduledFor ?? null,
+                  spaceName: space.name,
+                })),
+              ),
+            )
+          ).flat(),
+          streak: (
+            await Promise.all(
+              cadenceSpaces.map((space) =>
+                callAction(context, "sessions.readStreak", {
+                  spaceId: space.id,
+                }),
+              ),
+            )
+          ).reduce(
+            // The longest run any space is holding. A workspace-wide streak is
+            // not a sum: two spaces each meeting weekly is one weekly rhythm,
+            // not two.
+            (best, one) => Math.max(best, one.currentWeeks),
+            0,
+          ),
+          blockers: (
+            await Promise.all(
+              cadenceSpaces.map(async (space) =>
+                (
+                  await callAction(context, "blockers.board", {
+                    spaceId: space.id,
+                  })
+                ).blockers.map((blocker) => ({
+                  id: blocker.id,
+                  // The board names what is blocked rather than the blocker,
+                  // and measures in hours because §6.3's ladder does.
+                  title: blocker.blockedTitle ?? blocker.type,
+                  ageDays: Math.floor(blocker.ageHours / 24),
+                  ownerName: blocker.ownerName ?? null,
+                  spaceName: space.name,
+                })),
+              ),
+            )
+          )
+            .flat()
+            // Oldest first, because §6.3's ladder escalates on age and a list
+            // sorted any other way hides the one that has waited longest.
+            .sort((left, right) => right.ageDays - left.ageDays),
+        }
+      : null;
 
   const phase = workflow.phases[viewing];
   const work = phaseWorkAllowed(viewing, workflow.phases);
@@ -190,235 +313,299 @@ export default async function CyclePage({
       : null;
 
   return (
-    <AppShellLayout>
-      <div className="flex flex-col gap-4.5 xl:flex-row">
-        <div className="w-full flex-none xl:w-72">
-          <PhaseRail phases={workflow.phases} currentPhase={viewing} />
-        </div>
+    <div className="flex flex-col gap-4.5 xl:flex-row">
+      <div className="w-full flex-none xl:w-72">
+        <PhaseRail phases={workflow.phases} currentPhase={viewing} />
+      </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4.5">
-          <Card>
-            <CardHeader className="justify-between">
-              <div className="flex flex-col">
-                <h1 className="text-base font-bold text-ink">
-                  Phase {viewing} · {PHASE_TITLES[viewing]}
-                </h1>
-                <p className="text-xs text-ink-3">
-                  {workflow.name} · completion is computed, never self-reported
-                </p>
-              </div>
-              <Chip tone={workflow.mode === "annual" ? "brand" : "neutral"}>
-                {workflow.mode} mode
-              </Chip>
-            </CardHeader>
-            {work.allowed ? null : (
-              <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
-                <p className="text-sm font-bold text-warn">
-                  This phase is blocked by earlier work
-                </p>
-                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
-                  {work.because.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-                <p className="text-xs text-warn">
-                  <a className="underline" href="/cycle?phase=1">
-                    Go and gather what is missing
-                  </a>
-                </p>
-              </CardBody>
-            )}
-            {phase && phase.blocked.length > 0 ? (
-              <CardBody className="border-line border-t">
-                <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
-                  {phase.blocked.map((reason) => (
-                    <li key={reason}>Not yet checkable: {reason}</li>
-                  ))}
-                </ul>
-              </CardBody>
-            ) : null}
-            {phase && phase.missing.length > 0 ? (
-              <CardBody className="border-line border-t">
-                <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
-                  Still needed here
-                </p>
-                <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
-                  {phase.missing.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-              </CardBody>
-            ) : null}
-          </Card>
-
-          {viewing === 1 ? (
-            <InputPack
-              cycleId={workflow.cycleId}
-              mode={workflow.mode}
-              items={workflow.packItems}
-              distributedAt={workflow.packDistributedAt}
-              sponsor={workflow.sponsor}
-              facilitator={workflow.facilitator}
-              canEdit={canEdit}
-            />
+      <div className="flex min-w-0 flex-1 flex-col gap-4.5">
+        <Card>
+          <CardHeader className="justify-between">
+            <div className="flex flex-col">
+              <h1 className="text-base font-bold text-ink">
+                {t("common.phase")} {viewing} · {PHASE_TITLES[viewing]}
+              </h1>
+              <p className="text-xs text-ink-3">
+                {workflow.name} {t("cycle.completionIsComputedNever")}
+              </p>
+            </div>
+            <Chip tone={workflow.mode === "annual" ? "brand" : "neutral"}>
+              {workflow.mode} {t("common.mode")}
+            </Chip>
+          </CardHeader>
+          {work.allowed ? null : (
+            <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
+              <p className="text-sm font-bold text-warn">
+                {t("cycle.thisPhaseIsBlocked")}
+              </p>
+              <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-warn">
+                {work.because.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-warn">
+                <a className="underline" href="/cycle?phase=1">
+                  {t("cycle.goAndGatherWhat")}
+                </a>
+              </p>
+            </CardBody>
+          )}
+          {phase && phase.blocked.length > 0 ? (
+            <CardBody className="border-line border-t">
+              <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
+                {phase.blocked.map((reason) => (
+                  <li key={reason}>
+                    {t("cycle.notYetCheckable")} {reason}
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
           ) : null}
-
-          {viewing === 2 ? (
-            <Diagnose
-              cycleId={workflow.cycleId}
-              issues={workflow.issues}
-              minimum={workflow.asks.strategicIssues}
-              canEdit={canEdit}
-            />
+          {phase && phase.missing.length > 0 ? (
+            <CardBody className="border-line border-t">
+              <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
+                {t("cycle.stillNeededHere")}
+              </p>
+              <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
+                {phase.missing.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </CardBody>
           ) : null}
+        </Card>
 
-          {viewing === 3 ? (
-            <Direction
-              cycleId={workflow.cycleId}
-              mode={workflow.mode}
-              priorities={workflow.priorities}
-              issues={workflow.issues}
-              bounds={workflow.asks.priorities}
-              canEdit={canEdit}
-            />
-          ) : null}
+        {viewing === 1 ? (
+          <InputPack
+            cycleId={workflow.cycleId}
+            mode={workflow.mode}
+            items={workflow.packItems}
+            distributedAt={workflow.packDistributedAt}
+            sponsor={workflow.sponsor}
+            facilitator={workflow.facilitator}
+            canEdit={canEdit}
+          />
+        ) : null}
 
-          {/* Before the capacity check, because §5.4 comes before §5.5 in the
-              method and because the two answer the same conversation in order:
-              who are we waiting on, and can we carry what is left. */}
-          {register && registerMembers && registerSpaces && capacity ? (
-            <DependencyRegister
-              entries={register.register}
-              keyResults={capacity.keyResults.map((keyResult) => ({
+        {viewing === 2 ? (
+          <Diagnose
+            cycleId={workflow.cycleId}
+            issues={workflow.issues}
+            minimum={workflow.asks.strategicIssues}
+            canEdit={canEdit}
+          />
+        ) : null}
+
+        {viewing === 3 ? (
+          <Direction
+            cycleId={workflow.cycleId}
+            mode={workflow.mode}
+            priorities={workflow.priorities}
+            issues={workflow.issues}
+            bounds={workflow.asks.priorities}
+            canEdit={canEdit}
+          />
+        ) : null}
+
+        {/* Before the capacity check, because §5.4 comes before §5.5 in the
+            method and because the two answer the same conversation in order:
+            who are we waiting on, and can we carry what is left. */}
+        {register && registerMembers && registerSpaces && capacity ? (
+          <DependencyRegister
+            entries={register.register}
+            keyResults={capacity.keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+              goalTitle: keyResult.goalTitle,
+            }))}
+            members={registerMembers}
+            spaces={registerSpaces.map((space) => ({
+              id: space.id,
+              name: space.name,
+            }))}
+            canEdit={canEdit}
+          />
+        ) : null}
+
+        {capacity ? (
+          <Capacity
+            keyResults={capacity.keyResults}
+            initiatives={capacity.initiatives}
+          />
+        ) : null}
+
+        {viewing === 5 ? (
+          <Gates
+            cycleId={workflow.cycleId}
+            gates={workflow.gates}
+            publishable={workflow.publishable}
+            publishedAt={workflow.publishedAt}
+            canPublish={canPublish}
+          />
+        ) : null}
+
+        {viewing === 4 ? (
+          <Drafting
+            cycleId={workflow.cycleId}
+            goals={draft.goals}
+            members={draft.members}
+            canEdit={canEdit}
+            thresholds={draft.thresholds}
+            checkTitles={draft.checkTitles}
+            memberId={workspace.memberId}
+            assistsAvailable={await assistsAvailableAction()}
+          />
+        ) : null}
+
+        {viewing === 0 ? (
+          <AnnualFrame frame={frame} canEdit={canPublish} />
+        ) : null}
+
+        {viewing === 0 ? (
+          <AnnualObjectives
+            strategies={frame?.strategies ?? []}
+            objectives={annualObjectives}
+            canEdit={canPublish}
+            // The reader champions and reviews what they send forward. A
+            // picker here would be a second drafting form on a phase that
+            // is not the drafting phase; the goal page is where either is
+            // changed.
+            championId={workspace.memberId}
+            reviewerId={workspace.memberId}
+            frameAgreed={frame?.agreed ?? false}
+          />
+        ) : null}
+
+        {viewing === 6 && cadence ? (
+          <RunningCadence
+            sessions={cadence.sessions}
+            blockers={cadence.blockers}
+            decisions={cycleDecisions.map((decision) => ({
+              id: decision.id,
+              summary: decision.text,
+              at: decision.at,
+            }))}
+            confidence={cycleGoals.flatMap((goal) =>
+              goal.keyResults.map((keyResult) => ({
                 id: keyResult.id,
                 title: keyResult.title,
-                goalTitle: keyResult.goalTitle,
-              }))}
-              members={registerMembers}
-              spaces={registerSpaces.map((space) => ({
-                id: space.id,
-                name: space.name,
-              }))}
-              canEdit={canEdit}
-            />
-          ) : null}
+                goalTitle: goal.title,
+                confidence: keyResult.confidence,
+                // The trend needs the previous check-in's figure, which
+                // `goals.list` does not carry. Left null rather than
+                // guessed: the card renders "no trend yet" and says so,
+                // which is honest, and P6-G19 is where the confidence
+                // history arrives for the session screen anyway.
+                previousConfidence: null,
+              })),
+            )}
+            streak={cadence.streak}
+            calibratedAt={null}
+          />
+        ) : null}
 
-          {capacity ? (
-            <Capacity
-              keyResults={capacity.keyResults}
-              initiatives={capacity.initiatives}
-            />
-          ) : null}
-
-          {viewing === 5 ? (
-            <Gates
-              cycleId={workflow.cycleId}
-              gates={workflow.gates}
-              publishable={workflow.publishable}
-              publishedAt={workflow.publishedAt}
-              canPublish={canPublish}
-            />
-          ) : null}
-
-          {viewing === 4 ? (
-            <Drafting
-              cycleId={workflow.cycleId}
-              goals={draft.goals}
-              members={draft.members}
-              canEdit={canEdit}
-              thresholds={draft.thresholds}
-              checkTitles={draft.checkTitles}
-              memberId={workspace.memberId}
-              assistsAvailable={await assistsAvailableAction()}
-            />
-          ) : null}
-
-          {viewing === 0 || viewing === 6 || viewing === 7 ? (
-            <Card>
-              <CardBody>
-                <p className="text-sm text-ink-3">
-                  {viewing === 0
-                    ? "The annual strategy surface arrives at P6-G14: the frame, the annual strategies and the year's not-doing list."
-                    : viewing === 6
-                      ? "The running cadence view arrives at P6-G15: sessions held and upcoming, the streak, confidence per key result and open blockers by age. The check-ins and sessions it reads already exist."
-                      : "Scoring every key result and writing the cycle retrospective arrive at P6-G16. The arithmetic behind the scores is already here."}
-                </p>
-              </CardBody>
-            </Card>
-          ) : null}
-        </div>
-
-        <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
-          {viewing === 4 ? (
-            <QualityPanel
-              set={draft.goals.map((goal) => ({
-                objective: {
-                  id: goal.id,
-                  title: goal.title,
-                  hasCycle: true,
-                  hasTimeframe: false,
-                  championId: goal.champion.id,
-                  reviewerId: goal.reviewer.id,
-                  objectivesInUnit: draft.goals.filter(
-                    (other) => other.level === goal.level,
-                  ).length,
-                  level: goal.level,
-                },
-                keyResults: goal.keyResults.map((keyResult) => ({
-                  id: keyResult.id,
-                  title: keyResult.title,
-                  baseline: keyResult.baselineValue,
-                  target: keyResult.targetValue,
-                  dueOn: keyResult.dueOn,
-                  ownerId: keyResult.ownerId,
-                  indicatorType: keyResult.indicatorType,
-                  direction: keyResult.direction,
-                  confidence: keyResult.confidence,
-                })),
-              }))}
-              thresholds={draft.thresholds}
-              checkTitles={draft.checkTitles}
-            />
-          ) : null}
-          {cycleDecisions.length === 0 ? null : (
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">
-                  Decisions this cycle
-                </h2>
-              </CardHeader>
-              <CardBody className="flex flex-col gap-2">
-                <ul className="flex flex-col gap-2">
-                  {cycleDecisions.map((decision) => (
-                    <li key={decision.id} className="flex flex-col gap-0.5">
-                      <span className="text-sm text-ink">{decision.text}</span>
-                      <span className="text-xs text-ink-3">
-                        {decision.goalId ? (
-                          <a
-                            className="underline"
-                            href={`/goals/${decision.goalId}`}
-                          >
-                            {decision.keyResultTitle ?? decision.goalTitle}
-                          </a>
-                        ) : (
-                          (decision.keyResultTitle ?? decision.goalTitle)
-                        )}{" "}
-                        · {new Date(decision.at).toLocaleDateString()} ·{" "}
-                        {decision.authorName}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-xs text-ink-4">
-                  Recorded in the monthly reviews. Each one names the key result
-                  or the objective it affects.
-                </p>
-              </CardBody>
-            </Card>
-          )}
-          <GuidanceRail phase={viewing} mode={workflow.mode} />
-        </div>
+        {viewing === 7 && reviewThresholds ? (
+          <ReviewAndLearn
+            keyResults={cycleGoals.flatMap((goal) =>
+              goal.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                goalTitle: goal.title,
+                score: keyResult.score,
+                carryForward: keyResult.carryForward,
+              })),
+            )}
+            cycleName={workflow.name}
+            archivedAt={null}
+            canEdit={canPublish}
+            thresholds={reviewThresholds}
+          />
+        ) : null}
       </div>
-    </AppShellLayout>
+
+      <div className="flex w-full flex-none flex-col gap-4.5 xl:w-80">
+        {viewing === 4 ? (
+          <QualityPanel
+            set={draft.goals.map((goal) => ({
+              objective: {
+                id: goal.id,
+                title: goal.title,
+                hasCycle: true,
+                hasTimeframe: false,
+                championId: goal.champion.id,
+                reviewerId: goal.reviewer.id,
+                objectivesInUnit: draft.goals.filter(
+                  (other) => other.level === goal.level,
+                ).length,
+                level: goal.level,
+              },
+              keyResults: goal.keyResults.map((keyResult) => ({
+                id: keyResult.id,
+                title: keyResult.title,
+                baseline: keyResult.baselineValue,
+                target: keyResult.targetValue,
+                dueOn: keyResult.dueOn,
+                ownerId: keyResult.ownerId,
+                indicatorType: keyResult.indicatorType,
+                direction: keyResult.direction,
+                confidence: keyResult.confidence,
+              })),
+            }))}
+            thresholds={draft.thresholds}
+            checkTitles={draft.checkTitles}
+          />
+        ) : null}
+        {cycleDecisions.length === 0 ? null : (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("cycle.decisionsThisCycle")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-2">
+                {cycleDecisions.map((decision) => (
+                  <li key={decision.id} className="flex flex-col gap-0.5">
+                    <span className="text-sm text-ink">{decision.text}</span>
+                    <span className="text-xs text-ink-3">
+                      {decision.goalId ? (
+                        <a
+                          className="underline"
+                          href={`/goals/${decision.goalId}`}
+                        >
+                          {decision.keyResultTitle ?? decision.goalTitle}
+                        </a>
+                      ) : (
+                        (decision.keyResultTitle ?? decision.goalTitle)
+                      )}{" "}
+                      · {new Date(decision.at).toLocaleDateString()} ·{" "}
+                      {decision.authorName}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-ink-4">
+                {t("cycle.recordedInTheMonthly")}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+        <GuidanceRail phase={viewing} mode={workflow.mode} />
+        {/*
+         * **Inside the rail, not beside it.** The row above is
+         * `xl:flex-row` with exactly two children: the content column and
+         * this rail. A third child takes its intrinsic width and overlaps
+         * the column beside it, which is the defect P6-G11b shipped on the
+         * goal page and P6-G24b's own suite caught here within the hour.
+         */}
+        {canPublish ? (
+          <CycleAdmin
+            currentCycleId={cycle.id}
+            currentName={cycle.name}
+            publicationDeadline={cycle.publicationDeadline ?? null}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }

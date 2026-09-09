@@ -7,8 +7,10 @@ import {
 import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { getTranslations } from "../../../lib/translations";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { SubjectDocuments } from "../../documents/subject-documents.tsx";
@@ -21,6 +23,7 @@ import {
 } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { GoalComments } from "./goal-comments.tsx";
+import { GoalWrites } from "./goal-writes.tsx";
 import { Rail } from "./rail.tsx";
 import { Sparkline } from "./sparkline.tsx";
 
@@ -40,9 +43,14 @@ import { Sparkline } from "./sparkline.tsx";
  */
 export default async function GoalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
+  searchParams: Promise<{ at?: string; id?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -50,6 +58,33 @@ export default async function GoalPage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  // The feed for this surface (S-31, P6-G11b). Both halves of the cursor or
+  // neither: a half cursor is a link somebody edited by hand.
+  const feedParams = await searchParams;
+  const feedCursor =
+    feedParams.at && feedParams.id
+      ? { at: feedParams.at, id: feedParams.id }
+      : undefined;
+  const [feedItems, feedDirectory, feedSettings] = await Promise.all([
+    callAction(context, "activities.goalFeed", {
+      goalId: id,
+      ...(feedCursor ? { cursor: feedCursor } : {}),
+    }),
+    callAction(context, "people.directory", {}),
+    callAction(context, "settings.readWorkspaceSettings", {}),
+  ]);
+  const feedNames = new Map(
+    feedDirectory.map((member) => [member.id, member.name]),
+  );
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "goal",
+    subjectId: id,
+  });
 
   let goal: Awaited<ReturnType<typeof callAction<"goals.read">>>;
   try {
@@ -147,7 +182,12 @@ export default async function GoalPage({
   // that is the moment to add one rather than now.
   const reactions = new Map<
     string,
-    { emoji: string; count: number; own: boolean }[]
+    {
+      emoji: string;
+      count: number;
+      own: boolean;
+      ownReactionId: string | null;
+    }[]
   >();
   for (const comment of comments) {
     const groups = await callAction(context, "reactions.list", {
@@ -160,6 +200,7 @@ export default async function GoalPage({
         emoji: group.emoji,
         count: group.count,
         own: group.own,
+        ownReactionId: group.ownReactionId,
       })),
     );
   }
@@ -173,470 +214,506 @@ export default async function GoalPage({
   };
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
-        <div className="flex min-w-0 flex-1 flex-col gap-4.5">
-          <Card>
-            <CardHeader className="justify-between">
-              <div className="flex min-w-0 flex-col">
-                <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
-                <p className="text-xs text-ink-3">
-                  {goal.level} · {goal.champion.name} champions it,{" "}
-                  {goal.reviewer.name} reviews it · weight {goal.weight}
-                </p>
-              </div>
-              <Chip tone={closed ? "neutral" : "brand"}>
-                {closed
-                  ? `closed · ${goal.successStatus}`
-                  : goal.health.replace("_", " ")}
-              </Chip>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-              <div className="flex items-center gap-2.5">
-                <Bar value={goal.progressPct} className="h-1.5 flex-1" />
-                <span className="text-xs font-semibold text-ink-3">
-                  {Math.round(goal.progressPct)}%
-                </span>
-              </div>
-              {goal.nextCheckInOn ? (
-                <p className="text-xs text-ink-3">
-                  Next check-in due {goal.nextCheckInOn}
-                  {goal.daysPastDue !== null && goal.daysPastDue > 0
-                    ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                    : ""}
-                </p>
-              ) : (
-                <p className="text-xs text-ink-3">
-                  No check-in is due. A closed goal never is.
-                </p>
-              )}
+    <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
+      <div className="flex min-w-0 flex-1 flex-col gap-4.5">
+        <Card>
+          <CardHeader className="justify-between">
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
-                {goal.contributionStatement ??
-                  "No parent and no contribution statement, so publish gate 3 is red."}
+                {goal.level} · {goal.champion.name} {t("common.championsIt")}{" "}
+                {goal.reviewer.name} {t("goals.detail.reviewsItWeight")}{" "}
+                {goal.weight}
               </p>
-              {goal.progressPct === 0 ? (
-                <p className="text-xs text-ink-4">
-                  Nothing has moved yet. Progress is the weighted average of the
-                  key results, recomputed on every write, and health follows the
-                  §3.5 precedence rather than a formula over progress.
-                </p>
-              ) : null}
+            </div>
+            <Chip tone={closed ? "neutral" : "brand"}>
+              {closed
+                ? `closed · ${goal.successStatus}`
+                : goal.health.replace("_", " ")}
+            </Chip>
+            <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+          </CardHeader>
+          <CardBody className="flex flex-col gap-3">
+            <div className="flex items-center gap-2.5">
+              <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+              <span className="text-xs font-semibold text-ink-3">
+                {Math.round(goal.progressPct)}%
+              </span>
+            </div>
+            {goal.nextCheckInOn ? (
+              <p className="text-xs text-ink-3">
+                {t("goals.detail.nextCheckInDue")} {goal.nextCheckInOn}
+                {goal.daysPastDue !== null && goal.daysPastDue > 0
+                  ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
+                  : ""}
+              </p>
+            ) : (
+              <p className="text-xs text-ink-3">
+                {t("goals.detail.noCheckInIs")}
+              </p>
+            )}
+            <p className="text-xs text-ink-3">
+              {goal.contributionStatement ??
+                "No parent and no contribution statement, so publish gate 3 is red."}
+            </p>
+            {goal.progressPct === 0 ? (
+              <p className="text-xs text-ink-4">
+                {t("goals.detail.nothingHasMovedYet")}
+              </p>
+            ) : null}
+          </CardBody>
+        </Card>
+
+        <CoachStrip
+          goalId={goal.id}
+          score={goal.quality.score}
+          flags={goal.quality.flags}
+          keyResults={goal.keyResults.map((kr) => ({
+            id: kr.id,
+            title: kr.title,
+            qualityFlags: kr.qualityFlags,
+          }))}
+          drafting={drafting}
+          canEdit={canEdit && !closed}
+        />
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("goals.detail.keyResults")}
+              {goal.keyResults.length})
+            </h2>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2.5">
+            {goal.keyResults.length === 0 ? (
+              <p className="text-sm text-ink-3">
+                {t("goals.detail.noneYetWithoutOne")}
+              </p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-line">
+                {goal.keyResults.map((keyResult) => (
+                  <li
+                    key={keyResult.id}
+                    // The quality panel links straight at the key result a
+                    // check named, so an issue found in the panel lands on the
+                    // row that fixes it rather than at the top of the page.
+                    id={`kr-${keyResult.id}`}
+                    className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0 target:rounded-md target:bg-brand-weak"
+                  >
+                    {/* `gap-1` rather than nothing: the three children stack
+                        tight without it, and the sparkline's own box then sits
+                        hard against the line of metadata above it, which reads
+                        as the chart overlapping the row. */}
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm text-ink">
+                        {keyResult.title}
+                      </span>
+                      <span className="text-xs text-ink-3">
+                        {keyResult.direction} · {keyResult.indicatorType} ·{" "}
+                        {keyResult.baselineValue} {t("common.to")}{" "}
+                        {keyResult.targetValue}
+                        {keyResult.unit ? ` ${keyResult.unit}` : ""}{" "}
+                        {t("common.weight")} {keyResult.weight}
+                      </span>
+                      <Sparkline
+                        history={histories.get(keyResult.id) ?? []}
+                        direction={keyResult.direction}
+                        baseline={keyResult.baselineValue}
+                        target={keyResult.targetValue}
+                        horizonAt={horizonFor(keyResult.dueOn)}
+                      />
+                    </span>
+                    <span className="flex flex-none flex-col items-end gap-1">
+                      <span className="text-sm font-bold text-ink">
+                        {keyResult.currentValue}
+                        {keyResult.unit ? ` ${keyResult.unit}` : ""}
+                      </span>
+                      {canEdit && !closed && keyResult.kpiId === null ? (
+                        <ActionForm
+                          action={recordValue}
+                          className="flex items-center gap-1"
+                        >
+                          {/* The goal, so the write knows which page to
+                              revalidate. The key result alone would leave the
+                              action guessing. */}
+                          <input type="hidden" name="goalId" value={goal.id} />
+                          <input
+                            type="hidden"
+                            name="keyResultId"
+                            value={keyResult.id}
+                          />
+                          <label
+                            className="sr-only"
+                            htmlFor={`value-${keyResult.id}`}
+                          >
+                            {t("common.newValueFor")} {keyResult.title}
+                          </label>
+                          <input
+                            id={`value-${keyResult.id}`}
+                            name="value"
+                            type="number"
+                            step="any"
+                            defaultValue={keyResult.currentValue}
+                            className="w-20 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
+                          />
+                          <label
+                            className="sr-only"
+                            htmlFor={`confidence-${keyResult.id}`}
+                          >
+                            {t("goals.detail.confidenceFor")} {keyResult.title}
+                          </label>
+                          <input
+                            id={`confidence-${keyResult.id}`}
+                            name="confidence"
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            defaultValue={keyResult.confidence ?? 0.5}
+                            className="w-20"
+                          />
+                          <Button type="submit" size="sm">
+                            {t("common.save")}
+                          </Button>
+                        </ActionForm>
+                      ) : keyResult.kpiId ? (
+                        <Chip tone="info">{t("common.fromAKpi")}</Chip>
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-ink-4">
+              {t("goals.detail.keyResultsAreAdded")}{" "}
+              <a className="underline" href="/cycle?phase=4">
+                {t("goals.detail.phase4OfThe")}
+              </a>
+              .
+            </p>
+          </CardBody>
+        </Card>
+
+        {canEdit && !closed ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">{t("common.edit")}</h2>
+            </CardHeader>
+            <CardBody>
+              <ActionForm action={editGoal} className="flex flex-col gap-1.5">
+                <input type="hidden" name="id" value={goal.id} />
+                <label className="sr-only" htmlFor="edit-title">
+                  {t("common.theObjective")}
+                </label>
+                <input
+                  id="edit-title"
+                  name="title"
+                  required
+                  maxLength={500}
+                  defaultValue={goal.title}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+                />
+                <label className="sr-only" htmlFor="edit-contribution">
+                  {t("common.whatItContributesTo")}
+                </label>
+                <input
+                  id="edit-contribution"
+                  name="contributionStatement"
+                  maxLength={1000}
+                  defaultValue={goal.contributionStatement ?? ""}
+                  placeholder={t("common.thePriorityThisMoves")}
+                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                />
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-ink-3" htmlFor="edit-weight">
+                    {t("goals.detail.weight")}
+                  </label>
+                  <input
+                    id="edit-weight"
+                    name="weight"
+                    type="number"
+                    step="any"
+                    min={0}
+                    max={100}
+                    defaultValue={goal.weight}
+                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink"
+                  />
+                  <span className="text-xs text-ink-4">
+                    {t("goals.detail.0MeansTrackedBut")}
+                  </span>
+                  <Button type="submit" className="ml-auto">
+                    {t("common.save")}
+                  </Button>
+                </div>
+              </ActionForm>
             </CardBody>
           </Card>
+        ) : null}
 
-          <CoachStrip
-            goalId={goal.id}
-            score={goal.quality.score}
-            flags={goal.quality.flags}
-            keyResults={goal.keyResults.map((kr) => ({
-              id: kr.id,
-              title: kr.title,
-              qualityFlags: kr.qualityFlags,
-            }))}
-            drafting={drafting}
-            canEdit={canEdit && !closed}
-          />
-
+        {canAdminister ? (
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
-                Key results ({goal.keyResults.length})
+                {t("common.roles")}
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-2.5">
-              {goal.keyResults.length === 0 ? (
-                <p className="text-sm text-ink-3">
-                  None yet. Without one, nothing about this objective is
-                  measurable.
-                </p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-line">
-                  {goal.keyResults.map((keyResult) => (
-                    <li
-                      key={keyResult.id}
-                      // The quality panel links straight at the key result a
-                      // check named, so an issue found in the panel lands on the
-                      // row that fixes it rather than at the top of the page.
-                      id={`kr-${keyResult.id}`}
-                      className="flex items-start justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0 target:rounded-md target:bg-brand-weak"
-                    >
-                      {/* `gap-1` rather than nothing: the three children stack
-                          tight without it, and the sparkline's own box then sits
-                          hard against the line of metadata above it, which reads
-                          as the chart overlapping the row. */}
-                      <span className="flex min-w-0 flex-col gap-1">
-                        <span className="text-sm text-ink">
-                          {keyResult.title}
-                        </span>
-                        <span className="text-xs text-ink-3">
-                          {keyResult.direction} · {keyResult.indicatorType} ·{" "}
-                          {keyResult.baselineValue} to {keyResult.targetValue}
-                          {keyResult.unit ? ` ${keyResult.unit}` : ""} · weight{" "}
-                          {keyResult.weight}
-                        </span>
-                        <Sparkline
-                          history={histories.get(keyResult.id) ?? []}
-                          direction={keyResult.direction}
-                          baseline={keyResult.baselineValue}
-                          target={keyResult.targetValue}
-                          horizonAt={horizonFor(keyResult.dueOn)}
-                        />
-                      </span>
-                      <span className="flex flex-none flex-col items-end gap-1">
-                        <span className="text-sm font-bold text-ink">
-                          {keyResult.currentValue}
-                          {keyResult.unit ? ` ${keyResult.unit}` : ""}
-                        </span>
-                        {canEdit && !closed && keyResult.kpiId === null ? (
-                          <ActionForm
-                            action={recordValue}
-                            className="flex items-center gap-1"
-                          >
-                            {/* The goal, so the write knows which page to
-                                revalidate. The key result alone would leave the
-                                action guessing. */}
-                            <input
-                              type="hidden"
-                              name="goalId"
-                              value={goal.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="keyResultId"
-                              value={keyResult.id}
-                            />
-                            <label
-                              className="sr-only"
-                              htmlFor={`value-${keyResult.id}`}
-                            >
-                              New value for {keyResult.title}
-                            </label>
-                            <input
-                              id={`value-${keyResult.id}`}
-                              name="value"
-                              type="number"
-                              step="any"
-                              defaultValue={keyResult.currentValue}
-                              className="w-20 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
-                            />
-                            <label
-                              className="sr-only"
-                              htmlFor={`confidence-${keyResult.id}`}
-                            >
-                              Confidence for {keyResult.title}
-                            </label>
-                            <input
-                              id={`confidence-${keyResult.id}`}
-                              name="confidence"
-                              type="range"
-                              min="0"
-                              max="1"
-                              step="0.1"
-                              defaultValue={keyResult.confidence ?? 0.5}
-                              className="w-20"
-                            />
-                            <Button type="submit" size="sm">
-                              Save
-                            </Button>
-                          </ActionForm>
-                        ) : keyResult.kpiId ? (
-                          <Chip tone="info">from a KPI</Chip>
-                        ) : null}
-                      </span>
-                    </li>
+              <p className="text-xs text-ink-3">
+                {t("goals.detail.bothRolesAreAccess")}
+              </p>
+              <ActionForm
+                action={reassignRole}
+                className="flex flex-wrap items-center gap-1.5"
+              >
+                <input type="hidden" name="id" value={goal.id} />
+                <label className="sr-only" htmlFor="reassign-role">
+                  {t("goals.detail.role")}
+                </label>
+                <select
+                  id="reassign-role"
+                  name="role"
+                  defaultValue="champion"
+                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                >
+                  <option value="champion">{t("common.champion")}</option>
+                  <option value="reviewer">{t("common.reviewer")}</option>
+                </select>
+                <label className="sr-only" htmlFor="reassign-member">
+                  {t("goals.detail.member")}
+                </label>
+                <select
+                  id="reassign-member"
+                  name="memberId"
+                  required
+                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                >
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
                   ))}
-                </ul>
-              )}
+                </select>
+                <Button type="submit" variant="ghost">
+                  {t("common.reassign")}
+                </Button>
+              </ActionForm>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {decisions.length === 0 ? null : (
+          // Named, so it is a landmark a screen reader can jump to and a
+          // test can scope to. A card with no accessible name is a div.
+          <Card role="region" aria-labelledby="goal-decisions-heading">
+            <CardHeader>
+              <h2
+                id="goal-decisions-heading"
+                className="text-sm font-bold text-ink"
+              >
+                {t("common.decisions")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-2">
+                {decisions.map((decision) => (
+                  <li
+                    key={decision.id}
+                    className="flex flex-col gap-1 rounded-md border border-line p-2.5"
+                  >
+                    <span className="text-sm text-ink">{decision.text}</span>
+                    {/* The criterion names the date and the author, and the
+                        key result when one was named, because a decision
+                        about one number is not a decision about the goal. */}
+                    <span className="text-xs text-ink-3">
+                      {decision.keyResultTitle
+                        ? `${decision.keyResultTitle} · `
+                        : ""}
+                      {new Date(decision.at).toLocaleDateString()} ·{" "}
+                      {decision.authorName}
+                    </span>
+                  </li>
+                ))}
+              </ul>
               <p className="text-xs text-ink-4">
-                Key results are added and moved on the drafting surface, at{" "}
-                <a className="underline" href="/cycle?phase=4">
-                  phase 4 of the cycle
-                </a>
-                .
+                {t("goals.detail.recordedInAMonthly")}
               </p>
             </CardBody>
           </Card>
+        )}
 
-          {canEdit && !closed ? (
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">Edit</h2>
-              </CardHeader>
-              <CardBody>
-                <ActionForm action={editGoal} className="flex flex-col gap-1.5">
-                  <input type="hidden" name="id" value={goal.id} />
-                  <label className="sr-only" htmlFor="edit-title">
-                    The objective
-                  </label>
-                  <input
-                    id="edit-title"
-                    name="title"
-                    required
-                    maxLength={500}
-                    defaultValue={goal.title}
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                  />
-                  <label className="sr-only" htmlFor="edit-contribution">
-                    What it contributes to
-                  </label>
-                  <input
-                    id="edit-contribution"
-                    name="contributionStatement"
-                    maxLength={1000}
-                    defaultValue={goal.contributionStatement ?? ""}
-                    placeholder="The priority this moves forward"
-                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <label className="text-xs text-ink-3" htmlFor="edit-weight">
-                      Weight
-                    </label>
-                    <input
-                      id="edit-weight"
-                      name="weight"
-                      type="number"
-                      step="any"
-                      min={0}
-                      max={100}
-                      defaultValue={goal.weight}
-                      className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink"
-                    />
-                    <span className="text-xs text-ink-4">
-                      0 means tracked but not counted
-                    </span>
-                    <Button type="submit" className="ml-auto">
-                      Save
-                    </Button>
-                  </div>
-                </ActionForm>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {canAdminister ? (
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">Roles</h2>
-              </CardHeader>
-              <CardBody className="flex flex-col gap-2.5">
-                <p className="text-xs text-ink-3">
-                  Both roles are access-bearing, so moving one rebinds access
-                  with it rather than only changing a name.
-                </p>
-                <ActionForm
-                  action={reassignRole}
-                  className="flex flex-wrap items-center gap-1.5"
-                >
-                  <input type="hidden" name="id" value={goal.id} />
-                  <label className="sr-only" htmlFor="reassign-role">
-                    Role
-                  </label>
-                  <select
-                    id="reassign-role"
-                    name="role"
-                    defaultValue="champion"
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                  >
-                    <option value="champion">Champion</option>
-                    <option value="reviewer">Reviewer</option>
-                  </select>
-                  <label className="sr-only" htmlFor="reassign-member">
-                    Member
-                  </label>
-                  <select
-                    id="reassign-member"
-                    name="memberId"
-                    required
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                  >
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                  <Button type="submit" variant="ghost">
-                    Reassign
-                  </Button>
-                </ActionForm>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {decisions.length === 0 ? null : (
-            // Named, so it is a landmark a screen reader can jump to and a
-            // test can scope to. A card with no accessible name is a div.
-            <Card role="region" aria-labelledby="goal-decisions-heading">
-              <CardHeader>
-                <h2
-                  id="goal-decisions-heading"
-                  className="text-sm font-bold text-ink"
-                >
-                  Decisions
-                </h2>
-              </CardHeader>
-              <CardBody className="flex flex-col gap-2">
-                <ul className="flex flex-col gap-2">
-                  {decisions.map((decision) => (
-                    <li
-                      key={decision.id}
-                      className="flex flex-col gap-1 rounded-md border border-line p-2.5"
-                    >
-                      <span className="text-sm text-ink">{decision.text}</span>
-                      {/* The criterion names the date and the author, and the
-                          key result when one was named, because a decision
-                          about one number is not a decision about the goal. */}
-                      <span className="text-xs text-ink-3">
-                        {decision.keyResultTitle
-                          ? `${decision.keyResultTitle} · `
-                          : ""}
-                        {new Date(decision.at).toLocaleDateString()} ·{" "}
-                        {decision.authorName}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-xs text-ink-4">
-                  Recorded in a monthly review. Kept whether the goal is open or
-                  closed.
-                </p>
-              </CardBody>
-            </Card>
-          )}
-
-          {goal.retrospective ? (
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">Retrospective</h2>
-              </CardHeader>
-              <CardBody className="flex flex-col gap-1.5">
-                <p className="text-sm text-ink-2">
-                  {excerptRichText(goal.retrospective.body as never, 2000) ||
-                    "Written, but empty."}
-                </p>
-                <p className="text-xs text-ink-4">
-                  Kept whether the goal is open or closed. Reopening does not
-                  erase what happened.
-                </p>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          {canEdit ? (
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">
-                  {closed ? "Reopen" : "Close"}
-                </h2>
-              </CardHeader>
-              <CardBody>
-                {closed ? (
-                  <ActionForm
-                    action={reopenGoal}
-                    className="flex flex-col gap-1.5"
-                  >
-                    <input type="hidden" name="id" value={goal.id} />
-                    <p className="text-sm text-ink-3">
-                      Reopening clears the outcome and the decision, and keeps
-                      the retrospective. Health goes back to pending.
-                    </p>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      className="self-start"
-                    >
-                      Reopen this goal
-                    </Button>
-                  </ActionForm>
-                ) : (
-                  <ActionForm
-                    action={closeGoal}
-                    className="flex flex-col gap-1.5"
-                  >
-                    <input type="hidden" name="id" value={goal.id} />
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <label className="sr-only" htmlFor="close-outcome">
-                        Outcome
-                      </label>
-                      <select
-                        id="close-outcome"
-                        name="successStatus"
-                        defaultValue="achieved"
-                        className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                      >
-                        <option value="achieved">Achieved</option>
-                        <option value="missed">Missed</option>
-                      </select>
-                      <label className="sr-only" htmlFor="close-decision">
-                        Decision
-                      </label>
-                      <select
-                        id="close-decision"
-                        name="closeDecision"
-                        defaultValue="keep"
-                        className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                      >
-                        <option value="keep">Keep</option>
-                        <option value="modify">Modify</option>
-                        <option value="abandon">Abandon</option>
-                      </select>
-                      <input
-                        name="closeReason"
-                        maxLength={2000}
-                        placeholder="Why that decision?"
-                        aria-label="Why that decision?"
-                        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                      />
-                    </div>
-                    <label className="sr-only" htmlFor="close-retrospective">
-                      The retrospective
-                    </label>
-                    <textarea
-                      id="close-retrospective"
-                      name="retrospective"
-                      rows={4}
-                      required
-                      placeholder="What happened, and what would you do differently?"
-                      className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                    />
-                    <Button
-                      type="submit"
-                      variant="primary"
-                      className="self-start"
-                    >
-                      Close this goal
-                    </Button>
-                  </ActionForm>
-                )}
-              </CardBody>
-            </Card>
-          ) : null}
-
-          <SubjectDocuments
-            subjectType="goal"
-            subjectId={id}
-            documents={documents}
-            canEdit={canEdit}
-          />
-
+        {goal.retrospective ? (
           <Card>
-            <CardBody>
-              <GoalComments
-                goalId={id}
-                comments={comments.map((comment) => ({
-                  ...comment,
-                  reactions: reactions.get(comment.id) ?? [],
-                }))}
-                currentMemberId={workspace.memberId}
-              />
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("goals.detail.retrospective")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1.5">
+              <p className="text-sm text-ink-2">
+                {excerptRichText(goal.retrospective.body as never, 2000) ||
+                  "Written, but empty."}
+              </p>
+              <p className="text-xs text-ink-4">
+                {t("goals.detail.keptWhetherTheGoal")}
+              </p>
             </CardBody>
           </Card>
-        </div>
+        ) : null}
 
-        <aside className="w-full flex-none lg:w-80">
-          <Rail relations={relations} level={goal.level} />
-        </aside>
+        {canEdit ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {closed ? "Reopen" : "Close"}
+              </h2>
+            </CardHeader>
+            <CardBody>
+              {closed ? (
+                <ActionForm
+                  action={reopenGoal}
+                  className="flex flex-col gap-1.5"
+                >
+                  <input type="hidden" name="id" value={goal.id} />
+                  <p className="text-sm text-ink-3">
+                    {t("goals.detail.reopeningClearsTheOutcome")}
+                  </p>
+                  <Button type="submit" variant="ghost" className="self-start">
+                    {t("goals.detail.reopenThisGoal")}
+                  </Button>
+                </ActionForm>
+              ) : (
+                <ActionForm
+                  action={closeGoal}
+                  className="flex flex-col gap-1.5"
+                >
+                  <input type="hidden" name="id" value={goal.id} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <label className="sr-only" htmlFor="close-outcome">
+                      {t("goals.detail.outcome")}
+                    </label>
+                    <select
+                      id="close-outcome"
+                      name="successStatus"
+                      defaultValue="achieved"
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      <option value="achieved">
+                        {t("goals.detail.achieved")}
+                      </option>
+                      <option value="missed">{t("goals.detail.missed")}</option>
+                    </select>
+                    <label className="sr-only" htmlFor="close-decision">
+                      {t("goals.detail.decision")}
+                    </label>
+                    <select
+                      id="close-decision"
+                      name="closeDecision"
+                      defaultValue="keep"
+                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    >
+                      <option value="keep">{t("goals.detail.keep")}</option>
+                      <option value="modify">{t("goals.detail.modify")}</option>
+                      <option value="abandon">
+                        {t("goals.detail.abandon")}
+                      </option>
+                    </select>
+                    <input
+                      name="closeReason"
+                      maxLength={2000}
+                      placeholder={t("goals.detail.whyThatDecision")}
+                      aria-label={t("goals.detail.whyThatDecision")}
+                      className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                    />
+                  </div>
+                  <label className="sr-only" htmlFor="close-retrospective">
+                    {t("goals.detail.theRetrospective")}
+                  </label>
+                  <textarea
+                    id="close-retrospective"
+                    name="retrospective"
+                    rows={4}
+                    required
+                    placeholder={t("goals.detail.whatHappenedAndWhat")}
+                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  />
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="self-start"
+                  >
+                    {t("goals.detail.closeThisGoal")}
+                  </Button>
+                </ActionForm>
+              )}
+            </CardBody>
+          </Card>
+        ) : null}
+
+        <SubjectDocuments
+          subjectType="goal"
+          subjectId={id}
+          documents={documents}
+          canEdit={canEdit}
+        />
+
+        <Card>
+          <CardBody>
+            <GoalComments
+              goalId={id}
+              comments={comments.map((comment) => ({
+                ...comment,
+                reactions: reactions.get(comment.id) ?? [],
+              }))}
+              currentMemberId={workspace.memberId}
+            />
+          </CardBody>
+        </Card>
+
+        {/*
+         * The writes P6-G27 gave a browser path. Last in the column, because
+         * moving or deleting a goal is the end of a conversation rather than
+         * part of one.
+         */}
+        <GoalWrites
+          goalId={id}
+          cycles={cycles.map((cycle) => ({ id: cycle.id, name: cycle.name }))}
+          currentCycleId={goal.cycleId ?? null}
+          linkedKeyResults={goal.keyResults
+            .filter((keyResult) => keyResult.kpiId !== null)
+            .map((keyResult) => ({
+              id: keyResult.id,
+              title: keyResult.title,
+            }))}
+          canAdminister={canAdminister}
+        />
+
+        {/*
+         * **Inside the content column, not beside it.** P6-G11b put this
+         * panel where the closing tags made it look like a sibling of the
+         * rail, and the row above is `lg:flex-row` with exactly two
+         * children by design: a content column that is `min-w-0 flex-1`
+         * and a rail that is `lg:w-80`. A third child takes its intrinsic
+         * width, and `min-w-0` lets the content column give up every pixel
+         * of it, so the objective's own heading collapsed towards zero
+         * width. Continuous integration caught it as an end-to-end failure
+         * reading "hidden" on a heading the screenshot plainly showed,
+         * because an element with an empty box is hidden.
+         */}
+        <FeedPanel
+          title={t("common.activity")}
+          explains="What has happened to this goal, its key results and its check-ins, newest first."
+          items={feedItems}
+          names={feedNames}
+          timeZone={String(feedSettings.settings.timezone ?? "UTC")}
+          basePath={`/goals/${id}`}
+          paged={feedCursor !== undefined}
+          live={{ scope: "goal", subjectId: id }}
+        />
       </div>
-    </AppShellLayout>
+
+      <aside className="w-full flex-none lg:w-80">
+        <Rail relations={relations} level={goal.level} />
+      </aside>
+    </div>
   );
 }

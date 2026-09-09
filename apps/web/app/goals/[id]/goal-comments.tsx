@@ -45,8 +45,8 @@ export function GoalComments({
       onDelete={async (commentId) => {
         await deleteCommentAction(commentId);
       }}
-      onReact={async (subjectType, subjectId, emoji) => {
-        await toggleReaction(subjectType, subjectId, emoji);
+      onReact={async (subjectType, subjectId, emoji, ownReactionId) => {
+        await toggleReaction(subjectType, subjectId, emoji, ownReactionId);
       }}
     />
   );

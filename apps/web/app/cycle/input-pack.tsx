@@ -1,5 +1,6 @@
 import { SUGGESTED_TIMELINE } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { distributePack, savePackNote, togglePackItem } from "./actions.ts";
 
@@ -21,7 +22,7 @@ export interface PackItem {
   readonly note: string | null;
 }
 
-export function InputPack({
+export async function InputPack({
   cycleId,
   mode,
   items,
@@ -38,15 +39,19 @@ export function InputPack({
   readonly facilitator: { readonly name: string } | null;
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const gathered = items.filter((item) => item.gathered).length;
 
   return (
     <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Input pack</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("cycle.inputPack.inputPack")}
+          </h2>
           <Chip tone={gathered === items.length ? "ok" : "warn"}>
-            {gathered} of {items.length}
+            {gathered} {t("common.of")} {items.length}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col divide-y divide-line p-0">
@@ -120,7 +125,7 @@ export function InputPack({
                       <input
                         name="note"
                         defaultValue={item.note ?? ""}
-                        placeholder="Where it is, or who is bringing it"
+                        placeholder={t("cycle.inputPack.whereItIsOr")}
                         aria-label={`Note for "${item.label}"`}
                         className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2 placeholder:text-ink-4"
                       />
@@ -129,7 +134,7 @@ export function InputPack({
                         variant="ghost"
                         className="h-7 px-2 text-xs"
                       >
-                        Save
+                        {t("common.save")}
                       </Button>
                     </ActionForm>
                   ) : item.note ? (
@@ -147,22 +152,20 @@ export function InputPack({
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Distribution</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("cycle.inputPack.distribution")}
+          </h2>
           {distributedAt ? (
-            <Chip tone="ok">Distributed</Chip>
+            <Chip tone="ok">{t("cycle.inputPack.distributed")}</Chip>
           ) : (
-            <Chip tone="warn">Not sent</Chip>
+            <Chip tone="warn">{t("cycle.inputPack.notSent")}</Chip>
           )}
         </CardHeader>
         <CardBody className="flex flex-col gap-2.5">
-          <p className="text-sm text-ink-2">
-            §2.6 asks for the pack in every participant's hands three working
-            days before session one. An incomplete pack delivered on time beats
-            a complete pack delivered late.
-          </p>
+          <p className="text-sm text-ink-2">{t("cycle.inputPack.26AsksFor")}</p>
           {distributedAt ? (
             <p className="text-xs text-ink-3">
-              Sent {new Date(distributedAt).toLocaleString()}
+              {t("common.sent")} {new Date(distributedAt).toLocaleString()}
             </p>
           ) : null}
           {canEdit ? (
@@ -182,7 +185,7 @@ export function InputPack({
       <div className="grid gap-4.5 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Roles</h2>
+            <h2 className="text-sm font-bold text-ink">{t("common.roles")}</h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2.5 text-sm">
             <div className="flex flex-col">
@@ -190,7 +193,7 @@ export function InputPack({
                 {sponsor?.name ?? "No sponsor named"}
               </span>
               <span className="text-xs text-ink-3">
-                Sponsor · decides and unblocks. Escalations land here
+                {t("cycle.inputPack.sponsorDecidesAndUnblocks")}
               </span>
             </div>
             <div className="flex flex-col">
@@ -198,8 +201,7 @@ export function InputPack({
                 {facilitator?.name ?? "No facilitator named"}
               </span>
               <span className="text-xs text-ink-3">
-                Facilitator · guards the method. Can refuse to run Phase 4
-                without a complete pack
+                {t("cycle.inputPack.facilitatorGuardsTheMethod")}
               </span>
             </div>
           </CardBody>
@@ -207,17 +209,19 @@ export function InputPack({
 
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Suggested timeline</h2>
+            <h2 className="text-sm font-bold text-ink">
+              {t("cycle.inputPack.suggestedTimeline")}
+            </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2 p-0">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-line border-b">
                   <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
-                    Weeks before
+                    {t("cycle.inputPack.weeksBefore")}
                   </th>
                   <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
-                    Activity
+                    {t("common.activity")}
                   </th>
                 </tr>
               </thead>

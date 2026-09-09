@@ -1,5 +1,6 @@
 import { guidanceForPhase, HORIZONS } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * The right rail (UIUX-PLAN.md §4 S-04: "the facilitator guidance for this
@@ -11,27 +12,31 @@ import { Card, CardBody, CardHeader } from "@openokr/ui";
  * source of OKR practice, and a rail that wrote its own tips would be a second
  * one.
  */
-export function GuidanceRail({
+export async function GuidanceRail({
   phase,
   mode,
 }: {
   readonly phase: number;
   readonly mode: "annual" | "quarterly";
 }) {
+  const { t } = await getTranslations();
+
   const guidance = guidanceForPhase(phase);
   const horizon = HORIZONS[mode];
 
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-sm font-bold text-ink">Facilitator guidance</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("cycle.guidanceRail.facilitatorGuidance")}
+        </h2>
       </CardHeader>
       <CardBody className="flex flex-col gap-4">
         {guidance ? (
           <>
             <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
-                Key output
+                {t("cycle.guidanceRail.keyOutput")}
               </h3>
               <p className="border-brand-line border-l-2 pl-2.5 text-sm text-ink italic">
                 {guidance.output}
@@ -39,7 +44,7 @@ export function GuidanceRail({
             </section>
             <section className="flex flex-col gap-1.5">
               <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
-                Watch for
+                {t("cycle.guidanceRail.watchFor")}
               </h3>
               <ul className="flex list-disc flex-col gap-1.5 pl-4 text-sm text-ink-2">
                 {guidance.guidance.map((line) => (
@@ -51,16 +56,18 @@ export function GuidanceRail({
         ) : null}
         <section className="flex flex-col gap-1.5">
           <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
-            {mode} mode
+            {mode} {t("common.mode")}
           </h3>
           <p className="text-sm text-ink-2">{horizon.note}</p>
           <dl className="flex flex-col gap-1 text-xs text-ink-3">
             <div className="flex gap-1.5">
-              <dt className="font-semibold">Runs</dt>
+              <dt className="font-semibold">{t("cycle.guidanceRail.runs")}</dt>
               <dd>{horizon.runs}</dd>
             </div>
             <div className="flex gap-1.5">
-              <dt className="font-semibold">Revisited</dt>
+              <dt className="font-semibold">
+                {t("cycle.guidanceRail.revisited")}
+              </dt>
               <dd>{horizon.revisited}</dd>
             </div>
           </dl>

@@ -1,6 +1,14 @@
 "use client";
 
-import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useState, useTransition } from "react";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { applyFinding, dismissFinding, linkGoals } from "./actions.ts";
@@ -54,6 +62,8 @@ export function Studio({
   readonly threshold: number;
   readonly canEdit: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [selectedId, setSelectedId] = useState<string | null>(
     nodes[0]?.id ?? null,
   );
@@ -174,13 +184,12 @@ export function Studio({
                     </span>
                   </span>
                   <p className="text-xs text-ink-4">
-                    Re-parenting and editing happen on the goal page, so there
-                    is one place where a change is checked against the rules.
+                    {t("goals.studio.studio.reParentingAndEditing")}
                   </p>
                 </>
               ) : (
                 <p className="text-sm text-ink-3">
-                  Select a goal on the canvas.
+                  {t("goals.studio.studio.selectAGoalOn")}
                 </p>
               )
             ) : null}
@@ -189,13 +198,13 @@ export function Studio({
               <>
                 {score === null ? (
                   <p className="text-sm text-ink-3">
-                    No score: there is nothing in this cycle to align yet.
+                    {t("goals.studio.studio.noScoreThereIs")}
                   </p>
                 ) : (
                   <>
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
-                        Alignment health
+                        {t("goals.studio.studio.alignmentHealth")}
                       </span>
                       <span
                         className={
@@ -216,7 +225,9 @@ export function Studio({
                   </>
                 )}
                 {structural.length === 0 ? (
-                  <p className="text-xs text-ink-3">No structural gaps.</p>
+                  <p className="text-xs text-ink-3">
+                    {t("goals.studio.studio.noStructuralGaps")}
+                  </p>
                 ) : (
                   <ul className="flex flex-col gap-1.5">
                     {structural.map((finding) => (
@@ -238,7 +249,7 @@ export function Studio({
                                 value={finding.id}
                               />
                               <Button type="submit" size="sm">
-                                Dismiss
+                                {t("common.dismiss")}
                               </Button>
                             </ActionForm>
                           ) : null}
@@ -255,8 +266,7 @@ export function Studio({
                           </a>
                         ) : (
                           <span className="text-xs text-ink-4">
-                            No goal caused this one. It is the absence of a
-                            company objective.
+                            {t("goals.studio.studio.noGoalCausedThis")}
                           </span>
                         )}
                       </li>
@@ -269,14 +279,11 @@ export function Studio({
             {tab === "review" ? (
               semantic.length === 0 ? (
                 <>
-                  <p className="text-sm text-ink-3">Nothing here yet.</p>
+                  <p className="text-sm text-ink-3">
+                    {t("common.nothingHereYet")}
+                  </p>
                   <p className="text-xs text-ink-4">
-                    This tab holds the Coach's semantic findings: two goals that
-                    pull against each other, a goal whose content fits a
-                    different parent, a dependency nobody wrote down. Reading
-                    what goals mean needs an AI provider, so with none
-                    configured this stays empty. The structural gaps in the
-                    health tab work with the provider off and always will.
+                    {t("goals.studio.studio.thisTabHoldsThe")}
                   </p>
                 </>
               ) : (
@@ -307,7 +314,7 @@ export function Studio({
                                 value={finding.id}
                               />
                               <Button type="submit" size="sm">
-                                Re-parent
+                                {t("goals.studio.studio.reParent")}
                               </Button>
                             </ActionForm>
                           ) : null}
@@ -318,7 +325,7 @@ export function Studio({
                               value={finding.id}
                             />
                             <Button type="submit" size="sm">
-                              Dismiss
+                              {t("common.dismiss")}
                             </Button>
                           </ActionForm>
                         </span>

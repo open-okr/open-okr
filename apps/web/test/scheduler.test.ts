@@ -1,5 +1,6 @@
 import { AGENT_SCHEDULES } from "@openokr/agents";
 import { resetEnvCache } from "@openokr/config";
+import { actionNames } from "@openokr/core";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   localHourIn,
@@ -50,18 +51,47 @@ describe("the toggle", () => {
 });
 
 describe("the run table", () => {
-  test("has exactly one worker per declared schedule", () => {
+  test("has a worker for every agent cadence", () => {
     // The invariant this task exists for. A cron with no worker queues a job
     // that nothing ever runs, which looks identical to a product with nothing
     // to say, and that is what four months of this repository looked like.
-    expect(SCHEDULED_RUNS.map((run) => run.job).sort()).toEqual(
-      AGENT_SCHEDULES.map(([name]) => name).sort(),
-    );
+    const jobs = SCHEDULED_RUNS.map((run) => run.job);
+    for (const [name] of AGENT_SCHEDULES) {
+      expect(jobs).toContain(name);
+    }
+  });
+
+  test("every run has a cron, from one side or the other", () => {
+    // This used to assert the two lists were equal, which was the same
+    // invariant while every recurring run was an agent cadence. P6-G01b added
+    // the notification batch drain, which is plumbing rather than one of
+    // §6.2's cadences, so `packages/agents` does not own its cron and the host
+    // declares it. What still must hold is that nothing is registered without
+    // a worker and nothing waits for a cron that does not exist.
+    const agentJobs = new Set(AGENT_SCHEDULES.map(([name]) => name));
+    const orphans = SCHEDULED_RUNS.filter(
+      (run) => !agentJobs.has(run.job) && !run.cron,
+    ).map((run) => run.job);
+    expect(orphans).toEqual([]);
+
+    // And the other direction: a host-declared cron must not shadow a name the
+    // agents package already schedules, or the two would register the same job
+    // under different recurrences and the last writer would win silently.
+    const shadows = SCHEDULED_RUNS.filter(
+      (run) => agentJobs.has(run.job) && run.cron,
+    ).map((run) => run.job);
+    expect(shadows).toEqual([]);
   });
 
   test("names a real action for every run", () => {
+    // Checked against the registry rather than against a list written here.
+    // The list was a second copy of the type union three lines away, so it
+    // could only ever fail when somebody had already updated the union, and
+    // it did exactly that when the orphan reap was added at P6-G01c. What is
+    // worth catching is a run naming an action that does not exist.
+    const registered = new Set<string>(actionNames());
     for (const run of SCHEDULED_RUNS) {
-      expect(["agents.runChampion", "agents.runCoach"]).toContain(run.action);
+      expect(registered).toContain(run.action);
     }
   });
 

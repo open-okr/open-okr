@@ -51,6 +51,90 @@ Blocked? Set the task to `blocked` in `STATUS.md`, write down exactly why, and a
 
 Phases have design gates at P3-T00, P4-T00, P5-T00 and P8-T01. Do not begin a phase's implementation tasks until the human approves that gate's output with an explicit "design approved".
 
+## Committing and pushing
+
+**Commit on your own. Never push on your own.** Committing is how the work
+becomes reviewable and you do it without being asked, one commit per task, on
+`agung`. Pushing is what starts continuous integration and puts the work in
+front of other people, and it happens only when Agung says to push. Agung set
+this on 7 September 2026.
+
+**A push must leave continuous integration green. Every job, no exception.**
+Not "green except the one that was already failing", and not "green except the
+gate this machine cannot run". A red build on a shared branch blocks everybody
+else's work and the next person cannot tell your failure from theirs.
+
+So before you say the work is ready to push, run the whole set in the order
+`docs/development-plan/CI-GATES.md` gives, and read the output rather than the
+exit code:
+
+```
+pnpm typecheck
+pnpm lint             # read the last three lines, not the last one
+pnpm dead-code
+pnpm db:lint
+pnpm check:boundaries
+pnpm check:licences
+pnpm check:contract
+pnpm method:check
+pnpm test             # needs a database. One suite at a time
+pnpm build && pnpm test:e2e
+pnpm check:signoff origin/main HEAD
+```
+
+**A gate you did not run is not a gate that passed.** When this machine cannot
+run one, say which, why, and what would run it, in the `STATUS.md` row and in
+the summary you give Agung. `helm` and Docker are absent here, so
+`deploy/helm/check.sh`, `deploy/helm/cluster-test.sh` and
+`deploy/docker/smoke-test.sh` cannot run locally and are the ones to name.
+Never write "all gates pass" when you ran nine of eleven.
+
+**`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look
+green for days and fail the moment one opens. Run it yourself, and commit with
+`-s`.
+
+**Two jobs are not in the list above and still have to be green:** CodeQL and
+Dependency review. Neither is runnable locally. A new dependency is what
+usually turns them red, which is a second reason not to add one without asking.
+
+### Watch the run. A push is not finished until CI says so
+
+**After every push, find the run for your own commit and watch it to its
+conclusion.** Then report what it said. Not "the gates passed locally", not
+"it should be green": the run's own verdict, per job.
+
+```
+gh run list --branch agung --limit 10 \
+  --json databaseId,headSha,name,event,conclusion,createdAt
+gh run view <id> --json jobs          # which job, which step
+gh run view <id> --log-failed         # why
+```
+
+**A push with no run is not a pass.** `ci.yml` triggers on `push` to `main` and
+on `pull_request`, so a push to `agung` with no open pull request gets no
+verdict at all. Say that plainly and ask whether to open one. Never let silence
+read as green.
+
+**This rule exists because the alternative already happened.** On 6 September
+2026 nine commits went to `agung` under an open pull request, every local gate
+green, and left **six red checks from five causes**. Four were mine and
+somebody else fixed them in `dea40e6` and `5abf56f`:
+
+| Check | Cause |
+|---|---|
+| Helm | A grep in `check.sh` matched the explanatory `#` comment beside the setting it was checking for. `helm template` renders template comments into its output |
+| CodeQL | `js/polynomial-redos` on the S3 driver's `/^\/+\|\/+$/g`, two quantifiers backtracking on a value that is mostly slashes |
+| Dependency review | `bowser`, reached under `@aws-sdk/core`, reported as MIT AND MITNFA. A consequence of adding the dependency, invisible until CI |
+| An end-to-end spec | Serving the last four review-inbox sources emptied `inbox.pending`, and the spec still asserted the labels of the card that used to list them |
+
+Every one of those is a class the local gates cannot see: a rendered Helm
+manifest, a security query, a transitive licence, and a spec that encoded the
+old behaviour. That is the whole argument for watching the run.
+
+**A change to a spec's expectations is part of the change.** When you serve
+something a spec asserted was missing, the spec is now wrong and updating it is
+yours, not the next person's.
+
 ## Design docs
 
 Detailed designs live in `docs/design/`, written by you at each design gate. Keep them scannable: tables and examples over prose. Write acceptance criteria as testable Given / When / Then. When implementation deviates from a design document, update the document in the same change.
@@ -151,6 +235,25 @@ Keep this list current once scaffolded.
 
 - `pnpm dev`: run the application locally
 - `pnpm test` and `pnpm test:e2e`: unit and integration, then end to end. The end-to-end suite needs a Postgres, a one-off `pnpm test:e2e:install` for Chromium, and a `pnpm build` first, because it runs the standalone server the Docker image runs rather than the development server. It builds two databases on every run: one instance already set up for the dashboard specs, and one that never has been for the wizard specs. **Docker is not required.** `pnpm db:up` is the easy way to get the Postgres, and `TEST_DB_PORT` points the suite at one you already run, exactly as it does for the unit suites: `TEST_DB_PORT=5432 pnpm build && TEST_DB_PORT=5432 pnpm test:e2e`. This line said `pnpm db:up` outright for eight tasks, and four end-to-end defects reached continuous integration behind the belief that the suite could not be run locally
+
+  **Warm the traced symlinks after a build, or the first run times out.** On
+  Windows `start-server.sh` rewrites about eighty traced pnpm links as
+  junctions before the server binds, inside Playwright's readiness window, and
+  it does it for both servers. After a fresh `pnpm build` that first start
+  can exceed the 240-second timeout, which reads as flakiness and is not:
+  `playwright.config.ts` says so in its own comment. Running the repair once
+  first moves the work out of the window and costs a quarter of a second when
+  there is nothing to do:
+
+  ```
+  TEST_DB_PORT=5432 pnpm build
+  node --experimental-strip-types --no-warnings     e2e/repair-standalone-links.ts apps/web/.next/standalone/node_modules
+  TEST_DB_PORT=5432 pnpm test:e2e
+  ```
+
+  Measured on 8 September 2026: without it, two consecutive attempts timed out
+  after four minutes each and the retry passed; with it, the suite ran clean
+  first time. That is roughly six minutes back on every batch
 - `pnpm test:ci`: the whole repository as one suite, with retries and the flakiness report. Takes `--shard=i/n`
 - **`pnpm test` and `pnpm build` at the root honour `TEST_DB_PORT`, `TEST_PGBOUNCER_PORT`, `TEST_MYSQL_PORT`, `TEST_MYSQL_HOST`, `TEST_MYSQL_USER`, `TEST_MYSQL_PASSWORD`, `TEST_DB_HOST` and `DATABASE_URL`** through `passThroughEnv` in `turbo.json`. The same two port variables now also drive the compose stack itself, so the database and the suite move together, and continuous integration gives each job its own pair. Without that entry Turbo filters them out and the harness looks for the Docker stack on port 55432, which fails with `ECONNREFUSED` after running two of its ten tasks. Add any new variable a test needs to that list, or the root command will quietly not see it
 - `pnpm typecheck` and `pnpm lint`: strict types, then lint. `pnpm lint:fix` writes the fixes
@@ -213,6 +316,8 @@ test:e2e` was in this list for four tasks before P1-T08 built it.
 - Contract projections regenerated and the drift check green if the registry changed.
 - Every AI affordance is hidden or disabled when the provider is off, and the deterministic path is unchanged.
 - The design document is updated if implementation deviated. The `STATUS.md` row is updated.
+- Every gate in "Committing and pushing" ran and is green, or the row names the ones this machine could not run and why. The commit is made; the push waits for Agung.
+- After a push, the run for that commit was watched to its conclusion and reported per job. No run means no verdict, and the row says so rather than implying green.
 
 ## Writing style for everything you write in this repo
 

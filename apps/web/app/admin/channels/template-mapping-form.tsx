@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import { saveTemplateMapping } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
@@ -48,6 +48,8 @@ export function TemplateMappingForm({
   readonly templates: readonly MappableTemplate[];
   readonly sources: readonly BindingChoice[];
 }) {
+  const { t } = useTranslations();
+
   const [templateId, setTemplateId] = useState("");
   const chosen = templates.find((template) => template.id === templateId);
   // Named once rather than counted in the markup: the field name *is* the
@@ -61,8 +63,7 @@ export function TemplateMappingForm({
   if (templates.length === 0) {
     return (
       <p className="text-xs text-ink-3">
-        No approved template yet. Meta has to approve the words before a
-        reminder can use them.
+        {t("admin.channels.templateMappingForm.noApprovedTemplateYet")}
       </p>
     );
   }
@@ -73,10 +74,10 @@ export function TemplateMappingForm({
       className="flex flex-col gap-2 rounded-lg border border-line p-3"
     >
       <label className="flex flex-col gap-1 text-xs text-ink-2">
-        Reminder
+        {t("admin.channels.templateMappingForm.reminder")}
         <select name="ruleKey" className={FIELD} defaultValue="">
           <option value="" disabled>
-            Choose a reminder
+            {t("admin.channels.templateMappingForm.chooseAReminder")}
           </option>
           {rules.map((rule) => (
             <option key={rule.key} value={rule.key}>
@@ -87,7 +88,7 @@ export function TemplateMappingForm({
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-ink-2">
-        Template
+        {t("admin.channels.templateMappingForm.template")}
         <select
           name="templateId"
           className={FIELD}
@@ -95,7 +96,7 @@ export function TemplateMappingForm({
           onChange={(event) => setTemplateId(event.target.value)}
         >
           <option value="" disabled>
-            Choose a template
+            {t("admin.channels.templateMappingForm.chooseATemplate")}
           </option>
           {templates.map((template) => (
             <option key={template.id} value={template.id}>
@@ -133,13 +134,12 @@ export function TemplateMappingForm({
 
       {chosen && fields.length === 0 ? (
         <p className="text-xs text-ink-3">
-          This template takes no variables, so it says the same thing every
-          time.
+          {t("admin.channels.templateMappingForm.thisTemplateTakesNo")}
         </p>
       ) : null}
 
       <Button type="submit" variant="primary" size="sm" className="w-fit">
-        Save
+        {t("common.save")}
       </Button>
     </ChannelForm>
   );

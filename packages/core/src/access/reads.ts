@@ -419,6 +419,22 @@ export async function resolveSubjectContext<
   return resolver(tx, subjectId, workspaceId);
 }
 
+/**
+ * Whether a subject type has a resolver at all (P6-G07a).
+ *
+ * `resolveSubjectContext` raises for a type it does not know, and a caller
+ * looping over rows of mixed subject types needs to tell "this one is not
+ * reachable" from "nobody has taught the getter about this type yet". Those two
+ * answers demand opposite handling: the first must hide the row, the second
+ * must not, because the types with no resolver are the ones with no context of
+ * their own, whose visibility the workspace floor already decides. A check-in,
+ * a blocker, a KPI, a session and a cycle are all in that group, and every
+ * nudge in the product is about one of them.
+ */
+export function hasSubjectResolver(subjectType: string): boolean {
+  return subjectType in SUBJECT_RESOLVERS;
+}
+
 export interface GetAccessScopedInput {
   readonly workspaceId: string;
   readonly memberId: string;
@@ -470,4 +486,107 @@ export async function getAccessScoped<
     throw notFound();
   }
   return { contextId: context.contextId, level };
+}
+
+/**
+ * Refuses a read whose declared level the caller does not hold (P6-G31).
+ *
+ * **`access` on a read action recorded a requirement and nothing checked it.**
+ * Not `defineReadAction`, not `callAction`, not the REST, agent or chat
+ * transports, which take it only as the name of a scope. Twenty-nine reads
+ * declared above `view` and two enforced it, so over REST an ordinary member's
+ * token reached the AI budgets, the channel message log, every agent run, the
+ * nudge volume and the import history. In the browser the admin layout refuses
+ * first, which is why the screens looked right and the surface underneath did
+ * not. Found while writing `invitations.list` at P6-G06a.
+ *
+ * **The workspace context, not the resource.** These are workspace-wide reads:
+ * an administrative card, an AI setting, a channel connection. A read whose
+ * rows are themselves access-scoped goes through `getAccessScoped` per row
+ * instead and declares `view`, because the getter is what decides there.
+ *
+ * **`not_found`, in the getter's own words, and not `forbidden`.** A read
+ * refuses the way `getAccessScoped` refuses, so that a stranger, a suspended
+ * member and a member below the level are told the same thing. `forbidden`
+ * would have been defensible for a caller who is already a member and knows
+ * the workspace exists, and it is what the write actions beside these reads
+ * raise; it is not defensible for a caller with no member row at all, because
+ * "you hold too little access in this workspace" confirms the workspace.
+ * One check cannot tell the two apart without handing back the oracle it is
+ * there to close, so it says the safer thing to both. Two existing specs, in
+ * `settings-actions.test.ts` and `import-table.test.ts`, already required
+ * this, and they are what caught the first version of this function.
+ *
+ * The action's own name is not in the message, for the same reason: it would
+ * name the thing the caller may not reach. The caller knows which read it
+ * called, so nothing is lost that the caller did not already have.
+ *
+ * A `system` or `operator` actor passes, matching `runOperation`: a clock and a
+ * maintenance command have no member to resolve and full trust by construction.
+ */
+export async function requireWorkspaceLevel(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  actor: {
+    readonly kind: string;
+    readonly userId?: string;
+    readonly memberId?: string;
+  },
+  required: number,
+): Promise<void> {
+  if (actor.kind === "system" || actor.kind === "operator") {
+    return;
+  }
+
+  const refuse = (): never => {
+    throw new OperationError(
+      "not_found",
+      "No such workspace, or you do not have access to it.",
+    );
+  };
+
+  const memberId =
+    actor.memberId ?? (await memberIdForUser(tx, workspaceId, actor.userId));
+  if (!memberId) {
+    refuse();
+  }
+
+  const context = await resolveSubjectContext(
+    tx,
+    "workspace",
+    workspaceId,
+    workspaceId,
+  );
+  if (!context) {
+    refuse();
+  }
+
+  const level = await resolveMemberAccessLevel(tx, {
+    workspaceId,
+    memberId: memberId as string,
+    contextId: (context as { contextId: string }).contextId,
+  });
+  if (level < required) {
+    refuse();
+  }
+}
+
+/** The acting member's id, or null when the user is not an active member. */
+async function memberIdForUser(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
+  const result = await tx.execute<{ id: string }>(sql`
+    select id from workspace_members
+     where workspace_id = ${workspaceId}
+       and user_id = ${userId}
+       and status = 'active'
+       and deleted_at is null
+     limit 1
+  `);
+  return result.rows[0]?.id ?? null;
 }

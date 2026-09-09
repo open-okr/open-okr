@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import { resolveLocale } from "../lib/locale";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -59,9 +60,16 @@ export default async function RootLayout({
   // value proxy.ts already generates and forwards for this.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
+  // **The locale was a literal here from P2-T10 until P6-G22a.** It has to be
+  // decided on the server, because the server is where the text renders, and
+  // it has to survive a request with no member: this layout wraps the
+  // signed-out screens too. `resolveLocale` never throws and answers English
+  // for a visitor the product does not know yet.
+  const locale = await resolveLocale();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={geistSans.variable}
       data-theme="light"
       data-density="comfortable"
@@ -76,7 +84,7 @@ export default async function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <TranslationsProvider locale="en">
+          <TranslationsProvider locale={locale}>
             <QueryProvider buildId={loadEnv().APP_BUILD_ID}>
               {children}
             </QueryProvider>

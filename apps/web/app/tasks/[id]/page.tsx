@@ -3,12 +3,15 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
+import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { getTranslations } from "../../../lib/translations";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
   addChecklistItemAction,
   assignTaskAction,
+  removeChecklistItemAction,
   setChecklistItemAction,
   setDueOnAction,
   setTaskStatusAction,
@@ -41,6 +44,8 @@ export default async function TaskPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -48,6 +53,14 @@ export default async function TaskPage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const { id } = await params;
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "task",
+    subjectId: id,
+  });
 
   const task = await callAction(context, "tasks.read", { id }).catch(
     (error: unknown) => {
@@ -72,199 +85,218 @@ export default async function TaskPage({
   const assigned = new Set(task.assignees.map((one) => one.id));
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-4.5 xl:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-          <Card>
-            <CardHeader className="justify-between">
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <Link
-                  href={`/board?space=${task.spaceId}`}
-                  className="text-xs text-ink-3 hover:text-brand-text"
+    <div className="flex w-full flex-col gap-4.5 xl:flex-row">
+      <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+        <Card>
+          <CardHeader className="justify-between">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <Link
+                href={`/board?space=${task.spaceId}`}
+                className="text-xs text-ink-3 hover:text-brand-text"
+              >
+                {task.spaceName}
+              </Link>
+              <h1 className="text-lg font-bold text-ink">{task.title}</h1>
+            </div>
+            {canEdit ? (
+              <InlineSelect
+                label="Status"
+                value={task.status}
+                options={STATUS_OPTIONS}
+                onSave={setTaskStatusAction.bind(null, task.id)}
+              />
+            ) : (
+              <Chip tone="neutral">
+                {STATUS_OPTIONS.find((one) => one.value === task.status)
+                  ?.label ?? task.status}
+              </Chip>
+            )}
+            <WatchControl subjectType="task" subjectId={id} initial={watch} />
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader className="justify-between">
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.checklist")}
+            </h2>
+            <span className="text-xs text-ink-3">
+              {task.checklist.done} {t("common.of")} {task.checklist.total}{" "}
+              {t("common.done")}
+            </span>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2">
+            {task.items.length === 0 ? (
+              <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
+                {t("tasks.detail.nothingBrokenDownYet")}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1" data-testid="task-checklist">
+                {task.items.map((item) => (
+                  <ChecklistLine
+                    key={item.id}
+                    title={item.title}
+                    done={item.done}
+                    disabled={!canEdit}
+                    onToggle={setChecklistItemAction.bind(
+                      null,
+                      task.id,
+                      item.id,
+                    )}
+                    onRemove={removeChecklistItemAction.bind(
+                      null,
+                      task.id,
+                      item.id,
+                    )}
+                  />
+                ))}
+              </ul>
+            )}
+
+            {canEdit ? (
+              <ActionForm
+                action={addChecklistItemAction}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <input type="hidden" name="id" value={task.id} />
+                <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
+                  {t("tasks.detail.addALine")}
+                  <input
+                    name="title"
+                    maxLength={300}
+                    placeholder={t("tasks.detail.draftTheCopy")}
+                    className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
                 >
-                  {task.spaceName}
-                </Link>
-                <h1 className="text-lg font-bold text-ink">{task.title}</h1>
-              </div>
+                  {t("common.add")}
+                </button>
+              </ActionForm>
+            ) : null}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.whatIsNotHere")}
+            </h2>
+          </CardHeader>
+          <CardBody>
+            <p className="text-sm text-ink-3">
+              {t("tasks.detail.commentsAndTheActivity")}
+            </p>
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.assignees")}
+            </h2>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2">
+            {task.assignees.length === 0 ? (
+              <p className="text-xs text-ink-3">
+                {t("tasks.detail.nobodyYet")}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1" data-testid="task-assignees">
+                {task.assignees.map((one) => (
+                  <li
+                    key={one.id}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate text-sm text-ink">
+                      {one.name}
+                    </span>
+                    {canEdit ? (
+                      <RailButton
+                        label={`Unassign ${one.name}`}
+                        text="Remove"
+                        onRun={unassignTaskAction.bind(null, task.id, one.id)}
+                      />
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {canEdit
+              ? members
+                  .filter((one) => !assigned.has(one.id))
+                  .map((one) => (
+                    <RailButton
+                      key={one.id}
+                      label={`Assign ${one.name}`}
+                      text={`Assign ${one.name}`}
+                      onRun={assignTaskAction.bind(null, task.id, one.id)}
+                    />
+                  ))
+              : null}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("tasks.detail.whereItSits")}
+            </h2>
+          </CardHeader>
+          <CardBody className="flex flex-col gap-2 text-sm">
+            <Row label="Due">
               {canEdit ? (
-                <InlineSelect
-                  label="Status"
-                  value={task.status}
-                  options={STATUS_OPTIONS}
-                  onSave={setTaskStatusAction.bind(null, task.id)}
+                <DueDateField
+                  dueOn={task.dueOn}
+                  disabled={false}
+                  onSave={setDueOnAction.bind(null, task.id)}
                 />
               ) : (
-                <Chip tone="neutral">
-                  {STATUS_OPTIONS.find((one) => one.value === task.status)
-                    ?.label ?? task.status}
-                </Chip>
+                <span className="text-ink-2">{task.dueOn ?? "No date"}</span>
               )}
-            </CardHeader>
-          </Card>
-
-          <Card>
-            <CardHeader className="justify-between">
-              <h2 className="text-sm font-bold text-ink">Checklist</h2>
-              <span className="text-xs text-ink-3">
-                {task.checklist.done} of {task.checklist.total} done
-              </span>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-2">
-              {task.items.length === 0 ? (
-                <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
-                  Nothing broken down yet.
-                </p>
+            </Row>
+            <Row label="Initiative">
+              {task.initiativeId ? (
+                <Link
+                  href={`/initiatives/${task.initiativeId}`}
+                  className="text-brand-text hover:underline"
+                >
+                  {task.initiativeTitle ?? "An initiative"}
+                </Link>
               ) : (
-                <ul
-                  className="flex flex-col gap-1"
-                  data-testid="task-checklist"
-                >
-                  {task.items.map((item) => (
-                    <ChecklistLine
-                      key={item.id}
-                      title={item.title}
-                      done={item.done}
-                      disabled={!canEdit}
-                      onToggle={setChecklistItemAction.bind(
-                        null,
-                        task.id,
-                        item.id,
-                      )}
-                    />
-                  ))}
-                </ul>
+                <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
-
-              {canEdit ? (
-                <ActionForm
-                  action={addChecklistItemAction}
-                  className="flex flex-wrap items-end gap-2"
-                >
-                  <input type="hidden" name="id" value={task.id} />
-                  <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-                    Add a line
-                    <input
-                      name="title"
-                      maxLength={300}
-                      placeholder="Draft the copy"
-                      className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
-                  >
-                    Add
-                  </button>
-                </ActionForm>
-              ) : null}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">
-                What is not here yet
-              </h2>
-            </CardHeader>
-            <CardBody>
-              <p className="text-sm text-ink-3">
-                Comments and the activity list are P3-T16's surface, and hanging
-                it on a task is its own change. Documents and attachments arrive
-                at P5-T12.
-              </p>
-            </CardBody>
-          </Card>
-        </div>
-
-        <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Assignees</h2>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-2">
-              {task.assignees.length === 0 ? (
-                <p className="text-xs text-ink-3">Nobody yet.</p>
+            </Row>
+            <Row label="Key result">
+              {task.keyResultTitle ? (
+                <span className="text-ink-2">{task.keyResultTitle}</span>
               ) : (
-                <ul
-                  className="flex flex-col gap-1"
-                  data-testid="task-assignees"
-                >
-                  {task.assignees.map((one) => (
-                    <li
-                      key={one.id}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="truncate text-sm text-ink">
-                        {one.name}
-                      </span>
-                      {canEdit ? (
-                        <RailButton
-                          label={`Unassign ${one.name}`}
-                          text="Remove"
-                          onRun={unassignTaskAction.bind(null, task.id, one.id)}
-                        />
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                <span className="text-ink-3">{t("tasks.detail.none")}</span>
               )}
-
-              {canEdit
-                ? members
-                    .filter((one) => !assigned.has(one.id))
-                    .map((one) => (
-                      <RailButton
-                        key={one.id}
-                        label={`Assign ${one.name}`}
-                        text={`Assign ${one.name}`}
-                        onRun={assignTaskAction.bind(null, task.id, one.id)}
-                      />
-                    ))
-                : null}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Where it sits</h2>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-2 text-sm">
-              <Row label="Due">
-                {canEdit ? (
-                  <DueDateField
-                    dueOn={task.dueOn}
-                    disabled={false}
-                    onSave={setDueOnAction.bind(null, task.id)}
-                  />
-                ) : (
-                  <span className="text-ink-2">{task.dueOn ?? "No date"}</span>
-                )}
-              </Row>
-              <Row label="Initiative">
-                {task.initiativeId ? (
-                  <Link
-                    href={`/initiatives/${task.initiativeId}`}
-                    className="text-brand-text hover:underline"
-                  >
-                    {task.initiativeTitle ?? "An initiative"}
-                  </Link>
-                ) : (
-                  <span className="text-ink-3">None</span>
-                )}
-              </Row>
-              <Row label="Key result">
-                {task.keyResultTitle ? (
-                  <span className="text-ink-2">{task.keyResultTitle}</span>
-                ) : (
-                  <span className="text-ink-3">None</span>
-                )}
-              </Row>
-            </CardBody>
-          </Card>
-        </div>
+            </Row>
+          </CardBody>
+        </Card>
+        {/*
+         * **Inside the rail, not beside it** (P6-G27b). The row above holds a
+         * `min-w-0 flex-1` content column and this `xl:w-80` rail; a child
+         * that is neither takes its intrinsic width and squeezes the column,
+         * which `two-column-rows.test.ts` now refuses.
+         */}
+        {level >= ACCESS_LEVELS.full ? (
+          <DeleteControl
+            subject="task"
+            id={id}
+            what="this task"
+            returnTo="/board"
+          />
+        ) : null}
       </div>
-    </AppShellLayout>
+    </div>
   );
 }
 

@@ -86,6 +86,25 @@ export const workspaceMembers = pgTable("workspace_members", {
    * Set only on an imported member nobody has signed in as. Null on every
    * member with a real account, whose address lives on the user row.
    */
+  /**
+   * The member's own theme and density (P6-G23).
+   *
+   * Null means "follow the system", which is what the theme provider already
+   * does with no stored value, rather than a question waiting to be answered.
+   * Stored per member rather than only in the browser, so a preference follows
+   * somebody to a second machine.
+   */
+  theme: text("theme", { enum: ["light", "dark", "system"] }),
+  density: text("density", { enum: ["comfortable", "compact"] }),
+  /**
+   * The member's own language (P6-G22a).
+   *
+   * Null means "follow the workspace", which is what a member who has never
+   * chosen gets and what every member had before this column existed. A closed
+   * set, because a locale with no catalogue would make `translate()` raise:
+   * a new locale is a new catalogue plus a value here, in that order.
+   */
+  language: text("language", { enum: ["en", "ms"] }),
   placeholderEmail: text("placeholder_email"),
   legacyId: text("legacy_id"),
   legacyType: text("legacy_type", { enum: ["flowyteam", "csv"] }),

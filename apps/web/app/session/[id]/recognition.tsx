@@ -15,7 +15,14 @@
  * they did, and collapsing them to a count would turn recognition into a
  * leaderboard, which is the opposite of specific.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { giveKudosAction } from "./actions";
@@ -44,6 +51,8 @@ export function RecognitionPanel({
   readonly recognition: Recognition;
   readonly canGive: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,18 +92,17 @@ export function RecognitionPanel({
             id="recognition-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Recognition and wins
+            {t("session.detail.recognition.recognitionAndWins")}
           </h2>
           <Chip tone={recognition.entries.length === 0 ? "neutral" : "ok"}>
-            {recognition.entries.length} named
+            {recognition.entries.length} {t("common.named")}
           </Chip>
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         {recognition.entries.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nobody has been named yet. Three minutes, and specific beats
-            generous.
+            {t("session.detail.recognition.nobodyHasBeenNamed")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -108,9 +116,13 @@ export function RecognitionPanel({
                     {entry.toName}
                   </span>
                   <span className="text-xs text-ink-4">
-                    named by {entry.fromName}
+                    {t("common.namedBy")} {entry.fromName}
                   </span>
-                  {entry.mine ? <Chip tone="info">yours</Chip> : null}
+                  {entry.mine ? (
+                    <Chip tone="info">
+                      {t("session.detail.recognition.yours")}
+                    </Chip>
+                  ) : null}
                 </span>
                 <span className="text-sm text-ink-2">{entry.text}</span>
               </li>
@@ -121,7 +133,9 @@ export function RecognitionPanel({
         {canGive && recognition.recipients.length > 0 ? (
           <div className="flex flex-col gap-2 rounded-md border border-line p-2.5">
             <label className="flex flex-col gap-1" htmlFor="kudos-to">
-              <span className="text-xs font-medium text-ink-3">Who</span>
+              <span className="text-xs font-medium text-ink-3">
+                {t("session.detail.recognition.who")}
+              </span>
               <select
                 id="kudos-to"
                 className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
@@ -131,7 +145,7 @@ export function RecognitionPanel({
               >
                 {/* No default selection. A pre-picked name is a name the room
                     did not choose. */}
-                <option value="">Choose somebody</option>
+                <option value="">{t("common.chooseSomebody")}</option>
                 {recognition.recipients.map((person) => (
                   <option key={person.memberId} value={person.memberId}>
                     {person.name}
@@ -141,7 +155,7 @@ export function RecognitionPanel({
             </label>
             <label className="flex flex-col gap-1" htmlFor="kudos-text">
               <span className="text-xs font-medium text-ink-3">
-                What they did
+                {t("common.whatTheyDid")}
               </span>
               <input
                 id="kudos-text"
@@ -149,7 +163,9 @@ export function RecognitionPanel({
                 className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                 value={text}
                 disabled={pending}
-                placeholder="Specific beats generous"
+                placeholder={t(
+                  "session.detail.recognition.specificBeatsGenerous",
+                )}
                 onChange={(event) => setText(event.target.value)}
               />
             </label>
@@ -160,7 +176,7 @@ export function RecognitionPanel({
                 disabled={pending}
                 onClick={submit}
               >
-                Name it
+                {t("common.nameIt")}
               </Button>
             </span>
           </div>
@@ -170,7 +186,7 @@ export function RecognitionPanel({
           <p className="text-xs text-ink-4">
             {/* Not an error state. A workspace of one has nobody else to name,
                 and recognising yourself is refused by the action. */}
-            There is nobody else in the workspace to name yet.
+            {t("session.detail.recognition.thereIsNobodyElse")}
           </p>
         ) : null}
 
