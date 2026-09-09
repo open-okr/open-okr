@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
+import { FeedLive } from "../../lib/feed-live.tsx";
 import { getPool } from "../../lib/pool";
 import { requireWorkspace } from "../../lib/workspace";
 
@@ -88,6 +89,10 @@ export default async function ActivityPage({
   return (
     <AppShellLayout>
       <div className="flex flex-col gap-4.5">
+        {/* The workspace scope's live insert (P6-G11c). Not on a paged view:
+            paging is a link, and refreshing a window the reader navigated
+            back to would move the boundary they are reading across. */}
+        {cursor ? null : <FeedLive scope="workspace" />}
         <Card>
           <CardHeader>
             <div className="flex min-w-0 flex-col">

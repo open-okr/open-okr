@@ -597,6 +597,10 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // One member's inbox is told a row landed, so an open screen re-reads
   // instead of waiting for a navigation (P6-G07c). Identifiers only.
   "inbox.added": publishEvent,
+  // Every open feed in the workspace is told it moved (P6-G11c). No subject
+  // and no kind: each scope route decides whether to forward, and the server
+  // render that follows applies the filter and can().
+  "feed.added": publishEvent,
   "content.index": indexContent,
   // The large-export path (P5-T15). The row names a run; the worker rebuilds
   // the list as the member who asked, writes the file to storage and marks the

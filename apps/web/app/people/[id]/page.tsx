@@ -380,6 +380,7 @@ export default async function MemberProfilePage({
           timeZone={String(feedSettings.settings.timezone ?? "UTC")}
           basePath={`/people/${id}`}
           paged={feedCursor !== undefined}
+          live={{ scope: "profile", subjectId: id }}
         />
       </div>
     </AppShellLayout>

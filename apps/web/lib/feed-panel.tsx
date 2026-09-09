@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { FeedLive } from "./feed-live.tsx";
 
 /**
  * A feed, as a panel on the thing it is about (S-31, P6-G11b).
@@ -38,6 +39,7 @@ export function FeedPanel({
   /** This surface's own url, for the older-page link. */
   basePath,
   paged,
+  live,
 }: {
   readonly title: string;
   readonly explains: string;
@@ -47,12 +49,28 @@ export function FeedPanel({
   readonly basePath: string;
   /** Whether the reader is already on a later page. */
   readonly paged: boolean;
+  /**
+   * Which of S-31's four scopes this panel shows, and the subject it is
+   * about. The pair opens the live stream (P6-G11c); the panel renders
+   * without it, and then it is a snapshot rather than a feed.
+   */
+  readonly live?: {
+    readonly scope: "space" | "goal" | "profile";
+    readonly subjectId: string;
+  };
 }) {
   const last = items.at(-1);
   const join = basePath.includes("?") ? "&" : "?";
+  // Paging is a link, and a page the reader has navigated back through is a
+  // window they chose. Refreshing it under them would move the boundary they
+  // are reading across, so the stream runs on the first page only.
+  const watching = live && !paged ? live : null;
 
   return (
     <Card>
+      {watching ? (
+        <FeedLive scope={watching.scope} subjectId={watching.subjectId} />
+      ) : null}
       <CardHeader>
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">{title}</h2>

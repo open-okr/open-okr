@@ -78,6 +78,9 @@ export {
   queryFeed,
 } from "./activities/feed.ts";
 export {
+  FEED_ADDED_TOPIC,
+  type FeedAddedMessage,
+  feedAddedEvent,
   type LiveActivityEvent,
   toLiveActivityEvent,
   workspaceFeedChannel,

@@ -53,6 +53,7 @@ import {
 import { validateActivityPayload } from "../activities/catalogue.ts";
 import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
+import { feedAddedEvent } from "../activities/live.ts";
 import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
 import { INDEX_TOPIC, isIndexableSubject } from "../search/subjects.ts";
@@ -448,6 +449,37 @@ export async function runOperation<TResult, TLoaded = undefined>(
           at: new Date(),
         })
         .returning({ id: activities.id });
+
+      /**
+       * The feed's own live insert (P6-G11c).
+       *
+       * Here rather than in each action, for the reason the embedding job
+       * two blocks down gives: an enqueue every write has to remember is an
+       * enqueue the next write will forget. Every activity is a feed row, so
+       * every activity announces itself.
+       *
+       * Unconditional on `notify`. That flag decides whether anybody is
+       * *messaged*, and a feed is not a message: an activity nobody is
+       * subscribed to still belongs on the space's and the workspace's feed.
+       * `suppressNotifications` is not consulted for the same reason, with
+       * one exception below.
+       *
+       * **An import is the exception.** `suppressDispatch` exists because a
+       * run writes thousands of rows, and a thousand pings would make every
+       * open feed in the workspace re-render a thousand times while saying
+       * nothing a single refresh at the end would not. An import's rows are
+       * on the feed either way, from the first navigation after it.
+       */
+      if (!spec.suppressNotifications) {
+        await enqueueOutbox(
+          tx,
+          feedAddedEvent({
+            workspaceId: spec.workspaceId,
+            activityId: (insertedActivity as { id: string }).id,
+            actorMemberId: actor.memberId,
+          }),
+        );
+      }
 
       if (outcome.activity.notify && !spec.suppressNotifications) {
         await fanOutActivity(tx, {

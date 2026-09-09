@@ -340,6 +340,7 @@ export default async function SpacePage({
           timeZone={String(feedSettings.settings.timezone ?? "UTC")}
           basePath={`/spaces/${id}`}
           paged={feedCursor !== undefined}
+          live={{ scope: "space", subjectId: id }}
         />
       </div>
     </AppShellLayout>

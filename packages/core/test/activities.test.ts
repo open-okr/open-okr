@@ -631,3 +631,102 @@ describe("the feed at space, goal and profile scope (P6-G11b)", () => {
     expect(next.some((row) => row.id === first[0]?.id)).toBe(false);
   });
 });
+
+/**
+ * The feed's live insert, at every scope (S-31, P6-G11c).
+ *
+ * `workspaceFeedChannel` shipped at P2-T07 and nothing ever published on it,
+ * so no feed anywhere moved without a navigation. What is proved here is the
+ * producing half: every activity leaves one outbox row addressed to the
+ * workspace's channel, inside the write's own transaction. The four scopes
+ * share that one channel, and which of them a given event concerns is decided
+ * by the stream route, which is proved end to end.
+ */
+describe("every activity announces that the feed moved", () => {
+  it("enqueues one thin event, carrying the actor and nothing else", async () => {
+    const wb = await workerDb();
+    await wb.admin.query("delete from outbox where topic = $1", ["feed.added"]);
+
+    const subject = randomUUID();
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.feed",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        async execute() {
+          return {
+            result: {},
+            activity: {
+              kind: "workspace.renamed",
+              payload: { from: "Before", to: "After" },
+              subjectType: "workspace",
+              subjectId: subject,
+            },
+            audit: { action: "test.feed", targetType: "workspace" },
+          };
+        },
+      },
+    );
+
+    const rows = await wb.admin.query<{
+      payload: Record<string, unknown>;
+      idempotency_key: string;
+    }>("select payload, idempotency_key from outbox where topic = $1", [
+      "feed.added",
+    ]);
+    expect(rows.rows).toHaveLength(1);
+    const payload = rows.rows[0]?.payload;
+    expect(payload?.channel).toBe(`workspace:${workspaceId}:feed`);
+    expect(payload?.actorMemberId).toBe(ownerMemberId);
+    // No kind, no subject, no space. The route sends a bare ping and the
+    // re-read that follows applies the scope filter and can(), so anything
+    // more here would be information the browser has no business receiving.
+    expect(Object.keys(payload ?? {}).sort()).toEqual([
+      "activityId",
+      "actorMemberId",
+      "channel",
+      "workspaceId",
+    ]);
+    expect(rows.rows[0]?.idempotency_key).toBe(
+      `feed.added:${payload?.activityId as string}`,
+    );
+  });
+
+  it("says nothing for a write that suppressed its dispatch", async () => {
+    // An import writes thousands of rows through the pipeline with dispatch
+    // suppressed. A thousand pings would make every open feed in the
+    // workspace re-render a thousand times and say nothing that one refresh
+    // at the end would not. The rows are on the feed either way.
+    const wb = await workerDb();
+    await wb.admin.query("delete from outbox where topic = $1", ["feed.added"]);
+
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.feed",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        suppressNotifications: true,
+        async execute() {
+          return {
+            result: {},
+            activity: {
+              kind: "workspace.renamed",
+              payload: { from: "Before", to: "After" },
+              subjectType: "workspace",
+              subjectId: randomUUID(),
+            },
+            audit: { action: "test.feed", targetType: "workspace" },
+          };
+        },
+      },
+    );
+
+    const rows = await wb.admin.query(
+      "select id from outbox where topic = $1",
+      ["feed.added"],
+    );
+    expect(rows.rows).toHaveLength(0);
+  });
+});

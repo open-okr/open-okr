@@ -17,21 +17,38 @@
  * reach the card at all, so any other target already leaves a second
  * full-access holder behind. One member and one owner is that case exactly.
  */
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import pg from "pg";
 import { INSTANCE_ACCOUNT, goTo, signIn } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
+/** Only the feed's live insert needs one, and only to write its seed row. */
+let pool: pg.Pool;
+
+const CONNECTION = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : connectionOptions(
+      process.env.E2E_DATABASE ?? "openokr_e2e",
+      // The superuser, for the reason every other spec here records: these
+      // setup queries have to find the workspace before they could set
+      // `app.workspace_id`, and the forced row-level security policy would
+      // otherwise answer with nothing rather than raising.
+      testDbEnv.superuser,
+    );
 
 test.beforeAll(async ({ browser }) => {
+  pool = new pg.Pool(CONNECTION);
   context = await browser.newContext();
   page = await context.newPage();
 });
 
 test.afterAll(async () => {
+  await pool?.end();
   await context?.close();
 });
 
@@ -305,4 +322,85 @@ test("a theme follows the member to another browser", async ({ browser }) => {
     "aria-pressed",
     "true",
   );
+});
+
+/**
+ * The feed's live insert (S-31, P6-G11c).
+ *
+ * `workspaceFeedChannel` shipped at P2-T07 and nothing ever published on it,
+ * so no feed anywhere moved without a navigation.
+ *
+ * The whole chain runs here: an outbox row is drained by the relay inside this
+ * same server process, published on the workspace's feed channel, read by
+ * `/api/feed/live`, forwarded as a bare ping, and answered by a refresh. The
+ * page is never navigated after it is opened, which is what "without a reload"
+ * means.
+ *
+ * **The row is written to be unmistakable, and the assertion is its text
+ * rather than a count.** The first draft counted list items and failed at
+ * 49 of an expected 50: the feed pages at fifty, so on an instance with more
+ * activity than that a new row displaces the oldest instead of lengthening
+ * the list. `workspace.renamed` renders its payload, so this row carries a
+ * phrase nothing else in the workspace can produce.
+ *
+ * Its context is null, which `queryFeed` treats as visible to everybody, and
+ * its actor is null. The actor matters: the route drops a ping for the
+ * reader's own write, and a system row is nobody's.
+ */
+test("the workspace feed inserts a row without a reload", async () => {
+  const MARKER = "P6-G11c live insert";
+
+  const member = (
+    await pool.query<{ id: string; workspace_id: string }>(
+      `select m.id, m.workspace_id
+         from workspace_members m
+         join users u on u.id = m.user_id
+        where u.email = $1 and m.deleted_at is null
+        limit 1`,
+      [INSTANCE_ACCOUNT.email],
+    )
+  ).rows[0];
+  if (!member) {
+    throw new Error(`Member not found for ${INSTANCE_ACCOUNT.email}`);
+  }
+
+  await goTo(page, "/activity");
+  await expect(page.locator("main ul > li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(MARKER)).toHaveCount(0);
+
+  const inserted = (
+    await pool.query<{ id: string }>(
+      `insert into activities
+         (id, workspace_id, kind, payload, actor_member_id, actor_kind,
+          subject_type, subject_id, space_id, context_id, at)
+       values (gen_random_uuid(), $1, 'workspace.renamed', $2::jsonb, null,
+               'system', 'workspace', $1, null, null, now())
+       returning id`,
+      [member.workspace_id, JSON.stringify({ from: "Before", to: MARKER })],
+    )
+  ).rows[0];
+  if (!inserted) {
+    throw new Error("insert into activities returned no row");
+  }
+
+  await pool.query(
+    `insert into outbox (topic, payload, idempotency_key, available_at)
+     values ('feed.added', $1::jsonb, $2, now())`,
+    [
+      JSON.stringify({
+        channel: `workspace:${member.workspace_id}:feed`,
+        workspaceId: member.workspace_id,
+        activityId: inserted.id,
+        actorMemberId: null,
+      }),
+      `feed.added:${inserted.id}`,
+    ],
+  );
+
+  // The client collapses a burst into one refresh on a 1.5 second trailing
+  // window, so the row lands a moment after the ping rather than with it.
+  await expect(page.getByText(MARKER)).toBeVisible({ timeout: 30_000 });
+  expect(new URL(page.url()).pathname).toBe("/activity");
 });

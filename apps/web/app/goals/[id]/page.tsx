@@ -685,6 +685,7 @@ export default async function GoalPage({
             timeZone={String(feedSettings.settings.timezone ?? "UTC")}
             basePath={`/goals/${id}`}
             paged={feedCursor !== undefined}
+            live={{ scope: "goal", subjectId: id }}
           />
         </div>
 
