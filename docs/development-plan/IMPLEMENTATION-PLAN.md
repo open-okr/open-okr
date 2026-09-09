@@ -1926,7 +1926,9 @@ Acceptance: Given a frozen workspace, when a member tries to write, then the ove
 ### P6-G26: Onboarding, S-34 [L]
 Depends on: P3-T17
 Goal: a first sign-in as owner leads somewhere (GAP-AUDIT G-02).
-Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice P3-T17 built the action for and the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
+Deliverables: the four-step onboarding after the first sign-in, every step skippable over the TECHNICAL-PLAN §4.14 defaults; the demo-data choice the wizard never offered; the citation in this document corrected so S-34 has one owner rather than two.
+
+**Corrected at P6-G26: P3-T17 built no action.** This row said "the demo-data choice P3-T17 built the action for". P3-T17 built `buildDemoWorkspace` and a seed command; there is no registry action for the demo and P6-G26 did not add one, because the wizard calls the function and the pipeline is still what writes.
 Test plan: skipping every step leaves a working workspace practising the full method; choosing demo data seeds it idempotently; onboarding does not reappear once finished; a second owner does not see it.
 Acceptance: Given a first sign-in as owner, when they skip every step, then they land on a working workspace with every setting at its documented default.
 

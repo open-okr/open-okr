@@ -84,8 +84,20 @@ test("creating the first account finishes setup", async ({ page }) => {
 
   await page.getByRole("button", { name: "Finish setup" }).click();
 
+  /**
+   * **Into onboarding first, since P6-G26.** Finishing setup provisions a
+   * workspace, and a provisioned workspace owes its owner S-34, so the front
+   * door diverts once. Skipped four times here: this spec is about the wizard
+   * that configures the *instance*, and the four questions that configure the
+   * *workspace* have their own specs.
+   */
+  await expect(page).toHaveURL("/welcome");
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByTestId("welcome-skip").click();
+  }
+
   // Straight into the product, signed in, with a workspace already provisioned.
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
   // The Work Map, since P3-T11 replaced the proving dashboard this used to
   // assert. The workspace switcher still carries the admin name.
   await expect(

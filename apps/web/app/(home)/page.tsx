@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
@@ -41,6 +42,25 @@ export default async function HomePage({
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
+
+  /**
+   * A workspace that has never been set up goes to S-34 first (P6-G26).
+   *
+   * **Here rather than in the shell**, because this is the screen a first
+   * sign-in lands on and the only one worth interrupting. Redirecting from the
+   * layout would catch every navigation, including the wizard's own way back.
+   *
+   * The default is `true`, so a workspace nobody marked never comes here: only
+   * one provisioning wrote `false` for is pending.
+   */
+  const welcome = await callAction(
+    context,
+    "settings.readWorkspaceSettings",
+    {},
+  );
+  if (welcome.settings.onboardingDone === false) {
+    redirect("/welcome");
+  }
   const query = await searchParams;
 
   const level = await resolveAccessLevelFor(

@@ -579,6 +579,11 @@ export {
   type Reversal,
   reversalFor,
 } from "./copilot/proposals.ts";
+export {
+  type BuildDemoResult,
+  buildDemoWorkspace,
+  type DemoContext,
+} from "./demo/builder.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.

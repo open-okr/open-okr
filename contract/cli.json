@@ -29,6 +29,16 @@
       "pages": false
     },
     {
+      "name": "workspace finishOnboarding",
+      "action": "workspace.finishOnboarding",
+      "method": "POST",
+      "path": "/workspace/finishOnboarding",
+      "scope": "write",
+      "summary": "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace setState",
       "action": "workspace.setState",
       "method": "POST",

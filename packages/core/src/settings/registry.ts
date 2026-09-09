@@ -535,6 +535,19 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       .max(24 * 60),
   },
   {
+    key: "onboardingDone",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "True, which means nothing is pending. **The default is deliberately " +
+      "the finished state** (P6-G26): a workspace nobody explicitly marked " +
+      "has nothing to finish, which is the right answer for every workspace " +
+      "that existed before this key did. Provisioning writes false, because " +
+      "that is the one place a brand-new workspace is born.",
+    resolve: () => true,
+    schema: z.boolean(),
+  },
+  {
     key: "demoEnabled",
     scope: "workspace",
     home: "workspaces.settings",

@@ -43,9 +43,25 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
 
+  /**
+   * **A first sign-in goes to onboarding now, and that is P6-G26.** Before it,
+   * registering landed on an empty Work Map with nothing to do; the front door
+   * redirects a workspace provisioning marked pending to S-34 instead.
+   *
+   * Every step is skipped here, which is the acceptance criterion this spec is
+   * closest to: skip all four and land on a working workspace at every
+   * documented default. `s34-onboarding.spec.ts` cannot prove it, because by
+   * the time it runs the instance has been onboarded once and the wizard
+   * refuses to appear again, which is itself the behaviour it does prove.
+   */
+  await expect(page).toHaveURL("/welcome");
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByTestId("welcome-skip").click();
+  }
+
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/", { timeout: 15_000 });
   // The Work Map is the front door from P3-T11. It replaced the proving
   // dashboard P1-T08 put here, which asserted a "Signed in as" panel and two
   // `<strong>` elements; that panel was scaffolding and STATUS.md said so from

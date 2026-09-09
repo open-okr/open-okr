@@ -42,6 +42,10 @@ const APP = fileURLToPath(new URL("../app/", import.meta.url));
  */
 const INHERITS: Readonly<Record<string, string>> = {
   "dev/": "development only, and notFound() in production",
+  welcome:
+    "outside the shell (P6-G26). The root boundary is the right one: a " +
+    "reader here has no navigation to keep, which is the whole reason the " +
+    "screen exists",
 };
 
 // `api/`, `.well-known/` and `fonts` needed no entry here and had one until the

@@ -43,6 +43,21 @@
       }
     },
     {
+      "name": "workspace.finishOnboarding",
+      "description": "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.setState",
       "description": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
       "inputSchema": {

@@ -35,12 +35,16 @@ const BOUNDED = [
 /**
  * Screens outside the app shell, which draw their own centred card (S-35).
  *
+ * `welcome/` joined them at P6-G26: somebody who has never used the product
+ * has nothing to navigate to yet, and a sidebar full of empty screens is the
+ * state onboarding exists to get them out of.
+ *
  * `join/` joined them at P6-G06b. A visitor following an invitation has no
  * membership anywhere yet, so there is no workspace to render a shell for and
  * nothing in the sidebar they could reach. It is the same shape as sign-in and
  * the first-run wizard, and it is centred for the same reason.
  */
-const OUTSIDE_SHELL = ["(auth)/", "join/", "setup/"];
+const OUTSIDE_SHELL = ["(auth)/", "join/", "setup/", "welcome/"];
 
 // Resolved from this file, not from `process.cwd()`. Under `pnpm test` the cwd
 // is this package; under `pnpm test:ci` it is the repository root, which made
