@@ -1,11 +1,13 @@
 #!/bin/sh
-# The OpenOKR lifecycle helper (P1-T09).
+# The OpenOKR lifecycle helper (P1-T09, backup/restore P6-T06).
 #
 #   ./openokr up          start, generating every secret on first run
 #   ./openokr status      what is running, and whether it is healthy
 #   ./openokr logs        follow the application log
 #   ./openokr upgrade     pull, restart, re-run migrations, report
 #   ./openokr rotate-key  re-wrap stored secrets under a new root key
+#   ./openokr backup      encrypted database dump + blob copy, with checksum
+#   ./openokr restore F   restore from a backup directory created by backup
 #   ./openokr down        stop, keeping data
 #   ./openokr destroy     stop and delete every volume
 #
@@ -268,7 +270,168 @@ case "${1:-help}" in
     log "rotated. The previous key is in $APP_ENV.backup; delete it once you are satisfied."
     ;;
 
+  backup)
+    # Encrypted backup: database dump + blob storage + manifest (P6-T06).
+    #
+    # The backup directory is self-contained: everything needed to restore
+    # lives inside it. The database is pg_dump custom format (compressed,
+    # supports parallel restore). Blobs are copied from the storage volume.
+    # Both the dump and the blob tar are encrypted with the instance's root
+    # key via openssl AES-256-CBC, so a backup on an untrusted host is still
+    # sealed. A SHA-256 checksum covers the whole directory so a restore can
+    # refuse a damaged one.
+    [ -f "$APP_ENV" ] || fail "no $APP_ENV. This instance has not been started yet."
+
+    encryption_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
+    [ -n "$encryption_key" ] || fail "no OPENOKR_ENCRYPTION_KEY in $APP_ENV"
+
+    backup_root="${OPENOKR_BACKUP_DIR:-./backups}"
+    timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    backup_dir="$backup_root/$timestamp"
+    mkdir -p "$backup_dir"
+
+    log "backing up to $backup_dir"
+
+    # Database dump, encrypted.
+    log "dumping database..."
+    compose exec -T db pg_dump -U openokr -Fc openokr > "$backup_dir/db.dump.tmp"
+    openssl enc -aes-256-cbc -salt -pbkdf2 \
+      -pass "pass:$encryption_key" \
+      -in "$backup_dir/db.dump.tmp" \
+      -out "$backup_dir/db.dump.enc"
+    rm -f "$backup_dir/db.dump.tmp"
+
+    # Blob storage, encrypted.
+    log "copying blob storage..."
+    storage_id="$(compose ps -q app | head -1)"
+    if [ -n "$storage_id" ] && docker cp "$storage_id:/app/storage" "$backup_dir/storage.tmp" 2>/dev/null; then
+      tar -cf - -C "$backup_dir/storage.tmp" . | \
+        openssl enc -aes-256-cbc -salt -pbkdf2 \
+          -pass "pass:$encryption_key" \
+          -out "$backup_dir/blobs.tar.enc"
+      rm -rf "$backup_dir/storage.tmp"
+      blob_count="$(find "$backup_dir" -name 'blobs.tar.enc' -exec wc -c {} \; | awk '{print $1}')"
+    else
+      log "no blob storage to back up (S3 or empty)"
+      blob_count=0
+    fi
+
+    # Schema version (newest migration).
+    schema_version="$(compose exec -T db psql -U openokr -d openokr -t -A \
+      -c "SELECT name FROM _migrations ORDER BY name DESC LIMIT 1" 2>/dev/null || echo "unknown")"
+
+    # Manifest.
+    db_size="$(wc -c < "$backup_dir/db.dump.enc" | tr -d ' ')"
+    cat > "$backup_dir/manifest.json" <<MANIFEST
+{
+  "timestamp": "$timestamp",
+  "schemaVersion": "$schema_version",
+  "dbBytes": $db_size,
+  "blobBytes": $blob_count,
+  "format": "openokr-backup-v1"
+}
+MANIFEST
+
+    # Checksum over the whole directory.
+    (cd "$backup_dir" && find . -type f ! -name 'checksum.sha256' -print0 | sort -z | xargs -0 sha256sum) \
+      > "$backup_dir/checksum.sha256"
+
+    # Retention: keep the N newest backups.
+    retention="${OPENOKR_BACKUP_RETENTION:-7}"
+    if [ -d "$backup_root" ]; then
+      # List directories by name (which is a timestamp), remove all but the newest N.
+      kept=0
+      for d in $(ls -1dr "$backup_root"/*/); do
+        kept=$((kept + 1))
+        if [ "$kept" -gt "$retention" ]; then
+          log "removing old backup: $d"
+          rm -rf "$d"
+        fi
+      done
+    fi
+
+    log "backup complete: $backup_dir (db ${db_size} bytes, schema $schema_version)"
+    ;;
+
+  restore)
+    # Restore from a backup directory created by ./openokr backup (P6-T06).
+    #
+    # Verifies the checksum before decrypting anything. Supports decryption
+    # with a previous key (after a key rotation) by trying
+    # OPENOKR_PREVIOUS_ENCRYPTION_KEYS if the current one fails.
+    shift
+    backup_dir="${1:-}"
+    [ -n "$backup_dir" ] || fail "usage: ./openokr restore <backup-directory>"
+    [ -d "$backup_dir" ] || fail "$backup_dir is not a directory"
+    [ -f "$backup_dir/checksum.sha256" ] || fail "$backup_dir has no checksum file"
+    [ -f "$backup_dir/db.dump.enc" ] || fail "$backup_dir has no database dump"
+    [ -f "$backup_dir/manifest.json" ] || fail "$backup_dir has no manifest"
+    [ -f "$APP_ENV" ] || fail "no $APP_ENV. Cannot decrypt without the root key."
+
+    # Verify checksum before touching anything.
+    log "verifying checksum..."
+    if ! (cd "$backup_dir" && sha256sum -c checksum.sha256 --quiet 2>/dev/null); then
+      fail "checksum verification failed. The backup is damaged or was altered."
+    fi
+    log "checksum OK"
+
+    # Try decryption with the current key, then previous keys.
+    encryption_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
+    previous_keys="$(grep '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' "$APP_ENV" | cut -d= -f2- || true)"
+
+    decrypt_db() {
+      openssl enc -d -aes-256-cbc -pbkdf2 \
+        -pass "pass:$1" \
+        -in "$backup_dir/db.dump.enc" \
+        -out "$backup_dir/db.dump" 2>/dev/null
+    }
+
+    decrypted=0
+    if decrypt_db "$encryption_key"; then
+      decrypted=1
+      log "decrypted with current key"
+    else
+      # Try previous keys (comma-separated).
+      IFS=','
+      for key in $previous_keys; do
+        key="$(echo "$key" | tr -d ' ')"
+        if [ -n "$key" ] && decrypt_db "$key"; then
+          decrypted=1
+          log "decrypted with a previous key"
+          break
+        fi
+      done
+      unset IFS
+    fi
+    [ "$decrypted" -eq 1 ] || fail "could not decrypt the database dump with any known key"
+
+    # Restore database.
+    log "restoring database..."
+    compose exec -T db dropdb -U openokr --if-exists openokr
+    compose exec -T db createdb -U openokr openokr
+    cat "$backup_dir/db.dump" | compose exec -T db pg_restore -U openokr -d openokr --no-owner --no-privileges
+    rm -f "$backup_dir/db.dump"
+
+    # Restore blobs if the backup has them.
+    if [ -f "$backup_dir/blobs.tar.enc" ]; then
+      log "restoring blob storage..."
+      openssl enc -d -aes-256-cbc -pbkdf2 \
+        -pass "pass:$encryption_key" \
+        -in "$backup_dir/blobs.tar.enc" | \
+        docker cp - "$(compose ps -q app | head -1):/app/storage"
+      log "blobs restored"
+    fi
+
+    # Run migrations in case the backup is from an older schema.
+    log "running migrations..."
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/db/src/migrate.ts 2>/dev/null || true
+
+    log "restore complete from $backup_dir"
+    log "verify with: ./openokr status"
+    ;;
+
   *)
-    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

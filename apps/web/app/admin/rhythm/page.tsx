@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { RhythmForm } from "./rhythm-form";
 
@@ -15,6 +16,8 @@ import { RhythmForm } from "./rhythm-form";
  * read the argument for leaving it alone.
  */
 export default async function RhythmSettingsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
 
   const rhythm = await callAction(
@@ -36,11 +39,9 @@ export default async function RhythmSettingsPage() {
 
   return (
     <>
-      <h1>Rhythm and thresholds</h1>
+      <h1>{t("admin.rhythm.rhythmAndThresholds")}</h1>
       <p className="text-sm text-ink-3">
-        Every number the method fires on, with the canon default beside it.
-        Nothing here needs changing: a workspace that leaves this page alone
-        practises the method as written.
+        {t("admin.rhythm.everyNumberTheMethod")}
       </p>
       <RhythmForm rhythm={rhythm} canManage={level >= ACCESS_LEVELS.full} />
     </>

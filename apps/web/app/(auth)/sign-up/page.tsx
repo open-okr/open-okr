@@ -1,6 +1,11 @@
-import { isRegistrationOpen, REGISTRATION_CLOSED_MESSAGE } from "@openokr/core";
+import {
+  REGISTRATION_CLOSED_MESSAGE,
+  registrationOpenOrInvited,
+} from "@openokr/core";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
 import { SignUpForm } from "./sign-up-form";
 
@@ -19,16 +24,26 @@ import { SignUpForm } from "./sign-up-form";
 export const dynamic = "force-dynamic";
 
 export default async function SignUpPage() {
-  if (!(await isRegistrationOpen(getPool()))) {
+  const { t } = await getTranslations();
+
+  // **The invitation counts here too, and it did not until P6-G06b.** This
+  // asked `isRegistrationOpen`, which is the narrower question, so a closed
+  // instance told an invitee "Registration is closed" and never rendered a
+  // form that Better Auth's own hook would have accepted: the invitation was
+  // redeemable and unreachable at the same time. One function answers for both
+  // now. The end-to-end spec found it by pressing the button and waiting for a
+  // name field that was never going to appear.
+  const cookieHeader = (await headers()).get("cookie");
+  if (!(await registrationOpenOrInvited(getPool(), cookieHeader))) {
     return (
       <AuthCard
-        title="Registration is closed"
+        title={t("auth.signUp.registrationIsClosed")}
         footer={
           <Link
             href="/sign-in"
             className="font-medium text-brand-text hover:underline"
           >
-            Back to sign in
+            {t("common.backToSignIn")}
           </Link>
         }
       >

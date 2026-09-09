@@ -19,9 +19,11 @@
  * listed as "no data yet" placeholders rather than faked. P4-T07a owns the
  * session record and the live sync; the subsequent tasks fill the panels.
  */
+
 import { callAction, excerptRichText } from "@openokr/core";
 import {
   REVIEW_STAGE_KEYS,
+  type ResolvedThresholds,
   ROOT_CAUSES,
   reviewStages,
   WEEKLY_STAGE_KEYS,
@@ -32,14 +34,19 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
+import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
-  advanceStageAction,
   closeSessionAction,
   openSessionAction,
   skipSessionAction,
 } from "./actions";
+import { AdvanceControl } from "./advance-control.tsx";
+import { BlockerPanel } from "./blocker-panel.tsx";
+import { Commitments } from "./commitments.tsx";
 import { ConfidenceRound } from "./confidence-round";
+import { CoordinatorNote } from "./coordinator-note.tsx";
 import { type Diagnostic, DiagnosticPanel } from "./diagnostic";
 import { Digest } from "./digest";
 import { type Forward, ForwardPanel } from "./forward";
@@ -68,6 +75,8 @@ interface SessionPageProps {
 }
 
 export default async function SessionPage({ params }: SessionPageProps) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
   const pool = getPool();
@@ -77,8 +86,15 @@ export default async function SessionPage({ params }: SessionPageProps) {
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
+  // A hand-written narrowing of what `sessions.read` answers, cast into
+  // below. `spaceId` and `cycleId` were absent from it although the action has
+  // returned both since P4-T07a, so this screen did not know which space its
+  // own session belonged to. Added at P6-G19a, which needs the space's key
+  // results to offer them to a commitment.
   let sessionRow: {
     id: string;
+    spaceId: string | null;
+    cycleId: string | null;
     kind: string;
     title: string;
     state: string;
@@ -121,14 +137,211 @@ export default async function SessionPage({ params }: SessionPageProps) {
     }
   }
 
+  // The weekly figures (P6-G19b). Loaded for every weekly session, running or
+  // not: "how have we been doing" is the question a facilitator asks before
+  // opening one as much as during it.
+  const TREND_WEEKS = 12;
+  let weeklyFigures: {
+    trend: Array<{ weekStart: string; average: number }>;
+    streakWeeks: number;
+    thresholds: ResolvedThresholds;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.spaceId) {
+    const [trend, streak, rhythm] = await Promise.all([
+      callAction(context, "sessions.confidenceTrend", {
+        spaceId: sessionRow.spaceId,
+        weeks: TREND_WEEKS,
+      }),
+      callAction(context, "sessions.readStreak", {
+        spaceId: sessionRow.spaceId,
+      }),
+      callAction(context, "rhythm.read", {}),
+    ]);
+    weeklyFigures = {
+      trend: [...trend],
+      streakWeeks: streak.currentWeeks,
+      thresholds: rhythm.thresholds as unknown as ResolvedThresholds,
+    };
+  }
+
+  // §7.2 step 2's blockers, on their own stage (P6-G19b).
+  let diagnoseStage: {
+    blockers: Array<{
+      id: string;
+      type: string;
+      keyResultTitle: string | null;
+      ownerName: string;
+      nextAction: string;
+      hoursOpen: number;
+      overdue: boolean;
+      resolved: boolean;
+    }>;
+    owners: Array<{ id: string; label: string }>;
+    keyResults: Array<{ id: string; label: string }>;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.stageKey === "diagnose") {
+    const raised = await callAction(context, "sessions.blockerStatus", {
+      sessionId: id,
+    });
+    const cycleGoals =
+      sessionRow.spaceId && sessionRow.cycleId
+        ? (
+            await callAction(context, "goals.list", {
+              cycleId: sessionRow.cycleId,
+              spaceId: sessionRow.spaceId,
+              includeClosed: false,
+            })
+          ).goals
+        : [];
+    const titles = new Map<string, string>();
+    for (const goal of cycleGoals) {
+      for (const keyResult of goal.keyResults) {
+        titles.set(keyResult.id, keyResult.title);
+      }
+    }
+    const names = new Map(participants.map((one) => [one.memberId, one.name]));
+    diagnoseStage = {
+      blockers: raised.map((blocker) => ({
+        id: blocker.id,
+        type: blocker.type,
+        keyResultTitle: blocker.keyResultId
+          ? (titles.get(blocker.keyResultId) ?? null)
+          : null,
+        // An owner who has left the room since is reported rather than blanked.
+        ownerName:
+          names.get(blocker.ownerId) ?? "Someone no longer in this session",
+        nextAction: blocker.nextAction,
+        hoursOpen: blocker.hoursOpen,
+        overdue: blocker.overdue,
+        resolved: blocker.resolvedAt !== null,
+      })),
+      owners: participants.map((one) => ({
+        id: one.memberId,
+        label: one.name,
+      })),
+      keyResults: [...titles].map(([keyResultId, title]) => ({
+        id: keyResultId,
+        label: title,
+      })),
+    };
+  }
+
+  // §7.2 step 3 (P6-G19a). Loaded only on its own stage, like the confidence
+  // round above: three reads a facilitator on stage 1 has no use for.
+  let commitmentStage: {
+    carried: Array<{
+      id: string;
+      text: string;
+      ownerName: string;
+      weekStart: string;
+      keyResultTitle: string | null;
+    }>;
+    already: Array<{
+      id: string;
+      text: string;
+      ownerName: string;
+      keyResultTitle: string | null;
+    }>;
+    owners: Array<{ id: string; label: string }>;
+    keyResults: Array<{ id: string; label: string }>;
+    low: number;
+    high: number;
+  } | null = null;
+  if (sessionRow.kind === "weekly" && sessionRow.stageKey === "commitments") {
+    const [carriedRows, setRows, rhythm] = await Promise.all([
+      callAction(context, "sessions.carriedCommitments", { sessionId: id }),
+      callAction(context, "sessions.listCommitments", { sessionId: id }),
+      callAction(context, "rhythm.read", {}),
+    ]);
+
+    // The space's key results in this cycle, which is what a commitment may
+    // point at. Empty when the session sits outside a cycle, and the select
+    // then offers only "No key result", which is the honest answer.
+    const cycleGoals =
+      sessionRow.spaceId && sessionRow.cycleId
+        ? (
+            await callAction(context, "goals.list", {
+              cycleId: sessionRow.cycleId,
+              spaceId: sessionRow.spaceId,
+              includeClosed: false,
+            })
+          ).goals
+        : [];
+    const keyResultTitles = new Map<string, string>();
+    for (const goal of cycleGoals) {
+      for (const keyResult of goal.keyResults) {
+        keyResultTitles.set(keyResult.id, keyResult.title);
+      }
+    }
+
+    const memberNames = new Map(
+      participants.map((one) => [one.memberId, one.name]),
+    );
+    // A commitment's owner can have left the room since it was set, so a name
+    // the participant list does not hold is reported rather than blanked.
+    const nameOf = (memberId: string) =>
+      memberNames.get(memberId) ?? "Someone no longer in this session";
+
+    const bounds = (rhythm.thresholds as unknown as ResolvedThresholds)[
+      "sessions.weeklyCommitmentBounds"
+    ];
+
+    commitmentStage = {
+      carried: carriedRows.map((row) => ({
+        id: row.id,
+        text: row.text,
+        ownerName: nameOf(row.ownerId),
+        weekStart: row.weekStart,
+        keyResultTitle: row.keyResultId
+          ? (keyResultTitles.get(row.keyResultId) ?? null)
+          : null,
+      })),
+      already: setRows.map((row) => ({
+        id: row.id,
+        text: row.text,
+        ownerName: nameOf(row.ownerId),
+        keyResultTitle: row.keyResultId
+          ? (keyResultTitles.get(row.keyResultId) ?? null)
+          : null,
+      })),
+      owners: participants.map((one) => ({
+        id: one.memberId,
+        label: one.name,
+      })),
+      keyResults: [...keyResultTitles].map(([keyResultId, title]) => ({
+        id: keyResultId,
+        label: title,
+      })),
+      low: bounds.low,
+      high: bounds.high,
+    };
+  }
+
   // The weekly digest (P4-T15b-a). Deterministic, so it loads with the page and
   // needs no provider; null before step 4 has produced one.
-  let weeklyDigest: { weekStart: string; lines: string[] } | null = null;
+  /**
+   * **The shape is named rather than written inline.**
+   *
+   * This was `let weeklyDigest: {...} | null = null` assigned with
+   * `as typeof weeklyDigest`, and `typeof` a `let` reads the type narrowed at
+   * that point, which is `null` immediately after the initialiser. The cast
+   * therefore said "null", the variable stayed `null` for the whole render as
+   * far as the compiler was concerned, and nothing caught it because the one
+   * place it was read accepts null. Found at P6-G19b, when a second reader
+   * asked for a field.
+   */
+  interface WeeklyDigestRead {
+    weekStart: string;
+    lines: string[];
+    /** What the coordinator added for leadership (P6-G19b). */
+    note: string | null;
+  }
+  let weeklyDigest: WeeklyDigestRead | null = null;
   let digestAssistAvailable = false;
   if (sessionRow.kind === "weekly") {
     weeklyDigest = (await callAction(context, "sessions.digest", {
       sessionId: id,
-    })) as typeof weeklyDigest;
+    })) as WeeklyDigestRead | null;
     const { drafterFor } = await import("../../../lib/drafter");
     digestAssistAvailable = (await drafterFor(workspace.workspaceId)) !== null;
   }
@@ -403,7 +616,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             }}
           >
             <Button type="submit" variant="primary">
-              Start session
+              {t("session.detail.startSession")}
             </Button>
           </form>
           <form
@@ -413,7 +626,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
             }}
           >
             <Button type="submit" variant="default">
-              Skip
+              {t("common.skip")}
             </Button>
           </form>
         </div>
@@ -422,7 +635,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Step rail */}
       {sessionRow.kind === "weekly" && (
         <Card>
-          <CardHeader>Steps</CardHeader>
+          <CardHeader>{t("session.detail.steps")}</CardHeader>
           <CardBody>
             <ol className="space-y-3">
               {WEEKLY_STEPS.map((step: WeeklyStep, index: number) => {
@@ -489,20 +702,56 @@ export default async function SessionPage({ params }: SessionPageProps) {
         />
       )}
 
+      {weeklyFigures && (
+        <WeeklyFigures
+          trend={weeklyFigures.trend}
+          streakWeeks={weeklyFigures.streakWeeks}
+          weeks={TREND_WEEKS}
+          thresholds={weeklyFigures.thresholds}
+        />
+      )}
+
+      {isRunning && diagnoseStage && (
+        <BlockerPanel
+          sessionId={id}
+          blockers={diagnoseStage.blockers}
+          owners={diagnoseStage.owners}
+          keyResults={diagnoseStage.keyResults}
+          canWrite={isFacilitator}
+        />
+      )}
+
+      {/* **After the close, not on the digest stage.**
+          `sessions.setCoordinatorNote` writes onto the digest row, and
+          `sessions.close` is what creates it, so the same form on step 4
+          refused every press with "No digest exists for this session yet".
+          Found by the test that asserted the note came back. */}
+      {sessionRow.state === "closed" &&
+        isFacilitator &&
+        weeklyDigest !== null && (
+          <CoordinatorNote sessionId={id} note={weeklyDigest.note} />
+        )}
+
+      {isRunning &&
+        sessionRow.stageKey === "commitments" &&
+        commitmentStage && (
+          <Commitments
+            sessionId={id}
+            carried={commitmentStage.carried}
+            already={commitmentStage.already}
+            owners={commitmentStage.owners}
+            keyResults={commitmentStage.keyResults}
+            low={commitmentStage.low}
+            high={commitmentStage.high}
+            canWrite={isFacilitator}
+          />
+        )}
+
       {/* Continue / close controls for the facilitator during a running session */}
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
           {!isOnLastStage && !isMonthly ? (
-            <form
-              action={async () => {
-                "use server";
-                await advanceStageAction(id);
-              }}
-            >
-              <Button type="submit" variant="primary">
-                Continue to next step
-              </Button>
-            </form>
+            <AdvanceControl sessionId={id} />
           ) : (
             <form
               action={async () => {
@@ -511,7 +760,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
               }}
             >
               <Button type="submit" variant="primary">
-                Close session
+                {t("session.detail.closeSession")}
               </Button>
             </form>
           )}
@@ -614,8 +863,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
         <Card>
           <CardBody>
             <p className="text-sm text-ink-3">
-              This stage is the four questions leadership answers. It is read by
-              this space's managers and its coordinator.
+              {t("session.detail.thisStageIsThe")}
             </p>
           </CardBody>
         </Card>
@@ -648,10 +896,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {isQuarterly ? (
         <p className="text-xs text-ink-4">
           <Link className="underline" href={`/session/${id}/minutes`}>
-            The minutes
+            {t("session.detail.theMinutes")}
           </Link>{" "}
-          are generated from whatever the review has recorded so far, and say so
-          while it is still running.
+          {t("session.detail.areGeneratedFromWhatever")}
         </p>
       ) : null}
 
@@ -686,7 +933,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {/* Participant list */}
       {participants.length > 0 && (
         <Card>
-          <CardHeader>Participants</CardHeader>
+          <CardHeader>{t("session.detail.participants")}</CardHeader>
           <CardBody>
             <ul className="space-y-1">
               {participants.map((p) => (
@@ -697,18 +944,6 @@ export default async function SessionPage({ params }: SessionPageProps) {
             </ul>
           </CardBody>
         </Card>
-      )}
-
-      {/* The tables exist; the panels that read them do not yet. The line said
-          "appear once their tables exist" from P4-T07 until the gap audit of
-          7 September 2026 found all three tables shipped and the sentence still
-          standing, which is the kind of claim that stops anybody looking. */}
-      {isRunning && !isMonthly && !isQuarterly && (
-        <p className="text-xs text-ink-3">
-          The confidence trend, the open blockers with their ages, the streak
-          ribbon and this week's commitments arrive at P6-G19. Their tables are
-          already here.
-        </p>
       )}
     </div>
   );

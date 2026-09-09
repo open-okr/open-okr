@@ -21,8 +21,17 @@ import { eq } from "drizzle-orm";
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
 
-export const DEFAULT_BATCH_WINDOW_MINUTES = 30;
-export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
+/**
+ * Re-exported, not defined here (P6-G08).
+ *
+ * Both live in `settings/registry.ts` now, with every other §4.14 default and
+ * the sentence explaining each one. The names stay exported from this module
+ * because the sweep, the fan-out and the barrel already import them from here.
+ */
+export {
+  DEFAULT_BATCH_WINDOW_MINUTES,
+  DEFAULT_DAILY_SUMMARY_TIME,
+} from "../settings/registry.ts";
 
 export interface NotificationSettingsView {
   readonly memberId: string;

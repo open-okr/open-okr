@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
@@ -21,6 +21,8 @@ import { finishSetup } from "./actions";
  * instance with nobody in it, and there would be no way back in.
  */
 export function SetupAccountForm() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -93,8 +95,7 @@ export function SetupAccountForm() {
           required
         />
         <p className="text-xs text-ink-3">
-          At least 12 characters. A phrase you can remember beats a short
-          password you cannot.
+          {t("setup.account.setupAccountForm.atLeast12Characters")}
         </p>
       </div>
 

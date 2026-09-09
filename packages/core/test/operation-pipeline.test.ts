@@ -109,17 +109,23 @@ const counts = async () => {
   const result = await wb.admin.query(
     `select (select count(*) from audit_events)::int as audit,
             (select count(*) from activities)::int as activity,
-            (select count(*) from outbox)::int as outbox`,
+            (select count(*) from outbox)::int as outbox,
+            (select count(*) from outbox
+              where topic = 'workspace.renamed')::int as renamed,
+            (select count(*) from outbox
+              where topic = 'feed.added')::int as feed`,
   );
   return result.rows[0] as {
     audit: number;
     activity: number;
     outbox: number;
+    renamed: number;
+    feed: number;
   };
 };
 
 describe("a committed mutation", () => {
-  it("leaves exactly one audit, one activity and one outbox row", async () => {
+  it("leaves exactly one audit, one activity and the two outbox rows it owes", async () => {
     // Provisioning is itself an operation, so start from its baseline.
     const before = await counts();
     await rename("Renamed");
@@ -127,7 +133,16 @@ describe("a committed mutation", () => {
 
     expect(after.audit - before.audit).toBe(1);
     expect(after.activity - before.activity).toBe(1);
-    expect(after.outbox - before.outbox).toBe(1);
+
+    // **Two, and counted by topic rather than in total.** The write asks for
+    // one, and the pipeline adds the feed's own announcement (P6-G11c),
+    // because every activity is a feed row and an enqueue each action had to
+    // remember is an enqueue the next one would forget. A bare total would
+    // have to be edited again the next time the pipeline gains a row of its
+    // own, and would stop saying which rows were written.
+    expect(after.outbox - before.outbox).toBe(2);
+    expect(after.renamed - before.renamed).toBe(1);
+    expect(after.feed - before.feed).toBe(1);
   });
 
   it("applies the change itself", async () => {

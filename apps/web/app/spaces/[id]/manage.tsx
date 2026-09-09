@@ -1,4 +1,5 @@
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { getTranslations } from "../../../lib/translations";
 import {
   addSpaceMember,
   archiveSpace,
@@ -51,7 +52,7 @@ export interface ManageMember {
   readonly role: string;
 }
 
-export function SpaceManagement({
+export async function SpaceManagement({
   spaceId,
   name,
   mission,
@@ -69,6 +70,8 @@ export function SpaceManagement({
   readonly canManage: boolean;
   readonly canArchive: boolean;
 }) {
+  const { t } = await getTranslations();
+
   if (!canManage) {
     return null;
   }
@@ -77,9 +80,11 @@ export function SpaceManagement({
     <Card>
       <CardHeader>
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Manage this space</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("spaces.detail.manage.manageThisSpace")}
+          </h2>
           <p className="text-xs text-ink-3">
-            Its name, who is in it, and what each of them does here.
+            {t("spaces.detail.manage.itsNameWhoIs")}
           </p>
         </div>
       </CardHeader>
@@ -87,7 +92,7 @@ export function SpaceManagement({
         <SpaceForm action={updateSpace} className="flex flex-col gap-2">
           <input type="hidden" name="id" value={spaceId} />
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Name
+            {t("common.name")}
             <input
               name="name"
               defaultValue={name}
@@ -96,28 +101,28 @@ export function SpaceManagement({
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            Mission
+            {t("common.mission")}
             <input
               name="mission"
               defaultValue={mission ?? ""}
               maxLength={280}
-              placeholder="What this team is for, in one line"
+              placeholder={t("common.whatThisTeamIs")}
               className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             />
             <span className="text-ink-4">
-              Leaving it empty clears it, which is a real answer.
+              {t("spaces.detail.manage.leavingItEmptyClears")}
             </span>
           </label>
           <button
             type="submit"
             className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
           >
-            Save
+            {t("common.save")}
           </button>
         </SpaceForm>
 
         <div className="flex flex-col gap-2">
-          <h3 className="text-xs font-bold text-ink-2">Roles</h3>
+          <h3 className="text-xs font-bold text-ink-2">{t("common.roles")}</h3>
           <ul className="flex flex-col gap-2">
             {members.map((member) => (
               <li
@@ -151,7 +156,7 @@ export function SpaceManagement({
                       type="submit"
                       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
                     >
-                      Set
+                      {t("common.set")}
                     </button>
                   </SpaceForm>
                   <SpaceForm action={removeSpaceMember}>
@@ -165,7 +170,7 @@ export function SpaceManagement({
                       type="submit"
                       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-3"
                     >
-                      Remove
+                      {t("common.remove")}
                     </button>
                   </SpaceForm>
                 </span>
@@ -189,7 +194,7 @@ export function SpaceManagement({
           >
             <input type="hidden" name="spaceId" value={spaceId} />
             <label className="flex flex-col gap-1 text-xs text-ink-3">
-              Add somebody
+              {t("spaces.detail.manage.addSomebody")}
               <select
                 name="memberId"
                 required
@@ -203,7 +208,7 @@ export function SpaceManagement({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-ink-3">
-              As
+              {t("spaces.detail.manage.as")}
               <select
                 name="role"
                 defaultValue="member"
@@ -220,19 +225,19 @@ export function SpaceManagement({
               type="submit"
               className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
             >
-              Add
+              {t("common.add")}
             </button>
           </SpaceForm>
         ) : (
           <p className="text-xs text-ink-4">
-            Everybody in this workspace is already in this space.
+            {t("spaces.detail.manage.everybodyInThisWorkspace")}
           </p>
         )}
 
         {canArchive ? (
           <details className="rounded-md border border-line p-2.5">
             <summary className="cursor-pointer text-xs font-semibold text-ink-2">
-              Archive this space
+              {t("spaces.detail.manage.archiveThisSpace")}
             </summary>
             <SpaceForm
               action={archiveSpace}
@@ -240,14 +245,13 @@ export function SpaceManagement({
             >
               <input type="hidden" name="id" value={spaceId} />
               <p className="text-xs text-ink-3">
-                Its goals, sessions and history stay readable. It stops
-                appearing in the list and nothing new can be filed in it.
+                {t("spaces.detail.manage.itsGoalsSessionsAnd")}
               </p>
               <button
                 type="submit"
                 className="self-start rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-2"
               >
-                Archive
+                {t("common.archive")}
               </button>
             </SpaceForm>
           </details>

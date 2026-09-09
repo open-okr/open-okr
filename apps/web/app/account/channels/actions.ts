@@ -123,3 +123,58 @@ export async function saveDelivery(
   // does to a reminder.
   return { ok: true, code: null, message: "" };
 }
+
+/**
+ * Saves how often the product writes to this member (S-36 member card,
+ * P6-G08).
+ *
+ * One write for the whole card, because the four fields are one decision: a
+ * member choosing "group everything into ten minutes" is also choosing not to
+ * be told immediately, and saving those separately would let the two disagree
+ * between two round trips.
+ *
+ * The routing map arrives as one `routing.<reason>` field per reason, because
+ * that is what a form can express. An empty value means "no override", which
+ * is what removing a key means, and the map is rebuilt rather than patched:
+ * `notifications.updateSettings` takes the whole map for the same reason.
+ */
+export async function saveCadence(
+  _previous: LinkResult | null,
+  form: FormData,
+): Promise<LinkResult> {
+  const routing: Record<string, string> = {};
+  for (const [field, value] of form.entries()) {
+    if (!field.startsWith("routing.")) {
+      continue;
+    }
+    const channel = String(value);
+    if (channel !== "") {
+      routing[field.slice("routing.".length)] = channel;
+    }
+  }
+
+  const summaryTime = String(form.get("dailySummaryTime") ?? "");
+  try {
+    await callAction(await context(), "notifications.updateSettings", {
+      mentionImmediate: form.get("mentionImmediate") !== null,
+      batchWindowMinutes: Number(form.get("batchWindowMinutes") ?? 30),
+      dailySummary: form.get("dailySummary") !== null,
+      // An empty time input submits an empty string, which the schema would
+      // refuse. Absent means "leave it as it was", which is the honest reading
+      // of a field somebody cleared without choosing anything.
+      ...(summaryTime === "" ? {} : { dailySummaryTime: summaryTime }),
+      routing: routing as Record<
+        "invited" | "joined" | "mentioned" | "role" | "review" | "check_in",
+        "app" | "email" | "slack" | "teams" | "whatsapp" | "telegram"
+      >,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      code: null,
+      message: error instanceof Error ? error.message : "That did not save.",
+    };
+  }
+  revalidatePath("/account/channels");
+  return { ok: true, code: null, message: "Saved." };
+}

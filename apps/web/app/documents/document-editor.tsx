@@ -1,7 +1,11 @@
 "use client";
 
 import type { RichTextDocument } from "@openokr/core";
-import { RichTextEditor, type RichTextEditorHandle } from "@openokr/ui";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+  useTranslations,
+} from "@openokr/ui";
 import { useRef, useState, useTransition } from "react";
 import type { WriteState } from "../cycle/write-state.ts";
 
@@ -29,6 +33,8 @@ export function DocumentEditor({
   readonly onSave: (body: RichTextDocument | null) => Promise<WriteState>;
   readonly onPublish: () => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
+
   const editor = useRef<RichTextEditorHandle>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -53,7 +59,7 @@ export function DocumentEditor({
         ref={editor}
         content={body ?? null}
         editable={canEdit}
-        placeholder="What is the plan?"
+        placeholder={t("documents.documentEditor.whatIsThePlan")}
       />
 
       {canEdit ? (
@@ -75,7 +81,7 @@ export function DocumentEditor({
             }}
             className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-ink-2 hover:border-brand disabled:text-ink-4"
           >
-            Save
+            {t("common.save")}
           </button>
           <button
             type="button"
@@ -87,7 +93,7 @@ export function DocumentEditor({
           </button>
           {saved ? (
             <span className="text-xs text-ink-3">
-              Saved. Not published yet.
+              {t("documents.documentEditor.savedNotPublishedYet")}
             </span>
           ) : null}
         </div>

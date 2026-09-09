@@ -722,3 +722,286 @@ describe("the annual frame", () => {
     expect(rows.rows[0]?.n).toBe(1);
   });
 });
+
+describe("the §11 registry beyond its scalars (P6-G20)", () => {
+  const call = async (overrides: Record<string, unknown>) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "rhythm.update",
+      { overrides },
+    );
+  };
+  const read = async () => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "rhythm.read",
+      {},
+    );
+  };
+
+  it("stores a ladder as a whole object", async () => {
+    // Every escalation ladder, every band set and every bounds pair is one of
+    // these, and the admin card rendered them read-only until P6-G20: a
+    // workspace could see its own ladder and not move it.
+    await call({
+      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+    });
+    const after = await read();
+    expect(after.thresholds["cadence.blockerLadderHours"]).toEqual({
+      owner: 12,
+      coordinator: 36,
+      sponsor: 60,
+    });
+  });
+
+  it("stores a list parameter as a list", async () => {
+    // Two §11 parameters are `z.array`, and a form that reassembles them from
+    // their indices has to send an array back. An object keyed "0", "1", "2"
+    // is refused by the schema, which is why the card names those fields
+    // differently.
+    await call({ "cadence.publicationCountdownDays": [21, 10, 2] });
+    const after = await read();
+    expect(after.thresholds["cadence.publicationCountdownDays"]).toEqual([
+      21, 10, 2,
+    ]);
+  });
+
+  it("refuses an out-of-range value and states the bound", async () => {
+    // The admin card swallowed this refusal until P6-G20: an impossible value
+    // looked exactly like a successful save.
+    await expect(call({ "cadence.stalenessGraceDays": 9999 })).rejects.toThrow(
+      /cadence\.stalenessGraceDays.*(less than or equal to|<=)\s*\d+/is,
+    );
+  });
+
+  it("returns a whole card to the canon in one call", async () => {
+    // What the card's reset button sends: every key in the group as null,
+    // rather than the canon's numbers. Storing today's default would keep it
+    // after the canon moved.
+    await call({
+      "cadence.stalenessGraceDays": 5,
+      "cadence.toleranceDays": 2,
+      "cadence.blockerLadderHours": { owner: 12, coordinator: 36, sponsor: 60 },
+    });
+    expect(Object.keys((await read()).overrides)).toHaveLength(3);
+
+    await call({
+      "cadence.stalenessGraceDays": null,
+      "cadence.toleranceDays": null,
+      "cadence.blockerLadderHours": null,
+    });
+
+    const after = await read();
+    expect(after.overrides).toEqual({});
+    expect(after.thresholds["cadence.stalenessGraceDays"]).toBe(3);
+    expect(after.thresholds["cadence.toleranceDays"]).toBe(1);
+    // And the canon's ladder is back, not the one that was stored.
+    expect(after.thresholds["cadence.blockerLadderHours"]).not.toEqual({
+      owner: 12,
+      coordinator: 36,
+      sponsor: 60,
+    });
+  });
+});
+
+describe("frame.annualObjectives (P6-G14b)", () => {
+  /** The workspace's own member id, which every goal here is championed by. */
+  async function ownerMemberId(): Promise<string> {
+    const wb = await workerDb();
+    const rows = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return rows.rows[0]?.id as string;
+  }
+
+  /**
+   * A cycle in annual mode.
+   *
+   * `cycles.ensureCurrent` takes no mode and answers the quarterly one
+   * provisioning already made; the cadence is what decides the mode, and
+   * `annual` is the only cadence that gives `mode: "annual"`. The first draft
+   * of this helper passed `{ mode: "annual" }` to `ensureCurrent`, which is
+   * not in its schema, and quietly got the quarter back.
+   */
+  async function annualCycleId(): Promise<string> {
+    const wb = await workerDb();
+    const cycle = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.create",
+      { on: "2027-06-30", cadence: "annual", firstCycle: false },
+    );
+    return cycle.id;
+  }
+
+  it("answers nothing before anything is drafted", async () => {
+    const wb = await workerDb();
+    expect(
+      await callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "frame.annualObjectives",
+        {},
+      ),
+    ).toEqual([]);
+  });
+
+  it("lists an annual objective with the strategy it serves", async () => {
+    const wb = await workerDb();
+    const frame = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.set",
+      {
+        yearLabel: "2027",
+        agreed: true,
+        strategies: [{ text: "Win the mid-market" }, { text: "Self-serve" }],
+      },
+    );
+    const strategyId = frame.strategies[0]?.id as string;
+    const member = await ownerMemberId();
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "Land fifty mid-market accounts",
+      cycleId: await annualCycleId(),
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      strategyId,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.strategyId).toBe(strategyId);
+    expect(listed[0]?.sentForward).toBe(0);
+  });
+
+  it("reports an objective serving no strategy rather than hiding it", async () => {
+    // §2.1's whole point. A screen that files this under "other" is the screen
+    // not doing its job, and a read that omits it makes that screen possible.
+    const wb = await workerDb();
+    const member = await ownerMemberId();
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "Something nobody has placed",
+      cycleId: await annualCycleId(),
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.strategyId).toBeNull();
+  });
+
+  it("leaves a quarterly objective out, and counts it as sent forward", async () => {
+    const wb = await workerDb();
+    const member = await ownerMemberId();
+    const annual = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "goals.create",
+      {
+        title: "The year's objective",
+        cycleId: await annualCycleId(),
+        level: "company",
+        ownerKind: "workspace",
+        championId: member,
+        reviewerId: member,
+        weight: 1,
+      },
+    );
+    // Named, not inferred. `ensureCurrent` defaults to the most recent
+    // cycle's cadence, and the annual cycle above is now the most recent, so a
+    // bare call here builds the annual period containing today. That is what
+    // this test caught, and `sendForward` had the same bug.
+    const quarter = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "cycles.ensureCurrent",
+      { cadence: "quarterly" },
+    );
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.create", {
+      title: "This quarter's slice of it",
+      cycleId: quarter.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId: member,
+      reviewerId: member,
+      parentGoalId: annual.id,
+      weight: 1,
+    });
+
+    const listed = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.annualObjectives",
+      {},
+    );
+    // One row, not two: the quarterly objective is not an annual one.
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.title).toBe("The year's objective");
+    expect(listed[0]?.sentForward).toBe(1);
+  });
+
+  it("moves an objective from one strategy to another, and off both", async () => {
+    const wb = await workerDb();
+    const frame = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "frame.set",
+      {
+        yearLabel: "2027",
+        agreed: true,
+        strategies: [{ text: "First" }, { text: "Second" }],
+      },
+    );
+    const first = frame.strategies[0]?.id as string;
+    const second = frame.strategies[1]?.id as string;
+    const member = await ownerMemberId();
+    const goal = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "goals.create",
+      {
+        title: "Moves around",
+        cycleId: await annualCycleId(),
+        level: "company",
+        ownerKind: "workspace",
+        championId: member,
+        reviewerId: member,
+        strategyId: first,
+        weight: 1,
+      },
+    );
+
+    const read = async () =>
+      (
+        (await callAction(
+          { pool: wb.appPool, ...context(OWNER) },
+          "frame.annualObjectives",
+          {},
+        )) as Array<{ strategyId: string | null }>
+      )[0]?.strategyId;
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.update", {
+      id: goal.id,
+      strategyId: second,
+    });
+    expect(await read()).toBe(second);
+
+    // Null is a real answer, not a failure to choose.
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "goals.update", {
+      id: goal.id,
+      strategyId: null,
+    });
+    expect(await read()).toBeNull();
+  });
+});

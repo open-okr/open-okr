@@ -412,6 +412,11 @@ export async function publishCheckInInTx<
     await tx.insert(notifications).values({
       workspaceId: input.workspaceId,
       recipientMemberId: goal.reviewerId,
+      // The goal, not the check-in: the obligation is to review a goal's
+      // progress, and the goal is what the row links to and groups under
+      // (migration 0074, P6-G07a). This producer had no activity id either.
+      subjectType: "goal",
+      subjectId: goal.id,
       reason: "review",
       channel: "app",
     });

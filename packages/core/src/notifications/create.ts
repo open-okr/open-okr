@@ -13,12 +13,14 @@
  */
 import {
   activeOnly,
+  enqueueOutbox,
   notifications,
   type WorkspaceTx,
   workspaceMembers,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
 import { ensurePendingBatch } from "./batching.ts";
+import { inboxAddedEvent } from "./live.ts";
 import type { Recipient } from "./recipients.ts";
 import {
   DEFAULT_BATCH_WINDOW_MINUTES,
@@ -43,6 +45,50 @@ async function primaryChannelFor<
     )
     .limit(1);
   return member?.primaryChannel ?? "email";
+}
+
+/**
+ * Tells one member's open inbox that a row landed (P6-G07c).
+ *
+ * **Here rather than at each call site.** Three writes call
+ * `notifyRecipients` and one of them is the Operation pipeline's own
+ * activity fan-out, which is every notifying write in the product. A publish
+ * each of them had to remember is a publish the fourth would forget, and the
+ * recipient list is only known here.
+ *
+ * **An outbox row, not a publish.** CLAUDE.md: side effects are enqueued only
+ * by inserting an outbox row in the write's own transaction, so nothing
+ * announces a row that rolls back. `channels/log.ts` enqueues from inside a
+ * helper for the same reason.
+ *
+ * Both branches announce. A batched row is in the inbox the moment it is
+ * written: batching decides when the member is *messaged* on their channel,
+ * not when the screen may show the row.
+ */
+async function announce<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: NotifyRecipientsInput,
+  recipient: Recipient,
+  notificationId: string | undefined,
+): Promise<void> {
+  if (!notificationId) {
+    return;
+  }
+  // openokr:allow-side-effect: an outbox row inside the caller's transaction,
+  // which is the one way this repository allows a side effect to be raised.
+  await enqueueOutbox(
+    tx,
+    inboxAddedEvent({
+      workspaceId: input.workspaceId,
+      recipientMemberId: recipient.memberId,
+      notificationId,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      reason: recipient.reason,
+    }),
+  );
 }
 
 export interface NotifyRecipientsInput {
@@ -93,13 +139,22 @@ export async function notifyRecipients<
     if (sendImmediately) {
       // openokr:allow-mutation: this helper is called only from inside an
       // Operation's execute, on the transaction that Operation opened.
-      await tx.insert(notifications).values({
-        workspaceId: input.workspaceId,
-        recipientMemberId: recipient.memberId,
-        activityId: input.activityId ?? null,
-        reason: recipient.reason,
-        channel,
-      });
+      const [inserted] = await tx
+        .insert(notifications)
+        .values({
+          workspaceId: input.workspaceId,
+          recipientMemberId: recipient.memberId,
+          activityId: input.activityId ?? null,
+          // Stored rather than only used to find the recipients (migration
+          // 0074). Without it a row from a producer that has no activity id has
+          // no subject at all, which is two of the three (P6-G07a).
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          reason: recipient.reason,
+          channel,
+        })
+        .returning({ id: notifications.id });
+      await announce(tx, input, recipient, inserted?.id);
       immediate++;
     } else {
       const batchId = await ensurePendingBatch(tx, {
@@ -110,14 +165,21 @@ export async function notifyRecipients<
           settings.batchWindowMinutes ?? DEFAULT_BATCH_WINDOW_MINUTES,
       });
       // openokr:allow-mutation: same reason as the branch above.
-      await tx.insert(notifications).values({
-        workspaceId: input.workspaceId,
-        recipientMemberId: recipient.memberId,
-        activityId: input.activityId ?? null,
-        batchId,
-        reason: recipient.reason,
-        channel,
-      });
+      const [inserted] = await tx
+        .insert(notifications)
+        .values({
+          workspaceId: input.workspaceId,
+          recipientMemberId: recipient.memberId,
+          activityId: input.activityId ?? null,
+          batchId,
+          // Same as the immediate branch above.
+          subjectType: input.subjectType,
+          subjectId: input.subjectId,
+          reason: recipient.reason,
+          channel,
+        })
+        .returning({ id: notifications.id });
+      await announce(tx, input, recipient, inserted?.id);
       batched++;
     }
   }

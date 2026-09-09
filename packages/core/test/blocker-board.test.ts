@@ -491,3 +491,43 @@ describe("the KPI suggestion", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * A workspace's own blocker ladder (METHOD.md §11, P6-G21b).
+ *
+ * `nudge_rules.escalation_ladder` has been stored since P4-T04b and read by
+ * nothing, so a workspace that set one was ranked by §11's numbers anyway.
+ * This is the consumer half: the write and the refusals are in
+ * `nudges.test.ts`.
+ */
+describe("the workspace's own blocker ladder", () => {
+  it("ranks by the workspace's rungs rather than §11's", async () => {
+    // Eighteen hours is below §11's first rung at twenty and above a
+    // workspace ladder whose top rung is twelve, so the same blocker reads
+    // differently under each and nothing else about it changes.
+    await openBlocker("Waiting on billing", 18);
+    expect((await board())[0]?.escalation).toBe("none");
+
+    await call("nudges.setRule", {
+      ruleKey: "blocker.escalated",
+      escalationLadder: { owner: 4, coordinator: 8, sponsor: 12 },
+    });
+
+    expect((await board())[0]?.escalation).toBe("sponsor");
+  });
+
+  it("falls back to §11 when the stored ladder is unreadable", async () => {
+    // A row written by an older release, by hand or by a restore is a row
+    // this code did not write. Canon is always answerable, so there is no
+    // state in which escalation stops working.
+    const wb = await workerDb();
+    await openBlocker("Waiting on legal", 30);
+    await wb.admin.query(
+      `insert into nudge_rules (id, workspace_id, rule_key, escalation_ladder)
+       values (gen_random_uuid(), $1, 'blocker.escalated', $2::jsonb)`,
+      [workspaceId, JSON.stringify({ nonsense: true })],
+    );
+
+    expect((await board())[0]?.escalation).toBe("coordinator");
+  });
+});

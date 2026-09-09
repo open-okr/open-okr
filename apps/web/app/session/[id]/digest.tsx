@@ -14,7 +14,14 @@
  * answers null when one was invented, so this component has no judgement to make
  * about whether to trust what it was given.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useCallback, useState } from "react";
 import { narrateDigestAction } from "./actions";
@@ -35,6 +42,8 @@ export function Digest({
   /** Whether a provider can narrate at all. False is the normal case. */
   readonly assistAvailable: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [narrative, setNarrative] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -60,10 +69,10 @@ export function Digest({
   if (!digest) {
     return (
       <Card>
-        <CardHeader>Digest</CardHeader>
+        <CardHeader>{t("session.detail.digest.digest")}</CardHeader>
         <CardBody>
           <p className="text-sm text-ink-3">
-            The digest is assembled when the session reaches step 4.
+            {t("session.detail.digest.theDigestIsAssembled")}
           </p>
         </CardBody>
       </Card>
@@ -73,31 +82,36 @@ export function Digest({
   return (
     <Card>
       <CardHeader className="justify-between">
-        <span>Digest, week of {digest.weekStart}</span>
+        <span>
+          {t("session.detail.digest.digestWeekOf")} {digest.weekStart}
+        </span>
         {assistAvailable ? (
           <Button variant="ai" disabled={busy} onClick={() => void narrate()}>
             <Sparkles className="size-3" />
-            Narrate it
+            {t("session.detail.digest.narrateIt")}
           </Button>
         ) : null}
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         {narrative ? (
           <section
-            aria-label="Narrated digest"
+            aria-label={t("session.detail.digest.narratedDigest")}
             className="rounded-md border border-line bg-surface p-3"
           >
             <span className="mb-1.5 flex items-center gap-2">
-              <Chip tone="agent">AI</Chip>
+              <Chip tone="agent">{t("common.ai")}</Chip>
               <span className="text-xs text-ink-4">
-                Same numbers, fewer lines
+                {t("session.detail.digest.sameNumbersFewerLines")}
               </span>
             </span>
             <p className="text-sm text-ink">{narrative}</p>
           </section>
         ) : null}
 
-        <ul aria-label="The digest" className="flex flex-col gap-1.5">
+        <ul
+          aria-label={t("session.detail.digest.theDigest")}
+          className="flex flex-col gap-1.5"
+        >
           {digest.lines.map((line) => (
             <li key={line} className="text-sm text-ink-2">
               {line}

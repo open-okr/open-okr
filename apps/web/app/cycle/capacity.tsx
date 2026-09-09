@@ -1,5 +1,6 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 import { CAPACITY_LABEL, CAPACITY_TONE } from "../initiatives/labels.ts";
 
 /**
@@ -33,13 +34,15 @@ export interface CapacityInitiative {
   readonly capacity: "fits" | "tight" | "exceeds" | null;
 }
 
-export function Capacity({
+export async function Capacity({
   keyResults,
   initiatives,
 }: {
   readonly keyResults: readonly CapacityKeyResult[];
   readonly initiatives: readonly CapacityInitiative[];
 }) {
+  const { t } = await getTranslations();
+
   const byId = new Map(initiatives.map((one) => [one.id, one]));
   const overCommitted = initiatives.filter((one) => one.capacity === "exceeds");
   const unjudged = initiatives.filter((one) => one.capacity === null);
@@ -48,17 +51,16 @@ export function Capacity({
     <Card id="capacity-check">
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">Capacity</h2>
-          <p className="text-xs text-ink-3">
-            METHOD.md §5.5. Nothing may remain at "exceeds" when the set is
-            published, and what was cut has to be recorded.
-          </p>
+          <h2 className="text-sm font-bold text-ink">
+            {t("cycle.capacity.capacity")}
+          </h2>
+          <p className="text-xs text-ink-3">{t("cycle.capacity.methodMd55")}</p>
         </div>
         <Link
           href="/initiatives"
           className="flex-none rounded-md border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
         >
-          All initiatives
+          {t("cycle.capacity.allInitiatives")}
         </Link>
       </CardHeader>
 
@@ -72,7 +74,7 @@ export function Capacity({
               {overCommitted.length === 1
                 ? "One initiative is over capacity."
                 : `${overCommitted.length} initiatives are over capacity.`}{" "}
-              Gate five refuses this set until that changes.
+              {t("cycle.capacity.gateFiveRefusesThis")}
             </p>
             <ul className="mt-1 flex flex-col gap-0.5">
               {overCommitted.map((one) => (
@@ -94,13 +96,13 @@ export function Capacity({
             {unjudged.length === 1
               ? "One initiative has no capacity verdict yet."
               : `${unjudged.length} initiatives have no capacity verdict yet.`}{" "}
-            §5.5: if the answer is "nothing was cut", capacity was not checked.
+            {t("cycle.capacity.55IfThe")}
           </p>
         ) : null}
 
         {keyResults.length === 0 ? (
           <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-            This cycle has no key results to check capacity against yet.
+            {t("cycle.capacity.thisCycleHasNo")}
           </p>
         ) : (
           <ul className="flex flex-col divide-y divide-line">
@@ -119,7 +121,7 @@ export function Capacity({
                   </span>
                   {keyResult.initiativeIds.length === 0 ? (
                     <span className="text-xs text-ink-3">
-                      No initiative recorded against it yet.
+                      {t("cycle.capacity.noInitiativeRecordedAgainst")}
                     </span>
                   ) : (
                     <ul className="flex flex-wrap gap-1.5">

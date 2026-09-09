@@ -135,16 +135,25 @@ describe("agents.setEnabled", () => {
 });
 
 describe("agents.bindScope", () => {
+  /**
+   * **This test's title was right and its body was not.** It said "not the
+   * workspace at large" and bound `resourceType: "workspace"`, which is the
+   * grant CLAUDE.md forbids outright, and it passed because nothing refused
+   * it. What it actually proved was the other half of its own name, that the
+   * binding lands on the agent's own member group rather than a broad one.
+   * It binds a named space now, and the refusal has a test of its own below.
+   */
   it("grants the agent's own member group a binding on a named resource, not the workspace at large", async () => {
     const agent = await callAction(
       ownerContext(),
       "agents.create",
       createAgentInput({ name: "Bound" }),
     );
+    const spaces = await callAction(ownerContext(), "spaces.list", {});
     await callAction(ownerContext(), "agents.bindScope", {
       agentId: agent.id,
-      resourceType: "workspace",
-      resourceId: workspaceId,
+      resourceType: "space",
+      resourceId: (spaces as Array<{ id: string }>)[0]?.id as string,
       level: 40,
     });
 
@@ -302,5 +311,185 @@ describe("proposals.bulkApply / bulkDismiss", () => {
       status: "pending",
     });
     expect(list.map((r) => r.id)).toEqual([firstId]);
+  });
+});
+
+describe("agents.setAutonomy (P6-G13b)", () => {
+  it("moves an agent between all three policies", async () => {
+    // `agents.create` took an autonomy and nothing could change it, so the
+    // propose-and-approve default was in practice permanent and the sandbox a
+    // one-way door.
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({ name: "Policy", autonomy: "sandbox" }),
+    );
+
+    for (const autonomy of ["propose", "scoped_direct", "sandbox"] as const) {
+      const moved = await callAction(ownerContext(), "agents.setAutonomy", {
+        id: agent.id,
+        autonomy,
+      });
+      expect(moved.autonomy).toBe(autonomy);
+      const rows = await callAction(ownerContext(), "agents.list", {});
+      expect(rows.find((r) => r.id === agent.id)?.autonomy).toBe(autonomy);
+    }
+  });
+
+  it("records both ends of the change, because that is the question asked later", async () => {
+    const wb = await workerDb();
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({ name: "Audited", autonomy: "propose" }),
+    );
+    await callAction(ownerContext(), "agents.setAutonomy", {
+      id: agent.id,
+      autonomy: "scoped_direct",
+    });
+
+    const rows = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from audit_events where action = 'agents.setAutonomy'",
+    );
+    expect(rows.rows).toHaveLength(1);
+    // "Who widened this, and from what" needs both ends, not just the new one.
+    expect(rows.rows[0]?.payload).toMatchObject({
+      from: "propose",
+      to: "scoped_direct",
+    });
+  });
+
+  it("refuses an agent that is not this workspace's", async () => {
+    await expect(
+      callAction(ownerContext(), "agents.setAutonomy", {
+        id: "00000000-0000-4000-8000-000000000000",
+        autonomy: "sandbox",
+      }),
+    ).rejects.toThrow(/no such agent/i);
+  });
+});
+
+describe("agents.bindScope refuses the workspace (P6-G13b, restored at P6-G13c)", () => {
+  it("will not give an agent authority over everything", async () => {
+    // CLAUDE.md: an agent gets bindings on named spaces, goals and KPI trees
+    // only, and there is no service account with ambient authority. The
+    // action's own summary said "never workspace-wide" from P4-T05a and
+    // nothing enforced it: `resolveSubjectContext` resolves `workspace` like
+    // any other subject, so this call used to succeed.
+    //
+    // P6-G13b added the refusal and withdrew it, because the access floor
+    // measured every actor against the workspace and an agent bound to a
+    // space could then write nothing. P6-G13c fixed the floor, so this test
+    // is back with the behaviour it always described.
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({ name: "Greedy" }),
+    );
+    await expect(
+      callAction(ownerContext(), "agents.bindScope", {
+        agentId: agent.id,
+        resourceType: "workspace",
+        resourceId: workspaceId,
+        level: 100,
+      }),
+    ).rejects.toThrow(/never to the whole workspace/i);
+  });
+
+  it("still binds a named space", async () => {
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({ name: "Scoped" }),
+    );
+    const spaces = await callAction(ownerContext(), "spaces.list", {});
+    const spaceId = (spaces as Array<{ id: string }>)[0]?.id as string;
+
+    const bound = await callAction(ownerContext(), "agents.bindScope", {
+      agentId: agent.id,
+      resourceType: "space",
+      resourceId: spaceId,
+      level: 70,
+    });
+    expect(bound.resourceType).toBe("space");
+    expect(bound.level).toBe(70);
+  });
+});
+
+describe("the access floor measures the subject (P6-G13c)", () => {
+  /**
+   * The acceptance criterion, at the pipeline rather than at the executor.
+   *
+   * An agent holds nothing on the workspace: `workspace_standard` excludes
+   * agent-kind members by design. So before this change the floor refused it
+   * every write, whatever it was bound to, and `scoped_direct` was a mode no
+   * agent could act in.
+   */
+  async function boundAgent(spaceId: string, level: number) {
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({
+        name: `Bound to ${spaceId}`,
+        autonomy: "scoped_direct",
+      }),
+    );
+    await callAction(ownerContext(), "agents.bindScope", {
+      agentId: agent.id,
+      resourceType: "space",
+      resourceId: spaceId,
+      level,
+    });
+    return agent;
+  }
+
+  it("lets an agent bound to one space write in it, and refuses it in another", async () => {
+    const provisioned = await callAction(ownerContext(), "spaces.list", {});
+    const mine = (provisioned as Array<{ id: string }>)[0]?.id as string;
+    const theirs = await callAction(ownerContext(), "spaces.create", {
+      name: "Somebody else's",
+    });
+
+    const agent = await boundAgent(mine, 100);
+    const asAgent = () => ({
+      pool,
+      workspaceId,
+      actor: { kind: "agent" as const, memberId: agent.memberId },
+    });
+
+    const renamed = await callAction(asAgent(), "spaces.update", {
+      id: mine,
+      name: "Renamed by its own agent",
+    });
+    expect(renamed.name).toBe("Renamed by its own agent");
+
+    await expect(
+      callAction(asAgent(), "spaces.update", {
+        id: theirs.id,
+        name: "Should never land",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("refuses an agent bound to nothing", async () => {
+    const spaces = await callAction(ownerContext(), "spaces.list", {});
+    const spaceId = (spaces as Array<{ id: string }>)[0]?.id as string;
+    const agent = await callAction(
+      ownerContext(),
+      "agents.create",
+      createAgentInput({ name: "Unbound", autonomy: "scoped_direct" }),
+    );
+
+    await expect(
+      callAction(
+        {
+          pool,
+          workspaceId,
+          actor: { kind: "agent" as const, memberId: agent.memberId },
+        },
+        "spaces.update",
+        { id: spaceId, name: "Should never land" },
+      ),
+    ).rejects.toThrow();
   });
 });

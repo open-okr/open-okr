@@ -7,16 +7,22 @@
  */
 import {
   activeOnly,
+  activities,
   NOTIFICATION_REASONS,
   notifications,
+  nudges,
+  subscriptionLists,
   subscriptions,
+  type WorkspaceTx,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, desc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, count, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { renderActivity } from "../activities/renderers.ts";
+import { claimDueBatches } from "../notifications/drain.ts";
 import {
   getOrCreateNotificationSettings,
   updateNotificationSettings,
@@ -26,49 +32,117 @@ import {
   ensureSubscriptionList,
   subscribeMember,
 } from "../notifications/subscriptions.ts";
+import { readerMaySeeSubject } from "../notifications/visibility.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
+/**
+ * One inbox row (screen S-03, P6-G07a).
+ *
+ * **The reason enum came from the table, not from a copy of it.** It listed
+ * four of the six until P6-G07a: `review` and `check_in` were added to
+ * `NOTIFICATION_REASONS` at P3-T07 and P4-T04 and never reached this schema,
+ * so the OpenAPI document and the command line described an inbox that could
+ * not contain a reviewer's obligation or a nudge. Nothing validated the output,
+ * which is why it went unnoticed, and a client that did validate would have
+ * rejected the two reasons that matter most.
+ */
 const notificationRow = z.object({
   id: z.uuid(),
-  reason: z.enum(["invited", "joined", "mentioned", "role"]),
+  reason: z.enum(NOTIFICATION_REASONS),
   channel: z.string(),
   readAt: z.string().nullable(),
   snoozedUntil: z.string().nullable(),
   createdAt: z.string(),
+  /**
+   * What this row is about, so it can be grouped and linked.
+   *
+   * Null only on a row written before migration 0074, where the activity's own
+   * subject is the fallback and there is nothing to fall back to when the
+   * producer wrote no activity either.
+   */
+  subjectType: z.string().nullable(),
+  subjectId: z.string().nullable(),
+  /**
+   * What happened, in the activity renderer's words: the same sentence the
+   * feed shows, so the inbox and the feed can never describe one event
+   * differently. Null for a nudge, which has no activity behind it.
+   */
+  rendered: z.string().nullable(),
+  /**
+   * The rule a proactive message cites (UIUX-PLAN §3: "Every proactive
+   * message shows its rule"). Null for everything that is not a nudge.
+   */
+  ruleKey: z.string().nullable(),
+  /**
+   * Whether the reader still holds a live subscription to this subject, so the
+   * row can offer mute without the screen guessing. False when the subject is
+   * one nothing subscribes to, such as an invitation or a role change.
+   */
+  watching: z.boolean(),
 });
+
+/** The page the screen draws, and the ceiling the read will not go above. */
+const INBOX_PAGE_SIZE = 50;
+
+/**
+ * The acting member, or null when the caller is not one.
+ *
+ * The inbox is addressed to a member, so a caller with no member row has no
+ * inbox rather than an empty one. Returning null and letting each action decide
+ * keeps the read answering `[]` where it always did, so nothing that already
+ * calls it changes behaviour.
+ */
+async function actingMember(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+  return member?.id ?? null;
+}
 
 export const listNotifications = defineReadAction({
   name: "notifications.list",
   summary: "The signed-in member's own inbox.",
-  input: z.object({ unreadOnly: z.boolean().optional() }),
+  input: z.object({
+    unreadOnly: z.boolean().optional(),
+    /** One reason, for §3's reason filter. Absent means every reason. */
+    reason: z.enum(NOTIFICATION_REASONS).optional(),
+    cursor: z.object({ createdAt: z.string(), id: z.uuid() }).optional(),
+  }),
   output: z.array(notificationRow),
   access: ACCESS_LEVELS.view,
+  page: { cursorFrom: ["createdAt", "id"] },
   async handler(context, input) {
     const db = drizzle(context.pool);
-    return withWorkspace(db, context.workspaceId, async (tx) => {
-      const userId = context.actor.userId;
-      if (!userId) {
-        return [];
-      }
-      const [member] = await tx
-        .select({ id: workspaceMembers.id })
-        .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.workspaceId, context.workspaceId),
-            eq(workspaceMembers.userId, userId),
-          ),
-        )
-        .limit(1);
-      if (!member) {
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
         return [];
       }
 
       const now = new Date();
       const conditions = [
-        eq(notifications.recipientMemberId, member.id),
+        eq(notifications.recipientMemberId, memberId),
         or(
           isNull(notifications.snoozedUntil),
           lte(notifications.snoozedUntil, now),
@@ -76,6 +150,24 @@ export const listNotifications = defineReadAction({
       ];
       if (input.unreadOnly) {
         conditions.push(isNull(notifications.readAt));
+      }
+      if (input.reason) {
+        conditions.push(eq(notifications.reason, input.reason));
+      }
+      if (input.cursor) {
+        // Keyset rather than an offset, and the id breaks the tie: two
+        // notifications written in the same millisecond are ordinary in a
+        // fan-out, and an offset page would show one of them twice.
+        const at = new Date(input.cursor.createdAt);
+        conditions.push(
+          or(
+            lt(notifications.createdAt, at),
+            and(
+              eq(notifications.createdAt, at),
+              lt(notifications.id, input.cursor.id),
+            ),
+          ) as never,
+        );
       }
 
       const rows = await tx
@@ -86,8 +178,22 @@ export const listNotifications = defineReadAction({
           readAt: notifications.readAt,
           snoozedUntil: notifications.snoozedUntil,
           createdAt: notifications.createdAt,
+          // Coalesced in that order: the row's own subject where it has one,
+          // then the activity behind it for a row written before migration
+          // 0074, then the nudge's. Left joins, because a row can have none.
+          ownSubjectType: notifications.subjectType,
+          ownSubjectId: notifications.subjectId,
+          activityKind: activities.kind,
+          activityPayload: activities.payload,
+          activitySubjectType: activities.subjectType,
+          activitySubjectId: activities.subjectId,
+          ruleKey: nudges.ruleKey,
+          nudgeSubjectType: nudges.subjectType,
+          nudgeSubjectId: nudges.subjectId,
         })
         .from(notifications)
+        .leftJoin(activities, eq(activities.id, notifications.activityId))
+        .leftJoin(nudges, eq(nudges.id, notifications.nudgeId))
         .where(
           activeOnly(
             notifications,
@@ -95,15 +201,174 @@ export const listNotifications = defineReadAction({
             and(...conditions),
           ),
         )
-        .orderBy(desc(notifications.createdAt))
-        .limit(100);
+        .orderBy(desc(notifications.createdAt), desc(notifications.id))
+        .limit(INBOX_PAGE_SIZE);
 
-      return rows.map((row) => ({
-        ...row,
-        readAt: row.readAt?.toISOString() ?? null,
-        snoozedUntil: row.snoozedUntil?.toISOString() ?? null,
-        createdAt: row.createdAt.toISOString(),
-      }));
+      // The subjects this reader is watching, in one query rather than one per
+      // row. Only the subjects on this page, so a member watching a thousand
+      // things pays for the fifty in front of them.
+      const watched = await watchedSubjects(
+        tx,
+        context.workspaceId,
+        memberId,
+        rows.map((row) => ({
+          subjectType:
+            row.ownSubjectType ??
+            row.activitySubjectType ??
+            row.nudgeSubjectType,
+          subjectId:
+            row.ownSubjectId ?? row.activitySubjectId ?? row.nudgeSubjectId,
+        })),
+      );
+
+      const visible: z.infer<typeof notificationRow>[] = [];
+      for (const row of rows) {
+        const subjectType =
+          row.ownSubjectType ??
+          row.activitySubjectType ??
+          row.nudgeSubjectType ??
+          null;
+        const subjectId =
+          row.ownSubjectId ??
+          row.activitySubjectId ??
+          row.nudgeSubjectId ??
+          null;
+        if (
+          !(await readerMaySeeSubject(
+            tx,
+            context.workspaceId,
+            memberId,
+            subjectType,
+            subjectId,
+          ))
+        ) {
+          continue;
+        }
+        visible.push({
+          id: row.id,
+          reason: row.reason,
+          channel: row.channel,
+          readAt: row.readAt?.toISOString() ?? null,
+          snoozedUntil: row.snoozedUntil?.toISOString() ?? null,
+          createdAt: row.createdAt.toISOString(),
+          subjectType,
+          subjectId,
+          rendered: row.activityKind
+            ? renderActivity(row.activityKind, row.activityPayload ?? {})
+            : null,
+          ruleKey: row.ruleKey ?? null,
+          watching:
+            subjectType !== null &&
+            subjectId !== null &&
+            watched.has(`${subjectType}:${subjectId}`),
+        });
+      }
+      return visible;
+    });
+  },
+});
+
+/**
+ * Which of these subjects the member holds a live subscription to.
+ *
+ * One query for the page. A canceled subscription is not one: `mute` cancels
+ * rather than deletes, so the row has to read the flag and not merely the
+ * row's existence.
+ */
+async function watchedSubjects(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  subjects: readonly {
+    subjectType: string | null;
+    subjectId: string | null;
+  }[],
+): Promise<ReadonlySet<string>> {
+  const pairs = subjects.filter(
+    (subject): subject is { subjectType: string; subjectId: string } =>
+      subject.subjectType !== null && subject.subjectId !== null,
+  );
+  if (pairs.length === 0) {
+    return new Set();
+  }
+  const rows = await tx
+    .select({
+      subjectType: subscriptionLists.subjectType,
+      subjectId: subscriptionLists.subjectId,
+    })
+    .from(subscriptions)
+    .innerJoin(
+      subscriptionLists,
+      eq(subscriptionLists.id, subscriptions.listId),
+    )
+    .where(
+      activeOnly(
+        subscriptions,
+        eq(subscriptions.workspaceId, workspaceId),
+        eq(subscriptions.memberId, memberId),
+        eq(subscriptions.canceled, false),
+      ),
+    );
+  const held = new Set(
+    rows.map((row) => `${row.subjectType}:${row.subjectId}`),
+  );
+  return new Set(
+    pairs
+      .map((subject) => `${subject.subjectType}:${subject.subjectId}`)
+      .filter((key) => held.has(key)),
+  );
+}
+
+/**
+ * The number on the Inbox item in the sidebar (UIUX-PLAN §3, S-03, P6-G07a).
+ *
+ * Unread and not snoozed, which is the same set the screen's default view
+ * lists, so the badge and the list cannot disagree. Snoozed rows are excluded
+ * on purpose: a snooze that left the badge standing would be a snooze that did
+ * nothing the reader asked for.
+ *
+ * **Not access-scoped, and it says so rather than pretending.** A count is a
+ * number, not a subject, and scoping it would mean running the getter over
+ * every unread row on every page load to decide a digit. What it can overstate
+ * by is the rows whose subject the reader has since lost access to, which the
+ * screen then does not list. The alternative is a badge that costs a page of
+ * access checks on every navigation in the product.
+ */
+export const unreadNotificationCount = defineReadAction({
+  name: "notifications.unreadCount",
+  summary: "How many unread, unsnoozed notifications the member has.",
+  input: z.object({}),
+  output: z.object({ unread: z.number().int() }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
+        return { unread: 0 };
+      }
+      const now = new Date();
+      const [row] = await tx
+        .select({ unread: count() })
+        .from(notifications)
+        .where(
+          activeOnly(
+            notifications,
+            eq(notifications.workspaceId, context.workspaceId),
+            eq(notifications.recipientMemberId, memberId),
+            isNull(notifications.readAt),
+            or(
+              isNull(notifications.snoozedUntil),
+              lte(notifications.snoozedUntil, now),
+            ) as never,
+          ),
+        );
+      return { unread: Number(row?.unread ?? 0) };
     });
   },
 });
@@ -209,7 +474,45 @@ const settingsOutput = z.object({
   batchWindowMinutes: z.number(),
   dailySummary: z.boolean(),
   dailySummaryTime: z.string(),
+  /**
+   * A channel per reason, and the primary channel for every reason absent
+   * (P6-G08).
+   *
+   * `notification_settings.routing` has been read by `notifyRecipients` since
+   * P2-T06 and there was no way to see it or set it: this schema described four
+   * of the row's fields and the routing was not one of them, so the member half
+   * of §4.14 was unreachable. The gap audit recorded it under B-06.
+   */
+  routing: z.record(z.string(), z.string()),
 });
+
+/**
+ * The settings row as the contract describes it.
+ *
+ * `NotificationRouting` allows an undefined value per key, because a partial
+ * record is what the jsonb column holds and a caller reading a reason that was
+ * never set gets undefined. The contract describes what is actually stored, so
+ * the undefined entries are dropped here rather than declared as nullable
+ * fields nothing ever writes.
+ */
+function settingsView(
+  row: Awaited<ReturnType<typeof getOrCreateNotificationSettings>>,
+): z.infer<typeof settingsOutput> {
+  const routing: Record<string, string> = {};
+  for (const [reason, channel] of Object.entries(row.routing)) {
+    if (channel !== undefined) {
+      routing[reason] = channel;
+    }
+  }
+  return {
+    memberId: row.memberId,
+    mentionImmediate: row.mentionImmediate,
+    batchWindowMinutes: row.batchWindowMinutes,
+    dailySummary: row.dailySummary,
+    dailySummaryTime: row.dailySummaryTime,
+    routing,
+  };
+}
 
 export const getNotificationSettings = defineReadAction({
   name: "notifications.getSettings",
@@ -238,10 +541,12 @@ export const getNotificationSettings = defineReadAction({
       if (!member) {
         throw new OperationError("not_found", "No such member.");
       }
-      return getOrCreateNotificationSettings(
-        tx,
-        context.workspaceId,
-        member.id,
+      return settingsView(
+        await getOrCreateNotificationSettings(
+          tx,
+          context.workspaceId,
+          member.id,
+        ),
       );
     });
   },
@@ -252,11 +557,35 @@ export const updateOwnNotificationSettings = defineWriteAction({
   summary: "Updates the signed-in member's own notification settings.",
   input: z.object({
     mentionImmediate: z.boolean().optional(),
-    batchWindowMinutes: z.number().int().positive().optional(),
+    // Bounded, where this was any positive integer. A window of a million
+    // minutes is a member who never hears from the product again, and the
+    // registry's own schema is where that bound is written (P6-G08).
+    batchWindowMinutes: z.number().int().min(1).max(1440).optional(),
     dailySummary: z.boolean().optional(),
     dailySummaryTime: z
       .string()
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .optional(),
+    /**
+     * The whole map, not one entry (P6-G08).
+     *
+     * `notification_settings.routing` has been read by `notifyRecipients` on
+     * every fan-out since P2-T06 and nothing could write it: this input
+     * described four of the row's fields and the routing was not one of them,
+     * so per-reason routing was storage with no way in. A reason absent from
+     * the map falls back to the member's primary channel, so removing an
+     * override means sending a map without that key; a per-entry patch would
+     * need a second verb to delete one, and the map is six keys at most.
+     */
+    // `partialRecord`, not `record`. In Zod 4 a record keyed by an enum is
+    // exhaustive: it demands an entry for all six reasons, which is exactly
+    // the map §4.14 says not to store, because a reason absent is what "follow
+    // my primary channel" means. Caught by the test that stores two overrides.
+    routing: z
+      .partialRecord(
+        z.enum(NOTIFICATION_REASONS),
+        z.enum(["app", "email", "slack", "teams", "whatsapp", "telegram"]),
+      )
       .optional(),
   }),
   output: settingsOutput,
@@ -273,7 +602,7 @@ export const updateOwnNotificationSettings = defineWriteAction({
         ...input,
       });
       return {
-        result: updated,
+        result: settingsView(updated),
         activity: {
           kind: "notification_settings.updated",
           subjectType: "workspace_member",
@@ -287,6 +616,125 @@ export const updateOwnNotificationSettings = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * Whether the reader is watching one subject, and why (S-03, P6-G07b).
+ *
+ * **`subscriptions.toggle` had no read beside it.** It shipped at P2-T06 and
+ * could subscribe or unsubscribe, and nothing could answer "am I watching
+ * this", so a control for it could only be a button that guessed its own
+ * state. That is why no page had one.
+ *
+ * **The reason is the half worth reading.** A member added because they were
+ * mentioned, and a member added because they are the reviewer, are both
+ * watching, and only one of them chose to be. A control that says "watching"
+ * and nothing else invites somebody to turn off an obligation without knowing
+ * it was one.
+ *
+ * A subject nobody has ever subscribed to has no list, which is not an error:
+ * nobody is watching it, and saying so is the answer.
+ */
+export const readSubscription = defineReadAction({
+  name: "subscriptions.read",
+  summary:
+    "Whether the signed-in member is watching a subject, why, and how many others are.",
+  input: z.object({
+    subjectType: z.string().min(1),
+    subjectId: z.uuid(),
+  }),
+  output: z.object({
+    watching: z.boolean(),
+    /** Why they were subscribed, or null when they are not. */
+    reason: z.enum(NOTIFICATION_REASONS).nullable(),
+    /** Everybody on the list, including the reader. */
+    watchers: z.number().int(),
+    /** Whether the list sends to the whole space rather than to a list. */
+    everyone: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
+        throw new OperationError("not_found", "No such subject.");
+      }
+
+      // The same visibility check the inbox makes. A subject the reader may
+      // not see answers not-found rather than confirming it exists.
+      const visible = await readerMaySeeSubject(
+        tx,
+        context.workspaceId,
+        memberId,
+        input.subjectType,
+        input.subjectId,
+      );
+      if (!visible) {
+        throw new OperationError("not_found", "No such subject.");
+      }
+
+      const [list] = await tx
+        .select({
+          id: subscriptionLists.id,
+          sendToEveryone: subscriptionLists.sendToEveryone,
+        })
+        .from(subscriptionLists)
+        .where(
+          activeOnly(
+            subscriptionLists,
+            eq(subscriptionLists.workspaceId, context.workspaceId),
+            eq(subscriptionLists.subjectType, input.subjectType),
+            eq(subscriptionLists.subjectId, input.subjectId),
+          ),
+        )
+        .limit(1);
+
+      if (!list) {
+        // No list is not a missing row to repair: it means nobody has ever
+        // subscribed, which is a complete answer.
+        return {
+          watching: false,
+          reason: null,
+          watchers: 0,
+          everyone: false,
+        };
+      }
+
+      const rows = await tx
+        .select({
+          memberId: subscriptions.memberId,
+          reason: subscriptions.reason,
+        })
+        .from(subscriptions)
+        .where(
+          activeOnly(
+            subscriptions,
+            eq(subscriptions.workspaceId, context.workspaceId),
+            eq(subscriptions.listId, list.id),
+            // **Cancelled, not deleted.** Unsubscribing sets `canceled` and
+            // keeps the row, so the history of who was ever on a list
+            // survives. A read that only asked `activeOnly` counted somebody
+            // who had muted the subject as still watching it, which is what
+            // the test for turning a watch off found.
+            eq(subscriptions.canceled, false),
+          ),
+        );
+
+      const mine = rows.find((row) => row.memberId === memberId);
+      return {
+        watching: mine !== undefined,
+        reason: mine?.reason ?? null,
+        watchers: rows.length,
+        everyone: list.sendToEveryone,
+      };
+    });
+  },
 });
 
 export const toggleSubscription = defineWriteAction({
@@ -431,3 +879,67 @@ async function countSubscribers(
     .limit(1);
   return row !== undefined;
 }
+
+/**
+ * Drains the batches whose window has closed (P6-G01b).
+ *
+ * **Nothing had ever called this path.** P2-T06 coalesced notifications into
+ * batches correctly and its own comment said so plainly: "nothing dispatches a
+ * `pending` batch or an unsent immediate row yet". Four months later nothing
+ * did, so a member who chose a thirty-minute window received nothing rather
+ * than one mail every half hour, and `renderDigest` had no caller outside the
+ * package barrel. The gap audit recorded it as the second half of B-01.
+ *
+ * **A write action through the pipeline, not a bare function**, because it
+ * changes rows and enqueues side effects and those two have to commit
+ * together. The claim and the outbox row land in one transaction, so a crash
+ * between them is impossible rather than merely unlikely.
+ *
+ * The scheduler host calls it per workspace as `system`, the same principal
+ * the agent cadences run as. An administrator can call it by hand, which is
+ * what makes the drain testable without a clock.
+ */
+export const drainNotificationBatches = defineWriteAction({
+  name: "notifications.drainBatches",
+  summary:
+    "Claims every notification batch whose window has closed and enqueues its digest.",
+  input: z.object({
+    /** Defaults to the moment the request arrives. Overridden by tests. */
+    now: z.string().optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+  output: z.object({
+    claimed: z.number().int(),
+    waiting: z.number().int(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const now = input.now ? new Date(input.now) : new Date();
+      const drained = await claimDueBatches(tx as WorkspaceTx, {
+        workspaceId,
+        now,
+        ...(input.limit ? { limit: input.limit } : {}),
+      });
+      return {
+        result: { claimed: drained.claimed, waiting: drained.waiting },
+        // The outbox rows the claim produced, written by the pipeline in this
+        // same transaction. This is the only way a side effect leaves a write
+        // path in this product.
+        outbox: drained.outbox,
+        activity: {
+          kind: "notifications.drained",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { claimed: drained.claimed },
+        },
+        audit: {
+          action: "notifications.drainBatches",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { claimed: drained.claimed },
+        },
+      };
+    },
+  }),
+});

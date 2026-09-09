@@ -17,7 +17,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
 const REDIRECT = "http://127.0.0.1:7788/callback";

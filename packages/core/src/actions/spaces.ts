@@ -27,6 +27,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -35,6 +36,7 @@ import { accessScopeFilter, getAccessScoped } from "../access/reads.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { resolveCoordinator, wouldStrandSpace } from "../spaces/roles.ts";
 import {
   addSpaceMemberInTx,
@@ -65,6 +67,18 @@ const spaceDetail = spaceSummary.extend({
   ),
   /** The named coordinator, or the manager covering for them (§4.2). */
   coordinatorMemberId: z.uuid().nullable(),
+  /**
+   * §4.14's space scope, resolved (P6-G18b).
+   *
+   * Always three values, never a partial map: a space that has configured
+   * nothing reads the registry's defaults, which is what makes the scope
+   * usable without anybody visiting its screen.
+   */
+  settings: z.object({
+    teamVoting: z.boolean(),
+    coachStrictness: z.enum(COACH_STRICTNESS).nullable(),
+    defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).nullable(),
+  }),
 });
 
 export type SpaceSummary = z.infer<typeof spaceSummary>;
@@ -274,6 +288,7 @@ export const readSpace = defineReadAction({
             id: spaces.id,
             name: spaces.name,
             mission: spaces.mission,
+            settings: spaces.settings,
           })
           // openokr:allow-raw-read: getAccessScoped above just confirmed access
           // to this space; this loads the display columns the getter does not
@@ -328,10 +343,118 @@ export const readSpace = defineReadAction({
             role: row.role,
           })),
           coordinatorMemberId: resolveCoordinator(members) ?? null,
+          // Resolved, not raw: a space created before §4.14's space scope
+          // existed holds `{}` and reads the registry's defaults (P6-G18b).
+          settings: resolveSpaceSettingsFrom(space.settings),
         };
       },
     );
   },
+});
+
+/**
+ * Writes one space's §4.14 settings (P6-G18b).
+ *
+ * **Behind the space manager's own level, not the workspace admin's.** §4.14
+ * gives this row to "Space manager", and `spaces.update` already declares
+ * `edit`, which a manager holds through their binding on the space. The same
+ * level here, so a team can set its own strictness without an admin.
+ *
+ * **A key absent from the input is left as it is**, and a key set to null
+ * returns it to the workspace's. That is the difference the two nullable
+ * settings exist to express: a space with no opinion is not a space that chose
+ * the workspace's current value, because the workspace's can change.
+ */
+export const updateSpaceSettings = defineWriteAction({
+  name: "spaces.updateSettings",
+  summary:
+    "Sets one space's team voting, strictness override and default check-in frequency.",
+  input: z.object({
+    id: z.uuid(),
+    teamVoting: z.boolean().optional(),
+    /** Null returns this to the workspace's own strictness. */
+    coachStrictness: z.enum(COACH_STRICTNESS).nullable().optional(),
+    /** Null returns this to the workspace's own §11 cadence. */
+    defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).nullable().optional(),
+  }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actingMemberId(actor.memberId);
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "space",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.edit,
+      });
+
+      const [existing] = await tx
+        .select({ settings: spaces.settings })
+        // openokr:allow-raw-read: `getAccessScoped` above confirmed edit access
+        // to this space, and this reads the map about to be merged into.
+        .from(spaces)
+        .where(
+          activeOnly(
+            spaces,
+            eq(spaces.id, input.id),
+            eq(spaces.workspaceId, workspaceId),
+          ),
+        )
+        .limit(1);
+      if (!existing) {
+        throw new OperationError("not_found", "No such space.");
+      }
+
+      // Merged, one key at a time, rather than replacing the map. A screen
+      // that sends only what it renders must not silently drop a key a later
+      // release added.
+      const merged: Record<string, unknown> = {
+        ...(existing.settings as Record<string, unknown>),
+      };
+      if (input.teamVoting !== undefined) {
+        merged.teamVoting = input.teamVoting;
+      }
+      if (input.coachStrictness !== undefined) {
+        merged.coachStrictness = input.coachStrictness;
+      }
+      if (input.defaultCheckInFrequency !== undefined) {
+        merged.defaultCheckInFrequency = input.defaultCheckInFrequency;
+      }
+
+      const [updated] = await tx
+        .update(spaces)
+        .set({ settings: merged, updatedAt: new Date() })
+        .where(
+          activeOnly(
+            spaces,
+            eq(spaces.id, input.id),
+            eq(spaces.workspaceId, workspaceId),
+          ),
+        )
+        .returning({ id: spaces.id, name: spaces.name });
+      if (!updated) {
+        throw new OperationError("not_found", "No such space.");
+      }
+
+      return {
+        result: { id: updated.id },
+        activity: {
+          kind: "space.settingsChanged",
+          subjectType: "space",
+          subjectId: updated.id,
+          payload: { name: updated.name },
+        },
+        audit: {
+          action: "spaces.updateSettings",
+          targetType: "space",
+          targetId: updated.id,
+          payload: { settings: merged },
+        },
+      };
+    },
+  }),
 });
 
 export const createSpace = defineWriteAction({
@@ -411,6 +534,12 @@ export const updateSpace = defineWriteAction({
   // through requireSpaceAdmin. Declaring `full` here would lock managers out.
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "space", id: input.id },
     async execute({ tx, workspaceId, actor }) {
       const contextId = await requireSpaceAdmin(tx, {
         workspaceId,

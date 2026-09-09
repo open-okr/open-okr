@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import { type DecisionResult, NOTHING_YET } from "./decision-state.ts";
 
@@ -26,6 +26,8 @@ export function DecisionForm({
   ) => Promise<DecisionResult>;
   readonly userCode: string;
 }) {
+  const { t } = useTranslations();
+
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
 
   if (state.decided) {
@@ -56,7 +58,7 @@ export function DecisionForm({
           variant="primary"
           size="sm"
         >
-          Authorise this terminal
+          {t("account.device.decisionForm.authoriseThisTerminal")}
         </Button>
         <Button
           type="submit"
@@ -65,7 +67,7 @@ export function DecisionForm({
           variant="ghost"
           size="sm"
         >
-          Refuse
+          {t("common.refuse")}
         </Button>
       </div>
       {state.message === "" ? null : (

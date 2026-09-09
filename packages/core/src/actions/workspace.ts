@@ -7,7 +7,7 @@
  * with a human actor, a freshly loaded row and a side effect.
  */
 import { activeOnly, workspaces } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
@@ -80,6 +80,53 @@ export const renameWorkspace = defineWriteAction({
             idempotencyKey: `workspace.renamed:${workspaceId}:${loaded.name}:${updated.name}`,
           },
         ],
+      };
+    },
+  }),
+});
+
+export const finishOnboarding = defineWriteAction({
+  name: "workspace.finishOnboarding",
+  summary:
+    "Mark the workspace's own setup as finished, so the wizard stops offering itself.",
+  input: z.object({}),
+  output: z.object({ workspaceId: z.uuid(), onboardingDone: z.boolean() }),
+  // `full`, because it decides what every member of the workspace sees on
+  // their next navigation. Onboarding is the owner's, and P6-G26's acceptance
+  // line says "a first sign-in as owner".
+  access: ACCESS_LEVELS.full,
+  operation: () => ({
+    async execute({ tx, workspaceId }) {
+      // **Merged into the stored map rather than replacing it.** Every other
+      // key in `workspaces.settings` belongs to somebody else, and a write
+      // that set the whole object would silently reset the timezone the
+      // registering browser reported.
+      const [updated] = await tx
+        .update(workspaces)
+        .set({
+          settings: sql`coalesce(${workspaces.settings}, '{}'::jsonb) || '{"onboardingDone": true}'::jsonb`,
+          updatedAt: new Date(),
+        })
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .returning({ id: workspaces.id });
+      if (!updated) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      return {
+        result: { workspaceId, onboardingDone: true },
+        activity: {
+          kind: "workspace.onboarded",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {},
+        },
+        audit: {
+          action: "workspace.finish_onboarding",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {},
+        },
       };
     },
   }),

@@ -239,10 +239,21 @@ export async function deleteCommentAction(
   }
 }
 
+/**
+ * Reacting, and taking it back (P6-G27).
+ *
+ * **It was named a toggle and only ever added.** `reactions.remove` shipped
+ * with the reaction and had no browser caller, so pressing an emoji a second
+ * time did nothing and a reaction given by mistake stayed for good. The read
+ * now hands back the caller's own reaction id, which is the one thing this
+ * needed.
+ */
 export async function toggleReaction(
   subjectType: string,
   subjectId: string,
   emoji: string,
+  /** The caller's existing reaction with this emoji, when there is one. */
+  ownReactionId?: string | null,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -251,11 +262,17 @@ export async function toggleReaction(
     actor: { kind: "human" as const, userId: session.user.id },
   };
   try {
-    await callAction(context, "reactions.add", {
-      subjectType,
-      subjectId,
-      emoji,
-    });
+    if (ownReactionId) {
+      await callAction(context, "reactions.remove", {
+        reactionId: ownReactionId,
+      });
+    } else {
+      await callAction(context, "reactions.add", {
+        subjectType,
+        subjectId,
+        emoji,
+      });
+    }
     revalidatePath("/goals/[id]", "page");
     return NO_ERROR;
   } catch (error) {
@@ -263,7 +280,7 @@ export async function toggleReaction(
       error:
         error instanceof OperationError
           ? error.message
-          : "Failed to add reaction.",
+          : "Failed to change the reaction.",
     };
   }
 }

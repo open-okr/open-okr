@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "../lib/auth";
+import { getTranslations } from "../lib/translations";
 import { menuRowClass } from "./avatar-menu.tsx";
 
 /**
@@ -24,14 +25,16 @@ async function signOut(): Promise<void> {
   redirect("/sign-in");
 }
 
-export function SignOut() {
+export async function SignOut() {
+  const { t } = await getTranslations();
+
   return (
     <form action={signOut}>
       {/* `menuRowClass` rather than a class list of its own: this button sits
        * directly under three menu rows, and an unstyled one inherited the
        * body's 16px next to their 13px. */}
       <button type="submit" className={menuRowClass}>
-        Sign out
+        {t("signOut.signOut")}
       </button>
     </form>
   );

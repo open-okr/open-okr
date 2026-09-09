@@ -1,4 +1,5 @@
 import { Button } from "@openokr/ui";
+import { getTranslations } from "../lib/translations";
 import { ActionForm } from "./cycle/action-form.tsx";
 import { recordFromMap } from "./work-map-actions.ts";
 
@@ -17,7 +18,7 @@ import { recordFromMap } from "./work-map-actions.ts";
  * narrative. A panel that let somebody flip a goal to green with one click would
  * be the shortcut around the ritual the whole product exists to keep.
  */
-export function QuickCheckIn({
+export async function QuickCheckIn({
   goalId,
   keyResultId,
   currentValue,
@@ -28,6 +29,8 @@ export function QuickCheckIn({
   readonly currentValue: number;
   readonly unit: string | null;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <ActionForm action={recordFromMap} className="flex flex-col gap-1.5">
       <input type="hidden" name="goalId" value={goalId} />
@@ -36,7 +39,8 @@ export function QuickCheckIn({
         className="text-xs font-semibold text-ink-2"
         htmlFor={`map-value-${keyResultId}`}
       >
-        Record a value{unit ? ` (${unit})` : ""}
+        {t("quickCheckIn.recordAValue")}
+        {unit ? ` (${unit})` : ""}
       </label>
       <span className="flex items-center gap-1.5">
         <input
@@ -48,12 +52,11 @@ export function QuickCheckIn({
           className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
         />
         <Button type="submit" variant="primary" size="sm">
-          Save
+          {t("common.save")}
         </Button>
       </span>
       <span className="text-xs text-ink-4">
-        Status and confidence come from a check-in, where they arrive with a
-        narrative.
+        {t("quickCheckIn.statusAndConfidenceCome")}
       </span>
     </ActionForm>
   );

@@ -3,8 +3,11 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
+import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { getTranslations } from "../../../lib/translations";
+import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import {
@@ -42,6 +45,8 @@ export default async function InitiativePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -49,6 +54,14 @@ export default async function InitiativePage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const { id } = await params;
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "initiative",
+    subjectId: id,
+  });
 
   const initiative = await callAction(context, "initiatives.read", {
     id,
@@ -65,6 +78,20 @@ export default async function InitiativePage({
     workspace.workspaceId,
     workspace.memberId,
   );
+
+  // The files on this subject (P6-G27b). Seven attachment actions shipped and
+  // none of them had a caller anywhere.
+  // This initiative's own tasks (P6-G28). `tasks.list` gained the filter with
+  // this row: the board is per space and the other filters are per person or
+  // per date, so nothing could answer "the work this initiative is made of".
+  const initiativeTasks = await callAction(context, "tasks.list", {
+    initiativeId: id,
+  });
+
+  const attachments = await callAction(context, "attachments.list", {
+    subjectType: "initiative",
+    subjectId: id,
+  });
   const canEdit = level >= ACCESS_LEVELS.edit;
 
   // Every key result the reader can see, so the link picker offers real
@@ -102,164 +129,217 @@ export default async function InitiativePage({
   );
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <Link
-                href="/initiatives"
-                className="text-xs text-ink-3 hover:text-brand-text"
-              >
-                Initiatives
-              </Link>
-              <h1 className="text-lg font-bold text-ink">{initiative.title}</h1>
-              <p className="text-xs text-ink-3">
-                {initiative.spaceName} · owned by {initiative.ownerName}
-                {initiative.startsOn || initiative.endsOn
-                  ? ` · ${[initiative.startsOn, initiative.endsOn]
-                      .filter(Boolean)
-                      .join(" to ")}`
-                  : ""}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-start gap-2">
-              {canEdit ? (
-                <>
-                  <InlineSelect
-                    label="Status"
-                    value={initiative.status}
-                    options={STATUS_OPTIONS}
-                    onSave={setStatusAction.bind(null, initiative.id)}
-                  />
-                  <InlineSelect
-                    label="Capacity"
-                    value={initiative.capacity ?? ""}
-                    options={CAPACITY_OPTIONS}
-                    onSave={setCapacityAction.bind(null, initiative.id)}
-                  />
-                </>
-              ) : (
-                <>
-                  <Chip tone="neutral">{STATUS_LABEL[initiative.status]}</Chip>
-                  <Chip
-                    tone={CAPACITY_TONE[initiative.capacity ?? "unjudged"]}
-                    dot
-                  >
-                    {CAPACITY_LABEL[initiative.capacity ?? "unjudged"]}
-                  </Chip>
-                </>
-              )}
-            </div>
-          </CardHeader>
-          {initiative.capacity === "exceeds" ? (
-            <CardBody>
-              <p className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad">
-                This is over capacity, so publish gate five refuses the cycles
-                its key results belong to. METHOD.md §5.5: nothing may remain at
-                "exceeds" when the set is published, and what was cut has to be
-                recorded.
-              </p>
-            </CardBody>
-          ) : null}
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              The key results this work will move
-            </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {linked.length === 0 ? (
-              <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
-                Nothing yet. An initiative behind no measure is work nobody can
-                tell the value of.
-              </p>
+    <div className="flex w-full flex-col gap-3.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <Link
+              href="/initiatives"
+              className="text-xs text-ink-3 hover:text-brand-text"
+            >
+              {t("common.initiatives")}
+            </Link>
+            <h1 className="text-lg font-bold text-ink">{initiative.title}</h1>
+            <p className="text-xs text-ink-3">
+              {initiative.spaceName} {t("initiatives.detail.ownedBy")}{" "}
+              {initiative.ownerName}
+              {initiative.startsOn || initiative.endsOn
+                ? ` · ${[initiative.startsOn, initiative.endsOn]
+                    .filter(Boolean)
+                    .join(" to ")}`
+                : ""}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-start gap-2">
+            {canEdit ? (
+              <>
+                <InlineSelect
+                  label="Status"
+                  value={initiative.status}
+                  options={STATUS_OPTIONS}
+                  onSave={setStatusAction.bind(null, initiative.id)}
+                />
+                <InlineSelect
+                  label="Capacity"
+                  value={initiative.capacity ?? ""}
+                  options={CAPACITY_OPTIONS}
+                  onSave={setCapacityAction.bind(null, initiative.id)}
+                />
+              </>
             ) : (
-              <ul
-                className="flex flex-col divide-y divide-line"
-                data-testid="linked-key-results"
-              >
-                {linked.map((keyResult) => (
-                  <li
-                    key={keyResult.id}
-                    className="flex items-center gap-2 py-2"
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm text-ink">
-                        {keyResult.title}
-                      </span>
-                      {keyResult.goalTitle ? (
-                        <span className="truncate text-xs text-ink-3">
-                          {keyResult.goalTitle}
-                        </span>
-                      ) : null}
-                    </div>
-                    {canEdit ? (
-                      <UnlinkButton
-                        label={`Unlink ${keyResult.title}`}
-                        onUnlink={unlinkKeyResultAction.bind(
-                          null,
-                          initiative.id,
-                          keyResult.id,
-                        )}
-                      />
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {canEdit && linkable.length > 0 ? (
-              <ActionForm
-                action={linkKeyResultAction}
-                className="flex flex-wrap items-end gap-2"
-              >
-                <input type="hidden" name="id" value={initiative.id} />
-                <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
-                  Record this work against a key result
-                  <select
-                    name="keyResultId"
-                    aria-label="Key result to link"
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  >
-                    {linkable.map((one) => (
-                      <option key={one.id} value={one.id}>
-                        {one.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="submit"
-                  className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+              <>
+                <Chip tone="neutral">{STATUS_LABEL[initiative.status]}</Chip>
+                <Chip
+                  tone={CAPACITY_TONE[initiative.capacity ?? "unjudged"]}
+                  dot
                 >
-                  Link
-                </button>
-              </ActionForm>
-            ) : null}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">What is not here yet</h2>
-          </CardHeader>
+                  {CAPACITY_LABEL[initiative.capacity ?? "unjudged"]}
+                </Chip>
+              </>
+            )}
+          </div>
+          <WatchControl
+            subjectType="initiative"
+            subjectId={id}
+            initial={watch}
+          />
+        </CardHeader>
+        {initiative.capacity === "exceeds" ? (
           <CardBody>
-            <ul className="flex list-disc flex-col gap-1 pl-4 text-sm text-ink-3">
-              <li>
-                The tasks panel arrives at P6-G28. Until then this initiative's
-                progress reads zero for everybody, which is honest rather than
-                empty: progress is the share of its own tasks that are done, and
-                this page cannot yet read them. The tasks themselves exist, and
-                the board at <code>/board</code> shows them.
-              </li>
-              <li>Documents and attachments arrive at P6-G28 beside them.</li>
-            </ul>
+            <p className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad">
+              {t("initiatives.detail.thisIsOverCapacity")}
+            </p>
           </CardBody>
-        </Card>
-      </div>
-    </AppShellLayout>
+        ) : null}
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-bold text-ink">
+            {t("initiatives.detail.theKeyResultsThis")}
+          </h2>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-3">
+          {linked.length === 0 ? (
+            <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
+              {t("initiatives.detail.nothingYetAnInitiative")}
+            </p>
+          ) : (
+            <ul
+              className="flex flex-col divide-y divide-line"
+              data-testid="linked-key-results"
+            >
+              {linked.map((keyResult) => (
+                <li key={keyResult.id} className="flex items-center gap-2 py-2">
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm text-ink">
+                      {keyResult.title}
+                    </span>
+                    {keyResult.goalTitle ? (
+                      <span className="truncate text-xs text-ink-3">
+                        {keyResult.goalTitle}
+                      </span>
+                    ) : null}
+                  </div>
+                  {canEdit ? (
+                    <UnlinkButton
+                      label={`Unlink ${keyResult.title}`}
+                      onUnlink={unlinkKeyResultAction.bind(
+                        null,
+                        initiative.id,
+                        keyResult.id,
+                      )}
+                    />
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canEdit && linkable.length > 0 ? (
+            <ActionForm
+              action={linkKeyResultAction}
+              className="flex flex-wrap items-end gap-2"
+            >
+              <input type="hidden" name="id" value={initiative.id} />
+              <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
+                {t("initiatives.detail.recordThisWorkAgainst")}
+                <select
+                  name="keyResultId"
+                  aria-label={t("initiatives.detail.keyResultToLink")}
+                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                >
+                  {linkable.map((one) => (
+                    <option key={one.id} value={one.id}>
+                      {one.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+              >
+                {t("common.link")}
+              </button>
+            </ActionForm>
+          ) : null}
+        </CardBody>
+      </Card>
+
+      {/*
+       * The tasks this initiative is made of (S-26, P6-G28).
+       *
+       * **The progress figure above is the share of these that are done.**
+       * `initiatives.progress_pct` exists as a column and nothing has ever
+       * written to it, so every initiative in the product read nought per
+       * cent; the read derives it from exactly this list now.
+       *
+       * An initiative with no tasks says so rather than drawing a zero bar:
+       * that is not nought per cent done, it is a plan nobody has broken
+       * down yet, and the two deserve different sentences.
+       */}
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h2 className="text-sm font-bold text-ink">
+              {t("initiatives.detail.tasks")}
+              {initiative.tasks.done} {t("common.of")} {initiative.tasks.total}{" "}
+              {t("initiatives.detail.done")}
+            </h2>
+            <p className="text-xs text-ink-3">
+              {t("initiatives.detail.theWorkThisInitiative")}
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-2.5">
+          {initiativeTasks.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              {t("initiatives.detail.noTasksYetAn")}
+            </p>
+          ) : (
+            <ul
+              className="flex flex-col gap-1.5"
+              data-testid="initiative-tasks"
+            >
+              {initiativeTasks.map((task) => (
+                <li
+                  key={task.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2"
+                >
+                  <Link
+                    href={`/tasks/${task.id}`}
+                    className="min-w-0 text-sm text-brand-text hover:underline"
+                  >
+                    {task.title}
+                  </Link>
+                  <span className="flex items-center gap-2.5 text-xs text-ink-4">
+                    <Chip tone={task.status === "done" ? "ok" : "neutral"}>
+                      {task.status.replace("_", " ")}
+                    </Chip>
+                    {task.dueOn ?? ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+      <Attachments
+        subjectType="initiative"
+        subjectId={id}
+        attachments={attachments}
+        canEdit={level >= ACCESS_LEVELS.edit}
+      />
+
+      {level >= ACCESS_LEVELS.full ? (
+        <DeleteControl
+          subject="initiative"
+          id={id}
+          what="this initiative"
+          returnTo="/initiatives"
+        />
+      ) : null}
+    </div>
   );
 }

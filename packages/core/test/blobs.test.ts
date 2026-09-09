@@ -285,3 +285,162 @@ describe("orphan cleanup", () => {
     expect(orphans.map((o) => o.id)).not.toContain(prepared.blobId);
   });
 });
+
+describe("blobs.reapOrphans (P6-G01c)", () => {
+  /** A storage port that records what it was asked to remove. */
+  function recordingStorage() {
+    const deleted: string[] = [];
+    return {
+      deleted,
+      port: {
+        get: async () => Buffer.alloc(0),
+        delete: async (key: string) => {
+          deleted.push(key);
+        },
+      },
+    };
+  }
+
+  async function prepare(filename: string): Promise<string> {
+    const wb = await workerDb();
+    const prepared = await callAction(
+      { pool: wb.appPool, ...context() },
+      "blobs.prepareUpload",
+      { filename, contentType: "application/pdf", declaredSize: 10 },
+    );
+    return prepared.blobId;
+  }
+
+  it("takes the bytes with the row", async () => {
+    const wb = await workerDb();
+    const storage = recordingStorage();
+    const blobId = await prepare("abandoned.pdf");
+    const key = (
+      await wb.admin.query("select storage_key from blobs where id = $1", [
+        blobId,
+      ])
+    ).rows[0].storage_key as string;
+
+    await wb.admin.query(
+      "update blobs set created_at = now() - interval '2 days' where id = $1",
+      [blobId],
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context(), storage: storage.port },
+      "blobs.reapOrphans",
+      {},
+    );
+
+    expect(result).toEqual({ discarded: 1, bytesLeft: 0 });
+    expect(storage.deleted).toEqual([key]);
+
+    const row = await wb.admin.query(
+      "select deleted_at from blobs where id = $1",
+      [blobId],
+    );
+    expect(row.rows[0].deleted_at).not.toBeNull();
+  });
+
+  it("leaves a recent prepare alone, at the workspace's own window", async () => {
+    const wb = await workerDb();
+    const storage = recordingStorage();
+    const blobId = await prepare("still-uploading.pdf");
+    // An hour old, and the default window is a day.
+    await wb.admin.query(
+      "update blobs set created_at = now() - interval '1 hour' where id = $1",
+      [blobId],
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context(), storage: storage.port },
+      "blobs.reapOrphans",
+      {},
+    );
+    expect(result.discarded).toBe(0);
+    expect(storage.deleted).toEqual([]);
+  });
+
+  it("never touches an upload that was claimed", async () => {
+    const wb = await workerDb();
+    const storage = recordingStorage();
+    const blobId = await prepare("real.pdf");
+    await callAction({ pool: wb.appPool, ...context() }, "blobs.claimUpload", {
+      blobId,
+      actualSize: 10,
+      digest: "claimed-for-real",
+    });
+    await wb.admin.query(
+      "update blobs set created_at = now() - interval '30 days' where id = $1",
+      [blobId],
+    );
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context(), storage: storage.port },
+      "blobs.reapOrphans",
+      {},
+    );
+    expect(result.discarded).toBe(0);
+
+    const row = await wb.admin.query(
+      "select deleted_at from blobs where id = $1",
+      [blobId],
+    );
+    expect(row.rows[0].deleted_at).toBeNull();
+  });
+
+  it("discards the row and counts the bytes it could not remove", async () => {
+    const wb = await workerDb();
+    const blobId = await prepare("never-uploaded.pdf");
+    await wb.admin.query(
+      "update blobs set created_at = now() - interval '2 days' where id = $1",
+      [blobId],
+    );
+
+    // An object that was never uploaded is the ordinary reason a prepare goes
+    // unclaimed. Leaving the row behind would mean trying the same dead key
+    // every day for good.
+    const result = await callAction(
+      {
+        pool: wb.appPool,
+        ...context(),
+        storage: {
+          get: async () => Buffer.alloc(0),
+          delete: async () => {
+            throw new Error("no such object");
+          },
+        },
+      },
+      "blobs.reapOrphans",
+      {},
+    );
+
+    expect(result).toEqual({ discarded: 1, bytesLeft: 1 });
+    const row = await wb.admin.query(
+      "select deleted_at from blobs where id = $1",
+      [blobId],
+    );
+    expect(row.rows[0].deleted_at).not.toBeNull();
+  });
+
+  it("writes an activity row naming what it cleared", async () => {
+    const wb = await workerDb();
+    const storage = recordingStorage();
+    const blobId = await prepare("abandoned.pdf");
+    await wb.admin.query(
+      "update blobs set created_at = now() - interval '2 days' where id = $1",
+      [blobId],
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(), storage: storage.port },
+      "blobs.reapOrphans",
+      {},
+    );
+
+    const rows = await wb.admin.query(
+      "select payload from activities where kind = 'blob.reaped'",
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].payload).toMatchObject({ discarded: 1, bytesLeft: 0 });
+  });
+});

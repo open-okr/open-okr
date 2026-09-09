@@ -14,7 +14,14 @@
  * than from the model. So a reader is never shown a confident draft with nothing
  * said about whether it is any good: they see "fails OBJ-2" before they decide.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useCallback, useState } from "react";
 import {
@@ -55,11 +62,13 @@ function Verdicts({
   readonly passing: readonly string[];
   readonly failing: readonly string[];
 }) {
+  const { t } = useTranslations();
+
   return (
     <span className="flex flex-wrap items-center gap-1">
       {failing.map((id) => (
         <Chip key={id} tone="warn">
-          {id} fails
+          {id} {t("cycle.assists.fails")}
         </Chip>
       ))}
       {passing.map((id) => (
@@ -87,6 +96,8 @@ export function DraftFromAmbition({
   /** The reader, who becomes champion and reviewer of what they apply. */
   readonly memberId: string;
 }) {
+  const { t } = useTranslations();
+
   const [ambition, setAmbition] = useState("");
   const [level, setLevel] = useState<Level>("team");
   const [drafted, setDrafted] = useState<Drafted | null>(null);
@@ -161,30 +172,33 @@ export function DraftFromAmbition({
         <span className="flex items-center gap-2">
           <Chip tone="agent">
             <Sparkles className="size-3" />
-            AI
+            {t("common.ai")}
           </Chip>
-          <h2 className="text-sm font-bold text-ink">Draft from an ambition</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("cycle.assists.draftFromAnAmbition")}
+          </h2>
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-xs text-ink-3">
-          Say what you want to be true by the end of the quarter. Nothing is
-          created until you apply it.
+          {t("cycle.assists.sayWhatYouWant")}
         </p>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-ink-4">The ambition</span>
+          <span className="text-xs text-ink-4">
+            {t("cycle.assists.theAmbition")}
+          </span>
           <textarea
             rows={2}
             value={ambition}
             disabled={busy}
             onChange={(event) => setAmbition(event.target.value)}
-            placeholder="We should be the platform mid-market teams reach for first"
+            placeholder={t("cycle.assists.weShouldBeThe")}
             className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
           />
         </label>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs text-ink-4">
-            Level
+            {t("common.level")}
             <select
               value={level}
               disabled={busy}
@@ -203,13 +217,13 @@ export function DraftFromAmbition({
             disabled={busy || ambition.trim() === ""}
             onClick={() => void draft()}
           >
-            Draft it
+            {t("common.draftIt")}
           </Button>
         </div>
 
         {drafted ? (
           <section
-            aria-label="Drafted objective"
+            aria-label={t("cycle.assists.draftedObjective")}
             className="rounded-lg border border-line bg-surface p-3"
           >
             <p className="text-sm font-semibold text-ink">{drafted.title}</p>
@@ -224,7 +238,7 @@ export function DraftFromAmbition({
                 <li key={measure.title} className="text-xs">
                   <p className="text-ink-2">{measure.title}</p>
                   <p className="text-ink-4">
-                    {measure.baseline} to {measure.target}
+                    {measure.baseline} {t("common.to")} {measure.target}
                     {measure.unit ? ` ${measure.unit}` : ""} ·{" "}
                     {measure.direction} · {measure.indicatorType}
                   </p>
@@ -241,14 +255,14 @@ export function DraftFromAmbition({
                 disabled={busy}
                 onClick={() => void apply()}
               >
-                Apply
+                {t("common.apply")}
               </Button>
               <Button
                 variant="ghost"
                 disabled={busy}
                 onClick={() => setDrafted(null)}
               >
-                Discard
+                {t("cycle.assists.discard")}
               </Button>
             </div>
           </section>
@@ -270,6 +284,8 @@ export function DraftFromAmbition({
  * accident. They read the numbers, and they type the ones they agree with.
  */
 export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
+  const { t } = useTranslations();
+
   const [title, setTitle] = useState("");
   const [suggested, setSuggested] = useState<{
     unit: string | null;
@@ -310,26 +326,29 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
     <div className="flex flex-col gap-1.5">
       <label className="flex flex-col gap-1">
         <span className="text-xs text-ink-4">
-          What is measured, and the assist will suggest the numbers
+          {t("cycle.assists.whatIsMeasuredAnd")}
         </span>
         <input
           value={title}
           disabled={busy}
           maxLength={500}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Trial to paid conversion"
+          placeholder={t("cycle.assists.trialToPaidConversion")}
           className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
         />
       </label>
       <Button variant="ai" disabled={busy} onClick={() => void run()}>
         <Sparkles className="size-3" />
-        Suggest numbers
+        {t("cycle.assists.suggestNumbers")}
       </Button>
       {suggested ? (
         /* A section, not a paragraph: `aria-label` needs a role that supports
            it, and a named region is what a screen reader wants here anyway. */
-        <section aria-label="Suggested measure" className="text-xs text-ink-3">
-          {suggested.baseline} to {suggested.target}
+        <section
+          aria-label={t("cycle.assists.suggestedMeasure")}
+          className="text-xs text-ink-3"
+        >
+          {suggested.baseline} {t("common.to")} {suggested.target}
           {suggested.unit ? ` ${suggested.unit}` : ""} · {suggested.direction} ·{" "}
           {suggested.indicatorType}{" "}
           <Verdicts passing={suggested.passing} failing={suggested.failing} />
@@ -349,6 +368,8 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
  * screen does.
  */
 export function SuggestParent({ goalId }: { readonly goalId: string }) {
+  const { t } = useTranslations();
+
   const [suggested, setSuggested] = useState<{
     parentGoalId: string;
     parentTitle: string;
@@ -394,10 +415,13 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
     <div className="flex flex-col gap-1">
       <Button variant="ai" disabled={busy} onClick={() => void run()}>
         <Sparkles className="size-3" />
-        Suggest a parent
+        {t("cycle.assists.suggestAParent")}
       </Button>
       {suggested ? (
-        <section aria-label="Suggested parent" className="text-xs">
+        <section
+          aria-label={t("cycle.assists.suggestedParent")}
+          className="text-xs"
+        >
           <p className="text-ink-2">{suggested.parentTitle}</p>
           <p className="text-ink-4">{suggested.reason}</p>
           <Button
@@ -405,7 +429,7 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
             disabled={busy}
             onClick={() => void align()}
           >
-            Align to it
+            {t("cycle.assists.alignToIt")}
           </Button>
         </section>
       ) : null}

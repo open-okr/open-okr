@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,6 +12,8 @@ import { AuthCard, Field, FormError } from "../auth-card";
  * this, losing a phone means losing the account.
  */
 export default function BackupCodePage() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -36,14 +38,14 @@ export default function BackupCodePage() {
 
   return (
     <AuthCard
-      title="Use a backup code"
+      title={t("auth.backupCode.useABackupCode")}
       description="Each code works once. Generate a fresh set afterwards."
       footer={
         <Link
           href="/sign-in"
           className="font-medium text-brand-text hover:underline"
         >
-          Back to sign in
+          {t("common.backToSignIn")}
         </Link>
       }
     >

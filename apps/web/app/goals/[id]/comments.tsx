@@ -6,7 +6,7 @@
  * Shows comments, a composer with mention support, and reactions per comment.
  * Each comment is deep-linkable via #comment-{id}.
  */
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 // Rich text editor and mention extensions will be wired in once the
 // comment thread component uses the full TipTap editor. For now the
 // composer uses a plain textarea that wraps input into editor JSON.
@@ -17,6 +17,13 @@ interface ReactionGroupData {
   readonly emoji: string;
   readonly count: number;
   readonly own: boolean;
+  /**
+   * The reader's own reaction, so pressing the emoji again takes it back
+   * (P6-G27). Null when `own` is false. `reactions.remove` takes an id and
+   * nothing on this screen knew it, so a reaction could be given and never
+   * withdrawn.
+   */
+  readonly ownReactionId: string | null;
 }
 
 export interface CommentData {
@@ -41,6 +48,7 @@ interface CommentThreadProps {
     subjectType: string,
     subjectId: string,
     emoji: string,
+    ownReactionId: string | null,
   ) => Promise<void>;
 }
 
@@ -56,6 +64,8 @@ export function CommentThread({
   onDelete,
   onReact,
 }: CommentThreadProps) {
+  const { t } = useTranslations();
+
   const [isPending, startTransition] = useTransition();
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -79,9 +89,14 @@ export function CommentThread({
   );
 
   const handleReact = useCallback(
-    (targetSubjectType: string, targetSubjectId: string, emoji: string) => {
+    (
+      targetSubjectType: string,
+      targetSubjectId: string,
+      emoji: string,
+      ownReactionId: string | null,
+    ) => {
       startTransition(async () => {
-        await onReact(targetSubjectType, targetSubjectId, emoji);
+        await onReact(targetSubjectType, targetSubjectId, emoji, ownReactionId);
       });
     },
     [onReact],
@@ -90,12 +105,13 @@ export function CommentThread({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium text-ink-2">
-        Discussion ({comments.length})
+        {t("goals.detail.comments.discussion")}
+        {comments.length})
       </h3>
 
       {comments.length === 0 && (
         <p className="text-sm text-ink-3">
-          No comments yet. Start the conversation.
+          {t("goals.detail.comments.noCommentsYetStart")}
         </p>
       )}
 
@@ -145,7 +161,14 @@ export function CommentThread({
                     ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
                     : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
                 }
-                onClick={() => handleReact("comment", comment.id, group.emoji)}
+                onClick={() =>
+                  handleReact(
+                    "comment",
+                    comment.id,
+                    group.emoji,
+                    group.ownReactionId,
+                  )
+                }
               >
                 {group.emoji} {group.count}
               </button>
@@ -153,7 +176,16 @@ export function CommentThread({
             <button
               type="button"
               className="text-xs text-ink-3 hover:text-ink-2"
-              onClick={() => handleReact("comment", comment.id, "\u{1F44D}")}
+              onClick={() =>
+                handleReact(
+                  "comment",
+                  comment.id,
+                  "\u{1F44D}",
+                  // The thumb always adds. A reader who already gave one sees
+                  // it in the row above and presses that to take it back.
+                  null,
+                )
+              }
             >
               +1
             </button>
@@ -165,14 +197,14 @@ export function CommentThread({
                     className="text-xs text-ink-3 hover:text-ink-2"
                     onClick={() => setEditingId(comment.id)}
                   >
-                    Edit
+                    {t("common.edit")}
                   </button>
                   <button
                     type="button"
                     className="text-xs text-ink-3 hover:text-bad"
                     onClick={() => handleDelete(comment.id)}
                   >
-                    Delete
+                    {t("common.delete")}
                   </button>
                 </>
               )}
@@ -189,7 +221,7 @@ export function CommentThread({
             });
           }}
           saving={isPending}
-          placeholder="Write a comment..."
+          placeholder={t("goals.detail.comments.writeAComment")}
         />
       </div>
     </div>
@@ -197,15 +229,25 @@ export function CommentThread({
 }
 
 function CommentBody({ body }: { body: unknown }) {
+  const { t } = useTranslations();
+
   if (!body || typeof body !== "object") {
-    return <p className="text-ink-3 italic">Empty comment</p>;
+    return (
+      <p className="text-ink-3 italic">
+        {t("goals.detail.comments.emptyComment")}
+      </p>
+    );
   }
   // Render rich text content as paragraphs for now.
   // The full rich-text renderer from packages/core will be used once
   // the sanitising allow-list render is wired to a React component.
   const doc = body as { content?: unknown[] };
   if (!doc.content || !Array.isArray(doc.content)) {
-    return <p className="text-ink-3 italic">Empty comment</p>;
+    return (
+      <p className="text-ink-3 italic">
+        {t("goals.detail.comments.emptyComment")}
+      </p>
+    );
   }
   return (
     <>
@@ -253,6 +295,8 @@ function CommentEditor({
   saving,
   placeholder,
 }: CommentEditorProps) {
+  const { t } = useTranslations();
+
   const [body, setBody] = useState<unknown>(initialBody ?? null);
 
   return (
@@ -286,7 +330,7 @@ function CommentEditor({
         </Button>
         {onCancel && (
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </Button>
         )}
       </div>

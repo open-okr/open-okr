@@ -28,6 +28,7 @@ import { localTimeIn } from "../channels/members.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { deliverDueNudges, unreachableRecipients } from "./deliver.ts";
+import { resolveRhythmWithLadders } from "./ladders.ts";
 import { dueQualityNudges } from "./quality.ts";
 import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
@@ -165,7 +166,13 @@ export async function runDueNudgesInTx(
 ): Promise<NudgeRunResult> {
   const { workspaceId, at } = input;
   const cadence = input.cadence ?? "hourly";
-  const { thresholds } = resolveRhythm(await readRhythmRow(tx, workspaceId));
+  // The sweep that produces the nudges reads all three §11 ladders, so it is
+  // the reader a per-rule override matters most to (P6-G21b).
+  const thresholds = await resolveRhythmWithLadders(
+    tx,
+    workspaceId,
+    resolveRhythm(await readRhythmRow(tx, workspaceId)),
+  );
   const timeZone = await workspaceTimeZone(tx, workspaceId);
 
   let staleFlipped = 0;

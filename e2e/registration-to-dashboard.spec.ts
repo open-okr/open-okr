@@ -1,5 +1,5 @@
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 
 /**
@@ -43,9 +43,25 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
 
+  /**
+   * **A first sign-in goes to onboarding now, and that is P6-G26.** Before it,
+   * registering landed on an empty Work Map with nothing to do; the front door
+   * redirects a workspace provisioning marked pending to S-34 instead.
+   *
+   * Every step is skipped here, which is the acceptance criterion this spec is
+   * closest to: skip all four and land on a working workspace at every
+   * documented default. `s34-onboarding.spec.ts` cannot prove it, because by
+   * the time it runs the instance has been onboarded once and the wizard
+   * refuses to appear again, which is itself the behaviour it does prove.
+   */
+  await expect(page).toHaveURL("/welcome");
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByTestId("welcome-skip").click();
+  }
+
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/", { timeout: 15_000 });
   // The Work Map is the front door from P3-T11. It replaced the proving
   // dashboard P1-T08 put here, which asserted a "Signed in as" panel and two
   // `<strong>` elements; that panel was scaffolding and STATUS.md said so from
@@ -144,12 +160,16 @@ test("both seeded agents are in admin, with their schedules and an empty log", a
     .filter({ hasText: "OKR Champion" });
   await expect(champion).toHaveCount(1);
   await expect(champion.getByText("On the hour")).toBeVisible();
-  await expect(champion.getByText("propose")).toBeVisible();
+  // **Exact, so it means the chip.** P6-G13b put a "Propose" button in each
+  // row, and `getByText` is case-insensitive by default, so the bare match
+  // resolved to two elements and Playwright refused it under strict mode. The
+  // chip is lower case and the button is not, which `exact` distinguishes.
+  await expect(champion.getByText("propose", { exact: true })).toBeVisible();
 
   const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
   await expect(coach).toHaveCount(1);
   await expect(coach.getByText("On every write")).toBeVisible();
-  await expect(coach.getByText("propose")).toBeVisible();
+  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
 
   // Nothing schedules a run on this instance, and the page says so rather
   // than showing an empty list that reads like a bug.
@@ -176,6 +196,54 @@ test("an administrator can run an agent, and the page says whether it can draft"
   // button: a run happened because somebody asked for one.
   await expect(page.getByText(/No run yet/)).toBeHidden({ timeout: 15_000 });
   await expect(page.getByText("schedule.quality")).toBeVisible();
+});
+
+test("an agent's write policy can be moved, and the workspace cannot be bound", async () => {
+  // P6-G13b. `agents.create` took an autonomy and nothing could change it, so
+  // the propose-and-approve default was in practice permanent and the sandbox
+  // a one-way door.
+  await page.goto("/admin/agents");
+
+  const coach = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await expect(coach.getByText("propose", { exact: true })).toBeVisible();
+
+  // Into the sandbox, which commits nothing at all. Chosen rather than
+  // scoped direct because widening asks for a confirmation and this test is
+  // about the move, not about the dialog.
+  await coach.getByTestId("autonomy-sandbox").click();
+  await expect(coach.getByText("commits nothing at all")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.goto("/admin/agents");
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "OKR Coach" })
+      .getByText("sandbox", { exact: true }),
+  ).toBeVisible();
+
+  // The binder offers named things and not the workspace. CLAUDE.md's rule is
+  // that there is no service account with authority over everything, and the
+  // action refuses it too; this is the half a browser can see.
+  const restored = page.getByRole("listitem").filter({ hasText: "OKR Coach" });
+  await restored.getByRole("button", { name: "Bind a scope" }).click();
+  const kinds = restored.locator("select[name='resourceType'] option");
+  await expect(kinds).toHaveText(["Space", "Goal", "KPI tree"]);
+
+  // Put back, so every spec after this one meets the agent it expects.
+  await page.goto("/admin/agents");
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "OKR Coach" })
+    .getByTestId("autonomy-propose")
+    .click();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "OKR Coach" })
+      .getByText("into the review queue"),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("registration is closed once the instance has been claimed", async () => {
@@ -721,6 +789,60 @@ test("the tree draws the driver added under a node, and the detail reads it back
   // The corridor is stated in words, not only in colour.
   await expect(page.getByText(/healthy at 90%, watch at 70%/)).toBeVisible();
   await expect(page.getByText("Nothing recorded yet.")).toBeVisible();
+});
+
+/**
+ * The grid finishes S-20 (P6-G30).
+ *
+ * The page carried a "Not here yet" card naming three things and naming
+ * P3-T13 as the blocker; P3-T13 landed, which is how this row came to exist.
+ * By this point in the file one KPI has been created and given one value, so
+ * the sparkline's own refusal is the honest thing to assert: two points are
+ * the fewest a trend can be made of.
+ */
+test("the grid carries its subtotals, sparklines and filters", async () => {
+  await page.goto("/kpis");
+
+  // The card that promised all three is gone.
+  await expect(page.getByText("Not here yet")).toHaveCount(0);
+
+  // The subtotal is a tally of §6.4's corridor states, because METHOD.md
+  // defines no aggregate for a category and adding a revenue figure to a
+  // response time would be a number nobody measured.
+  const subtotal = page.getByTestId("category-subtotal").first();
+  await expect(subtotal).toBeVisible({ timeout: 15_000 });
+  await expect(subtotal).toContainText("KPI");
+
+  // One value so far, so no line is drawn and the row says why.
+  await expect(page.getByTestId("sparkline-too-short").first()).toBeVisible();
+
+  /*
+   * The filters are links, so a combination survives a reload and can be sent
+   * to somebody.
+   *
+   * **The value is read off the page rather than named here.** The choices are
+   * derived from the KPIs this instance actually holds, so naming one asserts
+   * something about the fixture instead of about the filter: the first draft
+   * picked `unhealthy`, and by this point in the file the recovery has flipped
+   * the only KPI that was.
+   */
+  const chosen = await page
+    .locator('[data-testid^="filter-frequency-"]')
+    .evaluateAll((links) => {
+      const first = links
+        .map((link) => link.getAttribute("data-testid") ?? "")
+        .find((id) => id !== "filter-frequency-all");
+      return first ?? "";
+    });
+  expect(chosen, "no frequency filter to follow").not.toBe("");
+  await page.getByTestId(chosen).click();
+  await expect(page).toHaveURL(/frequency=/, { timeout: 15_000 });
+  await page.reload();
+  await expect(page.getByTestId(chosen)).toBeVisible();
+
+  // And back, so the grid the later specs read is unfiltered.
+  await page.getByTestId("filter-frequency-all").click();
+  await expect(page).toHaveURL(/\/kpis$/, { timeout: 15_000 });
 });
 
 test("signing out ends the session", async () => {

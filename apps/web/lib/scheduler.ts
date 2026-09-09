@@ -45,6 +45,7 @@ import { callAction } from "@openokr/core";
 import { drafterFor } from "./drafter";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
+import { getStorage } from "./storage";
 
 const log = (message: string): void => {
   process.stdout.write(`scheduler: ${message}\n`);
@@ -88,16 +89,71 @@ export interface SchedulableWorkspace {
  */
 export interface ScheduledRun {
   readonly job: string;
-  readonly action: "agents.runChampion" | "agents.runCoach";
+  readonly action:
+    | "agents.runChampion"
+    | "agents.runCoach"
+    | "notifications.drainBatches"
+    | "blobs.reapOrphans";
   readonly cadence?: "hourly" | "daily" | "weekly" | "cycle";
   readonly localHour?: number;
+  /**
+   * The recurrence, for a run that is not one of the agent cadences.
+   *
+   * `registerAgentSchedules` owns the crons in `AGENT_SCHEDULES` and this
+   * host owns the rest. Declaring it here rather than adding it to that list
+   * keeps `packages/agents` about agents: the batch drain is plumbing, not a
+   * cadence AI-NATIVE-PLAN §6.2 gives the Champion (P6-G01b).
+   */
+  readonly cron?: string;
 }
+
+/**
+ * The job name the notification batch drain is registered under (P6-G01b).
+ *
+ * Not exported. The agent job names come from `packages/agents` because
+ * `registerAgentSchedules` and this host both need them; this one has exactly
+ * one reader, three lines below, and exporting it would be a name for the
+ * dead-code gate to complain about rather than one anybody imports.
+ */
+const NOTIFICATION_DRAIN_JOB = "notifications.drain";
+
+/**
+ * Every five minutes.
+ *
+ * The batch window is a member's own setting, defaulting to thirty minutes, so
+ * the poll has to be shorter than the shortest window anybody is likely to
+ * choose without being a poll for its own sake. Five means a ten-minute window
+ * closes and is delivered inside fifteen, and a member who sets one minute
+ * waits up to five. The alternative, a job per batch scheduled at its own
+ * `send_at`, buys those four minutes for a queue row per burst.
+ */
+const NOTIFICATION_DRAIN_CRON = "*/5 * * * *";
+
+/**
+ * The job name the orphan-upload reap is registered under (P6-G01c).
+ *
+ * Not exported, for the same reason the drain's name is not: it has one
+ * reader, a few lines below.
+ */
+const ORPHAN_REAP_JOB = "blobs.reapOrphans";
+
+/**
+ * Once a day, at twenty past three in the morning UTC.
+ *
+ * The window this sweeps is a day wide by default, so running it more often
+ * would find nothing new; running it less often lets a bucket hold a week of
+ * abandoned bytes. The odd minute is so it does not start in the same second
+ * as every other daily job in every other product on the host.
+ */
+const ORPHAN_REAP_CRON = "20 3 * * *";
 
 /**
  * Every job this host subscribes a worker to.
  *
- * One entry per name in `AGENT_SCHEDULES`, asserted by a test. A cron with no
- * worker is a job that queues forever and looks exactly like a product with
+ * One entry for every name in `AGENT_SCHEDULES`, plus the runs this host
+ * declares itself, and a test holds both halves: nothing is registered without
+ * a worker, and nothing here waits on a cron that does not exist. A cron with
+ * no worker is a job that queues forever and looks exactly like a product with
  * nothing to say, which is the failure this whole task exists to end.
  */
 export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
@@ -109,6 +165,16 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: COACH_NIGHTLY_JOB,
     action: "agents.runCoach",
     localHour: COACH_SWEEP_LOCAL_HOUR,
+  },
+  {
+    job: NOTIFICATION_DRAIN_JOB,
+    action: "notifications.drainBatches",
+    cron: NOTIFICATION_DRAIN_CRON,
+  },
+  {
+    job: ORPHAN_REAP_JOB,
+    action: "blobs.reapOrphans",
+    cron: ORPHAN_REAP_CRON,
   },
 ];
 
@@ -231,8 +297,20 @@ async function runOne(
     workspaceId: workspace.id,
     actor: { kind: "system" as const },
     ring: getKeyRing(),
+    // The orphan reap deletes the bytes as well as the row (P6-G01c). Passed
+    // to every scheduled run rather than to that one: the seam is two methods
+    // and an action that does not use it does not notice it.
+    storage: getStorage(),
     ...(drafter ? { drafter } : {}),
   };
+  if (run.action === "notifications.drainBatches") {
+    await callAction(context, "notifications.drainBatches", {});
+    return;
+  }
+  if (run.action === "blobs.reapOrphans") {
+    await callAction(context, "blobs.reapOrphans", {});
+    return;
+  }
   if (run.action === "agents.runCoach") {
     await callAction(context, "agents.runCoach", {});
     return;
@@ -296,11 +374,36 @@ export function startScheduler(): PgBossJobQueue | null {
         });
       }
       await registerAgentSchedules(queue);
+      // The runs this host declares itself, which is everything that is not an
+      // agent cadence. Registered after the agents so one failure to register
+      // cannot hide the other.
+      for (const run of SCHEDULED_RUNS) {
+        if (run.cron) {
+          // openokr:allow-side-effect: declaring a recurrence, not causing one.
+          // This is boot, not a write path: nothing is enqueued here and no
+          // transaction is open. `registerAgentSchedules` makes the same call
+          // for the same reason and records it in its own file comment.
+          await queue.schedule(run.job, run.cron);
+        }
+      }
       // One line, naming what was registered. A host that says nothing is a
       // host nobody can tell apart from one that never started.
+      //
+      // **Both sources, not just the agent cadences.** This counted
+      // `SCHEDULED_RUNS` and then named only `AGENT_SCHEDULES`, so the moment
+      // P6-G01b added the batch drain the line read "6 recurring runs" and
+      // listed five. A log line that miscounts what it just did is worse than
+      // no log line, and this one is the only evidence a deployment has that
+      // the scheduler is running at all.
+      const crons = new Map<string, string>(AGENT_SCHEDULES);
+      for (const run of SCHEDULED_RUNS) {
+        if (run.cron) {
+          crons.set(run.job, run.cron);
+        }
+      }
       log(
-        `started, ${SCHEDULED_RUNS.length} recurring runs: ` +
-          `${AGENT_SCHEDULES.map(([name, cron]) => `${name} (${cron})`).join(", ")}`,
+        `started, ${crons.size} recurring runs: ` +
+          `${[...crons].map(([name, cron]) => `${name} (${cron})`).join(", ")}`,
       );
     } catch (error) {
       logError(`could not start: ${reason(error)}`);

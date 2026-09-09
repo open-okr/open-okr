@@ -16,7 +16,14 @@
  * confirming rather than diagnosing. Same reason the monthly trend buttons start
  * empty (P4-T09).
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { setRootCauseAction } from "./actions";
@@ -53,6 +60,8 @@ function MissedRow({
   readonly canName: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState<number | null>(keyResult.causeKey);
@@ -87,9 +96,9 @@ function MissedRow({
         <span className="flex-1 text-sm text-ink">{keyResult.title}</span>
         <Chip tone="bad">{keyResult.score.toFixed(1)}</Chip>
         {keyResult.causeKey === null ? (
-          <Chip tone="warn">no cause yet</Chip>
+          <Chip tone="warn">{t("session.detail.rootCause.noCauseYet")}</Chip>
         ) : (
-          <Chip tone="ok">named</Chip>
+          <Chip tone="ok">{t("common.named")}</Chip>
         )}
       </span>
       <span className="text-xs text-ink-4">{keyResult.goalTitle}</span>
@@ -118,7 +127,7 @@ function MissedRow({
             htmlFor={`detail-${keyResult.keyResultId}`}
           >
             <span className="text-xs font-medium text-ink-3">
-              Ask why until it stops being a symptom
+              {t("session.detail.rootCause.askWhyUntilIt")}
             </span>
             <input
               id={`detail-${keyResult.keyResultId}`}
@@ -126,7 +135,7 @@ function MissedRow({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={detail}
               disabled={pending}
-              placeholder="The system, not the person"
+              placeholder={t("session.detail.rootCause.theSystemNotThe")}
               onChange={(event) => setDetail(event.target.value)}
               onBlur={() => {
                 // Saved with the cause rather than on its own, because a detail
@@ -160,6 +169,8 @@ export function RootCausePanel({
   readonly rootCauses: RootCauses;
   readonly canName: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
@@ -170,10 +181,11 @@ export function RootCausePanel({
             id="root-cause-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Root cause
+            {t("session.detail.rootCause.rootCause")}
           </h2>
           <Chip tone={rootCauses.complete ? "ok" : "neutral"}>
-            {rootCauses.named} of {rootCauses.keyResults.length} named
+            {rootCauses.named} {t("common.of")} {rootCauses.keyResults.length}{" "}
+            {t("common.named")}
           </Chip>
         </span>
       </CardHeader>
@@ -181,8 +193,9 @@ export function RootCausePanel({
         {rootCauses.keyResults.length === 0 ? (
           <p className="text-sm text-ink-3">
             {/* Two different empty states, and they mean opposite things. */}
-            Nothing came in below {rootCauses.threshold.toFixed(1)}. Either the
-            room has not graded yet, or nothing missed.
+            {t("session.detail.rootCause.nothingCameInBelow")}{" "}
+            {rootCauses.threshold.toFixed(1)}
+            {t("session.detail.rootCause.eitherTheRoomHas")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -205,8 +218,9 @@ export function RootCausePanel({
 
         {rootCauses.keyResults.length === 0 ? null : (
           <p className="text-xs text-ink-4">
-            One primary cause each, below {rootCauses.threshold.toFixed(1)}.
-            Look for the system, not the person.
+            {t("session.detail.rootCause.onePrimaryCauseEach")}{" "}
+            {rootCauses.threshold.toFixed(1)}
+            {t("session.detail.rootCause.lookForTheSystem")}
           </p>
         )}
       </CardBody>

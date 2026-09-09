@@ -12,7 +12,12 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
-import { workspaceFeed } from "./activities.ts";
+import {
+  goalFeed,
+  profileFeed,
+  spaceFeed,
+  workspaceFeed,
+} from "./activities.ts";
 import {
   bindAgentScope,
   bulkApplyProposedChanges,
@@ -25,6 +30,7 @@ import {
   readAgents,
   runChampion,
   runCoach,
+  setAgentAutonomy,
   setAgentEnabled,
   startAgentRun,
 } from "./agents.ts";
@@ -82,6 +88,7 @@ import {
   getBlobForDownload,
   prepareImport,
   prepareUpload,
+  reapOrphanedBlobs,
 } from "./blobs.ts";
 import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
 import {
@@ -161,6 +168,7 @@ import {
   feedForwardCycle,
   listCycles,
   readAnnualFrame,
+  readAnnualObjectives,
   readCurrentCycle,
   readRhythmSettings,
   readScorecard,
@@ -251,15 +259,25 @@ import {
   updateKpi,
 } from "./kpis.ts";
 import {
+  drainNotificationBatches,
   getNotificationSettings,
   importWatcher,
   listNotifications,
   markNotificationRead,
+  readSubscription,
   snoozeNotification,
   toggleSubscription,
+  unreadNotificationCount,
   updateOwnNotificationSettings,
 } from "./notifications.ts";
-import { listNudges, nudgeVolume, runNudges, snoozeNudge } from "./nudges.ts";
+import {
+  listNudgeRules,
+  listNudges,
+  nudgeVolume,
+  runNudges,
+  setNudgeRule,
+  snoozeNudge,
+} from "./nudges.ts";
 import { listMyConnections, revokeConnection } from "./oauth-connections.ts";
 import { workspaceOverview } from "./overview.ts";
 import {
@@ -269,12 +287,13 @@ import {
   importMember,
   orgChart,
   possibleManagersFor,
+  readMember,
   restoreMember,
   suspendMember,
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
-import { exportArchive } from "./portability.ts";
+import { exportArchive, importArchive } from "./portability.ts";
 import { reviewInbox } from "./review.ts";
 import {
   clusterRetroNotes,
@@ -291,11 +310,13 @@ import {
   addStageMinute,
   advanceStage,
   captureLearning,
+  carriedCommitments,
   castRetroVote,
   castSessionVote,
   closeSession,
   closeSessionCommitments,
   completeReviewAction,
+  confidenceTrend,
   confirmSessionConfidence,
   createSession,
   createSessionBlocker,
@@ -365,6 +386,7 @@ import {
   removeSpaceMember,
   setSpaceMemberRole,
   updateSpace,
+  updateSpaceSettings,
 } from "./spaces.ts";
 import {
   addChecklistItem,
@@ -382,6 +404,7 @@ import {
   updateTask,
 } from "./tasks.ts";
 import {
+  finishOnboarding,
   provisionWorkspace,
   renameWorkspace,
   setWorkspaceState,
@@ -394,6 +417,7 @@ import {
 export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
+  "workspace.finishOnboarding": finishOnboarding,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,
   "people.updateOwnProfile": updateOwnProfile,
@@ -404,6 +428,7 @@ export const ACTION_MAP = {
   "people.convertToGuest": convertToGuest,
   "people.erase": eraseMember,
   "people.directory": directory,
+  "people.readMember": readMember,
   "people.orgChart": orgChart,
   "people.possibleManagers": possibleManagersFor,
   "invitations.list": listInvitations,
@@ -446,21 +471,30 @@ export const ACTION_MAP = {
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
   "blobs.prepareUpload": prepareUpload,
+  "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.
   "blobs.prepareImport": prepareImport,
   "blobs.claimUpload": claimUpload,
   "blobs.getForDownload": getBlobForDownload,
+  "notifications.drainBatches": drainNotificationBatches,
   "notifications.list": listNotifications,
+  "notifications.unreadCount": unreadNotificationCount,
   "notifications.markRead": markNotificationRead,
   "notifications.snooze": snoozeNotification,
   "notifications.getSettings": getNotificationSettings,
   "notifications.updateSettings": updateOwnNotificationSettings,
+  "subscriptions.read": readSubscription,
   "subscriptions.toggle": toggleSubscription,
   // P6-T04b. Restores a watcher an import found, by name.
   "subscriptions.importWatcher": importWatcher,
+  "activities.goalFeed": goalFeed,
+  "activities.profileFeed": profileFeed,
+  "activities.spaceFeed": spaceFeed,
   "activities.workspaceFeed": workspaceFeed,
   // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
   "workspace.exportArchive": exportArchive,
+  // P6-T05b. An archive into another instance (§7.3).
+  "workspace.importArchive": importArchive,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
@@ -491,6 +525,7 @@ export const ACTION_MAP = {
   "ai.readUsageSummary": readUsageSummary,
   "agents.list": readAgents,
   "agents.create": createAgent,
+  "agents.setAutonomy": setAgentAutonomy,
   "agents.setEnabled": setAgentEnabled,
   "agents.bindScope": bindAgentScope,
   "agents.startRun": startAgentRun,
@@ -506,6 +541,7 @@ export const ACTION_MAP = {
   "spaces.read": readSpace,
   "spaces.create": createSpace,
   "spaces.update": updateSpace,
+  "spaces.updateSettings": updateSpaceSettings,
   "spaces.archive": archiveSpace,
   "spaces.addMember": addSpaceMember,
   "spaces.setMemberRole": setSpaceMemberRole,
@@ -523,6 +559,7 @@ export const ACTION_MAP = {
   "cycles.scorecard": readScorecard,
   "rhythm.read": readRhythmSettings,
   "rhythm.update": updateRhythmSettings,
+  "frame.annualObjectives": readAnnualObjectives,
   "frame.read": readAnnualFrame,
   "frame.set": setAnnualFrame,
   "workflow.read": readWorkflow,
@@ -645,6 +682,8 @@ export const ACTION_MAP = {
   "comments.delete": deleteCommentAction,
   "comments.previewNotify": previewNotifyAction,
   "nudges.run": runNudges,
+  "nudges.rules": listNudgeRules,
+  "nudges.setRule": setNudgeRule,
   "nudges.list": listNudges,
   "nudges.snooze": snoozeNudge,
   "nudges.volume": nudgeVolume,
@@ -677,6 +716,8 @@ export const ACTION_MAP = {
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,
   "sessions.closeCommitments": closeSessionCommitments,
+  "sessions.carriedCommitments": carriedCommitments,
+  "sessions.confidenceTrend": confidenceTrend,
   "sessions.listCommitments": listSessionCommitments,
   "sessions.setCoordinatorNote": setCoordinatorNote,
   "sessions.readStreak": readStreak,

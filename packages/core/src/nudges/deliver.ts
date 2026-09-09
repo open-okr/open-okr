@@ -18,16 +18,19 @@
 import {
   activeOnly,
   notifications,
+  nudgeRules,
   nudges,
   type WorkspaceTx,
 } from "@openokr/db";
-import { asc, eq, isNull, lte } from "drizzle-orm";
+import { asc, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { buildMessage } from "../channels/builder.ts";
 import type { ChannelProviderKey } from "../channels/capabilities.ts";
 import { queueChannelMessageInTx } from "../channels/log.ts";
 import { connectedProviders, loadRoutingMembers } from "../channels/members.ts";
-import { resolveDelivery } from "../channels/routing.ts";
+import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
+import { digestItemsFor } from "../notifications/digest.ts";
+import { primaryChannelSchema } from "../settings/registry.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
@@ -57,6 +60,56 @@ function draftFor(ruleKey: string): { subject: string; text: string } {
       "",
       `Rule: ${ruleKey}`,
     ].join("\n"),
+  };
+}
+
+/** The trigger key §6.4 gives the morning summary. */
+const DAILY_DIGEST_RULE = "digest.daily";
+
+/**
+ * The morning summary's own message: the member's own unread rows (P6-G01b).
+ *
+ * Null when there is nothing unread, and the caller falls back to the generic
+ * line rather than mailing an empty list. A summary of nothing is still worth
+ * sending to somebody who asked for one every day, and saying "you have a
+ * reminder waiting" is the honest version of that.
+ *
+ * The same builder the batch drain uses, so the two digests cannot describe one
+ * event differently, and the access filter is applied once in one place.
+ */
+async function dailyDigestDraft(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly baseUrl: string;
+    readonly now: Date;
+  },
+): Promise<{ subject: string; text: string } | null> {
+  const contents = await digestItemsFor(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    unreadOnly: true,
+    baseUrl: input.baseUrl,
+    now: input.now,
+  });
+  if (contents.items.length === 0) {
+    return null;
+  }
+  const count = contents.items.length;
+  const lines = [
+    "Here is what happened since you last looked.",
+    "",
+    ...contents.items.map((item) => `- ${item.summary}\n  ${item.link}`),
+    ...(contents.omitted > 0 ? ["", `and ${contents.omitted} more.`] : []),
+    "",
+    // The rule key, on this message as on every other proactive message the
+    // product sends. It is what a reader follows back to METHOD.md.
+    `Rule: ${DAILY_DIGEST_RULE}`,
+  ];
+  return {
+    subject: count === 1 ? "OpenOKR: 1 update" : `OpenOKR: ${count} updates`,
+    text: lines.join("\n"),
   };
 }
 
@@ -148,6 +201,35 @@ export async function deliverDueNudges(
   });
   const connected = await connectedProviders(tx, input.workspaceId);
 
+  // Every rule this workspace has re-routed (P6-G21). One read for the whole
+  // batch rather than one per nudge, and an absent key is the member's own
+  // channel, which is what no row means everywhere else in this table.
+  const overrideRows = await tx
+    .select({
+      ruleKey: nudgeRules.ruleKey,
+      channelOverride: nudgeRules.channelOverride,
+    })
+    .from(nudgeRules)
+    .where(
+      activeOnly(
+        nudgeRules,
+        eq(nudgeRules.workspaceId, input.workspaceId),
+        isNotNull(nudgeRules.channelOverride),
+      ),
+    );
+  // The column is free text in the table and the routing decision takes the
+  // same union a member's own channel does. Narrowed here, once, rather than
+  // at the call site: a value outside the set is a row written before the
+  // action that validates it existed, and the member's own channel is the
+  // right answer for one of those.
+  const overrides = new Map<string, PrimaryChannel>();
+  for (const row of overrideRows) {
+    const parsed = primaryChannelSchema.safeParse(row.channelOverride);
+    if (parsed.success) {
+      overrides.set(row.ruleKey, parsed.data);
+    }
+  }
+
   let toChannel = 0;
   const unreachable = new Set<string>();
 
@@ -170,6 +252,7 @@ export async function deliverDueNudges(
       // ladder position is what says so. Step 3 is where §6.3 widens.
       urgent: row.escalationStep >= 3,
       connectedProviders: connected,
+      channelOverride: overrides.get(row.ruleKey) ?? null,
       now: input.now,
     });
 
@@ -195,6 +278,12 @@ export async function deliverDueNudges(
       workspaceId: input.workspaceId,
       recipientMemberId: row.recipientMemberId,
       nudgeId: row.id,
+      // Copied from the nudge so the inbox row can be grouped and linked
+      // without joining back to it (migration 0074, P6-G07a). The nudge's
+      // subject types are a narrower list than the activity's, and every one
+      // of them is a subject the access getter can resolve.
+      subjectType: row.subjectType,
+      subjectId: row.subjectId,
       // One reason across every cadence. The inbox is a list of obligations,
       // not a taxonomy of clocks; the rule key on the nudge row says which
       // trigger fired.
@@ -218,7 +307,23 @@ export async function deliverDueNudges(
               now: input.now,
               ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
             })) ?? draftFor(row.ruleKey))
-          : draftFor(row.ruleKey);
+          : // **The daily summary carries what it is summarising** (P6-G01b).
+            // Every other rule is one line by design, because per-rule wording
+            // is coaching copy and METHOD.md owns that. This rule is the
+            // exception for the opposite reason: `digest.daily` is not a
+            // sentence about a thing, it is a list of things, and a morning
+            // summary that said "you have a reminder waiting" while summarising
+            // nothing was the state of it from P4-T05b until here. Falls back to
+            // the generic line when the list comes back empty, which is what a
+            // member with a quiet day gets.
+            row.ruleKey === DAILY_DIGEST_RULE && input.baseUrl
+            ? ((await dailyDigestDraft(tx, {
+                workspaceId: input.workspaceId,
+                memberId: row.recipientMemberId,
+                baseUrl: input.baseUrl,
+                now: input.now,
+              })) ?? draftFor(row.ruleKey))
+            : draftFor(row.ruleKey);
       // WhatsApp is the one provider with a clock on it (P5-T04b-b). Outside
       // Meta's twenty-four hour window the body will not go at all, so the
       // rule's approved template and its filled-in variables are looked up and

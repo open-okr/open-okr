@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
@@ -13,6 +13,8 @@ import { AuthCard, Field, FormError } from "../auth-card";
  * a different answer would let anyone test which addresses have accounts.
  */
 export default function ForgotPasswordPage() {
+  const { t } = useTranslations();
+
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
@@ -39,14 +41,14 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <AuthCard
-        title="Check your email"
+        title={t("auth.forgotPassword.checkYourEmail")}
         description="If that address has an account, a reset link is on its way. The link expires in an hour."
       >
         <Link
           href="/sign-in"
           className="font-medium text-brand-text hover:underline"
         >
-          Back to sign in
+          {t("common.backToSignIn")}
         </Link>
       </AuthCard>
     );
@@ -54,14 +56,14 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthCard
-      title="Reset your password"
+      title={t("auth.forgotPassword.resetYourPassword")}
       description="We will email you a link to set a new one."
       footer={
         <Link
           href="/sign-in"
           className="font-medium text-brand-text hover:underline"
         >
-          Back to sign in
+          {t("common.backToSignIn")}
         </Link>
       }
     >

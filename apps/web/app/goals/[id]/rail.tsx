@@ -1,4 +1,5 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../../lib/translations";
 import { HealthChip } from "../health-chip.tsx";
 
 /**
@@ -48,7 +49,7 @@ export interface Relations {
   }[];
 }
 
-export function Rail({
+export async function Rail({
   relations,
   level,
 }: {
@@ -56,11 +57,15 @@ export function Rail({
   /** This goal's own level, so the orphan note can name it. */
   readonly level: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-3.5">
       <Card>
         <CardHeader>
-          <h2 className="text-sm font-bold text-ink">Supports</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("goals.detail.rail.supports")}
+          </h2>
         </CardHeader>
         <CardBody>
           {relations.parent ? (
@@ -77,13 +82,12 @@ export function Rail({
             </a>
           ) : level === "company" ? (
             <p className="text-xs text-ink-3">
-              A company objective anchors the tree. It supports nothing above it
-              by design.
+              {t("goals.detail.rail.aCompanyObjectiveAnchors")}
             </p>
           ) : (
             <p className="text-xs text-ink-3">
-              Nothing. A {level} goal with no parent costs the alignment score
-              12 points, because it supports nothing above it.
+              {t("goals.detail.rail.nothingA")} {level}{" "}
+              {t("goals.detail.rail.goalWithNoParent")}
             </p>
           )}
         </CardBody>
@@ -91,13 +95,15 @@ export function Rail({
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Supported by</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("goals.detail.rail.supportedBy")}
+          </h2>
           <Chip tone="neutral">{relations.children.length}</Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {relations.children.length === 0 ? (
             <p className="text-xs text-ink-3">
-              No goals hang off this one yet.
+              {t("goals.detail.rail.noGoalsHangOff")}
             </p>
           ) : (
             relations.children.map((child) => (
@@ -123,16 +129,17 @@ export function Rail({
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Depends on</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("goals.detail.rail.dependsOn")}
+          </h2>
           <Chip tone="neutral">{relations.dependencies.length}</Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
           {relations.dependencies.length === 0 ? (
             <p className="text-xs text-ink-3">
-              No horizontal links. A department whose whole subtree has none is
-              flagged as a possible silo.{" "}
+              {t("goals.detail.rail.noHorizontalLinksA")}{" "}
               <a className="underline" href="/goals/studio">
-                Add one in the studio
+                {t("goals.detail.rail.addOneInThe")}
               </a>
               .
             </p>
@@ -157,7 +164,9 @@ export function Rail({
 
       <Card>
         <CardHeader className="justify-between">
-          <h2 className="text-sm font-bold text-ink">Dependency register</h2>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.dependencyRegister")}
+          </h2>
           <Chip
             tone={
               relations.register.some((entry) => entry.blocksPublish)
@@ -171,8 +180,7 @@ export function Rail({
         <CardBody className="flex flex-col gap-1.5">
           {relations.register.length === 0 ? (
             <p className="text-xs text-ink-3">
-              Nothing recorded. A key result that needs another team to deliver
-              belongs here, or publish gate 4 has nothing to check.
+              {t("goals.detail.rail.nothingRecordedAKey")}
             </p>
           ) : (
             relations.register.map((entry) => (
@@ -181,11 +189,15 @@ export function Rail({
                 <span className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
                   <span>{entry.provider}</span>
                   {entry.confirmed ? (
-                    <Chip tone="ok">confirmed</Chip>
+                    <Chip tone="ok">{t("common.confirmed")}</Chip>
                   ) : entry.riskOwnerName ? (
-                    <Chip tone="warn">risk: {entry.riskOwnerName}</Chip>
+                    <Chip tone="warn">
+                      {t("goals.detail.rail.risk")} {entry.riskOwnerName}
+                    </Chip>
                   ) : (
-                    <Chip tone="bad">blocks publishing</Chip>
+                    <Chip tone="bad">
+                      {t("goals.detail.rail.blocksPublishing")}
+                    </Chip>
                   )}
                 </span>
               </div>

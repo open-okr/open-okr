@@ -37,6 +37,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { daysPastDue, dueLocalDate } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   acknowledgementDueLabel,
@@ -207,8 +208,16 @@ export const reviewInbox = defineReadAction({
         const rhythm = resolveRhythm(
           await readRhythmRow(tx, context.workspaceId),
         );
+        // The workspace's own acknowledgement ladder when it has replaced
+        // §11's (P6-G21b). The column has been stored since P4-T04b and read
+        // by nothing until this row.
+        const thresholds = await resolveRhythmWithLadders(
+          tx,
+          context.workspaceId,
+          rhythm,
+        );
         const escalateAfter =
-          rhythm.thresholds["cadence.acknowledgementLadderDays"].escalate;
+          thresholds["cadence.acknowledgementLadderDays"].escalate;
         const now = new Date();
 
         const obligations: Obligation[] = [];

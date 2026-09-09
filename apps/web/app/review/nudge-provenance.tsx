@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useState } from "react";
 import { snoozeNudge } from "./actions.ts";
 
@@ -43,13 +44,14 @@ export function NudgeProvenance({
 }: {
   readonly nudges: readonly NudgeEntry[];
 }) {
+  const { t } = useTranslations();
+
   const [busy, setBusy] = useState<string | null>(null);
 
   if (nudges.length === 0) {
     return (
       <p className="text-xs text-ink-3">
-        Nothing has nudged you. Anything the product says to you appears here
-        with the rule that caused it.
+        {t("review.nudgeProvenance.nothingHasNudgedYou")}
       </p>
     );
   }
@@ -67,22 +69,25 @@ export function NudgeProvenance({
             </span>
             {nudge.escalationStep > 1 ? (
               <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[0.65rem] font-semibold text-warn">
-                escalation step {nudge.escalationStep}
+                {t("review.nudgeProvenance.escalationStep")}{" "}
+                {nudge.escalationStep}
               </span>
             ) : null}
-            <span className="text-xs text-ink-3">via {nudge.channel}</span>
+            <span className="text-xs text-ink-3">
+              {t("review.nudgeProvenance.via")} {nudge.channel}
+            </span>
           </div>
 
           {nudge.suppressedReason ? (
             <p className="text-xs text-ink-3">
-              Held back, because{" "}
-              {REASON[nudge.suppressedReason] ?? nudge.suppressedReason}. It is
-              recorded here so the silence is answerable.
+              {t("review.nudgeProvenance.heldBackBecause")}{" "}
+              {REASON[nudge.suppressedReason] ?? nudge.suppressedReason}
+              {t("review.nudgeProvenance.itIsRecordedHere")}
             </p>
           ) : (
             <p className="text-xs text-ink-3">
-              Sent {nudge.sentAt ? new Date(nudge.sentAt).toLocaleString() : ""}
-              .
+              {t("common.sent")}{" "}
+              {nudge.sentAt ? new Date(nudge.sentAt).toLocaleString() : ""}.
             </p>
           )}
 
@@ -91,7 +96,7 @@ export function NudgeProvenance({
               href={`/method/${nudge.ruleKey}`}
               className="text-xs font-semibold text-brand-text hover:underline"
             >
-              See the rule
+              {t("review.nudgeProvenance.seeTheRule")}
             </a>
             <button
               type="button"
@@ -111,8 +116,7 @@ export function NudgeProvenance({
               {busy === nudge.id ? "Snoozing…" : "Snooze for a week"}
             </button>
             <span className="text-xs text-ink-4">
-              Snoozing stops the messages. It does not clear what you owe, and
-              the list above will not move.
+              {t("review.nudgeProvenance.snoozingStopsTheMessages")}
             </span>
           </div>
         </li>

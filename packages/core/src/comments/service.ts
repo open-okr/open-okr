@@ -349,6 +349,8 @@ export interface ReactionGroup {
   readonly memberIds: readonly string[];
   /** Whether the reading member reacted with this emoji. */
   readonly own: boolean;
+  /** The caller's own reaction, so it can be taken back (P6-G27). */
+  readonly ownReactionId: string | null;
 }
 
 export async function listReactions<
@@ -376,13 +378,25 @@ export async function listReactions<
       ),
     );
 
-  const groups = new Map<string, { memberIds: string[]; own: boolean }>();
+  const groups = new Map<
+    string,
+    { memberIds: string[]; own: boolean; ownReactionId: string | null }
+  >();
 
   for (const row of rows) {
-    const group = groups.get(row.emoji) ?? { memberIds: [], own: false };
+    const group = groups.get(row.emoji) ?? {
+      memberIds: [],
+      own: false,
+      ownReactionId: null,
+    };
     group.memberIds.push(row.memberId);
     if (row.memberId === readingMemberId) {
       group.own = true;
+      // **The id, not just the fact** (P6-G27). `reactions.remove` takes a
+      // reaction id and this read already knew which row was the caller's, so
+      // a reaction could be added from a screen and never taken back. One
+      // column on an answer this query was already computing.
+      group.ownReactionId = row.id;
     }
     groups.set(row.emoji, group);
   }
@@ -392,5 +406,6 @@ export async function listReactions<
     count: g.memberIds.length,
     memberIds: g.memberIds,
     own: g.own,
+    ownReactionId: g.ownReactionId,
   }));
 }

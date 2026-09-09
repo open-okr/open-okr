@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import { NOTHING_YET, type RevokeResult } from "./revoke-state.ts";
 
@@ -21,12 +21,14 @@ export function RevokeForm({
   ) => Promise<RevokeResult>;
   readonly id: string;
 }) {
+  const { t } = useTranslations();
+
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className="w-fit" aria-busy={pending}>
       <input type="hidden" name="id" value={id} />
       <Button type="submit" variant="ghost" size="sm">
-        Revoke
+        {t("common.revoke")}
       </Button>
       {state.ok ? null : (
         <p role="alert" className="mt-1.5 text-xs text-bad">

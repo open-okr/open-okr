@@ -421,6 +421,126 @@ describe("an ordinary member's own access", () => {
   });
 });
 
+describe("directory includeSuspended (P6-G09)", () => {
+  it("excludes a suspended member by default", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Soon Suspended");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const rows = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      {},
+    );
+    expect(rows.map((r) => r.id)).not.toContain(member);
+  });
+
+  it("includes a suspended member when includeSuspended is true", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Soon Suspended");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const rows = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.directory",
+      { includeSuspended: true },
+    );
+    expect(rows.map((r) => r.id)).toContain(member);
+    const suspended = rows.find((r) => r.id === member);
+    expect(suspended?.status).toBe("suspended");
+  });
+});
+
+describe("readMember (P6-G09)", () => {
+  it("returns full profile for an active member", async () => {
+    const wb = await workerDb();
+    const profile = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(profile.id).toBe(ownerMemberId);
+    expect(profile.name).toBe("People Owner");
+    expect(profile).toHaveProperty("bio");
+    expect(profile).toHaveProperty("primaryChannel");
+    expect(profile).toHaveProperty("avatarBlobId");
+  });
+
+  it("returns not_found for a non-existent member", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context(OWNER) }, "people.readMember", {
+        memberId: "00000000-0000-0000-0000-000000000000",
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("returns a suspended member to an admin caller", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Suspended for Profile");
+    await grantFullOnWorkspace(member);
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    const profile = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: member },
+    );
+    expect(profile.id).toBe(member);
+    expect(profile.status).toBe("suspended");
+  });
+
+  it("returns not_found for a suspended member when the caller is not admin", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Suspended Target");
+    await grantFullOnWorkspace(member);
+
+    // Create a non-admin user to act as caller.
+    const NON_ADMIN_USER = "people-reader";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [NON_ADMIN_USER, "Reader", "reader@example.com"],
+    );
+    const readerMember = await addMember("Reader");
+    // Bind the user to the member row so the handler can find the caller.
+    await wb.admin.query(
+      "update workspace_members set user_id = $1 where id = $2",
+      [NON_ADMIN_USER, readerMember],
+    );
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.suspend",
+      { memberId: member },
+    );
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(NON_ADMIN_USER) },
+        "people.readMember",
+        { memberId: member },
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("bio is validated as rich text (P2-T11)", () => {
   it("accepts a valid rich text document", () => {
     const result = updateOwnProfile.input.safeParse({
@@ -455,5 +575,171 @@ describe("bio is validated as rich text (P2-T11)", () => {
     expect(
       updateOwnProfile.input.safeParse({ bio: "just a string" }).success,
     ).toBe(false);
+  });
+});
+
+describe("a member's theme and density (P6-G23)", () => {
+  it("starts null, which the provider reads as follow the system", async () => {
+    const wb = await workerDb();
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Not "light". A product that picked one for somebody would be overriding
+    // a choice they already made in their operating system.
+    expect(me.theme).toBeNull();
+    expect(me.density).toBeNull();
+  });
+
+  it("keeps what the member chose, on the member", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", density: "compact" },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Stored per member rather than in a browser, which is the whole point:
+    // signing in on a second machine used to put somebody back on the default.
+    expect(me.theme).toBe("dark");
+    expect(me.density).toBe("compact");
+  });
+
+  it("takes one without disturbing the other", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", density: "compact" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "light" },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBe("light");
+    expect(me.density).toBe("compact");
+  });
+
+  it("goes back to following the system when set to null", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark" },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: null },
+    );
+
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBeNull();
+  });
+
+  it("refuses a theme the design system has no tokens for", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateOwnProfile",
+        { theme: "solarized" } as never,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+/**
+ * A member's own language (UIUX-PLAN §8, P6-G22a).
+ *
+ * The catalogue has existed since P2-T10 and the locale has been pinned to
+ * `en` in the root layout ever since, so the workspace's `language` setting
+ * was read by no renderer and a member had no language at all. These prove the
+ * column round-trips and that a locale with no catalogue is refused.
+ */
+describe("a member's language (P6-G22a)", () => {
+  it("starts null, which reads as follow the workspace", async () => {
+    const wb = await workerDb();
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    // Not "en". A member who has never chosen should get whatever their
+    // organisation chose, and null is the only value that can say so.
+    expect(me.language).toBeNull();
+  });
+
+  it("keeps what the member chose, and clears back to the workspace", async () => {
+    const wb = await workerDb();
+    const read = async () =>
+      (
+        await callAction(
+          { pool: wb.appPool, ...context(OWNER) },
+          "people.readMember",
+          { memberId: ownerMemberId },
+        )
+      ).language;
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { language: "ms" },
+    );
+    expect(await read()).toBe("ms");
+
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { language: null },
+    );
+    expect(await read()).toBeNull();
+  });
+
+  it("refuses a locale with no catalogue", async () => {
+    // `translate()` raises on a missing key by design rather than falling back
+    // to something that looks like content, so a locale with no catalogue
+    // would take out the first screen that rendered a key.
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "people.updateOwnProfile",
+        { language: "fr" } as never,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("leaves the theme and the density alone", async () => {
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.updateOwnProfile",
+      { theme: "dark", language: "ms" },
+    );
+    const me = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(me.theme).toBe("dark");
+    expect(me.language).toBe("ms");
   });
 });
