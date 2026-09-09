@@ -8,6 +8,7 @@ import {
   type QualityStatus,
   type ResolvedThresholds,
 } from "@openokr/method";
+import { useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useMemo } from "react";
 import type { CoachKeyResult, CoachObjective } from "./draft-coach.tsx";
@@ -65,6 +66,8 @@ export function QualityPanel({
     readonly title: string;
   }[];
 }) {
+  const { t } = useTranslations();
+
   const titles = useMemo(
     () => new Map(checkTitles.map((entry) => [entry.id, entry.title])),
     [checkTitles],
@@ -151,31 +154,34 @@ export function QualityPanel({
     >
       <div className="flex items-center justify-between gap-2">
         <h2 id="quality-panel-heading" className="text-sm font-bold text-ink">
-          Quality panel
+          {t("cycle.qualityPanel.qualityPanel")}
         </h2>
         {mustFix > 0 ? (
           <span className="rounded-full bg-bad-bg px-2 py-0.5 text-xs font-semibold text-bad">
-            {mustFix} must fix
+            {mustFix} {t("cycle.qualityPanel.mustFix")}
           </span>
         ) : null}
       </div>
 
       {set.length === 0 ? (
         <p className="text-xs text-ink-3">
-          Nothing drafted yet, so there is nothing to check. The panel fills as
-          objectives arrive.
+          {t("cycle.qualityPanel.nothingDraftedYetSo")}
         </p>
       ) : total === 0 ? (
         <p className="text-xs text-ok">
-          Every check passes across {set.length} objective
-          {set.length === 1 ? "" : "s"}. Nothing here is blocking a publication.
+          {t("cycle.qualityPanel.everyCheckPassesAcross")} {set.length}{" "}
+          {t("common.objective")}
+          {set.length === 1 ? "" : "s"}
+          {t("cycle.qualityPanel.nothingHereIsBlocking")}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
-          {total} issue{total === 1 ? "" : "s"} across{" "}
-          {groups.filter((g) => g.issues.length > 0).length} objective
-          {groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s"}.
-          Each one links at the field that fixes it.
+          {total} {t("cycle.qualityPanel.issue")}
+          {total === 1 ? "" : "s"} {t("cycle.qualityPanel.across")}{" "}
+          {groups.filter((g) => g.issues.length > 0).length}{" "}
+          {t("common.objective")}
+          {groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s"}
+          {t("cycle.qualityPanel.eachOneLinksAt")}
         </p>
       )}
 
@@ -204,7 +210,9 @@ export function QualityPanel({
                       </span>
                     </span>
                     <span className="text-xs text-ink-3">{issue.prompt}</span>
-                    <span className="text-xs text-ink-4">In {issue.where}</span>
+                    <span className="text-xs text-ink-4">
+                      {t("cycle.qualityPanel.in")} {issue.where}
+                    </span>
                   </Link>
                 </li>
               ))}

@@ -16,7 +16,14 @@
  * register P3-T09 already keeps. A second copy filled in here would give a
  * facilitator two answers about one dependency.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
@@ -96,6 +103,8 @@ export function MonthlyReview({
   readonly subjects: readonly DecisionSubject[];
   readonly canEdit: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -134,12 +143,13 @@ export function MonthlyReview({
   return (
     <div className="flex flex-col gap-6">
       <Card>
-        <CardHeader>Trend per objective</CardHeader>
+        <CardHeader>
+          {t("session.detail.monthlyReview.trendPerObjective")}
+        </CardHeader>
         <CardBody className="flex flex-col gap-3">
           {objectives.length === 0 ? (
             <p className="text-sm text-ink-3">
-              No objectives in this space and cycle, so there is no trend to
-              record.
+              {t("session.detail.monthlyReview.noObjectivesInThis")}
             </p>
           ) : null}
           {objectives.map((objective) => {
@@ -189,7 +199,7 @@ export function MonthlyReview({
                   ))}
                   {entry ? null : (
                     <span className="self-center text-xs text-ink-4">
-                      Not recorded yet
+                      {t("session.detail.monthlyReview.notRecordedYet")}
                     </span>
                   )}
                 </span>
@@ -200,13 +210,13 @@ export function MonthlyReview({
       </Card>
 
       <Card>
-        <CardHeader>Dependency and risk log</CardHeader>
+        <CardHeader>
+          {t("session.detail.monthlyReview.dependencyAndRiskLog")}
+        </CardHeader>
         <CardBody className="flex flex-col gap-2">
           {dependencies.length === 0 ? (
             <p className="text-sm text-ink-3">
-              Nothing in the register for this space and cycle. Dependencies are
-              added on the key result, not here, so this reads the one list
-              rather than starting a second.
+              {t("session.detail.monthlyReview.nothingInTheRegister")}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -226,7 +236,9 @@ export function MonthlyReview({
                       // §5.4: unconfirmed and unowned is what holds publish
                       // gate 4 red, so the screen names it rather than leaving
                       // a reader to work out why the gate will not open.
-                      <Chip tone="bad">no risk owner</Chip>
+                      <Chip tone="bad">
+                        {t("session.detail.monthlyReview.noRiskOwner")}
+                      </Chip>
                     )}
                   </span>
                   {dependency.description ? (
@@ -242,14 +254,18 @@ export function MonthlyReview({
       </Card>
 
       <Card>
-        <CardHeader>Resource or priority shifts</CardHeader>
+        <CardHeader>
+          {t("session.detail.monthlyReview.resourceOrPriorityShifts")}
+        </CardHeader>
         <CardBody className="flex flex-col gap-2">
           <textarea
             className="min-h-24 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
             value={shiftsDraft}
             disabled={!canEdit}
-            aria-label="Resource or priority shifts"
-            placeholder="What moved, and why"
+            aria-label={t(
+              "session.detail.monthlyReview.resourceOrPriorityShifts",
+            )}
+            placeholder={t("session.detail.monthlyReview.whatMovedAndWhy")}
             onChange={(event) => setShiftsDraft(event.target.value)}
           />
           {canEdit ? (
@@ -261,7 +277,7 @@ export function MonthlyReview({
                   run(() => setShiftsAction(sessionId, shiftsDraft))
                 }
               >
-                Save the note
+                {t("common.saveTheNote")}
               </Button>
             </span>
           ) : null}
@@ -269,16 +285,16 @@ export function MonthlyReview({
       </Card>
 
       <Card>
-        <CardHeader>Decisions</CardHeader>
+        <CardHeader>{t("common.decisions")}</CardHeader>
         <CardBody className="flex flex-col gap-3">
           <p className="text-xs text-ink-4">
-            The record that survives the meeting. Every decision names the key
-            result or the objective it affects, and appears on that goal's page
-            afterwards.
+            {t("session.detail.monthlyReview.theRecordThatSurvives")}
           </p>
 
           {decisions.length === 0 ? (
-            <p className="text-sm text-ink-3">Nothing decided yet.</p>
+            <p className="text-sm text-ink-3">
+              {t("session.detail.monthlyReview.nothingDecidedYet")}
+            </p>
           ) : (
             <ul className="flex flex-col gap-2">
               {decisions.map((decision) => (
@@ -303,7 +319,7 @@ export function MonthlyReview({
                 className="text-xs font-medium text-ink-3"
                 htmlFor="decision-subject"
               >
-                What it affects
+                {t("session.detail.monthlyReview.whatItAffects")}
               </label>
               <select
                 id="decision-subject"
@@ -324,13 +340,13 @@ export function MonthlyReview({
                 className="text-xs font-medium text-ink-3"
                 htmlFor="decision-text"
               >
-                The decision
+                {t("session.detail.monthlyReview.theDecision")}
               </label>
               <textarea
                 id="decision-text"
                 className="min-h-20 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                 value={decisionText}
-                placeholder="What was decided"
+                placeholder={t("session.detail.monthlyReview.whatWasDecided")}
                 onChange={(event) => setDecisionText(event.target.value)}
               />
               <span>
@@ -351,7 +367,7 @@ export function MonthlyReview({
                     });
                   }}
                 >
-                  Record the decision
+                  {t("session.detail.monthlyReview.recordTheDecision")}
                 </Button>
               </span>
             </div>

@@ -1,4 +1,5 @@
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { addPriority } from "./actions.ts";
 import type { Issue } from "./diagnose.tsx";
@@ -15,7 +16,7 @@ import type { Issue } from "./diagnose.tsx";
  * of the task's test plan, and it needs objectives. Those arrive at P3-T04, so the
  * promotion recorded here stops at the priority.
  */
-export function Direction({
+export async function Direction({
   cycleId,
   mode,
   priorities,
@@ -34,6 +35,8 @@ export function Direction({
   readonly bounds: { readonly low: number; readonly high: number };
   readonly canEdit: boolean;
 }) {
+  const { t } = await getTranslations();
+
   const withinBounds =
     priorities.length >= bounds.low && priorities.length <= bounds.high;
   const unpromoted = issues.filter((issue) => !issue.promotedToPriorityId);
@@ -41,28 +44,30 @@ export function Direction({
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">Priorities</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("cycle.direction.priorities")}
+        </h2>
         {mode === "annual" ? (
           <Chip tone={withinBounds ? "ok" : "warn"}>
-            {priorities.length} of {bounds.low} to {bounds.high}
+            {priorities.length} {t("common.of")} {bounds.low} {t("common.to")}{" "}
+            {bounds.high}
           </Chip>
         ) : (
-          <Chip tone="neutral">{priorities.length} chosen</Chip>
+          <Chip tone="neutral">
+            {priorities.length} {t("cycle.direction.chosen")}
+          </Chip>
         )}
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         {mode === "quarterly" ? (
           <p className="text-sm text-ink-3">
-            A quarterly cycle revalidates the annual frame rather than setting
-            new priorities. Anything recorded here is this quarter's focus, not
-            a new direction.
+            {t("cycle.direction.aQuarterlyCycleRevalidates")}
           </p>
         ) : null}
 
         {priorities.length === 0 ? (
           <p className="text-sm text-ink-3">
-            Nothing chosen yet. A list that accommodates everything is a to-do
-            list, not a strategy.
+            {t("cycle.direction.nothingChosenYetA")}
           </p>
         ) : (
           <ol className="flex flex-col divide-y divide-line">
@@ -87,29 +92,29 @@ export function Direction({
           <ActionForm action={addPriority} className="flex flex-col gap-1.5">
             <input type="hidden" name="cycleId" value={cycleId} />
             <label className="sr-only" htmlFor="new-priority">
-              The priority
+              {t("cycle.direction.thePriority")}
             </label>
             <input
               id="new-priority"
               name="text"
               required
               maxLength={500}
-              placeholder="What has to be measurably different, and by when"
+              placeholder={t("cycle.direction.whatHasToBe")}
               className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
             />
             <label className="sr-only" htmlFor="new-priority-success">
-              The success statement
+              {t("cycle.direction.theSuccessStatement")}
             </label>
             <input
               id="new-priority-success"
               name="successStatement"
               maxLength={1000}
-              placeholder="How we will know it worked"
+              placeholder={t("cycle.direction.howWeWillKnow")}
               className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
             />
             <div className="flex items-center gap-1.5">
               <label className="sr-only" htmlFor="new-priority-issue">
-                The issue this answers
+                {t("cycle.direction.theIssueThisAnswers")}
               </label>
               <select
                 id="new-priority-issue"
@@ -117,14 +122,16 @@ export function Direction({
                 defaultValue=""
                 className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink-2"
               >
-                <option value="">Answers no issue on the list</option>
+                <option value="">
+                  {t("cycle.direction.answersNoIssueOn")}
+                </option>
                 {unpromoted.map((issue) => (
                   <option key={issue.id} value={issue.id}>
-                    Impact {issue.impact} · {issue.text}
+                    {t("common.impact")} {issue.impact} · {issue.text}
                   </option>
                 ))}
               </select>
-              <Button type="submit">Add</Button>
+              <Button type="submit">{t("common.add")}</Button>
             </div>
           </ActionForm>
         ) : null}

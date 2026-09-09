@@ -2,6 +2,7 @@ import { listUserSessions, type UserSession } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getAuth } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * The session list with revoke (TECHNICAL-PLAN §8.2, P2-T09).
@@ -33,6 +34,8 @@ async function revoke(formData: FormData): Promise<void> {
 }
 
 export async function Sessions({ userId }: { userId: string }) {
+  const { t } = await getTranslations();
+
   let sessions: UserSession[] | null = null;
   try {
     sessions = await listUserSessions(getAuth(), userId);
@@ -44,16 +47,12 @@ export async function Sessions({ userId }: { userId: string }) {
 
   return (
     <section style={{ fontFamily: "system-ui, sans-serif" }}>
-      <h2>Sessions</h2>
-      <p>
-        Every device currently signed in. Revoking one signs it out immediately.
-      </p>
+      <h2>{t("common.sessions")}</h2>
+      <p>{t("account.security.sessions.everyDeviceCurrentlySigned")}</p>
       {sessions === null ? (
-        <p role="status">
-          This list could not be read just now. Reload the page to try again.
-        </p>
+        <p role="status">{t("account.security.sessions.thisListCouldNot")}</p>
       ) : sessions.length === 0 ? (
-        <p>No other device is signed in.</p>
+        <p>{t("account.security.sessions.noOtherDeviceIs")}</p>
       ) : (
         <ul>
           {sessions.map((session) => (
@@ -64,7 +63,7 @@ export async function Sessions({ userId }: { userId: string }) {
               {session.createdAt.toLocaleString()}{" "}
               <form action={revoke} style={{ display: "inline" }}>
                 <input type="hidden" name="token" value={session.token} />
-                <button type="submit">Revoke</button>
+                <button type="submit">{t("common.revoke")}</button>
               </form>
             </li>
           ))}

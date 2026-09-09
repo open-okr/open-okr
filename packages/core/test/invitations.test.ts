@@ -316,6 +316,12 @@ describe("only a member with full access may invite", () => {
     // Added at P6-G06a. Reading who has been invited is reading email
     // addresses and who invited them, which is the same fact the create path
     // guards, so it takes the same level.
+    //
+    // `not_found` where the create path beside it raises `forbidden`, and the
+    // asymmetry is the convention rather than an oversight: a read refuses the
+    // way the access getter refuses, so that a stranger and a member below the
+    // level are told the same thing. P6-G31 moved this enforcement out of the
+    // handler and into `defineReadAction`, and changed the code with it.
     const wb = await workerDb();
     await createUser("low-reader", "reader@example.com", "Low Reader");
     const link = await callAction(
@@ -335,7 +341,7 @@ describe("only a member with full access may invite", () => {
         "invitations.list",
         {},
       ),
-    ).rejects.toMatchObject({ code: "forbidden" });
+    ).rejects.toMatchObject({ code: "not_found" });
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Kbd } from "@openokr/ui";
+import { Kbd, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { type PaletteAnswer, paletteSearchAction } from "./actions.ts";
@@ -25,6 +25,8 @@ import { type PaletteAnswer, paletteSearchAction } from "./actions.ts";
 const EMPTY: PaletteAnswer = { jump: null, hits: [], error: null };
 
 export function CommandPalette() {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -98,7 +100,7 @@ export function CommandPalette() {
        */}
       <button
         type="button"
-        aria-label="Close the search"
+        aria-label={t("search.palette.closeTheSearch")}
         tabIndex={-1}
         onClick={() => setOpen(false)}
         className="absolute inset-0 bg-scrim"
@@ -106,7 +108,7 @@ export function CommandPalette() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Search everything"
+        aria-label={t("search.palette.searchEverything")}
         data-testid="palette"
         className="relative flex w-full max-w-xl flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-lg"
       >
@@ -114,8 +116,8 @@ export function CommandPalette() {
           <input
             ref={input}
             value={text}
-            aria-label="Search everything"
-            placeholder="Search, or type a short identifier"
+            aria-label={t("search.palette.searchEverything")}
+            placeholder={t("search.palette.searchOrTypeA")}
             className="flex-1 bg-transparent text-sm text-ink outline-none"
             onChange={(event) => {
               setText(event.target.value);
@@ -140,7 +142,7 @@ export function CommandPalette() {
               }
             }}
           />
-          <Kbd>Esc</Kbd>
+          <Kbd>{t("common.esc")}</Kbd>
         </div>
 
         <div className="max-h-80 overflow-y-auto">

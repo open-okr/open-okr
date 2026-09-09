@@ -46,7 +46,9 @@ async function run(
     revalidatePath(path);
   }
   const created = (result as { id?: string } | undefined)?.id;
-  return created ? { error: null, createdId: created } : NO_SPACE_ERROR;
+  return created
+    ? { error: null, saved: true, createdId: created }
+    : { ...NO_SPACE_ERROR, saved: true };
 }
 
 export async function createSpace(
@@ -137,5 +139,45 @@ export async function removeSpaceMember(
   const memberId = String(formData.get("memberId") ?? "");
   return run(["/spaces", `/spaces/${spaceId}`], (context) =>
     callAction(context, "spaces.removeMember", { spaceId, memberId }),
+  );
+}
+
+/**
+ * One space's §4.14 settings (P6-G18b).
+ *
+ * **An empty select means "the workspace's", not "unset".** Both overrides are
+ * nullable on purpose: a space that has decided nothing inherits, and storing
+ * the workspace's current value instead would freeze it the next time the
+ * workspace changed.
+ */
+export async function updateSpaceSettings(
+  _previous: SpaceWriteState,
+  formData: FormData,
+): Promise<SpaceWriteState> {
+  const id = String(formData.get("id") ?? "");
+  const strictness = String(formData.get("coachStrictness") ?? "");
+  const frequency = String(formData.get("defaultCheckInFrequency") ?? "");
+
+  return run(["/spaces", `/spaces/${id}`], (context) =>
+    callAction(context, "spaces.updateSettings", {
+      id,
+      // An unchecked checkbox sends nothing at all, which is what makes this
+      // false rather than absent: the form always renders the box, so its
+      // absence is a decision and not a field the screen left out.
+      teamVoting: formData.get("teamVoting") !== null,
+      coachStrictness:
+        strictness === ""
+          ? null
+          : (strictness as "advisory" | "warn" | "strict"),
+      defaultCheckInFrequency:
+        frequency === ""
+          ? null
+          : (frequency as
+              | "daily"
+              | "weekly"
+              | "biweekly"
+              | "monthly"
+              | "quarterly"),
+    }),
   );
 }

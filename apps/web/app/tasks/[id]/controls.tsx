@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -33,12 +34,20 @@ export function ChecklistLine({
   done,
   disabled,
   onToggle,
+  onRemove,
 }: {
   readonly title: string;
   readonly done: boolean;
   readonly disabled: boolean;
   readonly onToggle: (done: boolean) => Promise<WriteState>;
+  /**
+   * Taking the line off (P6-G27). Absent where the reader cannot edit, and
+   * distinct from ticking it: a ticked line says the work was done, and a
+   * removed one says it was never work.
+   */
+  readonly onRemove?: () => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
   const [ticked, setTicked] = useState(done);
   const { error, pending, run } = useRun();
 
@@ -62,6 +71,17 @@ export function ChecklistLine({
         <span className={ticked ? "text-ink-3 line-through" : undefined}>
           {title}
         </span>
+        {onRemove && !disabled ? (
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={`${t("common.remove")} "${title}"`}
+            onClick={() => run(onRemove)}
+            className="ml-auto text-xs text-ink-4 hover:text-bad"
+          >
+            {t("common.remove")}
+          </button>
+        ) : null}
       </label>
       {error ? (
         <span role="alert" className="text-xs text-bad">
@@ -111,6 +131,8 @@ export function DueDateField({
   readonly disabled: boolean;
   readonly onSave: (dueOn: string) => Promise<WriteState>;
 }) {
+  const { t } = useTranslations();
+
   const [value, setValue] = useState(dueOn ?? "");
   const { error, pending, run } = useRun();
 
@@ -118,7 +140,7 @@ export function DueDateField({
     <span className="flex flex-col items-end gap-1">
       <input
         type="date"
-        aria-label="Due date"
+        aria-label={t("tasks.detail.controls.dueDate")}
         value={value}
         disabled={disabled || pending}
         onChange={(event) => {

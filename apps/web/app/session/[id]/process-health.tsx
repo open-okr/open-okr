@@ -16,7 +16,14 @@
  * statements two and five, so a partial submission produces a diagnostic with a
  * hole in it, and the action refuses one.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { submitProcessHealthAction } from "./actions";
@@ -48,6 +55,8 @@ export function ProcessHealthPanel({
   readonly health: ProcessHealth;
   readonly canAnswer: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,19 +92,20 @@ export function ProcessHealthPanel({
             id="process-health-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            OKR process health
+            {t("session.detail.processHealth.okrProcessHealth")}
           </h2>
           <Chip tone="neutral">
             {health.responses}{" "}
             {health.responses === 1 ? "response" : "responses"}
           </Chip>
-          {health.submitted ? <Chip tone="ok">yours is in</Chip> : null}
+          {health.submitted ? (
+            <Chip tone="ok">{t("session.detail.processHealth.yoursIsIn")}</Chip>
+          ) : null}
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-xs text-ink-4">
-          Anonymous. One to five, where one is not true for us and five is
-          consistently true. Nothing stored here can say who answered what.
+          {t("session.detail.processHealth.anonymousOneToFive")}
         </p>
 
         <ul className="flex flex-col gap-2">
@@ -162,7 +172,9 @@ export function ProcessHealthPanel({
 
         {health.rhythmScore === null ? null : (
           <p className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-ink-3">Rhythm score</span>
+            <span className="text-xs font-medium text-ink-3">
+              {t("session.detail.processHealth.rhythmScore")}
+            </span>
             <span className="text-lg font-bold tabular-nums text-ink">
               {health.rhythmScore.toFixed(1)}
             </span>
@@ -170,15 +182,16 @@ export function ProcessHealthPanel({
               {/* Named rather than left as an unexplained number: §8.6 averages
                   statements two and five, and the diagnostic at P4-T11c reads
                   this against the cycle score. */}
-              the average of statements 2 and 5, which the diagnostic reads
+              {t("session.detail.processHealth.theAverageOfStatements")}
             </span>
           </p>
         )}
 
         {health.lowest === null ? null : (
           <p className="text-xs text-ink-3">
-            Lowest: statement {health.lowest.statementKey}. §8.5 makes it next
-            cycle's process OKR.
+            {t("session.detail.processHealth.lowestStatement")}{" "}
+            {health.lowest.statementKey}
+            {t("session.detail.processHealth.85MakesIt")}
           </p>
         )}
       </CardBody>

@@ -94,6 +94,7 @@ import { excerptRichText } from "../rich-text/excerpt.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { sessionChannel } from "../sessions/live.ts";
+import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 // ---------------------------------------------------------------------------
@@ -180,6 +181,82 @@ async function requireSessionAccess(
   }
 
   return session;
+}
+
+/**
+ * The space access getter, on the way into a space-scoped read (P6-G19b,
+ * P6-G19c).
+ *
+ * This is the same call `spaces.read` makes and the same one
+ * `requireSessionAccess` makes once it has a session's space: one
+ * `getAccessScoped`, not-found on refusal.
+ *
+ * **The space-scoped session reads beside these two do not make it.**
+ * `sessions.readStreak`, `sessions.blockerStatus`, `sessions.listCommitments`
+ * and `blockers.board` check that the caller is an active member of the
+ * workspace and stop there. Whether that is reachable as a disclosure depends
+ * on the bindings a workspace has, and provisioning currently gives every
+ * member a workspace-wide binding that resolves on each space, so the default
+ * install shows nothing it should not. It is still the one enforcement point
+ * CLAUDE.md asks every protected read to go through, and four of them skip it.
+ * Recorded in STATUS: it is wider than either task that noticed it, and
+ * fixing four actions here without their own tests would be worse than saying
+ * so.
+ */
+async function requireSpaceRead(
+  tx: OperationTx,
+  workspaceId: string,
+  userId: string | undefined,
+  spaceId: string,
+): Promise<void> {
+  const memberId = await actingMember(tx, workspaceId, userId);
+  await getAccessScoped(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "space",
+    resourceId: spaceId,
+    requires: ACCESS_LEVELS.view as never,
+  });
+}
+
+/**
+ * Refuses a vote in a space that turned team voting off (§4.14, P6-G18b).
+ *
+ * **In the action, not only on the screen.** CLAUDE.md's rule is that the
+ * interface never hides an authorisation, and a setting a space chose is worth
+ * the same treatment: a space that has switched voting off should not be
+ * votable through the API because the button is absent from the page.
+ *
+ * A session with no space cannot have the setting, so it votes.
+ */
+async function requireTeamVoting(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string | null,
+): Promise<void> {
+  if (!spaceId) {
+    return;
+  }
+  const [row] = await tx
+    .select({ settings: spaces.settings })
+    // openokr:allow-raw-read: the caller has already been through
+    // `requireSessionAccess`, which is what authorises touching this session;
+    // this reads one settings map to decide whether the stage exists here.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.id, spaceId),
+        eq(spaces.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  if (!resolveSpaceSettingsFrom(row?.settings).teamVoting) {
+    throw new OperationError(
+      "forbidden",
+      "This space has turned team voting off.",
+    );
+  }
 }
 
 async function resolveSpaceContextId(
@@ -470,6 +547,16 @@ export const advanceStage = defineWriteAction({
         }
         nextStageKey = stageKeys[stageIndex + 1] ?? null;
 
+        // **Every gate below reads this workspace's own §11 numbers.**
+        // Two of them held a hand-written copy instead: 0.4 for the low
+        // confidence boundary and 2 for the commitment minimum, the second
+        // sitting under a comment that named the registry entry it was not
+        // reading. Resolved once here, because a stage advance should not
+        // load the settings row twice to answer two questions about it.
+        const { thresholds: gateThresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+
         // Stage completion gate: confidence → diagnose requires every KR
         // in the space's active cycle to have a confirmed confidence.
         // **`session.cycleId` is part of the condition, not defaulted inside
@@ -544,13 +631,14 @@ export const advanceStage = defineWriteAction({
               ),
             );
 
-          // Find KRs with confidence below the low threshold (0.4 default).
-          // The threshold is a §11 parameter; reading it here would require
-          // resolving thresholds inside the action. For now, use 0.4 as the
-          // hard-coded default — it matches the check constraint the design
-          // specifies. METHOD.md says the threshold, not the action, is the
-          // authority, and P4-T15 wires the resolved value.
-          const LOW_THRESHOLD = 0.4;
+          // Below §3.2's low boundary, resolved for this workspace.
+          //
+          // This was `const LOW_THRESHOLD = 0.4` with a comment saying P4-T15
+          // would wire the resolved value, and P4-T15 did not. A workspace that
+          // moved its own boundary was gated on the canon default instead of
+          // its own number, which is the hardcoding the method rule exists to
+          // stop. Fixed at P6-G19a.
+          const LOW_THRESHOLD = gateThresholds["scoring.confidenceLow"];
           const lowKrIds = confirmations
             .filter((c) => Number(c.confidence) < LOW_THRESHOLD)
             .map((c) => c.keyResultId);
@@ -625,7 +713,11 @@ export const advanceStage = defineWriteAction({
             );
 
           if ((krCount?.count ?? 0) > 0) {
-            const MIN_COMMITMENTS = 2;
+            // §11's own lower bound, not a second copy of it. The
+            // registry entry this gate cites was already named in the comment
+            // above; the number beside it was written out by hand.
+            const MIN_COMMITMENTS =
+              gateThresholds["sessions.weeklyCommitmentBounds"].low;
             const [commitmentCount] = await tx
               .select({ count: sql<number>`count(*)::int` })
               .from(commitments)
@@ -845,8 +937,19 @@ export const closeSession = defineWriteAction({
             ? confidences.reduce((s, v) => s + v, 0) / confidences.length
             : 0;
 
-        const HIGH = 0.7;
-        const LOW = 0.4;
+        // §3.2's boundaries, resolved for this workspace (P6-G19b).
+        //
+        // These were `const HIGH = 0.7` and `const LOW = 0.4`, the third and
+        // fourth copies of the same two numbers in this file. P6-G19a took the
+        // first two out of `advanceStage`; these decide the on-track and
+        // at-risk counts in the digest the room reads and the space home shows,
+        // so a workspace that moved its own bounds was being counted by the
+        // canon's.
+        const { thresholds: closeThresholds } = resolveRhythm(
+          await readRhythmRow(tx, workspaceId),
+        );
+        const HIGH = closeThresholds["scoring.confidenceHigh"];
+        const LOW = closeThresholds["scoring.confidenceLow"];
         const onTrack = confidences.filter((c) => c >= HIGH).length;
         const atRisk = confidences.filter((c) => c < LOW).length;
 
@@ -1407,6 +1510,7 @@ export const castSessionVote = defineWriteAction({
         input.sessionId,
         ACCESS_LEVELS.edit,
       );
+      await requireTeamVoting(tx, workspaceId, session.spaceId);
 
       // Verify the KR exists.
       const [kr] = await tx
@@ -2353,6 +2457,201 @@ export const listSessionCommitments = defineReadAction({
           delivered: r.delivered ?? null,
           closedAt: r.closedAt?.toISOString() ?? null,
         }));
+      },
+    );
+  },
+});
+
+/**
+ * Last week's commitments, still open, for the space this session belongs to
+ * (P6-G19a).
+ *
+ * **This is the rollover P4-T08 deferred.** `sessions.listCommitments` answers
+ * for one session, so the stage that closes last week's commitments had no way
+ * to reach them: the session that set them is a different row. Nothing is
+ * copied forward. A commitment stays on the session that set it, and this read
+ * is what makes it reachable from the next one, so the record of who committed
+ * to what in which week stays true.
+ *
+ * "Still open" is `closedAt` being null. A commitment closed as not delivered
+ * is closed: §7.2 asks the room to say whether it landed, not to keep asking
+ * until it does.
+ */
+export const carriedCommitments = defineReadAction({
+  name: "sessions.carriedCommitments",
+  summary:
+    "Commitments set by earlier sessions in this session's space and not yet closed.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      text: z.string(),
+      ownerId: z.uuid(),
+      keyResultId: z.uuid().nullable(),
+      /** The Monday of the week it was set for, as an ISO date. */
+      weekStart: z.string(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<
+    Array<{
+      id: string;
+      text: string;
+      ownerId: string;
+      keyResultId: string | null;
+      weekStart: string;
+    }>
+  > {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        const [session] = await tx
+          .select({ spaceId: sessions.spaceId })
+          .from(sessions)
+          .where(
+            activeOnly(
+              sessions,
+              eq(sessions.workspaceId, context.workspaceId),
+              eq(sessions.id, input.sessionId),
+            ),
+          )
+          .limit(1);
+        if (!session) {
+          // An empty list would read as "nothing was carried in", which is a
+          // different answer from "there is no such session".
+          throw new OperationError("not_found", "No such session.");
+        }
+        if (!session.spaceId) {
+          // The column is nullable although `sessions.create` requires a
+          // space, so this is reachable only by a row written another way.
+          return [];
+        }
+        await requireSpaceRead(
+          tx as unknown as OperationTx,
+          context.workspaceId,
+          context.actor.userId,
+          session.spaceId,
+        );
+
+        const rows = await tx
+          .select()
+          .from(commitments)
+          .where(
+            activeOnly(
+              commitments,
+              eq(commitments.workspaceId, context.workspaceId),
+              eq(commitments.spaceId, session.spaceId),
+              ne(commitments.sessionId, input.sessionId),
+              isNull(commitments.closedAt),
+            ),
+          )
+          .orderBy(commitments.weekStart);
+
+        return rows.map((row) => ({
+          id: row.id,
+          text: row.text,
+          ownerId: row.ownerId,
+          keyResultId: row.keyResultId ?? null,
+          weekStart: row.weekStart,
+        }));
+      },
+    );
+  },
+});
+
+/**
+ * A space's weekly confidence, one point per held session (P6-G19b).
+ *
+ * **Read from the digests, because that is where the figure already lives.**
+ * `sessions.close` writes the week's average confidence into the digest body,
+ * so a trend is those rows in order rather than a second computation over the
+ * confidence table that could disagree with the digest the room read.
+ *
+ * **Twelve weeks is the window, and a shorter history is drawn short.** A
+ * space four weeks old has four points. Padding to twelve with zeroes would
+ * draw a collapse that never happened.
+ */
+export const confidenceTrend = defineReadAction({
+  name: "sessions.confidenceTrend",
+  summary: "A space's weekly average confidence, oldest first.",
+  input: z.object({
+    spaceId: z.uuid(),
+    /** How many weeks back. §7.2's trend is twelve. */
+    weeks: z.number().int().min(1).max(52).default(12),
+  }),
+  output: z.array(
+    z.object({
+      weekStart: z.string(),
+      /** 0 to 1, in §3.2's scale. */
+      average: z.number(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(
+    context,
+    input,
+  ): Promise<Array<{ weekStart: string; average: number }>> {
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      async (tx) => {
+        await requireSpaceRead(
+          tx as unknown as OperationTx,
+          context.workspaceId,
+          context.actor.userId,
+          input.spaceId,
+        );
+
+        const rows = await tx
+          .select({
+            periodStart: digests.periodStart,
+            body: digests.body,
+          })
+          .from(digests)
+          .where(
+            activeOnly(
+              digests,
+              eq(digests.workspaceId, context.workspaceId),
+              eq(digests.scope, "space"),
+              eq(digests.scopeId, input.spaceId),
+              eq(digests.period, "weekly"),
+            ),
+          )
+          .orderBy(desc(digests.periodStart))
+          .limit(input.weeks);
+
+        // **One point per period, latest first, then reversed.**
+        //
+        // `sessions.close` inserts a digest row every time it runs and stamps
+        // `period_start` with the day it ran, so a space that closes two
+        // sessions in one week holds two rows. The read is ordered newest
+        // first, so the first row seen for a period is the one to keep: two
+        // points for one week would draw a jump that never happened, and two
+        // identical `weekStart` values would collide as React keys in the
+        // sparkline. Found by the full end-to-end suite, where earlier specs
+        // had already closed a session in the same space.
+        const seen = new Set<string>();
+        const points: Array<{ weekStart: string; average: number }> = [];
+        for (const row of rows) {
+          if (typeof row.body.averageConfidence !== "number") {
+            continue;
+          }
+          if (seen.has(row.periodStart)) {
+            continue;
+          }
+          seen.add(row.periodStart);
+          points.push({
+            weekStart: row.periodStart,
+            average: row.body.averageConfidence,
+          });
+        }
+        return points.reverse();
       },
     );
   },
@@ -4681,6 +4980,7 @@ export const castRetroVote = defineWriteAction({
         input.sessionId,
         ACCESS_LEVELS.edit,
       );
+      await requireTeamVoting(tx, workspaceId, session.spaceId);
 
       const [note] = await tx
         .select({ id: retroNotes.id })

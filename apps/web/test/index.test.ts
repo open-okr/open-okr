@@ -8,6 +8,9 @@ test("entry point resolves with the package graph", () => {
 });
 
 test("the root page is a component", async () => {
-  const { default: Page } = await import("../app/page");
+  // In the `(home)` route group since P6-G24b, which changes no url: the
+  // group exists so `/` can have a layout that renders the shell, and
+  // therefore an error boundary that renders inside it.
+  const { default: Page } = await import("../app/(home)/page");
   expect(typeof Page).toBe("function");
 });

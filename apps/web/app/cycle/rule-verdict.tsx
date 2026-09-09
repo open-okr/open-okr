@@ -1,7 +1,7 @@
 "use client";
 
 import type { QualityStatus } from "@openokr/method";
-import { Button, buttonVariants } from "@openokr/ui";
+import { Button, buttonVariants, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -84,6 +84,8 @@ export function RuleVerdict({
 }: {
   readonly verdict: RuleVerdictView;
 }) {
+  const { t } = useTranslations();
+
   const [open, setOpen] = useState(false);
   const label = `${verdict.id} · ${verdict.title}`;
 
@@ -130,7 +132,9 @@ export function RuleVerdict({
             <p className="text-sm text-ink-2">{verdict.prompt}</p>
 
             <p className="text-xs text-ink-3">
-              <span className="font-semibold text-ink-2">What was seen. </span>
+              <span className="font-semibold text-ink-2">
+                {t("cycle.ruleVerdict.whatWasSeen")}{" "}
+              </span>
               {verdict.condition}
               {verdict.offenders.length > 0
                 ? `: ${verdict.offenders.map((title) => `"${title}"`).join(", ")}`
@@ -145,7 +149,7 @@ export function RuleVerdict({
                  * that you can tell which half is which at a glance. */}
                 <div className="rounded-control border border-bad-dot bg-bad-bg p-3">
                   <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-bad">
-                    Weak
+                    {t("common.weak")}
                   </p>
                   <p className="text-sm font-medium leading-snug text-ink">
                     {pair.weak}
@@ -153,7 +157,7 @@ export function RuleVerdict({
                 </div>
                 <div className="rounded-control border border-ok-dot bg-ok-bg p-3">
                   <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-ok">
-                    Strong
+                    {t("common.strong")}
                   </p>
                   <p className="text-sm font-medium leading-snug text-ink">
                     {pair.strong}
@@ -172,14 +176,14 @@ export function RuleVerdict({
                 href={`/method/${verdict.id}`}
                 className={buttonVariants({ variant: "default" })}
               >
-                See the rule in METHOD
+                {t("cycle.ruleVerdict.seeTheRuleIn")}
               </Link>
               <Button
                 variant="ghost"
                 className="ml-auto"
                 onClick={() => setOpen(false)}
               >
-                Dismiss
+                {t("common.dismiss")}
               </Button>
             </div>
           </div>
@@ -209,11 +213,12 @@ export function StrengthMeter({
   };
   readonly bands: { readonly red: number; readonly green: number };
 }) {
+  const { t } = useTranslations();
+
   if (score === null) {
     return (
       <p className="text-xs text-ink-3">
-        Nothing to score yet. The strength score arrives with the first check
-        that can be answered.
+        {t("cycle.ruleVerdict.nothingToScoreYet")}
       </p>
     );
   }
@@ -241,12 +246,15 @@ export function StrengthMeter({
         />
       </div>
       <p className="text-xs text-ink-3">
-        OKR strength · {counts.pass} pass, {counts.warn} warn, {counts.fail}{" "}
-        fail, {counts.todo} to do
+        {t("cycle.ruleVerdict.okrStrength")} {counts.pass}{" "}
+        {t("cycle.ruleVerdict.pass")} {counts.warn}{" "}
+        {t("cycle.ruleVerdict.warn")} {counts.fail}{" "}
+        {t("cycle.ruleVerdict.fail")} {counts.todo}{" "}
+        {t("cycle.ruleVerdict.toDo")}
       </p>
       <p className="text-xs text-ink-4">
-        {bands.green}% and above is green. A warning never blocks typing; the
-        six publish gates are what refuse a publication.
+        {bands.green}
+        {t("cycle.ruleVerdict.andAboveIsGreen")}
       </p>
     </div>
   );

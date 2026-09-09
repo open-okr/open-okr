@@ -1,4 +1,5 @@
 import { Button, Chip } from "@openokr/ui";
+import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { castVote, revealVotes } from "./actions.ts";
 
@@ -20,13 +21,15 @@ export interface VoteState {
   readonly votes: readonly { memberId: string; confidence: number }[];
 }
 
-export function VotePanel({
+export async function VotePanel({
   vote,
   canReveal,
 }: {
   readonly vote: VoteState;
   readonly canReveal: boolean;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
       <div className="flex items-start justify-between gap-2.5">
@@ -54,7 +57,7 @@ export function VotePanel({
         <ActionForm action={castVote} className="flex items-center gap-1.5">
           <input type="hidden" name="keyResultId" value={vote.keyResultId} />
           <label className="sr-only" htmlFor={`vote-${vote.keyResultId}`}>
-            Your confidence in {vote.title}
+            {t("checkIn.votePanel.yourConfidenceIn")} {vote.title}
           </label>
           <input
             id={`vote-${vote.keyResultId}`}
@@ -76,7 +79,7 @@ export function VotePanel({
         <ActionForm action={revealVotes}>
           <input type="hidden" name="keyResultId" value={vote.keyResultId} />
           <Button type="submit" variant="ghost" className="h-7 px-2 text-xs">
-            Reveal together
+            {t("checkIn.votePanel.revealTogether")}
           </Button>
         </ActionForm>
       ) : null}

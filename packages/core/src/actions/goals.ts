@@ -905,6 +905,15 @@ export const createGoal = defineWriteAction({
       reviewerId: z.uuid(),
       parentGoalId: z.uuid().optional(),
       parentKeyResultId: z.uuid().optional(),
+      /**
+       * The §2.1 annual strategy this objective serves (P6-G14b).
+       *
+       * Annual objectives only in practice. A quarterly objective serves its
+       * parent objective, which is where §2.1 puts the link, and nothing
+       * refuses one here because the frame is a facilitator's tool and a
+       * refusal mid-workshop is worse than a strange-looking row.
+       */
+      strategyId: z.uuid().optional(),
       weight: z.number().default(1),
       contributionStatement: z.string().trim().max(1000).optional(),
       /**
@@ -1018,6 +1027,7 @@ export const createGoal = defineWriteAction({
         reviewerId: input.reviewerId,
         parentGoalId: input.parentGoalId ?? null,
         parentKeyResultId: input.parentKeyResultId ?? null,
+        strategyId: input.strategyId ?? null,
         weight: input.weight,
         contributionStatement: input.contributionStatement ?? null,
         aiGenerated: input.aiGenerated ?? false,
@@ -1084,6 +1094,14 @@ export const updateGoal = defineWriteAction({
     /** Null clears the alignment. A goal with no parent is an island, not an error. */
     parentGoalId: z.uuid().nullable().optional(),
     parentKeyResultId: z.uuid().nullable().optional(),
+    /**
+     * The §2.1 annual strategy this objective serves, or null (P6-G14b).
+     *
+     * Separate from the parent pointers above and does not clear them: a
+     * strategy is what an annual objective is *for*, and a parent is what a
+     * quarterly one hangs *under*. An objective can honestly have both.
+     */
+    strategyId: z.uuid().nullable().optional(),
     checkInFrequency: z
       .enum(["daily", "weekly", "biweekly", "monthly"])
       .nullable()
@@ -1092,6 +1110,12 @@ export const updateGoal = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "goal", id: input.id },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,
@@ -1163,6 +1187,9 @@ export const updateGoal = defineWriteAction({
       }
       if (input.checkInFrequency !== undefined) {
         patch.checkInFrequency = input.checkInFrequency;
+      }
+      if (input.strategyId !== undefined) {
+        patch.strategyId = input.strategyId;
       }
       // Setting either pointer clears the other, because at most one can hold.
       if (input.parentGoalId !== undefined) {
@@ -1541,6 +1568,12 @@ export const moveGoalToCycle = defineWriteAction({
   output: z.object({ id: z.uuid(), cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "goal", id: input.id },
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
         tx,

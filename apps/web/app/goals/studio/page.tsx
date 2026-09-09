@@ -1,9 +1,9 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { GOAL_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { Studio } from "./studio.tsx";
 
@@ -20,6 +20,8 @@ export default async function StudioPage({
 }: {
   searchParams: Promise<{ cycle?: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -42,13 +44,13 @@ export default async function StudioPage({
 
   if (!cycleId) {
     return (
-      <AppShellLayout>
-        <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">There is no cycle to draw yet.</p>
-          </CardBody>
-        </Card>
-      </AppShellLayout>
+      <Card>
+        <CardBody>
+          <p className="text-sm text-ink-2">
+            {t("goals.studio.thereIsNoCycle")}
+          </p>
+        </CardBody>
+      </Card>
     );
   }
 
@@ -59,30 +61,30 @@ export default async function StudioPage({
   });
 
   return (
-    <AppShellLayout>
-      <div className="flex flex-col gap-3.5">
-        <SectionTabs items={GOAL_TABS} active="/goals/studio" />
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">Alignment studio</h1>
-              <p className="text-xs text-ink-3">
-                The cascade, with dashed lines for horizontal dependencies.
-              </p>
-            </div>
-          </CardHeader>
-        </Card>
+    <div className="flex flex-col gap-3.5">
+      <SectionTabs items={GOAL_TABS} active="/goals/studio" />
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">
+              {t("goals.studio.alignmentStudio")}
+            </h1>
+            <p className="text-xs text-ink-3">
+              {t("goals.studio.theCascadeWithDashed")}
+            </p>
+          </div>
+        </CardHeader>
+      </Card>
 
-        <Studio
-          nodes={graph.nodes}
-          edges={graph.edges}
-          findings={alignment.findings}
-          score={alignment.score}
-          healthy={alignment.healthy}
-          threshold={alignment.threshold}
-          canEdit={canEdit}
-        />
-      </div>
-    </AppShellLayout>
+      <Studio
+        nodes={graph.nodes}
+        edges={graph.edges}
+        findings={alignment.findings}
+        score={alignment.score}
+        healthy={alignment.healthy}
+        threshold={alignment.threshold}
+        canEdit={canEdit}
+      />
+    </div>
   );
 }

@@ -2,9 +2,9 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
 import { getPool } from "../../../lib/auth";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { LaunchRecovery } from "../recovery/launch.tsx";
@@ -85,6 +85,8 @@ export default async function KpiTreesPage({
     readonly under?: string;
   }>;
 }) {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const context = {
     pool: getPool(),
@@ -115,315 +117,306 @@ export default async function KpiTreesPage({
       : [];
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <SectionTabs items={KPI_TABS} active="/kpis/trees" />
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">KPI trees</h1>
-              <p className="text-xs text-ink-3">
-                Each child drives its parent. To move the root, find the
-                unhealthy branch and then its leading drivers.
-              </p>
-            </div>
-          </CardHeader>
-          {tree.trees.length > 0 ? (
-            <CardBody className="flex flex-wrap gap-1.5">
-              {tree.trees.map((named) => (
-                <Link
-                  key={named.id}
-                  href={`/kpis/trees?tree=${named.id}`}
-                  className={
-                    named.id === tree.treeId
-                      ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                      : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-                  }
-                >
-                  {named.name}
-                </Link>
-              ))}
+    <div className="flex w-full flex-col gap-3.5">
+      <SectionTabs items={KPI_TABS} active="/kpis/trees" />
+      <Card>
+        <CardHeader>
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">
+              {t("kpis.trees.kpiTrees")}
+            </h1>
+            <p className="text-xs text-ink-3">
+              {t("kpis.trees.eachChildDrivesIts")}
+            </p>
+          </div>
+        </CardHeader>
+        {tree.trees.length > 0 ? (
+          <CardBody className="flex flex-wrap gap-1.5">
+            {tree.trees.map((named) => (
               <Link
-                href="/kpis/trees?tree=none"
+                key={named.id}
+                href={`/kpis/trees?tree=${named.id}`}
                 className={
-                  tree.treeId === null
+                  named.id === tree.treeId
                     ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
                     : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
                 }
               >
-                No tree
+                {named.name}
               </Link>
-            </CardBody>
-          ) : null}
-        </Card>
+            ))}
+            <Link
+              href="/kpis/trees?tree=none"
+              className={
+                tree.treeId === null
+                  ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                  : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
+              }
+            >
+              {t("kpis.trees.noTree")}
+            </Link>
+          </CardBody>
+        ) : null}
+      </Card>
 
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-bold text-ink">
+            {tree.treeId === null
+              ? "KPIs in no tree"
+              : (tree.trees.find((named) => named.id === tree.treeId)?.name ??
+                "Tree")}
+          </h2>
+        </CardHeader>
+        <CardBody className="p-0">
+          {rows.length === 0 ? (
+            <p className="p-3 text-sm text-ink-3">
+              {t("kpis.trees.nothingInThisTree")}
+            </p>
+          ) : (
+            <ul className="flex flex-col">
+              {rows.map(({ node, depth }) => (
+                <li
+                  key={node.id}
+                  className="flex flex-wrap items-center gap-2 border-line border-b px-3 py-2 last:border-b-0"
+                  style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                    {node.title}
+                    {node.unit ? (
+                      <span className="text-ink-4"> ({node.unit})</span>
+                    ) : null}
+                  </span>
+                  <span className="text-xs text-ink-4">
+                    {node.indicatorType} · {node.tier}
+                  </span>
+                  <Bar value={node.achievementPct ?? 0} className="w-24" />
+                  <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
+                    {node.achievementPct === null
+                      ? "no data"
+                      : `${Math.round(node.achievementPct)}%`}
+                  </span>
+                  <Chip tone={stateTone(node.state)} dot>
+                    {node.state}
+                  </Chip>
+                  {node.recoveryGoalId ? (
+                    <Link
+                      href={`/goals/${node.recoveryGoalId}`}
+                      className="text-xs font-semibold text-brand-text hover:underline"
+                    >
+                      {t("kpis.trees.recovery")}{" "}
+                      {Math.round(node.recoveryProgressPct ?? 0)}%
+                    </Link>
+                  ) : node.state === "unhealthy" && canEdit ? (
+                    <LaunchRecovery kpiId={node.id} />
+                  ) : null}
+                  <Link
+                    href={`/kpis/${node.id}`}
+                    className="text-xs text-ink-3 hover:underline"
+                  >
+                    {t("common.open")}
+                  </Link>
+                  {canEdit ? (
+                    <Link
+                      href={`/kpis/trees?${new URLSearchParams({
+                        // Carried so the form returns to the view it was
+                        // opened from, including the unfiled one.
+                        tree: tree.treeId ?? "none",
+                        under: node.id,
+                      }).toString()}`}
+                      className="text-xs font-semibold text-brand-text hover:underline"
+                    >
+                      {t("kpis.trees.addDriver")}
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+
+      {canEdit && params.under ? (
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {tree.treeId === null
-                ? "KPIs in no tree"
-                : (tree.trees.find((named) => named.id === tree.treeId)?.name ??
-                  "Tree")}
+              {t("kpis.trees.addADriverUnder")}{" "}
+              {tree.nodes.find((node) => node.id === params.under)?.title ??
+                "this KPI"}
             </h2>
           </CardHeader>
-          <CardBody className="p-0">
-            {rows.length === 0 ? (
-              <p className="p-3 text-sm text-ink-3">
-                Nothing in this tree yet. A KPI joins one by being filed into
-                it; its parent decides where it hangs.
-              </p>
-            ) : (
-              <ul className="flex flex-col">
-                {rows.map(({ node, depth }) => (
-                  <li
-                    key={node.id}
-                    className="flex flex-wrap items-center gap-2 border-line border-b px-3 py-2 last:border-b-0"
-                    style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                      {node.title}
-                      {node.unit ? (
-                        <span className="text-ink-4"> ({node.unit})</span>
-                      ) : null}
-                    </span>
-                    <span className="text-xs text-ink-4">
-                      {node.indicatorType} · {node.tier}
-                    </span>
-                    <Bar value={node.achievementPct ?? 0} className="w-24" />
-                    <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
-                      {node.achievementPct === null
-                        ? "no data"
-                        : `${Math.round(node.achievementPct)}%`}
-                    </span>
-                    <Chip tone={stateTone(node.state)} dot>
-                      {node.state}
-                    </Chip>
-                    {node.recoveryGoalId ? (
-                      <Link
-                        href={`/goals/${node.recoveryGoalId}`}
-                        className="text-xs font-semibold text-brand-text hover:underline"
-                      >
-                        recovery {Math.round(node.recoveryProgressPct ?? 0)}%
-                      </Link>
-                    ) : node.state === "unhealthy" && canEdit ? (
-                      <LaunchRecovery kpiId={node.id} />
-                    ) : null}
-                    <Link
-                      href={`/kpis/${node.id}`}
-                      className="text-xs text-ink-3 hover:underline"
-                    >
-                      open
-                    </Link>
-                    {canEdit ? (
-                      <Link
-                        href={`/kpis/trees?${new URLSearchParams({
-                          // Carried so the form returns to the view it was
-                          // opened from, including the unfiled one.
-                          tree: tree.treeId ?? "none",
-                          under: node.id,
-                        }).toString()}`}
-                        className="text-xs font-semibold text-brand-text hover:underline"
-                      >
-                        add driver
-                      </Link>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-
-        {canEdit && params.under ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">
-                Add a driver under{" "}
-                {tree.nodes.find((node) => node.id === params.under)?.title ??
-                  "this KPI"}
-              </h2>
-            </CardHeader>
-            <CardBody>
-              <ActionForm action={addDriver} className="flex flex-col gap-2">
-                <input type="hidden" name="parentKpiId" value={params.under} />
-                <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
-                <label className="sr-only" htmlFor="driver-title">
-                  What the driver measures
-                </label>
-                <input
-                  id="driver-title"
-                  name="title"
-                  required
-                  placeholder="Qualified leads"
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                />
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="text-xs text-ink-3" htmlFor="indicatorType">
-                    Indicator
-                  </label>
-                  <select
-                    id="indicatorType"
-                    name="indicatorType"
-                    defaultValue="leading"
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    <option value="leading">leading</option>
-                    <option value="lagging">lagging</option>
-                  </select>
-                  <label className="text-xs text-ink-3" htmlFor="driver-freq">
-                    Frequency
-                  </label>
-                  <select
-                    id="driver-freq"
-                    name="frequency"
-                    defaultValue="monthly"
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    <option value="daily">daily</option>
-                    <option value="weekly">weekly</option>
-                    <option value="monthly">monthly</option>
-                    <option value="quarterly">quarterly</option>
-                    <option value="yearly">yearly</option>
-                  </select>
-                  <label className="text-xs text-ink-3" htmlFor="driver-dir">
-                    Better when
-                  </label>
-                  <select
-                    id="driver-dir"
-                    name="direction"
-                    defaultValue="higher_better"
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    <option value="higher_better">higher</option>
-                    <option value="lower_better">lower</option>
-                  </select>
-                  <label className="text-xs text-ink-3" htmlFor="driver-target">
-                    Standing target
-                  </label>
-                  <input
-                    id="driver-target"
-                    name="targetDefault"
-                    type="number"
-                    step="any"
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-                  >
-                    Add the driver
-                  </button>
-                  <Link
-                    href={`/kpis/trees?tree=${tree.treeId ?? "none"}`}
-                    className="text-xs text-ink-3 hover:underline"
-                  >
-                    Cancel
-                  </Link>
-                </div>
-                <p className="text-xs text-ink-4">
-                  A leading driver is something a team can act on this week,
-                  which is what makes it a candidate for a recovery key result.
-                  It joins this tree automatically.
-                </p>
-              </ActionForm>
-            </CardBody>
-          </Card>
-        ) : null}
-
-        {canEdit && tree.treeId !== null && tree.nodes.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">
-                File a KPI into this tree
-              </h2>
-            </CardHeader>
-            <CardBody>
-              <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
-                <input type="hidden" name="treeId" value={tree.treeId} />
-                <label className="sr-only" htmlFor="kpiId">
-                  Which KPI
+          <CardBody>
+            <ActionForm action={addDriver} className="flex flex-col gap-2">
+              <input type="hidden" name="parentKpiId" value={params.under} />
+              <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
+              <label className="sr-only" htmlFor="driver-title">
+                {t("kpis.trees.whatTheDriverMeasures")}
+              </label>
+              <input
+                id="driver-title"
+                name="title"
+                required
+                placeholder={t("kpis.trees.qualifiedLeads")}
+                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+              />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <label className="text-xs text-ink-3" htmlFor="indicatorType">
+                  {t("common.indicator")}
                 </label>
                 <select
-                  id="kpiId"
-                  name="kpiId"
-                  required
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                  id="indicatorType"
+                  name="indicatorType"
+                  defaultValue="leading"
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                 >
-                  {unfiled.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      {node.title}
-                    </option>
-                  ))}
+                  <option value="leading">{t("kpis.trees.leading")}</option>
+                  <option value="lagging">{t("kpis.trees.lagging")}</option>
                 </select>
-                <button
-                  type="submit"
-                  className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+                <label className="text-xs text-ink-3" htmlFor="driver-freq">
+                  {t("common.frequency")}
+                </label>
+                <select
+                  id="driver-freq"
+                  name="frequency"
+                  defaultValue="monthly"
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
                 >
-                  File it
-                </button>
-                <p className="text-xs text-ink-4">
-                  The root goes in first. Everything under it joins as its
-                  drivers are added.
-                </p>
-              </ActionForm>
-            </CardBody>
-          </Card>
-        ) : null}
-
-        {canEdit ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">Name a tree</h2>
-            </CardHeader>
-            <CardBody>
-              <ActionForm action={addTree} className="flex flex-col gap-2">
-                <label className="sr-only" htmlFor="name">
-                  Tree name
+                  <option value="daily">{t("common.daily")}</option>
+                  <option value="weekly">{t("common.weekly")}</option>
+                  <option value="monthly">{t("common.monthly")}</option>
+                  <option value="quarterly">{t("common.quarterly")}</option>
+                  <option value="yearly">{t("common.yearly")}</option>
+                </select>
+                <label className="text-xs text-ink-3" htmlFor="driver-dir">
+                  {t("common.betterWhen")}
+                </label>
+                <select
+                  id="driver-dir"
+                  name="direction"
+                  defaultValue="higher_better"
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                >
+                  <option value="higher_better">{t("common.higher")}</option>
+                  <option value="lower_better">{t("common.lower")}</option>
+                </select>
+                <label className="text-xs text-ink-3" htmlFor="driver-target">
+                  {t("common.standingTarget")}
                 </label>
                 <input
-                  id="name"
-                  name="name"
-                  required
-                  placeholder="Operating margin"
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  id="driver-target"
+                  name="targetDefault"
+                  type="number"
+                  step="any"
+                  className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
                 />
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   type="submit"
-                  className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+                  className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
                 >
-                  Name it
+                  {t("kpis.trees.addTheDriver")}
                 </button>
-                <p className="text-xs text-ink-4">
-                  A workspace may have several trees. The parent pointers shape
-                  one; this names it.
-                </p>
-              </ActionForm>
-            </CardBody>
-          </Card>
-        ) : null}
-
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">Not here yet</h2>
-          </CardHeader>
-          <CardBody>
-            <ul className="flex flex-col gap-1 text-xs text-ink-3">
-              <li>
-                The right-hand panel S-18 describes, which edits the selected
-                KPI in place. The fields are all editable through the KPI
-                detail, so this is a second surface for the same action rather
-                than missing capability.
-              </li>
-              <li>
-                Dragging a node onto a new parent. Re-parenting works through
-                the detail page; the canvas gesture does not exist.
-              </li>
-            </ul>
+                <Link
+                  href={`/kpis/trees?tree=${tree.treeId ?? "none"}`}
+                  className="text-xs text-ink-3 hover:underline"
+                >
+                  {t("common.cancel")}
+                </Link>
+              </div>
+              <p className="text-xs text-ink-4">
+                {t("kpis.trees.aLeadingDriverIs")}
+              </p>
+            </ActionForm>
           </CardBody>
         </Card>
-      </div>
-    </AppShellLayout>
+      ) : null}
+
+      {canEdit && tree.treeId !== null && tree.nodes.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.trees.fileAKpiInto")}
+            </h2>
+          </CardHeader>
+          <CardBody>
+            <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
+              <input type="hidden" name="treeId" value={tree.treeId} />
+              <label className="sr-only" htmlFor="kpiId">
+                {t("kpis.trees.whichKpi")}
+              </label>
+              <select
+                id="kpiId"
+                name="kpiId"
+                required
+                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+              >
+                {unfiled.map((node) => (
+                  <option key={node.id} value={node.id}>
+                    {node.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+              >
+                {t("kpis.trees.fileIt")}
+              </button>
+              <p className="text-xs text-ink-4">
+                {t("kpis.trees.theRootGoesIn")}
+              </p>
+            </ActionForm>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {canEdit ? (
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-bold text-ink">
+              {t("kpis.trees.nameATree")}
+            </h2>
+          </CardHeader>
+          <CardBody>
+            <ActionForm action={addTree} className="flex flex-col gap-2">
+              <label className="sr-only" htmlFor="name">
+                {t("kpis.trees.treeName")}
+              </label>
+              <input
+                id="name"
+                name="name"
+                required
+                placeholder={t("kpis.trees.operatingMargin")}
+                className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+              />
+              <button
+                type="submit"
+                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+              >
+                {t("common.nameIt")}
+              </button>
+              <p className="text-xs text-ink-4">
+                {t("kpis.trees.aWorkspaceMayHave")}
+              </p>
+            </ActionForm>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-bold text-ink">
+            {t("common.notHereYet")}
+          </h2>
+        </CardHeader>
+        <CardBody>
+          <ul className="flex flex-col gap-1 text-xs text-ink-3">
+            <li>{t("kpis.trees.theRightHandPanel")}</li>
+            <li>{t("kpis.trees.draggingANodeOnto")}</li>
+          </ul>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

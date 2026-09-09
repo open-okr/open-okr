@@ -41,7 +41,7 @@ Six screens specified in UIUX-PLAN.md §6 have no route at all (S-03, S-31, S-33
 ## B-01: Nothing schedules the agents, so the product is never active
 
 - [x] Wire a job queue host and call `registerAgentSchedules` at boot. **Closed at P6-G01a.** `apps/web/lib/scheduler.ts` builds the pg-boss driver, subscribes a worker to every declared job and registers the schedules at boot, behind `OPENOKR_SCHEDULER` which defaults to on. The Coach gained the nightly cadence §6.1 gives it and had never had, fired at each workspace's own local hour. Proved by construction, not by observation: no run against a live pg-boss yet.
-- [ ] **P6-G01b** the notification batch drain. `renderDigest` has had no caller outside the barrel since P2-T06, so no batched notification has ever been delivered.
+- [x] **P6-G01b** the notification batch drain. Closed on 7 September 2026. `notifications.drainBatches` claims every batch whose window has closed and enqueues one digest per batch through the outbox; the `notification.digest` handler renders it and sends. The claim is a conditional update from `pending`, which is the whole of the idempotence under several hosts. The daily summary was a second finding inside this one: `digest.daily` had fired at each member's local hour since P4-T05b carrying the generic "you have a reminder waiting" line, so it was scheduled and summarised nothing; it now carries the member's own unread rows through the same builder as the batch digest.
 - [ ] **P6-G01c** the orphan-blob reap, which needs `delete` on the action context's storage seam.
 
 `registerAgentSchedules` declares four cron cadences for the Champion ([schedule.ts:69](../../packages/agents/src/schedule.ts#L69)). Nothing calls it. No file outside `packages/adapters` and `packages/agents` references `JobQueue` at all, and `apps/web` constructs no queue: [instrumentation.node.ts](../../apps/web/instrumentation.node.ts) starts the outbox relay and nothing else.
@@ -51,8 +51,8 @@ Consequences in a running instance:
 | What should happen on its own | What happens today |
 |---|---|
 | The Champion chases a due check-in on the hour | Nothing, unless an admin presses Run now on `/admin/agents` |
-| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Never sends |
-| Notification batches drain on their window | Never drain |
+| The daily summary sends at 08:00 local (TECHNICAL-PLAN §4.14) | Fires since P6-G01a, and says what happened since P6-G01b |
+| Notification batches drain on their window | Every five minutes, since P6-G01b |
 | Staleness flips to `outdated` past the grace | Only when somebody runs `pnpm cadence:sweep` by hand |
 | Orphan blobs are reaped, thumbnails generated (P2-T05) | Never |
 
@@ -123,7 +123,11 @@ Practical effect: an administrator cannot supply a provider key, route a tier, s
 
 ## B-06: The notification inbox does not exist
 
-- [ ] Build screen S-03
+- [x] **P6-G07a** built screen S-03 on 7 September 2026. The route, the Inbox entry in the primary block with its own icon, the sidebar badge beside Review's, subject grouping, reason chips, unread dots, deep links, mark-read, three snooze choices and mute. Mute is `subscriptions.toggle` with `subscribe: false`, which cancels rather than deletes, so muting a noisy subject keeps the history.
+- [ ] **P6-G07b** the watch control on the six subject pages, and live insert. Watching something is still only reachable through a mention or a check-in fan-out.
+- [ ] **P6-G08** the member half of §4.14: per-reason routing, the batch window and the daily summary time.
+
+**Two defects the screen could not be built on top of, both older than this row.** `notifyRecipients` takes the subject, resolves who is watching from it, and stored neither, so the only route back to what a row was about was `activity_id` — nullable, and null on two of the three producers, because the Operation pipeline writes the activity after `execute` returns. Migration **0074** stores `subject_type` and `subject_id` and all three producers set them. And `notifications.list` described four of the table's six reasons: `review` and `check_in` reached `NOTIFICATION_REASONS` at P3-T07 and P4-T04 and never reached the output schema, so the contract described an inbox that could not hold a reviewer's obligation or a nudge.
 
 P2-T06 is `done` and names "the in-app inbox with a live badge, mute and snooze" (IMPLEMENTATION-PLAN.md:169). There is no `/inbox` route and no notification UI anywhere in `apps/web`.
 
@@ -136,9 +140,11 @@ The member half of TECHNICAL-PLAN §4.14 is unreachable with it: per-reason rout
 ## B-07: No way to invite anybody
 
 - [x] **P6-G06a** the issuing half. An administrator can issue a personal invitation or a shareable link, see everything issued with what each one is doing, and revoke. `invitations.list` is the read P2-T04 never built, which is why revoke was unreachable in practice as well as in the interface.
-- [ ] **P6-G06b** the redeeming half. `/join`, a cross-tenant token lookup behind the second-key policy `api_tokens` already has, and registration on a closed instance. Until it lands, a token issued on the card is redeemable through the command line and the REST surface and nowhere else, and the card says so rather than handing out an address that answers 404.
+- [x] **P6-G06b** the redeeming half, closed on 8 September 2026, so **B-07 is closed**. `/join` exists, migration 0075 gives `invite_links` the second-key policy, and registration on a closed instance is allowed by a valid token and nothing else. The card hands out the address now rather than a bare token. **Migration 0010's own comment was the wrong assumption written down**: it said the URL would carry the workspace slug, and `sendInvitation` had been mailing a slug-less `/join/<token>` since P1-T07, so every invitation this product ever sent was a 404.
 
 **A security defect this task turned up, wider than invitations.** `defineReadAction` records `access` and nothing reads it back: not the builder, not `callAction`, not the REST, agent or chat transports, which take it only as a scope name. In the browser the admin layout refuses below `full` before a page renders, so the screens are safe; over REST an ordinary member's token reaches a read declaring `full`. `invitations.list` enforces its own level; `imports.listRuns` and the nudge volume read are the two others already visible. The sweep is **P6-G31**.
+
+- [x] **P6-G31** closed it on 7 September 2026, in `defineReadAction` rather than read by read. The sweep found **29 reads declaring above `view` and 2 enforcing it**, so 27 were open: the AI provider config, model catalogue, tier routing, feature settings, prompts, budgets and usage summary; every agent and agent run; the proposal queue; the channel connections, message log, templates and mappings; the import history; the nudge volume; and the workspace settings map. The hand-rolled check written at P6-G06a is gone from `invitations.list`, because a second one behind the builder's is a second one to keep in step. The refusal is `not_found` in the access getter's own words, which is what two existing specs required and the first version of the check got wrong.
 
 P2-T04 is `done`. The words "invite" and "invitation" appear in `apps/web/app` in three places only: the sign-up page, `not-found.tsx` and the setup account page. All five invitation actions have no caller: `invitations.createWorkspaceLink`, `invitations.createPersonalLink`, `invitations.revokeLink`, `invitations.acceptLink`, `invitations.joinByTrustedDomain`.
 
@@ -215,7 +221,7 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 | [/](../../apps/web/app/page.tsx) | S-01 | nav | yes | |
 | [/review](../../apps/web/app/review/page.tsx) | S-02 | nav | yes | **B-02** four of seven sources missing (closed at P6-G02). **G** "Your week" absent ([page.tsx:35](../../apps/web/app/review/page.tsx#L35)) |
 | [/search](../../apps/web/app/search/page.tsx) | S-32 | nav | yes | |
-| *missing* | S-03 Inbox | none | none | **B-06** |
+| [/inbox](../../apps/web/app/inbox/page.tsx) | S-03 | nav, badge | yes | closed at **P6-G07a** |
 | *missing* | S-31 Activity feed | none | none | **G-01**, below |
 | *missing* | S-33 People | none | none | **B-08** |
 | *missing* | S-34 Onboarding | none | none | **G-02**, below |
@@ -290,7 +296,8 @@ P1-T09's STATUS row records the human decision as "local disk stays the only sto
 
 ## G-01: No activity feed anywhere
 
-- [ ] Build screen S-31
+- [x] **P6-G11a** the workspace feed. `/activity` renders it with its own cursor paging, the actor joined from the directory, and the audit-log distinction stated on the screen. Reached from the work map rather than the sidebar, because §6 gives S-31 a screen and §3's nine sidebar items do not include one.
+- [ ] **P6-G11b** the space, goal and profile scopes. `queryFeed` can answer all three and none of them is a registered action yet, so a panel on those surfaces has nothing to call.
 
 P2-T07 is `done` and its deliverables name "per-kind renderers behind a registry" and "live inserts" (IMPLEMENTATION-PLAN.md:176). The engine is real: 19 catalogued kinds, `queryFeed`, `aggregateFeed`. No screen renders any of it, and `activities.workspaceFeed` has no caller. Nineteen kinds of typed, access-scoped, human-readable history are written on every operation and never shown to anyone.
 
@@ -320,7 +327,8 @@ TECHNICAL-PLAN §4.14 names "per-rule enable, channel override, ladder override 
 
 ## G-05: Agents can be watched but not configured
 
-- [ ] Add agent configuration and the proposal review queue
+- [x] **P6-G13a** the proposal review queue, plus enable, disable and cancel. The queue is what closes the hard rule: "Propose by default. Agents produce proposals into the review queue" was true of the engine and of nothing a person could see.
+- [ ] **P6-G13b** the write policy and the scope binder. `agents.setAutonomy` does not exist, so an agent's policy is fixed at creation, and `agents.bindScope` needs a picker across three resource types.
 
 `/admin/agents` reads the agent list and the run log and offers a Run now control. Six actions have no caller: `agents.create`, `agents.setEnabled`, `agents.bindScope`, `agents.startRun`, `agents.readRun`, `agents.cancelRun`. Three more have none: `proposals.list`, `proposals.bulkApply`, `proposals.bulkDismiss`.
 
@@ -330,7 +338,11 @@ An agent also cannot be disabled or scoped from the product, which is the contro
 
 ## G-06: No loading state on any route
 
-- [ ] Decide whether Next's own pending state is enough, and if not add `loading.tsx` where a read is slow
+- [ ] **Attempted at P6-G24a and reverted the same day. Now P6-G24c.** Twenty-two `loading.tsx` files took the end-to-end suite from **184 passing to 75 passing and 86 not run**: a loading boundary makes Next stream the segment, so `page.goto` resolves once the fallback is painted and a spec that asserts immediately races the content, and these specs are serial so the first failure stops the rest.
+
+  **The first failure is the reason this is not just a test fix.** It caught two copies of the same chip in the DOM at once on `/admin/agents`, and streaming does not explain that: it inserts one copy of the content beside one fallback. That may be a real defect the boundaries merely exposed, and it is explained before they come back.
+
+  Attribution was measured. A worktree at the pre-change commit passes the same spec 24/24; removing the boundaries with every other change of the day still in place returns the suite to 184/184.
 
 `find apps/web/app -name loading.tsx` returns nothing, and one file in the whole app tree mentions `Suspense`. Every page is an async server component that awaits its reads before rendering, so a navigation shows the previous page until the new one is ready with no indication that anything is happening.
 
@@ -338,7 +350,8 @@ UIUX-PLAN §9's first checked item is "Loading, empty, error and permission-deni
 
 ## G-07: One error boundary for the whole application
 
-- [ ] Add section-level `error.tsx` files, or record the single boundary as the decision
+- [x] **P6-G24a** an `error.tsx` per segment, plus `global-error.tsx` for a root layout that throws. Eighteen segments own one; `segment-boundaries.test.ts` fails when a new segment resolves neither.
+- [ ] **P6-G24b** the shell into the segment layouts. Thirty-one pages render `AppShellLayout` themselves, so a boundary below a thrown page has no sidebar to keep: the card renders standalone until that moves.
 
 [apps/web/app/error.tsx](../../apps/web/app/error.tsx) is the only error boundary and there is no `global-error.tsx`. Any thrown read anywhere replaces the entire shell, including the sidebar, so a failure in one admin card looks like a failure of the product. This is also what makes G-06's `kpis/[id]` finding user-visible: a mistyped KPI id shows "something went wrong" rather than not-found.
 
@@ -420,11 +433,11 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 ## Then, the screens that do not exist
 
 - [ ] **B-05** AI console (S-37). Largest of these; twenty-three actions and seven cards.
-- [ ] **B-06** inbox (S-03) plus member notification settings.
-- [ ] **B-07** invitations. Smallest of these and it unblocks every multi-person test.
+- [x] **B-06** inbox (S-03). Closed at P6-G07a; the watch controls are P6-G07b and the member notification settings are P6-G08.
+- [x] **B-07** invitations. Closed at P6-G06a (issuing) and P6-G06b (redeeming). It was the smallest of these and it does unblock every multi-person test.
 - [ ] **B-08** people directory and org chart (S-33).
-- [ ] **G-01** activity feed (S-31).
-- [ ] **G-05** proposal review queue and agent configuration.
+- [x] **G-01** activity feed (S-31). Workspace scope closed at P6-G11a; the other three scopes are P6-G11b.
+- [x] **G-05** proposal review queue, and turning an agent off. Closed at P6-G13a; the write policy and the scope binder are P6-G13b.
 
 ## Then, the cycle and the session
 
@@ -439,7 +452,8 @@ Grouped so each group is one working session or a small run of them. Sizes are g
 - [ ] **G-04** nudge rule cards.
 - [ ] **G-08** string catalogue and locale wiring.
 - [ ] **G-09** theme and density control.
-- [ ] **G-06** and **G-07** loading and error states.
+- [x] **G-07** error states. Closed at P6-G24a; the shell-into-layouts half is P6-G24b.
+- [ ] **G-06** loading states. Attempted at P6-G24a, reverted the same day for taking the end-to-end suite from 184 passing to 75. Now P6-G24c.
 - [ ] **G-02** decide who owns S-34.
 
 ## Housekeeping, cheap and worth doing in one pass

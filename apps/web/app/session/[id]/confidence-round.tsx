@@ -7,7 +7,13 @@
  * result gets a dial, a vote status, and a what-changed input. The facilitator
  * reveals votes and confirms the final confidence per KR.
  */
-import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
@@ -36,13 +42,16 @@ export function ConfidenceRound({
   krStatuses,
   isFacilitator,
 }: ConfidenceRoundProps) {
+  const { t } = useTranslations();
+
   return (
     <Card>
-      <CardHeader>Confidence round</CardHeader>
+      <CardHeader>
+        {t("session.detail.confidenceRound.confidenceRound")}
+      </CardHeader>
       <CardBody>
         <p className="mb-4 text-sm text-ink-2">
-          Score each key result's confidence. Votes reveal together so nobody
-          anchors on the champion.
+          {t("session.detail.confidenceRound.scoreEachKeyResult")}
         </p>
         <div className="space-y-6">
           {krStatuses.map((kr) => (
@@ -68,6 +77,8 @@ function KrVoteCard({
   kr: KrConfidenceStatus;
   isFacilitator: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [dialValue, setDialValue] = useState(kr.confirmedConfidence ?? 0.5);
@@ -103,7 +114,7 @@ function KrVoteCard({
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-ink">{kr.title}</h4>
           <span className="text-sm font-semibold text-good">
-            {kr.confirmedConfidence?.toFixed(1)} confirmed
+            {kr.confirmedConfidence?.toFixed(1)} {t("common.confirmed")}
           </span>
         </div>
         {kr.whatChanged && (
@@ -130,11 +141,13 @@ function KrVoteCard({
           onClick={handleVote}
           disabled={isPending}
         >
-          Cast vote
+          {t("session.detail.confidenceRound.castVote")}
         </Button>
       ) : (
         <div className="space-y-2">
-          <p className="text-xs text-ink-2">Vote cast. Waiting for reveal.</p>
+          <p className="text-xs text-ink-2">
+            {t("session.detail.confidenceRound.voteCastWaitingFor")}
+          </p>
           {isFacilitator && (
             <Button
               type="button"
@@ -142,7 +155,7 @@ function KrVoteCard({
               onClick={handleReveal}
               disabled={isPending}
             >
-              Reveal votes
+              {t("session.detail.confidenceRound.revealVotes")}
             </Button>
           )}
         </div>
@@ -155,14 +168,14 @@ function KrVoteCard({
             htmlFor={`what-changed-${kr.keyResultId}`}
             className="block text-xs font-medium text-ink-2"
           >
-            What changed this week (required)
+            {t("session.detail.confidenceRound.whatChangedThisWeek")}
           </label>
           <input
             id={`what-changed-${kr.keyResultId}`}
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Facts, not feelings"
+            placeholder={t("common.factsNotFeelings")}
             className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
             disabled={isPending}
           />
@@ -172,7 +185,7 @@ function KrVoteCard({
             onClick={handleConfirm}
             disabled={isPending || note.trim().length === 0}
           >
-            Confirm confidence
+            {t("session.detail.confidenceRound.confirmConfidence")}
           </Button>
         </div>
       )}

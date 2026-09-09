@@ -14,6 +14,7 @@ import {
   CYCLE_CADENCES,
   cycles,
   GOAL_LEVELS,
+  goals,
   performanceSnapshots,
   rhythmSettings,
   scorecardSettings,
@@ -26,8 +27,9 @@ import {
   THRESHOLD_KEYS,
   THRESHOLDS,
 } from "@openokr/method";
-import { asc, desc, eq, isNull } from "drizzle-orm";
+import { asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
@@ -55,6 +57,8 @@ import {
 } from "../cycles/service.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const cycleOutput = z.object({
@@ -259,16 +263,30 @@ export const ensureCurrentCycle = defineWriteAction({
   name: "cycles.ensureCurrent",
   summary:
     "Creates the cycle containing today if the workspace has none. Idempotent.",
-  input: z.object({}),
+  input: z.object({
+    /**
+     * Which cadence's period to ensure, defaulting to the workspace's own
+     * (P6-G14b).
+     *
+     * **The default is the most recent cycle's cadence, and that surprised a
+     * caller.** A workspace that opens an annual cycle for §2.1's frame has an
+     * annual cycle as its most recent, so the next bare `ensureCurrent` builds
+     * the annual period containing today rather than the quarter. Phase 0's
+     * "send this into the quarter" wants a quarter whatever the frame did, and
+     * says so here instead of hoping.
+     */
+    cadence: z.enum(CYCLE_CADENCES).optional(),
+  }),
   output: cycleOutput.extend({ created: z.boolean() }),
   // Any human member may bring the current cycle into being. Refusing an
   // ordinary member would mean a workspace whose admin is on holiday cannot
   // check in, and the row it creates is one every surface needs.
   access: ACCESS_LEVELS.edit,
-  operation: () => ({
+  operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const timeZone = await workspaceTimeZone(tx, workspaceId);
       const ensured = await ensureCurrentCycleInTx(tx, {
+        ...(input.cadence ? { cadence: input.cadence } : {}),
         workspaceId,
         timeZone,
         now: new Date(),
@@ -610,6 +628,16 @@ export const updateRhythmSettings = defineWriteAction({
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).optional(),
     checkInAnchorDay: z.number().int().min(1).max(7).optional(),
     coachStrictness: z.enum(COACH_STRICTNESS).optional(),
+    /**
+     * Holds every non-exempt §6.4 rule quiet (P6-G21).
+     *
+     * `rhythm_settings.quiet_mode` has existed since P4-T04b and the
+     * suppression decision has read it since then; nothing could set it, so a
+     * workspace being drowned by its own product had a switch with no handle.
+     * Not a §11 threshold: it is an operational state a workspace turns on for
+     * a fortnight, not a number the practice is judged by.
+     */
+    quietMode: z.boolean().optional(),
     /** Sparse. A key set to null returns that threshold to the canon default. */
     overrides: z.record(z.string(), z.unknown()).optional(),
     labels: z.record(z.string(), z.unknown()).optional(),
@@ -648,6 +676,10 @@ export const updateRhythmSettings = defineWriteAction({
       }
       if (patch.coachStrictness !== undefined) {
         values.coachStrictness = patch.coachStrictness;
+      }
+      // Straight through rather than into the override map: it has a column.
+      if (input.quietMode !== undefined) {
+        values.quietMode = input.quietMode;
       }
       if (patch.overrides !== undefined) {
         values.overrides = mergeOverrides(
@@ -705,11 +737,39 @@ export const updateRhythmSettings = defineWriteAction({
 
 // --- The annual frame -----------------------------------------------------
 
+/**
+ * Editor JSON for the current schema, or null (P6-G14).
+ *
+ * The frame's four prose fields are rich text with their own version columns,
+ * the same shape a task description takes, because METHOD.md §2.1 expects a
+ * mission somebody wrote in sentences rather than a single line.
+ */
+const frameProse = z
+  .unknown()
+  .refine(
+    (value) =>
+      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+    { message: "not valid editor JSON for the current rich text schema" },
+  );
+
 const frameOutput = z.object({
   id: z.uuid(),
   yearLabel: z.string(),
   horizonLabel: z.string().nullable(),
   agreed: z.boolean(),
+  /**
+   * The prose §2.1 asks for, which migration 0020 has stored since P3-T02 and
+   * nothing ever read or wrote (P6-G14).
+   *
+   * The columns were there, with their version columns beside them, and this
+   * action returned four scalars and a list. So phase 0 had a table holding a
+   * mission and no way to put one in it, which is what made B-03 a blocker
+   * rather than a missing screen.
+   */
+  mission: z.unknown().nullable(),
+  vision: z.unknown().nullable(),
+  strategy: z.unknown().nullable(),
+  notDoing: z.unknown().nullable(),
   strategies: z.array(
     z.object({
       id: z.uuid(),
@@ -755,6 +815,10 @@ export const readAnnualFrame = defineReadAction({
             yearLabel: annualFrames.yearLabel,
             horizonLabel: annualFrames.horizonLabel,
             agreed: annualFrames.agreed,
+            mission: annualFrames.mission,
+            vision: annualFrames.vision,
+            strategy: annualFrames.strategy,
+            notDoing: annualFrames.notDoing,
           })
           .from(annualFrames)
           .where(
@@ -792,6 +856,104 @@ export const readAnnualFrame = defineReadAction({
   },
 });
 
+/**
+ * This year's objectives, each naming the strategy it serves (§2.1, P6-G14b).
+ *
+ * **An annual objective is one in a cycle whose mode is `annual`.** There is no
+ * separate table and there should not be: §2.1's annual layer is a set of
+ * objectives on a longer clock, judged by the same scoring and the same checks
+ * as a quarterly one.
+ *
+ * `strategyId` is null for an objective nobody has linked yet, and the phase 0
+ * panel lists those under their own heading rather than hiding them. An
+ * objective serving no strategy is the thing §2.1 is trying to surface, not an
+ * error to swallow.
+ */
+export const readAnnualObjectives = defineReadAction({
+  name: "frame.annualObjectives",
+  summary:
+    "This year's annual objectives, each with the strategy it serves and whether it has been sent into a quarter.",
+  input: z.object({}),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      strategyId: z.uuid().nullable(),
+      championName: z.string().nullable(),
+      keyResultCount: z.number().int(),
+      /** How many quarterly objectives already hang off this one. */
+      sentForward: z.number().int(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const memberId = await actingMember(
+          tx as OperationTx,
+          context.workspaceId,
+          userId,
+        );
+        await getAccessScoped(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const children = alias(goals, "children");
+        const rows = await tx
+          .select({
+            id: goals.id,
+            title: goals.title,
+            strategyId: goals.strategyId,
+            championName: workspaceMembers.name,
+            keyResultCount: sql<number>`(
+              select count(*)::int from key_results kr
+              where kr.goal_id = ${goals.id} and kr.deleted_at is null
+            )`,
+            sentForward: sql<number>`(
+              select count(*)::int from goals ${children}
+              where ${children}.parent_goal_id = ${goals.id}
+                and ${children}.deleted_at is null
+            )`,
+          })
+          // openokr:allow-raw-read: `getAccessScoped` above confirmed workspace
+          // access, which is what an annual objective is scoped by. The same
+          // shape `frame.read` uses two actions above.
+          .from(goals)
+          .innerJoin(cycles, eq(cycles.id, goals.cycleId))
+          .leftJoin(workspaceMembers, eq(workspaceMembers.id, goals.championId))
+          .where(
+            activeOnly(
+              goals,
+              eq(goals.workspaceId, context.workspaceId),
+              eq(cycles.mode, "annual"),
+            ),
+          )
+          .orderBy(goals.title);
+
+        return rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          strategyId: row.strategyId,
+          championName: row.championName,
+          keyResultCount: Number(row.keyResultCount),
+          sentForward: Number(row.sentForward),
+        }));
+      },
+    );
+  },
+});
+
 export const setAnnualFrame = defineWriteAction({
   name: "frame.set",
   summary:
@@ -800,6 +962,15 @@ export const setAnnualFrame = defineWriteAction({
     yearLabel: z.string().trim().min(1).max(40),
     horizonLabel: z.string().trim().max(80).nullable().optional(),
     agreed: z.boolean().default(false),
+    /**
+     * The four prose fields (P6-G14). Absent leaves whatever the frame holds;
+     * an explicit null clears it, which is how "we have not written a vision
+     * yet" is said without inventing an empty document.
+     */
+    mission: frameProse.nullable().optional(),
+    vision: frameProse.nullable().optional(),
+    strategy: frameProse.nullable().optional(),
+    notDoing: frameProse.nullable().optional(),
     /** Replaces the whole list, which is how a two-to-five set is edited. */
     strategies: z
       .array(
@@ -816,7 +987,18 @@ export const setAnnualFrame = defineWriteAction({
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [current] = await tx
-        .select({ id: annualFrames.id, yearLabel: annualFrames.yearLabel })
+        .select({
+          id: annualFrames.id,
+          yearLabel: annualFrames.yearLabel,
+          mission: annualFrames.mission,
+          missionVersion: annualFrames.missionVersion,
+          vision: annualFrames.vision,
+          visionVersion: annualFrames.visionVersion,
+          strategy: annualFrames.strategy,
+          strategyVersion: annualFrames.strategyVersion,
+          notDoing: annualFrames.notDoing,
+          notDoingVersion: annualFrames.notDoingVersion,
+        })
         .from(annualFrames)
         .where(
           activeOnly(
@@ -856,6 +1038,30 @@ export const setAnnualFrame = defineWriteAction({
             yearLabel: input.yearLabel,
             horizonLabel: input.horizonLabel ?? null,
             agreed: input.agreed,
+            // Carried from the superseded frame when this call does not name
+            // one, so replacing a frame to add a strategy does not silently
+            // drop the mission somebody wrote in January. Each version column
+            // moves with its own field.
+            mission: input.mission ?? current?.mission ?? null,
+            missionVersion:
+              input.mission === undefined
+                ? (current?.missionVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            vision: input.vision ?? current?.vision ?? null,
+            visionVersion:
+              input.vision === undefined
+                ? (current?.visionVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            strategy: input.strategy ?? current?.strategy ?? null,
+            strategyVersion:
+              input.strategy === undefined
+                ? (current?.strategyVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
+            notDoing: input.notDoing ?? current?.notDoing ?? null,
+            notDoingVersion:
+              input.notDoing === undefined
+                ? (current?.notDoingVersion ?? null)
+                : RICH_TEXT_SCHEMA_VERSION,
           })
           .returning({ id: annualFrames.id });
         if (!inserted) {
@@ -911,6 +1117,10 @@ export const setAnnualFrame = defineWriteAction({
           yearLabel: input.yearLabel,
           horizonLabel: input.horizonLabel ?? null,
           agreed: input.agreed,
+          mission: input.mission ?? current?.mission ?? null,
+          vision: input.vision ?? current?.vision ?? null,
+          strategy: input.strategy ?? current?.strategy ?? null,
+          notDoing: input.notDoing ?? current?.notDoing ?? null,
           strategies,
         },
         activity: {

@@ -11,7 +11,7 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AppShellLayout } from "../../../lib/app-shell.tsx";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * One rule, as METHOD.md defines it (P4-T02b).
@@ -53,6 +53,8 @@ export default async function RulePage({
 }: {
   readonly params: Promise<{ readonly id: string }>;
 }) {
+  const { t } = await getTranslations();
+
   const { id } = await params;
   const wanted = decodeURIComponent(id).toLowerCase();
   const check = ALL.find((entry) => entry.id.toLowerCase() === wanted);
@@ -72,100 +74,96 @@ export default async function RulePage({
   const examples = examplesFor(check.id);
 
   return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">
-                {check.id} · {check.title}
-              </h1>
-              <p className="text-xs text-ink-3">{GROUP_LABEL[check.group]}</p>
-            </div>
-            <Chip tone={check.feedsStrengthScore ? "info" : "neutral"}>
-              {check.feedsStrengthScore
-                ? "counts towards the strength score"
-                : "feeds the publish gates"}
-            </Chip>
-          </CardHeader>
-        </Card>
+    <div className="flex w-full flex-col gap-3.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">
+              {check.id} · {check.title}
+            </h1>
+            <p className="text-xs text-ink-3">{GROUP_LABEL[check.group]}</p>
+          </div>
+          <Chip tone={check.feedsStrengthScore ? "info" : "neutral"}>
+            {check.feedsStrengthScore
+              ? "counts towards the strength score"
+              : "feeds the publish gates"}
+          </Chip>
+        </CardHeader>
+      </Card>
 
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-bold text-ink">
+            {t("method.detail.howItJudgesIn")}
+          </h2>
+        </CardHeader>
+        <CardBody className="p-0">
+          <ul className="flex flex-col">
+            {check.conditions.map((row) => (
+              <li
+                key={row.condition}
+                className="flex flex-col gap-1 border-line border-b p-3 last:border-b-0"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip tone={TONE[row.status]} dot>
+                    {row.status}
+                  </Chip>
+                  <span className="text-sm font-semibold text-ink">
+                    {row.condition}
+                  </span>
+                </div>
+                <p className="text-sm text-ink-2">{row.prompt}</p>
+              </li>
+            ))}
+          </ul>
+        </CardBody>
+      </Card>
+
+      {examples.length > 0 ? (
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              How it judges, in order
+              {t("method.detail.weakAndStrongMethod")}
             </h2>
           </CardHeader>
-          <CardBody className="p-0">
-            <ul className="flex flex-col">
-              {check.conditions.map((row) => (
-                <li
-                  key={row.condition}
-                  className="flex flex-col gap-1 border-line border-b p-3 last:border-b-0"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip tone={TONE[row.status]} dot>
-                      {row.status}
-                    </Chip>
-                    <span className="text-sm font-semibold text-ink">
-                      {row.condition}
-                    </span>
+          <CardBody className="flex flex-col gap-3">
+            {examples.map((pair) => (
+              <div key={pair.weak} className="flex flex-col gap-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
+                      {t("common.weak")}
+                    </p>
+                    <p className="text-sm text-ink">{pair.weak}</p>
                   </div>
-                  <p className="text-sm text-ink-2">{row.prompt}</p>
-                </li>
-              ))}
-            </ul>
-          </CardBody>
-        </Card>
-
-        {examples.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-sm font-bold text-ink">
-                Weak and strong (METHOD.md §4.6)
-              </h2>
-            </CardHeader>
-            <CardBody className="flex flex-col gap-3">
-              {examples.map((pair) => (
-                <div key={pair.weak} className="flex flex-col gap-2">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
-                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
-                        Weak
-                      </p>
-                      <p className="text-sm text-ink">{pair.weak}</p>
-                    </div>
-                    <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
-                      <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
-                        Strong
-                      </p>
-                      <p className="text-sm text-ink">{pair.strong}</p>
-                    </div>
+                  <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
+                      {t("common.strong")}
+                    </p>
+                    <p className="text-sm text-ink">{pair.strong}</p>
                   </div>
-                  <p className="text-xs text-ink-3">{pair.why}</p>
                 </div>
-              ))}
-            </CardBody>
-          </Card>
-        ) : null}
-
-        <Card>
-          <CardBody>
-            <p className="text-xs text-ink-3">
-              First match wins: the conditions are tested in the order above and
-              the first that holds is the verdict. Every rule in this catalogue
-              is METHOD.md §4, and a build fails when the two disagree.
-            </p>
-            <Link
-              href="/cycle"
-              className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
-            >
-              Back to the cycle
-            </Link>
+                <p className="text-xs text-ink-3">{pair.why}</p>
+              </div>
+            ))}
           </CardBody>
         </Card>
-      </div>
-    </AppShellLayout>
+      ) : null}
+
+      <Card>
+        <CardBody>
+          <p className="text-xs text-ink-3">
+            {t("method.detail.firstMatchWinsThe")}
+          </p>
+          <Link
+            href="/cycle"
+            className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
+          >
+            {t("method.detail.backToTheCycle")}
+          </Link>
+        </CardBody>
+      </Card>
+    </div>
   );
 }
 
@@ -177,56 +175,58 @@ export default async function RulePage({
  * and a trigger has a condition, a recipient and whether it survives the AI
  * provider being off.
  */
-function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
-  return (
-    <AppShellLayout>
-      <div className="flex w-full flex-col gap-3.5">
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
-              <p className="text-xs text-ink-3">
-                Proactive message (AI-NATIVE-PLAN.md §6.4), owned by the{" "}
-                {trigger.owner === "coach" ? "OKR Coach" : "OKR Champion"}
-              </p>
-            </div>
-            <Chip tone={trigger.escalates ? "warn" : "neutral"}>
-              {trigger.escalates ? "climbs a ladder" : "does not escalate"}
-            </Chip>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-2">
-            <p className="text-sm text-ink">
-              <span className="font-semibold text-ink-2">Fires. </span>
-              {trigger.fires}
-            </p>
-            <p className="text-sm text-ink">
-              <span className="font-semibold text-ink-2">Goes to. </span>
-              {trigger.recipient}
-            </p>
-            <p className="text-xs text-ink-3">
-              {trigger.deterministic
-                ? "Fires with the AI provider switched off. Every rule in this catalogue but one does."
-                : "Needs the AI provider. It is a judgement about meaning, so with the provider off it does not fire rather than guessing."}
-            </p>
-          </CardBody>
-        </Card>
+async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
+  const { t } = await getTranslations();
 
-        <Card>
-          <CardBody>
+  return (
+    <div className="flex w-full flex-col gap-3.5">
+      <Card>
+        <CardHeader className="justify-between">
+          <div className="flex min-w-0 flex-col">
+            <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
             <p className="text-xs text-ink-3">
-              Every proactive message the product sends is a recorded row citing
-              a rule key, and a message citing a key the method package does not
-              define fails the build.
+              {t("method.detail.proactiveMessageAiNative")}{" "}
+              {trigger.owner === "coach" ? "OKR Coach" : "OKR Champion"}
             </p>
-            <Link
-              href="/review"
-              className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
-            >
-              Back to what you owe
-            </Link>
-          </CardBody>
-        </Card>
-      </div>
-    </AppShellLayout>
+          </div>
+          <Chip tone={trigger.escalates ? "warn" : "neutral"}>
+            {trigger.escalates ? "climbs a ladder" : "does not escalate"}
+          </Chip>
+        </CardHeader>
+        <CardBody className="flex flex-col gap-2">
+          <p className="text-sm text-ink">
+            <span className="font-semibold text-ink-2">
+              {t("method.detail.fires")}{" "}
+            </span>
+            {trigger.fires}
+          </p>
+          <p className="text-sm text-ink">
+            <span className="font-semibold text-ink-2">
+              {t("method.detail.goesTo")}{" "}
+            </span>
+            {trigger.recipient}
+          </p>
+          <p className="text-xs text-ink-3">
+            {trigger.deterministic
+              ? "Fires with the AI provider switched off. Every rule in this catalogue but one does."
+              : "Needs the AI provider. It is a judgement about meaning, so with the provider off it does not fire rather than guessing."}
+          </p>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
+          <p className="text-xs text-ink-3">
+            {t("method.detail.everyProactiveMessageThe")}
+          </p>
+          <Link
+            href="/review"
+            className="mt-2 inline-block text-xs font-semibold text-brand-text hover:underline"
+          >
+            {t("method.detail.backToWhatYou")}
+          </Link>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

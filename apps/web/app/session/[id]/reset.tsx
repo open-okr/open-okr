@@ -20,7 +20,14 @@
  * close, and stage nine collects only the decision. What that means for actually
  * closing an objective is an open question on the P4-T11c-a row.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { decideObjectiveAction } from "./actions";
@@ -56,6 +63,8 @@ function ObjectiveRow({
   readonly canDecide: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState<DecisionKind | null>(objective.decision);
@@ -100,7 +109,7 @@ function ObjectiveRow({
           <Chip tone="neutral">{objective.score.toFixed(2)}</Chip>
         )}
         {objective.decision === null ? (
-          <Chip tone="warn">undecided</Chip>
+          <Chip tone="warn">{t("session.detail.reset.undecided")}</Chip>
         ) : (
           <Chip tone="ok">{objective.decision}</Chip>
         )}
@@ -134,7 +143,7 @@ function ObjectiveRow({
             htmlFor={`why-${objective.goalId}`}
           >
             <span className="text-xs font-medium text-ink-3">
-              One line on why
+              {t("common.oneLineOnWhy")}
             </span>
             <input
               id={`why-${objective.goalId}`}
@@ -142,7 +151,7 @@ function ObjectiveRow({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={why}
               disabled={pending}
-              placeholder="What the room actually said"
+              placeholder={t("session.detail.reset.whatTheRoomActually")}
               onChange={(event) => setWhy(event.target.value)}
             />
           </label>
@@ -170,6 +179,8 @@ export function ResetPanel({
   readonly reset: Reset;
   readonly canDecide: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
@@ -177,18 +188,18 @@ export function ResetPanel({
       <CardHeader>
         <span className="flex flex-wrap items-center gap-2">
           <h2 id="reset-heading" className="flex-1 text-sm font-bold text-ink">
-            Keep, modify or abandon
+            {t("common.keepModifyOrAbandon")}
           </h2>
           <Chip tone={reset.complete ? "ok" : "neutral"}>
-            {reset.decided} of {reset.total} decided
+            {reset.decided} {t("common.of")} {reset.total}{" "}
+            {t("session.detail.reset.decided")}
           </Chip>
         </span>
       </CardHeader>
       <CardBody className="flex flex-col gap-2">
         {reset.objectives.length === 0 ? (
           <p className="text-sm text-ink-3">
-            No open objectives in this space and cycle, so there is nothing to
-            close.
+            {t("session.detail.reset.noOpenObjectivesIn")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -210,9 +221,7 @@ export function ResetPanel({
 
         {reset.objectives.length === 0 ? null : (
           <p className="text-xs text-ink-4">
-            Nothing carries over by default. A carried objective re-enters the
-            next cycle as an issue and has to survive prioritisation on its
-            merits.
+            {t("session.detail.reset.nothingCarriesOverBy")}
           </p>
         )}
       </CardBody>

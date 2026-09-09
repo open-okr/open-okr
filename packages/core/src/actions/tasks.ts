@@ -491,6 +491,16 @@ export const listTasks = defineReadAction({
     mine: z.boolean().optional(),
     dueBy: z.string().optional(),
     status: z.enum(TASK_STATUSES).optional(),
+    /**
+     * One initiative's own tasks (P6-G28).
+     *
+     * S-26 asks for a tasks panel and this read had no way to answer it: the
+     * board is per space and the other filters are per person or per date, so
+     * the initiative page could not list the work it is made of. The
+     * initiative's progress is the share of these that are done, which is why
+     * it read zero for everybody until this row.
+     */
+    initiativeId: z.uuid().optional(),
   }),
   output: z.array(taskCard),
   access: ACCESS_LEVELS.view,
@@ -536,6 +546,9 @@ export const listTasks = defineReadAction({
               ...(mineIds ? [inArray(tasks.id, mineIds)] : []),
               ...(input.status ? [eq(tasks.status, input.status)] : []),
               ...(input.dueBy ? [lte(tasks.dueOn, input.dueBy)] : []),
+              ...(input.initiativeId
+                ? [eq(tasks.initiativeId, input.initiativeId)]
+                : []),
             ),
           )
           .orderBy(asc(tasks.dueOn), asc(tasks.position));
@@ -789,6 +802,12 @@ export const updateTask = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
+    // A level on this clears the access floor, as a level on the
+    // workspace does (P6-G13c). The input already names the subject and its
+    // type has a resolver, which is the whole precondition. Without it an
+    // agent bound to one space holds nothing on the workspace and is refused
+    // before its own binding is ever consulted.
+    subject: { type: "task", id: input.id },
     async load({ tx, workspaceId, actor }) {
       return requireTask(
         tx,

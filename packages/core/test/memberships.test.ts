@@ -18,6 +18,9 @@ const membership = (workspaceId: string, slug: string): Membership => ({
   memberId: `member-${slug}`,
   name: slug,
   slug,
+  // Every fixture here is about which workspace a cookie picks, not about
+  // whether it takes writes, so they are all active (P6-G25).
+  state: "active",
 });
 
 const ALPHA = membership("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "alpha");

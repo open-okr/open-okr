@@ -22,9 +22,16 @@
  * direction cannot be stored. They stay in the catalogue because the Draft
  * Coach evaluates text before it is a row, and there they fire.
  */
-import { activeOnly, goals, keyResults, type WorkspaceTx } from "@openokr/db";
+import {
+  activeOnly,
+  goals,
+  keyResults,
+  spaces,
+  type WorkspaceTx,
+} from "@openokr/db";
 import {
   applyStrictness,
+  type CoachStrictness,
   evaluateKeyResults,
   evaluateObjective,
   type KeyResultInput,
@@ -36,6 +43,7 @@ import {
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 
 /**
  * The workspace's resolved thresholds, read inside the transaction doing the
@@ -52,6 +60,44 @@ async function loadThresholdsInTx(
   workspaceId: string,
 ): Promise<ResolvedThresholds> {
   return resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds;
+}
+
+/**
+ * The strictness in force for a goal, which is its space's when the space set
+ * one (§4.14's space scope, P6-G18b).
+ *
+ * **The override is a deviation, not a copy.** A space stores null until it
+ * decides, and null means the workspace's: storing the workspace's current
+ * value would freeze it, so a workspace that later tightened would leave every
+ * space at the old setting.
+ *
+ * Read inside the same transaction as the thresholds above, and for the same
+ * reason: a manager changing their space's strictness between the read and the
+ * write would leave the row carrying a score from neither.
+ */
+async function spaceStrictnessInTx(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  spaceId: string | null,
+): Promise<CoachStrictness | null> {
+  if (!spaceId) {
+    return null;
+  }
+  const [row] = await tx
+    .select({ settings: spaces.settings })
+    // openokr:allow-raw-read: the goal this space belongs to was already
+    // loaded by the caller, which is what authorised the evaluation; this
+    // reads one settings map to decide how harshly to judge it.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.id, spaceId),
+        eq(spaces.workspaceId, workspaceId),
+      ),
+    )
+    .limit(1);
+  return resolveSpaceSettingsFrom(row?.settings).coachStrictness;
 }
 
 export interface GoalQuality {
@@ -173,7 +219,20 @@ export async function evaluateGoalInTx(
     confidence: row.confidence === null ? null : Number(row.confidence),
   }));
 
-  const strictness = thresholds["quality.coachStrictness"];
+  // A space's own strictness wins for its own goals, and nowhere else
+  // (P6-G18b). The thresholds object is rebuilt rather than mutated, because
+  // the caller may have passed it in and a unit recompute shares one across
+  // several goals in different spaces.
+  const override = await spaceStrictnessInTx(
+    tx,
+    input.workspaceId,
+    goal.spaceId,
+  );
+  const inForce: ResolvedThresholds =
+    override === null
+      ? thresholds
+      : { ...thresholds, "quality.coachStrictness": override };
+  const strictness = inForce["quality.coachStrictness"];
   const objective = applyStrictness(
     evaluateObjective(
       {
@@ -185,12 +244,12 @@ export async function evaluateGoalInTx(
         objectivesInUnit: Math.max(unit.length, 1),
         level: goal.level,
       },
-      thresholds,
+      inForce,
     ),
     strictness,
   );
   const keyResultVerdicts = applyStrictness(
-    evaluateKeyResults({ keyResults: set }, thresholds),
+    evaluateKeyResults({ keyResults: set }, inForce),
     strictness,
   );
 

@@ -19,7 +19,14 @@ import type { ReviewAct, TimedReviewStage } from "@openokr/method";
  * readout keeps counting and turns, because a facilitator needs to know how far
  * over they are, and a timer that stopped at zero would hide exactly that.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { addMinuteAction, setStageNoteAction } from "./actions";
@@ -70,6 +77,8 @@ export function QuarterlyReview({
   readonly isFacilitator: boolean;
   readonly isRunning: boolean;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
@@ -147,17 +156,20 @@ export function QuarterlyReview({
       <div className="flex flex-wrap items-center gap-2.5">
         {current ? (
           <Chip tone="info">
-            Stage {current.stage} of {stages.length} · {current.title}
+            {t("session.detail.quarterlyReview.stage")} {current.stage}{" "}
+            {t("common.of")} {stages.length} · {current.title}
           </Chip>
         ) : (
-          <Chip tone="neutral">Not started</Chip>
+          <Chip tone="neutral">
+            {t("session.detail.quarterlyReview.notStarted")}
+          </Chip>
         )}
         {current && isRunning ? (
           <>
             {/* Tabular, so the digits do not jump every second. */}
             <Chip tone={over ? "bad" : "neutral"}>
               <span className="tabular-nums">
-                {clock(spent)} of {clock(budget)}
+                {clock(spent)} {t("common.of")} {clock(budget)}
               </span>
             </Chip>
             {isFacilitator ? (
@@ -167,7 +179,7 @@ export function QuarterlyReview({
                 disabled={pending}
                 onClick={() => run(() => addMinuteAction(sessionId))}
               >
-                + 1 min
+                {t("session.detail.quarterlyReview.1Min")}
               </Button>
             ) : null}
           </>
@@ -217,7 +229,7 @@ export function QuarterlyReview({
               id="review-stages-heading"
               className="text-sm font-bold text-ink"
             >
-              Stages
+              {t("session.detail.quarterlyReview.stages")}
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
@@ -277,8 +289,7 @@ export function QuarterlyReview({
             })}
             {Object.values(addedMinutes).some((added) => added > 0) ? (
               <p className="text-2xs text-ink-4">
-                * includes minutes added in this review. The workspace's own
-                agenda is unchanged.
+                {t("session.detail.quarterlyReview.includesMinutesAddedIn")}
               </p>
             ) : null}
           </CardBody>
@@ -290,9 +301,11 @@ export function QuarterlyReview({
               <CardHeader>
                 <span className="flex flex-wrap items-center gap-2">
                   <h2 className="text-sm font-bold text-ink">
-                    Your note on this stage
+                    {t("session.detail.quarterlyReview.yourNoteOnThis")}
                   </h2>
-                  <Chip tone="neutral">private</Chip>
+                  <Chip tone="neutral">
+                    {t("session.detail.quarterlyReview.private")}
+                  </Chip>
                 </span>
               </CardHeader>
               <CardBody className="flex flex-col gap-2">
@@ -300,7 +313,9 @@ export function QuarterlyReview({
                   className="min-h-20 w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
                   value={noteDraft}
                   aria-label={`Private note for ${current.title}`}
-                  placeholder="Only you can read this"
+                  placeholder={t(
+                    "session.detail.quarterlyReview.onlyYouCanRead",
+                  )}
                   onChange={(event) => setNoteDraft(event.target.value)}
                 />
                 <span className="flex flex-wrap items-center gap-2">
@@ -311,11 +326,10 @@ export function QuarterlyReview({
                       run(() => setStageNoteAction(sessionId, noteDraft))
                     }
                   >
-                    Save the note
+                    {t("common.saveTheNote")}
                   </Button>
                   <span className="text-xs text-ink-4">
-                    One note per stage. Nobody else in the room can see it, and
-                    it is not in the activity feed.
+                    {t("session.detail.quarterlyReview.oneNotePerStage")}
                   </span>
                 </span>
               </CardBody>
@@ -348,21 +362,18 @@ export function QuarterlyReview({
                           It named three tasks that had all landed until the gap
                           audit of 7 September 2026; a fallback that lies is
                           worse than one that admits it does not know. */}
-                      This stage has no panel on this screen. The rail, the
-                      pacing and the notes work, and the stage can still be
-                      advanced.
+                      {t("session.detail.quarterlyReview.thisStageHasNo")}
                     </p>
                   )}
                 </>
               ) : (
                 <p className="text-sm text-ink-3">
-                  Eleven stages across three acts, sixty minutes. The
-                  facilitator opens it when the room is together.
+                  {t("session.detail.quarterlyReview.elevenStagesAcrossThree")}
                 </p>
               )}
               {Object.keys(elapsed).length > 0 ? (
                 <p className="text-xs text-ink-4">
-                  Time spent so far:{" "}
+                  {t("session.detail.quarterlyReview.timeSpentSoFar")}{" "}
                   {stages
                     .map((stage, index) => ({
                       stage,

@@ -285,7 +285,15 @@ async function insertWorkspaceAndMember(
 ): Promise<ProvisionedWorkspace> {
   const name = input.name?.trim() || defaultWorkspaceName(input.user.name);
   const base = slugify(name);
-  const settings = resolveWorkspaceSettings(input);
+  // **A newly provisioned workspace owes its owner a setup** (P6-G26). The
+  // registry's default for `onboardingDone` is true, because a workspace
+  // nobody marked has nothing pending and that is what every workspace older
+  // than the key should read. This is the one place a workspace is born, so it
+  // is the one place that can say otherwise.
+  const settings = {
+    ...resolveWorkspaceSettings(input),
+    onboardingDone: false,
+  };
   const memberSettings = resolveMemberSettings(input);
   const memberId = newId();
 

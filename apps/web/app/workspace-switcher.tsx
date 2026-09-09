@@ -1,6 +1,7 @@
 import type { Membership } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { getTranslations } from "../lib/translations";
 import { ACTIVE_WORKSPACE_COOKIE } from "../lib/workspace";
 import { WorkspaceSelect } from "./workspace-select.tsx";
 
@@ -59,13 +60,15 @@ function initialsOf(name: string): string {
   ).toUpperCase();
 }
 
-export function WorkspaceSwitcher({
+export async function WorkspaceSwitcher({
   memberships,
   active,
 }: {
   memberships: readonly Membership[];
   active: Membership;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <div className="flex items-center gap-2 rounded-lg p-1.5">
       <span
@@ -85,7 +88,7 @@ export function WorkspaceSwitcher({
         {memberships.length > 1 ? (
           <form action={switchWorkspace}>
             <label htmlFor="workspaceId" className="sr-only">
-              Workspace
+              {t("workspaceSwitcher.workspace")}
             </label>
             <WorkspaceSelect
               memberships={memberships}
@@ -93,7 +96,7 @@ export function WorkspaceSwitcher({
             />
             <noscript>
               <button type="submit" className="text-xs text-ink-4 underline">
-                Switch
+                {t("workspaceSwitcher.switch")}
               </button>
             </noscript>
           </form>

@@ -29,7 +29,7 @@
  * retrieval finds nothing to cite even with a key configured. That is a gap in
  * the product, not in this spec.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
 import { signIn } from "./instance-account.ts";
 

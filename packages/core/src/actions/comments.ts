@@ -166,6 +166,14 @@ export const listReactionsAction = defineReadAction({
       count: z.number().int(),
       memberIds: z.array(z.string().uuid()),
       own: z.boolean(),
+      /**
+       * The caller's own reaction, so a screen can take it back (P6-G27).
+       *
+       * Null when `own` is false. `reactions.remove` takes an id and this
+       * read was the only thing that knew it, so until now a reaction could be
+       * added from the browser and never removed.
+       */
+      ownReactionId: z.string().uuid().nullable(),
     }),
   ),
   access: ACCESS_LEVELS.view,

@@ -1,6 +1,7 @@
 import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * The eight phases down the left of the cycle workspace (UIUX-PLAN.md §4 S-04:
@@ -68,22 +69,26 @@ function Mark({
   );
 }
 
-export function PhaseRail({
+export async function PhaseRail({
   phases,
   currentPhase,
 }: {
   readonly phases: readonly PhaseSummary[];
   readonly currentPhase: number;
 }) {
+  const { t } = await getTranslations();
+
   const applicable = phases.filter((entry) => entry.state !== "not_applicable");
   const done = applicable.filter((entry) => entry.state === "pass").length;
 
   return (
     <Card>
       <CardHeader className="justify-between">
-        <h2 className="text-sm font-bold text-ink">The cycle</h2>
+        <h2 className="text-sm font-bold text-ink">
+          {t("cycle.phaseRail.theCycle")}
+        </h2>
         <Chip tone={done === applicable.length ? "ok" : "brand"}>
-          {done} of {applicable.length} done
+          {done} {t("common.of")} {applicable.length} {t("common.done")}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-1 p-2">
@@ -127,7 +132,7 @@ export function PhaseRail({
                         phase is. */}
                     <Bar value={(met / total) * 100} className="h-1.5 flex-1" />
                     <span className="text-xs font-semibold text-ink-3">
-                      {met} of {total}
+                      {met} {t("common.of")} {total}
                     </span>
                   </span>
                 ) : null}

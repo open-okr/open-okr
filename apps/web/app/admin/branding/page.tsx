@@ -1,9 +1,12 @@
 import { callAction } from "@openokr/core";
 import { getPool } from "../../../lib/auth";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { BrandingSettingsForm } from "./branding-settings-form";
 
 export default async function BrandingSettingsPage() {
+  const { t } = await getTranslations();
+
   const { session, workspace } = await requireWorkspace();
   const read = await callAction(
     {
@@ -17,7 +20,7 @@ export default async function BrandingSettingsPage() {
 
   return (
     <>
-      <h1>Branding</h1>
+      <h1>{t("admin.branding.branding")}</h1>
       <BrandingSettingsForm
         branding={(read.settings.branding as Record<string, unknown>) ?? {}}
       />

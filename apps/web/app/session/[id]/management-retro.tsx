@@ -18,7 +18,14 @@
  * renders in its place, which says the stage is leadership's without saying what
  * is in it.
  */
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import { setManagementAnswerAction } from "./actions";
@@ -47,6 +54,8 @@ function QuestionRow({
   readonly canAnswer: boolean;
   readonly onProblem: (message: string | null) => void;
 }) {
+  const { t } = useTranslations();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -83,9 +92,11 @@ function QuestionRow({
         </span>
         <span className="flex-1 text-sm text-ink">{question.question}</span>
         {question.body === null ? (
-          <Chip tone="warn">unanswered</Chip>
+          <Chip tone="warn">
+            {t("session.detail.managementRetro.unanswered")}
+          </Chip>
         ) : (
-          <Chip tone="ok">answered</Chip>
+          <Chip tone="ok">{t("session.detail.managementRetro.answered")}</Chip>
         )}
       </span>
 
@@ -128,13 +139,15 @@ function QuestionRow({
               className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
               value={body}
               disabled={pending}
-              placeholder="What leadership actually said"
+              placeholder={t(
+                "session.detail.managementRetro.whatLeadershipActuallySaid",
+              )}
               onChange={(event) => setBody(event.target.value)}
             />
           </label>
           <span className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" disabled={pending} onClick={save}>
-              Save the answer
+              {t("session.detail.managementRetro.saveTheAnswer")}
             </Button>
             <Button
               type="button"
@@ -143,7 +156,7 @@ function QuestionRow({
               disabled={pending}
               onClick={() => setOpen(false)}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </span>
         </>
@@ -161,6 +174,8 @@ export function ManagementRetroPanel({
   readonly retro: ManagementRetro;
   readonly canAnswer: boolean;
 }) {
+  const { t } = useTranslations();
+
   const [problem, setProblem] = useState<string | null>(null);
 
   return (
@@ -171,10 +186,11 @@ export function ManagementRetroPanel({
             id="management-retro-heading"
             className="flex-1 text-sm font-bold text-ink"
           >
-            Management retro
+            {t("common.managementRetro")}
           </h2>
           <Chip tone={retro.complete ? "ok" : "neutral"}>
-            {retro.answered} of {retro.questions.length} answered
+            {retro.answered} {t("common.of")} {retro.questions.length}{" "}
+            {t("session.detail.managementRetro.answered")}
           </Chip>
         </span>
       </CardHeader>
@@ -196,8 +212,7 @@ export function ManagementRetroPanel({
         )}
 
         <p className="text-xs text-ink-4">
-          Read by this space's managers and its coordinator. The four questions
-          are fixed: they are the practice, not a template.
+          {t("session.detail.managementRetro.readByThisSpace")}
         </p>
       </CardBody>
     </Card>
