@@ -231,6 +231,11 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
           p.rowsSkipped ?? 0,
         )}`
       : "An import failed",
+  // Archive import (P6-T05b).
+  "import.archive": (p) =>
+    p.mode === "dry_run"
+      ? "A workspace archive was previewed as a dry run"
+      : "A workspace archive was imported",
   // Documents and attachments (P5-T12).
   "document.drafted": (p) =>
     `A document "${asString(p.title, "untitled")}" was started`,

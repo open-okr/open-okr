@@ -1703,6 +1703,29 @@
       "pages": false
     },
     {
+      "name": "workspace importArchive",
+      "action": "workspace.importArchive",
+      "method": "POST",
+      "path": "/workspace/importArchive",
+      "scope": "write",
+      "summary": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "flags": [
+        {
+          "name": "archive-base64",
+          "field": "archiveBase64",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "dry-run",
+          "field": "dryRun",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "settings readWorkspaceSettings",
       "action": "settings.readWorkspaceSettings",
       "method": "GET",

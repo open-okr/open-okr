@@ -263,6 +263,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     rowsWritten: z.number().int(),
     rowsSkipped: z.number().int(),
   }),
+  // Archive import (P6-T05b). An archive carries a whole workspace, so the
+  // feed records whether it was a dry run and what digest identified it.
+  "import.archive": z.object({
+    mode: z.string(),
+    digest: z.string(),
+  }),
   // Documents and attachments (P5-T12). Drafting emits an activity but no
   // notification: the author's own record that they started one, with nothing
   // in anybody else's feed about something they cannot open.

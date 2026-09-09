@@ -9187,6 +9187,165 @@
         }
       }
     },
+    "/workspace/importArchive": {
+      "post": {
+        "operationId": "workspace.importArchive",
+        "summary": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+        "tags": [
+          "workspace"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "importId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "difference": {
+                          "type": "object",
+                          "properties": {
+                            "created": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "merged": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "email": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "archivedId": {
+                                    "type": "string"
+                                  },
+                                  "existingId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "email",
+                                  "name",
+                                  "archivedId",
+                                  "existingId"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "skipped": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "blobs": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "created",
+                            "merged",
+                            "skipped",
+                            "blobs"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "alreadyImported": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "importId",
+                        "difference",
+                        "alreadyImported"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "archiveBase64": {
+                    "type": "string"
+                  },
+                  "dryRun": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "archiveBase64"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/settings/readWorkspaceSettings": {
       "get": {
         "operationId": "settings.readWorkspaceSettings",

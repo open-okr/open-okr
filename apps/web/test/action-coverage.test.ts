@@ -42,7 +42,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "a read the Work Map does not use: it composes its own reads for the map, the strip and the badges, and this one answers a different shape for the API",
   "workspace.provision":
     "the pipeline calls it, from registration and the wizard",
-  "workspace.exportArchive": "another surface owns it: the command line",
   "people.importMember": "another surface owns it: the importers",
   "subscriptions.importWatcher": "another surface owns it: the importers",
   "comments.importComment": "another surface owns it: the importers",

@@ -2524,6 +2524,34 @@
       "example": {}
     },
     {
+      "name": "workspace.importArchive",
+      "description": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "archiveBase64": {
+            "type": "string"
+          },
+          "dryRun": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archiveBase64"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "archiveBase64": "…"
+      }
+    },
+    {
       "name": "settings.readWorkspaceSettings",
       "description": "The workspace's own settings map, for the admin cards.",
       "inputSchema": {
