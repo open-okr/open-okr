@@ -91,8 +91,8 @@ catalogs:
       specifier: ^13.0.0
       version: 13.0.0
     nodemailer:
-      specifier: ^9.0.5
-      version: 9.0.5
+      specifier: ^9.1.1
+      version: 9.1.1
     openai:
       specifier: ^7.4.0
       version: 7.4.0
@@ -257,7 +257,7 @@ importers:
         version: link:../config
       nodemailer:
         specifier: 'catalog:'
-        version: 9.0.5
+        version: 9.1.1
       openai:
         specifier: 'catalog:'
         version: 7.4.0(@aws-sdk/credential-provider-node@3.972.82)(@smithy/signature-v4@5.7.3)(ws@8.21.3)(zod@4.4.3)
@@ -3077,8 +3077,8 @@ packages:
   node-int64@0.4.0:
     resolution: {integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==}
 
-  nodemailer@9.0.5:
-    resolution: {integrity: sha512-wvjiKvjczmsN7U/8006JOdXubgBk2XFAbioDMbT+sM7cPs0QrhJTa6KBRX7P5REGGkDcLUz/EarWidb8G8C1jQ==}
+  nodemailer@9.1.1:
+    resolution: {integrity: sha512-izw9mVKFix6YSnC9eLgV6g1opl9DUlRio9ZNcq+Wu9Ujn2UwF+8Nl0B8nz22kEC+CTZCvinkxwJ0DeFbb6NwcQ==}
     engines: {node: '>=6.0.0'}
 
   non-error@0.1.0:
@@ -6064,7 +6064,7 @@ snapshots:
 
   node-int64@0.4.0: {}
 
-  nodemailer@9.0.5: {}
+  nodemailer@9.1.1: {}
 
   non-error@0.1.0: {}
 
@@ -6708,7 +6708,7 @@ snapshots:
   vite@8.2.0(@types/node@26.4.1)(jiti@2.7.0)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.26
       rolldown: 1.2.2
       tinyglobby: 0.2.17
