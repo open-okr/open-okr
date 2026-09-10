@@ -2087,7 +2087,18 @@ Acceptance: no errors and within budget at the target concurrency, with realtime
 
 ### P7-T03: Security review, supply chain and tenant fuzzing [L]
 Depends on: Phase 6 complete
-Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; the tenant property and fuzz suite firing random cross-tenant probes at every table and requiring zero rows, plus a policy-removal mutation check; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
+
+**Cut in two on 2026-09-10.** The tenant suite is a test against the running
+schema; the control audit and the supply chain are a review producing a signed
+table. They share a heading and nothing else.
+
+#### P7-T03a: The tenant property and fuzz suite [M]
+Deliverables: random cross-tenant probes at every table carrying `workspace_id`, requiring zero rows; the schema property that each one has row-level security enabled, forced, and a policy reading `app.workspace_id`; the with-check half exercised by a write naming another workspace; a policy-removal mutation check proving the suite can fail.
+Acceptance: every table is covered, a stranger reads zero rows everywhere, and disabling row-level security on one table makes the suite fail.
+
+#### P7-T03b: The §8.2 control audit, supply chain and outbound rules [M]
+Depends on: P7-T03a
+Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
 Acceptance: no high findings remain open, and every control row carries either a verified mark or an accepted-risk note signed off by the human.
 
 ### P7-T04: Agent, nudge and channel safety hardening [M]
