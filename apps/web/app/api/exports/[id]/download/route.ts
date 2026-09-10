@@ -22,10 +22,26 @@
 import { myExportBlob } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../../lib/auth";
+import { getCache } from "../../../../../lib/cache";
 import { readStoredFile } from "../../../../../lib/storage";
 import { requireWorkspace } from "../../../../../lib/workspace";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Downloads a member may start in a minute (P7-T03b, finding F-1).
+ *
+ * §8.2 asks for per-address and per-user limits on "authentication, the API,
+ * channels and exports". The first three had them and this route did not: it
+ * does not pass through the `/api/v1` handler that carries the API limiter,
+ * so a member could re-download their own finished exports as fast as they
+ * could connect. Only their own, so this is bandwidth rather than disclosure,
+ * and an export is the largest response the product serves.
+ *
+ * Twenty is generous for a person clicking a link and mean for a loop.
+ */
+const DOWNLOAD_LIMIT = 20;
+const DOWNLOAD_WINDOW_SECONDS = 60;
 
 export async function GET(
   _request: NextRequest,
@@ -41,6 +57,18 @@ export async function GET(
     userId = session.user.id;
   } catch {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Keyed on the person, not the export: the cost being bounded is theirs to
+  // spend, and a loop over twenty different exports is the same load as a
+  // loop over one.
+  const limited = await getCache().rateLimit(
+    `export-download:${userId}`,
+    DOWNLOAD_LIMIT,
+    DOWNLOAD_WINDOW_SECONDS,
+  );
+  if (!limited.allowed) {
+    return new Response("Too many requests", { status: 429 });
   }
 
   const found = await myExportBlob(getPool(), {
