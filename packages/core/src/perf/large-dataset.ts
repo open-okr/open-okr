@@ -54,6 +54,17 @@ import {
 export interface LargeDatasetCounts {
   readonly spaces: number;
   readonly members: number;
+  /**
+   * Quarters the goals are spread across.
+   *
+   * Not in §13.1, and it decides whether one of its rows can be measured at
+   * all. "Alignment score recomputation, 10,000 goals" is scoped to a cycle,
+   * so a workspace holding all hundred thousand in a single quarter measures
+   * that row at ten times the scale it names. Ten cycles puts 10,000 in each,
+   * which is both §13.1's own figure and what an organisation actually looks
+   * like after two and a half years.
+   */
+  readonly cycles: number;
   readonly goals: number;
   readonly keyResults: number;
   readonly initiatives: number;
@@ -72,6 +83,7 @@ export interface LargeDatasetCounts {
 export const LARGE_DATASET: LargeDatasetCounts = {
   spaces: 20,
   members: 200,
+  cycles: 10,
   goals: 100_000,
   keyResults: 100_000,
   initiatives: 5_000,
@@ -524,6 +536,54 @@ export async function buildLargeDataset(
   );
   report("space_groups", spacesNeedingGroups.length, step);
 
+  // --- Cycles --------------------------------------------------------------
+  // Consecutive quarters ending with the one provisioning already made, so
+  // the newest cycle is the live one and the goals spread backwards through
+  // real history rather than piling into a single quarter.
+  step = Date.now();
+  const QUARTER = 91 * DAY;
+  const extraCycles = Math.max(counts.cycles - 1, 0);
+  const newCycleIds: string[] = [];
+  await insertGenerated(
+    pool,
+    workspaceId,
+    "cycles",
+    [
+      { name: "id", type: "uuid" },
+      { name: "workspace_id", type: "uuid" },
+      { name: "name", type: "text" },
+      { name: "starts_on", type: "date" },
+      { name: "ends_on", type: "date" },
+      { name: "status", type: "text" },
+      { name: "created_at", type: "timestamptz" },
+      { name: "updated_at", type: "timestamptz" },
+    ],
+    extraCycles,
+    batchSize,
+    (index) => {
+      // Counting back from the quarter before the live one.
+      const endsAt = now - (index + 1) * QUARTER;
+      const startsAt = endsAt - QUARTER;
+      const id = newId(startsAt);
+      newCycleIds.push(id);
+      return [
+        id,
+        workspaceId,
+        `Quarter ${extraCycles - index}`,
+        new Date(startsAt).toISOString().slice(0, 10),
+        new Date(endsAt).toISOString().slice(0, 10),
+        "closed",
+        new Date(startsAt),
+        new Date(startsAt),
+      ];
+    },
+  );
+  report("cycles", newCycleIds.length, step);
+
+  // The live one first, so a reader opening the workspace lands on goals in
+  // the current quarter.
+  const cycleIds = [anchors.cycleId, ...newCycleIds];
+
   // --- Goals, their contexts and their four bindings each ------------------
   // Generated together so a goal and its access rows share one index, and
   // inserted table by table because `unnest` writes one table per statement.
@@ -571,7 +631,7 @@ export async function buildLargeDataset(
         id,
         workspaceId,
         `Objective ${index + 1}`,
-        anchors.cycleId,
+        cycleIds[index % cycleIds.length] as string,
         pick(LEVELS, random),
         "space",
         spaceId,

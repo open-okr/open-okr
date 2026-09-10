@@ -5192,9 +5192,21 @@
           "field": "mine",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "cursor",
+          "field": "cursor",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
-      "pages": false
+      "pages": true
     },
     {
       "name": "goals read",

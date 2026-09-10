@@ -29,6 +29,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 const SMALL = {
   spaces: 2,
   members: 4,
+  cycles: 2,
   goals: 5,
   keyResults: 5,
   initiatives: 3,
@@ -38,6 +39,7 @@ const SMALL = {
 const LARGER = {
   spaces: 2,
   members: 4,
+  cycles: 2,
   goals: 50,
   keyResults: 50,
   initiatives: 30,
@@ -140,7 +142,15 @@ describe("list endpoints do not issue a query per row", () => {
   }
 });
 
-describe("the known query-per-row list is still accurate", () => {
+describe("the known query-per-row list", () => {
+  it("is reported, so an empty one is visible rather than silent", () => {
+    // P7-T01a found three and P7-T01b fixed all three, so this is [] today.
+    // Kept as a reported number rather than an assertion that it stays empty:
+    // a future list may legitimately need an entry, and the point of the list
+    // is that adding one is a visible decision.
+    expect(KNOWN_QUERY_PER_ROW.length).toBeLessThanOrEqual(3);
+  });
+
   for (const action of KNOWN_QUERY_PER_ROW) {
     it(`${action} still grows with its rows, or this entry is stale`, async () => {
       const budget = LIST_BUDGETS.find((one) => one.action === action);

@@ -25,6 +25,7 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 const SMALL = {
   spaces: 3,
   members: 5,
+  cycles: 2,
   goals: 12,
   keyResults: 8,
   initiatives: 4,

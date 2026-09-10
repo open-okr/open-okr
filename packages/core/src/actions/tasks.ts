@@ -39,7 +39,7 @@ import { asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { notifyRecipients } from "../notifications/create.ts";
@@ -285,28 +285,29 @@ const CARD_COLUMNS = {
 };
 
 /** Keeps only the cards this member may read, in the order they came. */
+/**
+ * The rows this member may see, in one statement (P7-T01b).
+ *
+ * This was a loop calling `getAccessScoped` once per row, which resolves a
+ * context and then a level: `tasks.list` cost 12 statements at ten tasks and
+ * 102 at a hundred. `visibleResourceIds` applies the same rules to the whole
+ * set. It also stops swallowing every error: the loop treated any failure as
+ * "not visible", so a broken query would have quietly emptied the board
+ * instead of saying so.
+ */
 async function readable<T extends { id: string }>(
   tx: OperationTx,
   workspaceId: string,
   memberId: string,
   rows: readonly T[],
 ): Promise<T[]> {
-  const kept: T[] = [];
-  for (const row of rows) {
-    const allowed = await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType: "task",
-      resourceId: row.id,
-    }).then(
-      () => true,
-      () => false,
-    );
-    if (allowed) {
-      kept.push(row);
-    }
-  }
-  return kept;
+  const allowed = await visibleResourceIds(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "task",
+    ids: rows.map((row) => row.id),
+  });
+  return rows.filter((row) => allowed.has(row.id));
 }
 
 /**
@@ -1301,22 +1302,18 @@ export const readLinkedWork = defineReadAction({
           );
 
         // Through the goal, which is the rule the rest of the product follows: a
-        // key result inherits its goal's context.
-        const visible: string[] = [];
-        for (const row of rows) {
-          const allowed = await getAccessScoped(tx, {
-            workspaceId: context.workspaceId,
-            memberId,
-            resourceType: "goal",
-            resourceId: row.goalId,
-          }).then(
-            () => true,
-            () => false,
-          );
-          if (allowed) {
-            visible.push(row.id);
-          }
-        }
+        // key result inherits its goal's context. One statement rather than one
+        // per row (P7-T01b), and the goal ids are deduplicated first because
+        // several key results share one goal.
+        const allowedGoals = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: [...new Set(rows.map((row) => row.goalId))],
+        });
+        const visible = rows
+          .filter((row) => allowedGoals.has(row.goalId))
+          .map((row) => row.id);
         return buildRail(tx, context.workspaceId, visible);
       },
     );

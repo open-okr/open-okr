@@ -62,6 +62,8 @@ function scaled(counts: LargeDatasetCounts, scale: number): LargeDatasetCounts {
     // different reviewer.
     spaces: Math.max(at(counts.spaces), 1),
     members: Math.max(at(counts.members), 2),
+    // At least one quarter to hang a goal on.
+    cycles: Math.max(at(counts.cycles), 1),
     goals: at(counts.goals),
     keyResults: at(counts.keyResults),
     initiatives: at(counts.initiatives),

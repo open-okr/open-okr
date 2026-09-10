@@ -488,6 +488,96 @@ export async function getAccessScoped<
   return { contextId: context.contextId, level };
 }
 
+export interface VisibleIdsInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  /** A type that owns its own context: `goal`, `initiative`, `task`, `space`. */
+  readonly resourceType: string;
+  readonly ids: readonly string[];
+  /** Defaults to view. */
+  readonly requires?: number;
+}
+
+/**
+ * The subset of `ids` the member may see, decided in one statement (P7-T01b).
+ *
+ * **Why this exists.** A list of protected aggregates cannot be trusted from
+ * its own query: §4.1 sends every read through the getter, so `goals.list`,
+ * `tasks.list` and `initiatives.list` each called `getAccessScoped` once per
+ * row. That is correct and it is an N+1. The query-count budget P7-T01a added
+ * measured it: `goals.list` cost 15 statements at five goals and 105 at fifty,
+ * two per row, because the getter resolves the context and then the level. At
+ * §13.1's hundred thousand goals that is two hundred thousand round trips for
+ * one page.
+ *
+ * **What it does not change.** The rules are `resolveMemberAccessLevel`'s,
+ * copied deliberately rather than approximated: the same actor test, the same
+ * three group tiers, the same restriction of the two blanket tiers to a human
+ * member so an agent or a guest inherits nothing. A row whose context is
+ * missing is absent from the answer, which is the set-shaped form of the
+ * getter's not-found. The one thing that changes is the number of round trips.
+ *
+ * **Own-context types only.** A sub-resource that inherits a parent's context
+ * (a comment, a check-in) is not resolvable this way and its caller resolves
+ * the parent first, exactly as it does today. `SUBJECT_RESOLVERS` says which
+ * types own a context; passing another one returns nothing rather than
+ * guessing, and the caller keeps the per-row path.
+ */
+export async function visibleResourceIds<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: VisibleIdsInput): Promise<Set<string>> {
+  if (input.ids.length === 0) {
+    return new Set();
+  }
+  const requires = input.requires ?? ACCESS_LEVELS.view;
+  const result = await tx.execute<{ resource_id: string }>(sql`
+    with actor as (
+      select kind from workspace_members
+       where id = ${input.memberId}
+         and workspace_id = ${input.workspaceId}
+         and status = 'active'
+         and deleted_at is null
+    )
+    select c.resource_id
+      from access_contexts c
+      join access_bindings b
+        on b.context_id = c.id
+       and b.workspace_id = ${input.workspaceId}
+       and b.deleted_at is null
+      join access_groups g
+        on g.id = b.group_id
+       and g.deleted_at is null
+       and g.workspace_id = ${input.workspaceId}
+     where c.workspace_id = ${input.workspaceId}
+       and c.resource_type = ${input.resourceType}
+       and c.deleted_at is null
+       -- sql.param, not the bare array: Drizzle expands a plain array into a
+       -- row of values, which Postgres then refuses to cast to uuid[].
+       and c.resource_id = any(${sql.param([...input.ids])}::uuid[])
+       and exists (select 1 from actor)
+       and (
+         (g.kind = 'member' and g.member_id = ${input.memberId})
+         or (
+           g.kind = 'workspace_standard'
+           and exists (select 1 from actor where kind = 'human')
+         )
+         or (
+           g.kind = 'space_standard'
+           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from access_group_memberships gm
+              where gm.group_id = g.id
+                and gm.member_id = ${input.memberId}
+                and gm.deleted_at is null
+           )
+         )
+       )
+     group by c.resource_id
+    having max(b.level) >= ${requires}
+  `);
+  return new Set(result.rows.map((row) => row.resource_id));
+}
+
 /**
  * Refuses a read whose declared level the caller does not hold (P6-G31).
  *

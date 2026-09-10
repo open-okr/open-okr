@@ -135,9 +135,9 @@ export const LIST_BUDGETS: readonly ListBudget[] = [
   // `sessions.list` is deliberately absent: it takes a `spaceId` and is a
   // list within one space rather than across the workspace, so it belongs to
   // a space-scoped budget rather than this one.
-  { action: "goals.list", input: {}, queries: 16 },
-  { action: "tasks.list", input: {}, queries: 13 },
-  { action: "initiatives.list", input: {}, queries: 6 },
+  { action: "goals.list", input: {}, queries: 7 },
+  { action: "tasks.list", input: {}, queries: 4 },
+  { action: "initiatives.list", input: {}, queries: 4 },
   { action: "spaces.list", input: {}, queries: 3 },
   { action: "people.directory", input: {}, queries: 2 },
   { action: "review.inbox", input: {}, queries: 12 },
@@ -147,30 +147,27 @@ export const LIST_BUDGETS: readonly ListBudget[] = [
 ];
 
 /**
- * Lists whose cost grows with their row count, found the day this gate was
- * built (P7-T01a) and not yet fixed.
+ * Lists whose cost grows with their row count. Empty, and it took two tasks.
  *
- * Measured at five rows against fifty:
+ * P7-T01a built this gate and its first run found three, measured at five
+ * rows against fifty:
  *
- * | Action | 5 rows | 50 rows |
+ * | Action | Before | After |
  * |---|---|---|
- * | `goals.list` | 15 | 105 |
- * | `tasks.list` | 12 | 102 |
- * | `initiatives.list` | 5 | 32 |
+ * | `goals.list` | 15, then 105 | 6, flat |
+ * | `tasks.list` | 12, then 102 | 3, flat |
+ * | `initiatives.list` | 5, then 32 | 3, flat |
  *
- * Two queries per goal and one per task and per initiative. At §13.1's
- * hundred thousand goals that is two hundred thousand round trips for one
- * page, which is why the budget's growth half exists and why its first run
- * found three.
+ * Two statements per goal and one per task and per initiative, because each
+ * list called `getAccessScoped` in a loop: correct, and an N+1. At §13.1's
+ * hundred thousand goals that was two hundred thousand round trips for one
+ * page. P7-T01b replaced the loops with `visibleResourceIds`, which applies
+ * the same rules to the whole set in one statement.
  *
- * **They are listed rather than silently excluded**, the same way the string
- * catalogue carried its debt while P6-G22c worked through it. The growth
- * assertion skips them and a second assertion requires each one to still be
- * growing, so fixing one fails the build until its entry is removed. The list
- * is emptied by P7-T01b, which owns the fixes.
+ * **The list stays, empty.** An entry is how a list that genuinely cannot be
+ * fixed today is recorded rather than silently excluded, the way the string
+ * catalogue carried its debt through P6-G22c. The growth assertion skips
+ * whatever is named here, and a second assertion requires each entry to still
+ * be growing, so fixing one fails the build until its entry is deleted.
  */
-export const KNOWN_QUERY_PER_ROW: readonly string[] = [
-  "goals.list",
-  "tasks.list",
-  "initiatives.list",
-];
+export const KNOWN_QUERY_PER_ROW: readonly string[] = [];
