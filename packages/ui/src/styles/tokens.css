@@ -66,12 +66,20 @@
   /* Neutral grey ramp (§2). */
   --ink: #0f172a;
   --ink-2: #334155;
-  --ink-3: #617087; /* owners, metadata, timestamps. Two steps below the
-                     * ramp's #64748b, which lands at 4.48 on --bg and 4.27
-                     * on --raised. Secondary text sits on both constantly. */
-  --ink-4: #64748b; /* the faintest text the product uses. 4.8 on --bg and
-                     * 4.6 on --raised, so it passes WCAG 1.4.3 wherever it
-                     * lands.
+  --ink-3: #55637a; /* owners, metadata, timestamps. 6.08 on --surface, 5.72
+                     * on --bg, 5.46 on --raised. It was #617087, which
+                     * passed with almost nothing to spare; it moved a step
+                     * down when --ink-4 took that value, so the two are
+                     * still visibly different weights (P7-T05). */
+  --ink-4: #617087; /* the faintest text the product uses. 5.03 on
+                     * --surface, 4.73 on --bg and 4.52 on --raised, so it
+                     * passes WCAG 1.4.3 wherever it lands, with the least
+                     * margin of any text token because that is its job.
+                     *
+                     * #64748b was tried first and is 4.48 on --bg: under,
+                     * by a hair, which the ramp's own old comment had
+                     * already written down and this author had already
+                     * forgotten. The suite caught it.
                      *
                      * It was #94a3b8 and deliberately below 4.5, on the
                      * reasoning that it was for placeholders and disabled
