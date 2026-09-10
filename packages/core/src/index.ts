@@ -386,6 +386,12 @@ export {
   verifyChain,
 } from "./audit/chain.ts";
 export {
+  type ChainedReport,
+  chainAllWorkspaces,
+  chainWorkspace,
+  countPending,
+} from "./audit/chainer.ts";
+export {
   type InstanceAuditRow,
   instanceAuditRowHash,
   type RecordInstanceAuditEventInput,

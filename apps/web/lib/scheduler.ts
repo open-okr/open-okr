@@ -41,7 +41,7 @@ import {
   registerAgentSchedules,
 } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
-import { callAction } from "@openokr/core";
+import { callAction, chainWorkspace } from "@openokr/core";
 import { drafterFor } from "./drafter";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -93,7 +93,12 @@ export interface ScheduledRun {
     | "agents.runChampion"
     | "agents.runCoach"
     | "notifications.drainBatches"
-    | "blobs.reapOrphans";
+    | "blobs.reapOrphans"
+    // Not a registry action: chaining the audit trail is maintenance, and
+    // exposing it over REST, the command line and the agent catalogue would
+    // be four surfaces for something only a scheduler and an operator call
+    // (P7-T02a). `pnpm audit:chain` is the operator half.
+    | "audit.chain";
   readonly cadence?: "hourly" | "daily" | "weekly" | "cycle";
   readonly localHour?: number;
   /**
@@ -147,6 +152,18 @@ const ORPHAN_REAP_JOB = "blobs.reapOrphans";
  */
 const ORPHAN_REAP_CRON = "20 3 * * *";
 
+/** The audit chainer (P7-T02a). */
+const AUDIT_CHAIN_JOB = "audit.chain";
+/**
+ * Every minute.
+ *
+ * The write path records an event and leaves it unchained, so this is the
+ * gap between "recorded" and "verifiable". A minute keeps the pending tail
+ * short enough that `pnpm audit:verify` reads as settled on a quiet instance,
+ * and the pass costs nothing when there is nothing to do.
+ */
+const AUDIT_CHAIN_CRON = "* * * * *";
+
 /**
  * Every job this host subscribes a worker to.
  *
@@ -170,6 +187,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: NOTIFICATION_DRAIN_JOB,
     action: "notifications.drainBatches",
     cron: NOTIFICATION_DRAIN_CRON,
+  },
+  {
+    job: AUDIT_CHAIN_JOB,
+    action: "audit.chain",
+    cron: AUDIT_CHAIN_CRON,
   },
   {
     job: ORPHAN_REAP_JOB,
@@ -305,6 +327,13 @@ async function runOne(
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});
+    return;
+  }
+  if (run.action === "audit.chain") {
+    // Straight to the chainer rather than through `callAction`: it writes no
+    // domain change, has no audit row of its own to leave, and running the
+    // audit trail through the Operation pipeline would make it audit itself.
+    await chainWorkspace(getPool(), workspace.id);
     return;
   }
   if (run.action === "blobs.reapOrphans") {

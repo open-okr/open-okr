@@ -37,6 +37,7 @@
     "check:signoff": "node --experimental-strip-types --no-warnings scripts/check-signoff.ts",
     "flaky": "node --experimental-strip-types --no-warnings packages/test-support/bin/flaky.ts",
     "audit:verify": "pnpm --filter @openokr/core audit:verify",
+    "audit:chain": "pnpm --filter @openokr/core audit:chain",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"

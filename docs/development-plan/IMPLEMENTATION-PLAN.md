@@ -2085,6 +2085,14 @@ Depends on: P7-T01
 Deliverables: load scripts covering hundreds of concurrent members in one workspace with check-in bursts, a live session with twenty participants, feed reads, board drags, chat inbound and external agent traffic; a soak run; fixes.
 Acceptance: no errors and within budget at the target concurrency, with realtime fan-out bounded and nudge delivery inside its budget.
 
+#### P7-T02a: The audit chain leaves the write path [M]
+Depends on: P7-T02's measurement
+
+Added 2026-09-10. Not in the original plan, because the plan could not know the number: P1-T07 recorded the per-workspace audit lock as a follow-up "to measure", P7-T02 measured it at 14.8 seconds at the 95th percentile for a write at fifty concurrent members, and Agung chose the fix.
+
+Deliverables: the audit row written with no lock and no chain position; a chainer that fills `seq`, `prev_hash` and `row_hash` as a single writer per workspace; `pnpm audit:chain` and a scheduled pass; a row-level trigger narrowing append-only from "no update" to "the content is immutable and the position is write-once"; the verifier counting unchained rows as pending rather than verified or broken.
+Acceptance: the chain the chainer builds verifies, content cannot be edited or deleted by any route including an owner connection, a chained row cannot be renumbered, and a pending tail never reads as either verified or broken.
+
 ### P7-T03: Security review, supply chain and tenant fuzzing [L]
 Depends on: Phase 6 complete
 

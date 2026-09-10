@@ -10,6 +10,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "audit:verify": "node --experimental-strip-types --no-warnings src/bin/verify-audit.ts",
+    "audit:chain": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/chain-audit.ts",
     "keys:rotate": "node --experimental-strip-types --no-warnings src/bin/rotate-keys.ts",
     "cadence:sweep": "node --experimental-strip-types --no-warnings src/bin/sweep-staleness.ts",
     "gen:contract": "node --experimental-strip-types --no-warnings src/bin/gen-contract.ts",

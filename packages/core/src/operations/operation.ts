@@ -42,7 +42,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
-import { desc, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
@@ -55,7 +55,6 @@ import { validateActivityPayload } from "../activities/catalogue.ts";
 import { resolveActivityContext } from "../activities/context.ts";
 import { fanOutActivity } from "../activities/fanout.ts";
 import { feedAddedEvent } from "../activities/live.ts";
-import { auditRowHash, GENESIS_HASH } from "../audit/chain.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
 import { INDEX_TOPIC, isIndexableSubject } from "../search/subjects.ts";
 import { OperationError } from "./errors.ts";
@@ -406,14 +405,31 @@ async function resolveActor(
 }
 
 /**
- * Appends the audit row, chained to this workspace's previous one.
+ * Appends the audit row. Its position in the chain is filled in later.
  *
- * The advisory lock is what makes the chain a chain: without it two
- * transactions read the same head and claim the same sequence number, and one
- * of them loses to the unique index after doing all its work. Taken as late as
- * possible, so it is held for the tail of the transaction rather than all of
- * it. This does serialise the end of concurrent writes within one workspace,
- * which is the price of a trail that can be verified. P7-T01 measures it.
+ * **This used to take `pg_advisory_xact_lock('audit:' || workspace_id)` for
+ * the tail of every write**, so the row could read the workspace's head and
+ * commit to it. That made the chain a chain and it serialised the end of every
+ * concurrent write in one workspace. P7-T02 measured the cost: at ten
+ * concurrent members every scenario is inside its §13.1 budget, and at fifty
+ * the reads degrade one to two and a half times while the write degrades
+ * thirty, to 14.8 seconds at the 95th percentile, with throughput barely
+ * moving. A queue, not a shortage of capacity.
+ *
+ * Agung chose on 10 September 2026 to move the chaining out rather than take
+ * the recorded sequence-and-retry fallback, which would have swapped a lock
+ * for a retry storm under exactly the contention that was measured.
+ *
+ * **What did not move.** The row is still written in the same transaction as
+ * the change it records, with the same actor, action, target and payload.
+ * Whether an event is recorded is unchanged and still atomic. Only its
+ * position in the chain is deferred, to `audit/chainer.ts`, which is a single
+ * writer per workspace and so needs no coordination with anybody.
+ *
+ * **The window is real.** Between this insert and the chainer's next pass the
+ * row is recorded and not yet committed to, so tampering in that window would
+ * not break a hash. `verifyWorkspaceChain` counts those rows as pending and
+ * never as verified, which is the honest half of the trade.
  */
 async function appendAudit(
   tx: OperationTx,
@@ -421,19 +437,9 @@ async function appendAudit(
   actor: ResolvedActor,
   audit: AuditInput,
 ): Promise<void> {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtext(${`audit:${workspaceId}`}))`,
-  );
-
-  const [head] = await tx
-    .select({ seq: auditEvents.seq, rowHash: auditEvents.rowHash })
-    .from(auditEvents)
-    .orderBy(desc(auditEvents.seq))
-    .limit(1);
-
-  const row = {
+  await tx.insert(auditEvents).values({
     workspaceId,
-    seq: head ? Number(head.seq) + 1 : 1,
+    seq: null,
     actorMemberId: actor.memberId,
     actorKind: actor.kind,
     action: audit.action,
@@ -441,10 +447,9 @@ async function appendAudit(
     targetId: audit.targetId ?? null,
     payload: audit.payload ?? {},
     at: new Date(),
-    prevHash: head ? head.rowHash : GENESIS_HASH,
-  };
-
-  await tx.insert(auditEvents).values({ ...row, rowHash: auditRowHash(row) });
+    prevHash: null,
+    rowHash: null,
+  });
 }
 
 /**

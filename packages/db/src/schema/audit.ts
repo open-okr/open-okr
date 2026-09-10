@@ -26,8 +26,11 @@ export const auditEvents = pgTable("audit_events", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id),
-  /** Position in this workspace's chain, from 1. */
-  seq: bigint("seq", { mode: "number" }).notNull(),
+  /**
+   * Position in the workspace chain, filled by the chainer rather than by
+   * the write (P7-T02a). Null means recorded and not yet chained.
+   */
+  seq: bigint("seq", { mode: "number" }),
   actorMemberId: uuid("actor_member_id").references(() => workspaceMembers.id),
   actorKind: text("actor_kind", {
     enum: ["human", "agent", "system", "operator"],
@@ -38,8 +41,8 @@ export const auditEvents = pgTable("audit_events", {
   targetId: uuid("target_id"),
   payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
   at: timestamp("at", { withTimezone: true }).notNull(),
-  prevHash: text("prev_hash").notNull(),
-  rowHash: text("row_hash").notNull(),
+  prevHash: text("prev_hash"),
+  rowHash: text("row_hash"),
 });
 
 export const activities = pgTable("activities", {
