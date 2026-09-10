@@ -82,7 +82,7 @@ export default async function AccountChannelsPage() {
   const connected = new Set(settings.connected);
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+    <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader>
           <h1 className="text-lg font-bold text-ink">
