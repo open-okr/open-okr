@@ -6,7 +6,11 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    # Three group pull requests, plus a major on its own whenever one lands.
+    # Five was enough while everything travelled in groups; splitting majors
+    # out needs room for them to appear, and a limit reached is a bump that
+    # silently never opens. Security updates are not counted against this.
+    open-pull-requests-limit: 10
     ignore:
       # Pinned to 5.9.x by the P1-T01 decision. Moving to a new major is a
       # human task with its own verification, not a bot bump: the 7.0.2 bump
@@ -27,8 +31,29 @@ updates:
       # The groups are drawn by blast radius, so one bad version holds back as
       # little as possible. `next` is on its own because it is the framework
       # the application is built on and its bumps have broken the build twice.
+      #
+      # Every group takes minor and patch only. A major arrives on its own,
+      # which is the point: each major that has reached this repository needed
+      # a human change before it could pass, and inside a group it blocked
+      # everything travelling with it.
+      #
+      #   vitest 4 to 5      a test asserted nothing without an await
+      #   nodemailer 9 to 10 fine in the end, but a major on the mail path
+      #   better-auth 1.6 to 1.7  added a required column, then reverted it
+      #                           one patch later
+      #
+      # The 22-package runtime group sat unmergeable for days behind one of
+      # those. Split, the safe group merges the day it opens and the major
+      # gets read on its own. That also breaks the staleness loop: a group
+      # left open long enough is closed and reopened as new versions land,
+      # which cost this repository four dev-tooling pull requests in a
+      # fortnight, none of them merged.
+      #
+      # Majors are not ignored. They arrive as ordinary single-package pull
+      # requests, and typescript stays the one exception below.
       next:
         patterns: ["next", "react", "react-dom", "@next/*"]
+        update-types: ["minor", "patch"]
       # Nothing here is shipped to a user. A bad version stops the build
       # rather than the product.
       dev-tooling:
@@ -42,6 +67,7 @@ updates:
           - "@playwright/*"
           - "@testing-library/*"
           - "jsdom"
+        update-types: ["minor", "patch"]
       # Everything else, which is everything that runs in production. The
       # excludes repeat the two groups above rather than relying on which
       # group is declared first, so moving these blocks around cannot
@@ -62,6 +88,7 @@ updates:
           - "@playwright/*"
           - "@testing-library/*"
           - "jsdom"
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "deps"
 
