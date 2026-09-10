@@ -84,6 +84,20 @@ export function SecuritySettings({
       });
       return;
     }
+    // Better Auth 1.7 returns one of two shapes here. A second factor sent as
+    // a one-time code carries nothing to show, and only the authenticator app
+    // ("totp") returns a secret to scan and the backup codes. This screen
+    // offers the authenticator app, so the other shape means the instance is
+    // configured for something this form cannot complete, and saying so beats
+    // rendering an empty QR code.
+    if (data.method !== "totp") {
+      setNote({
+        scope: "totp",
+        tone: "bad",
+        text: "This instance is not set up for an authenticator app.",
+      });
+      return;
+    }
     setTotpUri(data.totpURI);
     setBackupCodes(data.backupCodes);
     setPassword("");
