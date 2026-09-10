@@ -32,7 +32,11 @@ import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { accessScopeFilter, getAccessScoped } from "../access/reads.ts";
+import {
+  accessFilterMember,
+  accessScopeFilter,
+  getAccessScoped,
+} from "../access/reads.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -223,6 +227,10 @@ export const listSpaces = defineReadAction({
                 workspaceId: context.workspaceId,
                 memberId: member.id,
                 minLevel: ACCESS_LEVELS.view,
+                member: await accessFilterMember(tx, {
+                  workspaceId: context.workspaceId,
+                  memberId: member.id,
+                }),
               }),
             ),
           )

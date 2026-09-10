@@ -1,0 +1,47 @@
+-- A card's position becomes fractional, so a drag never renumbers a column
+-- (P7-T02, TECHNICAL-PLAN §13.1).
+--
+-- **Measured, twice, and the second measurement is what this fixes.**
+-- `moveTaskInTx` used to row-lock every card in the column before reading the
+-- two neighbours it needed. P7-T02 removed that: a column in §13.1's dataset
+-- holds 18,937 cards, and a drag went from 20,394ms at the 95th percentile to
+-- 2,087ms.
+--
+-- What remained was a long tail. Most drags were fast (the median sat between
+-- 200 and 500 milliseconds) and roughly one in ten took fifteen to twenty
+-- seconds. That one is `normaliseAndPlace`: integer positions are spaced 1024
+-- apart and each drop into the same slot halves the gap, so after about ten
+-- the gap closes to `MINIMUM_GAP` and the whole column is rewritten evenly. On
+-- this dataset that is nineteen thousand rows in one transaction. The evidence
+-- is in the data rather than in the reasoning: after the load runs, 187,285
+-- task rows carried an `ordering_state.normalisedAt` stamp.
+--
+-- Agung chose fractional positions on 10 September 2026 over three
+-- alternatives: renumbering only the moved range, bounding ordering to the
+-- loaded page, or accepting the cost.
+--
+-- **Why `double precision` rather than `numeric`.** node-postgres returns
+-- `numeric` as a *string*, to protect the arbitrary precision Postgres offers,
+-- so a release still reading this column as a number would start receiving
+-- text. `double precision` comes back as a JavaScript number from both, which
+-- is what makes this safe to deploy under a rolling upgrade. Its 53 bits of
+-- mantissa allow roughly fifty successive halvings of one gap before precision
+-- runs out, against ten today, and `normaliseAndPlace` stays for that case
+-- rather than being deleted: rare is not never.
+--
+-- **Forward-only and safe in both directions.** Every existing value is a
+-- whole number and stays one, so the release before this reads the same
+-- integers it wrote. A card that release moves gets an integer position, which
+-- this one handles because an integer is a valid double. Nothing is renamed
+-- and nothing is dropped, so PLAN.md §5.1's expand-then-contract rule has
+-- nothing to contract.
+--
+-- **This rewrites the table.** `alter column type` takes an ACCESS EXCLUSIVE
+-- lock and rebuilds every row, which on a million tasks is minutes, not
+-- seconds. Stated here rather than discovered during an upgrade.
+--
+-- No new policy. `tasks` carries `workspace_id` and its row-level security
+-- from migration 0043.
+
+alter table tasks
+  alter column position type double precision;

@@ -18,9 +18,11 @@ export { ACCESS_LEVELS, type AccessLevel } from "./access/levels.ts";
 export { PERMISSIONS, type Permission } from "./access/permissions.ts";
 export { derivePrivacy, type PrivacyLabel } from "./access/privacy.ts";
 export {
+  type AccessFilterMember,
   type AccessScopedResource,
   type AccessScopeFilterInput,
   type AnonymousContextInput,
+  accessFilterMember,
   accessScopeFilter,
   can,
   type GetAccessScopedInput,

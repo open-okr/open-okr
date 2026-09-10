@@ -33,7 +33,7 @@ import {
   or,
 } from "drizzle-orm";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
-import { accessScopeFilter } from "../access/reads.ts";
+import { accessFilterMember, accessScopeFilter } from "../access/reads.ts";
 import { PRIVATE_ACTIVITY_KINDS } from "./catalogue.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
@@ -134,6 +134,12 @@ export async function queryFeed<
 >(tx: AnyTx<TSchema>, input: QueryFeedInput): Promise<FeedItem[]> {
   const limit = input.limit ?? DEFAULT_LIMIT;
   const minLevel = input.minLevel ?? ACCESS_LEVELS.view;
+  // Who the reader is, once, so the row filter below stays correlated
+  // (P7-T02). `accessFilterMember` says why that matters.
+  const member = await accessFilterMember(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+  });
 
   const conditions = [
     eq(activities.workspaceId, input.workspaceId),
@@ -149,6 +155,7 @@ export async function queryFeed<
         workspaceId: input.workspaceId,
         memberId: input.memberId,
         minLevel,
+        member,
       }),
     ),
   ];

@@ -78,7 +78,8 @@ const taskCard = z.object({
   title: z.string(),
   status: z.enum(TASK_STATUSES),
   dueOn: z.string().nullable(),
-  position: z.number().int(),
+  /** Fractional since migration 0081, so a drag writes one row. */
+  position: z.number(),
   assignees: z.array(assignee),
   checklist: z.object({ done: z.number().int(), total: z.number().int() }),
 });
@@ -920,7 +921,7 @@ export const moveTask = defineWriteAction({
   }),
   output: z.object({
     id: z.uuid(),
-    position: z.number().int(),
+    position: z.number(),
     /** True when the column was renumbered to make room. */
     normalised: z.boolean(),
   }),

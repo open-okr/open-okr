@@ -45,6 +45,8 @@ export interface LoadWorld {
   readonly spaceIds: readonly string[];
   /** Task ids per space, so a drag stays inside a space its actor is in. */
   readonly tasksBySpace: ReadonlyMap<string, readonly string[]>;
+  /** Goal ids per space, for the same reason, for the check-in burst. */
+  readonly goalsBySpace: ReadonlyMap<string, readonly string[]>;
   readonly cycleId: string;
 }
 
@@ -174,7 +176,111 @@ export const SCENARIOS: readonly Scenario[] = [
       );
     },
   },
+  {
+    /**
+     * A drop between two cards rather than at the top of the column.
+     *
+     * The `drag` scenario above never names a card to land after, so it only
+     * ever exercises the head of a column, and since P7-T02 that branch
+     * cannot renumber. This is the other half: it lands the card in a real
+     * slot, which is what closes a gap and eventually renumbers.
+     *
+     * **Its timing includes the board read it needs**, because the
+     * destination column's cards move as the run goes and a list captured at
+     * the start decays within seconds. A browser already has that read, so
+     * this number is not comparable with `drag`'s; it is here to exercise the
+     * path, and the budget is the board's plus the drag's.
+     */
+    name: "reorder",
+    weight: 5,
+    writes: true,
+    budgetMs: 2000,
+    async run(world, actor, tick) {
+      const spaceId = actor.spaceIds[tick % Math.max(actor.spaceIds.length, 1)];
+      if (!spaceId) {
+        return;
+      }
+      const status = TASK_STATUSES[tick % TASK_STATUSES.length];
+      const board = (await callAction(
+        context(world, actor) as never,
+        "tasks.board" as never,
+        { spaceId } as never,
+      )) as { columns: { status: string; cards: { id: string }[] }[] };
+      const cards =
+        board.columns.find((column) => column.status === status)?.cards ?? [];
+      // Two cards at least: one to move and one to land after.
+      if (cards.length < 2) {
+        return;
+      }
+      const moved = cards[cards.length - 1];
+      const after = cards[tick % (cards.length - 1)];
+      if (!moved || !after || moved.id === after.id) {
+        return;
+      }
+      await callAction(
+        context(world, actor) as never,
+        "tasks.move" as never,
+        { id: moved.id, status, afterTaskId: after.id } as never,
+      );
+    },
+  },
+  {
+    /**
+     * A check-in burst: the heaviest write the product has.
+     *
+     * One publish writes the snapshot, the key result value history, the
+     * cadence advance and the reviewer's obligation, and it is the write
+     * P7-T02's deliverables name first. Opening the draft is idempotent (one
+     * per author per goal), so a burst reopens rather than piling up drafts,
+     * which is what a Friday afternoon looks like anyway. Judged against
+     * §13.1's "save actions" ceiling of 500ms plus the draft it opens first.
+     */
+    name: "check-in",
+    weight: 5,
+    writes: true,
+    budgetMs: 1000,
+    async run(world, actor, tick) {
+      const spaceId = actor.spaceIds[tick % Math.max(actor.spaceIds.length, 1)];
+      const inSpace = spaceId ? world.goalsBySpace.get(spaceId) : undefined;
+      if (!inSpace || inSpace.length === 0) {
+        return;
+      }
+      const goalId = inSpace[tick % inSpace.length];
+      if (!goalId) {
+        return;
+      }
+      const draft = (await callAction(
+        context(world, actor) as never,
+        "goals.startCheckIn" as never,
+        { goalId } as never,
+      )) as { id: string };
+      await callAction(
+        context(world, actor) as never,
+        "goals.publishCheckIn" as never,
+        {
+          id: draft.id,
+          status: CHECK_IN_STATUSES[tick % CHECK_IN_STATUSES.length],
+          confidence: 0.6,
+          narrative: NARRATIVE,
+          values: [],
+        } as never,
+      );
+    },
+  },
 ];
+
+const CHECK_IN_STATUSES = ["on_track", "caution", "off_track"] as const;
+
+/** The shortest valid editor document, so the write is not about parsing. */
+const NARRATIVE = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: "Steady, no new blockers." }],
+    },
+  ],
+};
 
 function context(world: LoadWorld, actor: LoadActor) {
   return {

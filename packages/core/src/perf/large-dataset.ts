@@ -203,6 +203,31 @@ function pick<T>(list: readonly T[], random: () => number): T {
   return list[Math.floor(random() * list.length)] as T;
 }
 
+/** How many goals hang off one parent in the seeded alignment tree. */
+const ALIGNMENT_FANOUT = 5;
+
+/**
+ * The goal one goal aligns to, or null for a root.
+ *
+ * Goals are laid out round robin across cycles, so the goals of one cycle are
+ * every `cycleCount`-th index. Within a cycle they form a tree of fanout
+ * `ALIGNMENT_FANOUT`, which is six levels deep at ten thousand goals and is
+ * the shape §13.1's "alignment score recomputation, 10,000 goals" describes.
+ * The parent always sits at a lower index, so its id is already generated.
+ */
+function parentGoalIdFor(
+  index: number,
+  cycleCount: number,
+  goalIds: readonly string[],
+): string | null {
+  const withinCycle = Math.floor(index / cycleCount);
+  if (withinCycle === 0) {
+    return null;
+  }
+  const parentWithinCycle = Math.floor((withinCycle - 1) / ALIGNMENT_FANOUT);
+  return goalIds[parentWithinCycle * cycleCount + (index % cycleCount)] ?? null;
+}
+
 /**
  * Generates `total` rows in chunks and inserts each chunk as it is built.
  *
@@ -775,6 +800,13 @@ export async function buildLargeDataset(
   const cycleIds = [anchors.cycleId, ...newCycleIds];
 
   // --- Goals, their contexts and their four bindings each ------------------
+  //
+  // **The goals are aligned into a tree** (P7-T02). The first version of this
+  // dataset left every `parent_goal_id` null, so the alignment score, the
+  // cascade and the recompute were all measured against a hundred thousand
+  // roots: three §13.1 rows reading green over a graph with no edges. That is
+  // the third time this dataset flattered a budget by leaving a column out,
+  // after the missing access contexts and the single cycle.
   // Generated together so a goal and its access rows share one index, and
   // inserted table by table because `unnest` writes one table per statement.
   step = Date.now();
@@ -793,6 +825,7 @@ export async function buildLargeDataset(
       { name: "workspace_id", type: "uuid" },
       { name: "title", type: "text" },
       { name: "cycle_id", type: "uuid" },
+      { name: "parent_goal_id", type: "uuid" },
       { name: "level", type: "text" },
       { name: "owner_kind", type: "text" },
       { name: "space_id", type: "uuid" },
@@ -822,6 +855,7 @@ export async function buildLargeDataset(
         workspaceId,
         `Objective ${index + 1}`,
         cycleIds[index % cycleIds.length] as string,
+        parentGoalIdFor(index, cycleIds.length, goalIds),
         pick(LEVELS, random),
         "space",
         spaceId,

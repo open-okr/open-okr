@@ -37,6 +37,7 @@ if (!slug) {
       "  --seconds <n>   How long to run (default 60, or 900 with --soak).",
       "  --think <ms>    Pause between one member's actions (default 250).",
       "  --budget <ms>   The p95 every scenario must stay inside (default 500).",
+      "  --pool <n>      Database connections the run may hold (default 20).",
       "  --soak          A long hold, judged on drift rather than the number.",
       "",
     ].join("\n"),
@@ -62,10 +63,20 @@ for (const [name, value] of [
 }
 
 const env = loadEnv();
-// One connection per virtual member is what a real instance does not have
-// either: the pool is the bottleneck under load and pretending otherwise
-// would measure Postgres rather than the product.
-const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 20 });
+// **The pool size is a flag because it turned out to be the answer**
+// (P7-T02). With the audit lock gone from the write path, every scenario
+// settled into the same 2 to 5 second band at fifty members, which is the
+// shape of a queue for connections rather than of any one slow query. A
+// number nobody can change is a number nobody can test.
+const poolMax = Number(flag("pool") ?? "20");
+if (!Number.isInteger(poolMax) || poolMax < 1) {
+  process.stderr.write("--pool takes a positive whole number.\n");
+  process.exit(2);
+}
+const pool = new pg.Pool({
+  connectionString: env.DATABASE_URL,
+  max: poolMax,
+});
 
 const workspace = (
   await pool.query<{ id: string; name: string }>(
@@ -133,6 +144,19 @@ for (const spaceId of spaceIds) {
   );
 }
 
+// The same, for goals, which the check-in burst publishes against.
+const goalsBySpace = new Map<string, string[]>();
+for (const spaceId of spaceIds) {
+  const rows = await pool.query<{ id: string }>(
+    "select id from goals where workspace_id = $1 and space_id = $2 and deleted_at is null order by created_at desc limit 200",
+    [workspace.id, spaceId],
+  );
+  goalsBySpace.set(
+    spaceId,
+    rows.rows.map((row) => row.id),
+  );
+}
+
 const cycleId = (
   await pool.query<{ id: string }>(
     "select id from cycles where workspace_id = $1 and deleted_at is null order by starts_on desc limit 1",
@@ -152,11 +176,12 @@ const world: LoadWorld = {
   actors,
   spaceIds,
   tasksBySpace,
+  goalsBySpace,
   cycleId,
 };
 
 write(
-  `${soak ? "Soaking" : "Loading"} "${workspace.name}": ${actors.length} members, ${seconds}s, ${thinkMs}ms think.`,
+  `${soak ? "Soaking" : "Loading"} "${workspace.name}": ${actors.length} members, ${seconds}s, ${thinkMs}ms think, ${poolMax} connections.`,
 );
 write("");
 
@@ -176,7 +201,7 @@ write("");
 write("  scenario         calls  errors      p50      p95      p99");
 let failed = 0;
 for (const scenario of result.scenarios) {
-  // The scenario's own 00a713.1 ceiling, unless the caller overrode it.
+  // The scenario's own §13.1 ceiling, unless the caller overrode it.
   const ceiling = flag("budget") ? budgetMs : scenario.budgetMs;
   const over = scenario.p95 > ceiling;
   if (over || scenario.errors > 0) {

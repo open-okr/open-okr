@@ -187,7 +187,7 @@ All keyed on a `session` of kind `quarterly`.
 |---|---|---|
 | `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct`, `position` | Importable. The work that moves a key result. It owns an access context: `workspace_standard` at view, the owning space at edit, the owner at full. `capacity` is nullable and null means nobody has judged it, which publish gate 5 reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks and no input schema accepts one. No `cycle_id`: an initiative reaches a cycle through the key results it serves, and a column would be a second answer that disagrees the first time one serves two cycles |
 | `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many. Unique on the pair while live, so recording the same link twice is one link rather than two |
-| `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable. Owns an access context: `workspace_standard` at view, the owning space at edit, and each assignee's own group at edit. `position` is sparse; `ordering_state` records the spacing used and when the column was last renumbered. A move takes a row lock over the destination column's live rows, so two concurrent drags serialise |
+| `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable. Owns an access context: `workspace_standard` at view, the owning space at edit, and each assignee's own group at edit. `position` is sparse and fractional (`double precision`, migration 0081); `ordering_state` records the spacing used and when the column was last renumbered. A move writes the midpoint of its two new neighbours, so a drag touches one row, and an advisory lock over the destination column serialises two concurrent drags |
 | `task_assignees` | `task_id`, `member_id` | Multiple assignees. Assignment grants edit access through the member's group, subscribes them as `role`, and notifies everybody except the actor. Unique on the pair while live; an agent is refused, because an agent proposes work and does not carry it |
 | `checklist_items` | `task_id`, `title`, `done`, `position` | |
 | `documents` | `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` | Drafts are author-private, enforced in the query: every read composes `(state = 'published' or author_member_id = $me)`, so a direct identifier probe answers not-found. No access context of its own; it inherits its subject's. A check constraint keeps `state` and `published_at` from disagreeing |
@@ -332,6 +332,8 @@ The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, 
 6. **Portfolio verdict.** METHOD.md §3.4 over any scored set.
 
 `recomputeGoal(graph, change)` is the single entry point. Invalidation fans out from the outbox.
+
+**Scope is the branch, not the cycle** (P7-T02). A change to one goal loads that goal, the goals above it, and the siblings each of those rolls up with, because progress only ever rolls upward. A cycle scope still loads the cycle, which is what closing or publishing one moves. The rows are then written in one statement per table, and only where a derived value actually moved: the previous version wrote every row in scope one statement at a time, which on §13.1's dataset was 20,034 statements and 8.9 seconds for one check-in, and bumped `updated_at` on ten thousand goals nobody had touched.
 
 ### 6.3 The cadence engine (`packages/core`)
 
@@ -578,6 +580,7 @@ Measured on the large seeded dataset: 100,000 goals and key results plus 1,000,0
 - Virtualised trees, tables and boards.
 - A query-count budget enforced in CI on list endpoints, with a development-mode counter failing tests over budget.
 - Indexes ship with the feature, including composite indexes matching the common list filters.
+- The access filter on a list stays correlated: one index lookup per candidate row, never a set of every context the reader can see. Added at P7-T02, where Postgres rewrote that filter into a hashed subplan and built 1,271,774 rows to answer a fifty-row page. `accessScopeFilter` holds the fence and says why.
 - Derived values recomputed by outbox-driven jobs into columns, never per row at render.
 - Every resource declares a summary shape for lists and a full shape for detail. List endpoints return only the summary.
 - A client cache persisted and keyed by build identifier, so back and forward are instant and a new deployment invalidates it.
