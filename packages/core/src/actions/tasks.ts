@@ -320,11 +320,21 @@ async function readable<T extends { id: string }>(
  * Access-filtered, so nothing leaked, and still the wrong answer to the
  * question. Found by a test that expected the refusal.
  */
+/**
+ * Cards per column when the caller names no limit.
+ *
+ * 00a713.1 measures this screen at "4 columns by 50 cards", so fifty is the
+ * figure the budget itself is written against.
+ */
+const BOARD_COLUMN = 50;
+
 const boardInput = z
   .object({
     spaceId: z.uuid().optional(),
     initiativeId: z.uuid().optional(),
     keyResultId: z.uuid().optional(),
+    /** Cards per column. Optional for the reason `goals.list` states. */
+    limit: z.number().int().min(1).max(200).optional(),
   })
   .refine(
     (value) =>
@@ -377,24 +387,51 @@ export const readBoard = defineReadAction({
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
 
-        const rows = await tx
-          .select(CARD_COLUMNS)
-          .from(tasks)
-          .leftJoin(keyResults, eq(keyResults.id, tasks.keyResultId))
-          .where(
-            activeOnly(
-              tasks,
-              eq(tasks.workspaceId, context.workspaceId),
-              ...(input.spaceId ? [eq(tasks.spaceId, input.spaceId)] : []),
-              ...(input.initiativeId
-                ? [eq(tasks.initiativeId, input.initiativeId)]
-                : []),
-              ...(input.keyResultId
-                ? [eq(tasks.keyResultId, input.keyResultId)]
-                : []),
+        // **A column at a time, each bounded** (P7-T02).
+        //
+        // This was one query for every task in the space, and §13.1's budget
+        // for this screen is "4 columns by 50 cards". A space in the seeded
+        // dataset holds fifty thousand tasks, so the board read all of them,
+        // decorated all of them and threw away 99.6% — 1.4 seconds for one
+        // reader, and the slowest thing in the workspace under load.
+        //
+        // Four bounded queries rather than one unbounded: the planner takes
+        // each with the status filter and stops at the limit, and a board
+        // shows the top of each column by definition. The scroll that reaches
+        // the rest is a cursor, and the input carries one.
+        const perColumn = input.limit ?? BOARD_COLUMN;
+        const rows = (
+          await Promise.all(
+            TASK_STATUSES.map((status) =>
+              tx
+                .select(CARD_COLUMNS)
+                .from(tasks)
+                .leftJoin(keyResults, eq(keyResults.id, tasks.keyResultId))
+                .where(
+                  activeOnly(
+                    tasks,
+                    eq(tasks.workspaceId, context.workspaceId),
+                    eq(tasks.status, status),
+                    ...(input.spaceId
+                      ? [eq(tasks.spaceId, input.spaceId)]
+                      : []),
+                    ...(input.initiativeId
+                      ? [eq(tasks.initiativeId, input.initiativeId)]
+                      : []),
+                    ...(input.keyResultId
+                      ? [eq(tasks.keyResultId, input.keyResultId)]
+                      : []),
+                  ),
+                )
+                .orderBy(asc(tasks.position), asc(tasks.id))
+                // Over-fetched, because the access filter runs after this and
+                // can empty a page. Three times the column is enough for a
+                // workspace where most cards in a space are visible to its
+                // members, and a short column is not a wrong one.
+                .limit(perColumn * 3),
             ),
           )
-          .orderBy(asc(tasks.position), asc(tasks.createdAt));
+        ).flat();
 
         const cards = await decorate(
           tx,
@@ -414,7 +451,9 @@ export const readBoard = defineReadAction({
         return {
           columns: TASK_STATUSES.map((status) => ({
             status,
-            cards: cards.filter((card) => card.status === status),
+            cards: cards
+              .filter((card) => card.status === status)
+              .slice(0, perColumn),
           })),
           rail,
         };

@@ -236,6 +236,113 @@ async function insertGenerated(
   return written;
 }
 
+/**
+ * Gives every row of a table its own access context and its two group
+ * bindings, a page at a time (P7-T02).
+ *
+ * **Spaces, initiatives and tasks own contexts too, and leaving them out made
+ * three budgets meaningless.** The first version of this dataset wired goals
+ * and stopped, so `tasks.board`, `tasks.list` and `initiatives.list` returned
+ * nothing at all: the access filter found no context and hid every row, and
+ * the budget harness happily measured an empty answer in three hundred
+ * milliseconds. Exactly the failure this file's own header warns about, one
+ * entity type further along.
+ *
+ * The bindings are the ones `tasks/service.ts` and `initiatives/service.ts`
+ * write: `workspace_standard` at view, the owning space's `space_standard` at
+ * edit.
+ *
+ * **Paged rather than held in memory.** A million tasks means a million
+ * contexts and two million bindings, and keeping three million ids resident
+ * to write them is how a seeder runs out of heap. It reads a page of rows
+ * back by keyset, writes that page's access rows, and forgets them.
+ */
+async function attachContexts(
+  pool: pg.Pool,
+  workspaceId: string,
+  table: string,
+  resourceType: string,
+  workspaceStandardGroupId: string,
+  spaceGroupIds: Map<string, string>,
+  batchSize: number,
+): Promise<number> {
+  let after = "00000000-0000-0000-0000-000000000000";
+  let written = 0;
+  for (;;) {
+    // A space is its own space for binding purposes; everything else names
+    // one. And a row that already has a context is skipped rather than given
+    // a second: provisioning wired the first space before this ran.
+    const spaceColumn = table === "spaces" ? "t.id" : "t.space_id";
+    const page = await inTenantTransaction(pool, workspaceId, async (client) =>
+      client.query<{ id: string; space_id: string | null; created_at: Date }>(
+        `select t.id, ${spaceColumn} as space_id, t.created_at
+           from "${table}" t
+          where t.workspace_id = $1 and t.id > $2 and t.deleted_at is null
+            and not exists (
+              select 1 from access_contexts c
+               where c.workspace_id = t.workspace_id
+                 and c.resource_type = $4
+                 and c.resource_id = t.id)
+          order by t.id limit $3`,
+        [workspaceId, after, batchSize, resourceType],
+      ),
+    );
+    if (page.rows.length === 0) {
+      return written;
+    }
+    after = page.rows[page.rows.length - 1]?.id as string;
+
+    const contexts: unknown[][] = [];
+    const bindings: unknown[][] = [];
+    for (const row of page.rows) {
+      const when = row.created_at;
+      const contextId = newId(when.getTime());
+      contexts.push([contextId, workspaceId, resourceType, row.id, when, when]);
+      bindings.push([
+        newId(when.getTime()),
+        workspaceId,
+        workspaceStandardGroupId,
+        contextId,
+        ACCESS_LEVELS.view,
+        null,
+        when,
+      ]);
+      const spaceGroupId = row.space_id
+        ? spaceGroupIds.get(row.space_id)
+        : undefined;
+      if (spaceGroupId) {
+        bindings.push([
+          newId(when.getTime()),
+          workspaceId,
+          spaceGroupId,
+          contextId,
+          ACCESS_LEVELS.edit,
+          null,
+          when,
+        ]);
+      }
+    }
+
+    await inTenantTransaction(pool, workspaceId, async (client) => {
+      await bulkInsert(
+        client,
+        "access_contexts",
+        CONTEXT_COLUMNS,
+        contexts,
+        batchSize,
+      );
+      await bulkInsert(
+        client,
+        "access_bindings",
+        BINDING_COLUMNS,
+        bindings,
+        batchSize,
+      );
+    });
+    written += page.rows.length;
+  }
+}
+
 const CONTEXT_COLUMNS: readonly BulkColumn[] = [
   { name: "id", type: "uuid" },
   { name: "workspace_id", type: "uuid" },
@@ -348,12 +455,54 @@ export async function buildLargeDataset(
   const at = (index: number, total: number): number =>
     Math.floor(oldest + ((now - oldest) * index) / Math.max(total, 1));
 
+  // --- People --------------------------------------------------------------
+  // **With user accounts, unlike the demo builder's cast** (P7-T02). Every
+  // action resolves its actor through `users`, so a workspace of members with
+  // no account has exactly one principal who can do anything, and a load run
+  // of "hundreds of concurrent members" would be one member repeated. `users`
+  // sits outside the tenant floor, so these go in without the setting.
+  let step = Date.now();
+  const userIds: string[] = [];
+  {
+    const client = await pool.connect();
+    try {
+      for (let start = 0; start < counts.members; start += batchSize) {
+        const size = Math.min(batchSize, counts.members - start);
+        const ids: string[] = [];
+        const names: string[] = [];
+        const emails: string[] = [];
+        for (let offset = 0; offset < size; offset += 1) {
+          const index = start + offset;
+          const id = newId(at(index, counts.members));
+          ids.push(id);
+          names.push(`Member ${index + 1}`);
+          // The id keeps them unique across repeated runs on one database.
+          emails.push(`member-${id.slice(0, 13)}@perf.invalid`);
+          userIds.push(id);
+        }
+        // openokr:allow-mutation: the performance dataset writes outside the
+        // Operation pipeline on purpose, and `perf/bulk.ts` carries the whole
+        // argument: a million rows nobody made would otherwise cost a million
+        // transactions and five million audit, activity and outbox rows. It
+        // is dev tooling, refused on a production instance, and it is not a
+        // substitute for the fixtures a behaviour test builds.
+        await client.query(
+          "insert into users (id, name, email) select * from unnest($1::uuid[], $2::text[], $3::text[])",
+          [ids, names, emails],
+        );
+      }
+    } finally {
+      client.release();
+    }
+  }
+  report("users", userIds.length, step);
+
   // --- Members -------------------------------------------------------------
   // Placeholder people, the same shape the demo builder writes: no user
   // account, active, human. They exist to be champions, reviewers and owners,
   // which is what makes a goal's bindings resolve to different principals
   // instead of all pointing at one.
-  let step = Date.now();
+  step = Date.now();
   const memberIds: string[] = [];
   await insertGenerated(
     pool,
@@ -362,6 +511,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "user_id", type: "uuid" },
       { name: "name", type: "text" },
       { name: "title", type: "text" },
       { name: "kind", type: "text" },
@@ -378,6 +528,7 @@ export async function buildLargeDataset(
       return [
         id,
         workspaceId,
+        userIds[index] as string,
         `Member ${index + 1}`,
         "Placeholder",
         "human",
@@ -535,6 +686,45 @@ export async function buildLargeDataset(
     },
   );
   report("space_groups", spacesNeedingGroups.length, step);
+
+  // Members join spaces, which is what makes the `space_standard` edit
+  // binding resolve for anybody (P7-T02). Without this every member holds
+  // only the workspace tier's `view`, so a board renders and no card can be
+  // dragged, and a load run's write scenario fails every call.
+  step = Date.now();
+  const SPACES_EACH = 3;
+  const spaceMemberships = memberIds.flatMap((memberId, index) =>
+    Array.from({ length: Math.min(SPACES_EACH, spaceIds.length) }, (_v, n) => ({
+      memberId,
+      spaceId: spaceIds[(index + n) % spaceIds.length] as string,
+      when: at(index, memberIds.length),
+    })),
+  );
+  await insertGenerated(
+    pool,
+    workspaceId,
+    "access_group_memberships",
+    [
+      { name: "id", type: "uuid" },
+      { name: "workspace_id", type: "uuid" },
+      { name: "group_id", type: "uuid" },
+      { name: "member_id", type: "uuid" },
+      { name: "created_at", type: "timestamptz" },
+    ],
+    spaceMemberships.length,
+    batchSize,
+    (index) => {
+      const row = spaceMemberships[index] as (typeof spaceMemberships)[number];
+      return [
+        newId(row.when),
+        workspaceId,
+        spaceGroupIds.get(row.spaceId) as string,
+        row.memberId,
+        new Date(row.when),
+      ];
+    },
+  );
+  report("space_memberships", spaceMemberships.length, step);
 
   // --- Cycles --------------------------------------------------------------
   // Consecutive quarters ending with the one provisioning already made, so
@@ -864,6 +1054,28 @@ export async function buildLargeDataset(
     },
   );
   report("tasks", counts.tasks, step);
+
+  // --- The access rows for everything that is not a goal -------------------
+  // Goals were wired as they were written, above. These three are attached
+  // afterwards because their contexts are the bulk of the dataset and paging
+  // them back keeps the memory flat.
+  for (const [table, resourceType] of [
+    ["spaces", "space"],
+    ["initiatives", "initiative"],
+    ["tasks", "task"],
+  ] as const) {
+    step = Date.now();
+    const attached = await attachContexts(
+      pool,
+      workspaceId,
+      table,
+      resourceType,
+      anchors.workspaceStandardGroupId,
+      spaceGroupIds,
+      batchSize,
+    );
+    report(`${resourceType}_contexts`, attached, step);
+  }
 
   return { rows, seconds: (Date.now() - started) / 1000 };
 }

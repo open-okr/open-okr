@@ -136,8 +136,8 @@ export const LIST_BUDGETS: readonly ListBudget[] = [
   // list within one space rather than across the workspace, so it belongs to
   // a space-scoped budget rather than this one.
   { action: "goals.list", input: {}, queries: 7 },
-  { action: "tasks.list", input: {}, queries: 4 },
-  { action: "initiatives.list", input: {}, queries: 4 },
+  { action: "tasks.list", input: {}, queries: 6 },
+  { action: "initiatives.list", input: {}, queries: 6 },
   { action: "spaces.list", input: {}, queries: 3 },
   { action: "people.directory", input: {}, queries: 2 },
   { action: "review.inbox", input: {}, queries: 12 },

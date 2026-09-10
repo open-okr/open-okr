@@ -4444,6 +4444,12 @@
           "field": "keyResultId",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false
