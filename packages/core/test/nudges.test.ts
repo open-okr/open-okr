@@ -533,10 +533,18 @@ describe("a snooze", () => {
       "nudges.list",
       { limit: 50 },
     );
+    // The one about the goal specifically. `nudges.list` also carries the
+    // notices a member gets about themselves, and snoozing one of those would
+    // silence nothing about this goal and would make the assertions below
+    // pass for the wrong reason.
+    const aboutTheGoal = mine.find(
+      (row: { subjectId: string }) => row.subjectId === goalId,
+    );
+    expect(aboutTheGoal).toBeTruthy();
     const until = new Date(`${dueOn}T12:00:00Z`);
     until.setUTCDate(until.getUTCDate() + 7);
     await callAction({ pool: wb.appPool, ...context() }, "nudges.snooze", {
-      nudgeId: mine[0]?.id as string,
+      nudgeId: aboutTheGoal?.id as string,
       until: until.toISOString(),
     });
 
@@ -549,6 +557,57 @@ describe("a snooze", () => {
       {},
     );
     expect(after.obligations.length).toBe(before.obligations.length);
+
+    // **And the other half, which this test's own title claimed and did not
+    // check** (P7-T04). `nudges.snooze` wrote `snoozed_until` and
+    // `decideSuppression` passed a hard-coded null in its place, so the
+    // snooze silenced nothing: the next engine pass nudged the same member
+    // about the same goal as though they had never asked it to stop. The rule
+    // was already written and golden-mastered in `packages/method`; it had no
+    // caller. Running the engine a day later is what proves it does now.
+    // Only what the *next* pass writes counts. The row the snooze was set on
+    // is still there and was sent yesterday, and reading it back would prove
+    // nothing about today.
+    const { rows: existing } = await wb.admin.query<{ id: string }>(
+      "select id from nudges where workspace_id = $1",
+      [workspaceId],
+    );
+    const already = new Set(existing.map((row) => row.id));
+
+    await runAt(1);
+    const { rows: fresh } = await wb.admin.query<{
+      id: string;
+      subject_id: string;
+      recipient_member_id: string;
+      sent_at: string | null;
+      suppressed_reason: string | null;
+    }>(
+      `select id, subject_id, recipient_member_id, sent_at, suppressed_reason
+         from nudges where workspace_id = $1`,
+      [workspaceId],
+    );
+    const aboutTheSnoozedGoal = fresh.filter(
+      (row) =>
+        !already.has(row.id) &&
+        row.recipient_member_id === ownerMemberId &&
+        row.subject_id === goalId,
+    );
+    expect(aboutTheSnoozedGoal.length).toBeGreaterThan(0);
+    for (const row of aboutTheSnoozedGoal) {
+      // Recorded with its reason rather than dropped, and never sent.
+      expect(row.suppressed_reason).toBe("snooze");
+      expect(row.sent_at).toBeNull();
+    }
+
+    // The obligation survives the second pass too, which is the sentence in
+    // CLAUDE.md this pair of assertions exists for: a snooze never hides a
+    // review-inbox obligation.
+    const stillOwed = await callAction(
+      { pool: wb.appPool, ...context() },
+      "review.inbox",
+      {},
+    );
+    expect(stillOwed.obligations.length).toBe(before.obligations.length);
   });
 
   it("refuses to snooze somebody else's nudge, as a not-found", async () => {

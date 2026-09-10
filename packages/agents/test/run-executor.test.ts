@@ -1,4 +1,8 @@
-import { callAction, provisionWorkspaceForUser } from "@openokr/core";
+import {
+  callAction,
+  provisionWorkspaceForUser,
+  recordUsageEvent,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -233,6 +237,81 @@ describe("bindings", () => {
     });
     expect(result.logEntry.kind).toBe("denied");
     expect(await spaceName()).toBe(originalName);
+  });
+});
+
+describe("the cost cap", () => {
+  it("halts a run mid-flight, with tasks still to go", async () => {
+    // **Mid-flight is the part that was untested** (P7-T04). The cap had two
+    // tests, and both were pre-flight: a budget already crossed before the
+    // run started, and the predicate on its own. What the deliverable asks
+    // about is a run that is already going when the money runs out, which is
+    // the only case where a half-finished run has to be left in a sane state.
+    const agent = await createAgent("scoped_direct");
+    await bindToSpace(agent.id, 100);
+    const run = await startRenameRun(agent.id, ["First", "Second", "Third"]);
+
+    const wb = await workerDb();
+    const first = await processNextTask(wb.appPool, {
+      workspaceId,
+      runId: run.id,
+    });
+    expect(first.finished).toBe(false);
+    expect(await spaceName()).toBe("First");
+
+    // The budget is crossed between task one and task two, which is what a
+    // long run against a metered provider does to itself.
+    await callAction(ownerContext(), "ai.setBudget", {
+      scope: "workspace",
+      scopeRef: null,
+      metric: "calls",
+      period: "day",
+      limitValue: 1,
+    });
+    await recordUsageEvent(wb.appPool, {
+      workspaceId,
+      source: "agent",
+      provider: "anthropic",
+      modelId: "claude-sonnet-5",
+      inputTokens: 10,
+      outputTokens: 10,
+      cost: 0.01,
+    });
+    await recordUsageEvent(wb.appPool, {
+      workspaceId,
+      source: "agent",
+      provider: "anthropic",
+      modelId: "claude-sonnet-5",
+      inputTokens: 10,
+      outputTokens: 10,
+      cost: 0.01,
+    });
+
+    const halted = await processNextTask(wb.appPool, {
+      workspaceId,
+      runId: run.id,
+    });
+    expect(halted.finished).toBe(true);
+    expect(halted.status).toBe("failed");
+    expect(halted.logEntry.kind).toBe("error");
+    expect(halted.logEntry.message).toMatch(/halted/i);
+
+    // The second task never ran, and the first one's work stands: a halt is
+    // not a rollback of what was already done under budget.
+    expect(await spaceName()).toBe("First");
+    const state = await readRunState(wb.appPool, {
+      workspaceId,
+      runId: run.id,
+    });
+    expect(state?.status).toBe("failed");
+    expect(state?.currentTaskIndex).toBe(1);
+
+    // And it is on the record as a budget halt rather than an unexplained
+    // failure, which is what an operator asking "why did this stop" needs.
+    const audit = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from audit_events where action = 'agents.processNextTask' order by id desc limit 1",
+    );
+    expect(audit.rows[0]?.payload?.haltedOnBudget).toBe(true);
   });
 });
 
