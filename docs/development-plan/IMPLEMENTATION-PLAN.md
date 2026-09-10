@@ -2065,8 +2065,20 @@ that the route still calls the registry.
 
 ### P7-T01: Performance budgets and indexing at scale [L]
 Depends on: Phase 6 complete
-Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace; every TECHNICAL-PLAN.md §13.1 budget measured in continuous integration; the query-count budget enforced on list endpoints; an index and plan review with fixes.
-Acceptance: every budget row is green on the large dataset in continuous integration.
+
+**Cut in two on 2026-09-10**, approved by Agung, because the four deliverables
+below are two working sessions rather than one. The dataset has to exist before
+anything can be measured against it, and the query-count budget needs no
+dataset at all, so the seam is between building the instrument and using it.
+
+#### P7-T01a: The dataset and the query-count budget [M]
+Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace, built through the tenant floor with every goal's access context and four bindings, and refused on a production instance; `pnpm db:seed:large`; the query-count budget on list endpoints, enforcing both a ceiling and the stronger rule that the count may not grow with the row count.
+Acceptance: the full dataset builds into an empty workspace and its goals resolve through `resolveMemberAccessLevel`; the budget suite passes, and any list whose cost grows with its rows is named on a list that P7-T01b empties.
+
+#### P7-T01b: The budget harness, the index and plan review [M]
+Depends on: P7-T01a
+Deliverables: every TECHNICAL-PLAN.md §13.1 budget measured against the large dataset and wired into continuous integration; `EXPLAIN (ANALYZE, BUFFERS)` over the list queries with the composite indexes §13.2 asks for; the three query-per-row lists P7-T01a found (`goals.list`, `tasks.list`, `initiatives.list`) fixed and removed from `KNOWN_QUERY_PER_ROW`.
+Acceptance: every budget row is green on the large dataset in continuous integration, and `KNOWN_QUERY_PER_ROW` is empty.
 
 ### P7-T02: Load and soak testing [M]
 Depends on: P7-T01

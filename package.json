@@ -23,6 +23,7 @@
     "import:csv": "pnpm --filter @openokr/importer import:csv",
     "import:flowyteam": "pnpm --filter @openokr/importer import:flowyteam",
     "db:seed": "pnpm --filter @openokr/core seed",
+    "db:seed:large": "pnpm --filter @openokr/core seed:large",
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",

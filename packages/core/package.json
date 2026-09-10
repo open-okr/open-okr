@@ -14,7 +14,8 @@
     "cadence:sweep": "node --experimental-strip-types --no-warnings src/bin/sweep-staleness.ts",
     "gen:contract": "node --experimental-strip-types --no-warnings src/bin/gen-contract.ts",
     "check:contract": "node --experimental-strip-types --no-warnings src/bin/gen-contract.ts --check",
-    "seed": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed.ts"
+    "seed": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed.ts",
+    "seed:large": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed-large.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",
