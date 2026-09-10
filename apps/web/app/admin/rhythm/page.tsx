@@ -39,7 +39,9 @@ export default async function RhythmSettingsPage() {
 
   return (
     <>
-      <h1>{t("admin.rhythm.rhythmAndThresholds")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.rhythm.rhythmAndThresholds")}
+      </h1>
       <p className="text-sm text-ink-3">
         {t("admin.rhythm.everyNumberTheMethod")}
       </p>
