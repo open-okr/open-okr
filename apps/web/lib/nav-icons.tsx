@@ -1,22 +1,31 @@
 import {
   BarChart3,
+  Bell,
+  Bot,
   CalendarDays,
   CheckCircle2,
   Circle,
   ClipboardCheck,
   Columns3,
+  Gauge,
   Hammer,
   Home,
   Inbox,
   KeyRound,
   Layers,
   MessageSquare,
+  Palette,
   Plug,
+  Radio,
   RefreshCw,
   Search,
   Shield,
+  SlidersHorizontal,
+  Sparkles,
   Target,
   Trophy,
+  Upload,
+  UserPlus,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -59,6 +68,24 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "account-security": <Shield className="size-full" />,
   "account-api-tokens": <KeyRound className="size-full" />,
   "account-connections": <Plug className="size-full" />,
+
+  // The admin sections. They had none until the section navigation started
+  // drawing them, which is why nine labels sat in a plain column while every
+  // other navigation in the product carried §2's fixed entity iconography.
+  // `Settings` is deliberately absent: the primary sidebar's own Admin row
+  // wears it, and the section a reader lands on should not repeat the row
+  // that brought them there.
+  "admin-general": <SlidersHorizontal className="size-full" />,
+  "admin-branding": <Palette className="size-full" />,
+  // Thresholds are the readable half of "rhythm and thresholds", and a dial
+  // is what a threshold looks like. Cycle already holds the arrows.
+  "admin-rhythm": <Gauge className="size-full" />,
+  "admin-channels": <Radio className="size-full" />,
+  "admin-nudges": <Bell className="size-full" />,
+  "admin-invitations": <UserPlus className="size-full" />,
+  "admin-imports": <Upload className="size-full" />,
+  "admin-ai": <Sparkles className="size-full" />,
+  "admin-agents": <Bot className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */
