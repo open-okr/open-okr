@@ -1,12 +1,9 @@
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
-import { cn } from "@openokr/ui";
-import { headers } from "next/headers";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireAccessLevel } from "../../lib/access.ts";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
-import { iconFor } from "../../lib/nav-icons.tsx";
 import { getTranslations } from "../../lib/translations";
+import { AdminSections } from "./admin-sections.tsx";
 
 /**
  * The admin shell (screen S-36 skeleton, P2-T08, restyled P2-T10).
@@ -38,10 +35,11 @@ import { getTranslations } from "../../lib/translations";
  *
  * **The row you are on was the missing half.** Nine labels rendered in one
  * uniform weight with no active state at all, so the section navigation could
- * not answer the one question a section navigation exists to answer. The path
- * arrives as a request header from `proxy.ts`, the same way `app-shell.tsx`
- * marks the primary rail, because a server component cannot ask the router
- * where it is.
+ * not answer the one question a section navigation exists to answer. Which row
+ * is current is decided in `admin-sections.tsx`, on the client, and that file
+ * carries the reason: a layout does not re-render when you navigate inside it,
+ * so the request header this first read froze on whichever admin card the
+ * reader opened first.
  */
 export default async function AdminLayout({
   children,
@@ -51,8 +49,14 @@ export default async function AdminLayout({
   const { t } = await getTranslations();
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
-  const sections = navigationFor("admin", access.level);
-  const path = (await headers()).get("x-openokr-path") ?? "";
+  // Narrowed to what the list needs before it crosses the client boundary.
+  // The registry entry also carries the level that filtered it, which is a
+  // server-side fact and has no business in a browser bundle.
+  const sections = navigationFor("admin", access.level).map((item) => ({
+    id: item.id,
+    label: item.label,
+    href: item.href,
+  }));
 
   return (
     <AppShellLayout>
@@ -80,37 +84,7 @@ export default async function AdminLayout({
           <h2 className="mb-1 hidden px-2.5 text-[10.5px] font-bold tracking-wider text-ink-4 uppercase md:block">
             {t("admin.layout.admin")}
           </h2>
-          <ul className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-1 md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0 md:pb-0">
-            {sections.map((item) => {
-              const active =
-                path === item.href || path.startsWith(`${item.href}/`);
-              return (
-                <li key={item.id} className="flex-none md:flex-auto">
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-[520] whitespace-nowrap text-ink-2",
-                      "transition-colors duration-fast ease-out hover:bg-ink/[0.045]",
-                      active &&
-                        "bg-brand-weak font-[650] text-brand-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_12%,transparent)] hover:bg-brand-weak",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "size-4 flex-none opacity-75",
-                        active && "opacity-100",
-                      )}
-                      aria-hidden="true"
-                    >
-                      {iconFor(item.id)}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <AdminSections sections={sections} />
         </nav>
         <main className="min-w-0 flex-1">{children}</main>
       </div>
