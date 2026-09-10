@@ -27,18 +27,15 @@ export default async function SecurityPage() {
           </p>
         </CardBody>
       </Card>
-      <Card>
-        <CardBody>
-          <SecuritySettings
-            twoFactorEnabled={session.user.twoFactorEnabled === true}
-          />
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <Sessions userId={session.user.id} />
-        </CardBody>
-      </Card>
+      {/*
+       * Both draw their own cards, one per heading, rather than being wrapped
+       * in one here. Passkeys, one-time codes and signed-in devices are three
+       * separate decisions and they used to share a box.
+       */}
+      <SecuritySettings
+        twoFactorEnabled={session.user.twoFactorEnabled === true}
+      />
+      <Sessions userId={session.user.id} />
     </div>
   );
 }

@@ -21,7 +21,9 @@ export default async function GeneralSettingsPage() {
 
   return (
     <div className="flex flex-col gap-4.5">
-      <h1>{t("admin.general.general")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.general.general")}
+      </h1>
       <GeneralSettingsForm settings={read.settings} />
       {/*
        * The freeze switch (P6-G25). `workspace.setState` shipped at P2-T09
