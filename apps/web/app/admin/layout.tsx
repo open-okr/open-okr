@@ -81,7 +81,7 @@ export default async function AdminLayout({
           // reader ends up using the browser's back button as a menu.
           className="md:sticky md:top-0 md:w-52 md:flex-none md:self-start"
         >
-          <h2 className="mb-1 hidden px-2.5 text-[10.5px] font-bold tracking-wider text-ink-4 uppercase md:block">
+          <h2 className="mb-1 hidden px-2.5 text-[10.5px] font-bold tracking-wider text-ink-3 uppercase md:block">
             {t("admin.layout.admin")}
           </h2>
           <AdminSections sections={sections} />

@@ -34,6 +34,8 @@ export function CommandPalette() {
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
   const input = useRef<HTMLInputElement>(null);
+  /** Whatever had focus when the palette opened, so Escape can hand it back. */
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -51,11 +53,27 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (open) {
+      // **Remember where focus came from, and put it back on close**
+      // (P7-T05). A dialog opened by a shortcut has no trigger element for
+      // the browser to return focus to, so closing it left
+      // `document.activeElement` as `<body>`: the next Tab started again
+      // from the top of the page, which for a keyboard user means walking
+      // the whole navigation after every search. Found by
+      // `s43b-accessibility-keyboard.spec.ts`, which is the class of defect
+      // an axe scan cannot see at all.
+      returnFocusTo.current = document.activeElement as HTMLElement | null;
       input.current?.focus();
     } else {
       setText("");
       setAnswer(EMPTY);
       setActive(0);
+      const previous = returnFocusTo.current;
+      returnFocusTo.current = null;
+      // Only if it is still on the page: a result that navigated away has
+      // replaced it, and focusing a detached node silently does nothing.
+      if (previous?.isConnected) {
+        previous.focus();
+      }
     }
   }, [open]);
 

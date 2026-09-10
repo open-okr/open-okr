@@ -43,6 +43,7 @@
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@biomejs/biome": "2.5.12",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",

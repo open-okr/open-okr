@@ -1,0 +1,23 @@
+{
+  "/": [
+    "color-contrast"
+  ],
+  "/admin/ai": [
+    "label"
+  ],
+  "/admin/imports": [
+    "label"
+  ],
+  "/admin/rhythm": [
+    "label"
+  ],
+  "/cycle": [
+    "color-contrast"
+  ],
+  "/goals/studio": [
+    "color-contrast"
+  ],
+  "/welcome": [
+    "color-contrast"
+  ]
+}

@@ -69,8 +69,25 @@
   --ink-3: #617087; /* owners, metadata, timestamps. Two steps below the
                      * ramp's #64748b, which lands at 4.48 on --bg and 4.27
                      * on --raised. Secondary text sits on both constantly. */
-  --ink-4: #94a3b8; /* placeholders and disabled labels only. Deliberately
-                     * below 4.5 — the two cases WCAG 1.4.3 exempts. */
+  --ink-4: #64748b; /* the faintest text the product uses. 4.8 on --bg and
+                     * 4.6 on --raised, so it passes WCAG 1.4.3 wherever it
+                     * lands.
+                     *
+                     * It was #94a3b8 and deliberately below 4.5, on the
+                     * reasoning that it was for placeholders and disabled
+                     * labels, the two cases 1.4.3 exempts. P7-T05's scan
+                     * showed the reasoning had not survived contact with the
+                     * product: 152 uses, most of them ordinary small text
+                     * (table column headers, metadata, helper lines), and
+                     * seventeen screens failing contrast because of it. A
+                     * token that is unsafe by design and safe only if every
+                     * caller remembers is a token that will keep failing.
+                     * Agung chose darkening it on 10 September 2026.
+                     *
+                     * There is deliberately no separate disabled token: a
+                     * disabled control is already distinguishable by more
+                     * than its colour, and adding one would recreate the
+                     * same trap for the next person. */
   --line: #e4e9f2;
   --line-2: #cdd6e4;
   --bg: #f6f8fc;
@@ -186,7 +203,13 @@
   --ink: #f1f5f9;
   --ink-2: #cbd5e1;
   --ink-3: #94a3b8;
-  --ink-4: #64748b;
+  /* Was #64748b, which is 4.0 on --bg and fails 1.4.3 the same way the light
+   * theme's did. #7d8ba1 is 5.5 on --bg and 5.1 on --surface, and stays a
+   * step below --ink-3 so the ramp still reads as a ramp. **Computed, not
+   * measured**: the scan in `s43-accessibility.spec.ts` runs the light theme
+   * only, so nothing here would have caught it and nothing here will catch
+   * the next one. Scanning both themes is the obvious follow-up. */
+  --ink-4: #7d8ba1;
   --line: #1e293b;
   --line-2: #334155;
   --bg: #0b1220;
