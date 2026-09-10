@@ -6725,13 +6725,13 @@
         {
           "name": "actual-value",
           "field": "actualValue",
-          "type": "string",
+          "type": "number",
           "required": false
         },
         {
           "name": "target-value",
           "field": "targetValue",
-          "type": "string",
+          "type": "number",
           "required": false
         },
         {
@@ -6969,7 +6969,7 @@
         {
           "name": "target-default",
           "field": "targetDefault",
-          "type": "string",
+          "type": "number",
           "required": false
         },
         {

@@ -18,7 +18,7 @@
     "@openokr/core": "workspace:*",
     "@openokr/method": "workspace:*",
     "@openokr/ui": "workspace:*",
-    "@react-pdf/renderer": "^4.8.1",
+    "@react-pdf/renderer": "^4.9.0",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
     "next": "16.3.4",

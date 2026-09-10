@@ -169,8 +169,20 @@ test("erasure asks for the name typed, and a wrong one erases nothing", async ()
     .getByRole("button", { name: "Erase this member", exact: true })
     .click();
 
+  // Scoped to the erase card, whose refusal sits beside the form rather than
+  // inside it. The suspension test above provokes the same refusal on the
+  // suspend card, and nothing between these two tests clears it: they share
+  // one page and never reload. Whether it is still on screen by the time this
+  // line runs is a race, so an unscoped match finds one element or two
+  // depending on the machine, and fails on strict mode rather than on the
+  // behaviour. Two refusals for two refused actions is correct; what this
+  // line means is that the erase card is one of them.
+  const eraseCard = page
+    .locator("div")
+    .filter({ has: page.getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`) })
+    .last();
   await expect(
-    page.getByText(
+    eraseCard.getByText(
       "This is the only member with full access to the workspace.",
     ),
   ).toBeVisible({ timeout: 15_000 });
