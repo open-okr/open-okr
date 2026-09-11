@@ -57,6 +57,13 @@ import { fanOutActivity } from "../activities/fanout.ts";
 import { feedAddedEvent } from "../activities/live.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
 import { INDEX_TOPIC, isIndexableSubject } from "../search/subjects.ts";
+import {
+  defaultMetrics,
+  METRIC,
+  type MetricRecorder,
+  OUTCOME,
+  type Outcome,
+} from "../telemetry/recorder.ts";
 import { OperationError } from "./errors.ts";
 import { isRecoveryAction } from "./freeze.ts";
 
@@ -462,6 +469,16 @@ export async function runOperation<TResult, TLoaded = undefined>(
   const db = drizzle(deps.pool);
   const required = spec.requires ?? ACCESS_LEVELS.edit;
 
+  // **Measured around the transaction, not around the action** (P7-T06a,
+  // wired here at P7-T06c). `callAction` already times the whole call; this
+  // is the part inside `BEGIN` and `COMMIT`. The two apart are what tell an
+  // operator whether a slow save is slow in the database or slow before it
+  // got there, and that is the only question the pair answers that either
+  // one alone does not.
+  const metrics = defaultMetrics();
+  const startedAt = performance.now();
+  const operationOutcome: Outcome = OUTCOME.ok;
+
   return withContext(
     db,
     {
@@ -694,5 +711,40 @@ export async function runOperation<TResult, TLoaded = undefined>(
 
       return outcome.result;
     },
+  ).then(
+    (result) => {
+      recordOperation(metrics, spec.action, operationOutcome, startedAt);
+      return result;
+    },
+    (error: unknown) => {
+      // A throw out of `withContext` is a rollback: the domain change, the
+      // activity row, the audit row and the outbox row all went back
+      // together, which is the pipeline's whole promise. Counted as such.
+      recordOperation(
+        metrics,
+        spec.action,
+        error instanceof OperationError
+          ? error.code === "forbidden"
+            ? OUTCOME.refused
+            : OUTCOME.notFound
+          : OUTCOME.error,
+        startedAt,
+      );
+      throw error;
+    },
+  );
+}
+
+function recordOperation(
+  metrics: MetricRecorder,
+  action: string,
+  outcome: Outcome,
+  startedAt: number,
+): void {
+  metrics.count(METRIC.operationsTotal, { action, outcome });
+  metrics.observe(
+    METRIC.operationDuration,
+    (performance.now() - startedAt) / 1000,
+    { action },
   );
 }

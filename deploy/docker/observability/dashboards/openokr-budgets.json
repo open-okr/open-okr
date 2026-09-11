@@ -1,0 +1,130 @@
+{
+  "title": "OpenOKR: the §13.1 budgets",
+  "uid": "openokr-budgets",
+  "schemaVersion": 39,
+  "editable": false,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "The TECHNICAL-PLAN §13.1 rows this instance can measure from its own series. The six that need a browser or a channel are charted by pnpm perf:budgets and the P7-T05 suites instead, and are named in the text panel below rather than left silently absent.",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Review inbox, 95th percentile (budget 500 ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.5 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(openokr_action_duration_seconds_bucket{action=\"review.inbox\"}[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Save actions, 95th percentile (budget 500 ms)",
+      "description": "Every write the registry declares as `write` or `destructive`, which is what §13.1 means by a save.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.5 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(openokr_action_duration_seconds_bucket{action=~\".*\\.(create|update|delete|record|publish|close)\"}[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Global search suggestions, 95th percentile (budget 300 ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.3 }
+            ]
+          },
+          "custom": { "thresholdsStyle": { "mode": "line" } }
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(openokr_action_duration_seconds_bucket{action=~\"search\\..*\"}[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Slowest actions, 95th percentile",
+      "description": "No budget of its own. This is where a §13.1 row that has not been given a panel yet shows up first.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "topk(8, histogram_quantile(0.95, sum by (le, action) (rate(openokr_action_duration_seconds_bucket[5m]))))",
+          "legendFormat": "{{action}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP at the edge, by status class",
+      "description": "From Caddy, not from the application. `apps/web/proxy.ts` is synchronous and returns before the handler produces a status, so this is the only honest place to measure it.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum by (code) (rate(caddy_http_response_duration_seconds_count[5m]))",
+          "legendFormat": "{{code}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP at the edge, 95th percentile",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(caddy_http_response_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "title": "The six rows that are not on this dashboard, and why",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 24 },
+      "options": {
+        "mode": "markdown",
+        "content": "These §13.1 rows cannot be measured from a server-side metric, so they are charted by the tool that can rather than left silently absent.\n\n| Row | Measured by |\n|---|---|\n| Work Map first paint and interactive | `pnpm perf:budgets`, and `e2e/s44-web-vitals.spec.ts` for the browser half |\n| Work Map and list scroll at 60fps | `e2e/s44-web-vitals.spec.ts` |\n| Draft Coach evaluation under 16 ms on the client | `e2e/s44-web-vitals.spec.ts` |\n| Session stage transition to every client | `pnpm perf:load` (P7-T02) |\n| Channel nudge delivery under 60 s | needs a real provider; `openokr_nudges_total` here shows what was sent and why |\n| Core web vitals | `e2e/s44-web-vitals.spec.ts` |"
+      }
+    }
+  ]
+}

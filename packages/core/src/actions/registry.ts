@@ -844,7 +844,20 @@ export async function callAction<K extends ActionName>(
   const started = performance.now();
   let outcome: Outcome = OUTCOME.ok;
   try {
-    return await call();
+    // One span per action, and it is the root of everything the action does
+    // (P7-T06c). The Operation underneath it, the access reads and the
+    // outbox row it enqueues all happen inside this call, so they nest
+    // without any of them having to know a trace exists. The attributes are
+    // the action's own name and its declared level: both fixed by the
+    // registry, and a span leaves the host so nothing else may go here.
+    return await metrics.span(
+      `action ${name}`,
+      {
+        action: name,
+        required: ACCESS_LEVEL_NAMES[action.access] ?? String(action.access),
+      },
+      call,
+    );
   } catch (error) {
     outcome = outcomeOf(error);
     throw error;

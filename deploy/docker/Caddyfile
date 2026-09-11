@@ -58,3 +58,23 @@
 		}
 	}
 }
+
+# HTTP metrics for the observability profile (P7-T06c).
+#
+# **Here rather than on the admin API**, which stays off. Caddy serves its
+# metrics from the admin socket by default, and turning that on to get them
+# would give anything inside the network a way to reconfigure the proxy. The
+# `metrics` directive exposes the same series as an ordinary handler, so this
+# costs a route instead of an attack surface.
+#
+# Port 2019 is not published in compose, so this is reachable from the
+# compose network and from nowhere else. An instance running without the
+# observability profile has this listener up and nothing scraping it, which
+# costs one idle socket.
+#
+# This is the only place HTTP request count, status class and duration are
+# measured. `apps/web/proxy.ts` cannot do it: it is synchronous and returns
+# before the handler that produces the status and the duration has run.
+:2019 {
+	metrics /metrics
+}

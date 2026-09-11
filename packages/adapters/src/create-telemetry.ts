@@ -17,13 +17,15 @@ export interface TelemetryConfig extends OtelTelemetryOptions {
 
 /**
  * Resolves the Telemetry port, the way every other port is resolved
- * (P7-T06a).
+ * (P7-T06a, tracing added at P7-T06c).
  *
- * There is no third driver and no address here on purpose. Exporting
- * measurements off the host is `observability.otlp.endpoint`, which arrives
- * with the traces at P7-T06c and is empty by default. Until then this
- * product cannot send a measurement anywhere, which is a property worth
- * being able to state plainly rather than a configuration nobody checked.
+ * Two switches, and they are separate because they mean different things.
+ * `enabled` decides whether this instance measures itself at all, and it
+ * defaults to on because the exposition is local. `otlpEndpoint` decides
+ * whether anything leaves the host, and it defaults to empty: with no
+ * address, no exporter is constructed, no socket is opened, and `span` is a
+ * plain function call. That is the whole of the "zero external calls"
+ * claim, and it is one branch rather than a policy anybody has to trust.
  */
 export function createTelemetry(config: TelemetryConfig = {}): Telemetry {
   if (config.enabled === false) {

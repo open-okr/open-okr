@@ -371,3 +371,178 @@ describe("the duplicated series names agree across the package boundary", () => 
     }
   });
 });
+
+describe("tracing is off unless there is somewhere to send spans", () => {
+  it("runs the function and builds no tracer when no endpoint is given", async () => {
+    const telemetry = new OtelTelemetry();
+    let ran = false;
+    const result = await telemetry.span(
+      "action goals.read",
+      { a: "b" },
+      async () => {
+        ran = true;
+        return 42;
+      },
+    );
+
+    expect(ran).toBe(true);
+    expect(result).toBe(42);
+    await telemetry.stop();
+  });
+
+  it("propagates the error rather than swallowing it", async () => {
+    const telemetry = new OtelTelemetry({
+      otlpEndpoint: "http://127.0.0.1:1/v1/traces",
+    });
+    await expect(
+      telemetry.span("action goals.create", {}, async () => {
+        throw new Error("a goal needs a title");
+      }),
+    ).rejects.toThrow("a goal needs a title");
+    await telemetry.stop();
+  });
+
+  it("returns the value through the span when tracing is on", async () => {
+    // The address is unreachable on purpose. A span that cannot be exported
+    // must not change what the traced code returns, because tracing is
+    // decoration over work that happens regardless.
+    const telemetry = new OtelTelemetry({
+      otlpEndpoint: "http://127.0.0.1:1/v1/traces",
+    });
+    await expect(
+      telemetry.span(
+        "action goals.read",
+        { action: "goals.read" },
+        async () => "ok",
+      ),
+    ).resolves.toBe("ok");
+    await telemetry.stop();
+  });
+});
+
+/**
+ * The operator guide makes four claims about what leaves the host. Each one
+ * is checked against the code here, because a runbook that has quietly
+ * stopped being true is worse than no runbook: an operator reads it, decides
+ * the instance is quiet, and stops looking.
+ */
+describe("the operator guide agrees with the code", () => {
+  const GUIDE = join(REPO_ROOT, "docs/runbooks/observability.md");
+
+  it("names every series the code records, and no series it does not", async () => {
+    const guide = await readFile(GUIDE, "utf8");
+    const coreSource = await readFile(
+      join(REPO_ROOT, "packages/core/src/telemetry/recorder.ts"),
+      "utf8",
+    );
+
+    const recorded = new Set(
+      [...coreSource.matchAll(/"(openokr_[a-z0-9_]+)"/g)].map(
+        (match) => match[1] as string,
+      ),
+    );
+    const documented = new Set(
+      [...guide.matchAll(/`(openokr_[a-z0-9_]+)`/g)].map(
+        (match) => match[1] as string,
+      ),
+    );
+
+    expect(recorded.size).toBeGreaterThanOrEqual(14);
+    for (const name of recorded) {
+      expect(
+        documented.has(name),
+        `${name} is recorded and is not in docs/runbooks/observability.md. ` +
+          "An operator reading that page would not know it exists.",
+      ).toBe(true);
+    }
+    for (const name of documented) {
+      expect(
+        recorded.has(name),
+        `${name} is documented and nothing records it. The page promises a ` +
+          "series that will never appear on a dashboard.",
+      ).toBe(true);
+    }
+  });
+
+  it("is right that the default build opens no exporter", async () => {
+    const guide = await readFile(GUIDE, "utf8");
+    expect(guide).toContain("no tracer provider is constructed");
+
+    // The claim, tested: a driver built with no endpoint has no tracer, so
+    // `span` cannot be doing anything but calling the function.
+    const telemetry = new OtelTelemetry();
+    const order: string[] = [];
+    await telemetry.span("probe", {}, async () => {
+      order.push("inside");
+    });
+    expect(order).toEqual(["inside"]);
+    await telemetry.stop();
+  });
+
+  it("is right that the two queue readings are taken at scrape time", async () => {
+    const guide = await readFile(GUIDE, "utf8");
+    expect(guide).toContain("queried when you read the endpoint");
+
+    const telemetry = new OtelTelemetry();
+    let reads = 0;
+    telemetry.gauge("openokr_outbox_pending", () => {
+      reads += 1;
+      return reads;
+    });
+
+    expect(reads).toBe(0);
+    await telemetry.scrape();
+    await telemetry.scrape();
+    expect(reads).toBe(2);
+    await telemetry.stop();
+  });
+
+  it("is right that the observability profile is off by default", async () => {
+    const compose = await readFile(
+      join(REPO_ROOT, "deploy/docker/compose.yaml"),
+      "utf8",
+    );
+    const guide = await readFile(GUIDE, "utf8");
+    expect(guide).toContain("Off unless asked for");
+
+    // Every service the profile adds must declare the profile. A service
+    // without one starts on a plain `up`, which is exactly the promise this
+    // page makes and the reason the default deployment is three services.
+    for (const service of ["prometheus:", "grafana:"]) {
+      const at = compose.indexOf(`\n  ${service}`);
+      expect(at, `${service} is missing from compose.yaml`).toBeGreaterThan(0);
+      const block = compose.slice(at, at + 600);
+      expect(
+        block.includes('profiles: ["observability"]'),
+        `${service} does not declare the observability profile, so it would ` +
+          "start on a plain `docker compose up`.",
+      ).toBe(true);
+    }
+  });
+
+  it("is right that the stack itself phones nobody", async () => {
+    const compose = await readFile(
+      join(REPO_ROOT, "deploy/docker/compose.yaml"),
+      "utf8",
+    );
+    // Grafana checks for updates and reports usage unless told not to, and
+    // this stack exists to prove an instance can watch itself without
+    // talking to anyone.
+    for (const off of [
+      "GF_ANALYTICS_REPORTING_ENABLED",
+      "GF_ANALYTICS_CHECK_FOR_UPDATES",
+      "GF_NEWS_NEWS_FEED_ENABLED",
+    ]) {
+      expect(compose).toContain(`${off}: "false"`);
+    }
+    // No remote write. Prometheus that forwards is Prometheus that leaves.
+    const prometheus = await readFile(
+      join(REPO_ROOT, "deploy/docker/observability/prometheus.yml"),
+      "utf8",
+    );
+    // The YAML key, not the word: the file explains in a comment that it
+    // has no remote write, and a substring match would fail on its own
+    // explanation.
+    expect(prometheus).not.toMatch(/^s*remote_write:/m);
+  });
+});

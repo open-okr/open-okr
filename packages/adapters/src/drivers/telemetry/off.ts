@@ -37,6 +37,17 @@ export class OffTelemetry implements Telemetry {
     // not measuring itself must not pay for one.
   }
 
+  span<T>(
+    _name: string,
+    _attributes: MetricLabels,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    // The function, unwrapped. Not `await fn()` inside a try: that would add
+    // a microtask and a stack frame to every action on an instance that
+    // asked for none of this.
+    return fn();
+  }
+
   scrape(): Promise<string> {
     return Promise.resolve(
       "# observability.metrics is off on this instance. Nothing is recorded.\n",

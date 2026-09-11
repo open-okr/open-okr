@@ -3,13 +3,20 @@ import type {
   Histogram,
   Meter,
   ObservableGauge,
+  Tracer,
 } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
 import {
   PrometheusExporter,
   PrometheusSerializer,
 } from "@opentelemetry/exporter-prometheus";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { MeterProvider } from "@opentelemetry/sdk-metrics";
+import {
+  BatchSpanProcessor,
+  NodeTracerProvider,
+} from "@opentelemetry/sdk-trace-node";
 
 import type { MetricLabels, Telemetry } from "../../ports/telemetry.ts";
 
@@ -84,6 +91,16 @@ export interface OtelTelemetryOptions {
    * correct for a single-process install and is the common case.
    */
   readonly instanceId?: string;
+  /**
+   * Where to send spans, from `observability.otlp.endpoint` (P7-T06c).
+   *
+   * **Empty or absent means no tracer is built at all**, and that is the
+   * default. This is the only value in the whole product that can make a
+   * measurement leave the host, so it is worth being able to say plainly:
+   * with nothing here, no exporter object exists, no socket is opened, and
+   * `span` is a function call.
+   */
+  readonly otlpEndpoint?: string;
 }
 
 /**
@@ -136,22 +153,54 @@ export class OtelTelemetry implements Telemetry {
     string,
     { read: () => number | Promise<number>; labels?: MetricLabels }
   >();
+  readonly #resource: ReturnType<typeof resourceFromAttributes>;
+  readonly #tracerProvider: NodeTracerProvider | undefined;
+  readonly #tracer: Tracer | undefined;
   #stopped = false;
 
   constructor(options: OtelTelemetryOptions = {}) {
+    this.#resource = resourceFromAttributes({
+      "service.name": options.serviceName ?? "openokr",
+      ...(options.instanceId
+        ? { "service.instance.id": options.instanceId }
+        : {}),
+    });
     // `preventServerStart` is the whole reason this driver is shaped the way
     // it is. See the class note.
     this.#reader = new PrometheusExporter({ preventServerStart: true });
     this.#provider = new MeterProvider({
       readers: [this.#reader],
-      resource: resourceFromAttributes({
-        "service.name": options.serviceName ?? "openokr",
-        ...(options.instanceId
-          ? { "service.instance.id": options.instanceId }
-          : {}),
-      }),
+      resource: this.#resource,
     });
     this.#meter = this.#provider.getMeter("openokr");
+
+    // **Built only when there is somewhere to send spans.** An exporter with
+    // no address is an exporter that batches into memory and drops, which
+    // costs allocation on every action for nothing. With no endpoint there
+    // is no provider, no exporter and no socket, and `span` below is one
+    // function call. That is the property the acceptance criterion turns on.
+    if (options.otlpEndpoint) {
+      this.#tracerProvider = new NodeTracerProvider({
+        resource: this.#resource,
+        spanProcessors: [
+          new BatchSpanProcessor(
+            // **Five seconds, not the SDK's thirty.** A collector that is
+            // down should cost a process five seconds on the way out, not
+            // half a minute: `stop` waits for this flush, and a container
+            // orchestrator that sends SIGTERM and waits ten seconds would
+            // kill the process mid-wait and lose the spans anyway. Spans are
+            // the most disposable thing this product produces and must never
+            // be what keeps it from exiting.
+            new OTLPTraceExporter({
+              url: options.otlpEndpoint,
+              timeoutMillis: 5_000,
+            }),
+            { exportTimeoutMillis: 5_000 },
+          ),
+        ],
+      });
+      this.#tracer = this.#tracerProvider.getTracer("openokr");
+    }
   }
 
   count(name: string, labels?: MetricLabels, by = 1): void {
@@ -206,6 +255,39 @@ export class OtelTelemetry implements Telemetry {
     this.#gauges.set(name, instrument);
   }
 
+  span<T>(
+    name: string,
+    attributes: MetricLabels,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const tracer = this.#tracer;
+    if (!tracer || this.#stopped) {
+      // No endpoint configured, so nothing is tracing. The function, not a
+      // wrapper around it.
+      return fn();
+    }
+    return tracer.startActiveSpan(name, { attributes }, async (active) => {
+      try {
+        const result = await fn();
+        active.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        // **The type, never the message.** An error message from this
+        // product can name a goal, quote a member's input or echo a
+        // provider's body, and a span leaves the host. The class name says
+        // which failure it was, which is what a trace is for, and the
+        // message stays in the log where access control applies.
+        active.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.name : "unknown",
+        });
+        throw error;
+      } finally {
+        active.end();
+      }
+    });
+  }
+
   async scrape(): Promise<string> {
     if (this.#stopped) {
       return "# the meter has been stopped\n";
@@ -219,6 +301,23 @@ export class OtelTelemetry implements Telemetry {
       return;
     }
     this.#stopped = true;
+    // The tracer first, so a batch already collected is flushed before the
+    // process stops rather than dropped with it.
+    //
+    // **The flush may fail and must not fail the shutdown.** A collector
+    // that is down, or an address an operator mistyped, makes this reject
+    // with a connection error. Letting that escape would mean an unreachable
+    // tracing endpoint could take down a process that was only trying to
+    // exit, which is an observability feature turned into an availability
+    // risk. The spans are lost either way; the difference is whether
+    // anything else is.
+    await this.#tracerProvider?.shutdown().catch((error: unknown) => {
+      process.stderr.write(
+        `telemetry: could not flush spans on shutdown: ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
+      );
+    });
     await this.#provider.shutdown();
   }
 

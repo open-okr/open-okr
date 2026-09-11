@@ -50,6 +50,26 @@ export interface MetricRecorder {
     read: () => number | Promise<number>,
     labels?: MetricLabels,
   ): void;
+  /**
+   * Runs `fn` inside a span, and returns whatever `fn` returns.
+   *
+   * A wrapper rather than a start/end pair, because a span ended by hand is
+   * a span somebody forgets to end on the error path, and the error path is
+   * the one worth tracing.
+   *
+   * Off unless an export address is configured, and off means this calls
+   * `fn` and nothing else. Treat a span as decoration over work that happens
+   * regardless: nothing may depend on one existing.
+   *
+   * `attributes` is bounded the way labels are, and for a sharper reason: a
+   * span leaves the host. Never a title, a body, an address, or anything a
+   * person typed.
+   */
+  span<T>(
+    name: string,
+    attributes: MetricLabels,
+    fn: () => Promise<T>,
+  ): Promise<T>;
 }
 
 /**
@@ -70,6 +90,15 @@ export const NO_METRICS: MetricRecorder = Object.freeze({
     // Deliberately empty, and the reader is never called: a gauge's reader
     // is a query, and an instance that is not measuring itself must not run
     // one on every scrape it does not serve.
+  },
+  span<T>(
+    _name: string,
+    _attributes: MetricLabels,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    // Not even a wrapper. The function is returned as it is, so an
+    // untraced instance runs exactly the code it ran before spans existed.
+    return fn();
   },
 });
 

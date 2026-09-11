@@ -58,8 +58,24 @@ export function getTelemetry(): Telemetry {
     ...(process.env.APP_BUILD_ID
       ? { instanceId: process.env.APP_BUILD_ID }
       : {}),
+    ...(otlpEndpoint() ? { otlpEndpoint: otlpEndpoint() } : {}),
   });
   return globals.openokrTelemetry;
+}
+
+/**
+ * Where spans go, from `observability.otlp.endpoint`.
+ *
+ * Read from the environment at boot for the same reason `metricsEnabled` is,
+ * and with the same narrowing of TECHNICAL-PLAN §4.14's stored-wins rule: the
+ * tracer is built before the first request and therefore before any query.
+ *
+ * **Empty is the default and empty means nothing leaves.** A blank string
+ * and an unset variable are the same answer here, which matters because a
+ * Compose file that interpolates an unset variable produces the blank one.
+ */
+function otlpEndpoint(): string {
+  return (process.env.OPENOKR_OTLP_ENDPOINT ?? "").trim();
 }
 
 /** True when this instance is measuring itself. Used by the route to refuse. */

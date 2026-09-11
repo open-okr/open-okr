@@ -59,6 +59,27 @@ export interface MetricRecorder {
     read: () => number | Promise<number>,
     labels?: MetricLabels,
   ): void;
+  /**
+   * Runs `fn` inside a span, and returns whatever `fn` returns.
+   *
+   * **A wrapper rather than start/end pair, deliberately.** A span that has
+   * to be ended by hand is a span somebody forgets to end on the error path,
+   * and the error path is the one worth tracing. This shape cannot leak one.
+   *
+   * Tracing is off unless `observability.otlp.endpoint` names somewhere to
+   * send spans, and off means this calls `fn` and nothing else: no provider,
+   * no context, no allocation. Every caller must therefore treat a span as
+   * decoration over work that happens regardless.
+   *
+   * `attributes` is bounded the same way labels are, and for a sharper
+   * reason: a span leaves the host. Never put a title, a body, an address or
+   * anything a person typed in here.
+   */
+  span<T>(
+    name: string,
+    attributes: MetricLabels,
+    fn: () => Promise<T>,
+  ): Promise<T>;
 }
 
 export interface Telemetry extends MetricRecorder {

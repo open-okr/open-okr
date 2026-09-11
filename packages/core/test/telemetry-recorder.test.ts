@@ -33,6 +33,9 @@ function spyRecorder() {
       // query behind them, and `adapters/test/telemetry.test.ts` proves the
       // reader runs at scrape time.
     },
+    span<T>(_name: string, _attributes: MetricLabels, fn: () => Promise<T>) {
+      return fn();
+    },
   };
 }
 

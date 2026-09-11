@@ -1,0 +1,13 @@
+# Grafana finds its data source without anybody clicking through a setup
+# screen (P7-T06c). `isDefault` matters: the dashboards below reference the
+# default source rather than a UID, so an operator who replaces Prometheus
+# with something compatible does not have to edit every panel.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
