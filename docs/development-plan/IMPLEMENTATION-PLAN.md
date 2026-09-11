@@ -2198,14 +2198,35 @@ close it, and retention comes last because it is the only part that deletes
 on a clock and so is the only part where a wrong default destroys data
 nobody asked it to.
 
-### P7-T09: Release engineering and the upgrade contract [L]
+### P7-T09a: The expand-then-contract rule, in the linter [S]
 Depends on: P7-T03
-Goal: a release is produced by a pipeline, and an instance any supported distance behind reaches it without losing data, per PLAN.md §5.1.
-Deliverables: changesets wired into the repository, producing the version, changelog and release notes on tag, and failing the build for a release with no changeset; a software bill of materials produced per release and attached to it; image signing moved from P1-T10's tag step into the same pipeline, so one job owns the whole artifact set; the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure; the PLAN.md §5.1 expand-then-contract rule added to the migration linter, so a migration that drops or renames a column names the earlier release that added its replacement.
-Test plan: the upgrade matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring the dump with the previous image returns the instance to its prior state; the linter rejects a same-release drop and accepts a two-release one; a release with no changeset fails the build.
-Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it to the current release, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
+Goal: a migration that drops what the previous release still reads fails the build instead of a rollout.
+Deliverables: PLAN.md §5.1's removal rule added to the migration linter, refusing any `drop column` or `rename column` that does not carry an `openokr:replaces` marker naming where the replacement shipped; constraints and indexes left alone, because neither is read by name by the previous release.
+Test plan: a drop, a rename and a `drop column if exists` are each refused; a marker with a reason is accepted and a marker without one is not; a constraint drop and an index drop pass; the marker is found when the drop sits on its own line inside a multi-line `alter table`, which is the form the first implementation missed.
+Acceptance: Given a migration dropping a column with no marker, when `pnpm db:lint` runs, then it fails naming the column and the rule.
 
----
+### P7-T09b: Changesets, the version, and the artifact set [M]
+Depends on: P7-T09a
+Goal: one job owns everything a release produces.
+Deliverables: changesets wired in, producing the version, changelog and release notes on tag and failing the build for a release with no changeset; a software bill of materials per release, attached to it; image signing moved from P1-T10's tag step into the same pipeline, so the image, the signature and the bill of materials are one artifact set rather than three steps that can disagree.
+Test plan: a release with no changeset fails; the bill of materials names every runtime dependency the lockfile does; the signature verifies against the published image.
+Acceptance: Given a tag, when the pipeline finishes, then a version, a changelog, release notes, a signed image and a bill of materials exist and agree with each other.
+
+### P7-T09c: The upgrade matrix, and the backup that makes rollback real [L]
+Depends on: P7-T09b
+Goal: an instance any supported distance behind reaches the current release without losing data, and can go back.
+Deliverables: the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure.
+Test plan: the matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring it with the previous image returns the instance to its prior state.
+Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
+
+**Why P7-T09 was split, and why the order is this one.** The single [L] card
+carried the changeset wiring, a bill of materials, image signing, a
+two-target upgrade matrix, a backup-and-restore path in the lifecycle helper,
+the rollback documentation and a linter rule. The linter rule comes first and
+alone because it is the only part that needs neither Docker nor a cluster and
+so is the only part a developer can prove on the machine they are sitting at,
+and because the upgrade matrix's own first test is a migration the linter
+should already have refused. Cut 11 September 2026.
 
 # Phase 8: Cloud, enterprise and launch
 
