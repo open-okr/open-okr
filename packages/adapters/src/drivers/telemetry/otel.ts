@@ -1,4 +1,9 @@
-import type { Counter, Histogram, Meter } from "@opentelemetry/api";
+import type {
+  Counter,
+  Histogram,
+  Meter,
+  ObservableGauge,
+} from "@opentelemetry/api";
 import {
   PrometheusExporter,
   PrometheusSerializer,
@@ -46,6 +51,25 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
     "Wall time of one Operation's transaction.",
   openokr_authorisation_total:
     "Authorisation decisions, by action, the level it required and the outcome.",
+  openokr_outbox_dispatched_total:
+    "Outbox rows dispatched, by topic and outcome.",
+  openokr_outbox_pending: "Outbox rows waiting to be delivered.",
+  openokr_outbox_oldest_pending_seconds:
+    "Age of the oldest outbox row still waiting. Grows while the relay is stopped.",
+  openokr_outbox_dead_lettered_total:
+    "Outbox rows given up on after the attempt ceiling, by topic.",
+  openokr_job_runs_total: "Scheduled runs finished, by job name and outcome.",
+  openokr_job_duration_seconds: "Wall time of one scheduled run.",
+  openokr_nudges_total:
+    "Nudges resolved, by rule and whether they were sent or why they were suppressed.",
+  openokr_channel_deliveries_total:
+    "Channel messages attempted, by provider and outcome. Never carries message content.",
+  openokr_realtime_events_total: "Realtime events published, by topic.",
+  openokr_agent_runs_total: "Agent runs finished, by agent and outcome.",
+  openokr_agent_run_duration_seconds: "Wall time of one agent run.",
+  openokr_ai_tokens_total: "Tokens spent, by provider, model and direction.",
+  openokr_ai_cost_total:
+    "Money spent on AI, by provider and model, in the smallest currency unit.",
 };
 
 function descriptionFor(name: string): string {
@@ -83,9 +107,35 @@ export class OtelTelemetry implements Telemetry {
   readonly #provider: MeterProvider;
   readonly #reader: PrometheusExporter;
   readonly #meter: Meter;
-  readonly #serializer = new PrometheusSerializer();
+  /**
+   * The scope label is switched off.
+   *
+   * The serializer stamps `otel_scope_name` on every series. That earns its
+   * place in a process with several instrumentation libraries reporting
+   * through one meter; this product has exactly one scope, so the label is
+   * the same value on every line of every scrape. It costs bytes on each
+   * read and it has to be typed into or ignored by every query an operator
+   * writes.
+   *
+   * Positional because the constructor takes no options object:
+   * (prefix, appendTimestamp, withResourceConstantLabels, withoutTargetInfo,
+   * withoutScopeInfo). `target_info` is kept, because it carries the service
+   * name and is one line rather than one per series.
+   */
+  readonly #serializer = new PrometheusSerializer(
+    undefined,
+    false,
+    undefined,
+    false,
+    true,
+  );
   readonly #counters = new Map<string, Counter>();
   readonly #histograms = new Map<string, Histogram>();
+  readonly #gauges = new Map<string, ObservableGauge>();
+  readonly #gaugeReaders = new Map<
+    string,
+    { read: () => number | Promise<number>; labels?: MetricLabels }
+  >();
   #stopped = false;
 
   constructor(options: OtelTelemetryOptions = {}) {
@@ -116,6 +166,44 @@ export class OtelTelemetry implements Telemetry {
       return;
     }
     this.#histogram(name).record(seconds, labels);
+  }
+
+  gauge(
+    name: string,
+    read: () => number | Promise<number>,
+    labels?: MetricLabels,
+  ): void {
+    if (this.#stopped) {
+      return;
+    }
+    // The reader is replaced rather than added, and the instrument is created
+    // once. Registering a second callback on the same instrument would make
+    // the series report both values on every scrape, which reads as a
+    // flapping gauge rather than as the duplicate registration it is.
+    this.#gaugeReaders.set(name, { read, labels });
+    if (this.#gauges.has(name)) {
+      return;
+    }
+
+    const instrument = this.#meter.createObservableGauge(name, {
+      description: descriptionFor(name),
+      ...(name.endsWith("_seconds") ? { unit: "s" } : {}),
+    });
+    instrument.addCallback(async (result) => {
+      const registered = this.#gaugeReaders.get(name);
+      if (!registered) {
+        return;
+      }
+      try {
+        result.observe(await registered.read(), registered.labels);
+      } catch {
+        // A gauge whose reader throws reports nothing for that scrape rather
+        // than failing the whole collection. One unreadable series must not
+        // take the exposition down with it, and the gap is visible on the
+        // chart, which is the honest signal.
+      }
+    });
+    this.#gauges.set(name, instrument);
   }
 
   async scrape(): Promise<string> {

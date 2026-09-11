@@ -21,6 +21,8 @@
  * gets it from the data it receives, never from arrival order.
  */
 
+import type { MetricLabels, MetricRecorder } from "./ports/telemetry.ts";
+
 /**
  * Thrown by a dispatcher when retrying cannot possibly help (P5-T01a).
  *
@@ -84,7 +86,32 @@ export interface OutboxRelayOptions {
   readonly onError?: (error: unknown) => void;
   /** Called the moment a row is dead-lettered, so it is surfaced somewhere rather than only sitting in the table. */
   readonly onDeadLetter?: (record: OutboxRecord, error: unknown) => void;
+  /**
+   * Where to record what the relay did, when the host is measuring itself
+   * (P7-T06b).
+   *
+   * Absent is a relay that delivers exactly as it always did. Passing one
+   * also registers the two queue gauges, which are read on every scrape
+   * rather than written on every drain, because the number an operator
+   * needs is how far behind the queue is *now* and a stopped relay writes
+   * nothing at all.
+   */
+  readonly metrics?: MetricRecorder;
 }
+
+/**
+ * The series this file records.
+ *
+ * Spelled out here rather than imported from `packages/core`'s `METRIC`,
+ * because this package sits below that one and may not reach it. The same
+ * trade `MetricRecorder` makes two files up, and `telemetry.test.ts` asserts
+ * the two lists still agree so a rename in one cannot quietly split a
+ * dashboard in two.
+ */
+const OUTBOX_DISPATCHED = "openokr_outbox_dispatched_total";
+const OUTBOX_DEAD_LETTERED = "openokr_outbox_dead_lettered_total";
+const OUTBOX_PENDING = "openokr_outbox_pending";
+const OUTBOX_OLDEST_PENDING_SECONDS = "openokr_outbox_oldest_pending_seconds";
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -103,9 +130,9 @@ export interface DeadLetteredOutboxRecord extends OutboxRecord {
 export class OutboxRelay {
   readonly #pool: RelayPool;
   readonly #options: Required<
-    Omit<OutboxRelayOptions, "onError" | "onDeadLetter">
+    Omit<OutboxRelayOptions, "onError" | "onDeadLetter" | "metrics">
   > &
-    Pick<OutboxRelayOptions, "onError" | "onDeadLetter">;
+    Pick<OutboxRelayOptions, "onError" | "onDeadLetter" | "metrics">;
   #timer: NodeJS.Timeout | undefined;
   #running = false;
   #draining: Promise<number> | undefined;
@@ -121,7 +148,66 @@ export class OutboxRelay {
       maxAttempts: options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       onError: options.onError,
       onDeadLetter: options.onDeadLetter,
+      metrics: options.metrics,
     };
+
+    // **Registered here, not in the drain loop, and read at scrape time.**
+    // This is what makes a stopped relay legible. Counters written during a
+    // drain say nothing once draining stops, so the series goes flat at
+    // whatever it last reported and the outage looks like quiet. These two
+    // are queries against the world as it is when somebody asks, so a relay
+    // that died an hour ago reports an hour of lag.
+    options.metrics?.gauge(OUTBOX_PENDING, () => this.#pendingCount());
+    options.metrics?.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
+      this.#oldestPendingSeconds(),
+    );
+  }
+
+  /** Rows waiting: not delivered, not given up on, and due. */
+  async #pendingCount(): Promise<number> {
+    const client = await this.#pool.connect();
+    try {
+      const result = await client.query(
+        `select count(*)::bigint as pending
+           from outbox
+          where delivered_at is null
+            and dead_lettered_at is null`,
+      );
+      return Number(result.rows[0]?.pending ?? 0);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Age of the oldest waiting row, in seconds. Zero when nothing waits.
+   *
+   * Measured from `created_at`, the moment the write committed the row, and
+   * deliberately not from `available_at`. A row being backed off has
+   * `available_at` in the future, and measuring from that would report a
+   * *negative* lag for exactly the rows that are struggling, which is the
+   * opposite of the signal. What an operator needs is how long the oldest
+   * piece of undelivered work has been undelivered.
+   */
+  async #oldestPendingSeconds(): Promise<number> {
+    const client = await this.#pool.connect();
+    try {
+      const result = await client.query(
+        `select coalesce(
+                  extract(epoch from (now() - min(created_at))), 0
+                )::double precision as lag
+           from outbox
+          where delivered_at is null
+            and dead_lettered_at is null`,
+      );
+      return Math.max(0, Number(result.rows[0]?.lag ?? 0));
+    } finally {
+      client.release();
+    }
+  }
+
+  #count(name: string, labels: MetricLabels): void {
+    this.#options.metrics?.count(name, labels);
   }
 
   /**
@@ -166,8 +252,20 @@ export class OutboxRelay {
         await this.#options.dispatch(record);
         await this.#markDelivered(record.id);
         delivered++;
+        this.#count(OUTBOX_DISPATCHED, { topic: record.topic, outcome: "ok" });
       } catch (error) {
-        await this.#markFailed(record, error);
+        const deadLettered = await this.#markFailed(record, error);
+        // Counted apart because they mean different things to whoever is
+        // watching. A failure is a provider having a bad minute and the row
+        // will be tried again. A dead letter is work this instance has given
+        // up on, and somebody has to look at it.
+        this.#count(OUTBOX_DISPATCHED, {
+          topic: record.topic,
+          outcome: deadLettered ? "dead_lettered" : "failed",
+        });
+        if (deadLettered) {
+          this.#count(OUTBOX_DEAD_LETTERED, { topic: record.topic });
+        }
       }
     }
 
@@ -295,7 +393,7 @@ export class OutboxRelay {
    * A `PermanentDispatchError` skips the ceiling and dead-letters on the first
    * attempt, because the dispatcher has said retrying cannot help (P5-T01a).
    */
-  async #markFailed(record: OutboxRecord, error: unknown): Promise<void> {
+  async #markFailed(record: OutboxRecord, error: unknown): Promise<boolean> {
     const message = error instanceof Error ? error.message : String(error);
     // Truncated: the text is diagnostic, and a driver can return a very
     // large body.
@@ -312,7 +410,7 @@ export class OutboxRelay {
           [record.id, truncated],
         );
         this.#options.onDeadLetter?.(record, error);
-        return;
+        return true;
       }
 
       const backoff = this.#options.backoffSeconds(record.attempts);
@@ -323,6 +421,7 @@ export class OutboxRelay {
           where id = $1`,
         [record.id, truncated, backoff],
       );
+      return false;
     } finally {
       client.release();
     }

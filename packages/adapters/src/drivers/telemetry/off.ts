@@ -27,6 +27,16 @@ export class OffTelemetry implements Telemetry {
     // Deliberately empty.
   }
 
+  gauge(
+    _name: string,
+    _read: () => number | Promise<number>,
+    _labels?: MetricLabels,
+  ): void {
+    // Deliberately empty, and the reader is never called. A gauge's reader
+    // is a database query on this product's hot paths; an instance that is
+    // not measuring itself must not pay for one.
+  }
+
   scrape(): Promise<string> {
     return Promise.resolve(
       "# observability.metrics is off on this instance. Nothing is recorded.\n",

@@ -41,7 +41,12 @@ import {
   registerAgentSchedules,
 } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
-import { callAction, chainWorkspace } from "@openokr/core";
+import {
+  callAction,
+  chainWorkspace,
+  defaultMetrics,
+  METRIC,
+} from "@openokr/core";
 import { drafterFor } from "./drafter";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -251,6 +256,8 @@ export async function runScheduledJob(
   deps: SchedulerDeps,
 ): Promise<JobOutcome> {
   const now = deps.now();
+  const metrics = defaultMetrics();
+  const startedAt = performance.now();
   let ran = 0;
   let skipped = 0;
   let failed = 0;
@@ -271,6 +278,31 @@ export async function runScheduledJob(
       deps.onWorkspaceError?.(run, workspace, error);
     }
   }
+
+  // **Per workspace, not per job** (P7-T06b). A job that succeeds in
+  // twenty-nine workspaces and fails in the thirtieth is the shape this
+  // product actually produces, and a single per-job outcome would report it
+  // as either a clean run or a failed one, both of which are lies. The
+  // workspace is not a label for the reason no unbounded value is: the
+  // counts are what an operator needs, the identity is not.
+  metrics.count(METRIC.jobRunsTotal, { job: run.job, outcome: "ok" }, ran);
+  if (skipped > 0) {
+    metrics.count(
+      METRIC.jobRunsTotal,
+      { job: run.job, outcome: "skipped" },
+      skipped,
+    );
+  }
+  if (failed > 0) {
+    metrics.count(
+      METRIC.jobRunsTotal,
+      { job: run.job, outcome: "error" },
+      failed,
+    );
+  }
+  metrics.observe(METRIC.jobDuration, (performance.now() - startedAt) / 1000, {
+    job: run.job,
+  });
 
   return { ran, skipped, failed };
 }

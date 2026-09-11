@@ -35,6 +35,21 @@ export interface MetricRecorder {
   count(name: string, labels?: MetricLabels, by?: number): void;
   /** Records one observation into a histogram, in seconds. */
   observe(name: string, seconds: number, labels?: MetricLabels): void;
+  /**
+   * Registers a value read at scrape time rather than written at event time.
+   *
+   * The only shape that can answer a question about the world right now,
+   * such as how far behind the outbox is: a counter written during a drain
+   * says nothing at all once the relay stops, and the series goes flat
+   * instead of showing the lag growing. `read` runs on every scrape, so keep
+   * it to one cheap query. Registering the same name twice replaces the
+   * reader.
+   */
+  gauge(
+    name: string,
+    read: () => number | Promise<number>,
+    labels?: MetricLabels,
+  ): void;
 }
 
 /**
@@ -50,6 +65,11 @@ export const NO_METRICS: MetricRecorder = Object.freeze({
   },
   observe(): void {
     // Deliberately empty.
+  },
+  gauge(): void {
+    // Deliberately empty, and the reader is never called: a gauge's reader
+    // is a query, and an instance that is not measuring itself must not run
+    // one on every scrape it does not serve.
   },
 });
 
@@ -117,6 +137,51 @@ export const METRIC = {
   operationDuration: "openokr_operation_duration_seconds",
   /** Authorisation decisions, by action, required level and outcome. */
   authorisationTotal: "openokr_authorisation_total",
+
+  // The asynchronous surfaces (P7-T06b). Everything below happens after a
+  // request has returned, or because a clock said so, which is exactly why
+  // it needs measuring: nobody is watching a screen when it goes wrong.
+
+  /** Outbox rows dispatched, by topic and outcome. */
+  outboxDispatchedTotal: "openokr_outbox_dispatched_total",
+  /** Rows waiting to be delivered. Read at scrape time. */
+  outboxPending: "openokr_outbox_pending",
+  /**
+   * Age of the oldest row still waiting, in seconds. Read at scrape time,
+   * which is the whole point: a relay that has stopped must report a lag
+   * that grows rather than a counter that went quiet.
+   */
+  outboxOldestPendingSeconds: "openokr_outbox_oldest_pending_seconds",
+  /** Rows given up on, by topic. */
+  outboxDeadLetteredTotal: "openokr_outbox_dead_lettered_total",
+
+  /** Scheduled runs, by job name and outcome. */
+  jobRunsTotal: "openokr_job_runs_total",
+  /** Wall time of one scheduled run. */
+  jobDuration: "openokr_job_duration_seconds",
+
+  /** Nudges resolved, by rule and what happened: sent, or why suppressed. */
+  nudgesTotal: "openokr_nudges_total",
+
+  /** Channel messages attempted, by provider and outcome. */
+  channelDeliveriesTotal: "openokr_channel_deliveries_total",
+
+  /** Realtime events published, by topic. */
+  realtimeEventsTotal: "openokr_realtime_events_total",
+
+  /** Agent runs finished, by agent and outcome. */
+  agentRunsTotal: "openokr_agent_runs_total",
+  /** Wall time of one agent run. */
+  agentRunDuration: "openokr_agent_run_duration_seconds",
+
+  /** Tokens spent, by provider, model and whether they were in or out. */
+  aiTokensTotal: "openokr_ai_tokens_total",
+  /**
+   * Money spent, by provider and model, in the smallest currency unit the
+   * usage row records. A float here would drift; the usage table already
+   * stores an integer and this passes it through unchanged.
+   */
+  aiCostTotal: "openokr_ai_cost_total",
 } as const;
 
 /**

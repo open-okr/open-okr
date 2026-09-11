@@ -39,6 +39,26 @@ export interface MetricRecorder {
   count(name: string, labels?: MetricLabels, by?: number): void;
   /** Records one observation into a histogram, in seconds. */
   observe(name: string, seconds: number, labels?: MetricLabels): void;
+  /**
+   * Registers a value that is read at scrape time rather than written at
+   * event time.
+   *
+   * **This is the only shape that can answer "how far behind is the
+   * outbox".** A counter or a histogram is written when something happens,
+   * so a relay that has stopped writes nothing and the series goes flat at
+   * whatever it last said. Queue depth and queue age are properties of the
+   * world at the moment somebody asks, and a relay that has stopped must
+   * report a lag that grows. `read` is called on every scrape, so keep it to
+   * one cheap query.
+   *
+   * Registering the same name twice replaces the reader, so a caller that
+   * re-registers after a restart does not accumulate them.
+   */
+  gauge(
+    name: string,
+    read: () => number | Promise<number>,
+    labels?: MetricLabels,
+  ): void;
 }
 
 export interface Telemetry extends MetricRecorder {

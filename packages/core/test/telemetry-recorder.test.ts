@@ -28,6 +28,11 @@ function spyRecorder() {
     observe(name: string, seconds: number, labels?: MetricLabels) {
       observations.push({ name, labels, value: seconds });
     },
+    gauge() {
+      // Not exercised here. The gauges belong to the relay, which owns the
+      // query behind them, and `adapters/test/telemetry.test.ts` proves the
+      // reader runs at scrape time.
+    },
   };
 }
 
