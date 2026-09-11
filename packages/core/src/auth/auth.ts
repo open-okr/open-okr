@@ -110,8 +110,23 @@ export function createAuth(options: AuthOptions) {
     (async ({ to, url }: { to: string; url: string }) => {
       // The console fallback. Mail is an instance connection that is optional
       // by design (TECHNICAL-PLAN §4.14), so this path has to work.
+      //
+      // **The link is not printed in production** (P7-T08d). A reset link is
+      // not only personal data, it is a credential: anyone who can read the
+      // process log can take the account, and container logs are usually
+      // shipped somewhere. The address stays, so an operator can still see
+      // that a reset was asked for and by whom, which is the part that helps
+      // them and cannot be used to sign in.
+      //
+      // In development the link is printed, because a developer with no mail
+      // server needs to click it and that is the whole reason this path
+      // exists. Found by the P7-T08a privacy review on 11 September 2026.
+      const printLink = process.env.NODE_ENV !== "production";
+      const line = printLink
+        ? `link: ${url}\n`
+        : "link: withheld. Configure mail, or read it from the reset token in the database.\n";
       process.stdout.write(
-        `\n--- password reset (no mailer configured) ---\nto:  ${to}\nlink: ${url}\n---------------------------------------------\n`,
+        `\n--- password reset (no mailer configured) ---\nto:  ${to}\n${line}---------------------------------------------\n`,
       );
     });
 
