@@ -126,6 +126,8 @@ export async function stripBindings<
   );
 }
 
+import type { ErasureSweep } from "./erasure.ts";
+
 export interface ErasureExport {
   readonly memberId: string;
   readonly erasedAt: string;
@@ -135,4 +137,6 @@ export interface ErasureExport {
     readonly bio: unknown;
     readonly timezone: string | null;
   };
+  /** What the sweep removed, by table (P7-T08b). Counts only, never an identifier. */
+  readonly removed: ErasureSweep;
 }

@@ -1559,12 +1559,53 @@
                                 "timezone"
                               ],
                               "additionalProperties": false
+                            },
+                            "removed": {
+                              "type": "object",
+                              "properties": {
+                                "channelIdentities": {
+                                  "type": "number"
+                                },
+                                "channelLinkCodes": {
+                                  "type": "number"
+                                },
+                                "channelMessages": {
+                                  "type": "number"
+                                },
+                                "apiTokens": {
+                                  "type": "number"
+                                },
+                                "oauthGrants": {
+                                  "type": "number"
+                                },
+                                "oauthTokens": {
+                                  "type": "number"
+                                },
+                                "copilotThreads": {
+                                  "type": "number"
+                                },
+                                "copilotMessages": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "channelIdentities",
+                                "channelLinkCodes",
+                                "channelMessages",
+                                "apiTokens",
+                                "oauthGrants",
+                                "oauthTokens",
+                                "copilotThreads",
+                                "copilotMessages"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
                             "memberId",
                             "erasedAt",
-                            "priorProfile"
+                            "priorProfile",
+                            "removed"
                           ],
                           "additionalProperties": false
                         }

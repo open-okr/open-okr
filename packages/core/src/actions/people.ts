@@ -31,6 +31,7 @@ import {
 } from "../access/reads.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
+import { sweepPersonalData } from "../people/erasure.ts";
 import {
   type ErasureExport,
   isLastFullAccessHolder,
@@ -465,6 +466,25 @@ export const eraseMember = defineWriteAction({
         bio: z.unknown(),
         timezone: z.string().nullable(),
       }),
+      /**
+       * What the sweep removed, by table (P7-T08b).
+       *
+       * Handed back because "we deleted your data" is a claim and a count
+       * per table is the nearest thing to evidence a person can be given.
+       * The same object goes on the audit row, so a quarter later somebody
+       * can see what an erasure actually did rather than only that one
+       * happened.
+       */
+      removed: z.object({
+        channelIdentities: z.number(),
+        channelLinkCodes: z.number(),
+        channelMessages: z.number(),
+        apiTokens: z.number(),
+        oauthGrants: z.number(),
+        oauthTokens: z.number(),
+        copilotThreads: z.number(),
+        copilotMessages: z.number(),
+      }),
     }),
   }),
   access: ACCESS_LEVELS.full,
@@ -524,6 +544,17 @@ export const eraseMember = defineWriteAction({
         throw new OperationError("not_found", "No such member.");
       }
 
+      // **After the member row, not before** (P7-T08b). Both run in this
+      // one transaction, so the order changes nothing about what commits.
+      // It changes what a reader of this function believes happened: the
+      // row is anonymised and then everything that identified the person
+      // outside it is removed, which is the sentence the audit row will
+      // carry.
+      const removed = await sweepPersonalData(tx, {
+        workspaceId,
+        memberId: input.memberId,
+      });
+
       const exported: ErasureExport = {
         memberId: updated.id,
         erasedAt: erasedAt.toISOString(),
@@ -533,6 +564,7 @@ export const eraseMember = defineWriteAction({
           bio: loaded.bio,
           timezone: loaded.timezone,
         },
+        removed,
       };
 
       return {
@@ -549,6 +581,10 @@ export const eraseMember = defineWriteAction({
           action: "people.erase",
           targetType: "workspace_member",
           targetId: updated.id,
+          // What the sweep removed, so the trail records what the erasure
+          // did and not only that it ran. No identifier is in here: these
+          // are counts.
+          payload: { removed },
         },
       };
     },
