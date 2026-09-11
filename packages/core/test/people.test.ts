@@ -886,3 +886,78 @@ describe("erasure reaches past the member row (P7-T08b)", () => {
     expect(payload).not.toContain("Ola Mensah");
   });
 });
+
+describe("the export is produced before anything is erased (P7-T08b)", () => {
+  it("hands back what they wrote, and says what it left out and why", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Yusuf Adeyemi");
+    await grantFullOnWorkspace(member);
+
+    // Something they wrote, so the export has content rather than only a
+    // shape. A profile update is the smallest write an ordinary member can
+    // make without any other setup.
+    await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+      },
+      "people.updateOwnProfile",
+      { timezone: "UTC" },
+    );
+
+    const outcome = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.erase",
+      { memberId: member },
+    );
+
+    const data = outcome.export.data;
+    expect(data.memberId).toBe(member);
+    expect(data.tables.length).toBeGreaterThan(10);
+
+    // **The omissions are in the export itself.** A person receiving this
+    // should be able to see that their tokens and their access bindings were
+    // not included, and read the reason, rather than conclude the product
+    // holds less of their data than it does.
+    expect(data.omitted.length).toBeGreaterThan(5);
+    for (const entry of data.omitted) {
+      expect(entry.because.length, entry.table).toBeGreaterThan(20);
+    }
+    expect(data.omitted.map((entry) => entry.table)).toContain("api_tokens");
+  });
+
+  it("is taken before the sweep, so it is not a copy of the hole", async () => {
+    // The sharp one. Copilot threads are deleted by the sweep, so an export
+    // read afterwards would report none however many there were. This proves
+    // the order by writing a thread and finding it in the export of the same
+    // call that destroyed it.
+    const wb = await workerDb();
+    const member = await addMember("Lucia Ferrari");
+
+    await wb.admin.query(
+      `insert into ai_threads (id, workspace_id, member_id, title)
+       values (gen_random_uuid(), $1, $2, 'How do I write a key result?')`,
+      [workspaceId, member],
+    );
+
+    const outcome = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.erase",
+      { memberId: member },
+    );
+
+    const threads = outcome.export.data.tables.find(
+      (entry) => entry.table === "ai_threads",
+    );
+    expect(threads?.rows).toHaveLength(1);
+    expect(outcome.export.removed.copilotThreads).toBe(1);
+
+    // And gone from the database, which is the other half of the same claim.
+    const after = await wb.admin.query(
+      "select count(*)::int as n from ai_threads where member_id = $1",
+      [member],
+    );
+    expect(after.rows[0].n).toBe(0);
+  });
+});

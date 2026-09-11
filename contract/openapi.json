@@ -1560,6 +1560,89 @@
                               ],
                               "additionalProperties": false
                             },
+                            "data": {
+                              "type": "object",
+                              "properties": {
+                                "memberId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "takenAt": {
+                                  "type": "string"
+                                },
+                                "tables": {
+                                  "readOnly": true,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "table": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "rows": {
+                                        "readOnly": true,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "propertyNames": {
+                                            "type": "string"
+                                          },
+                                          "additionalProperties": {}
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "table",
+                                      "label",
+                                      "rows"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "omitted": {
+                                  "readOnly": true,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "table": {
+                                        "type": "string"
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "enum": [
+                                          "structural",
+                                          "access",
+                                          "derived",
+                                          "credential",
+                                          "workspace_record"
+                                        ]
+                                      },
+                                      "because": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "table",
+                                      "reason",
+                                      "because"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "memberId",
+                                "takenAt",
+                                "tables",
+                                "omitted"
+                              ],
+                              "additionalProperties": false
+                            },
                             "removed": {
                               "type": "object",
                               "properties": {
@@ -1605,6 +1688,7 @@
                             "memberId",
                             "erasedAt",
                             "priorProfile",
+                            "data",
                             "removed"
                           ],
                           "additionalProperties": false

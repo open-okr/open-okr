@@ -32,6 +32,7 @@ import {
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { sweepPersonalData } from "../people/erasure.ts";
+import { buildPersonalExport } from "../people/export.ts";
 import {
   type ErasureExport,
   isLastFullAccessHolder,
@@ -475,6 +476,45 @@ export const eraseMember = defineWriteAction({
        * can see what an erasure actually did rather than only that one
        * happened.
        */
+      /**
+       * Everything the manifest marks as theirs, read before the sweep
+       * ran (P7-T08b).
+       *
+       * Rows are `unknown` on purpose: this is forty-odd tables wide and a
+       * schema naming every column would be a second copy of the database
+       * schema, drifting from the first.
+       */
+      data: z.object({
+        memberId: z.uuid(),
+        takenAt: z.string(),
+        tables: z
+          .array(
+            z.object({
+              table: z.string(),
+              label: z.string(),
+              // Records rather than `unknown`: a row is a row, and the
+              // looser type made this schema disagree with `PersonalExport`
+              // at the one call site that consumes both.
+              rows: z.array(z.record(z.string(), z.unknown())).readonly(),
+            }),
+          )
+          .readonly(),
+        omitted: z
+          .array(
+            z.object({
+              table: z.string(),
+              reason: z.enum([
+                "structural",
+                "access",
+                "derived",
+                "credential",
+                "workspace_record",
+              ]),
+              because: z.string(),
+            }),
+          )
+          .readonly(),
+      }),
       removed: z.object({
         channelIdentities: z.number(),
         channelLinkCodes: z.number(),
@@ -509,7 +549,16 @@ export const eraseMember = defineWriteAction({
       if (!before) {
         throw new OperationError("not_found", "No such member.");
       }
-      return before;
+      // **Taken in `load`, before a single row is anonymised, and on the
+      // same transaction** (P7-T08b). An export read afterwards would be a
+      // copy of what erasure had already destroyed, and one read in a
+      // separate transaction could miss a row written between the two. This
+      // is the member's one chance to be handed what the instance held.
+      const personalExport = await buildPersonalExport(tx, {
+        workspaceId,
+        memberId: input.memberId,
+      });
+      return { ...before, personalExport };
     },
     async execute({ tx, workspaceId, loaded }) {
       refuseIfLastOwner(
@@ -565,6 +614,7 @@ export const eraseMember = defineWriteAction({
           timezone: loaded.timezone,
         },
         removed,
+        data: loaded.personalExport,
       };
 
       return {
