@@ -83,6 +83,22 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       ? `Cleared ${files}`
       : `Cleared ${files}, and ${bytesLeft} left bytes behind`;
   },
+  "channel.log_swept": (payload) => {
+    const { deleted, retentionDays } = payload as {
+      deleted: number;
+      retentionDays: number;
+    };
+    // Zero days is retention off, which is the default. Saying so is more
+    // use than "cleared 0 rows": one is a setting nobody has chosen, the
+    // other reads like a sweep that found nothing to do.
+    if (retentionDays === 0) {
+      return "Message log retention is off, so nothing was cleared";
+    }
+    if (deleted === 0) {
+      return `No message log rows older than ${retentionDays} days`;
+    }
+    return `Cleared ${deleted} message log row${deleted === 1 ? "" : "s"} older than ${retentionDays} days`;
+  },
   "notification.read": () => "A notification was read",
   "notification.snoozed": () => "A notification was snoozed",
   "notification_settings.updated": () => "Notification settings were updated",

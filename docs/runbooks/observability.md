@@ -176,6 +176,50 @@ or echo a provider's body, and a span leaves the host.
 With it empty, no tracer provider is constructed, no exporter object exists,
 and no socket is opened.
 
+## What is kept, and for how long
+
+By default, everything. Nothing in this product deletes a record on a clock
+unless an administrator has put a number somewhere on purpose.
+
+| Setting | Default | What it sweeps |
+|---|---|---|
+| `messageLogRetentionDays` | `0`, meaning keep everything | Rows in the channel message log older than the window |
+
+Zero is off. The sweep reads the setting and returns without touching a row
+unless it finds a number, because "not configured" must never mean "delete
+everything": an instance upgrading into this feature loses nothing it did
+not agree to lose.
+
+The floor is seven days when it does run. A one-day window would delete the
+delivery record for a message sent yesterday, which is exactly what somebody
+debugging a delivery reaches for.
+
+The sweep runs daily at 03:40 UTC, twenty minutes after the orphan-upload
+reap. Both hold a transaction per workspace and both walk every workspace in
+turn, so starting them together would double the load on the one minute of
+the day an instance does its housekeeping for no benefit. It removes at most
+a thousand rows per workspace per run and says whether a backlog remains, so
+a workspace turning retention on after a year of messages drains over
+several nights rather than holding one transaction open over the lot.
+
+Every sweep writes an audit row carrying the count and the window. It
+carries no message and no address: the rows are being deleted for holding
+words, so the trail must not keep them.
+
+### What is deliberately never swept
+
+**Nudge records and agent run logs.** An earlier draft of this feature
+covered all three. Two of them are not ordinary data: this product requires
+that every proactive message it sends is a recorded nudge row carrying a
+rule key, a channel, an escalation step and a suppression reason, and an
+agent run log is the record of what an agent did on the workspace's behalf.
+A retention sweep over either would delete the evidence the product is
+required to keep. Decided 11 September 2026.
+
+**Everything else.** There is no general retention. Check-ins, comments,
+decisions, retro notes and every other thing a member wrote stay until
+somebody removes them or the member is erased.
+
 ## An air-gapped install
 
 Everything on this page works with no outbound network at all. The exposition

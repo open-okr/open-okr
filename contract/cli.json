@@ -685,6 +685,23 @@
       "pages": false
     },
     {
+      "name": "channels sweepMessageLog",
+      "action": "channels.sweepMessageLog",
+      "method": "POST",
+      "path": "/channels/sweepMessageLog",
+      "scope": "write",
+      "summary": "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
+      "flags": [
+        {
+          "name": "retention-days",
+          "field": "retentionDays",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "channels mySettings",
       "action": "channels.mySettings",
       "method": "GET",

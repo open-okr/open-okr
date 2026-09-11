@@ -99,6 +99,7 @@ export interface ScheduledRun {
     | "agents.runCoach"
     | "notifications.drainBatches"
     | "blobs.reapOrphans"
+    | "channels.sweepMessageLog"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -158,6 +159,29 @@ const ORPHAN_REAP_JOB = "blobs.reapOrphans";
 const ORPHAN_REAP_CRON = "20 3 * * *";
 
 /** The audit chainer (P7-T02a). */
+/**
+ * The channel message log retention sweep (P7-T08c).
+ *
+ * Not exported, like the two job names above it: one reader, a few lines
+ * down.
+ */
+const MESSAGE_LOG_SWEEP_JOB = "channels.sweepMessageLog";
+/**
+ * Once a day, at forty past three in the morning UTC.
+ *
+ * **Twenty minutes after the orphan reap rather than with it.** Both hold a
+ * transaction per workspace and both run over every workspace in turn, so
+ * starting them together would double the load on the one minute of the day
+ * an instance does its housekeeping for no benefit: neither is urgent and a
+ * retention window is measured in days.
+ *
+ * A day is also the right frequency for what this does. The window has a
+ * seven-day floor, so running more often would find the same nothing, and
+ * running less often would let a workspace that turned retention on wait a
+ * week to see it take effect.
+ */
+const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -202,6 +226,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: ORPHAN_REAP_JOB,
     action: "blobs.reapOrphans",
     cron: ORPHAN_REAP_CRON,
+  },
+  {
+    job: MESSAGE_LOG_SWEEP_JOB,
+    action: "channels.sweepMessageLog",
+    cron: MESSAGE_LOG_SWEEP_CRON,
   },
 ];
 
