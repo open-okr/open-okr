@@ -173,6 +173,89 @@ jobs:
             "${REGISTRY}/${IMAGE}@${DIGEST}"
           echo "Signature verified for ${REGISTRY}/${IMAGE}@${DIGEST}"
 
+  # The artefact set, in one place (P7-T09b).
+  #
+  # **A bill of materials attested to an image is not a bill of materials a
+  # person can read.** `sbom: true` on the build step puts one in the
+  # registry, where reading it needs cosign, a digest and a reason to look.
+  # An auditor asking "what is in the release we deployed in March" wants a
+  # file on the release page. So the same image is scanned again into a file
+  # and attached beside the notes.
+  #
+  # The notes come from the changesets the changes carried, which is the
+  # whole point of `.changeset`: the sentence a release note needs was
+  # written by the person who made the change, while they still knew whether
+  # it broke anything.
+  release:
+    name: Publish the release and its bill of materials
+    needs: [publish, verify-signature]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The whole history, because the notes are assembled from the
+          # changesets between this tag and the last.
+          fetch-depth: 0
+
+      - name: Generate the bill of materials
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE }}@${{ needs.publish.outputs.digest }}
+          format: spdx-json
+          artifact-name: openokr-${{ github.ref_name }}.spdx.json
+          output-file: openokr-${{ github.ref_name }}.spdx.json
+
+      - name: Assemble the notes
+        id: notes
+        env:
+          TAG: ${{ github.ref_name }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          set -euo pipefail
+          # CHANGELOG.md is written by `changeset version` on the branch that
+          # bumped the version, so by tag time the section for this release
+          # already exists. Taking it from the file rather than regenerating
+          # it means the notes and the changelog cannot disagree.
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="${TAG#v}" '
+              $0 ~ "^## " tag "$" { grab = 1; next }
+              grab && /^## / { exit }
+              grab { print }
+            ' CHANGELOG.md > notes.md
+          else
+            : > notes.md
+          fi
+          if [ ! -s notes.md ]; then
+            # Never silently empty. A release with no notes is a release
+            # nobody can decide whether to take, and saying so is better than
+            # publishing a blank page.
+            printf 'No changelog section was found for %s. See the commit log.\n' "${TAG}" > notes.md
+          fi
+          {
+            printf '\n---\n\n'
+            printf 'Image: `%s/%s@%s`\n\n' "${REGISTRY}" "${IMAGE}" "${DIGEST}"
+            printf 'Verify the signature before you run it:\n\n'
+            printf '```\ncosign verify \\n'
+            printf '  --certificate-identity-regexp "^https://github.com/%s/.github/workflows/release.yml@refs/tags/" \\n' "${GITHUB_REPOSITORY}"
+            printf '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \\n'
+            printf '  %s/%s@%s\n```\n' "${REGISTRY}" "${IMAGE}" "${DIGEST}"
+          } >> notes.md
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --notes-file notes.md \
+            --prerelease="${{ contains(github.ref_name, '-') }}" \
+            "openokr-${TAG}.spdx.json#Software bill of materials (SPDX)"
+
   chart:
     name: Package the chart
     needs: publish

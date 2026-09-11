@@ -28,6 +28,8 @@
     "perf:load": "pnpm --filter @openokr/core perf:load",
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
     "method:verdicts": "node --experimental-strip-types --no-warnings scripts/method-verdicts.ts",
+    "changeset": "changeset",
+    "check:changeset": "node --experimental-strip-types --no-warnings scripts/check-changeset.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
     "okr": "pnpm --filter @openokr/cli okr",
@@ -46,6 +48,8 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@biomejs/biome": "2.5.12",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.2",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.63.0",

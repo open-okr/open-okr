@@ -318,6 +318,16 @@ jobs:
         # merges them.
         if: github.event_name == 'pull_request' && !endsWith(github.actor, '[bot]')
         run: pnpm check:signoff origin/${{ github.base_ref }} HEAD
+      - name: Changeset gate
+        # Pull requests only. A push to main has already been through this on
+        # the branch that produced it, and a release tag is past the point
+        # where a changeset could still be written.
+        #
+        # Bots are exempt for the reason they are exempt from sign-off: a
+        # dependency bump carries no release note anybody reads, and the
+        # maintainer who merges it owns the version it lands in.
+        if: github.event_name == 'pull_request' && !endsWith(github.actor, '[bot]')
+        run: pnpm check:changeset origin/${{ github.base_ref }} HEAD
 
   # One required check to protect the branch with, so the shard count and the
   # documentation-only skip can change without touching branch protection.

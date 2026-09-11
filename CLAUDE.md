@@ -80,6 +80,7 @@ pnpm method:check
 pnpm test             # needs a database. One suite at a time
 pnpm build && pnpm test:e2e
 pnpm check:signoff origin/main HEAD
+pnpm check:changeset origin/main HEAD
 ```
 
 **A gate you did not run is not a gate that passed.** When this machine cannot
@@ -268,6 +269,7 @@ Keep this list current once scaffolded.
 - **Never run two Vitest suites at once against the same Postgres.** The harness creates and drops a per-worker database, so a second run tears the first one's out from under it: 604 of 1987 tests failed that way on 3 September 2026, which reads as a regression and is not one. Worse, it can leave the server in recovery ("FATAL 57P03: the database system is not yet accepting connections") and the next run dies before it starts. Wait for a background suite to finish.
 
 - `pnpm dead-code`: the dead-code gate
+- `pnpm changeset` and `pnpm check:changeset`: write the version bump a change carries, then the gate that refuses a branch changing what a running instance does and naming no bump (P7-T09b). The version, the changelog and the release notes used to be three things written at tag time from remembered commits, which is three things that can disagree. **Silence is not a claim**: a change with no changeset might be invisible from outside or might be a breaking migration somebody forgot, and the two look identical in a diff, so the gate refuses both and `pnpm changeset --empty` is how you say a customer cannot observe it. Docs, tests, workflows and the plan set are exempt by path. Runs in CI on pull requests only, like sign-off
 - `pnpm check:licences` and `pnpm check:signoff`: the dependency licence gate, then the commit sign-off gate. Sign-off runs in CI on pull requests only, so a branch can look green for days and fail the moment one opens. `docs/development-plan/CI-GATES.md` lists every gate and the order to run them in
 - `pnpm okr`: the command line, generated from the registry. `pnpm okr help` lists the domains, `pnpm okr <domain> <verb> --help` one command's flags. It reads `contract/cli.json` and nothing else, so it has no database and no domain code in it. `okr login --url <instance>` runs the device login: it prints a link, somebody approves it at `/account/device`, and the granted token lands in the profile. `--token` stores one you already have instead, from `/account/api-tokens`. `--scopes` narrows what is asked for; the default is read and write, never destructive. Exit 2 is a usage error decided before anything is sent, exit 1 is the instance refusing
 - `pnpm gen:contract` and `pnpm check:contract`: regenerate `contract/openapi.json` and `contract/cli.json` from the action registry, then the drift gate that compares fresh artifacts against the committed ones and fails naming the actions and commands that moved. One script in two modes, so a generator and a checker cannot disagree about what the artifact should be. The document is also served live at `/api/v1/openapi.json`, built by the same function, so it describes the running instance

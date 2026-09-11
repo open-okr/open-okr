@@ -25,6 +25,7 @@ pnpm method:check     # packages/method against METHOD.md
 pnpm test             # unit and integration, needs a database. One at a time
 pnpm build            # then pnpm test:e2e
 pnpm check:signoff origin/main HEAD   # CI runs this on pull requests only
+pnpm check:changeset origin/main HEAD # and this one
 ```
 
 **`pnpm test` at the root stops the whole run when one package fails**, and
@@ -78,6 +79,7 @@ If all of those pass locally, CI passes, with one exception named under
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
+| Changeset | `pnpm check:changeset` | Refuses a branch that changes what an instance does and names no version bump. Pull requests only |
 | Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
 
 **Dependency review is the second gate no local command covers**, and the
@@ -263,6 +265,7 @@ and fail the moment a pull request opens. Check it yourself first:
 
 ```
 pnpm check:signoff origin/main HEAD
+pnpm check:changeset origin/main HEAD
 ```
 
 To fix commits that already exist:
