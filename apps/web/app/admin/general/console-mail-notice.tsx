@@ -22,6 +22,14 @@ import { getTranslations } from "../../../lib/translations";
  * which is its own small finding. This is the instance settings screen, so
  * this is where an instance-level warning belongs until one exists.
  *
+ * **The warning colour is in the border and the background, not in the
+ * text.** The first version set the heading in `text-warn` on a `bg-warn/5`
+ * tint, and the accessibility gate refused it: #b45309 on the #f3f0f0 that
+ * tint resolves to is 4.43, under the 4.5 a bold 13px heading needs. On the
+ * real `--warn-bg` token it reaches 4.53, which passes and is too close to
+ * the line to leave. So the colour signals from the edges and the words read
+ * at full contrast, which is one signal rather than three anyway.
+ *
  * **The setting names are in the sentence rather than in markup.** An
  * earlier version set `mail.transport` and `smtp` in `<code>` around the
  * words, which put four fragments of an English sentence in the file
@@ -33,8 +41,8 @@ export async function ConsoleMailNotice() {
   const { t } = await getTranslations();
 
   return (
-    <section className="rounded-md border border-warn/30 bg-warn/5 p-4.5">
-      <h2 className="text-sm font-bold text-warn">
+    <section className="rounded-md border border-warn/30 bg-warn-bg p-4.5">
+      <h2 className="text-sm font-bold text-ink">
         {t("admin.general.consoleMail.title")}
       </h2>
       <p className="mt-1.5 text-sm text-ink-2">
