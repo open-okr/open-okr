@@ -2119,10 +2119,47 @@ Depends on: P7-T01
 Deliverables: automated accessibility checks across every screen wired into continuous integration and failing on serious findings; keyboard-only walkthrough scripts for the primary flows including both sessions; performance budgets on the seeded dataset; fixes; the screen-reader smoke procedure.
 Acceptance: continuous integration blocks a change that introduces a serious accessibility finding or breaks a web vitals budget.
 
-### P7-T06: Observability [M]
+### P7-T06a: The meter, the exposition and the synchronous surfaces [M]
 Depends on: Phase 6 complete
-Deliverables: traces and metrics for requests, Operations, outbox lag, jobs, nudge delivery, channel delivery, session synchronisation, agent runs, authorisation outcomes and AI usage; self-hostable dashboards; opt-in and documented, with no telemetry leaving by default.
-Acceptance: a self-hosted installation sees its own dashboards with zero external calls.
+Goal: the product can be measured at all, and the three surfaces on a request's own thread are measured first.
+Deliverables: a `telemetry` port in `packages/adapters` with an OpenTelemetry driver and an off driver, resolved the way every other port is; OpenTelemetry added to the boundary file's vendor list so a stray import outside the adapter fails the build; two settings in the TECHNICAL-PLAN §4.14 map, `observability.metrics` defaulting to on because a local endpoint sends nothing anywhere, and `observability.otlp.endpoint` defaulting to empty because an exporter with no address is an exporter that never dials; metrics for every action with its duration and outcome, for the Operations underneath them, and for authorisation decisions with the level each one wanted; the exposition endpoint, which refuses without an instance-administrator session.
+Test plan: the off driver records nothing and costs no allocation; the endpoint refuses an ordinary member and a signed-out visitor; a counter incremented on a refused authorisation names the level it wanted and never the subject's title; with `observability.otlp.endpoint` empty, no exporter is constructed; the meter opens no listening socket of its own.
+Acceptance: Given a fresh instance with nothing configured, when an administrator opens the exposition endpoint, then action, Operation and authorisation series are present and no process has opened a socket to anything outside the instance.
+
+**HTTP request metrics are not in this row, and the reason is a finding
+rather than a deferral.** The original card listed "requests" beside the
+others. `apps/web/proxy.ts` is the only application code that sees every
+request, and it cannot measure one: it is synchronous, it decides redirect
+or continue, and it returns before the handler that produces the status and
+the duration has run. Instrumenting it would also pull the whole adapter
+package, OpenTelemetry and the S3 and Postgres clients included, into a
+bundle that executes on every request. The honest place to measure HTTP is
+the collector in front of the instance, so the row moved to P7-T06c where
+the collector and the dashboards are. Found 11 September 2026 while wiring
+P7-T06a.
+
+### P7-T06b: The asynchronous surfaces [M]
+Depends on: P7-T06a
+Goal: the work that happens off the request thread is measured by the same meter.
+Deliverables: metrics for outbox lag and drain outcomes, scheduler jobs, nudge delivery with its suppression reasons, channel delivery per provider, session synchronisation fan-out, agent runs, and AI usage in tokens and cost.
+Test plan: outbox lag is measured from the row's own enqueue time rather than from the drain's start, so a relay that stops reports a growing lag instead of a flat zero; a suppressed nudge is counted under its suppression reason; a channel failure is counted per provider and carries no message content.
+Acceptance: Given a relay stopped with rows waiting, when the exposition endpoint is read, then outbox lag grows with the age of the oldest undrained row.
+
+### P7-T06c: Traces, dashboards and the operator guide [M]
+Depends on: P7-T06b
+Goal: the numbers become something an operator can look at, and a trace explains a slow request the numbers only flag.
+Deliverables: OpenTelemetry tracing behind the same port, spanning a request through its Operation and out to its outbox row; HTTP request metrics, taken at the collector rather than in `proxy.ts` for the reason recorded under P7-T06a; dashboards shipped as files an operator can import, covering the §13.1 budgets and the delivery paths; a Compose profile that runs a collector and the dashboards locally, off unless asked for; the operator documentation, saying what is measured, what leaves and what does not.
+Test plan: a span carries no personal data and no rich text; the Compose profile is absent from the default `up`; the documentation's claim about what leaves matches the code, asserted by a test that reads both.
+Acceptance: Given a self-hosted installation that has started the observability profile, when the operator opens the dashboards, then the §13.1 budgets are charted from its own data and no request has left the host.
+
+**Why P7-T06 was split.** The single [M] card carried ten instrumented
+surfaces across four packages, a new vendor dependency, an exposition
+endpoint, dashboards, a Compose profile and the operator guide. Ten call
+sites in `packages/core`, `packages/adapters`, `packages/agents` and
+`apps/web` is a lane, not a session, and the one-commit rule would have been
+broken silently rather than deliberately. Cut on 11 September 2026 before any
+code, along the seam the work already has: what a request does on its own
+thread, what happens after it returns, and what a human finally looks at.
 
 ### P7-T07: Method conformance audit [M]
 Depends on: P4-T01g

@@ -935,6 +935,17 @@ export {
   TASK_POSITION_SPACING,
   unassignTaskInTx,
 } from "./tasks/service.ts";
+export {
+  ACCESS_LEVEL_NAMES,
+  defaultMetrics,
+  METRIC,
+  type MetricLabels,
+  type MetricRecorder,
+  NO_METRICS,
+  OUTCOME,
+  type Outcome,
+  setDefaultMetrics,
+} from "./telemetry/recorder.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,

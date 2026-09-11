@@ -33,6 +33,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "fflate": "^0.8.3",
