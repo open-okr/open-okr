@@ -210,11 +210,62 @@ case "${1:-help}" in
     ;;
 
   upgrade)
+    [ -f "$APP_ENV" ] || fail "no $APP_ENV. This instance has not been started yet."
+
+    # **The backup happens before anything moves, and a failure stops the
+    # upgrade** (P7-T09c). Migrations are forward-only, so once one has
+    # applied the previous image may not run against the new schema. That
+    # makes "restore the backup" the only rollback there is, and an upgrade
+    # that proceeded without one would have removed the way back before
+    # anybody knew they needed it.
+    #
+    # It reuses `./openokr backup` rather than dumping here. One backup
+    # implementation and one restore implementation: a second dump written
+    # for this path would be the one nobody tests and the one that turns out
+    # not to restore.
+    if [ "${OPENOKR_SKIP_BACKUP:-}" = "1" ]; then
+      # The opt-out exists for an external database with its own backups.
+      # Deliberately a variable and not a flag: it is a thing an operator
+      # decides once about their deployment, not per upgrade.
+      log "skipping the pre-upgrade backup (OPENOKR_SKIP_BACKUP=1)."
+      log "your database had better be backed up somewhere else."
+    else
+      log "taking a backup before upgrading. Migrations are forward-only, so"
+      log "this is the only way back."
+      if ! "$0" backup; then
+        fail "the pre-upgrade backup failed, so nothing was upgraded.
+Fix the backup first: an upgrade with no backup cannot be rolled back,
+because a forward-only migration leaves the previous image unable to read
+the schema. Set OPENOKR_SKIP_BACKUP=1 only if this database is backed up
+somewhere else."
+      fi
+
+      # Keep the last three and no more. A pre-upgrade dump is insurance for
+      # the hours after an upgrade, not an archive: keeping every one fills
+      # the disk on the host that can least afford it, and the third oldest
+      # has never been the one anybody restored.
+      backup_root="${OPENOKR_BACKUP_DIR:-./backups}"
+      if [ -d "$backup_root" ]; then
+        # shellcheck disable=SC2012
+        ls -1d "$backup_root"/*/ 2>/dev/null | sort | head -n -3 | while read -r old; do
+          log "removing old backup ${old}"
+          rm -rf "$old"
+        done
+      fi
+    fi
+
     # The rollback path, printed before anything changes rather than in a
     # document nobody has open at the time.
     current="$(compose images app --format json 2>/dev/null | head -c 400 || true)"
     log "current image: ${current:-unknown}"
-    log "to roll back: OPENOKR_IMAGE=<previous tag> ./openokr up"
+    # **Not "run the previous tag"** (P7-T09c). That was wrong and was printed
+    # here until 11 September 2026. Migrations are forward-only: once one has
+    # applied, the previous image is looking at a schema it does not know, and
+    # starting it is not a rollback but a second failure on top of the first.
+    log "to roll back: ./openokr restore <the backup directory just written>,"
+    log "then OPENOKR_IMAGE=<previous tag> ./openokr up. Restoring first is"
+    log "the part that matters: the schema moved, so the old image cannot read"
+    log "the new database."
 
     # A failed pull is not fatal. An air-gapped install has no registry to
     # reach and a locally built image has nothing to pull, and both are
