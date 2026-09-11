@@ -1,9 +1,9 @@
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireAccessLevel } from "../../lib/access.ts";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
 import { getTranslations } from "../../lib/translations";
+import { AdminSections } from "./admin-sections.tsx";
 
 /**
  * The admin shell (screen S-36 skeleton, P2-T08, restyled P2-T10).
@@ -22,6 +22,24 @@ import { getTranslations } from "../../lib/translations";
  * sidebar's own single "Admin" link (`app-shell.tsx`): the primary sidebar
  * never expands a submenu for it, matching §3's diagram, which shows
  * "Admin" as one row with no visible children.
+ *
+ * **It borrows the primary sidebar's row grammar rather than inventing a
+ * second one.** The same 8px radius, the same 16px icon at three quarters
+ * opacity, the same `bg-brand-weak` pill with its hairline inset ring for the
+ * row you are on. A reader who has learned the left rail should not have to
+ * learn a different vocabulary 200 pixels to its right. What it does not
+ * borrow is the panel: the rail sits on a gradient with a border because it
+ * bounds the window, and a second bounded panel inside the content area would
+ * read as two sidebars arguing. This one is transparent and the gap does the
+ * separating, which is the mockups' own two-column composition.
+ *
+ * **The row you are on was the missing half.** Nine labels rendered in one
+ * uniform weight with no active state at all, so the section navigation could
+ * not answer the one question a section navigation exists to answer. Which row
+ * is current is decided in `admin-sections.tsx`, on the client, and that file
+ * carries the reason: a layout does not re-render when you navigate inside it,
+ * so the request header this first read froze on whichever admin card the
+ * reader opened first.
  */
 export default async function AdminLayout({
   children,
@@ -31,7 +49,14 @@ export default async function AdminLayout({
   const { t } = await getTranslations();
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
-  const sections = navigationFor("admin", access.level);
+  // Narrowed to what the list needs before it crosses the client boundary.
+  // The registry entry also carries the level that filtered it, which is a
+  // server-side fact and has no business in a browser bundle.
+  const sections = navigationFor("admin", access.level).map((item) => ({
+    id: item.id,
+    label: item.label,
+    href: item.href,
+  }));
 
   return (
     <AppShellLayout>
@@ -40,27 +65,26 @@ export default async function AdminLayout({
        * than centred inside it. This nav plus content was already the right
        * shape; the `mx-auto max-w-3xl` around it made admin the narrowest
        * screen in the product, a 160px nav and 580px of content on a 1920px
-       * display. */}
-      <div className="flex gap-8">
+       * display.
+       *
+       * Below `md` it stacks, because that is where the primary sidebar hands
+       * over to the mobile tab bar and a 208px column would otherwise be half
+       * a phone. Stacked, the sections are a scrolling strip rather than nine
+       * stacked rows: a reader on a phone should meet the card they came for,
+       * not scroll past the whole menu to reach it. */}
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
         <nav
           aria-label={t("admin.layout.adminSections")}
-          className="w-52 flex-none"
+          // Sticky from `md` up, so the sections stay put while a long card
+          // scrolls. Agents and runs, Invitations and Import all outrun the
+          // viewport, and losing the navigation halfway down a list is how a
+          // reader ends up using the browser's back button as a menu.
+          className="md:sticky md:top-0 md:w-52 md:flex-none md:self-start"
         >
-          <h2 className="mb-2 text-xs font-bold tracking-wider text-ink-4 uppercase">
+          <h2 className="mb-1 hidden px-2.5 text-[10.5px] font-bold tracking-wider text-ink-3 uppercase md:block">
             {t("admin.layout.admin")}
           </h2>
-          <ul className="flex flex-col gap-0.5">
-            {sections.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="block rounded-md px-2.5 py-1.5 text-sm font-medium text-ink-2 hover:bg-raised"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <AdminSections sections={sections} />
         </nav>
         <main className="min-w-0 flex-1">{children}</main>
       </div>

@@ -45,7 +45,9 @@ describe("instanceAuditRowHash and verifyInstanceChain (pure)", () => {
       { ...first, rowHash: instanceAuditRowHash(first) },
       { ...second, rowHash: instanceAuditRowHash(second) },
     ]);
-    expect(verdict).toEqual({ ok: true, checked: 2 });
+    // Zero pending: the instance chain is still written synchronously, and
+    // P7-T02a left it that way because its volume is operator events.
+    expect(verdict).toEqual({ ok: true, checked: 2, pending: 0 });
   });
 
   it("catches a row edited after the fact", () => {

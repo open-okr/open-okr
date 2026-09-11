@@ -82,7 +82,7 @@ export default async function AccountChannelsPage() {
   const connected = new Set(settings.connected);
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+    <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader>
           <h1 className="text-lg font-bold text-ink">
@@ -142,9 +142,15 @@ export default async function AccountChannelsPage() {
                 {t("account.channels.aReminderDueInside")}
               </p>
               <div className="flex items-center gap-2">
+                {/* Named for anybody who cannot see the "Quiet hours" heading
+                    above them. Two bare time inputs are announced as "time"
+                    and "time", which is P7-T05's `label` finding on this
+                    screen: the visible layout carries the meaning and the
+                    accessibility tree does not. */}
                 <input
                   type="time"
                   name="quietStart"
+                  aria-label={t("account.channels.quietStart")}
                   defaultValue={settings.quietHours?.start ?? ""}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
@@ -152,6 +158,7 @@ export default async function AccountChannelsPage() {
                 <input
                   type="time"
                   name="quietEnd"
+                  aria-label={t("account.channels.quietEnd")}
                   defaultValue={settings.quietHours?.end ?? ""}
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />

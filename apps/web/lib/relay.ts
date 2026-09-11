@@ -58,6 +58,7 @@ import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
 import { getStorage } from "./storage";
+import { getTelemetry } from "./telemetry";
 
 /** How long one delivery may take before another relay may claim the row. */
 const LEASE_SECONDS = 120;
@@ -373,6 +374,11 @@ export function startRelay(): OutboxRelay | null {
 
   const relay = new OutboxRelay(getPool(), {
     leaseSeconds: LEASE_SECONDS,
+    // Passing this also registers the two queue gauges, which are read at
+    // scrape time rather than written during a drain (P7-T06b). That is what
+    // makes a relay that has stopped legible: counters go quiet and look like
+    // a quiet queue, while the gauges keep reporting a lag that grows.
+    metrics: getTelemetry(),
     async dispatch(record) {
       await dispatchOutbox(record, await relayDeps(record));
     },

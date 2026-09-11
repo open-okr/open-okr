@@ -66,7 +66,7 @@ All tables get an identifier, `workspace_id`, `created_at`, `updated_at` and a r
 | `access_group_memberships` | `group_id`, `member_id` | Who is in a group |
 | `access_bindings` | `group_id`, `context_id`, `level` (view 10 / comment 40 / edit 70 / full 100), `tag?` (`champion` / `reviewer` / `sponsor` / `facilitator` / `coordinator`) | The grant. Effective access is the maximum over every reachable binding |
 | `invite_links` | `token_hash`, `mode` (`workspace` / `personal`), `member_id?`, `allowed_domains text[]?`, `use_count`, `max_uses?`, `expires_at?`, `revoked_at?` | Reusable and single-use invitations |
-| `audit_events` | `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id`, `payload jsonb`, `at`, `prev_hash`, `row_hash` | Append-only. No update or delete grants. Written in-transaction, hash-chained per workspace |
+| `audit_events` | `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id`, `payload jsonb`, `at`, `prev_hash`, `row_hash` | Append-only: the content is immutable and DELETE is refused, enforced by grants and by a row-level trigger that covers the owner too. Written in-transaction; **chained behind the write path** (P7-T02a), so `seq`, `prev_hash` and `row_hash` arrive null and are filled once by the chainer. The write no longer takes a per-workspace lock, which was measured at 14.8s p95 for a write at fifty concurrent members |
 | `outbox` | `topic`, `payload jsonb`, `idempotency_key`, `created_at`, `delivered_at?`, `attempts` | The transactional side-effect queue |
 | `system_settings` | Singleton: mail configuration with encrypted secrets, instance flags | Envelope-encrypted, admin-editable, environment as bootstrap |
 
@@ -187,7 +187,7 @@ All keyed on a `session` of kind `quarterly`.
 |---|---|---|
 | `initiatives` | `space_id`, `title`, `description` (rich), `owner_id`, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`), `confidence numeric?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct`, `position` | Importable. The work that moves a key result. It owns an access context: `workspace_standard` at view, the owning space at edit, the owner at full. `capacity` is nullable and null means nobody has judged it, which publish gate 5 reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks and no input schema accepts one. No `cycle_id`: an initiative reaches a cycle through the key results it serves, and a column would be a second answer that disagrees the first time one serves two cycles |
 | `initiative_key_results` | `initiative_id`, `key_result_id` | Many to many. Unique on the pair while live, so recording the same link twice is one link rather than two |
-| `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable. Owns an access context: `workspace_standard` at view, the owning space at edit, and each assignee's own group at edit. `position` is sparse; `ordering_state` records the spacing used and when the column was last renumbered. A move takes a row lock over the destination column's live rows, so two concurrent drags serialise |
+| `tasks` | `space_id`, `initiative_id?`, `key_result_id?`, `title`, `description` (rich), `status` (`backlog` / `todo` / `in_progress` / `done`), `due_on?`, `position`, `ordering_state jsonb` | Importable. Owns an access context: `workspace_standard` at view, the owning space at edit, and each assignee's own group at edit. `position` is sparse and fractional (`double precision`, migration 0081); `ordering_state` records the spacing used and when the column was last renumbered. A move writes the midpoint of its two new neighbours, so a drag touches one row, and an advisory lock over the destination column serialises two concurrent drags |
 | `task_assignees` | `task_id`, `member_id` | Multiple assignees. Assignment grants edit access through the member's group, subscribes them as `role`, and notifies everybody except the actor. Unique on the pair while live; an agent is refused, because an agent proposes work and does not carry it |
 | `checklist_items` | `task_id`, `title`, `done`, `position` | |
 | `documents` | `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich), `state` (`draft` / `published`), `published_at?`, `author_member_id` | Drafts are author-private, enforced in the query: every read composes `(state = 'published' or author_member_id = $me)`, so a direct identifier probe answers not-found. No access context of its own; it inherits its subject's. A check constraint keeps `state` and `published_at` from disagreeing |
@@ -332,6 +332,8 @@ The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, 
 6. **Portfolio verdict.** METHOD.md §3.4 over any scored set.
 
 `recomputeGoal(graph, change)` is the single entry point. Invalidation fans out from the outbox.
+
+**Scope is the branch, not the cycle** (P7-T02). A change to one goal loads that goal, the goals above it, and the siblings each of those rolls up with, because progress only ever rolls upward. A cycle scope still loads the cycle, which is what closing or publishing one moves. The rows are then written in one statement per table, and only where a derived value actually moved: the previous version wrote every row in scope one statement at a time, which on §13.1's dataset was 20,034 statements and 8.9 seconds for one check-in, and bumped `updated_at` on ten thousand goals nobody had touched.
 
 ### 6.3 The cadence engine (`packages/core`)
 
@@ -502,7 +504,7 @@ Operational discipline for the tenant floor: transaction-local settings only, a 
 | Headers | Strict content security policy with per-response nonces, transport security, frame and referrer policies |
 | Input | Zod everywhere. Rich text structurally validated and rendered through a sanitising allow-list at every surface including email. Upload type and size allow-list, images re-encoded |
 | Authorisation | Layers 1 and 2, a lint on raw reads, maximum-wins composition across overlapping grants, suspended members excluded, a fail-closed sub-resource resolver |
-| Audit | Append-only with no update or delete grants, written in-transaction, hash-chained per workspace, with a verification tool and access-scoped reads |
+| Audit | Append-only with no delete and no content update, written in-transaction, hash-chained per workspace by a pass behind the write path, with a verification tool that counts unchained rows as pending rather than verified, and access-scoped reads |
 | Freeze | Workspace state overlay with an admin recovery list |
 | Secrets | Environment plus encrypted database settings, envelope encryption with a key ring, one-command rotation that re-wraps data keys only, startup refusal of placeholder secrets in production |
 | Outbound requests | Every outbound fetch (link enrichment, AI base URLs, channel endpoints, client metadata) validates the literal host and the resolved address, blocks private and metadata ranges, follows no redirects, and caps size and time. Built at P5-T08b as `outboundFetch` in `packages/adapters`: **every** resolved address rather than the first, because a name with one public and one private answer is the whole trick; a literal address skips the resolver so a name server has no say; and the size cap is enforced on what arrives rather than on the declared length, which a hostile server is free to understate |
@@ -578,6 +580,7 @@ Measured on the large seeded dataset: 100,000 goals and key results plus 1,000,0
 - Virtualised trees, tables and boards.
 - A query-count budget enforced in CI on list endpoints, with a development-mode counter failing tests over budget.
 - Indexes ship with the feature, including composite indexes matching the common list filters.
+- The access filter on a list stays correlated: one index lookup per candidate row, never a set of every context the reader can see. Added at P7-T02, where Postgres rewrote that filter into a hashed subplan and built 1,271,774 rows to answer a fifty-row page. `accessScopeFilter` holds the fence and says why.
 - Derived values recomputed by outbox-driven jobs into columns, never per row at render.
 - Every resource declares a summary shape for lists and a full shape for detail. List endpoints return only the summary.
 - A client cache persisted and keyed by build identifier, so back and forward are instant and a new deployment invalidates it.

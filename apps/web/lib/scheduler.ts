@@ -41,7 +41,12 @@ import {
   registerAgentSchedules,
 } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
-import { callAction } from "@openokr/core";
+import {
+  callAction,
+  chainWorkspace,
+  defaultMetrics,
+  METRIC,
+} from "@openokr/core";
 import { drafterFor } from "./drafter";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -93,7 +98,13 @@ export interface ScheduledRun {
     | "agents.runChampion"
     | "agents.runCoach"
     | "notifications.drainBatches"
-    | "blobs.reapOrphans";
+    | "blobs.reapOrphans"
+    | "channels.sweepMessageLog"
+    // Not a registry action: chaining the audit trail is maintenance, and
+    // exposing it over REST, the command line and the agent catalogue would
+    // be four surfaces for something only a scheduler and an operator call
+    // (P7-T02a). `pnpm audit:chain` is the operator half.
+    | "audit.chain";
   readonly cadence?: "hourly" | "daily" | "weekly" | "cycle";
   readonly localHour?: number;
   /**
@@ -147,6 +158,41 @@ const ORPHAN_REAP_JOB = "blobs.reapOrphans";
  */
 const ORPHAN_REAP_CRON = "20 3 * * *";
 
+/** The audit chainer (P7-T02a). */
+/**
+ * The channel message log retention sweep (P7-T08c).
+ *
+ * Not exported, like the two job names above it: one reader, a few lines
+ * down.
+ */
+const MESSAGE_LOG_SWEEP_JOB = "channels.sweepMessageLog";
+/**
+ * Once a day, at forty past three in the morning UTC.
+ *
+ * **Twenty minutes after the orphan reap rather than with it.** Both hold a
+ * transaction per workspace and both run over every workspace in turn, so
+ * starting them together would double the load on the one minute of the day
+ * an instance does its housekeeping for no benefit: neither is urgent and a
+ * retention window is measured in days.
+ *
+ * A day is also the right frequency for what this does. The window has a
+ * seven-day floor, so running more often would find the same nothing, and
+ * running less often would let a workspace that turned retention on wait a
+ * week to see it take effect.
+ */
+const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
+
+const AUDIT_CHAIN_JOB = "audit.chain";
+/**
+ * Every minute.
+ *
+ * The write path records an event and leaves it unchained, so this is the
+ * gap between "recorded" and "verifiable". A minute keeps the pending tail
+ * short enough that `pnpm audit:verify` reads as settled on a quiet instance,
+ * and the pass costs nothing when there is nothing to do.
+ */
+const AUDIT_CHAIN_CRON = "* * * * *";
+
 /**
  * Every job this host subscribes a worker to.
  *
@@ -172,9 +218,19 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     cron: NOTIFICATION_DRAIN_CRON,
   },
   {
+    job: AUDIT_CHAIN_JOB,
+    action: "audit.chain",
+    cron: AUDIT_CHAIN_CRON,
+  },
+  {
     job: ORPHAN_REAP_JOB,
     action: "blobs.reapOrphans",
     cron: ORPHAN_REAP_CRON,
+  },
+  {
+    job: MESSAGE_LOG_SWEEP_JOB,
+    action: "channels.sweepMessageLog",
+    cron: MESSAGE_LOG_SWEEP_CRON,
   },
 ];
 
@@ -229,6 +285,8 @@ export async function runScheduledJob(
   deps: SchedulerDeps,
 ): Promise<JobOutcome> {
   const now = deps.now();
+  const metrics = defaultMetrics();
+  const startedAt = performance.now();
   let ran = 0;
   let skipped = 0;
   let failed = 0;
@@ -249,6 +307,31 @@ export async function runScheduledJob(
       deps.onWorkspaceError?.(run, workspace, error);
     }
   }
+
+  // **Per workspace, not per job** (P7-T06b). A job that succeeds in
+  // twenty-nine workspaces and fails in the thirtieth is the shape this
+  // product actually produces, and a single per-job outcome would report it
+  // as either a clean run or a failed one, both of which are lies. The
+  // workspace is not a label for the reason no unbounded value is: the
+  // counts are what an operator needs, the identity is not.
+  metrics.count(METRIC.jobRunsTotal, { job: run.job, outcome: "ok" }, ran);
+  if (skipped > 0) {
+    metrics.count(
+      METRIC.jobRunsTotal,
+      { job: run.job, outcome: "skipped" },
+      skipped,
+    );
+  }
+  if (failed > 0) {
+    metrics.count(
+      METRIC.jobRunsTotal,
+      { job: run.job, outcome: "error" },
+      failed,
+    );
+  }
+  metrics.observe(METRIC.jobDuration, (performance.now() - startedAt) / 1000, {
+    job: run.job,
+  });
 
   return { ran, skipped, failed };
 }
@@ -305,6 +388,13 @@ async function runOne(
   };
   if (run.action === "notifications.drainBatches") {
     await callAction(context, "notifications.drainBatches", {});
+    return;
+  }
+  if (run.action === "audit.chain") {
+    // Straight to the chainer rather than through `callAction`: it writes no
+    // domain change, has no audit row of its own to leave, and running the
+    // audit trail through the Operation pipeline would make it audit itself.
+    await chainWorkspace(getPool(), workspace.id);
     return;
   }
   if (run.action === "blobs.reapOrphans") {

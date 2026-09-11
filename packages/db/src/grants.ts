@@ -69,4 +69,26 @@ export async function grantAppPrivileges(
     }
     await client.query(`revoke update, delete on ${table} from ${appRole}`);
   }
+
+  // **One column-level exception, and it is not a hole** (P7-T02a).
+  //
+  // The chain is built behind the write path now, so the chainer fills `seq`,
+  // `prev_hash` and `row_hash` on rows that arrived with them null. It needs
+  // UPDATE on those three columns and on nothing else: the actor, the action,
+  // the target, the payload and the time stay unreachable, so what happened
+  // still cannot be changed by any route. Migration 0080's row-level trigger
+  // narrows it further, to a row that has no position yet, and refuses a
+  // second attempt on the same row. DELETE stays revoked outright.
+  //
+  // Stated here rather than only in the migration, for the reason this whole
+  // file exists: a privilege that lives in one place is a privilege somebody
+  // can re-open by accident from the other.
+  const auditExists = await client.query(
+    "select 1 from pg_tables where schemaname = 'public' and tablename = 'audit_events'",
+  );
+  if (auditExists.rows.length > 0) {
+    await client.query(
+      `grant update (seq, prev_hash, row_hash) on audit_events to ${appRole}`,
+    );
+  }
 }

@@ -14,7 +14,7 @@ export default async function SecurityPage() {
   const session = await requireSession();
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-4.5">
+    <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader>
           <h1 className="text-lg font-bold text-ink">
@@ -27,18 +27,15 @@ export default async function SecurityPage() {
           </p>
         </CardBody>
       </Card>
-      <Card>
-        <CardBody>
-          <SecuritySettings
-            twoFactorEnabled={session.user.twoFactorEnabled === true}
-          />
-        </CardBody>
-      </Card>
-      <Card>
-        <CardBody>
-          <Sessions userId={session.user.id} />
-        </CardBody>
-      </Card>
+      {/*
+       * Both draw their own cards, one per heading, rather than being wrapped
+       * in one here. Passkeys, one-time codes and signed-in devices are three
+       * separate decisions and they used to share a box.
+       */}
+      <SecuritySettings
+        twoFactorEnabled={session.user.twoFactorEnabled === true}
+      />
+      <Sessions userId={session.user.id} />
     </div>
   );
 }

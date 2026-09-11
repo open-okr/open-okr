@@ -125,13 +125,45 @@ curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the admin could not reach a provisioned workspace"
 pass "the admin reached a provisioned workspace"
 
-# --- the upgrade path re-runs migrations without damage -------------------
+# --- the upgrade path takes a backup, then re-runs migrations -------------
 # Idempotence is what makes an upgrade safe to repeat, so it is checked rather
 # than assumed.
 # The image is already on this host, so the pull is skipped: reaching a
 # registry that does not have it takes minutes to fail and proves nothing.
+backups_before="$(ls -1d ./backups/*/ 2>/dev/null | wc -l | tr -d ' ')"
 OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 || fail "upgrade failed"
 pass "the upgrade command ran"
+
+# **The backup is the rollback** (P7-T09c). Migrations are forward-only, so
+# once one has applied the previous image cannot read the schema and
+# restoring is the only way back. An upgrade that proceeded without a backup
+# would have removed the way back before anybody knew they needed it, so the
+# helper refuses. This is the assertion that the refusal is not theoretical.
+backups_after="$(ls -1d ./backups/*/ 2>/dev/null | wc -l | tr -d ' ')"
+[ "$backups_after" -gt "$backups_before" ] \
+  || fail "the upgrade took no backup (before ${backups_before}, after ${backups_after})"
+pass "the upgrade took a backup first"
+
+# And the refusal itself: an unwritable backup directory must stop the
+# upgrade rather than proceed without one. Checked with a file where the
+# directory should be, which is the cheapest way to make the dump fail for a
+# reason that has nothing to do with the database.
+mkdir -p ./backups-refusal-probe && rmdir ./backups-refusal-probe
+: > ./backups-refusal-probe
+if OPENOKR_BACKUP_DIR=./backups-refusal-probe OPENOKR_SKIP_PULL=1 \
+     ./openokr upgrade >/dev/null 2>&1; then
+  rm -f ./backups-refusal-probe
+  fail "the upgrade proceeded with a backup directory it could not write"
+fi
+rm -f ./backups-refusal-probe
+pass "an upgrade that cannot back up refuses to run"
+
+# The opt-out still works, for a deployment whose database is backed up
+# elsewhere. It is a variable rather than a flag because it is a thing an
+# operator decides once about their deployment, not per upgrade.
+OPENOKR_SKIP_BACKUP=1 OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 \
+  || fail "the upgrade refused even with OPENOKR_SKIP_BACKUP=1"
+pass "OPENOKR_SKIP_BACKUP=1 upgrades without one"
 
 # Restarting is what actually re-runs the entrypoint. `compose up -d` leaves a
 # container alone when its image has not changed, which is right for an

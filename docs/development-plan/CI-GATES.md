@@ -25,6 +25,7 @@ pnpm method:check     # packages/method against METHOD.md
 pnpm test             # unit and integration, needs a database. One at a time
 pnpm build            # then pnpm test:e2e
 pnpm check:signoff origin/main HEAD   # CI runs this on pull requests only
+pnpm check:changeset origin/main HEAD # and this one
 ```
 
 **`pnpm test` at the root stops the whole run when one package fails**, and
@@ -72,11 +73,13 @@ If all of those pass locally, CI passes, with one exception named under
 | Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
 | End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
+| Accessibility and web vitals | Part of the same end-to-end job (P7-T05). `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
+| Changeset | `pnpm check:changeset` | Refuses a branch that changes what an instance does and names no version bump. Pull requests only |
 | Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
 
 **Dependency review is the second gate no local command covers**, and the
@@ -262,6 +265,7 @@ and fail the moment a pull request opens. Check it yourself first:
 
 ```
 pnpm check:signoff origin/main HEAD
+pnpm check:changeset origin/main HEAD
 ```
 
 To fix commits that already exist:

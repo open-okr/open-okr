@@ -2,6 +2,7 @@ import { workspaces } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { chainWorkspace } from "../src/audit/chainer.ts";
 import {
   AuditVisibilityError,
   canEnumerateWorkspaces,
@@ -158,8 +159,13 @@ describe("a committed mutation", () => {
   it("records the acting member and the action", async () => {
     const wb = await workerDb();
     await rename("Renamed");
+    // **`id desc`, not `seq desc`** (P7-T02a). A row arrives with no
+    // position now, and Postgres sorts nulls first on a descending order, so
+    // "the newest row" by `seq` picked an arbitrary unchained one. Ids are
+    // time-ordered UUIDv7, so they are insertion order whether or not the
+    // chainer has run.
     const audit = await wb.admin.query(
-      "select actor_member_id, actor_kind, action, target_type, payload from audit_events order by seq desc limit 1",
+      "select actor_member_id, actor_kind, action, target_type, payload from audit_events order by id desc limit 1",
     );
     expect(audit.rows[0]).toMatchObject({
       actor_member_id: memberId,
@@ -174,9 +180,14 @@ describe("a committed mutation", () => {
     await rename("One");
     await rename("Two");
     await rename("Three");
+    // The chain is built behind the write path now (P7-T02a), so a
+    // verification with nothing chained yet is a verification of nothing.
+    // The scheduler does this every minute; a test does it explicitly.
+    await chainWorkspace(wb.appPool, workspaceId);
     const verdict = await verifyWorkspaceChain(wb.appPool, workspaceId);
     expect(verdict.ok).toBe(true);
     expect(verdict.checked).toBeGreaterThanOrEqual(4);
+    expect(verdict.pending).toBe(0);
   });
 });
 
@@ -209,6 +220,10 @@ describe("a rolled-back mutation", () => {
     await expect(rename("Doomed", { fail: true })).rejects.toThrow();
     await rename("Two");
 
+    // Chained first (P7-T02a): positions are assigned behind the write path,
+    // so a rolled-back write cannot have consumed one and the numbers the
+    // chainer hands out are still contiguous.
+    await chainWorkspace(wb.appPool, workspaceId);
     const rows = await wb.admin.query(
       "select seq from audit_events where workspace_id = $1 order by seq",
       [workspaceId],
@@ -356,6 +371,8 @@ describe("tenant isolation of the audit trail", () => {
       name: "Other Person",
     });
 
+    await chainWorkspace(wb.appPool, workspaceId);
+    await chainWorkspace(wb.appPool, other.workspaceId);
     const seqs = await wb.admin.query(
       "select workspace_id, min(seq)::int as first from audit_events group by workspace_id",
     );
@@ -380,6 +397,11 @@ describe("concurrent writes in one workspace", () => {
       rename("E"),
     ]);
 
+    // **This is the test the change was for** (P7-T02a). Six writes that used
+    // to queue behind one advisory lock now run without touching it, and the
+    // chain they produce is still contiguous and still verifies. What moved
+    // is when the positions are assigned, not whether they are.
+    await chainWorkspace(wb.appPool, workspaceId);
     const rows = await wb.admin.query(
       "select seq from audit_events where workspace_id = $1 order by seq",
       [workspaceId],
@@ -432,6 +454,9 @@ describe("tampering that defeats the trigger is still caught", () => {
     const wb = await workerDb();
     await rename("One");
     await rename("Two");
+    // Chained first (P7-T02a): there is nothing to forge the hash of until a
+    // row has one.
+    await chainWorkspace(wb.appPool, workspaceId);
 
     await wb.admin.query(
       "alter table audit_events disable trigger audit_events_no_update",

@@ -104,7 +104,7 @@ export function Wizard({
           <p className="text-xs text-ink-3">{t("welcome.explains")}</p>
           {/* The counter is digits and a slash, which is the same in every
               language; the catalogue names it for a screen reader instead. */}
-          <p className="mt-1 text-xs text-ink-4" data-testid="welcome-progress">
+          <p className="mt-1 text-xs text-ink-3" data-testid="welcome-progress">
             <span className="sr-only">{t("welcome.progress")}</span>
             {`${index + 1} / ${STEPS.length}`}
           </p>
@@ -129,7 +129,7 @@ export function Wizard({
                 onChange={(event) => setZone(event.target.value)}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               />
-              <span className="text-ink-4">
+              <span className="text-ink-3">
                 {t("welcome.basics.timezoneHelp")}
               </span>
             </label>
@@ -159,7 +159,7 @@ export function Wizard({
                 </button>
               ))}
             </div>
-            <span className="text-xs text-ink-4">
+            <span className="text-xs text-ink-3">
               {t("welcome.rhythm.help")}
             </span>
           </div>
@@ -176,7 +176,7 @@ export function Wizard({
                 onChange={(event) => setEmail(event.target.value)}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               />
-              <span className="text-ink-4">{t("welcome.people.help")}</span>
+              <span className="text-ink-3">{t("welcome.people.help")}</span>
             </label>
           </div>
         ) : null}
@@ -186,7 +186,7 @@ export function Wizard({
             <span className="text-xs text-ink-3">
               {t("welcome.demo.question")}
             </span>
-            <span className="text-xs text-ink-4">{t("welcome.demo.help")}</span>
+            <span className="text-xs text-ink-3">{t("welcome.demo.help")}</span>
           </div>
         ) : null}
 

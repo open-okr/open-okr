@@ -100,8 +100,73 @@ services:
       - caddy-data:/data
       - caddy-config:/config
 
+  # --- The observability profile (P7-T06c) ------------------------------
+  #
+  # Off unless asked for. `./openokr up` does not start any of this, and
+  # nothing below is reachable from outside the compose network unless the
+  # operator publishes a port themselves. That is what keeps the default
+  # deployment three services and the "zero external calls" claim true
+  # without anybody having to check a setting.
+  #
+  #     docker compose --profile observability up -d
+  #     open http://localhost:3001        # Grafana, admin/admin on first run
+  #
+  # Prometheus needs a token to read /api/metrics, because that endpoint
+  # refuses anything without an instance-administrator session. Create one at
+  # /account/api-tokens and write it to ./secrets/observability-token before
+  # starting the profile.
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    profiles: ["observability"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      # Fifteen days. Long enough to see a weekly cadence twice, short enough
+      # that an operator who forgets this is running does not fill a disk.
+      - "--storage.tsdb.retention.time=15d"
+      # No remote write, no web.enable-lifecycle, no admin API. This scrapes
+      # and it serves Grafana, and it does nothing else.
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./secrets/observability-token:/etc/prometheus/openokr-token:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    restart: unless-stopped
+    profiles: ["observability"]
+    ports:
+      # Bound to the loopback interface on purpose. An operator who wants this
+      # on a network puts it behind the same proxy everything else is behind,
+      # rather than having it exposed because a default said so.
+      - "127.0.0.1:3001:3000"
+    environment:
+      # No anonymous access and no sign-up. The dashboards show which actions
+      # are refused and how much AI costs, which is operator information.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Nothing phones home. Grafana checks for updates and reports usage by
+      # default, and this stack exists to prove an instance can watch itself
+      # without talking to anyone.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./observability/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   db-data:
   storage:
   caddy-data:
   caddy-config:
+  prometheus-data:
+  grafana-data:

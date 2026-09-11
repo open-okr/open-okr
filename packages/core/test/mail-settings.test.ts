@@ -100,14 +100,95 @@ describe("resolveMailSettings", () => {
     expect(fromEnv.source).toBe("environment");
   });
 
-  it("falls back to console on an unrecognised transport rather than failing the caller", async () => {
-    // A typo in a settings row must not take password reset down with it.
+  it("refuses an unrecognised transport instead of falling back to console", async () => {
+    // **This test asserted the opposite until 11 September 2026**, with the
+    // comment "a typo in a settings row must not take password reset down
+    // with it." The P7-T08a privacy review weighed the other side of that
+    // trade: a typo does not take password reset down, it moves password
+    // reset into the process log along with every address and every live
+    // reset link, because the console driver writes each message to stdout.
+    // Down is visible and gets fixed within the hour; this is invisible and
+    // can run for a quarter. Agung chose the refusal, because it changes
+    // what a misconfigured live instance does.
     const wb = await workerDb();
     await writeSettings(wb.appPool, ring, [
       { key: "mail.transport", value: "carrier-pigeon" },
     ]);
 
+    await expect(resolveMailSettings(wb.appPool, ring, {})).rejects.toThrow(
+      /carrier-pigeon/,
+    );
+  });
+});
+
+/**
+ * Absent and wrong stop meaning the same thing (P7-T08d).
+ *
+ * This resolver used to fall back to `console` for any value it did not
+ * recognise, with the reason written beside it: "a typo in a settings row
+ * must not take password reset down with it." It was a deliberate trade and
+ * its privacy cost was not part of it. A typo does not take password reset
+ * down; it moves password reset into the process log along with every
+ * address and every live reset link, because the console driver writes each
+ * message to stdout. Down is visible and gets fixed within the hour. This is
+ * invisible and can run for a quarter.
+ */
+describe("an unrecognised transport is refused", () => {
+  it("refuses a typo and names the setting", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "mail.transport", value: "smpt" },
+    ]);
+
+    await expect(resolveMailSettings(wb.appPool, ring, {})).rejects.toThrow(
+      /mail\.transport/,
+    );
+  });
+
+  it("says what to do instead, because a refusal with no way out is a wall", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "mail.transport", value: "sendgrid" },
+    ]);
+
+    await expect(resolveMailSettings(wb.appPool, ring, {})).rejects.toThrow(
+      /"smtp" to send, or "console"/,
+    );
+  });
+
+  it("still falls back to console when nothing is set", async () => {
+    // The half that must not change. An unset transport is "not configured
+    // yet", and console is what lets a fresh checkout run the first-run
+    // wizard with no mail server anywhere.
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "mail.transport", value: "" },
+    ]);
+
     const settings = await resolveMailSettings(wb.appPool, ring, {});
     expect(settings.transport).toBe("console");
+  });
+
+  it("leaves a valid transport alone", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "mail.transport", value: "smtp" },
+    ]);
+
+    const settings = await resolveMailSettings(wb.appPool, ring, {});
+    expect(settings.transport).toBe("smtp");
+  });
+
+  it("refuses a typo in the environment too, not only in a stored row", async () => {
+    // The environment is the bootstrap half of the §4.14 map, and a
+    // misspelt variable in a compose file is at least as likely as a
+    // misspelt settings row.
+    const wb = await workerDb();
+
+    await expect(
+      resolveMailSettings(wb.appPool, ring, {
+        OPENOKR_MAIL_TRANSPORT: "SMTP",
+      }),
+    ).rejects.toThrow(/mail\.transport/);
   });
 });

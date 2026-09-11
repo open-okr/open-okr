@@ -349,3 +349,104 @@ describe("characters a WIN1252 database cannot store", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Expand then contract (PLAN.md §5.1, P7-T09a).
+ *
+ * On Kubernetes, pods of release N and N+1 serve traffic together against
+ * the N+1 schema for the length of a rollout. A migration that drops a
+ * column the previous release still selects breaks every request that pod
+ * serves, and the failure reads as an application error rather than as a
+ * schema change. So a removal spans two releases, and this refuses the one
+ * that arrives alone.
+ */
+describe("expand then contract", () => {
+  const replaces = "replaces";
+
+  it("refuses a drop with no marker", () => {
+    const problems = lintMigrationSql(
+      "0099_drop.sql",
+      "alter table goals drop column old_title;",
+    );
+    expect(problems.some((problem) => problem.includes(replaces))).toBe(true);
+  });
+
+  it("refuses a rename, which is a drop with extra steps", () => {
+    const problems = lintMigrationSql(
+      "0099_rename.sql",
+      "alter table goals rename column title to headline;",
+    );
+    expect(problems.some((problem) => problem.includes(replaces))).toBe(true);
+  });
+
+  it("refuses `drop column if exists`, which is no safer", () => {
+    // `if exists` guards against the column being absent. It says nothing
+    // about whether anything still reads it, which is the only question
+    // this rule asks.
+    const problems = lintMigrationSql(
+      "0099_drop.sql",
+      "alter table goals drop column if exists old_title;",
+    );
+    expect(problems.some((problem) => problem.includes(replaces))).toBe(true);
+  });
+
+  it("accepts a drop whose marker names where the replacement shipped", () => {
+    const problems = lintMigrationSql(
+      "0099_drop.sql",
+      [
+        "-- openokr:replaces: 0061 added title_v2 and both have been written since",
+        "alter table goals drop column old_title;",
+      ].join("\n"),
+    );
+    expect(problems.some((problem) => problem.includes(replaces))).toBe(false);
+  });
+
+  it("refuses a marker with no reason", () => {
+    // The same rule every other marker follows: a marker without a written
+    // reason is a waiver nobody has to justify, which is the thing the
+    // marker convention exists to prevent.
+    const problems = lintMigrationSql(
+      "0099_drop.sql",
+      ["-- openokr:replaces:", "alter table goals drop column old_title;"].join(
+        "\n",
+      ),
+    );
+    expect(problems.length).toBeGreaterThan(0);
+  });
+
+  it("leaves constraints and indexes alone", () => {
+    // Neither is something the previous release reads by name, so removing
+    // one cannot break a pod serving against the new schema. Matching them
+    // would make the rule fire on ordinary tidying and train people to add
+    // the marker without reading it.
+    for (const sql of [
+      "alter table goals drop constraint goals_pkey;",
+      "drop index goals_title_idx;",
+      "drop index if exists goals_title_idx;",
+    ]) {
+      const problems = lintMigrationSql("0099_tidy.sql", sql);
+      expect(problems.some((problem) => problem.includes(replaces))).toBe(
+        false,
+      );
+    }
+  });
+
+  it("finds the marker even though a drop sits mid-line", () => {
+    // The bug this test exists for. `markersAbove` walks upward from the
+    // index it is given and stops at the first line that is not a comment.
+    // A `drop column` sits inside `alter table`, so the first version passed
+    // the match index and was handed "alter table goals drop " as the line
+    // above, breaking out before it ever saw the marker. Every other caller
+    // passes a `create table`, which starts a line, which is why this only
+    // ever bit here.
+    const problems = lintMigrationSql(
+      "0099_drop.sql",
+      [
+        "-- openokr:replaces: 0061 added the replacement",
+        "alter table goals",
+        "  drop column old_title;",
+      ].join("\n"),
+    );
+    expect(problems.some((problem) => problem.includes(replaces))).toBe(false);
+  });
+});

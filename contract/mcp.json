@@ -992,6 +992,27 @@
       "example": {}
     },
     {
+      "name": "channels.sweepMessageLog",
+      "description": "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
       "name": "channels.mySettings",
       "description": "The caller's own primary channel, quiet hours and linked accounts.",
       "inputSchema": {
@@ -6271,6 +6292,11 @@
             "type": "string",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
           }
         }
       },
@@ -7207,6 +7233,30 @@
           },
           "mine": {
             "type": "boolean"
+          },
+          "cursor": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              }
+            },
+            "required": [
+              "position",
+              "id"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
           }
         }
       },

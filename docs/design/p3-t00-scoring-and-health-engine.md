@@ -114,6 +114,15 @@ the weighted contribution of goals aligned beneath it.
 | A child aligned to a key result | Contributes to this **goal**, and leaves that key result's own measured progress alone (decision D-2) |
 | Cycle | Broken before any arithmetic runs, deterministically, and reported |
 | Depth | No limit in the arithmetic. The loader bounds the graph it hands over |
+| A partially loaded graph | A node the loader brings in only as a boundary carries `settledProgressPct`, its stored progress, and the cascade uses that instead of computing it. Its own children were never loaded, so computing it here would read it as lower than it is (P7-T02) |
+
+**What one change recomputes** (P7-T02, corrected 10 September 2026). A change
+to one goal loads that goal, every goal above it, and the siblings each of
+those rolls up with, which arrive as settled boundaries. It used to load the
+goal's whole cycle: on the §13.1 dataset that is 10,000 goals for a change that
+can move six rows, and publishing one check-in took 8.9 seconds and issued
+20,034 statements. A cycle scope still means the cycle, because closing or
+publishing one really does move every goal in it.
 
 Cycle breaking cannot depend on where the traversal started, or the same graph
 would produce different numbers on different requests. So it happens first, as

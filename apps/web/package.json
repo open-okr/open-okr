@@ -27,6 +27,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
     "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",

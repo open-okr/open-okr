@@ -1,0 +1,15 @@
+# Loads every dashboard file in the mounted directory at start (P7-T06c).
+# Files rather than a database, so a dashboard is reviewable in a diff and an
+# operator who edits one in the browser is told it will be overwritten.
+apiVersion: 1
+
+providers:
+  - name: OpenOKR
+    orgId: 1
+    folder: OpenOKR
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

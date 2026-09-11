@@ -1,0 +1,143 @@
+{
+  "title": "OpenOKR: delivery and the background",
+  "uid": "openokr-delivery",
+  "schemaVersion": 39,
+  "editable": false,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "Everything that happens after a request has returned, or because a clock said so. Nobody is watching a screen when this goes wrong, which is the whole reason it is charted.",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Oldest row still waiting",
+      "description": "Read at scrape time, not written during a drain. A relay that has stopped reports a lag that grows; a counter would go flat and the outage would read as a quiet queue.",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 60 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "openokr_outbox_oldest_pending_seconds" }]
+    },
+    {
+      "type": "stat",
+      "title": "Rows waiting",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "targets": [{ "expr": "openokr_outbox_pending" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox dispatch, by outcome",
+      "description": "`failed` will be tried again. `dead_lettered` is work this instance gave up on, and somebody has to look at it.",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(openokr_outbox_dispatched_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead letters, by topic",
+      "description": "Any line above zero is a standing obligation. Nothing else in the product will mention these.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (topic) (increase(openokr_outbox_dead_lettered_total[1h]))",
+          "legendFormat": "{{topic}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Nudges, by what happened",
+      "description": "`deferred` is quiet hours queueing to the next open window, which is a delivery that is going to happen. It is charted apart from the suppressions for that reason.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(openokr_nudges_total[15m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Channel delivery, by provider and outcome",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "expr": "sum by (provider, outcome) (rate(openokr_channel_deliveries_total[15m]))",
+          "legendFormat": "{{provider}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Scheduled jobs, by outcome",
+      "description": "Counted per workspace. A job that succeeds in twenty-nine and fails in the thirtieth shows both lines, which a per-job outcome could not.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 13 },
+      "targets": [
+        {
+          "expr": "sum by (job, outcome) (rate(openokr_job_runs_total[15m]))",
+          "legendFormat": "{{job}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent runs, by trigger and outcome",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (trigger, outcome) (rate(openokr_agent_runs_total[1h]))",
+          "legendFormat": "{{trigger}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI spend, by provider and model",
+      "description": "The authoritative record is `ai_usage_events`, which survives a restart and answers a bill. This is the same numbers moving today.",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (provider, model) (increase(openokr_ai_cost_total[1h]))",
+          "legendFormat": "{{provider}} {{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Authorisation refusals, by action",
+      "description": "A spike here is either a permission that was narrowed or somebody probing. The subject is deliberately not a label, so this says what was refused and never which row.",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 27 },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (action, required) (rate(openokr_authorisation_total{outcome=\"refused\"}[15m])))",
+          "legendFormat": "{{action}} needs {{required}}"
+        }
+      ]
+    }
+  ]
+}

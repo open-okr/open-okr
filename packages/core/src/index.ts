@@ -18,9 +18,11 @@ export { ACCESS_LEVELS, type AccessLevel } from "./access/levels.ts";
 export { PERMISSIONS, type Permission } from "./access/permissions.ts";
 export { derivePrivacy, type PrivacyLabel } from "./access/privacy.ts";
 export {
+  type AccessFilterMember,
   type AccessScopedResource,
   type AccessScopeFilterInput,
   type AnonymousContextInput,
+  accessFilterMember,
   accessScopeFilter,
   can,
   type GetAccessScopedInput,
@@ -385,6 +387,12 @@ export {
   GENESIS_HASH,
   verifyChain,
 } from "./audit/chain.ts";
+export {
+  type ChainedReport,
+  chainAllWorkspaces,
+  chainWorkspace,
+  countPending,
+} from "./audit/chainer.ts";
 export {
   type InstanceAuditRow,
   instanceAuditRowHash,
@@ -927,6 +935,17 @@ export {
   TASK_POSITION_SPACING,
   unassignTaskInTx,
 } from "./tasks/service.ts";
+export {
+  ACCESS_LEVEL_NAMES,
+  defaultMetrics,
+  METRIC,
+  type MetricLabels,
+  type MetricRecorder,
+  NO_METRICS,
+  OUTCOME,
+  type Outcome,
+  setDefaultMetrics,
+} from "./telemetry/recorder.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,

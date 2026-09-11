@@ -109,6 +109,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     bytesLeft: z.number().int(),
     olderThanMinutes: z.number().int(),
   }),
+  /** The retention sweep's own row, so the deletion is accountable (P7-T08c). */
+  "channel.log_swept": z.object({
+    deleted: z.number().int(),
+    retentionDays: z.number().int(),
+  }),
   "notification.read": z.object({}),
   "notification.snoozed": z.object({}),
   "notification_settings.updated": z.object({}),

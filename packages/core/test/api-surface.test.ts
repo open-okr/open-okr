@@ -106,12 +106,33 @@ describe("reading parameters", () => {
 });
 
 describe("paging", () => {
+  /**
+   * Any read that does not page, chosen from the registry rather than named.
+   *
+   * **This test hard-coded `goals.list` and went stale the day that action
+   * gained a cursor** (P7-T01b), reporting a paging bug where there was a
+   * paging feature. The property is "an action without a page contract
+   * refuses a cursor", and nothing about it depends on which action that is.
+   */
+  const notPaged = REST_ROUTES.find(
+    (route) => route.method === "GET" && !route.page,
+  );
+
+  it("has an unpaged read to test against at all", () => {
+    // Every read paging would make the assertion below vacuous rather than
+    // failing, which is the shape of hole this whole file exists to close.
+    expect(notPaged).toBeDefined();
+  });
+
   it("refuses a cursor on an action that does not page, naming the action", () => {
-    const result = inputFrom(routeOf("goals.list"), [["cursor", "abc"]]);
+    if (!notPaged) {
+      throw new Error("no unpaged read to test against");
+    }
+    const result = inputFrom(notPaged, [["cursor", "abc"]]);
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
       expect(result.error.code).toBe("unsupported_parameter");
-      expect(result.error.message).toContain("goals.list");
+      expect(result.error.message).toContain(notPaged.action);
     }
   });
 

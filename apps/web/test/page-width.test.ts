@@ -22,15 +22,26 @@ import { describe, expect, test } from "vitest";
  * somebody's eye six screens later.
  */
 
-/** Screens that are a single form, where a full-width input is its own defect. */
-const BOUNDED = [
-  "account/api-tokens",
-  "account/channels",
-  "account/connections",
-  "account/device",
-  "account/security",
-  "oauth/authorize",
-];
+/**
+ * Screens that are a single decision, where a full-width input is its own
+ * defect.
+ *
+ * **The four account screens left this list on 2026-09-10.** They were on it
+ * because each is a form, and the reasoning stopped there: a narrow column is
+ * one way to keep an input from growing to a thousand pixels, and it is not
+ * the only one. Sitting beside the rest of the product they read as a
+ * different application, which is the failure this file exists to catch. What
+ * replaced it is a bound on the field rather than on the page: `max-w-xs` on a
+ * password or a one-time code, `max-w-sm` on a setting, `max-w-prose` on the
+ * sentence that explains it, inside a card that fills the content area like
+ * every other card.
+ *
+ * What is left is the two screens that are one decision and nothing else. A
+ * device approval and an OAuth consent are read, answered and closed, they
+ * carry no navigation of their own, and there is nothing beside them for a
+ * wide column to line up with.
+ */
+const BOUNDED = ["account/device", "oauth/authorize"];
 
 /**
  * Screens outside the app shell, which draw their own centred card (S-35).
@@ -86,13 +97,18 @@ describe("content width", () => {
     expect(/className="[^"]*\bmx-auto\b[^"]*\bmax-w-/.test(source)).toBe(false);
   });
 
-  test("the bounded list names only single-form screens", async () => {
+  test("the bounded list names only single-decision screens", async () => {
     // Guards the exemption itself: a screen added to BOUNDED to silence the
     // first test would otherwise never be noticed.
     const files = await pageFiles();
     for (const prefix of BOUNDED) {
       expect(files).toContain(`${prefix}/page.tsx`);
     }
-    expect(BOUNDED.length).toBeLessThanOrEqual(6);
+    // Two, and the bound is the length rather than a round number above it.
+    // It was six while the account screens were on the list, which meant a
+    // seventh could be added without anybody arguing for it. Bounding the
+    // field instead of the page is the answer for a screen inside the shell,
+    // so growing this list needs a reason and this line asks for one.
+    expect(BOUNDED.length).toBeLessThanOrEqual(2);
   });
 });

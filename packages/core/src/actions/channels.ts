@@ -32,6 +32,7 @@ import {
   withContext,
   withWorkspace,
   workspaceMembers,
+  workspaces,
 } from "@openokr/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -42,6 +43,7 @@ import {
   hashLinkCode,
   LINK_CODE_TTL_SECONDS,
 } from "../channels/inbound.ts";
+import { sweepMessageLog } from "../channels/retention.ts";
 import {
   listMappings,
   removeMapping,
@@ -54,6 +56,7 @@ import {
 } from "../channels/templates.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
+import { DEFAULT_MESSAGE_LOG_RETENTION_DAYS } from "../settings/registry.ts";
 import {
   type ActionCallContext,
   defineReadAction,
@@ -1280,6 +1283,84 @@ export const removeTemplateMapping = defineWriteAction({
           targetType: "workspace",
           targetId: workspaceId,
           payload: { ruleKey: input.ruleKey },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Sweeps the channel message log to the workspace's retention (P7-T08c).
+ *
+ * Through the Operation pipeline like every other write, so the deletion
+ * carries an audit row. A retention sweep is the one kind of deletion
+ * nobody watches happen, which makes the trail the only evidence it did.
+ *
+ * `full`, because retention is an administrator's decision about the
+ * workspace's own records and not something an ordinary member triggers.
+ */
+export const sweepMessageLogRetention = defineWriteAction({
+  name: "channels.sweepMessageLog",
+  summary:
+    "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
+  input: z.object({
+    /** Overrides the workspace's own setting. For tests and an operator. */
+    retentionDays: z.number().int().min(0).optional(),
+  }),
+  output: z.object({
+    deleted: z.number().int(),
+    retentionDays: z.number().int(),
+    /** True when the batch filled, so a backlog remains for the next run. */
+    more: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [workspace] = await tx
+        .select({ settings: workspaces.settings })
+        // openokr:allow-raw-read: reading this workspace's own settings row
+        // from inside the Operation, the same as the orphan reap does.
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      const configured = (
+        workspace?.settings as Record<string, unknown> | undefined
+      )?.messageLogRetentionDays;
+      const retentionDays =
+        input.retentionDays ??
+        (typeof configured === "number"
+          ? configured
+          : DEFAULT_MESSAGE_LOG_RETENTION_DAYS);
+
+      const swept = await sweepMessageLog(tx as OperationTx, {
+        workspaceId,
+        retentionDays,
+        now: new Date(),
+      });
+
+      return {
+        result: swept,
+        activity: {
+          kind: "channel.log_swept",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            deleted: swept.deleted,
+            retentionDays: swept.retentionDays,
+          },
+        },
+        audit: {
+          // Counts and the window, never a message or an address. The rows
+          // are being deleted for carrying words; the trail must not keep
+          // them.
+          action: "channels.sweepMessageLog",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: {
+            deleted: swept.deleted,
+            retentionDays: swept.retentionDays,
+            more: swept.more,
+          },
         },
       };
     },

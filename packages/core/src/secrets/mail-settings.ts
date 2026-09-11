@@ -79,9 +79,8 @@ export async function resolveMailSettings(
     "";
 
   return {
-    // Anything unrecognised falls back to console: a typo in a settings row
-    // must not take password reset down with it.
-    transport: transport.value === "smtp" ? "smtp" : "console",
+    // **Absent falls back. Wrong refuses.** See `readTransport` below.
+    transport: readTransport(transport.value),
     host: resolve<string>("mail.host").value,
     port: resolve<number>("mail.port").value,
     secure: resolve<boolean>("mail.secure").value,
@@ -90,4 +89,58 @@ export async function resolveMailSettings(
     from: resolve<string>("mail.from").value,
     source: transport.source,
   };
+}
+
+/**
+ * Thrown when `mail.transport` holds a value this product does not know.
+ *
+ * A configuration error rather than an operational one: nothing about the
+ * instance is broken, somebody typed something it cannot act on.
+ */
+/** Not exported: nothing catches it by type, and a configuration error
+ * should reach whoever started the process rather than be handled. Export it
+ * the day something genuinely needs to tell it apart from any other throw. */
+class MailTransportError extends Error {
+  override readonly name = "MailTransportError";
+}
+
+/**
+ * Reads the transport, and refuses a value it does not recognise (P7-T08d).
+ *
+ * **This line used to fall back to `console` for anything unrecognised**,
+ * with the reason written beside it: "a typo in a settings row must not take
+ * password reset down with it." It was a deliberate trade and its privacy
+ * cost was not part of it.
+ *
+ * A typo does not take password reset down. It moves password reset **into
+ * the process log**, along with every address and every live reset link,
+ * because the console driver writes each message to stdout. Down is visible
+ * and somebody fixes it within the hour. This is invisible and can run for a
+ * quarter, losing every invitation and publishing every link.
+ *
+ * The distinction the old line never drew is between *absent* and *wrong*.
+ * Absent means "not configured yet", and console is the right answer: it is
+ * what makes a fresh checkout work with no mail server. `smpt` means
+ * somebody meant SMTP, and the honest answer is to say which setting is
+ * wrong rather than to guess.
+ *
+ * Found by the P7-T08a privacy review on 11 September 2026; the change was
+ * Agung's, because it alters what a misconfigured live instance does.
+ */
+function readTransport(value: string | undefined): "console" | "smtp" {
+  const trimmed = (value ?? "").trim();
+  if (trimmed === "") {
+    return "console";
+  }
+  if (trimmed === "console" || trimmed === "smtp") {
+    return trimmed;
+  }
+  throw new MailTransportError(
+    `mail.transport is "${trimmed}", which is not a transport this instance ` +
+      `has. Use "smtp" to send, or "console" to write messages to the log. ` +
+      `Leaving it unset gives you "console". It is refused rather than ` +
+      `guessed because falling back would write every message, every ` +
+      `address and every password-reset link to the process log without ` +
+      `telling anybody.`,
+  );
 }

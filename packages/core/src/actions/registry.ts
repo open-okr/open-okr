@@ -12,6 +12,15 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
+import { OperationError } from "../operations/errors.ts";
+import {
+  ACCESS_LEVEL_NAMES,
+  defaultMetrics,
+  METRIC,
+  NO_METRICS,
+  OUTCOME,
+  type Outcome,
+} from "../telemetry/recorder.ts";
 import {
   goalFeed,
   profileFeed,
@@ -105,6 +114,7 @@ import {
   saveTemplateMapping,
   send as sendChannelMessage,
   startLink,
+  sweepMessageLogRetention,
   syncTemplates,
   testSend,
   unlinkIdentity,
@@ -446,6 +456,7 @@ export const ACTION_MAP = {
   "channels.unlinkIdentity": unlinkIdentity,
   "channels.send": sendChannelMessage,
   "channels.listMessages": listMessages,
+  "channels.sweepMessageLog": sweepMessageLogRetention,
   "channels.mySettings": mySettings,
   "channels.testSend": testSend,
   "channels.templates": readTemplates,
@@ -812,7 +823,89 @@ export async function callAction<K extends ActionName>(
   const action = ACTION_MAP[name];
   // The cast is the one place the registry's heterogeneous shapes meet a
   // single call signature; the public types above keep callers honest.
-  return (action as ActionDefinition).handler(context, input) as Promise<
-    ActionOutput<K>
-  >;
+  const call = () =>
+    (action as ActionDefinition).handler(context, input) as Promise<
+      ActionOutput<K>
+    >;
+
+  // Measured here rather than per action, because this is the one door every
+  // surface comes through: the web app, the REST projection, the command
+  // line, the agent tool catalogue and the chat commands (P7-T06a). An
+  // action instrumented at its own definition would be measured once per
+  // definition and missed entirely by whichever one forgot.
+  // The context wins when it names one, which is how a test measures a single
+  // call without touching the process. Otherwise the host's, which is how the
+  // other four hundred call sites are measured without being edited.
+  const metrics = context.metrics ?? defaultMetrics();
+  if (metrics === NO_METRICS) {
+    // The instance is not measuring itself. Skip the timer and the labels
+    // rather than paying for them and throwing the answer away.
+    return call();
+  }
+
+  const started = performance.now();
+  let outcome: Outcome = OUTCOME.ok;
+  try {
+    // One span per action, and it is the root of everything the action does
+    // (P7-T06c). The Operation underneath it, the access reads and the
+    // outbox row it enqueues all happen inside this call, so they nest
+    // without any of them having to know a trace exists. The attributes are
+    // the action's own name and its declared level: both fixed by the
+    // registry, and a span leaves the host so nothing else may go here.
+    return await metrics.span(
+      `action ${name}`,
+      {
+        action: name,
+        required: ACCESS_LEVEL_NAMES[action.access] ?? String(action.access),
+      },
+      call,
+    );
+  } catch (error) {
+    outcome = outcomeOf(error);
+    throw error;
+  } finally {
+    // The action's own name is a label because the set of them is fixed by
+    // the registry. Nothing from `input` is, and nothing from `context`:
+    // neither the workspace nor the actor may become a label, because both
+    // are unbounded and one of them is a person.
+    const labels = { action: name, outcome };
+    metrics.count(METRIC.actionsTotal, labels);
+    metrics.observe(
+      METRIC.actionDuration,
+      (performance.now() - started) / 1000,
+      { action: name },
+    );
+
+    // The authorisation series is counted here too rather than down in the
+    // access layer, because this is the only place that knows both halves:
+    // the level the action declared it needs, and whether the call got past
+    // it. Splitting it would mean instrumenting the read path and the write
+    // path separately and keeping two counters agreeing about one decision.
+    //
+    // `required` is the declared level's name, which is one of five. The
+    // subject is not a label and never can be: what was refused is an
+    // operator's question, which row it was is the member's own business.
+    if (outcome === OUTCOME.ok || outcome === OUTCOME.refused) {
+      metrics.count(METRIC.authorisationTotal, {
+        action: name,
+        required: ACCESS_LEVEL_NAMES[action.access] ?? String(action.access),
+        outcome,
+      });
+    }
+  }
+}
+
+/**
+ * Which of the four outcomes an error means.
+ *
+ * `forbidden` and `not_found` are the access model answering, and the two are
+ * counted apart even though the product deliberately returns the same thing
+ * to a caller in most cases: an operator watching a spike of refusals needs
+ * to know which kind, and the counter never leaves the instance.
+ */
+function outcomeOf(error: unknown): Outcome {
+  if (error instanceof OperationError) {
+    return error.code === "forbidden" ? OUTCOME.refused : OUTCOME.notFound;
+  }
+  return OUTCOME.error;
 }

@@ -1559,12 +1559,137 @@
                                 "timezone"
                               ],
                               "additionalProperties": false
+                            },
+                            "data": {
+                              "type": "object",
+                              "properties": {
+                                "memberId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "takenAt": {
+                                  "type": "string"
+                                },
+                                "tables": {
+                                  "readOnly": true,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "table": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "rows": {
+                                        "readOnly": true,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "propertyNames": {
+                                            "type": "string"
+                                          },
+                                          "additionalProperties": {}
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "table",
+                                      "label",
+                                      "rows"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "omitted": {
+                                  "readOnly": true,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "table": {
+                                        "type": "string"
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "enum": [
+                                          "structural",
+                                          "access",
+                                          "derived",
+                                          "credential",
+                                          "workspace_record"
+                                        ]
+                                      },
+                                      "because": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "table",
+                                      "reason",
+                                      "because"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "memberId",
+                                "takenAt",
+                                "tables",
+                                "omitted"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "removed": {
+                              "type": "object",
+                              "properties": {
+                                "channelIdentities": {
+                                  "type": "number"
+                                },
+                                "channelLinkCodes": {
+                                  "type": "number"
+                                },
+                                "channelMessages": {
+                                  "type": "number"
+                                },
+                                "apiTokens": {
+                                  "type": "number"
+                                },
+                                "oauthGrants": {
+                                  "type": "number"
+                                },
+                                "oauthTokens": {
+                                  "type": "number"
+                                },
+                                "copilotThreads": {
+                                  "type": "number"
+                                },
+                                "copilotMessages": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "channelIdentities",
+                                "channelLinkCodes",
+                                "channelMessages",
+                                "apiTokens",
+                                "oauthGrants",
+                                "oauthTokens",
+                                "copilotThreads",
+                                "copilotMessages"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
                             "memberId",
                             "erasedAt",
-                            "priorProfile"
+                            "priorProfile",
+                            "data",
+                            "removed"
                           ],
                           "additionalProperties": false
                         }
@@ -3817,6 +3942,99 @@
             }
           }
         ]
+      }
+    },
+    "/channels/sweepMessageLog": {
+      "post": {
+        "operationId": "channels.sweepMessageLog",
+        "summary": "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
+        "tags": [
+          "channels"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "more": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "deleted",
+                        "retentionDays",
+                        "more"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "retentionDays": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/channels/mySettings": {
@@ -22286,9 +22504,7 @@
                                       ]
                                     },
                                     "position": {
-                                      "type": "integer",
-                                      "minimum": -9007199254740991,
-                                      "maximum": 9007199254740991
+                                      "type": "number"
                                     },
                                     "assignees": {
                                       "type": "array",
@@ -22483,6 +22699,16 @@
               "format": "uuid",
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
           }
         ]
       }
@@ -22568,9 +22794,7 @@
                             ]
                           },
                           "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
+                            "type": "number"
                           },
                           "assignees": {
                             "type": "array",
@@ -22786,9 +23010,7 @@
                           ]
                         },
                         "position": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "type": "number"
                         },
                         "assignees": {
                           "type": "array",
@@ -23252,9 +23474,7 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "position": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
+                          "type": "number"
                         },
                         "normalised": {
                           "type": "boolean"
@@ -25683,6 +25903,13 @@
                         "goals"
                       ],
                       "additionalProperties": false
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Opaque. Pass it back as `?cursor=` for the next page; null or absent at the end."
                     }
                   },
                   "required": [
@@ -25784,6 +26011,49 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "position",
+                "id"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "An opaque cursor from a previous response."
             }
           }
         ]

@@ -222,6 +222,7 @@ export async function GoalTable({
                     <span className="flex items-center gap-2">
                       <Bar
                         value={node.progressPct}
+                        label={node.title}
                         className="h-1.5 w-20 lg:w-28"
                       />
                       <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
@@ -308,7 +309,11 @@ export async function WorkMap({
                 <HealthChip health={selected.health} />
               </div>
               <div className="flex items-center gap-2">
-                <Bar value={selected.progressPct} className="h-1.5 flex-1" />
+                <Bar
+                  value={selected.progressPct}
+                  label={selected.title}
+                  className="h-1.5 flex-1"
+                />
                 <span className="text-xs font-semibold text-ink-3">
                   {Math.round(selected.progressPct)}%
                 </span>

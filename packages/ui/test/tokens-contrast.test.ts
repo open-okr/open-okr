@@ -172,13 +172,23 @@ const pairs: ReadonlyArray<
 ];
 
 /**
- * --ink-4 is the one token exempt from 4.5:1, and it is exempt on purpose:
- * placeholders and disabled labels are the two cases WCAG 1.4.3 itself
- * excludes. Asserted as a ceiling so nobody quietly promotes it to body
- * text, and as a floor so it does not fade to nothing. The floor is a house
- * number, not a WCAG one.
+ * --ink-4 clears 4.5:1 like every other text token, and the exemption it
+ * used to claim is gone (P7-T05).
+ *
+ * **This assertion used to say the opposite**, a ceiling of 4.5, on the
+ * reasoning that the token was for placeholders and disabled labels and
+ * those are the two cases WCAG 1.4.3 itself excludes. The reasoning was
+ * sound and it did not survive contact with the product: the accessibility
+ * scan found 152 uses, most of them ordinary small text, and seventeen
+ * screens failing contrast because of it. A token that is unsafe by design
+ * and safe only if every caller remembers is a token that keeps failing, so
+ * Agung chose darkening it on 10 September 2026 and this test now guards the
+ * new rule rather than the old one.
+ *
+ * The upper bound stays, moved up: --ink-4 is still the faintest text in the
+ * ramp and must not creep into --ink-3's job. The numbers are house ones.
  */
-const mutedRange = [2.2, 4.5] as const;
+const mutedRange = [4.5, 7] as const;
 
 describe.each([
   ["light", light],
@@ -192,10 +202,10 @@ describe.each([
     ).toBeGreaterThanOrEqual(min);
   });
 
-  it("keeps --ink-4 muted but visible", () => {
+  it("keeps --ink-4 the faintest text there is, and still readable", () => {
     for (const bg of ["--surface", "--bg", "--raised"]) {
       const ratio = contrast(hex(theme, "--ink-4"), hex(theme, bg));
-      expect(ratio, `--ink-4 on ${bg} in ${themeName}`).toBeGreaterThan(
+      expect(ratio, `--ink-4 on ${bg} in ${themeName}`).toBeGreaterThanOrEqual(
         mutedRange[0],
       );
       expect(ratio, `--ink-4 on ${bg} in ${themeName}`).toBeLessThan(
