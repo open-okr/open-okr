@@ -35,6 +35,19 @@ interface Draft {
   readonly context: string;
   readonly objective: string;
   readonly keyResults: readonly string[];
+  /**
+   * Which key results a reader would call leading indicators, by index.
+   *
+   * **Leading or lagging is a judgement about the business and cannot be
+   * read off the sentence**, so it is written down here per draft rather
+   * than guessed by the harness. The first version of this script tagged
+   * every key result `lagging`, which made KR-4's "all lagging" warning
+   * fire on all twenty drafts and look like a rule that is always on. It
+   * was the fixture, not the rule.
+   *
+   * Omitted means none: the set is all lagging, and KR-4 should say so.
+   */
+  readonly leading?: readonly number[];
   /** Set when the draft is deliberately missing something. */
   readonly missing?: {
     readonly champion?: true;
@@ -55,6 +68,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut median time to first value from 6 days to 2 days",
       "Reduce onboarding support tickets per 100 signups from 24 to 10",
     ],
+    leading: [1, 2],
   },
   {
     n: 2,
@@ -65,6 +79,7 @@ const DRAFTS: readonly Draft[] = [
       "Complete the Android beta programme",
       "Deliver the marketing site refresh",
     ],
+    leading: [0, 1, 2],
   },
   {
     n: 3,
@@ -74,6 +89,7 @@ const DRAFTS: readonly Draft[] = [
       "Increase new business bookings from 1.2M to 1.7M",
       "Lift net revenue retention from 104% to 112%",
     ],
+    leading: [0],
   },
   {
     n: 4,
@@ -92,6 +108,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut unplanned work from 40% to 20% of sprint capacity",
       "Reduce rollback count from 11 to 2 per quarter",
     ],
+    leading: [1, 2, 4, 5, 6, 9],
   },
   {
     n: 5,
@@ -118,6 +135,7 @@ const DRAFTS: readonly Draft[] = [
       "Create the semantic layer",
       "Build the self-serve dashboard library",
     ],
+    leading: [0, 1, 2, 3],
   },
   {
     n: 8,
@@ -128,6 +146,7 @@ const DRAFTS: readonly Draft[] = [
       "Better support response times",
       "More positive reviews",
     ],
+    leading: [1],
   },
   {
     n: 9,
@@ -137,6 +156,7 @@ const DRAFTS: readonly Draft[] = [
       "Raise the share of new revenue from referral and word of mouth from 8% to 25%",
       "Lift the free-to-paid rate from 3.1% to 6%",
     ],
+    leading: [1],
     level: "company",
     missing: { timeframe: true },
   },
@@ -149,6 +169,7 @@ const DRAFTS: readonly Draft[] = [
       "Reduce average first response time from 11 hours to 3 hours",
       "Raise one-touch resolution from 38% to 55%",
     ],
+    leading: [0, 1],
   },
   {
     n: 11,
@@ -158,6 +179,7 @@ const DRAFTS: readonly Draft[] = [
       "Complete 100% of the reconciliation automation",
       "Achieve 90% of the planned control migrations",
     ],
+    leading: [0, 1],
   },
   {
     n: 12,
@@ -167,6 +189,7 @@ const DRAFTS: readonly Draft[] = [
       "Raise market share from 4% to 20%",
       "Grow enterprise logos from 6 to 60",
     ],
+    leading: [1],
   },
   {
     n: 13,
@@ -176,6 +199,7 @@ const DRAFTS: readonly Draft[] = [
       "Hold weekly one-to-ones with all six engineers",
       "Attend the architecture forum every fortnight",
     ],
+    leading: [0, 1],
     level: "individual",
   },
   {
@@ -186,6 +210,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut infrastructure cost per enterprise account from 1,900 to 1,200 a month",
       "Reduce support hours per enterprise account from 14 to 8 a month",
     ],
+    leading: [1],
   },
   {
     n: 15,
@@ -195,6 +220,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut cart abandonment from 71% to 58%",
       "Raise payment success rate from 94.2% to 98%",
     ],
+    leading: [1],
     objectivesInUnit: 9,
   },
   {
@@ -205,6 +231,7 @@ const DRAFTS: readonly Draft[] = [
       "Raise the share of pipeline with complete stage data from 46% to 95%",
       "Cut the time to produce a board forecast from 5 days to 4 hours",
     ],
+    leading: [0],
   },
   {
     n: 17,
@@ -214,6 +241,7 @@ const DRAFTS: readonly Draft[] = [
       "Raise the share of privileged actions with a verifiable audit row from 82% to 100%",
       "Cut the time to produce a full access review from 3 weeks to 2 days",
     ],
+    leading: [0],
   },
   {
     n: 18,
@@ -223,6 +251,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut time to offer from 38 days to 21 days and raise offer acceptance from 62% to 80%",
       "Raise candidate experience score from 3.9 to 4.5 out of 5",
     ],
+    leading: [0],
   },
   {
     n: 19,
@@ -232,6 +261,7 @@ const DRAFTS: readonly Draft[] = [
       "Increase marketing-sourced pipeline from 4.1M to 7M",
       "Raise the pipeline-to-close rate from 19% to 26%",
     ],
+    leading: [0],
     level: "department",
   },
   {
@@ -243,6 +273,7 @@ const DRAFTS: readonly Draft[] = [
       "Cut involuntary churn from 2.4% to 0.9% a month",
       "Reduce payment-related contacts per 1,000 customers from 19 to 6",
     ],
+    leading: [0, 2],
   },
 ];
 
@@ -275,7 +306,7 @@ const RANGE = /\bfrom\s+([\d.,]+)\s*%?\s*[a-z%]*\s+to\s+([\d.,]+)/i;
 const RAISE_WORDS = /\b(raise|increase|lift|grow|improve|more)\b/i;
 const REDUCE_WORDS = /\b(cut|reduce|lower|decrease|fewer|less)\b/i;
 
-function asKeyResult(text: string, filled: boolean) {
+function asKeyResult(text: string, filled: boolean, leading: boolean) {
   if (!filled) {
     return {
       text,
@@ -304,8 +335,9 @@ function asKeyResult(text: string, filled: boolean) {
     ownerId: "member-1",
     // Whether a measure is leading or lagging is a judgement about the
     // business, not something a sentence states, so a filled-in draft is
-    // given the one a reader would pick rather than left null.
-    indicatorType: "lagging" as const,
+    // given the one a reader would pick rather than left null. The draft
+    // names which ones those are; see `Draft.leading`.
+    indicatorType: leading ? ("leading" as const) : ("lagging" as const),
     direction,
     confidence: 0.6,
   };
@@ -337,7 +369,11 @@ for (const draft of DRAFTS) {
       thresholds,
     ),
     ...evaluateKeyResults(
-      { keyResults: draft.keyResults.map((text) => asKeyResult(text, false)) },
+      {
+        keyResults: draft.keyResults.map((text, index) =>
+          asKeyResult(text, false, draft.leading?.includes(index) ?? false),
+        ),
+      },
       thresholds,
     ),
   ].filter((verdict) => verdict.status !== "pass");
@@ -361,7 +397,11 @@ for (const draft of DRAFTS) {
   );
 
   const keyResultVerdicts = evaluateKeyResults(
-    { keyResults: draft.keyResults.map((text) => asKeyResult(text, filled)) },
+    {
+      keyResults: draft.keyResults.map((text, index) =>
+        asKeyResult(text, filled, draft.leading?.includes(index) ?? false),
+      ),
+    },
     thresholds,
   );
 

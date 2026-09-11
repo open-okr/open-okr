@@ -64,12 +64,22 @@ point.
 
 | Moment | Clean | Warnings | Refusals |
 |---|---|---|---|
-| As first typed: the sentence and nothing else | 0 of 20 | 27 | 70 |
-| With what the sentence plainly states filled in | 0 of 20 | 47 | 21 |
+| As first typed: the sentence and nothing else | 0 of 20 | 19 | 70 |
+| With what the sentence plainly states filled in | 5 of 20 | 25 | 21 |
+
+Those are the figures after P7-T07a and after the harness defect in finding 2
+was corrected. The first reading of this table, before either, was 0 clean
+and 47 warnings on the second row.
 
 ## 3. The five findings
 
 ### Finding 1. OBJ-1 warns on sixteen of twenty objectives
+
+**Settled. Agung chose option 2 on 11 September 2026 and P7-T07a
+(`f48a367`) landed it.** §4.1 gained an end-state shapes table and a pass
+condition for it. OBJ-1's warnings across the twenty drafts fell from
+sixteen to eight; its three refusals are untouched. The record of the
+problem is kept below because the shape of it is what the decision answered.
 
 **The most consequential finding.** §4.1's OBJ-1 has a "Cannot tell" fallback
 row that warns with *"Could you complete this without anything actually
@@ -99,17 +109,40 @@ Three ways out, and the choice is a human's:
 3. Make "Cannot tell" a `pass` with no prompt, and let OBJ-1 speak only when
    it has actually seen output language or a bare metric.
 
-### Finding 2. KR-4 warns on all twenty
+### Finding 2. KR-4 warned on all twenty, and that was the harness
 
-§4.2's KR-4 warns when every measure in a set is lagging. Twenty of twenty
-drafts warn, because outcome measures usually *are* lagging and a team
-writing good ones will hit this every time.
+**Withdrawn as a finding about METHOD.md. It was a defect in this audit's
+own fixture**, found on 11 September 2026 when Agung re-ran the script and
+confirmed the count, which made the number worth going back to rather than
+ruling on.
 
-The warning is right on the practice: METHOD.md wants a leading indicator so
-a team finds out before the quarter ends. The question is whether a warning
-that is always on is a warning anybody reads, and whether the prompt should
-say what a leading indicator for *this* set would look like rather than only
-that there is none.
+`scripts/method-verdicts.ts` tagged every key result `indicatorType:
+"lagging"`. KR-4 warns when a set is all lagging, so it warned on all twenty
+sets because the harness had built all twenty that way. The rule was
+reporting the fixture back to itself.
+
+Leading or lagging is a judgement about the business and cannot be read off
+a sentence, so each draft now names which of its key results a reader would
+call leading, in `Draft.leading`. With honest tags KR-4 fires six times:
+
+| Draft | Prompt | Is it right? |
+|---|---|---|
+| 2, 7, 11, 13 | Which key result proves the actual outcome landed? | Yes. All four are sets of milestones with no outcome measure anywhere, which is the case KR-4 exists for |
+| 5, 6 | You will only find out at the end of the cycle whether it worked. | Open, see below |
+
+**What survives is narrower and still a human's call.** Drafts 5 and 6 hold
+one key result each. A set of one can never hold both a leading and a
+lagging measure, so KR-4 can never pass it, and KR-1 already warns at one
+measure. A single key result therefore always draws two warnings for the
+same fact. Whether that is coaching or repetition is a METHOD.md question:
+§4.2 could exempt a set of one from KR-4, or leave it, on the argument that
+one lagging measure is exactly when a team most needs telling.
+
+**How this got through, because the class matters more than the instance.**
+Every other number in this audit was measured against the product. This one
+was measured against a constant the harness supplied, and a rule firing on
+20 of 20 reads as a finding rather than as the flat line it is. A check that
+fires on everything is the first thing to suspect of measuring itself.
 
 ### Finding 3. Nothing reads a baseline out of the member's own sentence
 
@@ -175,6 +208,21 @@ The first half is done: eighteen enumerations, five rule families and the
 threshold registry, each proved by being broken.
 
 The second half is **outstanding and cannot be closed by this side.** Run
-`pnpm method:verdicts`, read the twenty, and rule on findings 1 to 5. A
-verdict you disagree with is a change to a word list, a threshold or a
-coaching message, and all three are yours.
+`pnpm method:verdicts`, read the twenty, and rule on what is left. A verdict
+you disagree with is a change to a word list, a threshold or a coaching
+message, and all three are yours.
+
+What is left, after finding 1 was settled and finding 2 was withdrawn:
+
+| # | Question | What ruling it would change |
+|---|---|---|
+| 2 | Should a set of one key result be exempt from KR-4? | §4.2 KR-4's conditions |
+| 3 | Should the product read "from X to Y" out of the member's own sentence? | A product decision, not METHOD.md. Clears 49 of 70 refusals |
+| 4 | Should the canon gain a duplicate-measure and a compound-measure check? | §4.2 gains one or two checks |
+| 5 | Which wording wins for four publish gates? | §4.5, or `GATE_TITLES` |
+
+Draft 1 is also worth one look. *"Reduce onboarding support tickets per 100
+signups from 24 to 10"* draws KR-5's *"Good instinct, but flip it"* because
+`ticket` is an activity noun in §4.2's list. It is a ratio, and reducing it
+is the impact, so the coach is asking for a flip that has already happened.
+A ruling here is a word-list change, which is yours.
