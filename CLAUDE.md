@@ -290,6 +290,8 @@ Keep this list current once scaffolded.
 - `sh deploy/helm/check.sh`: the Helm chart's behaviour checks, no cluster needed. What the chart refuses, where migrations run, and that no credential lands in a pod spec
 - `sh deploy/helm/cluster-test.sh`: install the chart into a kind cluster, register a user and upgrade. Needs `kind create cluster` and the image loaded. Takes `OPENOKR_IMAGE_TAG`
 - `pnpm db:lint`: the migration linter (tenant floor, soft delete) and the soft-delete usage lint
+- `pnpm method:check`: the conformance suite. It reads METHOD.md itself rather than a transcription, and compares five rule families, the §11 threshold registry and **eighteen of the document's own enumerations** against `packages/method`: the eight phases, the eight root causes, the five blocker types, the three rituals, the four weekly steps, the eleven review stages, the close decisions, the process-health statements, the retro questions and the §8.6 diagnostic. Every comparison runs in both directions and every parse is floored on its length, so a regex that finds nothing fails rather than quietly agreeing with everything. Extended at P7-T07, which found that the suite had been checking the rules that fire and the numbers they fire on and **not one enumeration**
+- `pnpm method:verdicts`: twenty real OKR drafts through the quality canon, with every verdict and the rule that produced it (P7-T07). **For a person to read, not a gate.** The conformance suite proves the package agrees with the document; it cannot prove the document is right. Each draft is printed at two moments, as first typed and with what its own sentence plainly states filled in, and the gap between the two counts is the false-positive picture. `docs/design/p7-t07-conformance-audit.md` records what that run found and the five questions it leaves for a human
 
 ### Commands that do not exist yet
 
@@ -298,10 +300,13 @@ settled, and so nobody documents a command as though it already runs. A command
 that is written down but absent has already cost this repository once: `pnpm
 test:e2e` was in this list for four tasks before P1-T08 built it.
 
-| Command | Arrives at | What it will do |
-|---|---|---|
-| `pnpm db:seed` | P3-T17 | Demo data. Needs objectives, key results and a cycle to seed |
-| `pnpm method:check` | P4-T01 | The conformance suite comparing `packages/method` against METHOD.md |
+**The list is empty.** Both rows that were here have been built and are in the
+list above: `pnpm db:seed` arrived at P3-T17 and `pnpm method:check` at
+P4-T01, and both sat here afterwards saying they did not exist. Corrected
+11 September 2026 at P7-T07, which is the task that runs `method:check`, so
+the very command being extended was documented as absent while it ran. Put a
+row back only for a command that genuinely does not exist yet, and delete it
+the day it does.
 
 ## Definition of done for every task
 

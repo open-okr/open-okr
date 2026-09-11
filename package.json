@@ -27,6 +27,7 @@
     "perf:budgets": "pnpm --filter @openokr/core perf:budgets",
     "perf:load": "pnpm --filter @openokr/core perf:load",
     "method:check": "node --experimental-strip-types --no-warnings scripts/method-check.ts",
+    "method:verdicts": "node --experimental-strip-types --no-warnings scripts/method-verdicts.ts",
     "db:lint": "pnpm --filter @openokr/db lint:migrations ../test-support/fixtures/db/migrations && pnpm --filter @openokr/db lint:soft-delete",
     "keys:rotate": "pnpm --filter @openokr/core keys:rotate",
     "okr": "pnpm --filter @openokr/cli okr",

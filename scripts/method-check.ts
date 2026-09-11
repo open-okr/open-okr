@@ -27,14 +27,25 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ALIGNMENT_CHECKS,
+  BLOCKER_TYPE_DEFINITIONS,
   canonThresholds,
+  CLOSE_DECISION_MEANINGS,
   CYCLE_CHECKS,
   isTriggerKey,
+  GATE_TITLES,
   KEY_RESULT_CHECKS,
+  MANAGEMENT_RETRO_QUESTIONS,
   OBJECTIVE_CHECKS,
+  PHASE_TITLES,
+  PROCESS_HEALTH_STATEMENTS,
   QUALITY_WORD_LISTS,
+  REVIEW_STAGES,
+  RITUALS,
+  rhythmDiagnostic,
   roomPulseRead,
+  ROOT_CAUSES,
   THRESHOLDS,
+  WEEKLY_STEPS,
 } from "../packages/method/src/index.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -290,6 +301,262 @@ for (const documentedRead of documentedReads) {
   }
 }
 
+/**
+ * How many of METHOD.md's own lists are compared below.
+ *
+ * Printed on success, because a conformance suite that says "passed" without
+ * saying what it looked at is a suite nobody notices has stopped looking.
+ * Raise it when you add a list.
+ */
+const ENUMERATIONS_CHECKED = 18;
+
+// --- 5. The enumerations (P7-T07) -------------------------------------------
+//
+// **The gap this audit found.** Everything above checks the rules that fire
+// and the numbers they fire on: the trigger keys, the §11 registry, the word
+// lists, the corpus. None of it checked a single one of METHOD.md's
+// *enumerations*, and those are most of what §2, §7 and §8 are made of: the
+// eight phases, the six publish gates, the eight root causes, the five
+// blocker types, the three rituals, the four weekly steps, the
+// process-health statements and the management retro questions.
+//
+// A taxonomy that has drifted is drift like any other. The five blocker
+// types are a closed list a facilitator picks from during a session, so an
+// item added to the document and not to the package is an option the product
+// will never offer, and nothing before this would have said so.
+//
+// Each list is compared in both directions and in order. Order matters for
+// the phases because they are a sequence people walk through, and for the
+// rest because a list that reads in one order in the document and another on
+// the screen is the same problem as a missing item.
+
+/** Every numbered item in an ordered markdown list. */
+const numberedItems = (body: string): string[] =>
+  body
+    .split(NEWLINE)
+    .map((line) => /^\d+\.\s+(.+?)\s*$/.exec(line)?.[1])
+    .filter((item): item is string => item !== undefined);
+
+/** One column of a markdown table, header row dropped. */
+const tableColumn = (body: string, index: number): string[] =>
+  body
+    .split(NEWLINE)
+    .filter((line) => line.trimStart().startsWith("|"))
+    .filter((line) => !/^\|[\s|:-]+\|$/.test(line.trim()))
+    .map((line) =>
+      line
+        .trim()
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cell.trim()),
+    )
+    .slice(1)
+    .map((cells) => cells[index])
+    .filter((cell): cell is string => cell !== undefined && cell !== "");
+
+const compare = (
+  what: string,
+  documented: readonly string[],
+  inPackage: readonly string[],
+  floor: number,
+): void => {
+  // A parse that finds nothing agrees with everything, so every list is
+  // floored before its contents are trusted. This is the guard that stops a
+  // broken regex passing silently, the same one the trigger-key check uses.
+  if (documented.length < floor) {
+    fail(
+      what,
+      `found ${documented.length} item(s) in METHOD.md where at least ${floor} were expected; the parse is wrong, not the document`,
+    );
+    return;
+  }
+  if (documented.length !== inPackage.length) {
+    fail(
+      what,
+      `METHOD.md lists ${documented.length} and packages/method carries ${inPackage.length}`,
+    );
+  }
+  documented.forEach((item, index) => {
+    if (inPackage[index] !== item) {
+      fail(
+        what,
+        `position ${index + 1}: METHOD.md says "${item}" and packages/method says "${inPackage[index] ?? "nothing"}"`,
+      );
+    }
+  });
+};
+
+// §2.2. The phase a workspace is in is stored as a number, so a list that
+// reordered would renumber every cycle in the database.
+compare(
+  "the eight phases",
+  tableColumn(section(method, "### 2.2 The eight phases", "### 2.3"), 1),
+  PHASE_TITLES,
+  8,
+);
+
+// §8.4. Exactly one primary cause per key result under 0.7, picked from a
+// closed list in a live session.
+compare(
+  "the root causes",
+  numberedItems(section(method, "### 8.4 Root causes", "### 8.5")),
+  ROOT_CAUSES,
+  8,
+);
+
+// §7.3. The five a blocker must be one of. A type in the document and not in
+// the package is a type the picker will never offer.
+compare(
+  "the blocker taxonomy",
+  tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 0),
+  BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.label),
+  5,
+);
+compare(
+  "the blocker definitions",
+  tableColumn(section(method, "### 7.3 Blocker taxonomy", "### 7.4"), 1),
+  BLOCKER_TYPE_DEFINITIONS.map((entry) => entry.definition),
+  5,
+);
+
+// §7.1. Length, frequency and purpose are what a facilitator books a calendar
+// from, so all three are compared rather than the name alone.
+const ritualRows = section(method, "### 7.1 The three rituals", "### 7.2");
+compare("the rituals: length", tableColumn(ritualRows, 1), RITUALS.map((r) => r.length), 3);
+compare("the rituals: frequency", tableColumn(ritualRows, 2), RITUALS.map((r) => r.frequency), 3);
+compare("the rituals: purpose", tableColumn(ritualRows, 3), RITUALS.map((r) => r.purpose), 3);
+
+// §8.5. Statements a room scores itself against. Wording is the whole of a
+// statement, so these are compared word for word.
+compare(
+  "the process-health statements",
+  numberedItems(section(method, "### 8.5 Process health", "### 8.6")),
+  PROCESS_HEALTH_STATEMENTS,
+  3,
+);
+
+// §8.7. What management is asked, in a room where the wording decides
+// whether anybody answers honestly.
+compare(
+  "the management retro questions",
+  numberedItems(section(method, "### 8.7 Management retro", "### 8.8")),
+  MANAGEMENT_RETRO_QUESTIONS,
+  3,
+);
+
+// §8.1. Eleven stages, in order, with the act each belongs to. The minutes
+// are not compared here: §11 lists "Quarterly stage minutes" as a parameter
+// in the same breath as saying the stage order cannot change, so they are a
+// threshold and the registry check above already owns them.
+const stageRows = section(method, "### 8.1 The stages", "### 8.2");
+compare(
+  "the review stages",
+  tableColumn(stageRows, 1),
+  REVIEW_STAGES.map((stage) => stage.title),
+  11,
+);
+compare(
+  "the review stage acts",
+  tableColumn(stageRows, 2).map((act) => act.toLowerCase()),
+  REVIEW_STAGES.map((stage) => stage.act),
+  11,
+);
+compare(
+  "the review stage purposes",
+  tableColumn(stageRows, 4),
+  REVIEW_STAGES.map((stage) => stage.purpose),
+  11,
+);
+
+// §7.2. Four steps, named in bold at the head of each paragraph.
+compare(
+  "the weekly steps",
+  [
+    ...section(method, "### 7.2 The weekly check-in", "### 7.3").matchAll(
+      /\*\*Step \d+\.\s*([^.*]+)\.?\*\*/g,
+    ),
+  ].map((match) => (match[1] ?? "").trim()),
+  WEEKLY_STEPS.map((step) => step.title),
+  4,
+);
+
+// §4.5. **Counted and ordered, not compared word for word, and this is the
+// one weaker check in the file.**
+//
+// The six gates carry the same six rules in the same order in both places,
+// and four of them are worded differently: the document writes full
+// sentences for a reader, the package writes titles for a screen. One of the
+// document's sentences is "Every key result passes the §4.2 checks", and a
+// section reference is not something to put on a publish button.
+//
+// So this asserts that there are six and that none has been added or
+// removed, which is the part a machine can judge. Whether a title still says
+// what its rule says is a human's call, and the wording differences are
+// recorded in STATUS.md for P7-T07 rather than quietly resolved here in
+// either direction.
+const documentedGates = numberedItems(
+  section(method, "### 4.5 Publish gates", "### 4.6"),
+);
+if (documentedGates.length !== GATE_TITLES.length) {
+  fail(
+    "the publish gates",
+    `METHOD.md §4.5 lists ${documentedGates.length} and packages/method carries ${GATE_TITLES.length}. A gate in one and not the other is a set that can be published without a rule the practice requires, or a rule nobody can satisfy.`,
+  );
+}
+
+// §8.8. Three decisions, and the one-line meaning beside each. A member
+// picks one of these to close an objective, so a meaning that has drifted is
+// a member choosing on the strength of a sentence the practice no longer
+// says.
+const closeRows = section(method, "### 8.8 Keep, modify, abandon", "### 8.9");
+compare(
+  "the close decisions",
+  tableColumn(closeRows, 0).map((label) => label.toLowerCase()),
+  Object.keys(CLOSE_DECISION_MEANINGS),
+  3,
+);
+compare(
+  "the close decision meanings",
+  tableColumn(closeRows, 1),
+  Object.values(CLOSE_DECISION_MEANINGS),
+  3,
+);
+
+// §8.6. **The diagnostic METHOD.md calls the most valuable output of the
+// review**, so every diagnosis and every prescription is compared word for
+// word. Getting the two lower rows backwards is the failure the section
+// exists to prevent: pushing a team that already ran the rhythm, or
+// rewriting objectives for a team that never met. A prescription that
+// drifted into the wrong row would do exactly that, and would read as
+// perfectly sensible advice.
+const diagnosticRows = section(
+  method,
+  "### 8.6 The rhythm diagnostic",
+  "### 8.7",
+);
+const canon = canonThresholds();
+const cycleFloor = canon["sessions.diagnosticCycleScore"];
+const rhythmFloor = canon["sessions.diagnosticRhythmScore"];
+const producedDiagnoses = [
+  // Above the cycle floor, the rhythm score is not consulted at all. The
+  // second argument is deliberately the failing one, to prove it is ignored.
+  rhythmDiagnostic(cycleFloor, rhythmFloor - 1, canon),
+  rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor, canon),
+  rhythmDiagnostic(cycleFloor - 0.01, rhythmFloor - 0.01, canon),
+];
+compare(
+  "the rhythm diagnostic: diagnoses",
+  tableColumn(diagnosticRows, 1),
+  producedDiagnoses.map((entry) => entry.diagnosis),
+  3,
+);
+compare(
+  "the rhythm diagnostic: prescriptions",
+  tableColumn(diagnosticRows, 2),
+  producedDiagnoses.map((entry) => entry.prescription),
+  3,
+);
+
 // --- Report -----------------------------------------------------------------
 
 if (problems.length > 0) {
@@ -311,6 +578,7 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 );
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
-    `${documented.size} thresholds, ${terms} word-list terms and ` +
-    `${corpusEntries.length} corpus entries agree with the documents.`,
+    `${documented.size} thresholds, ${terms} word-list terms, ` +
+    `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
+    `agree with the documents.`,
 );

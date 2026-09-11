@@ -2164,6 +2164,7 @@ thread, what happens after it returns, and what a human finally looks at.
 ### P7-T07: Method conformance audit [M]
 Depends on: P4-T01g
 Deliverables: a full pass comparing every rule, threshold, band, corridor, taxonomy, gate, agenda and diagnostic in METHOD.md against `packages/method` and against the behaviour observed in the running product; the coaching-prompt corpus reviewed for tone and accuracy against the tuned false-positive rate; any drift corrected in the document or the code, whichever is wrong.
+Test plan: every enumeration the suite compares is proved by being broken, so a check that has never failed is never trusted; each comparison runs in both directions, because an item in the document and not in the package is as much drift as the reverse; every list is floored on its parsed length, so a regex that finds nothing fails instead of agreeing with everything; the twenty-draft sample runs with the AI provider off, because a false-positive rate measured with a model filling in the gaps is not the rate a self-hosted instance gets. (Added at P7-T07: the card shipped with no test plan line, which is a Definition of Ready gap under criterion 3, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
 
 ### P7-T08: Privacy: export, erasure and retention [M]
