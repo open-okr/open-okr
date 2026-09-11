@@ -3,11 +3,20 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
+import { installTelemetry } from "../lib/telemetry";
 
 // Mocked rather than allowed to run: the real one opens a pool and polls
 // forever, which a unit test should neither connect for nor be kept alive by.
 vi.mock("../lib/relay", () => ({ startRelay: vi.fn() }));
 vi.mock("../lib/scheduler", () => ({ startScheduler: vi.fn() }));
+// **Mocked for the import cost, not for a side effect** (P7-T06a).
+// Constructing a meter opens nothing and connects to nothing. What it does do
+// is pull `@openokr/adapters` into this file's module graph, and that package
+// carries every vendor SDK the product has: the S3 client, the mail
+// transport, the socket server and four LLM clients. Loading it took these
+// two tests past the five-second timeout. The other two mocks above already
+// cut the same graph out, so an unmocked third route to it put the cost back.
+vi.mock("../lib/telemetry", () => ({ installTelemetry: vi.fn() }));
 
 const original = { ...process.env };
 
@@ -23,6 +32,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(startRelay).mockClear();
   vi.mocked(startScheduler).mockClear();
+  vi.mocked(installTelemetry).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -51,6 +61,14 @@ test("boot succeeds with a valid environment, and starts the relay (P5-T01a)", a
   // Without this call nothing delivers an invitation email or a live event,
   // which is exactly the state PLAN.md §12 R10 recorded.
   expect(startRelay).toHaveBeenCalled();
+  // **Before the relay and the scheduler, so the work they do from the first
+  // second is measured rather than missed** (P7-T06a). Held here because the
+  // order is the whole reason the call sits where it does in
+  // `instrumentation.ts`, and nothing else would notice if it moved.
+  expect(installTelemetry).toHaveBeenCalled();
+  expect(vi.mocked(installTelemetry).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(startRelay).mock.invocationCallOrder[0] as number,
+  );
 });
 
 test("a build worker does not start the relay, because it has to be able to exit", async () => {

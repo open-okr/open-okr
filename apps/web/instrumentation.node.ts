@@ -1,8 +1,7 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
-import { setDefaultMetrics } from "@openokr/core";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
-import { getTelemetry } from "./lib/telemetry";
+import { installTelemetry } from "./lib/telemetry";
 
 /**
  * Node-only boot checks. Kept out of `instrumentation.ts` so the edge bundle
@@ -91,7 +90,7 @@ export function startTelemetry(): void {
     return;
   }
   try {
-    setDefaultMetrics(getTelemetry());
+    installTelemetry();
   } catch (error) {
     // Non-fatal, and for a stronger reason than the relay's. A product that
     // refused to serve because it could not measure itself would have turned

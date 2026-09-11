@@ -1,4 +1,5 @@
 import { createTelemetry, type Telemetry } from "@openokr/adapters";
+import { setDefaultMetrics } from "@openokr/core";
 
 /**
  * This process's meter (P7-T06a).
@@ -81,4 +82,23 @@ function otlpEndpoint(): string {
 /** True when this instance is measuring itself. Used by the route to refuse. */
 export function isMetricsEnabled(): boolean {
   return metricsEnabled();
+}
+
+/**
+ * Builds the meter and installs it as the recorder every action uses.
+ *
+ * **Here rather than in `instrumentation.node.ts`, and the reason is a
+ * defect that cost two timed-out tests.** The boot module imported
+ * `setDefaultMetrics` from `@openokr/core` directly, which pulled the whole
+ * action registry, all three hundred and forty-one actions of it, into a
+ * module graph that `instrumentation.test.ts` had deliberately kept small by
+ * mocking the relay and the scheduler. Loading it took the two boot tests
+ * past their five-second budget.
+ *
+ * It is also the better shape. This module owns the meter, so this module is
+ * what installs it, and the boot hook calls one function from one place
+ * instead of assembling the pieces itself.
+ */
+export function installTelemetry(): void {
+  setDefaultMetrics(getTelemetry());
 }

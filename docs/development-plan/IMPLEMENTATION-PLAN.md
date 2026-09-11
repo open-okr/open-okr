@@ -2167,6 +2167,14 @@ Deliverables: a full pass comparing every rule, threshold, band, corridor, taxon
 Test plan: every enumeration the suite compares is proved by being broken, so a check that has never failed is never trusted; each comparison runs in both directions, because an item in the document and not in the package is as much drift as the reverse; every list is floored on its parsed length, so a regex that finds nothing fails instead of agreeing with everything; the twenty-draft sample runs with the AI provider off, because a false-positive rate measured with a model filling in the gaps is not the rate a self-hosted instance gets. (Added at P7-T07: the card shipped with no test plan line, which is a Definition of Ready gap under criterion 3, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
 
+### P7-T07a: OBJ-1 recognises an end state it has no word for [M]
+Depends on: P7-T07
+Goal: the objective check stops warning on nineteen objectives out of twenty.
+**Approved by Agung on 11 September 2026**, on the audit's finding 1. §4.1's OBJ-1 reaches its "Cannot tell" fallback unless the title matches the movement-with-a-why shape or carries one of twenty-two state words, so a natural and well-formed English outcome warns. Sixteen of twenty real drafts landed there. Agung chose to recognise the sentence shape rather than lengthen the word list, because a word list will always be behind English.
+Deliverables: METHOD.md §4.1 gains an end-state shape alongside its state-word list, covering at least "Make X something Y", "Reach the point where X" and "Get to where X"; `packages/method` implements the shape and the conformance suite compares it; `pnpm method:verdicts` re-run and its counts recorded, because the point of the change is the count.
+Test plan: every one of the twenty drafts that landed in "Cannot tell" only because of its shape now passes OBJ-1, and every draft that genuinely starts with an output verb or names a bare metric still fails; the shape matcher is compared against §4.1 by the conformance suite, so a phrase added to the document and not the package fails the build; a deliberately vague objective that names no end state at all still reaches the fallback, because the fallback is not being removed.
+Acceptance: Given the twenty drafts in `pnpm method:verdicts`, when the shape is recognised, then the objectives written deliberately as outcomes pass OBJ-1 and the ones written as deliverables still do not.
+
 ### P7-T08a: Where personal data actually goes [S]
 Depends on: P7-T03
 Goal: know what reaches logs, prompts and telemetry before deciding what to delete.
@@ -2177,14 +2185,15 @@ Acceptance: Given the review, when a human reads it, then every route personal d
 ### P7-T08b: Personal export and erasure across every table [L]
 Depends on: P7-T08a
 Goal: an erasure that finishes, and an export that is the member's content rather than their profile.
-Deliverables: a per-member export covering every table that holds them, generated through the Operation pipeline; erasure extended past `workspace_members` to channel connections and identities, message payloads, conversations, copilot threads and prompts, and issued tokens; a table-by-table record of what is anonymised and what is deleted, decided by a human before any code.
+Deliverables: a per-member export covering every table that holds them, generated through the Operation pipeline; erasure extended past `workspace_members` to channel connections and identities, message payloads, conversations, copilot threads and prompts, and issued tokens; a table-by-table record of what is anonymised and what is deleted.
+**Decided by Agung on 11 September 2026: anonymise the content, delete the identifiers.** The name, the address, the handle, the external account id and every issued token go. What the member wrote stays, attributed to the placeholder identity. Two reasons carried the decision: a quarter's record stays readable, and the audit chain still verifies, which matters because an erasure that breaks the chain has destroyed the record proving it happened. Channel message payloads are blanked and their rows kept, because the row is the delivery record the audit refers to.
 Test plan: an erasure followed by a search for the member's address, handle and external id across every table returns nothing; the content they authored is still readable and still attributed to the placeholder; the audit chain still verifies after the erasure, because an erasure that breaks the chain has destroyed the record that proves it happened.
 Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export of their own data is produced, and no personal data of theirs remains in message logs or prompts.
 
 ### P7-T08c: Retention, and the sweep that honours it [M]
 Depends on: P7-T08b
 Goal: an instance can forget what it no longer needs, and nothing forgets by accident.
-Deliverables: three settings in the TECHNICAL-PLAN §4.14 map for message logs, nudge records and agent run logs, each with a default a human chose; a sweep that runs on the scheduler and deletes past retention through the Operation pipeline so the deletion is audited; the operator documentation saying what is kept and for how long.
+Deliverables: three settings in the TECHNICAL-PLAN §4.14 map for message logs, nudge records and agent run logs, **each defaulting to zero, which means delete nothing** (decided by Agung on 11 September 2026: keep forever, with retention opt-in, so no instance loses data to a default it never chose); a sweep that runs on the scheduler and deletes past retention through the Operation pipeline so the deletion is audited; the operator documentation saying what is kept and for how long.
 Test plan: a retention of zero or unset deletes nothing, because "not configured" must never mean "delete everything"; the sweep is idempotent and bounded, so a backlog does not hold a transaction open over a quarter of messages; a row inside its window survives a run and a row outside it does not; the audit row for a sweep names how many rows went and from which table.
 Acceptance: Given a message log older than its retention, when the sweep runs, then the row is gone, the deletion is in the audit trail, and a row inside the window is untouched.
 
