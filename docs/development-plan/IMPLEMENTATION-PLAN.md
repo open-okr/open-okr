@@ -2167,10 +2167,36 @@ Deliverables: a full pass comparing every rule, threshold, band, corridor, taxon
 Test plan: every enumeration the suite compares is proved by being broken, so a check that has never failed is never trusted; each comparison runs in both directions, because an item in the document and not in the package is as much drift as the reverse; every list is floored on its parsed length, so a regex that finds nothing fails instead of agreeing with everything; the twenty-draft sample runs with the AI provider off, because a false-positive rate measured with a model filling in the gaps is not the rate a self-hosted instance gets. (Added at P7-T07: the card shipped with no test plan line, which is a Definition of Ready gap under criterion 3, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
 
-### P7-T08: Privacy: export, erasure and retention [M]
+### P7-T08a: Where personal data actually goes [S]
 Depends on: P7-T03
-Deliverables: personal data export and erasure as anonymisation tested end to end; retention settings for message logs, nudge records and agent run logs; a review that no personal data reaches logs, prompts or telemetry.
-Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export is produced, and no personal data of theirs remains in message logs, prompts or telemetry.
+Goal: know what reaches logs, prompts and telemetry before deciding what to delete.
+Deliverables: a written review of every place a member's personal data can leave the database, covering the log lines, the AI prompts and the metrics; each finding either fixed where no judgement is needed, or recorded as a question with the narrowest fix named.
+Test plan: the telemetry half is asserted rather than claimed, against the label rule declared in both packages and the runbook's own test; every runtime log line that interpolates a value is read, not grepped for a pattern.
+Acceptance: Given the review, when a human reads it, then every route personal data can take out of the database is named, and every one is either closed or carries a decision waiting on them.
+
+### P7-T08b: Personal export and erasure across every table [L]
+Depends on: P7-T08a
+Goal: an erasure that finishes, and an export that is the member's content rather than their profile.
+Deliverables: a per-member export covering every table that holds them, generated through the Operation pipeline; erasure extended past `workspace_members` to channel connections and identities, message payloads, conversations, copilot threads and prompts, and issued tokens; a table-by-table record of what is anonymised and what is deleted, decided by a human before any code.
+Test plan: an erasure followed by a search for the member's address, handle and external id across every table returns nothing; the content they authored is still readable and still attributed to the placeholder; the audit chain still verifies after the erasure, because an erasure that breaks the chain has destroyed the record that proves it happened.
+Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export of their own data is produced, and no personal data of theirs remains in message logs or prompts.
+
+### P7-T08c: Retention, and the sweep that honours it [M]
+Depends on: P7-T08b
+Goal: an instance can forget what it no longer needs, and nothing forgets by accident.
+Deliverables: three settings in the TECHNICAL-PLAN §4.14 map for message logs, nudge records and agent run logs, each with a default a human chose; a sweep that runs on the scheduler and deletes past retention through the Operation pipeline so the deletion is audited; the operator documentation saying what is kept and for how long.
+Test plan: a retention of zero or unset deletes nothing, because "not configured" must never mean "delete everything"; the sweep is idempotent and bounded, so a backlog does not hold a transaction open over a quarter of messages; a row inside its window survives a run and a row outside it does not; the audit row for a sweep names how many rows went and from which table.
+Acceptance: Given a message log older than its retention, when the sweep runs, then the row is gone, the deletion is in the audit trail, and a row inside the window is untouched.
+
+**Why P7-T08 was split.** The single [M] card carried a per-member export
+across twenty-four schema files, an erasure that has to decide anonymise or
+delete table by table, three retention settings and the sweep that acts on
+them, and the review. Cut on 11 September 2026 after the review, which is
+the part that needed no decision and is what told us how big the other two
+are. The order matters: the review names what leaves, the export and erasure
+close it, and retention comes last because it is the only part that deletes
+on a clock and so is the only part where a wrong default destroys data
+nobody asked it to.
 
 ### P7-T09: Release engineering and the upgrade contract [L]
 Depends on: P7-T03
