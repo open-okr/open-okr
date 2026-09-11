@@ -31,6 +31,7 @@ import {
   canonThresholds,
   CLOSE_DECISION_MEANINGS,
   CYCLE_CHECKS,
+  END_STATE_SHAPES,
   isTriggerKey,
   GATE_TITLES,
   KEY_RESULT_CHECKS,
@@ -308,7 +309,7 @@ for (const documentedRead of documentedReads) {
  * saying what it looked at is a suite nobody notices has stopped looking.
  * Raise it when you add a list.
  */
-const ENUMERATIONS_CHECKED = 18;
+const ENUMERATIONS_CHECKED = 19;
 
 // --- 5. The enumerations (P7-T07) -------------------------------------------
 //
@@ -554,6 +555,18 @@ compare(
   "the rhythm diagnostic: prescriptions",
   tableColumn(diagnosticRows, 2),
   producedDiagnoses.map((entry) => entry.prescription),
+  3,
+);
+
+// §4.1's end-state shapes (P7-T07a). Compared like the word lists above and
+// for the same reason: a shape is data the practice depends on, so one added
+// to the document and not the package is a sentence the coach will still
+// warn about, and one added to the package and not the document is the
+// product deciding practice on its own.
+compare(
+  "the end-state shapes",
+  tableColumn(section(method, "**End-state shapes.**", "**OBJ-2"), 0),
+  END_STATE_SHAPES,
   3,
 );
 

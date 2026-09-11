@@ -255,6 +255,7 @@ Statuses: **pass**, **warn** (worth another look), **fail** (fix before publishi
 | Bare metric movement, no why | fail | "Naming a metric to move is a key result in disguise. The outcome is the why behind the movement. Add the why, or lead with the end state." |
 | Metric movement with a why | pass | "You have paired movement with a why. Stronger still: lead with the end state and let the key results carry the movement." |
 | Names a change in state | pass | "This reads as a change in state, not a to-do. Keep the deliverables in your key results." |
+| Matches an end-state shape | pass | "This names the state you want to be in. Keep the deliverables in your key results." |
 | Cannot tell | warn | "Could you complete this without anything actually improving? If yes, rewrite around the improvement." |
 
 Word lists:
@@ -265,6 +266,16 @@ Word lists:
 | Movement verbs | increase, grow, improve, reduce, boost, raise, cut, double, triple, maximise, maximize, minimise, minimize, decrease, accelerate, expand, drive |
 | State words | become, be the, delight, delighted, loved, trusted, leading, best, strongest, profitable, sustainable, engaged, thriving, world-class, prefer, preferred, go-to, healthiest, excellence, dominant, known for, famous for, proud |
 | Why markers | to, so that, in order to, because |
+
+**End-state shapes.** A word list can only recognise an end state that happens to use one of its words. These are sentence shapes that name an end state without needing any of them, and an objective matching one passes OBJ-1. `…` stands for any words.
+
+| Shape | Example |
+|---|---|
+| make … something … | Make onboarding something new customers finish by themselves |
+| reach the point where … | Reach the point where the product sells itself |
+| get to where … | Get to where a failed payment never reaches a person |
+
+Added 11 September 2026 after the P7-T07 audit measured OBJ-1 against twenty real drafts. Sixteen of twenty warned, and the warning was the "Cannot tell" fallback rather than a real objection: the objectives were well-formed outcomes that happened to use none of the twenty-two state words. A check that fires on nineteen objectives out of twenty is a banner, not coaching. Lengthening the word list was the alternative and was rejected, because a word list will always be behind English.
 
 **OBJ-2 Inspiring and directional.**
 
