@@ -344,6 +344,10 @@ export {
   instanceAuditEvents,
 } from "./schema/instance-audit.ts";
 export {
+  type InstanceOperator,
+  instanceOperators,
+} from "./schema/instance-operators.ts";
+export {
   type InviteLink,
   type InviteMode,
   inviteLinks,
@@ -566,6 +570,7 @@ export {
   withInstanceAdmin,
   withInviteToken,
   withOAuthSecret,
+  withOperator,
   withProviderTeam,
   withUser,
   withWorkspace,

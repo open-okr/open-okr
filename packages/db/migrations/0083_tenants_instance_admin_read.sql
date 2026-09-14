@@ -22,11 +22,12 @@
 -- `nullif(..., '')` is what 0007 and 0014 already write for
 -- `app.instance_admin`, for the same reason. This brings `tenants` into line.
 --
--- **Every other business table still carries the original expression.** No
--- read of one has hit this yet, because nothing else reads a tenant-scoped
--- table under `app.instance_admin` on the application pool. Changing 106
--- policies is a change to the tenant floor and wants a human's decision, so
--- it is written down rather than done here.
+-- **Corrected at P8-T03a: this comment first said every other business
+-- table carried the original expression and that changing 106 policies
+-- needed a decision. That was wrong and the number was never counted.** 234
+-- policies in this schema already use `nullif`. Exactly two did not: this one
+-- and `workspace_imports` from P6-T05b, which migration 0085 fixes. The whole
+-- repair was two lines.
 DROP POLICY tenants_tenant ON tenants;
 
 CREATE POLICY tenants_tenant ON tenants
