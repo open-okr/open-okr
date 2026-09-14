@@ -1,10 +1,15 @@
-import { listTenantsAsOperator, readUsageAsOperator } from "@openokr/core";
+import {
+  listSupportSessions,
+  listTenantsAsOperator,
+  readUsageAsOperator,
+} from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
 import { LifecycleForm } from "./lifecycle-form";
+import { SupportRequest } from "./support-request";
 
 /**
  * S-46 Operator workspace detail: one tenant (P8-T03b).
@@ -140,6 +145,15 @@ export default async function OperatorWorkspacePage({
   }
 
   const [usage] = await readUsageAsOperator(pool, operator.userId, workspaceId);
+  // Whether this operator is already waiting on an answer. Read under their
+  // own policy, so it shows their own request and not somebody else's.
+  const sessions = await listSupportSessions(pool, workspaceId);
+  const pending = sessions.some(
+    (one) =>
+      one.operatorUserId === operator.userId &&
+      one.grantedAt === null &&
+      one.endedAt === null,
+  );
   const consequence = STATE_CONSEQUENCE[tenant.tenantState];
 
   return (
@@ -251,6 +265,14 @@ export default async function OperatorWorkspacePage({
             <Fact label="Closed" value={day(tenant.closedAt)} />
           ) : null}
         </dl>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold text-ink text-sm">Going inside</h2>
+        {/* Asking is all this does. There is no path in this product that
+         * lets an operator into a workspace on their own, and the form says
+         * so rather than leaving somebody to find out. */}
+        <SupportRequest pending={pending} workspaceId={workspaceId} />
       </section>
 
       <LifecycleForm

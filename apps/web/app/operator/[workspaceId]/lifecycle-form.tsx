@@ -102,13 +102,16 @@ export function LifecycleForm({
         </p>
 
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="state">
+          <label
+            className="font-medium text-ink text-sm"
+            htmlFor="lifecycle-state"
+          >
             Move to
           </label>
           <select
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
             defaultValue={currentState}
-            id="state"
+            id="lifecycle-state"
             name="state"
           >
             {OPTIONS.map((option) => (
@@ -120,7 +123,10 @@ export function LifecycleForm({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="reason">
+          <label
+            className="font-medium text-ink text-sm"
+            htmlFor="lifecycle-reason"
+          >
             Reason
           </label>
           {/* Written for the customer rather than as an internal note: this
@@ -128,7 +134,7 @@ export function LifecycleForm({
            * stays on their audit log after the change is lifted. */}
           <input
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
-            id="reason"
+            id="lifecycle-reason"
             maxLength={500}
             name="reason"
             placeholder="Why, in words a customer would understand"

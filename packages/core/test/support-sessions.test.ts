@@ -316,3 +316,78 @@ describe("the customer can see who was in their workspace", () => {
     expect(rows[0].payload.operatorUserId).toBe(OPERATOR);
   });
 });
+
+describe("somebody already in the workspace cannot be let in by support access", () => {
+  it("refuses the grant, and leaves their own membership untouched", async () => {
+    // **A regression test for a defect a browser found and this suite could
+    // not.** `provisionMemberForInvite` is idempotent: it returns an existing
+    // membership rather than creating a second one, which is right for every
+    // other joining path and wrong for this one. Against a workspace whose
+    // owner also held the operator grant, the session attached itself to
+    // their real membership, and ending it suspended that. The owner was
+    // locked out of their own workspace.
+    //
+    // Every earlier case here used an operator who was not already a member,
+    // which is why they all passed. The request is refused for this case too
+    // (below), and this asserts the backstop that catches somebody joining
+    // between the request and the answer.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into instance_operators (user_id, granted_by_user_id) values ($1, $2) on conflict do nothing",
+      [OWNER, GRANTER],
+    );
+
+    // The request is now refused outright for somebody already inside, so the
+    // pending row is written directly. That is the case this backstop exists
+    // for: somebody joining the workspace between the request and the answer.
+    const { rows } = await wb.admin.query(
+      "insert into operator_sessions (workspace_id, operator_user_id, reason) values ($1, $2, $3) returning id",
+      [workspaceId, OWNER, "Ticket 9001."],
+    );
+    const id = rows[0].id as string;
+
+    await expect(
+      grantSupportSession(wb.appPool, {
+        workspaceId,
+        sessionId: id,
+        grantedByUserId: OWNER,
+      }),
+    ).rejects.toThrow(/already a member/);
+
+    // The whole point: their own membership is exactly as it was.
+    const after = await wb.admin.query(
+      "select kind, status from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    expect(after.rows).toHaveLength(1);
+    expect(after.rows[0]).toMatchObject({ kind: "human", status: "active" });
+  });
+});
+
+describe("the refusal happens where somebody can act on it", () => {
+  it("refuses the request, not only the grant", async () => {
+    // The grant-time check is the backstop and stays, because somebody could
+    // join the workspace between the request and the answer. But a request
+    // that can never be granted is worse than a refusal: it sits in the
+    // customer's screen, they press the button, and nothing happens. Found by
+    // clicking it.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into instance_operators (user_id, granted_by_user_id) values ($1, $2) on conflict do nothing",
+      [OWNER, GRANTER],
+    );
+
+    await expect(
+      requestSupportSession(wb.appPool, {
+        workspaceId,
+        operatorUserId: OWNER,
+        reason: "Ticket 9002.",
+      }),
+    ).rejects.toThrow(/already a member/);
+
+    // And nothing is left pending for somebody to press a dead button on.
+    await expect(listSupportSessions(wb.appPool, workspaceId)).resolves.toEqual(
+      [],
+    );
+  });
+});

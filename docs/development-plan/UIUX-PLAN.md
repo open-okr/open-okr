@@ -288,6 +288,15 @@ cost of forgetting it is that somebody outside the organisation is reading
 the organisation's objectives. Specified in
 `docs/design/p8-t01b-support-access.md`.
 
+**Built at P8-T04b, and the customer's half does not live where this said.**
+S-48 described the grant decision as arriving "in their inbox". It is a
+screen under Admin, at `/admin/support`, gated at the level that manages
+access. An inbox item is read once and then gone; the decision needs a place
+that also holds every session that has ever run, because the promise is that
+a customer never has to ask the vendor what the vendor did. The banner is
+what does the interrupting, and it is on every screen rather than in one
+list.
+
 **S-49 Plan and seats.** A workspace administrator's screen rather than an
 operator's, reached from the S-36 admin navigation. The current plan,
 seats used against seats available with the list of who holds them, AI

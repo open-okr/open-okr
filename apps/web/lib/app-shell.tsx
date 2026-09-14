@@ -31,6 +31,7 @@ import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
+import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
 import { WorkspaceStateBanner } from "./workspace-state.tsx";
@@ -248,6 +249,11 @@ export async function AppShellLayout({
          * unaffected by design and the admin recovery list has to stay
          * reachable, so this explains rather than blocks.
          */}
+        {/* Somebody from outside the organisation is reading this workspace
+         * right now (P8-T04b). First of the three, because it is the only
+         * one that is about who is looking over the reader's shoulder, and
+         * the only one that cannot be dismissed. */}
+        <SupportBanner workspaceId={workspace.workspaceId} />
         {/* What the vendor is saying, above the workspace's own state
          * banner (P8-T03c). A site message is news from outside the
          * organisation and the state banner is a fact about the workspace,

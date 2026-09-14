@@ -103,6 +103,31 @@ export async function requestSupportSession(
   const { reason } = requestSchema.parse({ reason: input.reason });
 
   const db = drizzle(pool);
+
+  // **Somebody already in the workspace cannot ask to be let in.** They do
+  // not need to be: they are already there. Refused here as well as at the
+  // grant, because a request that can never be granted is worse than a
+  // refusal. It sits in the customer's screen, they press the button, and
+  // nothing happens.
+  const [existing] = await withWorkspace(db, input.workspaceId, (tx) =>
+    tx
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, input.workspaceId),
+          eq(workspaceMembers.userId, input.operatorUserId),
+        ),
+      )
+      .limit(1),
+  );
+  if (existing) {
+    throw new OperationError(
+      "forbidden",
+      "You are already a member of this workspace, so you do not need support access.",
+    );
+  }
   const [row] = await withOperator(db, input.operatorUserId, (tx) =>
     // openokr:allow-mutation: a request is not a change to the workspace. It
     // grants nothing, reads nothing and has no acting member to authorise;
@@ -201,6 +226,27 @@ export async function grantSupportSession(
           kind: "guest",
           level: level as (typeof GRANTABLE_LEVELS)[number],
         });
+
+        // **The funnel is idempotent, and that is a hazard here rather than a
+        // convenience.** It returns an existing membership rather than
+        // creating a second one, which is right for every other joining path
+        // and wrong for this one: if the operator is already a member of this
+        // workspace, the session would attach itself to their real
+        // membership, and ending it would suspend that.
+        //
+        // Found in a browser on 14 September 2026, against a workspace whose
+        // owner happened to also hold the operator grant. Granting and then
+        // ending a session locked the owner out of their own workspace. The
+        // suite missed it because its operator was never already a member.
+        //
+        // So a person who is already in the workspace cannot be let in by
+        // support access. They do not need it: they are already there.
+        if (!member.created) {
+          throw new OperationError(
+            "forbidden",
+            "That person is already a member of this workspace, so they do not need support access.",
+          );
+        }
 
         const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
         // openokr:allow-mutation: this is the Operation's own transaction.

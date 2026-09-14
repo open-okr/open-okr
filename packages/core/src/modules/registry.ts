@@ -331,6 +331,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-support",
+        label: "Support access",
+        href: "/admin/support",
+        section: "admin",
+        // Letting somebody from outside the organisation into it is the
+        // largest version of managing who has access, so it takes the level
+        // that manages access rather than a smaller one (P8-T04b).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-branding",
         label: "Branding",
         href: "/admin/branding",
