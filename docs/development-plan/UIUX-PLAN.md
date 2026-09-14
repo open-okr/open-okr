@@ -222,6 +222,66 @@ Format: purpose, layout, primary actions, states.
 
 **S-40 Consent.** The screen an external agent's user sees when connecting: the client's identity, the workspace picker, the scopes requested in plain language, and approve or deny. Granted connections are listed in the admin console with their last use and a revoke control.
 
+### Cloud operator screens
+
+Added at the P8-T01b design gate. These five exist only where
+`cloud.enabled` is true. On a self-hosted instance every route below is
+not-found rather than hidden or permission-denied, so the instance does
+not advertise a door it will not open.
+
+**They are numbered from S-45, and S-41 to S-44 are deliberately unused.**
+The end-to-end suite already took those four prefixes for specs that are
+not screens: `s41-mcp-transport`, `s42-route-coverage`, `s43-accessibility`
+and `s44-web-vitals`. The `sNN` prefix started out screen-derived and
+drifted at s41. A screen numbered S-43 would sit next to an accessibility
+spec it has nothing to do with, and the gap costs nothing.
+
+**S-45 Operator workspaces.** The list, and the only screen that shows
+more than one tenant at a time. Columns: name, slug, plan, state, seats
+used against seats available, last activity, region. Filter by state and
+by plan, search by name or slug. No content of any kind: the design behind
+this is `docs/design/p8-t01b-operator-console.md`, and the counts come
+from a named read-only view rather than from a policy on any content
+table. Row click opens S-46. Empty state on a fresh instance reads as a
+statement rather than an error.
+
+**S-46 Operator workspace detail.** One tenant. Header with name, slug,
+state and plan. Panels: metadata (region, created, trial end), usage
+(member count, goal count, check-in count, storage bytes, last activity),
+lifecycle actions (suspend, reactivate, close, change plan or seats), the
+support-session history for this workspace, and an extract of the
+workspace's own audit trail. Suspension asks for a reason and the reason
+is what the workspace's members are shown, so the field is written as
+customer-facing rather than as an internal note. No title, name or body
+from any content table appears anywhere on this screen.
+
+**S-47 Operator instance.** Instance feature flags, the plan catalogue
+(`cloud.plans`), and site messages. A site message carries its body, its
+level, its window of `starts_at` and `ends_at`, its target of all or a
+named list, and whether a member may dismiss it. The window is required:
+a site message with no end is a banner everybody learns to ignore.
+
+**S-48 Support session.** Two surfaces for one thing. The operator's side
+is the request: the workspace, the reason, the duration and the level
+being asked for, then a waiting state until the owner answers. The
+customer's side is the grant decision in their inbox, and the banner that
+runs for the length of a live session on every screen in the workspace,
+naming the operator, the remaining time and a revoke control. **The banner
+is the one banner in the product that cannot be dismissed**, because the
+cost of forgetting it is that somebody outside the organisation is reading
+the organisation's objectives. Specified in
+`docs/design/p8-t01b-support-access.md`.
+
+**S-49 Plan and seats.** A workspace administrator's screen rather than an
+operator's, reached from the S-36 admin navigation. The current plan,
+seats used against seats available with the list of who holds them, AI
+spend against its cap, and the upgrade and downgrade controls. A downgrade
+below the current headcount is refused naming both numbers and links to
+the member list, because the product never picks who loses access. With
+`cloud.enabled` false the section is absent from the navigation and the
+route is not-found: P8-T05 asks that no billing surface appears, and a
+disabled control is an appearance.
+
 ### Power-floor stubs
 
 Specified only enough that the v1 data model does not block them: a saved query and view builder, custom fields, configurable statuses and workflows, a Gantt timeline with scheduling, sprint boards, time logging, the operator console and billing.

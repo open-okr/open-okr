@@ -2266,7 +2266,7 @@ Acceptance: the human approves with an explicit statement.
 ### P8-T01b: The operator console, support access and the plan model [DESIGN GATE] [M]
 Depends on: P8-T01a
 Goal: the design documents P8-T03, P8-T04 and P8-T05 stand on.
-Deliverables: the operator console's surface and its boundaries, added to UIUX-PLAN.md §6 as screens numbered from S-41 so P8-T03 cites a screen like every other interface task; the instance-operator role and how it reads past the tenant floor without becoming a service account with ambient authority; the support-access contract covering the explicit grant, the time box, the owner's visibility and the automatic expiry, against the `operator_sessions` columns TECHNICAL-PLAN §4.13 already fixes; the plan catalogue, seat counting at the member-provisioning funnel, and the upgrade and downgrade paths, all behind the flag that is off for self-host.
+Deliverables: the operator console's surface and its boundaries, added to UIUX-PLAN.md §6 as screens S-45 to S-49 so P8-T03 and P8-T05 cite a screen like every other interface task, numbered from S-45 rather than S-41 because the end-to-end suite already took those four prefixes for specs that are not screens; the instance-operator role and how it reads past the tenant floor without becoming a service account with ambient authority; the support-access contract covering the explicit grant, the time box, the owner's visibility and the automatic expiry, against the `operator_sessions` columns TECHNICAL-PLAN §4.13 already fixes; the plan catalogue, seat counting at the member-provisioning funnel, and the upgrade and downgrade paths, all behind the flag that is off for self-host.
 Test plan: as P8-T01a, with one addition that only this half needs. Every operator capability is written with the workspace-side evidence beside it, because the support-access acceptance criterion is about what the customer can see rather than what the operator can do, and a design that lists only the operator's powers cannot be checked against it.
 Acceptance: the human approves with an explicit statement.
 
@@ -2277,17 +2277,17 @@ Acceptance: Given a new cloud signup, when the member dismisses onboarding entir
 
 ### P8-T03: Operator console [L]
 Depends on: P8-T02, P8-T01b
-Deliverables: the instance-operator role separate from every workspace role; list, inspect and suspend workspaces; instance feature flags; site messages that are dismissible, targeted and expiring; per-tenant health and usage. Every action audited. Absent entirely on self-hosted instances.
+Deliverables: screens S-45, S-46 and S-47; the instance-operator role separate from every workspace role, reading past the tenant floor through the narrow `app.operator_user_id` policy key rather than a privileged connection, with no policy on any content table; list, inspect and suspend workspaces; instance feature flags; site messages that are dismissible, targeted and expiring; per-tenant health and usage. Every action audited. Absent entirely on self-hosted instances.
 Acceptance: Given an operator suspending a workspace, when a member of it signs in, then they see a clear message, the workspace is read-only, and the suspension is recorded with its actor and reason.
 
 ### P8-T04: Transparent support access [M]
 Depends on: P8-T03
-Deliverables: time-boxed, reason-recorded operator access to a workspace, requiring an explicit grant, visible to the workspace owner in their inbox and in the audit log, with every action attributed to the operator and an automatic expiry.
+Deliverables: screen S-48; time-boxed, reason-recorded operator access to a workspace, granted by the workspace owner and never self-granted, carried as a real guest member row through the one member-provisioning funnel so `can()` answers for an operator exactly as it answers for anybody else, visible to the workspace owner in their inbox and in the audit log, with every action attributed to the operator and an automatic expiry.
 Acceptance: Given a support session, when it expires, then access ends automatically and the owner can see who was in their workspace, when, and what they did.
 
 ### P8-T05: Plans, seats and limits [M]
 Depends on: P8-T04
-Deliverables: plan definitions, seat counting and workspace limits behind a flag that is off for self-host; enforcement at the member-provisioning funnel; upgrade and downgrade paths; no feature gating anywhere.
+Deliverables: screen S-49; plan definitions in the `cloud.plans` instance setting rather than a table, with no field able to name a feature; seat counting where an invited human counts and a guest, an agent and a placeholder never do; workspace limits behind a flag that is off for self-host; enforcement at both the invitation and the member-provisioning funnel, because a reusable invite link overflows a plan that is only checked at invite time; upgrade and downgrade paths; no feature gating anywhere.
 Acceptance: Given the flag off, when any limit is evaluated, then it is unlimited and no billing surface appears; and given it on, then seat limits apply at invitation while every feature stays available.
 
 ### P8-T06: Cloud operations [M]

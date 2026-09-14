@@ -21,7 +21,7 @@ All in `docs/development-plan/` unless noted:
 3. `METHOD.md`: the OKR practice canon. Authority for every rule, threshold, band, corridor, taxonomy, gate, agenda and diagnostic.
 4. `TECHNICAL-PLAN.md`: the target design: identity and access, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance, the one-contract API.
 5. `AI-NATIVE-PLAN.md`: the AI and agent domain: providers, keys, governance, channels, the two agents with their trigger and escalation catalogue, the copilot, retrieval, the external agent surface.
-6. `UIUX-PLAN.md`: the interface: design system, navigation, interaction patterns, screens S-01 to S-40, quality gates.
+6. `UIUX-PLAN.md`: the interface: design system, navigation, interaction patterns, screens S-01 to S-40, plus the cloud operator screens S-45 to S-49, quality gates.
 7. `IMPLEMENTATION-PLAN.md`: the work: eight phases, 105 tasks, the Definition of Ready. Execution authority.
 8. `EXECUTION-GUIDE.md`: the process between you and the human.
 9. `CI-GATES.md`: every gate that will refuse the work, the command that runs it locally, and what each one catches that reading the diff does not. Read it before your first push, not after your first red build.
