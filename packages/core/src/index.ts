@@ -782,9 +782,15 @@ export {
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
+  createSiteMessage,
+  deleteSiteMessage,
+  dismissSiteMessage,
   isLiveOperator,
+  listSiteMessages,
   listTenantsAsOperator,
+  liveSiteMessagesFor,
   measureAllWorkspaces,
+  readInstanceFlags,
   readUsageAsOperator,
   setLifecycleAsOperator,
 } from "./operator/index.ts";

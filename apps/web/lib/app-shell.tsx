@@ -29,6 +29,7 @@ import { navBlocks } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
+import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
@@ -247,6 +248,14 @@ export async function AppShellLayout({
          * unaffected by design and the admin recovery list has to stay
          * reachable, so this explains rather than blocks.
          */}
+        {/* What the vendor is saying, above the workspace's own state
+         * banner (P8-T03c). A site message is news from outside the
+         * organisation and the state banner is a fact about the workspace,
+         * so the outside one reads first. */}
+        <SiteMessages
+          userId={session.user.id}
+          workspaceId={workspace.workspaceId}
+        />
         {workspace.state === "active" ? null : (
           <div className="mb-4.5">
             <WorkspaceStateBanner

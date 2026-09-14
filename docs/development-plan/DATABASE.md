@@ -809,6 +809,17 @@ Three policies: an operator reads it, instance administration writes it, and the
 
 **Migration 0086 also gives `workspaces` a select-only instance-admin policy.** Enumerating workspaces needs a way past the floor, and `listWorkspaces` in the scheduler and `pnpm audit:chain` have both been working around that by requiring a database role that can see past it. This is a smaller privilege than BYPASSRLS on a whole connection, and both existing callers could use it.
 
+### site_messages, site_message_dismissals
+`site_messages`: `body`, `level` (`info` / `warn` / `bad`), `starts_at`, `ends_at`, `target_workspace_ids?`, `dismissible`, `created_by_user_id?`. `site_message_dismissals`: `message_id`, `user_id`, `at`, keyed on the pair.
+
+Built at P8-T03c, migration 0088. Both sit above the tenant floor, because one message is shown in many workspaces and a copy per workspace would be the same sentence written a thousand times.
+
+**Two corrections to the P8-T01b design, recorded in the migration.** The body is plain text rather than editor JSON: a site message reaches every customer at once, which is the worst place to add a sanitising surface. And a dismissal is keyed on the **user** rather than a member, because a member is per workspace and somebody in three workspaces would otherwise meet the same instance-wide sentence three times.
+
+**The window is required.** A check constraint refuses a missing or backwards window at the database, and the Zod schema refuses it at the boundary so the refusal names the field. A message with no end is a banner everybody learns to ignore.
+
+Anybody signed in may read a live message, because that is what one is for. Writing is instance administration. A dismissal is read and written through the `app.user_id` key, so a person reaches their own rows and nobody else's.
+
 ### operator_sessions *(cloud only)*
 `operator_user_id` to users, `workspace_id` to workspaces, `reason`, `granted_at`, `expires_at`, `ended_at?`.
 
