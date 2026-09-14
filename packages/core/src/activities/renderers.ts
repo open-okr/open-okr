@@ -21,6 +21,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.onboarded": () => "Workspace setup finished",
   "workspace.state_changed": (p) =>
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
+  "workspace.lifecycle_changed": (p) =>
+    `Workspace lifecycle set to "${asString(p.state)}"`,
   "member.profile_updated": (p) =>
     `${asString(p.name, "A member")} updated their profile`,
   "channel.templatesSynced": (p) =>

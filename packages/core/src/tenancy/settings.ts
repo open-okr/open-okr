@@ -49,8 +49,19 @@ const resolve = async <T>(pool: Pool, key: string): Promise<T> => {
   return resolveSetting(stored, environment, definition.fallback).value as T;
 };
 
+/**
+ * Just the flag, for callers that need nothing else.
+ *
+ * Separate from `resolveCloudTenancy` because `isRegistrationOpen` runs on
+ * every sign-up page load and resolving the region and the retention window
+ * there would be two setting reads nobody asked for.
+ */
+export async function isCloudEnabled(pool: Pool): Promise<boolean> {
+  return resolve<boolean>(pool, CLOUD_ENABLED_KEY);
+}
+
 export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
-  const enabled = await resolve<boolean>(pool, CLOUD_ENABLED_KEY);
+  const enabled = await isCloudEnabled(pool);
   // The other two are only meaningful when the cloud is on, and asking for
   // them anyway costs two reads on a path that already runs once per
   // workspace ever created. Resolving them unconditionally keeps one shape

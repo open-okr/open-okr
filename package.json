@@ -43,7 +43,8 @@
     "audit:chain": "pnpm --filter @openokr/core audit:chain",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep"
+    "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep",
+    "cloud:sweep": "pnpm --filter @openokr/core cloud:sweep"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

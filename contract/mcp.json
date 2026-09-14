@@ -58,6 +58,35 @@
       "example": {}
     },
     {
+      "name": "workspace.setLifecycle",
+      "description": "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "closed"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "state": "active"
+      }
+    },
+    {
       "name": "workspace.setState",
       "description": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
       "inputSchema": {

@@ -9,10 +9,14 @@
  * because `pnpm dead-code` refuses an export nothing imports and a barrel
  * that re-exports everything is how that gate stops meaning anything.
  */
+
+export { setTenantStateInTx } from "./lifecycle.ts";
 export {
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,
+  isCloudEnabled,
   resolveCloudTenancy,
 } from "./settings.ts";
 export { readTenant, seedTenantInTx } from "./store.ts";
+export { sweepClosedTenants } from "./sweep.ts";

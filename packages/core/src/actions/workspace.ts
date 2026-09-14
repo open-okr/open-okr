@@ -11,6 +11,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
+import { setTenantStateInTx } from "../tenancy/index.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -234,3 +235,74 @@ export const provisionWorkspace = {
     return createWorkspace(context.pool, input);
   },
 };
+
+export const setWorkspaceLifecycle = defineWriteAction({
+  name: "workspace.setLifecycle",
+  summary:
+    "Move a cloud workspace between active, suspended and closed (P8-T02c).",
+  input: z.object({
+    state: z.enum(["active", "suspended", "closed"]),
+  }),
+  output: workspaceSummary.extend({
+    state: z.enum(["active", "suspended", "closed"]),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    // On the freeze overlay's recovery list by prefix, like
+    // `workspace.setState`: the write that lifts a suspension has to survive
+    // the suspension. Closing is on the same list, and that is deliberate,
+    // because a closed workspace being reopened is the same kind of write.
+    async load({ tx, workspaceId }) {
+      const [current] = await tx
+        .select({ name: workspaces.name, slug: workspaces.slug })
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      if (!current) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      return current;
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      // The tenancy module owns every read and write of `tenants`, and
+      // `pnpm check:boundaries` is what keeps it that way. This action never
+      // sees the table.
+      const moved = await setTenantStateInTx(tx, {
+        workspaceId,
+        state: input.state,
+      });
+      if (!moved) {
+        // No tenant row, which is every self-hosted instance. Refused rather
+        // than silently doing half the work: on a self-hosted instance
+        // `workspace.setState` is the whole of what freezing means, and a
+        // caller who reached here wanted something this deployment does not
+        // have.
+        throw new OperationError(
+          "not_found",
+          "This workspace has no tenant record, so it has no lifecycle to move.",
+        );
+      }
+
+      return {
+        result: {
+          workspaceId,
+          name: loaded.name,
+          slug: loaded.slug,
+          state: input.state,
+        },
+        activity: {
+          kind: "workspace.lifecycle_changed",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { state: input.state },
+        },
+        audit: {
+          action: "workspace.setLifecycle",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { state: input.state },
+        },
+      };
+    },
+  }),
+});

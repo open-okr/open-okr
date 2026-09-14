@@ -218,33 +218,45 @@ describe("the tenant floor applies to the tenant table itself", () => {
     const wb = await workerDb();
     await createWorkspace(wb.appPool, { user: await user("floor-3") });
 
-    // **Two behaviours, both fail-closed, and which one you get depends on
-    // the connection's history.** This is repo-wide and predates this table:
-    // every tenant policy compares against
-    // `current_setting('app.workspace_id', true)::uuid`.
+    // **Zero rows, on a fresh connection and on a reused one**, which is
+    // what migration 0083's `nullif(..., '')` buys and what the rest of the
+    // schema does not yet have.
     //
-    //   - A connection that has never carried a workspace reads the setting
-    //     as NULL, the cast is fine, and the comparison yields no rows.
-    //   - A pooled connection that has already served a tenant-scoped
-    //     transaction reads it as the empty string, because `SET LOCAL`
-    //     reverts to the session value at commit and a custom setting that
-    //     was never set at session level is ''. `''::uuid` then raises.
+    // The original expression, still on every other business table, is
+    // `current_setting('app.workspace_id', true)::uuid`. A connection that
+    // never carried a workspace reads the setting as NULL, the cast is fine,
+    // and the comparison yields nothing. A pooled connection that has
+    // already served a tenant-scoped transaction reads it as the empty
+    // string, because `SET LOCAL` reverts to the session value at commit and
+    // a custom setting never set at session level is ''. `''::uuid` then
+    // raises.
     //
-    // Neither leaks a row, so the floor holds either way. The test asserts
-    // the property that matters rather than one of the two shapes, because
-    // asserting a shape would make it fail on a pool that happened to hand
-    // back a different connection.
-    const outcome = await wb.appPool
-      .query("select * from tenants")
-      .then((result) => ({ kind: "rows" as const, rows: result.rows }))
-      .catch((error: Error) => ({ kind: "refused" as const, error }));
+    // Both are fail-closed, so nothing ever leaked. What broke was the
+    // policy underneath: the error is raised before Postgres can OR in a
+    // second permissive policy, which is how the P8-T02c sweep could read
+    // its own table on one connection and not on another. This asserts the
+    // table has the guard.
+    const { rows } = await wb.appPool.query("select * from tenants");
+    expect(rows).toHaveLength(0);
 
-    if (outcome.kind === "rows") {
-      expect(outcome.rows).toHaveLength(0);
-    } else {
-      expect(outcome.error.message).toContain(
-        "invalid input syntax for type uuid",
-      );
+    // And again on a connection that has certainly carried a workspace, so
+    // the assertion above is not passing by having drawn a fresh one.
+    const client = await wb.appPool.connect();
+    try {
+      const other = await createWorkspace(wb.appPool, {
+        user: await user("floor-4"),
+      });
+      await client.query("begin");
+      // `SET LOCAL` takes no parameter, so this is the function form, which
+      // is what `withWorkspace` uses for the same reason.
+      await client.query("select set_config('app.workspace_id', $1, true)", [
+        other.workspaceId,
+      ]);
+      await client.query("commit");
+      const reused = await client.query("select * from tenants");
+      expect(reused.rows).toHaveLength(0);
+    } finally {
+      client.release();
     }
   });
 });

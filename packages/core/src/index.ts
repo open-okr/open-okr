@@ -412,6 +412,7 @@ export {
   hashSessionToken,
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
+export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   type ClaimBlobInput,
   type ClaimedBlob,

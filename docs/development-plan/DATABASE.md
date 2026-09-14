@@ -792,6 +792,8 @@ Built at P8-T02a, migration 0082. Design: `docs/design/p8-t01a-tenant-lifecycle.
 
 The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
 
+Migration 0083 changed two things about its policies (P8-T02c). The tenant policy now reads `nullif(current_setting('app.workspace_id', true), '')::uuid`, because on a pooled connection that has already served a tenant-scoped transaction the setting reads back as the empty string rather than as NULL and the bare cast raises. Both behaviours are fail-closed and nothing ever leaked, but the error is raised before Postgres can OR in a second permissive policy. **Every other business table still carries the original expression**; no read of one has hit this, because nothing else reads a tenant-scoped table under `app.instance_admin` on the application pool. A select-only instance-admin policy was added beside it, so the closure sweep can list closed tenants and cannot change one.
+
 **Absent on every self-hosted instance**, where the table exists and holds no rows. `pnpm check:boundaries` refuses a read or an import of it from any product path, because a plan key read on the product path forks self-host from cloud and the fork stays invisible until a self-hosted instance meets the null.
 
 ### operator_sessions *(cloud only)*

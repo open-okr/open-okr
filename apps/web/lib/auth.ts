@@ -1,5 +1,5 @@
 import { loadEnv } from "@openokr/config";
-import { createAuth } from "@openokr/core";
+import { createAuth, resolveRequireEmailVerification } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
 import { getPool } from "./pool";
 
@@ -27,7 +27,33 @@ export { getPool };
  */
 const globals = globalThis as typeof globalThis & {
   openokrAuth?: ReturnType<typeof createAuth>;
+  openokrRequireEmailVerification?: boolean;
 };
+
+/**
+ * Resolves whether a sign-in must wait for a verified address, once, at boot
+ * (P8-T02b).
+ *
+ * Better Auth reads `requireEmailVerification` off an options object built
+ * once per process and `getAuth()` is synchronous, so the answer cannot be
+ * fetched when it is needed. `register()` calls this before anything is
+ * served, which is the one moment an async read fits.
+ *
+ * A failure here is not fatal and leaves the answer false. The question is
+ * whether to add a requirement, and an instance that cannot read its own
+ * settings should not lock everybody out while it works that out.
+ */
+export async function resolveSignupPolicy(): Promise<void> {
+  try {
+    globals.openokrRequireEmailVerification =
+      await resolveRequireEmailVerification(getPool());
+  } catch (error) {
+    process.stderr.write(
+      `auth: could not resolve the mail transport, so email verification ` +
+        `stays off: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
 
 export function getAuth(): ReturnType<typeof createAuth> {
   if (!globals.openokrAuth) {
@@ -53,6 +79,26 @@ export function getAuth(): ReturnType<typeof createAuth> {
           ].join("\n"),
         });
       },
+      // Resolved at boot from `mail.transport`: the question is whether a
+      // link can arrive, not whether this is a managed cloud (P8-T02b).
+      requireEmailVerification:
+        globals.openokrRequireEmailVerification ?? false,
+      sendVerificationEmail: globals.openokrRequireEmailVerification
+        ? async ({ to, url }) => {
+            const { sendMail } = await import("./mail");
+            await sendMail({
+              to,
+              subject: "Confirm your email address",
+              text: [
+                "Confirm this address to finish setting up your OpenOKR account.",
+                "",
+                `Confirm it here: ${url}`,
+                "",
+                "If you did not sign up, ignore this message. The link expires.",
+              ].join("\n"),
+            });
+          }
+        : undefined,
       // Lets a server action set and clear the session cookie. Framework glue,
       // so it lives here rather than in packages/core, and Better Auth
       // requires it last in the plugin list.

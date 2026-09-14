@@ -38,6 +38,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     from: z.enum(["active", "read_only", "frozen"]),
     to: z.enum(["active", "read_only", "frozen"]),
   }),
+  // P8-T02c. The cloud lifecycle, which projects onto the three states
+  // above rather than replacing them. Both are recorded: this one says what
+  // a customer was told, and `workspace.state_changed` says what the freeze
+  // overlay will read.
+  "workspace.lifecycle_changed": z.object({
+    state: z.enum(["active", "suspended", "closed"]),
+  }),
   "member.profile_updated": z.object({ name: z.string() }),
   "channel.templatesSynced": z.object({
     recorded: z.number(),
