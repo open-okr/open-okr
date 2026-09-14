@@ -796,6 +796,8 @@ Migration 0083 changed two things about its policies (P8-T02c). The tenant polic
 
 **Absent on every self-hosted instance**, where the table exists and holds no rows. `pnpm check:boundaries` refuses a read or an import of it from any product path, because a plan key read on the product path forks self-host from cloud and the fork stays invisible until a self-hosted instance meets the null.
 
+**Migration 0087 adds `audit_events.actor_operator_user_id`** (P8-T03b). `actor_kind` has carried `operator` since the table was created and had nothing to point at: an operator is a member of nothing, so `actor_member_id` is null for them and the row said only that somebody outside did something. The customer has to be able to see who, in their own audit log, without asking anybody. No expand-then-contract was needed because `actor_member_id` was already nullable.
+
 ### operator_workspace_usage *(cloud only)*
 `workspace_id` to workspaces (and it is the primary key), `member_count`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at?`, `measured_at`.
 

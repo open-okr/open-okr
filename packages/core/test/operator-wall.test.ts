@@ -5,6 +5,7 @@ import {
   listTenantsAsOperator,
   measureAllWorkspaces,
   readUsageAsOperator,
+  setLifecycleAsOperator,
 } from "../src/operator/index.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
@@ -297,5 +298,78 @@ describe("per-tenant usage, as a snapshot", () => {
       "storageBytes",
       "workspaceId",
     ]);
+  });
+});
+
+describe("what an operator does, and what the customer sees of it", () => {
+  const suspend = async (reason = "Unpaid invoice since August.") => {
+    const wb = await workerDb();
+    return setLifecycleAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      state: "suspended",
+      reason,
+    });
+  };
+
+  it("refuses somebody with no grant, and says nothing about the workspace", async () => {
+    // Not-found rather than forbidden, matching the access getter everywhere
+    // else: a caller who is not an operator learns nothing, including whether
+    // the workspace exists.
+    await expect(suspend()).rejects.toThrow(/No such workspace/);
+  });
+
+  it("suspends through the same lifecycle path a member would use", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await expect(suspend()).resolves.toMatchObject({ state: "suspended" });
+
+    const { rows } = await wb.admin.query(
+      "select state from workspaces where id = $1",
+      [workspaceId],
+    );
+    expect(rows[0].state).toBe("read_only");
+  });
+
+  it("writes the operator on the workspace's own audit row, not an empty actor", async () => {
+    // The whole point of the column. Before it, the row said only that
+    // somebody outside did something, because an operator is a member of
+    // nothing and `actor_member_id` is null for them.
+    const wb = await workerDb();
+    await grantOperator();
+    await suspend("Unpaid invoice since August.");
+
+    const { rows } = await wb.admin.query(
+      `select actor_kind, actor_member_id, actor_operator_user_id, payload
+         from audit_events
+        where workspace_id = $1 and action = 'workspace.setLifecycle'`,
+      [workspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actor_kind).toBe("operator");
+    expect(rows[0].actor_member_id).toBeNull();
+    expect(rows[0].actor_operator_user_id).toBe(OPERATOR);
+    // The reason travels with the row rather than only with the banner, so it
+    // survives a reactivation.
+    expect(rows[0].payload.reason).toBe("Unpaid invoice since August.");
+  });
+
+  it("refuses a lifecycle change with no reason", async () => {
+    await grantOperator();
+    await expect(suspend("   ")).rejects.toThrow(/needs a reason/);
+  });
+
+  it("can lift the suspension it applied", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await suspend();
+    await expect(
+      setLifecycleAsOperator(wb.appPool, {
+        workspaceId,
+        operatorUserId: OPERATOR,
+        state: "active",
+        reason: "Invoice settled.",
+      }),
+    ).resolves.toMatchObject({ state: "active" });
   });
 });

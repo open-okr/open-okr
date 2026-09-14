@@ -4,5 +4,6 @@
  * One of the two directories the boundary gate lets touch `tenants`. Design:
  * `docs/design/p8-t01b-operator-console.md`.
  */
+export { setLifecycleAsOperator } from "./lifecycle.ts";
 export { isLiveOperator, listTenantsAsOperator } from "./store.ts";
 export { measureAllWorkspaces, readUsageAsOperator } from "./usage.ts";
