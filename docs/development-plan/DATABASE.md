@@ -796,6 +796,17 @@ Migration 0083 changed two things about its policies (P8-T02c). The tenant polic
 
 **Absent on every self-hosted instance**, where the table exists and holds no rows. `pnpm check:boundaries` refuses a read or an import of it from any product path, because a plan key read on the product path forks self-host from cloud and the fork stays invisible until a self-hosted instance meets the null.
 
+### operator_workspace_usage *(cloud only)*
+`workspace_id` to workspaces (and it is the primary key), `member_count`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at?`, `measured_at`.
+
+Built at P8-T03b, migration 0086. A snapshot, refreshed by `pnpm cloud:usage` and replaced rather than appended.
+
+**It exists because a view could not do the job.** The P8-T01b design asked for counts an operator reads with no policy on any content table, answered by a named read-only view. `force row level security` applies to the table owner too, and migrations run as the owner rather than as a superuser, so a `security_invoker = off` view and a `security definer` function over one are both filtered and always count zero. Giving the owner BYPASSRLS would disable the floor for every table to make one count work. So the counts are taken one workspace at a time through the ordinary tenant setting, by a job that sees exactly what a member of that workspace would see.
+
+Three policies: an operator reads it, instance administration writes it, and the workspace itself reads its own row. The last one is there because the P7-T03a fuzz suite requires a tenant policy on every table carrying a `workspace_id` and refused this one without it. A universal claim with one exemption is not a universal claim.
+
+**Migration 0086 also gives `workspaces` a select-only instance-admin policy.** Enumerating workspaces needs a way past the floor, and `listWorkspaces` in the scheduler and `pnpm audit:chain` have both been working around that by requiring a database role that can see past it. This is a smaller privilege than BYPASSRLS on a whole connection, and both existing callers could use it.
+
 ### operator_sessions *(cloud only)*
 `operator_user_id` to users, `workspace_id` to workspaces, `reason`, `granted_at`, `expires_at`, `ended_at?`.
 

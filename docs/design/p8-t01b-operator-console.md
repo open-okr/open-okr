@@ -110,7 +110,7 @@ established, and `tenant.ts` already describes the argument for it:
 | `workspaces` | Read of the row, write of `state` only | Name, slug, state. **Not** `settings`, which holds branding and trusted domains and is the customer's own |
 | `instance_operators` | Read | So the console can show who else holds a grant |
 | `operator_sessions` | Read and write | The support-access contract |
-| Aggregate counts | Read, through named views | Section 5 |
+| Aggregate counts | Read, from the snapshot table | Section 5. Corrected at P8-T03b: this said "through named views", and a view cannot count a table the floor protects |
 | **Everything else** | **None** | A goal, a check-in, a comment, a document, a message, a nudge, an AI usage row. All unreachable |
 
 The policy is written to check that the operator's grant is live:
@@ -155,11 +155,42 @@ targeted at every workspace has no `workspace_id`:
 content by accident, because the natural way to build it is to count rows
 in content tables, and the natural way to debug it is to look at one.
 
-**Counts come from named read-only views, never from a table policy.** A
-view like `operator_workspace_usage` exposes `workspace_id`, member count,
-goal count, check-in count, storage bytes and last activity timestamp. The
-operator policy names the view. No policy is added to `goals` to make the
-count work, so the count is reachable and the rows behind it are not.
+**Counts come from a snapshot table, never from a policy on a content
+table.** `operator_workspace_usage` holds `workspace_id`, member count,
+goal count, check-in count, storage bytes, last activity and the instant the
+numbers were taken. The operator policy names that table. No policy is added
+to `goals` to make the count work, so the count is reachable and the rows
+behind it are not.
+
+**Corrected at P8-T03b. This section first said the counts come from a named
+read-only view, and that is not possible.** `force row level security`
+applies to the table owner too, which is the whole point of it, and
+migrations run as the owner rather than as a superuser. So a
+`security_invoker = off` view and a `security definer` function over one are
+both still filtered, and a count taken either way is always zero. P8-T03a
+wrote that view, measured zero, and cut it rather than ship a usage panel
+that silently reported nothing.
+
+Three ways out, and the third is what shipped:
+
+| Way | Verdict |
+|---|---|
+| Give the owner role BYPASSRLS | Refused. It disables the floor for every table to make one count work, and it is the privileged connection §3 of this document already refused |
+| Maintain counters on every domain write | Refused. A counter touched by every write is a second source of truth, and its drift is invisible |
+| **Snapshot them on a schedule** | Taken. A job enumerates workspaces under instance administration, opens each one properly through the tenant setting, counts what a member of it would count, and writes one row |
+
+The cost is that the numbers are as of the last sweep rather than live, and
+the row carries `measured_at` so nobody can mistake one for the other. For an
+operator deciding whether a workspace is active enough to matter, a figure
+from this morning is the same answer as a figure from this second.
+
+**A second finding came out of the same work.** Enumerating workspaces at all
+needs a way past the floor, and the scheduler's `listWorkspaces` and
+`pnpm audit:chain` have both been working around that by asking for a
+database role that can see past it. Migration 0086 gives `workspaces` a
+select-only instance-admin policy, which `tenants` already had from 0083.
+That is a smaller privilege than BYPASSRLS on a whole connection, and both
+existing callers could use it.
 
 **No titles, no names, no content of any kind crosses into the console.**
 A workspace's own name and slug do, because they are how a support request

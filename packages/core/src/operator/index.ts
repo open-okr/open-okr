@@ -5,3 +5,4 @@
  * `docs/design/p8-t01b-operator-console.md`.
  */
 export { isLiveOperator, listTenantsAsOperator } from "./store.ts";
+export { measureAllWorkspaces, readUsageAsOperator } from "./usage.ts";

@@ -423,6 +423,10 @@ export {
   oauthGrants,
   oauthRefreshTokens,
 } from "./schema/oauth.ts";
+export {
+  type OperatorWorkspaceUsage,
+  operatorWorkspaceUsage,
+} from "./schema/operator-usage.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
   type ManagementAnswer,

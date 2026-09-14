@@ -3,6 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   isLiveOperator,
   listTenantsAsOperator,
+  measureAllWorkspaces,
+  readUsageAsOperator,
 } from "../src/operator/index.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
@@ -207,4 +209,93 @@ describe("what an operator does see", () => {
   // else. That is the floor working; the fix is a decision rather than a
   // detail, and it belongs with the screen the counts appear on. Migration
   // 0084 says the same in its own text.
+});
+
+describe("per-tenant usage, as a snapshot", () => {
+  it("counts a real workspace properly, through its own tenant context", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await measureAllWorkspaces(wb.appPool);
+
+    const [usage] = await readUsageAsOperator(
+      wb.appPool,
+      OPERATOR,
+      workspaceId,
+    );
+    // A provisioned workspace has exactly one human member. The Coach and
+    // the Champion are members too and are deliberately not counted, or every
+    // workspace would look two people larger than it is.
+    expect(usage).toMatchObject({
+      workspaceId,
+      memberCount: 1,
+      goalCount: 0,
+      checkInCount: 0,
+      storageBytes: 0,
+    });
+    expect(usage?.measuredAt).toBeInstanceOf(Date);
+  });
+
+  it("is the fix for a view that measured zero, so zero has to be earned", async () => {
+    // The reason this suite exists at all: the first attempt was a
+    // security-definer view, and it reported zero members for a workspace
+    // that had one. A zero reads as a quiet workspace, so the test that
+    // matters is the one above finding a non-zero count. This one guards the
+    // opposite direction: a workspace with nothing really does report zero
+    // rather than the previous workspace's numbers.
+    const wb = await workerDb();
+    await grantOperator();
+    const other = await createWorkspace(wb.appPool, {
+      user: { id: OPERATOR, name: "Second Owner" },
+    });
+    await measureAllWorkspaces(wb.appPool);
+
+    const all = await readUsageAsOperator(wb.appPool, OPERATOR);
+    expect(all).toHaveLength(2);
+    const second = all.find((row) => row.workspaceId === other.workspaceId);
+    expect(second?.memberCount).toBe(1);
+  });
+
+  it("replaces the snapshot rather than appending to it", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await measureAllWorkspaces(wb.appPool);
+    const first = await readUsageAsOperator(wb.appPool, OPERATOR, workspaceId);
+    await measureAllWorkspaces(wb.appPool);
+    const second = await readUsageAsOperator(wb.appPool, OPERATOR, workspaceId);
+
+    expect(second).toHaveLength(1);
+    expect(second[0]?.measuredAt.getTime()).toBeGreaterThanOrEqual(
+      first[0]?.measuredAt.getTime() ?? 0,
+    );
+  });
+
+  it("shows nothing to somebody with no grant", async () => {
+    const wb = await workerDb();
+    await measureAllWorkspaces(wb.appPool);
+    await expect(readUsageAsOperator(wb.appPool, OPERATOR)).resolves.toEqual(
+      [],
+    );
+  });
+
+  it("carries no column a member wrote in", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await measureAllWorkspaces(wb.appPool);
+    const [usage] = await readUsageAsOperator(
+      wb.appPool,
+      OPERATOR,
+      workspaceId,
+    );
+    // Asserted on the column list rather than on a value, so adding a leaky
+    // column fails this test rather than passing review.
+    expect(Object.keys(usage ?? {}).sort()).toEqual([
+      "checkInCount",
+      "goalCount",
+      "lastActivityAt",
+      "measuredAt",
+      "memberCount",
+      "storageBytes",
+      "workspaceId",
+    ]);
+  });
 });
