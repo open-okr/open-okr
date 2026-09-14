@@ -53,6 +53,20 @@ export interface UsageSnapshot {
  * member of that workspace would see and nothing from anywhere else. That is
  * the point: no policy is loosened and no role is privileged to make a count
  * work.
+ *
+ * **Every count also names the workspace explicitly, and that is not
+ * redundant.** The floor is the guarantee, and a connection that can bypass
+ * it makes every one of these numbers the whole instance's total instead of
+ * one workspace's. Found on a real instance on 14 September 2026: a dev
+ * `DATABASE_URL` pointing at a superuser reported 2 members and 2 goals for
+ * a workspace that had 1 and 0, and for every other workspace as well,
+ * because a superuser has BYPASSRLS and nothing else in the query said which
+ * workspace was meant.
+ *
+ * The suite did not catch it, and could not have: the test harness connects
+ * as the application role, which is exactly the role that cannot bypass. A
+ * wrong count is also the worst failure shape available here, because it
+ * looks like an answer.
  */
 async function measureOne(
   pool: Pool,
@@ -71,6 +85,7 @@ async function measureOne(
         activeOnly(
           workspaceMembers,
           and(
+            eq(workspaceMembers.workspaceId, workspaceId),
             eq(workspaceMembers.kind, "human"),
             eq(workspaceMembers.status, "active"),
           ),
@@ -79,18 +94,19 @@ async function measureOne(
     const [goalRows] = await tx
       .select({ n: count() })
       .from(goals)
-      .where(activeOnly(goals));
+      .where(activeOnly(goals, eq(goals.workspaceId, workspaceId)));
     const [checkInRows] = await tx
       .select({ n: count() })
       .from(checkIns)
-      .where(activeOnly(checkIns));
+      .where(activeOnly(checkIns, eq(checkIns.workspaceId, workspaceId)));
     const [bytes] = await tx
       .select({ total: sum(blobs.filesize) })
       .from(blobs)
-      .where(activeOnly(blobs));
+      .where(activeOnly(blobs, eq(blobs.workspaceId, workspaceId)));
     const [activity] = await tx
       .select({ at: max(activities.at) })
-      .from(activities);
+      .from(activities)
+      .where(eq(activities.workspaceId, workspaceId));
 
     return {
       workspaceId,

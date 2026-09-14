@@ -779,6 +779,15 @@ export {
   type ResolvedActor,
   runOperation,
 } from "./operations/operation.ts";
+// The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
+// boundary gate lets only these touch `tenants`.
+export {
+  isLiveOperator,
+  listTenantsAsOperator,
+  measureAllWorkspaces,
+  readUsageAsOperator,
+  setLifecycleAsOperator,
+} from "./operator/index.ts";
 export {
   dispatchOutbox,
   memberEmail,
@@ -947,6 +956,7 @@ export {
   type Outcome,
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
+export { isCloudEnabled } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,

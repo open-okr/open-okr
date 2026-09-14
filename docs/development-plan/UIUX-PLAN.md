@@ -255,6 +255,22 @@ is what the workspace's members are shown, so the field is written as
 customer-facing rather than as an internal note. No title, name or body
 from any content table appears anywhere on this screen.
 
+**Built at P8-T03b, and S-46's specification above is corrected by what
+building it showed.** It described a header and four panels, and the first
+version rendered them as nine identical bordered cards: a plan key, a member
+count and the control that freezes a customer's workspace all carrying the
+same weight. Three changes, each of them information rather than decoration.
+**State drives the page**, so a workspace that is not active announces itself
+in a band, in its own tone, before any number, and states what its members
+can still do; an active one shows no band, because that is not news. **The
+counts share one container and one timestamp**, because they are one
+measurement taken at one instant, and five separate cards implied five
+independent facts while pushing the instant that qualifies all of them into a
+small aside. **A fact with no value is absent**, so there is no row reading
+"Closed: no". The lifecycle control is the one thing on the screen that looks
+like it changes somebody else's day, and it names the workspace inside its
+own button.
+
 **S-47 Operator instance.** Instance feature flags, the plan catalogue
 (`cloud.plans`), and site messages. A site message carries its body, its
 level, its window of `starts_at` and `ends_at`, its target of all or a

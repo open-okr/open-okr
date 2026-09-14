@@ -373,3 +373,46 @@ describe("what an operator does, and what the customer sees of it", () => {
     ).resolves.toMatchObject({ state: "active" });
   });
 });
+
+describe("the counts are scoped by the query, not only by the floor", () => {
+  it("stays per workspace on a connection that can bypass row-level security", async () => {
+    // **This is a regression test for a defect a browser found and the suite
+    // could not.** The first version of `measureOne` named no workspace in
+    // any of its five counts and relied entirely on the tenant policy to
+    // scope them. Every test here passed, because the harness connects as the
+    // application role, which is exactly the role that cannot bypass the
+    // floor.
+    //
+    // On a real instance whose `DATABASE_URL` points at a superuser, every
+    // workspace reported the whole instance's totals: 2 members and 2 goals
+    // for a workspace that had 1 and 0, and the same two numbers for every
+    // other workspace. A wrong count is the worst failure shape available
+    // here, because it looks like an answer.
+    //
+    // `wb.admin` is the superuser pool, so this runs under the same condition
+    // and asserts the counts are still each workspace's own.
+    const wb = await workerDb();
+    await grantOperator();
+
+    const other = await createWorkspace(wb.appPool, {
+      user: { id: OPERATOR, name: "Second Owner" },
+    });
+
+    // Measured through the bypassing connection, deliberately.
+    await measureAllWorkspaces(wb.admin);
+
+    const all = await readUsageAsOperator(wb.appPool, OPERATOR);
+    expect(all).toHaveLength(2);
+    for (const row of all) {
+      // One human each. Without the explicit predicates this was two on both,
+      // because the count saw every workspace at once.
+      expect(
+        row.memberCount,
+        `${row.workspaceId} counted more than its own members`,
+      ).toBe(1);
+    }
+    expect(all.map((row) => row.workspaceId).sort()).toEqual(
+      [workspaceId, other.workspaceId].sort(),
+    );
+  });
+});
