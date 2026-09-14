@@ -43,7 +43,17 @@ import {
   suppressionFor,
   trigger,
 } from "@openokr/method";
-import { and, asc, count, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  isNotNull,
+  isNull,
+} from "drizzle-orm";
 import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
 import { daysPastDue } from "../cadence/service.ts";
 import { OperationError } from "../operations/errors.ts";
@@ -694,6 +704,51 @@ async function previousFor(
   };
 }
 
+/**
+ * How far away this member's snooze on this subject reaches, in hours.
+ *
+ * **`nudges.snooze` wrote this column and nothing read it** (found at
+ * P7-T04). The action stamps `snoozed_until` on every nudge row for the
+ * member and subject, and `decideSuppression` passed a hard-coded null to the
+ * suppression rules, so a member who snoozed a subject kept being nudged
+ * about it. The rule itself was already written and golden-mastered in
+ * `packages/method`; it had no caller.
+ *
+ * Null when nothing is snoozed or the snooze has run out. Negative values are
+ * not returned: a snooze that expired is not a snooze.
+ */
+async function snoozeHoursAway(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly nudge: DueNudge;
+    readonly now: Date;
+  },
+): Promise<number | null> {
+  const [row] = await tx
+    .select({ snoozedUntil: nudges.snoozedUntil })
+    .from(nudges)
+    .where(
+      activeOnly(
+        nudges,
+        and(
+          eq(nudges.workspaceId, input.workspaceId),
+          eq(nudges.recipientMemberId, input.nudge.recipientMemberId),
+          eq(nudges.subjectType, input.nudge.subjectType),
+          eq(nudges.subjectId, input.nudge.subjectId),
+          isNotNull(nudges.snoozedUntil),
+          gt(nudges.snoozedUntil, input.now),
+        ),
+      ),
+    )
+    .orderBy(desc(nudges.snoozedUntil))
+    .limit(1);
+  if (!row?.snoozedUntil) {
+    return null;
+  }
+  return (row.snoozedUntil.getTime() - input.now.getTime()) / 3_600_000;
+}
+
 /** The member's local hour and minute, for the quiet-hours check. */
 const localTimeIn = (now: Date, timeZone: string) => {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -744,8 +799,15 @@ export async function decideSuppression(
       previous,
       localTime: localTimeIn(input.now, member?.timeZone ?? "UTC"),
       quietHours: member?.quietHours ?? null,
-      // A per-subject snooze is P4-T04c's provenance work; nothing sets it yet.
-      snoozedUntilHoursAway: null,
+      // The member's own snooze on this subject. It silences what the product
+      // says and never the obligation itself: the review inbox and the goal's
+      // own overdue state are unaffected, which `nudge-safety.test.ts` asserts
+      // in the same test.
+      snoozedUntilHoursAway: await snoozeHoursAway(tx, {
+        workspaceId: input.workspaceId,
+        nudge: input.nudge,
+        now: input.now,
+      }),
       sentThisWeek:
         input.context.sentThisWeek.get(input.nudge.recipientMemberId) ?? 0,
     },

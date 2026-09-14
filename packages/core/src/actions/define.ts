@@ -25,6 +25,7 @@ import {
   runOperation,
 } from "../operations/operation.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import type { MetricRecorder } from "../telemetry/recorder.ts";
 
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
@@ -124,6 +125,20 @@ export interface ActionCallContext {
    * it comes from the caller, in one place, the way the channel does.
    */
   readonly bulk?: boolean;
+  /**
+   * Where to record that this call happened, when the host has a meter to
+   * give (P7-T06a).
+   *
+   * Structural, like `storage` above and for the same reason: the driver
+   * lives in `packages/adapters`, which this package may not import, so the
+   * shape is declared in `../telemetry/recorder.ts` and the app passes the
+   * one it already built.
+   *
+   * Absent is a working instance that is not measuring itself. Nothing in
+   * the product's behaviour may depend on this being present, and a reader
+   * who finds a branch that does should treat it as the bug it is.
+   */
+  readonly metrics?: MetricRecorder;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

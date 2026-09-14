@@ -193,3 +193,62 @@ export function wordListsFrom(
 ): QualityWordLists {
   return { ...QUALITY_WORD_LISTS, ...resolved } as QualityWordLists;
 }
+
+/**
+ * §4.1's end-state shapes, which OBJ-1 passes on (P7-T07a).
+ *
+ * **A word list can only recognise an end state that happens to use one of
+ * its words.** The P7-T07 audit measured OBJ-1 against twenty real drafts:
+ * sixteen warned, and the warning was the "Cannot tell" fallback rather than
+ * a real objection. They were well-formed outcomes that used none of the
+ * twenty-two state words, because English has more ways of naming a state
+ * than any list will hold. A check firing on nineteen objectives out of
+ * twenty is a banner rather than coaching.
+ *
+ * So these are shapes, not vocabulary. Each is a sequence of literal words
+ * with `…` standing for any words between them, and an objective matching
+ * one names an end state whatever nouns it uses.
+ *
+ * Deliberately short and deliberately evidenced. Every shape here appeared in
+ * the audit's own drafts; none was invented to look thorough. Adding one is a
+ * METHOD.md change like any other, and the conformance suite compares this
+ * list against §4.1 in both directions.
+ */
+export const END_STATE_SHAPES: readonly string[] = [
+  "make … something …",
+  "reach the point where …",
+  "get to where …",
+];
+
+/**
+ * Whether a title matches one of the shapes above.
+ *
+ * The gap stands for at least one word, not for nothing: "make something" is
+ * not an end state, and a shape that matched it would pass an objective that
+ * names neither a subject nor a property.
+ */
+export function matchesEndStateShape(
+  title: string,
+  shapes: readonly string[] = END_STATE_SHAPES,
+): boolean {
+  const lower = title.toLowerCase().replace(/[^a-z0-9\s-]/g, " ");
+  return shapes.some((shape) => {
+    const parts = shape
+      .split("…")
+      .map((part) => part.trim())
+      .filter((part) => part !== "");
+    if (parts.length === 0) {
+      return false;
+    }
+    const pattern = parts
+      .map((part) => part.split(/\s+/).map(escapeForPattern).join("\\s+"))
+      .join("\\s+\\S+(?:\\s+\\S+)*\\s+");
+    // Anchored at the start, open at the end. Every shape here opens a
+    // sentence; a shape found in the middle of one is a coincidence rather
+    // than a form.
+    return new RegExp(`^\\s*${pattern}\\s+\\S+`, "i").test(lower);
+  });
+}
+
+const escapeForPattern = (word: string): string =>
+  word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

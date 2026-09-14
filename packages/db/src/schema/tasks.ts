@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  doublePrecision,
   integer,
   jsonb,
   pgTable,
@@ -59,7 +60,15 @@ export const tasks = pgTable("tasks", {
   descriptionVersion: integer("description_version"),
   status: text("status", { enum: TASK_STATUSES }).notNull().default("backlog"),
   dueOn: date("due_on"),
-  position: integer("position").notNull().default(0),
+  /**
+   * Where the card sits in its column, as a fraction rather than a whole
+   * number (migration 0081). A drop takes the midpoint of its two new
+   * neighbours, so one drag writes one row instead of renumbering the column.
+   * `double precision` and not `numeric` because node-postgres returns a
+   * numeric as a string, which would change this column's type in every
+   * caller.
+   */
+  position: doublePrecision("position").notNull().default(0),
   orderingState: jsonb("ordering_state")
     .$type<TaskOrderingState>()
     .notNull()

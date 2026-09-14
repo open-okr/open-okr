@@ -76,7 +76,9 @@ export default async function AgentsPage() {
   if (level < ACCESS_LEVELS.full) {
     return (
       <>
-        <h1>{t("admin.agents.agentsAndRuns")}</h1>
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.agents.agentsAndRuns")}
+        </h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
@@ -118,7 +120,9 @@ export default async function AgentsPage() {
 
   return (
     <>
-      <h1>{t("admin.agents.agentsAndRuns")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.agents.agentsAndRuns")}
+      </h1>
       <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
 
       <RunControls drafting={drafting} />

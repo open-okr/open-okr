@@ -1,0 +1,274 @@
+name: Upgrade
+
+# **What this catches that nothing else does.**
+#
+# Every other gate looks at one commit. This one boots the release an
+# instance is actually running, upgrades it to the commit under test, and
+# asks whether the workspace survived. That is the only question a
+# self-hosted operator has on upgrade day, and no amount of unit testing
+# answers it: a migration that drops a column the previous release still
+# reads passes typecheck, passes its own test, and breaks every pod serving
+# traffic during the rollout.
+#
+# PLAN.md §5.1 is the contract: any release upgrades directly to any later
+# release in the same major, with no stops, and rolling back means restoring
+# a backup rather than running the previous tag.
+#
+# Runs on a schedule and on demand rather than on every pull request. It
+# builds two images and boots a database twice, which is minutes rather than
+# seconds, and the thing it protects changes at the pace of migrations
+# rather than at the pace of commits.
+
+on:
+  schedule:
+    # Every night at 02:15 UTC. Late enough that the day's merges are in,
+    # early enough that somebody reads the result before the next working day.
+    - cron: "15 2 * * *"
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: "The commit or tag to upgrade from. Defaults to the pinned baseline below."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # **A pinned commit until the first public release exists.**
+  #
+  # PLAN.md §5.1 says the baseline is the oldest supported release. There is
+  # no release yet, so this is the commit that stands in for one: the last
+  # point the schema was known good end to end. Replace it with the oldest
+  # supported tag the day one exists, and never with `main`, which would
+  # make this job compare a commit against itself and pass for free.
+  UPGRADE_BASELINE: e27ce1340c260c2be6a69faf566d6c64a8ccf032
+
+jobs:
+  compose:
+    name: Upgrade on Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the commit under test
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Work out the baseline
+        id: baseline
+        env:
+          REQUESTED: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED:-$UPGRADE_BASELINE}"
+          # Refuse a baseline that is the commit under test. An upgrade from
+          # a commit to itself proves nothing and would pass every time,
+          # which is worse than not running: a green job nobody can trust is
+          # a green job everybody stops reading.
+          if [ "$(git rev-parse "$ref")" = "$(git rev-parse HEAD)" ]; then
+            echo "The baseline and the commit under test are the same." >&2
+            echo "This job would prove nothing. Move UPGRADE_BASELINE." >&2
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Build the baseline image
+        run: |
+          set -euo pipefail
+          git worktree add ../baseline "${{ steps.baseline.outputs.ref }}"
+          docker build -t openokr:baseline -f ../baseline/deploy/docker/Dockerfile ../baseline
+
+      - name: Build the image under test
+        run: docker build -t openokr:under-test -f deploy/docker/Dockerfile .
+
+      - name: Boot the baseline and seed a workspace
+        working-directory: deploy/docker
+        env:
+          OPENOKR_IMAGE: openokr:baseline
+          OPENOKR_SKIP_PULL: "1"
+        run: |
+          set -euo pipefail
+          ./openokr up
+          # The seed goes through the same registration the smoke test uses,
+          # so the rows this asserts on afterwards were written by the
+          # product rather than inserted behind it.
+          bash ./smoke-test.sh
+
+      - name: Record what the baseline holds
+        id: before
+        working-directory: deploy/docker
+        run: |
+          set -euo pipefail
+          # Counted through the database rather than the interface: the
+          # question is whether the data survived, and a screen that renders
+          # is a weaker claim than a row that is still there.
+          for table in workspaces workspace_members goals audit_events; do
+            n="$(docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "select count(*) from ${table}")"
+            echo "${table}=${n}" >> "$GITHUB_OUTPUT"
+            echo "baseline ${table}: ${n}"
+          done
+
+      - name: Upgrade to the commit under test
+        working-directory: deploy/docker
+        env:
+          OPENOKR_IMAGE: openokr:under-test
+          OPENOKR_SKIP_PULL: "1"
+        run: |
+          set -euo pipefail
+          # The helper takes its own backup first and refuses without one,
+          # which is the rollback path PLAN.md §5.1 requires. Not skipped
+          # here: this job is the one place that path runs end to end.
+          ./openokr upgrade
+
+      - name: The workspace is intact and a member can sign in
+        working-directory: deploy/docker
+        run: |
+          set -euo pipefail
+          for pair in \
+            "workspaces=${{ steps.before.outputs.workspaces }}" \
+            "workspace_members=${{ steps.before.outputs.workspace_members }}" \
+            "goals=${{ steps.before.outputs.goals }}" ; do
+            table="${pair%%=*}"
+            was="${pair#*=}"
+            now="$(docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "select count(*) from ${table}")"
+            [ "$now" = "$was" ] || {
+              echo "${table}: ${was} before the upgrade, ${now} after" >&2
+              exit 1
+            }
+            echo "${table}: ${now}, unchanged"
+          done
+
+          # **The audit trail may only grow.** It is append-only by design and
+          # the upgrade itself writes to it, so equality would be the wrong
+          # assertion here and shrinkage is the failure worth catching.
+          was="${{ steps.before.outputs.audit_events }}"
+          now="$(docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc "select count(*) from audit_events")"
+          [ "$now" -ge "$was" ] || {
+            echo "audit_events fell from ${was} to ${now}" >&2
+            exit 1
+          }
+          echo "audit_events: ${was} before, ${now} after"
+
+      - name: A backup exists, because that is the only rollback there is
+        working-directory: deploy/docker
+        run: |
+          set -euo pipefail
+          count="$(ls -1d ./backups/*/ 2>/dev/null | wc -l | tr -d ' ')"
+          [ "$count" -gt 0 ] || {
+            echo "the upgrade left no backup" >&2
+            exit 1
+          }
+          echo "${count} backup(s) on disk"
+
+      - name: What went wrong
+        if: failure()
+        working-directory: deploy/docker
+        run: docker compose -p openokr logs --tail=200 || true
+
+      - name: Stop
+        if: always()
+        working-directory: deploy/docker
+        run: ./openokr down || true
+
+  helm:
+    name: Upgrade on the Helm chart
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the commit under test
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Work out the baseline
+        id: baseline
+        env:
+          REQUESTED: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          ref="${REQUESTED:-$UPGRADE_BASELINE}"
+          if [ "$(git rev-parse "$ref")" = "$(git rev-parse HEAD)" ]; then
+            echo "The baseline and the commit under test are the same." >&2
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Build both images
+        run: |
+          set -euo pipefail
+          git worktree add ../baseline "${{ steps.baseline.outputs.ref }}"
+          docker build -t openokr:baseline -f ../baseline/deploy/docker/Dockerfile ../baseline
+          docker build -t openokr:under-test -f deploy/docker/Dockerfile .
+
+      - name: Create a cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: openokr-upgrade
+          wait: 120s
+
+      - name: Load both images into the cluster
+        # No registry involved: the cluster runs the two images this job
+        # built, which is what makes the comparison about the code rather
+        # than about what happened to be published.
+        run: |
+          set -euo pipefail
+          kind load docker-image openokr:baseline --name openokr-upgrade
+          kind load docker-image openokr:under-test --name openokr-upgrade
+
+      - name: Install the baseline and use it
+        # The chart's own script installs, waits for readiness and registers
+        # a user, which is the seed this job then asserts survived.
+        run: OPENOKR_IMAGE_TAG=baseline sh ../baseline/deploy/helm/cluster-test.sh
+
+      - name: Record what the baseline holds
+        id: before
+        run: |
+          set -euo pipefail
+          pod="$(kubectl get pod -l app.kubernetes.io/component=postgresql -o name | head -1)"
+          for table in workspaces workspace_members audit_events; do
+            n="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}")"
+            echo "${table}=$(echo "$n" | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Upgrade the release
+        # **The rolling half, which is the point of doing this on Kubernetes
+        # at all.** Pods of the baseline and the commit under test serve
+        # together against the new schema for the length of the rollout, so
+        # a migration that drops a column the baseline still reads breaks
+        # every request those pods serve. The Compose job cannot see that:
+        # it stops one container and starts another.
+        run: |
+          set -euo pipefail
+          helm upgrade openokr deploy/helm \
+            --set image.tag=under-test \
+            --wait --timeout 10m
+
+      - name: The workspace is intact
+        run: |
+          set -euo pipefail
+          pod="$(kubectl get pod -l app.kubernetes.io/component=postgresql -o name | head -1)"
+          for pair in \
+            "workspaces=${{ steps.before.outputs.workspaces }}" \
+            "workspace_members=${{ steps.before.outputs.workspace_members }}" ; do
+            table="${pair%%=*}"
+            was="${pair#*=}"
+            now="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}" | tr -d ' ')"
+            [ "$now" = "$was" ] || {
+              echo "${table}: ${was} before the upgrade, ${now} after" >&2
+              exit 1
+            }
+          done
+          # Append-only, so it may grow and must not shrink.
+          was="${{ steps.before.outputs.audit_events }}"
+          now="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from audit_events" | tr -d ' ')"
+          [ "$now" -ge "$was" ] || {
+            echo "audit_events fell from ${was} to ${now}" >&2
+            exit 1
+          }
+
+      - name: What went wrong
+        if: failure()
+        run: |
+          kubectl get pods -o wide || true
+          kubectl logs -l app.kubernetes.io/name=openokr --tail=200 || true

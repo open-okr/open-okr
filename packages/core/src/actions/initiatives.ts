@@ -36,7 +36,7 @@ import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { refreshGateStateFor } from "../cycles/workflow.ts";
@@ -418,24 +418,19 @@ export const listInitiatives = defineReadAction({
           )
           .orderBy(asc(initiatives.position), asc(initiatives.title));
 
-        // Every row is put to the access getter rather than filtered by a
+        // Every row is put to the access model rather than filtered by a
         // context column, which is the same shape every other list read here
         // uses. A member who cannot see the initiative never sees the row.
-        const readable: typeof rows = [];
-        for (const row of rows) {
-          const allowed = await getAccessScoped(tx, {
-            workspaceId: context.workspaceId,
-            memberId,
-            resourceType: "initiative",
-            resourceId: row.id,
-          }).then(
-            () => true,
-            () => false,
-          );
-          if (allowed) {
-            readable.push(row);
-          }
-        }
+        //
+        // In one statement rather than one per row (P7-T01b): this cost 5 at
+        // three initiatives and 32 at thirty.
+        const allowed = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "initiative",
+          ids: rows.map((row) => row.id),
+        });
+        const readable = rows.filter((row) => allowed.has(row.id));
         return withLinks(tx, context.workspaceId, readable);
       },
     );

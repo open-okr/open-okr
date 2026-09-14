@@ -66,8 +66,26 @@ function everyRoute(dir: string): string[] {
   return found;
 }
 
+/**
+ * The accessibility scan is read as evidence of nothing, on purpose.
+ *
+ * It derives its own screen list by walking the route tree, and it writes
+ * down the routes it deliberately does **not** open, each with a reason
+ * (P7-T05). Every one of those is a url in the file, and this test reads a
+ * url in a file as a visit, so leaving it in the corpus made six routes look
+ * covered the day that spec landed and turned this test red for the exact
+ * opposite reason: the excuses here were reported as stale.
+ *
+ * Naming a route is not opening it, and that spec is the one file in the
+ * suite that names routes it will not open.
+ */
+const NAMES_ROUTES_WITHOUT_VISITING = "s43-accessibility.spec.ts";
+
 const specs = readdirSync(E2E)
-  .filter((name) => name.endsWith(".spec.ts"))
+  .filter(
+    (name) =>
+      name.endsWith(".spec.ts") && name !== NAMES_ROUTES_WITHOUT_VISITING,
+  )
   .map((name) => readFileSync(join(E2E, name), "utf8"))
   .join("\n");
 

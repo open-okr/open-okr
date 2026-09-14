@@ -20,7 +20,9 @@ export default async function BrandingSettingsPage() {
 
   return (
     <>
-      <h1>{t("admin.branding.branding")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.branding.branding")}
+      </h1>
       <BrandingSettingsForm
         branding={(read.settings.branding as Record<string, unknown>) ?? {}}
       />

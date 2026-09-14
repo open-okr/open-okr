@@ -29,6 +29,7 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
+import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 
 export interface RecordUsageEventInput {
   readonly workspaceId: string;
@@ -95,6 +96,7 @@ export async function recordUsageEvent(
   pool: Pool,
   input: RecordUsageEventInput,
 ): Promise<{ readonly id: string; readonly flagged: boolean }> {
+  const metrics = defaultMetrics();
   return runOperation(
     { pool },
     {
@@ -133,6 +135,29 @@ export async function recordUsageEvent(
         if (!inserted) {
           throw new Error("Could not record the usage event.");
         }
+
+        // **Recorded beside the row, not instead of it** (P7-T06b). The
+        // table is the record that answers a bill and survives a restart;
+        // these are for the operator watching spend move today. Provider and
+        // model are labels because both come from the model catalogue and
+        // the set is fixed. The member, the agent and the feature are not:
+        // one of them is a person and the other two would multiply the
+        // series without telling an operator anything the table cannot.
+        const usageLabels = {
+          provider: input.provider,
+          model: input.modelId,
+        };
+        metrics.count(
+          METRIC.aiTokensTotal,
+          { ...usageLabels, direction: "in" },
+          input.inputTokens,
+        );
+        metrics.count(
+          METRIC.aiTokensTotal,
+          { ...usageLabels, direction: "out" },
+          input.outputTokens,
+        );
+        metrics.count(METRIC.aiCostTotal, usageLabels, input.cost);
 
         return {
           result: { id: inserted.id, flagged: anomaly.flagged },

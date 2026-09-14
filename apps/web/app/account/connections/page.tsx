@@ -36,7 +36,7 @@ export default async function ConnectionsPage() {
   const live = connections.filter((row) => row.revokedAt === null);
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4.5">
+    <div className="flex flex-col gap-4.5">
       <Card>
         <CardHeader>
           <span className="flex flex-wrap items-center gap-2">

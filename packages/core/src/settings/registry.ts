@@ -223,6 +223,39 @@ const orphanBlobMinutesSchema = z
   .max(60 * 24 * 30);
 
 /**
+ * Days to keep a channel message log row (P7-T08c).
+ *
+ * **Zero, which means delete nothing.** Agung chose keep-forever with
+ * retention opt-in on 11 September 2026, for the reason that decides most
+ * defaults about deletion: a number out of the box would delete data on
+ * every instance that never chose one, on the first sweep after an upgrade,
+ * and nobody would have asked for it.
+ *
+ * So "not configured" must never mean "delete everything". The sweep reads
+ * this and returns without touching a row unless somebody has put a number
+ * here on purpose.
+ */
+export const DEFAULT_MESSAGE_LOG_RETENTION_DAYS = 0;
+
+/**
+ * Days. Zero is off; a week is the floor for anything that does run.
+ *
+ * The floor is not arbitrary. A retention of one day on a channel log would
+ * delete the delivery record for a message sent yesterday, which is exactly
+ * what somebody debugging a delivery reaches for. A week is the shortest
+ * window where the record still outlives the question.
+ */
+const messageLogRetentionDaysSchema = z
+  .number()
+  .int()
+  .refine((days) => days === 0 || days >= 7, {
+    message: "Use 0 to keep everything, or at least 7 days.",
+  })
+  .refine((days) => days <= 365 * 5, {
+    message: "Five years is past any use for a delivery log.",
+  });
+
+/**
  * The channels a member can be reached on.
  *
  * Exported since P6-G21: a nudge rule's channel override picks from the same
@@ -355,6 +388,25 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "so it has none here.",
     resolve: () => DEFAULT_ORPHAN_BLOB_MINUTES,
     schema: orphanBlobMinutesSchema,
+  },
+  {
+    key: "messageLogRetentionDays",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "Zero, which means delete nothing (P7-T08c). Agung chose keep-forever " +
+      "with retention opt-in on 11 September 2026: a number out of the box " +
+      "would delete data on every instance that never chose one, on the " +
+      "first sweep after an upgrade. **Retention covers the channel message " +
+      "log and nothing else.** The original card named nudge records and " +
+      "agent run logs too, and neither is ordinary data: CLAUDE.md requires " +
+      "that every proactive message is a recorded nudge row carrying a rule " +
+      "key, a channel, an escalation step and a suppression reason, and an " +
+      "agent run log is the record of what an agent did on the workspace's " +
+      "behalf. A sweep over either would delete the evidence the product is " +
+      "required to keep. No S-36 card names this yet, so it has none here.",
+    resolve: () => DEFAULT_MESSAGE_LOG_RETENTION_DAYS,
+    schema: messageLogRetentionDaysSchema,
   },
   {
     key: "teamVoting",

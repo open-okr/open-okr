@@ -11,9 +11,16 @@ export async function register(): Promise<void> {
     return;
   }
 
-  const { validateEnvironment, startOutboxRelay, startRecurringWork } =
-    await import("./instrumentation.node");
+  const {
+    validateEnvironment,
+    startTelemetry,
+    startOutboxRelay,
+    startRecurringWork,
+  } = await import("./instrumentation.node");
   validateEnvironment();
+  // Before the relay and the scheduler, so the work they do from the first
+  // second is measured rather than missed (P7-T06a).
+  startTelemetry();
   startOutboxRelay();
   startRecurringWork();
 }

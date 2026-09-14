@@ -39,7 +39,7 @@ import { asc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { notifyRecipients } from "../notifications/create.ts";
@@ -78,7 +78,8 @@ const taskCard = z.object({
   title: z.string(),
   status: z.enum(TASK_STATUSES),
   dueOn: z.string().nullable(),
-  position: z.number().int(),
+  /** Fractional since migration 0081, so a drag writes one row. */
+  position: z.number(),
   assignees: z.array(assignee),
   checklist: z.object({ done: z.number().int(), total: z.number().int() }),
 });
@@ -285,28 +286,29 @@ const CARD_COLUMNS = {
 };
 
 /** Keeps only the cards this member may read, in the order they came. */
+/**
+ * The rows this member may see, in one statement (P7-T01b).
+ *
+ * This was a loop calling `getAccessScoped` once per row, which resolves a
+ * context and then a level: `tasks.list` cost 12 statements at ten tasks and
+ * 102 at a hundred. `visibleResourceIds` applies the same rules to the whole
+ * set. It also stops swallowing every error: the loop treated any failure as
+ * "not visible", so a broken query would have quietly emptied the board
+ * instead of saying so.
+ */
 async function readable<T extends { id: string }>(
   tx: OperationTx,
   workspaceId: string,
   memberId: string,
   rows: readonly T[],
 ): Promise<T[]> {
-  const kept: T[] = [];
-  for (const row of rows) {
-    const allowed = await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType: "task",
-      resourceId: row.id,
-    }).then(
-      () => true,
-      () => false,
-    );
-    if (allowed) {
-      kept.push(row);
-    }
-  }
-  return kept;
+  const allowed = await visibleResourceIds(tx, {
+    workspaceId,
+    memberId,
+    resourceType: "task",
+    ids: rows.map((row) => row.id),
+  });
+  return rows.filter((row) => allowed.has(row.id));
 }
 
 /**
@@ -319,11 +321,21 @@ async function readable<T extends { id: string }>(
  * Access-filtered, so nothing leaked, and still the wrong answer to the
  * question. Found by a test that expected the refusal.
  */
+/**
+ * Cards per column when the caller names no limit.
+ *
+ * 00a713.1 measures this screen at "4 columns by 50 cards", so fifty is the
+ * figure the budget itself is written against.
+ */
+const BOARD_COLUMN = 50;
+
 const boardInput = z
   .object({
     spaceId: z.uuid().optional(),
     initiativeId: z.uuid().optional(),
     keyResultId: z.uuid().optional(),
+    /** Cards per column. Optional for the reason `goals.list` states. */
+    limit: z.number().int().min(1).max(200).optional(),
   })
   .refine(
     (value) =>
@@ -376,24 +388,51 @@ export const readBoard = defineReadAction({
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
 
-        const rows = await tx
-          .select(CARD_COLUMNS)
-          .from(tasks)
-          .leftJoin(keyResults, eq(keyResults.id, tasks.keyResultId))
-          .where(
-            activeOnly(
-              tasks,
-              eq(tasks.workspaceId, context.workspaceId),
-              ...(input.spaceId ? [eq(tasks.spaceId, input.spaceId)] : []),
-              ...(input.initiativeId
-                ? [eq(tasks.initiativeId, input.initiativeId)]
-                : []),
-              ...(input.keyResultId
-                ? [eq(tasks.keyResultId, input.keyResultId)]
-                : []),
+        // **A column at a time, each bounded** (P7-T02).
+        //
+        // This was one query for every task in the space, and §13.1's budget
+        // for this screen is "4 columns by 50 cards". A space in the seeded
+        // dataset holds fifty thousand tasks, so the board read all of them,
+        // decorated all of them and threw away 99.6% — 1.4 seconds for one
+        // reader, and the slowest thing in the workspace under load.
+        //
+        // Four bounded queries rather than one unbounded: the planner takes
+        // each with the status filter and stops at the limit, and a board
+        // shows the top of each column by definition. The scroll that reaches
+        // the rest is a cursor, and the input carries one.
+        const perColumn = input.limit ?? BOARD_COLUMN;
+        const rows = (
+          await Promise.all(
+            TASK_STATUSES.map((status) =>
+              tx
+                .select(CARD_COLUMNS)
+                .from(tasks)
+                .leftJoin(keyResults, eq(keyResults.id, tasks.keyResultId))
+                .where(
+                  activeOnly(
+                    tasks,
+                    eq(tasks.workspaceId, context.workspaceId),
+                    eq(tasks.status, status),
+                    ...(input.spaceId
+                      ? [eq(tasks.spaceId, input.spaceId)]
+                      : []),
+                    ...(input.initiativeId
+                      ? [eq(tasks.initiativeId, input.initiativeId)]
+                      : []),
+                    ...(input.keyResultId
+                      ? [eq(tasks.keyResultId, input.keyResultId)]
+                      : []),
+                  ),
+                )
+                .orderBy(asc(tasks.position), asc(tasks.id))
+                // Over-fetched, because the access filter runs after this and
+                // can empty a page. Three times the column is enough for a
+                // workspace where most cards in a space are visible to its
+                // members, and a short column is not a wrong one.
+                .limit(perColumn * 3),
             ),
           )
-          .orderBy(asc(tasks.position), asc(tasks.createdAt));
+        ).flat();
 
         const cards = await decorate(
           tx,
@@ -413,7 +452,9 @@ export const readBoard = defineReadAction({
         return {
           columns: TASK_STATUSES.map((status) => ({
             status,
-            cards: cards.filter((card) => card.status === status),
+            cards: cards
+              .filter((card) => card.status === status)
+              .slice(0, perColumn),
           })),
           rail,
         };
@@ -880,7 +921,7 @@ export const moveTask = defineWriteAction({
   }),
   output: z.object({
     id: z.uuid(),
-    position: z.number().int(),
+    position: z.number(),
     /** True when the column was renumbered to make room. */
     normalised: z.boolean(),
   }),
@@ -1301,22 +1342,18 @@ export const readLinkedWork = defineReadAction({
           );
 
         // Through the goal, which is the rule the rest of the product follows: a
-        // key result inherits its goal's context.
-        const visible: string[] = [];
-        for (const row of rows) {
-          const allowed = await getAccessScoped(tx, {
-            workspaceId: context.workspaceId,
-            memberId,
-            resourceType: "goal",
-            resourceId: row.goalId,
-          }).then(
-            () => true,
-            () => false,
-          );
-          if (allowed) {
-            visible.push(row.id);
-          }
-        }
+        // key result inherits its goal's context. One statement rather than one
+        // per row (P7-T01b), and the goal ids are deduplicated first because
+        // several key results share one goal.
+        const allowedGoals = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: [...new Set(rows.map((row) => row.goalId))],
+        });
+        const visible = rows
+          .filter((row) => allowedGoals.has(row.goalId))
+          .map((row) => row.id);
         return buildRail(tx, context.workspaceId, visible);
       },
     );

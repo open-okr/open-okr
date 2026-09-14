@@ -73,11 +73,29 @@ describe("the document", () => {
     );
     expect(names).toContain("cursor");
 
-    const list = operation("/goals/list", "get");
-    const listNames = (list.parameters as { name: string }[]).map(
-      (parameter) => parameter.name,
+    // **The whole document, not one named example.** This asserted that
+    // `/goals/list` had no cursor, and went stale the day that action gained
+    // one (P7-T01b), reporting a documentation bug where there was a paging
+    // feature. What the title claims is a property of every path, so every
+    // path is what it checks: a cursor appears exactly where the registry
+    // says the action pages, and nowhere else.
+    const pagingPaths = new Set(
+      REST_ROUTES.filter((route) => route.page).map((route) => route.path),
     );
-    expect(listNames).not.toContain("cursor");
+    const documented: string[] = [];
+    for (const [path, methods] of Object.entries(
+      document.paths as JsonObject,
+    )) {
+      for (const operation of Object.values(methods as JsonObject)) {
+        const parameters =
+          ((operation as JsonObject).parameters as { name: string }[]) ?? [];
+        if (parameters.some((parameter) => parameter.name === "cursor")) {
+          documented.push(path);
+        }
+      }
+    }
+    expect(documented.length).toBeGreaterThan(0);
+    expect([...documented].sort()).toEqual([...pagingPaths].sort());
   });
 
   it("declares the error enumeration once and refers to it", () => {

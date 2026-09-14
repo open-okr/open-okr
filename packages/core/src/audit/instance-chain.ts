@@ -59,6 +59,11 @@ export function verifyInstanceChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        // The instance chain is written synchronously and has no pending
+        // tail: its volume is a handful of operator events, so P7-T02a left
+        // it alone. Zero rather than optional, so the two verdicts read the
+        // same way.
+        pending: 0,
         brokenAtSeq: row.seq,
         reason: `expected sequence ${expectedSeq} but found ${row.seq}: a row is missing or was reordered`,
       };
@@ -67,6 +72,11 @@ export function verifyInstanceChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        // The instance chain is written synchronously and has no pending
+        // tail: its volume is a handful of operator events, so P7-T02a left
+        // it alone. Zero rather than optional, so the two verdicts read the
+        // same way.
+        pending: 0,
         brokenAtSeq: row.seq,
         reason: "this row does not follow the one before it",
       };
@@ -75,6 +85,11 @@ export function verifyInstanceChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        // The instance chain is written synchronously and has no pending
+        // tail: its volume is a handful of operator events, so P7-T02a left
+        // it alone. Zero rather than optional, so the two verdicts read the
+        // same way.
+        pending: 0,
         brokenAtSeq: row.seq,
         reason: "this row's contents do not match its recorded hash",
       };
@@ -83,7 +98,7 @@ export function verifyInstanceChain(
     expectedSeq++;
   }
 
-  return { ok: true, checked: rows.length };
+  return { ok: true, checked: rows.length, pending: 0 };
 }
 
 export interface RecordInstanceAuditEventInput {

@@ -1,4 +1,5 @@
 import { listUserSessions, type UserSession } from "@openokr/core";
+import { Button, Card, CardBody, CardHeader } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { getAuth } from "../../../lib/auth";
@@ -18,6 +19,13 @@ import { getTranslations } from "../../../lib/translations";
  * carries the full reasoning. Revoking still goes through the endpoint, which
  * asks only that the session be real, and checks the token belongs to the
  * caller before it deletes anything.
+ *
+ * **A row per device rather than a run-on sentence.** The list was a bare
+ * `<ul>` whose every item ran the user agent, the address, the date and an
+ * unstyled Revoke button together on one line, so the longest string on the
+ * page was the thing hardest to read. The device leads, the address and the
+ * start time sit under it, and the control that ends the session is on the
+ * right where the other lists in this product put it.
  */
 
 async function revoke(formData: FormData): Promise<void> {
@@ -46,29 +54,50 @@ export async function Sessions({ userId }: { userId: string }) {
   }
 
   return (
-    <section style={{ fontFamily: "system-ui, sans-serif" }}>
-      <h2>{t("common.sessions")}</h2>
-      <p>{t("account.security.sessions.everyDeviceCurrentlySigned")}</p>
-      {sessions === null ? (
-        <p role="status">{t("account.security.sessions.thisListCouldNot")}</p>
-      ) : sessions.length === 0 ? (
-        <p>{t("account.security.sessions.noOtherDeviceIs")}</p>
-      ) : (
-        <ul>
-          {sessions.map((session) => (
-            <li key={session.id}>
-              {session.userAgent ?? "Unknown device"}
-              {session.ipAddress ? ` (${session.ipAddress})` : ""}
-              {", since "}
-              {session.createdAt.toLocaleString()}{" "}
-              <form action={revoke} style={{ display: "inline" }}>
-                <input type="hidden" name="token" value={session.token} />
-                <button type="submit">{t("common.revoke")}</button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <Card>
+      <CardHeader>
+        <h2 className="text-sm font-bold text-ink">{t("common.sessions")}</h2>
+      </CardHeader>
+      <CardBody className="flex flex-col gap-3">
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("account.security.sessions.everyDeviceCurrentlySigned")}
+        </p>
+        {sessions === null ? (
+          <p role="status" className="text-sm text-ink-3">
+            {t("account.security.sessions.thisListCouldNot")}
+          </p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-ink-3">
+            {t("account.security.sessions.noOtherDeviceIs")}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {sessions.map((session) => (
+              <li
+                key={session.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line p-3"
+              >
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="break-all text-sm font-medium text-ink">
+                    {session.userAgent ?? "Unknown device"}
+                  </span>
+                  <span className="text-xs text-ink-3">
+                    {[session.ipAddress, session.createdAt.toLocaleString()]
+                      .filter((one) => one)
+                      .join(" · ")}
+                  </span>
+                </span>
+                <form action={revoke}>
+                  <input type="hidden" name="token" value={session.token} />
+                  <Button type="submit" variant="ghost" size="sm">
+                    {t("common.revoke")}
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardBody>
+    </Card>
   );
 }

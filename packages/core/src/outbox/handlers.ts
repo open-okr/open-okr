@@ -45,6 +45,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { renderDigest } from "../notifications/templates.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
+import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
@@ -160,6 +161,11 @@ const publishEvent: OutboxHandler = async (delivery, deps) => {
   }
   const { channel: _channel, ...data } = delivery.payload;
   await deps.publish(channel, delivery.topic, data);
+  // The topic, never the channel. A topic is one of a fixed handful; a
+  // channel names a session, a goal or a workspace and is unbounded.
+  defaultMetrics().count(METRIC.realtimeEventsTotal, {
+    topic: delivery.topic,
+  });
 };
 
 /**
@@ -468,6 +474,17 @@ const deliverChannelMessage: OutboxHandler = async (delivery, deps) => {
     : failure
       ? ("failed" as const)
       : ("suppressed" as const);
+
+  // **The provider and the status, and nothing else** (P7-T06b). Not the
+  // member, not the idempotency key, and above all not `failure`: that
+  // string is a provider's own error text and can carry an address, a
+  // phone number or a fragment of the message. It belongs on the row,
+  // which is access-scoped, and never in a label, which is served to
+  // whoever can read the exposition and kept for the life of the process.
+  defaultMetrics().count(METRIC.channelDeliveriesTotal, {
+    provider: row.provider,
+    outcome: status,
+  });
 
   // openokr:allow-mutation: the delivery side of the outbox, marking the row
   // the relay has already claimed. Not a domain write: nothing about the

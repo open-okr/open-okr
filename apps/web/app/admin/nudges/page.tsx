@@ -63,7 +63,9 @@ export default async function NudgeVolumePage() {
     // exists and who to ask, which is what a permission-denied state is for.
     return (
       <>
-        <h1>{t("admin.nudges.nudgeVolume")}</h1>
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.nudges.nudgeVolume")}
+        </h1>
         <Card>
           <CardBody>
             <p className="text-sm text-ink-2">
@@ -93,7 +95,9 @@ export default async function NudgeVolumePage() {
 
   return (
     <>
-      <h1>{t("admin.nudges.nudgeVolume")}</h1>
+      <h1 className="text-lg font-bold text-ink">
+        {t("admin.nudges.nudgeVolume")}
+      </h1>
       <p className="text-sm text-ink-3">
         {t("admin.nudges.theLast")} {volume.windowDays}{" "}
         {t("admin.nudges.daysNoiseIsBounded")}

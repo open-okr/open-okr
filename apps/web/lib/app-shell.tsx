@@ -30,6 +30,7 @@ import { iconFor } from "./nav-icons.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
+import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
 import { WorkspaceStateBanner } from "./workspace-state.tsx";
 
@@ -135,6 +136,7 @@ export async function AppShellLayout({
   // instead of flashing an input it cannot use.
   const copilot = await copilotAvailabilityAction();
 
+  const { t } = await getTranslations();
   const path = (await headers()).get("x-openokr-path") ?? "/";
   const active = activeItemId(path, [
     ...sidebarItems,
@@ -183,6 +185,7 @@ export async function AppShellLayout({
     <KeyboardRegistryProvider>
       <AppearanceSync theme={me.theme} density={me.density} />
       <AppShell
+        skipToContentLabel={t("common.skipToContent")}
         sidebar={
           <Sidebar
             groups={groups}

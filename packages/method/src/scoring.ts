@@ -142,6 +142,19 @@ export interface CascadeGoal {
     readonly weight: number;
     readonly progressPct: number;
   }[];
+  /**
+   * This node's progress, already known, when the caller loaded only part of
+   * the graph.
+   *
+   * A caller recomputing one branch loads that branch's own nodes and the
+   * siblings they roll up with. A sibling's children are not loaded, so
+   * computing its progress here would read it as having none and would feed
+   * the parent a number that is too low. Its stored progress stands in for
+   * the subtree instead, and it is a boundary of the load rather than a
+   * result of it: nothing the caller writes back should come from a node
+   * carrying this.
+   */
+  readonly settledProgressPct?: number;
 }
 
 export interface CascadeResult {
@@ -270,6 +283,13 @@ export function cascadeProgress(goals: readonly CascadeGoal[]): CascadeResult {
         }
         continue;
       }
+    }
+
+    if (goal.settledProgressPct !== undefined) {
+      // A boundary of a partial load: its answer came in with it, and the
+      // subtree that produced it was never loaded.
+      progress.set(frame.id, clampPercent(goal.settledProgressPct));
+      continue;
     }
 
     const items: WeightedItem[] = goal.keyResults.map((keyResult) => ({

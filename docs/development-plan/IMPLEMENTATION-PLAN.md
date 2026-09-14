@@ -2065,17 +2065,48 @@ that the route still calls the registry.
 
 ### P7-T01: Performance budgets and indexing at scale [L]
 Depends on: Phase 6 complete
-Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace; every TECHNICAL-PLAN.md §13.1 budget measured in continuous integration; the query-count budget enforced on list endpoints; an index and plan review with fixes.
-Acceptance: every budget row is green on the large dataset in continuous integration.
+
+**Cut in two on 2026-09-10**, approved by Agung, because the four deliverables
+below are two working sessions rather than one. The dataset has to exist before
+anything can be measured against it, and the query-count budget needs no
+dataset at all, so the seam is between building the instrument and using it.
+
+#### P7-T01a: The dataset and the query-count budget [M]
+Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace, built through the tenant floor with every goal's access context and four bindings, and refused on a production instance; `pnpm db:seed:large`; the query-count budget on list endpoints, enforcing both a ceiling and the stronger rule that the count may not grow with the row count.
+Acceptance: the full dataset builds into an empty workspace and its goals resolve through `resolveMemberAccessLevel`; the budget suite passes, and any list whose cost grows with its rows is named on a list that P7-T01b empties.
+
+#### P7-T01b: The budget harness, the index and plan review [M]
+Depends on: P7-T01a
+Deliverables: every TECHNICAL-PLAN.md §13.1 budget measured against the large dataset and wired into continuous integration; `EXPLAIN (ANALYZE, BUFFERS)` over the list queries with the composite indexes §13.2 asks for; the three query-per-row lists P7-T01a found (`goals.list`, `tasks.list`, `initiatives.list`) fixed and removed from `KNOWN_QUERY_PER_ROW`.
+Acceptance: every budget row is green on the large dataset in continuous integration, and `KNOWN_QUERY_PER_ROW` is empty.
 
 ### P7-T02: Load and soak testing [M]
 Depends on: P7-T01
 Deliverables: load scripts covering hundreds of concurrent members in one workspace with check-in bursts, a live session with twenty participants, feed reads, board drags, chat inbound and external agent traffic; a soak run; fixes.
 Acceptance: no errors and within budget at the target concurrency, with realtime fan-out bounded and nudge delivery inside its budget.
 
+#### P7-T02a: The audit chain leaves the write path [M]
+Depends on: P7-T02's measurement
+
+Added 2026-09-10. Not in the original plan, because the plan could not know the number: P1-T07 recorded the per-workspace audit lock as a follow-up "to measure", P7-T02 measured it at 14.8 seconds at the 95th percentile for a write at fifty concurrent members, and Agung chose the fix.
+
+Deliverables: the audit row written with no lock and no chain position; a chainer that fills `seq`, `prev_hash` and `row_hash` as a single writer per workspace; `pnpm audit:chain` and a scheduled pass; a row-level trigger narrowing append-only from "no update" to "the content is immutable and the position is write-once"; the verifier counting unchained rows as pending rather than verified or broken.
+Acceptance: the chain the chainer builds verifies, content cannot be edited or deleted by any route including an owner connection, a chained row cannot be renumbered, and a pending tail never reads as either verified or broken.
+
 ### P7-T03: Security review, supply chain and tenant fuzzing [L]
 Depends on: Phase 6 complete
-Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; the tenant property and fuzz suite firing random cross-tenant probes at every table and requiring zero rows, plus a policy-removal mutation check; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
+
+**Cut in two on 2026-09-10.** The tenant suite is a test against the running
+schema; the control audit and the supply chain are a review producing a signed
+table. They share a heading and nothing else.
+
+#### P7-T03a: The tenant property and fuzz suite [M]
+Deliverables: random cross-tenant probes at every table carrying `workspace_id`, requiring zero rows; the schema property that each one has row-level security enabled, forced, and a policy reading `app.workspace_id`; the with-check half exercised by a write naming another workspace; a policy-removal mutation check proving the suite can fail.
+Acceptance: every table is covered, a stranger reads zero rows everywhere, and disabling row-level security on one table makes the suite fail.
+
+#### P7-T03b: The §8.2 control audit, supply chain and outbound rules [M]
+Depends on: P7-T03a
+Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
 Acceptance: no high findings remain open, and every control row carries either a verified mark or an accepted-risk note signed off by the human.
 
 ### P7-T04: Agent, nudge and channel safety hardening [M]
@@ -2088,29 +2119,131 @@ Depends on: P7-T01
 Deliverables: automated accessibility checks across every screen wired into continuous integration and failing on serious findings; keyboard-only walkthrough scripts for the primary flows including both sessions; performance budgets on the seeded dataset; fixes; the screen-reader smoke procedure.
 Acceptance: continuous integration blocks a change that introduces a serious accessibility finding or breaks a web vitals budget.
 
-### P7-T06: Observability [M]
+### P7-T06a: The meter, the exposition and the synchronous surfaces [M]
 Depends on: Phase 6 complete
-Deliverables: traces and metrics for requests, Operations, outbox lag, jobs, nudge delivery, channel delivery, session synchronisation, agent runs, authorisation outcomes and AI usage; self-hostable dashboards; opt-in and documented, with no telemetry leaving by default.
-Acceptance: a self-hosted installation sees its own dashboards with zero external calls.
+Goal: the product can be measured at all, and the three surfaces on a request's own thread are measured first.
+Deliverables: a `telemetry` port in `packages/adapters` with an OpenTelemetry driver and an off driver, resolved the way every other port is; OpenTelemetry added to the boundary file's vendor list so a stray import outside the adapter fails the build; two settings in the TECHNICAL-PLAN §4.14 map, `observability.metrics` defaulting to on because a local endpoint sends nothing anywhere, and `observability.otlp.endpoint` defaulting to empty because an exporter with no address is an exporter that never dials; metrics for every action with its duration and outcome, for the Operations underneath them, and for authorisation decisions with the level each one wanted; the exposition endpoint, which refuses without an instance-administrator session.
+Test plan: the off driver records nothing and costs no allocation; the endpoint refuses an ordinary member and a signed-out visitor; a counter incremented on a refused authorisation names the level it wanted and never the subject's title; with `observability.otlp.endpoint` empty, no exporter is constructed; the meter opens no listening socket of its own.
+Acceptance: Given a fresh instance with nothing configured, when an administrator opens the exposition endpoint, then action, Operation and authorisation series are present and no process has opened a socket to anything outside the instance.
+
+**HTTP request metrics are not in this row, and the reason is a finding
+rather than a deferral.** The original card listed "requests" beside the
+others. `apps/web/proxy.ts` is the only application code that sees every
+request, and it cannot measure one: it is synchronous, it decides redirect
+or continue, and it returns before the handler that produces the status and
+the duration has run. Instrumenting it would also pull the whole adapter
+package, OpenTelemetry and the S3 and Postgres clients included, into a
+bundle that executes on every request. The honest place to measure HTTP is
+the collector in front of the instance, so the row moved to P7-T06c where
+the collector and the dashboards are. Found 11 September 2026 while wiring
+P7-T06a.
+
+### P7-T06b: The asynchronous surfaces [M]
+Depends on: P7-T06a
+Goal: the work that happens off the request thread is measured by the same meter.
+Deliverables: metrics for outbox lag and drain outcomes, scheduler jobs, nudge delivery with its suppression reasons, channel delivery per provider, session synchronisation fan-out, agent runs, and AI usage in tokens and cost.
+Test plan: outbox lag is measured from the row's own enqueue time rather than from the drain's start, so a relay that stops reports a growing lag instead of a flat zero; a suppressed nudge is counted under its suppression reason; a channel failure is counted per provider and carries no message content.
+Acceptance: Given a relay stopped with rows waiting, when the exposition endpoint is read, then outbox lag grows with the age of the oldest undrained row.
+
+### P7-T06c: Traces, dashboards and the operator guide [M]
+Depends on: P7-T06b
+Goal: the numbers become something an operator can look at, and a trace explains a slow request the numbers only flag.
+Deliverables: OpenTelemetry tracing behind the same port, spanning a request through its Operation and out to its outbox row; HTTP request metrics, taken at the collector rather than in `proxy.ts` for the reason recorded under P7-T06a; dashboards shipped as files an operator can import, covering the §13.1 budgets and the delivery paths; a Compose profile that runs a collector and the dashboards locally, off unless asked for; the operator documentation, saying what is measured, what leaves and what does not.
+Test plan: a span carries no personal data and no rich text; the Compose profile is absent from the default `up`; the documentation's claim about what leaves matches the code, asserted by a test that reads both.
+Acceptance: Given a self-hosted installation that has started the observability profile, when the operator opens the dashboards, then the §13.1 budgets are charted from its own data and no request has left the host.
+
+**Why P7-T06 was split.** The single [M] card carried ten instrumented
+surfaces across four packages, a new vendor dependency, an exposition
+endpoint, dashboards, a Compose profile and the operator guide. Ten call
+sites in `packages/core`, `packages/adapters`, `packages/agents` and
+`apps/web` is a lane, not a session, and the one-commit rule would have been
+broken silently rather than deliberately. Cut on 11 September 2026 before any
+code, along the seam the work already has: what a request does on its own
+thread, what happens after it returns, and what a human finally looks at.
 
 ### P7-T07: Method conformance audit [M]
 Depends on: P4-T01g
 Deliverables: a full pass comparing every rule, threshold, band, corridor, taxonomy, gate, agenda and diagnostic in METHOD.md against `packages/method` and against the behaviour observed in the running product; the coaching-prompt corpus reviewed for tone and accuracy against the tuned false-positive rate; any drift corrected in the document or the code, whichever is wrong.
+Test plan: every enumeration the suite compares is proved by being broken, so a check that has never failed is never trusted; each comparison runs in both directions, because an item in the document and not in the package is as much drift as the reverse; every list is floored on its parsed length, so a regex that finds nothing fails instead of agreeing with everything; the twenty-draft sample runs with the AI provider off, because a false-positive rate measured with a model filling in the gaps is not the rate a self-hosted instance gets. (Added at P7-T07: the card shipped with no test plan line, which is a Definition of Ready gap under criterion 3, and the next reader should meet the corrected card rather than the original omission.)
 Acceptance: the conformance suite is complete, and a human confirms that a sample of twenty real OKR drafts receive verdicts they agree with.
 
-### P7-T08: Privacy: export, erasure and retention [M]
-Depends on: P7-T03
-Deliverables: personal data export and erasure as anonymisation tested end to end; retention settings for message logs, nudge records and agent run logs; a review that no personal data reaches logs, prompts or telemetry.
-Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export is produced, and no personal data of theirs remains in message logs, prompts or telemetry.
+### P7-T07a: OBJ-1 recognises an end state it has no word for [M]
+Depends on: P7-T07
+Goal: the objective check stops warning on nineteen objectives out of twenty.
+**Approved by Agung on 11 September 2026**, on the audit's finding 1. §4.1's OBJ-1 reaches its "Cannot tell" fallback unless the title matches the movement-with-a-why shape or carries one of twenty-two state words, so a natural and well-formed English outcome warns. Sixteen of twenty real drafts landed there. Agung chose to recognise the sentence shape rather than lengthen the word list, because a word list will always be behind English.
+Deliverables: METHOD.md §4.1 gains an end-state shape alongside its state-word list, covering at least "Make X something Y", "Reach the point where X" and "Get to where X"; `packages/method` implements the shape and the conformance suite compares it; `pnpm method:verdicts` re-run and its counts recorded, because the point of the change is the count.
+Test plan: every one of the twenty drafts that landed in "Cannot tell" only because of its shape now passes OBJ-1, and every draft that genuinely starts with an output verb or names a bare metric still fails; the shape matcher is compared against §4.1 by the conformance suite, so a phrase added to the document and not the package fails the build; a deliberately vague objective that names no end state at all still reaches the fallback, because the fallback is not being removed.
+Acceptance: Given the twenty drafts in `pnpm method:verdicts`, when the shape is recognised, then the objectives written deliberately as outcomes pass OBJ-1 and the ones written as deliverables still do not.
 
-### P7-T09: Release engineering and the upgrade contract [L]
+### P7-T08a: Where personal data actually goes [S]
 Depends on: P7-T03
-Goal: a release is produced by a pipeline, and an instance any supported distance behind reaches it without losing data, per PLAN.md §5.1.
-Deliverables: changesets wired into the repository, producing the version, changelog and release notes on tag, and failing the build for a release with no changeset; a software bill of materials produced per release and attached to it; image signing moved from P1-T10's tag step into the same pipeline, so one job owns the whole artifact set; the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure; the PLAN.md §5.1 expand-then-contract rule added to the migration linter, so a migration that drops or renames a column names the earlier release that added its replacement.
-Test plan: the upgrade matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring the dump with the previous image returns the instance to its prior state; the linter rejects a same-release drop and accepts a two-release one; a release with no changeset fails the build.
-Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it to the current release, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
+Goal: know what reaches logs, prompts and telemetry before deciding what to delete.
+Deliverables: a written review of every place a member's personal data can leave the database, covering the log lines, the AI prompts and the metrics; each finding either fixed where no judgement is needed, or recorded as a question with the narrowest fix named.
+Test plan: the telemetry half is asserted rather than claimed, against the label rule declared in both packages and the runbook's own test; every runtime log line that interpolates a value is read, not grepped for a pattern.
+Acceptance: Given the review, when a human reads it, then every route personal data can take out of the database is named, and every one is either closed or carries a decision waiting on them.
 
----
+### P7-T08b: Personal export and erasure across every table [L]
+Depends on: P7-T08a
+Goal: an erasure that finishes, and an export that is the member's content rather than their profile.
+Deliverables: a per-member export covering every table that holds them, generated through the Operation pipeline; erasure extended past `workspace_members` to channel connections and identities, message payloads, conversations, copilot threads and prompts, and issued tokens; a table-by-table record of what is anonymised and what is deleted.
+**Decided by Agung on 11 September 2026: anonymise the content, delete the identifiers.** The name, the address, the handle, the external account id and every issued token go. What the member wrote stays, attributed to the placeholder identity. Two reasons carried the decision: a quarter's record stays readable, and the audit chain still verifies, which matters because an erasure that breaks the chain has destroyed the record proving it happened. Channel message payloads are blanked and their rows kept, because the row is the delivery record the audit refers to.
+Test plan: an erasure followed by a search for the member's address, handle and external id across every table returns nothing; the content they authored is still readable and still attributed to the placeholder; the audit chain still verifies after the erasure, because an erasure that breaks the chain has destroyed the record that proves it happened.
+Acceptance: Given an erasure request, when it completes, then the member's content survives anonymised, an export of their own data is produced, and no personal data of theirs remains in message logs or prompts.
+
+### P7-T08c: Retention, and the sweep that honours it [M]
+Depends on: P7-T08b
+Goal: an instance can forget the message bodies it no longer needs, and nothing forgets by accident.
+**One setting, not three, decided by Agung on 11 September 2026.** The original card named message logs, nudge records and agent run logs. Two of those are not ordinary data: CLAUDE.md requires that every proactive message is a recorded nudge row carrying a rule key, a channel, an escalation step and a suppression reason, and an agent run log is the record of what an agent did on the workspace's behalf. A retention sweep over either would delete the evidence the product is required to keep. So retention covers the channel message log and nothing else, and the two excluded rows are named here rather than quietly dropped.
+Deliverables: one setting in the TECHNICAL-PLAN §4.14 map, `messageLogRetentionDays`, **defaulting to zero, which means delete nothing** (decided by Agung the same day: keep forever, with retention opt-in, so no instance loses data to a default it never chose); a sweep registered on the scheduler beside the orphan-blob reap, deleting through the Operation pipeline so the deletion is audited; the operator documentation saying what is kept, for how long, and what is deliberately never swept.
+Test plan: zero and unset both delete nothing, because "not configured" must never mean "delete everything"; the sweep is bounded per run so a backlog cannot hold a transaction open over a quarter of messages, and idempotent so a second run in the same minute removes nothing twice; a row inside its window survives and a row outside it does not; the audit row names how many rows went; a nudge row and an agent run log outside any window are untouched, which is the exclusion asserted rather than assumed.
+Acceptance: Given a channel message older than the configured retention, when the sweep runs, then the row is gone, the deletion is in the audit trail, a row inside the window is untouched, and no nudge or agent run row has been touched at all.
+
+### P7-T08d: The three routes out of the log [S]
+Depends on: P7-T08a
+Goal: close the three findings the privacy review left open, all of them approved by Agung on 11 September 2026.
+Deliverables: an unrecognised `mail.transport` refuses and names the setting, while unset or empty still falls back to console, so absent and wrong stop meaning the same thing; the password-reset console fallback logs the address and not the link outside development, because a reset link is a credential and anyone who can read the log can take the account; the admin screen warns once an instance has been sending through the console driver for long enough that nobody is watching it any more.
+Test plan: `smpt` is refused naming `mail.transport`, an empty value still resolves to console, and a valid `smtp` is unaffected; the reset fallback carries the address and no link when `NODE_ENV` is production and both in development, so the path a developer needs still works; the warning appears only after the threshold and never for an instance on SMTP.
+Acceptance: Given an instance whose transport setting is misspelt, when it resolves mail settings, then it refuses naming the setting rather than writing every message to the log.
+
+**Why P7-T08 was split.** The single [M] card carried a per-member export
+across twenty-four schema files, an erasure that has to decide anonymise or
+delete table by table, three retention settings and the sweep that acts on
+them, and the review. Cut on 11 September 2026 after the review, which is
+the part that needed no decision and is what told us how big the other two
+are. The order matters: the review names what leaves, the export and erasure
+close it, and retention comes last because it is the only part that deletes
+on a clock and so is the only part where a wrong default destroys data
+nobody asked it to.
+
+### P7-T09a: The expand-then-contract rule, in the linter [S]
+Depends on: P7-T03
+Goal: a migration that drops what the previous release still reads fails the build instead of a rollout.
+Deliverables: PLAN.md §5.1's removal rule added to the migration linter, refusing any `drop column` or `rename column` that does not carry an `openokr:replaces` marker naming where the replacement shipped; constraints and indexes left alone, because neither is read by name by the previous release.
+Test plan: a drop, a rename and a `drop column if exists` are each refused; a marker with a reason is accepted and a marker without one is not; a constraint drop and an index drop pass; the marker is found when the drop sits on its own line inside a multi-line `alter table`, which is the form the first implementation missed.
+Acceptance: Given a migration dropping a column with no marker, when `pnpm db:lint` runs, then it fails naming the column and the rule.
+
+### P7-T09b: Changesets, the version, and the artifact set [M]
+Depends on: P7-T09a
+Goal: one job owns everything a release produces.
+Deliverables: changesets wired in, producing the version, changelog and release notes on tag and failing the build for a release with no changeset; a software bill of materials per release, attached to it; image signing moved from P1-T10's tag step into the same pipeline, so the image, the signature and the bill of materials are one artifact set rather than three steps that can disagree.
+Test plan: a release with no changeset fails; the bill of materials names every runtime dependency the lockfile does; the signature verifies against the published image.
+Acceptance: Given a tag, when the pipeline finishes, then a version, a changelog, release notes, a signed image and a bill of materials exist and agree with each other.
+
+### P7-T09c: The upgrade matrix, and the backup that makes rollback real [L]
+Depends on: P7-T09b
+Goal: an instance any supported distance behind reaches the current release without losing data, and can go back.
+Deliverables: the upgrade matrix in continuous integration, which builds the upgrade baseline (a pinned commit until the first public release exists, the oldest supported release after it), boots it on Compose, seeds a workspace through the factory, upgrades to the current commit and asserts the workspace is intact and a member signs in, with the same run against the Helm chart in kind; a pre-upgrade database dump taken by the lifecycle helper into a named volume, keeping the last three and refusing to upgrade when it cannot dump, with an opt-out for external databases; the helper's rollback guidance corrected from "run the previous tag" to the restore procedure.
+Test plan: the matrix fails first against a deliberately destructive migration dropping a column the baseline still reads; the helper refuses to upgrade when the dump path is unwritable; a dump is taken, the upgrade applies, and restoring it with the previous image returns the instance to its prior state.
+Acceptance: Given an instance on the upgrade baseline with real data, when the lifecycle helper upgrades it, then a backup exists, the migrations apply, the data is intact, and restoring the backup with the previous image returns the instance to where it started.
+
+**Why P7-T09 was split, and why the order is this one.** The single [L] card
+carried the changeset wiring, a bill of materials, image signing, a
+two-target upgrade matrix, a backup-and-restore path in the lifecycle helper,
+the rollback documentation and a linter rule. The linter rule comes first and
+alone because it is the only part that needs neither Docker nor a cluster and
+so is the only part a developer can prove on the machine they are sitting at,
+and because the upgrade matrix's own first test is a migration the linter
+should already have refused. Cut 11 September 2026.
 
 # Phase 8: Cloud, enterprise and launch
 

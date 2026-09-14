@@ -741,3 +741,75 @@ describe("a workspace that adds its own vocabulary", () => {
     expect(verdict("OBJ-1", result)).toBe("fail");
   });
 });
+
+/**
+ * §4.1's end-state shapes (P7-T07a).
+ *
+ * The P7-T07 audit measured OBJ-1 against twenty real drafts: sixteen
+ * warned, and the warning was the "Cannot tell" fallback rather than a real
+ * objection. They were well-formed outcomes using none of the twenty-two
+ * state words, because English has more ways of naming a state than a list
+ * will hold.
+ */
+describe("OBJ-1 recognises an end state it has no word for", () => {
+  const objective = (title: string) =>
+    evaluateObjective(
+      {
+        title,
+        hasCycle: true,
+        hasTimeframe: true,
+        championId: "member-1",
+        reviewerId: "member-2",
+        objectivesInUnit: 3,
+        level: "team",
+      },
+      canonThresholds(),
+    ).find((verdict) => verdict.id === "OBJ-1");
+
+  it("passes a shape that carries no state word at all", () => {
+    for (const title of [
+      "Make onboarding something new customers finish by themselves",
+      "Make the checkout something nobody abandons",
+      "Reach the point where the product sells itself",
+      "Get to where a failed payment never reaches a person",
+    ]) {
+      const verdict = objective(title);
+      expect(verdict?.status, title).toBe("pass");
+      expect(verdict?.condition, title).toBe("Matches an end-state shape");
+    }
+  });
+
+  it("is asked before the output-verb sweep, and that order matters", () => {
+    // "Make the platform something an auditor can verify unaided" carries no
+    // output verb, but several real end-state sentences carry one somewhere
+    // in their tail. A sentence whose shape names an end state has named
+    // one, whatever words sit inside it.
+    const verdict = objective(
+      "Make the platform something an auditor can create a report from",
+    );
+    expect(verdict?.status).toBe("pass");
+    expect(verdict?.condition).toBe("Matches an end-state shape");
+  });
+
+  it("still refuses a deliverable, which is the point of the check", () => {
+    expect(objective("Launch the new mobile app by end of Q3")?.status).toBe(
+      "fail",
+    );
+    expect(objective("Modernise the data platform")?.status).not.toBe("pass");
+    expect(objective("Grow revenue 40% this quarter")?.status).toBe("fail");
+  });
+
+  it("needs a word after the shape, so a bare form is not an end state", () => {
+    // "Make it something" names a subject and no property. The gap stands
+    // for at least one word, not for nothing.
+    const verdict = objective("Make it something");
+    expect(verdict?.condition).not.toBe("Matches an end-state shape");
+  });
+
+  it("leaves the fallback in place for an objective that names nothing", () => {
+    // The fallback is not being removed. An objective that genuinely says
+    // nothing about an end state still gets asked the question.
+    const verdict = objective("Win back the customers we lost last year");
+    expect(verdict?.status).toBe("warn");
+  });
+});

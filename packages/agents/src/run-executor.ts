@@ -26,7 +26,9 @@
 import {
   ACCESS_LEVELS,
   callAction,
+  defaultMetrics,
   isOverHardCap,
+  METRIC,
   OperationError,
   type OperationTx,
   resolveMemberAccessLevel,
@@ -91,6 +93,35 @@ async function isDeniedByBindings(
     contextId: context.contextId,
   });
   return level < ACCESS_LEVELS.view;
+}
+
+/**
+ * Records that one run ended (P7-T06b).
+ *
+ * **`trigger`, not the agent and not the workspace.** The trigger catalogue
+ * is a fixed list, so it makes a bounded label and it is also the useful
+ * one: an operator watching agent runs wants to know which cadence is
+ * failing, not which workspace, and the workspace is unbounded anyway.
+ *
+ * The duration is measured from the run's own `startedAt` rather than from
+ * this call, because a run spans several tasks and several transactions.
+ * Skipped when the row has no start, which is a run that failed before it
+ * ever began.
+ */
+function recordRunFinished(
+  run: { readonly trigger: string; readonly startedAt: Date | null },
+  outcome: "completed" | "failed",
+  finishedAt: Date,
+): void {
+  const metrics = defaultMetrics();
+  metrics.count(METRIC.agentRunsTotal, { trigger: run.trigger, outcome });
+  if (run.startedAt) {
+    metrics.observe(
+      METRIC.agentRunDuration,
+      (finishedAt.getTime() - run.startedAt.getTime()) / 1000,
+      { trigger: run.trigger },
+    );
+  }
 }
 
 /**
@@ -182,6 +213,7 @@ export async function processNextTask(
             status: "failed",
             logEntry,
           };
+          recordRunFinished(run, "failed", now);
           return {
             result,
             activity: {
@@ -276,6 +308,10 @@ export async function processNextTask(
             updatedAt: now,
           })
           .where(eq(agentRuns.id, run.id));
+
+        if (finished) {
+          recordRunFinished(run, "completed", now);
+        }
 
         return {
           result: { finished, status, logEntry },

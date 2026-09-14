@@ -59,9 +59,13 @@ export interface QualityVerdict {
  * as a parameter and the registry needs them as a default. Re-exported here so
  * a caller reading the catalogue finds them where it expects.
  */
-export { QUALITY_WORD_LISTS } from "./word-lists.ts";
+export {
+  END_STATE_SHAPES,
+  matchesEndStateShape,
+  QUALITY_WORD_LISTS,
+} from "./word-lists.ts";
 
-import { wordListsFrom } from "./word-lists.ts";
+import { matchesEndStateShape, wordListsFrom } from "./word-lists.ts";
 
 export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
   {
@@ -93,6 +97,12 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
         status: "pass",
         prompt:
           "This reads as a change in state, not a to-do. Keep the deliverables in your key results.",
+      },
+      {
+        condition: "Matches an end-state shape",
+        status: "pass",
+        prompt:
+          "This names the state you want to be in. Keep the deliverables in your key results.",
       },
       {
         condition: "Contains an output verb anywhere",
@@ -527,9 +537,18 @@ export function evaluateObjective(
         ? verdictOf(obj1, "Metric movement with a why")
         : hasState
           ? verdictOf(obj1, "Names a change in state")
-          : contains(title, lists.outputVerbs)
-            ? verdictOf(obj1, "Contains an output verb anywhere")
-            : verdictOf(obj1, "Cannot tell");
+          : // **Before the output-verb sweep, and that order is the point**
+            // (P7-T07a). "Make X something Y" carries `make`, which is not
+            // an output verb, but "Make the platform something an auditor
+            // can verify unaided" carries `verify` and several shapes will
+            // catch a list word somewhere in their tail. A sentence whose
+            // shape names an end state has named one, whatever words sit
+            // inside it, so the shape is asked first.
+            matchesEndStateShape(title)
+            ? verdictOf(obj1, "Matches an end-state shape")
+            : contains(title, lists.outputVerbs)
+              ? verdictOf(obj1, "Contains an output verb anywhere")
+              : verdictOf(obj1, "Cannot tell");
 
   // OBJ-2. The bounds are the §11 registry's, not this function's: METHOD.md
   // §4.1 words them as four and eighteen and the registry carries those as

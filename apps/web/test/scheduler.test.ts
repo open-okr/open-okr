@@ -83,6 +83,17 @@ describe("the run table", () => {
     expect(shadows).toEqual([]);
   });
 
+  /**
+   * Runs the host dispatches itself, without going through the registry.
+   *
+   * One entry, and it is deliberately a list rather than a wildcard. Chaining
+   * the audit trail is maintenance: putting it in the registry would expose it
+   * over REST, the command line, the chat commands and the agent catalogue,
+   * four surfaces for something only a scheduler and an operator ever call
+   * (P7-T02a). Anything added here has to argue the same case.
+   */
+  const NOT_REGISTRY_ACTIONS = new Set(["audit.chain"]);
+
   test("names a real action for every run", () => {
     // Checked against the registry rather than against a list written here.
     // The list was a second copy of the type union three lines away, so it
@@ -91,7 +102,25 @@ describe("the run table", () => {
     // worth catching is a run naming an action that does not exist.
     const registered = new Set<string>(actionNames());
     for (const run of SCHEDULED_RUNS) {
+      if (NOT_REGISTRY_ACTIONS.has(run.action)) {
+        continue;
+      }
       expect(registered).toContain(run.action);
+    }
+  });
+
+  test("keeps the off-registry list to runs that argue for it", () => {
+    // Guards the exemption. A run added to it silently would be a scheduled
+    // job with no contract, no permission check and no place in the one-
+    // contract surface, which is the opposite of what the registry is for.
+    expect([...NOT_REGISTRY_ACTIONS]).toEqual(["audit.chain"]);
+    const off = SCHEDULED_RUNS.filter((run) =>
+      NOT_REGISTRY_ACTIONS.has(run.action),
+    );
+    // And it is scheduled, rather than declared and never run.
+    expect(off.map((run) => run.job)).toEqual(["audit.chain"]);
+    for (const run of off) {
+      expect(run.cron, run.job).toBeTruthy();
     }
   });
 

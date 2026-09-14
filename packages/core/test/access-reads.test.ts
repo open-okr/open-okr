@@ -20,6 +20,7 @@ import {
 } from "../src/access/contexts.ts";
 import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import {
+  accessFilterMember,
   accessScopeFilter,
   can,
   getAccessScoped,
@@ -769,22 +770,85 @@ describe("the composable list filter scopes many rows the same way a single read
       [workspaceId, visibleContext, tooLowContext, invisibleContext],
     );
 
-    const rows = await withReadTx((tx) =>
-      tx
-        .select({ title: accessProbes.title })
-        .from(accessProbes)
-        .where(
-          and(
-            activeOnly(accessProbes, eq(accessProbes.workspaceId, workspaceId)),
-            accessScopeFilter(accessProbes.contextId, {
-              workspaceId,
-              memberId,
-              minLevel: ACCESS_LEVELS.edit,
-            }),
-          ),
-        ),
+    const titlesFor = async (reader: string): Promise<string[]> =>
+      withReadTx(async (tx) => {
+        const rows = await tx
+          .select({ title: accessProbes.title })
+          .from(accessProbes)
+          .where(
+            and(
+              activeOnly(
+                accessProbes,
+                eq(accessProbes.workspaceId, workspaceId),
+              ),
+              accessScopeFilter(accessProbes.contextId, {
+                workspaceId,
+                memberId: reader,
+                minLevel: ACCESS_LEVELS.edit,
+                member: await accessFilterMember(tx, {
+                  workspaceId,
+                  memberId: reader,
+                }),
+              }),
+            ),
+          );
+        return rows.map((row) => row.title);
+      });
+
+    expect(await titlesFor(memberId)).toEqual(["visible"]);
+
+    // **The two facts now come in from outside, so they are asserted here**
+    // (P7-T02). The filter used to ask the database, per row, whether the
+    // reader was live and human, and that is what made Postgres materialise
+    // every visible context before probing it. Passing them in is only safe
+    // if the answers are the same, so both are exercised through the filter
+    // rather than only through `resolveMemberAccessLevel`.
+    await wb.admin.query(
+      "update workspace_members set status = 'suspended' where id = $1",
+      [memberId],
+    );
+    expect(await titlesFor(memberId)).toEqual([]);
+    await wb.admin.query(
+      "update workspace_members set status = 'active' where id = $1",
+      [memberId],
     );
 
-    expect(rows.map((r) => r.title)).toEqual(["visible"]);
+    // The other fact: only a person gets the blanket tiers. Binding the
+    // workspace-wide group to the third probe makes it visible to the human
+    // and must leave the agent with nothing.
+    const agentId = await addMember("agent");
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "test.bind-blanket",
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        async execute({ tx }) {
+          await bindGroup(tx, {
+            workspaceId,
+            groupId: await ensureWorkspaceStandardGroup(tx, { workspaceId }),
+            contextId: invisibleContext,
+            level: ACCESS_LEVELS.edit,
+          });
+          return {
+            result: undefined,
+            activity: {
+              kind: "test.bind-blanket",
+              subjectType: "test-aggregate",
+              subjectId: invisibleContext,
+            },
+            audit: {
+              action: "test.bind-blanket",
+              targetType: "test-aggregate",
+            },
+          };
+        },
+      },
+    );
+    expect((await titlesFor(memberId)).sort()).toEqual([
+      "invisible",
+      "visible",
+    ]);
+    expect(await titlesFor(agentId)).toEqual([]);
   });
 });

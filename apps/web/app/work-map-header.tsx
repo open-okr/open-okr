@@ -157,7 +157,13 @@ export async function WorkMapHeader({
             puts "Work Map" in the topbar and the workspace name in the title
             block; the topbar is not this component's to change, so the page
             keeps its own name here rather than becoming an unnamed screen. */}
-        <h1 className="text-[10px] font-bold tracking-wider text-ink-4 uppercase">
+        {/* `--ink-3`, not `--ink-4`. The ramp's own comment says ink-4 is
+            "placeholders and disabled labels only. Deliberately below 4.5",
+            and this is neither: it is the screen's name, on every page, at
+            10px. P7-T05's scan reported it as a serious contrast finding on
+            every screen in the product, which is one defect wearing thirty
+            hats. */}
+        <h1 className="text-[10px] font-bold tracking-wider text-ink-3 uppercase">
           {t("workMapHeader.workMap")}
         </h1>
         <p className="truncate text-xl font-bold text-ink">{workspaceName}</p>

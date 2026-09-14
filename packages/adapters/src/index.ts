@@ -23,6 +23,10 @@ export {
   defaultTierModelsFor,
 } from "./create-ai-provider.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
+export {
+  createTelemetry,
+  type TelemetryConfig,
+} from "./create-telemetry.ts";
 export { McpAgentServer } from "./drivers/agent/mcp.ts";
 // The mock driver is exported by name, the same way the socket server is:
 // infrastructure another package's own test suite constructs directly,
@@ -179,6 +183,11 @@ export type {
 } from "./ports/search.ts";
 export type { FileStorage, PutOptions, StoredObject } from "./ports/storage.ts";
 export { ObjectNotFoundError } from "./ports/storage.ts";
+export type {
+  MetricLabels,
+  MetricRecorder,
+  Telemetry,
+} from "./ports/telemetry.ts";
 export {
   type OutboxRecord,
   OutboxRelay,

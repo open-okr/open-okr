@@ -51,7 +51,7 @@ import {
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import {
   clearDue,
   daysPastDue,
@@ -84,7 +84,22 @@ import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
+import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
+
+/**
+ * Goals per page when the caller names no limit.
+ *
+ * Two hundred is the Work Map's own working set: 00a713.1 measures its first
+ * paint at "100 nodes visible", so a page is comfortably more than a screen
+ * and far less than a workspace. A caller who wants fewer says so.
+ *
+ * **A page is filtered for access after it is fetched, so it can come back
+ * short.** The access model decides per row and cannot be pushed into this
+ * query without duplicating its rules in two places. A short page is not the
+ * end of the list: the cursor still advances, and the caller asks again.
+ */
+const GOAL_PAGE = 200;
 
 const richText = z
   .unknown()
@@ -364,19 +379,27 @@ async function memberNames(
   workspaceId: string,
   ids: readonly string[],
 ): Promise<Map<string, string>> {
-  if (ids.length === 0) {
-    return new Map();
-  }
-  const rows = await tx
-    .select({ id: workspaceMembers.id, name: workspaceMembers.name })
-    .from(workspaceMembers)
-    .where(
-      activeOnly(
-        workspaceMembers,
-        eq(workspaceMembers.workspaceId, workspaceId),
-        inArray(workspaceMembers.id, [...ids]),
+  // **Deduplicated, and that is the fix rather than a tidy-up** (P7-T01b).
+  // The caller passes a champion and a reviewer per goal, so a hundred
+  // thousand goals asked for two hundred thousand ids naming at most a few
+  // hundred people. Drizzle builds `inArray` as a nested SQL tree and
+  // overflows its own call stack long before Postgres sees the statement, so
+  // the Work Map did not merely run slowly on a large workspace: it threw.
+  // Chunked as well, because a workspace can genuinely hold more distinct
+  // members than one statement may carry parameters.
+  const distinct = [...new Set(ids)];
+  const rows = await selectInChunks(distinct, (batch) =>
+    tx
+      .select({ id: workspaceMembers.id, name: workspaceMembers.name })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          eq(workspaceMembers.workspaceId, workspaceId),
+          inArray(workspaceMembers.id, batch),
+        ),
       ),
-    );
+  );
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
@@ -415,8 +438,36 @@ export const listGoals = defineReadAction({
     // input makes the field required in the inferred handler type, and every
     // existing caller of `goals.list` would have to pass it.
     mine: z.boolean().optional(),
+    /**
+     * One page, keyset (§13.2, P7-T01b).
+     *
+     * **This read had no bound at all and could not serve a large workspace.**
+     * On §13.1's hundred thousand goals it loaded every visible row, and the
+     * budget harness measured it in minutes against a one-second budget. Three
+     * separate failures hid behind each other on the way there: the parameter
+     * ceiling, Drizzle overflowing its own stack building the statement, and
+     * then simply the size of the answer.
+     *
+     * Optional, like `mine` above and for the same reason: a `default` on a
+     * read action's input makes the field required in the inferred handler
+     * type, so every existing caller would have to pass it. Absent means the
+     * first page.
+     */
+    cursor: z.object({ position: z.number().int(), id: z.uuid() }).optional(),
+    limit: z.number().int().min(1).max(500).optional(),
   }),
   output: z.object({ goals: z.array(goalOutput) }),
+  /**
+   * The cursor is `(position, id)`, not `(position, createdAt)`.
+   *
+   * The sort was position then creation time, and `createdAt` is not in the
+   * output, so a cursor could not be built from a returned row. Ids here are
+   * time-ordered UUIDv7, so ordering by id *is* ordering by creation time to
+   * the millisecond, and the pair is a total order the caller can see. Two
+   * goals created inside one millisecond may swap against each other, which
+   * was already true of the sort this replaces.
+   */
+  page: { cursorFrom: ["position", "id"], itemsAt: "goals" },
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
     const db = drizzle(context.pool);
@@ -458,49 +509,71 @@ export const listGoals = defineReadAction({
           filters.push(isNull(goals.closedAt));
         }
 
+        // The keyset predicate. A row tuple comparison rather than the
+        // `position > x or (position = x and id > y)` spelling, because
+        // Postgres can match the former to a composite index and the latter
+        // usually not.
+        if (input.cursor) {
+          filters.push(
+            sql`(${goals.position}, ${goals.id}) > (${input.cursor.position}, ${input.cursor.id}::uuid)` as never,
+          );
+        }
+
         const rows = await tx
           .select(GOAL_COLUMNS)
           .from(goals)
           .where(activeOnly(goals, ...filters))
-          .orderBy(asc(goals.position), asc(goals.createdAt));
+          .orderBy(asc(goals.position), asc(goals.id))
+          .limit(input.limit ?? GOAL_PAGE);
 
-        // Every goal is filtered through the getter rather than trusted from the
-        // list query. A list is a read of many protected aggregates, and §4.1
-        // does not exempt it from the one chokepoint.
-        const visible = [];
-        for (const row of rows) {
-          try {
-            await requireGoalAccess(
-              tx,
-              context.workspaceId,
-              memberId,
-              row.id,
-              ACCESS_LEVELS.view,
-            );
-            visible.push(row);
-          } catch (error) {
-            if (error instanceof OperationError && error.code === "not_found") {
-              continue;
-            }
-            throw error;
-          }
-        }
+        // Every goal is filtered through the access model rather than trusted
+        // from the list query. A list is a read of many protected aggregates,
+        // and §4.1 does not exempt it from the one chokepoint.
+        //
+        // In one statement rather than one per row (P7-T01b). This was a loop
+        // calling `getAccessScoped`, which resolves a context and then a level:
+        // two statements per goal, so the list cost 15 at five goals and 105 at
+        // fifty, and would cost two hundred thousand at §13.1's hundred
+        // thousand. `visibleResourceIds` applies the same rules to the whole
+        // set, and `access-visible-ids.test.ts` compares the two answers case
+        // by case so the swap cannot quietly widen what a member sees.
+        const allowed = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: rows.map((row) => row.id),
+          requires: ACCESS_LEVELS.view,
+        });
+        const visible = rows.filter((row) => allowed.has(row.id));
 
         const ids = visible.map((row) => row.id);
-        const children =
-          ids.length === 0
-            ? []
-            : await tx
-                .select(KEY_RESULT_COLUMNS)
-                .from(keyResults)
-                .where(
-                  activeOnly(
-                    keyResults,
-                    eq(keyResults.workspaceId, context.workspaceId),
-                    inArray(keyResults.goalId, ids),
-                  ),
-                )
-                .orderBy(asc(keyResults.position));
+        // **Chunked, because `in ($1, $2, ...)` has a ceiling** (P7-T01b).
+        // Drizzle's `inArray` sends one placeholder per id, and Postgres
+        // refuses a statement with more than 65,535 parameters. This action
+        // takes no limit, so on §13.1's hundred thousand goals the list did
+        // not merely run slowly: it failed outright, and the Work Map on a
+        // large workspace would not open at all. Found by the budget harness
+        // on the seeded dataset, which is the whole reason §13.1 asks for the
+        // measurement to happen there.
+        //
+        // The chunk is the containment, not the cure. §13.2 asks for keyset
+        // pagination everywhere and this read has none, so it still loads
+        // every goal a member can see into memory. Making it paginated changes
+        // the action's output shape and every caller, which is a decision
+        // rather than a fix, and it is recorded on the P7-T01b row.
+        const children = await selectInChunks(ids, (batch) =>
+          tx
+            .select(KEY_RESULT_COLUMNS)
+            .from(keyResults)
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, context.workspaceId),
+                inArray(keyResults.goalId, batch),
+              ),
+            )
+            .orderBy(asc(keyResults.position)),
+        );
 
         const names = await memberNames(
           tx,

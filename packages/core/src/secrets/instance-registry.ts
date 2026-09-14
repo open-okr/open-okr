@@ -66,6 +66,29 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_TELEMETRY",
     summary: "Anonymous usage reporting. Off unless deliberately turned on.",
   },
+  // The two rows below are not that one, and reusing it for them would be the
+  // direct route to failing P7-T06's "zero external calls" (P7-T06a).
+  // `instance.telemetry` is data leaving the instance and is off.
+  // `observability.metrics` is the instance measuring itself for its own
+  // operator and sends nothing anywhere, which is why it is on.
+  // `observability.otlp.endpoint` is the only setting in this product that can
+  // make a measurement leave the host, and it is empty.
+  {
+    key: "observability.metrics",
+    kind: "boolean",
+    fallback: true,
+    environment: "OPENOKR_OBSERVABILITY_METRICS",
+    summary:
+      "Serve this instance's own metrics at /api/metrics, for an instance administrator only. Local. Nothing leaves the host.",
+  },
+  {
+    key: "observability.otlp.endpoint",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_OTLP_ENDPOINT",
+    summary:
+      "Where to export traces and metrics. Empty means no exporter is built and nothing is ever sent. The only setting that can make measurements leave this host.",
+  },
   {
     key: "mail.transport",
     kind: "string",

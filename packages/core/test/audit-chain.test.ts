@@ -103,11 +103,14 @@ describe("verifyChain", () => {
   };
 
   it("accepts an intact chain", () => {
-    expect(verifyChain(chain(5))).toEqual({ ok: true, checked: 5 });
+    // `pending` joined the verdict at P7-T02a: the chain is built behind the
+    // write path, so "how many rows are recorded and not yet chained" is part
+    // of every answer. Nothing is pending in a chain handed over whole.
+    expect(verifyChain(chain(5))).toEqual({ ok: true, checked: 5, pending: 0 });
   });
 
   it("accepts an empty chain, which a new workspace has", () => {
-    expect(verifyChain([])).toEqual({ ok: true, checked: 0 });
+    expect(verifyChain([])).toEqual({ ok: true, checked: 0, pending: 0 });
   });
 
   it("rejects a chain whose first row does not start from genesis", () => {

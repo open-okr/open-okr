@@ -22,10 +22,19 @@ import { randomBytes } from "node:crypto";
  * Two ids generated inside the same millisecond order randomly against each
  * other. RFC 9562 allows that, and it costs nothing here: ordering matters at
  * the granularity of index pages, not individual rows.
+ *
+ * `atMilliseconds` states the time to stamp instead of reading the clock, and
+ * exists for the performance dataset (P7-T01a). Index locality is the whole
+ * reason for a time-ordered key, and a million rows minted in one process all
+ * carry one timestamp prefix and land in one region of the B-tree. Production
+ * spreads the same rows over months, so a dataset built without this measures
+ * a tree the product never has. It takes a parameter rather than growing a
+ * second generator beside it, because two implementations of one bit layout
+ * is how seeded data stops matching what the product writes.
  */
-export function newId(): string {
+export function newId(atMilliseconds: number = Date.now()): string {
   const bytes = randomBytes(16);
-  const milliseconds = Date.now();
+  const milliseconds = atMilliseconds;
 
   // The first 48 bits are the timestamp, most significant byte first.
   bytes[0] = Math.floor(milliseconds / 2 ** 40) & 0xff;

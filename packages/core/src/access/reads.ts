@@ -175,10 +175,50 @@ export async function resolveAnonymousAccessLevel<
   return Number(result.rows[0]?.level ?? 0);
 }
 
+/**
+ * The two facts about the reader that decide which tiers reach them, read
+ * once rather than asked of the database inside every row's filter.
+ *
+ * Load it with `accessFilterMember`. Never assemble one by hand: `active`
+ * is what excludes a suspended or deleted member and `human` is what stops
+ * an agent inheriting the blanket tiers, so a wrong value here is a wrong
+ * answer about who can see what.
+ */
+export interface AccessFilterMember {
+  /** Live, in this workspace, and not suspended. */
+  readonly active: boolean;
+  /** A person rather than an agent. Only a person gets the blanket tiers. */
+  readonly human: boolean;
+}
+
+/** Reads the two facts `accessScopeFilter` needs, in one query. */
+export async function accessFilterMember<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: { workspaceId: string; memberId: string },
+): Promise<AccessFilterMember> {
+  const result = await tx.execute<{ active: boolean; human: boolean }>(sql`
+    select (m.status = 'active') as active, (m.kind = 'human') as human
+      from workspace_members m
+     where m.id = ${input.memberId}
+       and m.workspace_id = ${input.workspaceId}
+       and m.deleted_at is null
+     limit 1
+  `);
+  const row = result.rows[0];
+  return {
+    active: row?.active === true,
+    human: row?.human === true,
+  };
+}
+
 export interface AccessScopeFilterInput {
   readonly workspaceId: string;
   readonly memberId: string;
   readonly minLevel: AccessLevel;
+  /** From `accessFilterMember`, on the same transaction. */
+  readonly member: AccessFilterMember;
 }
 
 /**
@@ -187,11 +227,39 @@ export interface AccessScopeFilterInput {
  * parameterised on whichever column holds the row's `context_id`. Drop it
  * into any `.where()` alongside the query's other conditions; nothing here
  * fetches or aggregates on its own.
+ *
+ * **It stays correlated, and that is what the `offset 0` is for** (P7-T02).
+ * Postgres rewrites an `EXISTS` whose only tie to the outer row is one
+ * equality into a hashed subplan: it builds the whole inner set once and
+ * probes it. That is the right plan when the outer side is large and it is
+ * catastrophic here, because the inner set is every context the reader can
+ * see. On §13.1's dataset the workspace-wide tier alone makes that 1,271,774
+ * rows, built to answer a fifty-row feed page: 468ms of the query's 540, and
+ * it does not shrink when the page does. `offset 0` is the standard
+ * optimisation fence and blocks that rewrite, leaving one index lookup on
+ * `access_bindings (context_id)` per candidate row: the same page costs 2ms.
+ * Every caller of this filter reads a bounded page, so per-row lookups are
+ * always the plan wanted. A caller that one day scans the whole table
+ * unbounded would want the hash back, and would need its own filter.
+ *
+ * **Who the reader is comes in rather than being asked per row**, for the
+ * same reason. This used to carry three `exists (select 1 from
+ * workspace_members ...)` checks inside the filter, none of which depend on
+ * the outer row: Postgres hoisted them into one-time filters, which is what
+ * exposed the rewrite above in the first place.
  */
 export function accessScopeFilter(
   contextIdColumn: AnyPgColumn,
   input: AccessScopeFilterInput,
 ): SQL {
+  if (!input.member.active) {
+    // A suspended, deleted or unknown member sees nothing. Said here rather
+    // than left to an `EXISTS` that cannot match, so the planner is told too.
+    return sql`false`;
+  }
+  // A literal rather than a bound parameter: it is a boolean this function
+  // already knows, and a parameter would leave the planner guessing again.
+  const blanket = sql.raw(input.member.human ? "true" : "false");
   return sql`exists (
     select 1
       from access_bindings b
@@ -203,31 +271,15 @@ export function accessScopeFilter(
        and b.workspace_id = ${input.workspaceId}
        and b.deleted_at is null
        and b.level >= ${input.minLevel}
-       and exists (
-         select 1 from workspace_members m
-          where m.id = ${input.memberId}
-            and m.workspace_id = ${input.workspaceId}
-            and m.status = 'active'
-            and m.deleted_at is null
-       )
        and (
          (g.kind = 'member' and g.member_id = ${input.memberId})
          -- The two blanket tiers reach only a human member, same restriction
          -- and same reason as resolveMemberAccessLevel above: an agent must
          -- never inherit ambient access, and a guest must actually lose it.
+         or (${blanket} and g.kind = 'workspace_standard')
          or (
-           g.kind = 'workspace_standard'
-           and exists (
-             select 1 from workspace_members m
-              where m.id = ${input.memberId} and m.kind = 'human'
-           )
-         )
-         or (
-           g.kind = 'space_standard'
-           and exists (
-             select 1 from workspace_members m
-              where m.id = ${input.memberId} and m.kind = 'human'
-           )
+           ${blanket}
+           and g.kind = 'space_standard'
            and exists (
              select 1 from access_group_memberships gm
               where gm.group_id = g.id
@@ -236,6 +288,7 @@ export function accessScopeFilter(
            )
          )
        )
+     offset 0
   )`;
 }
 
@@ -486,6 +539,96 @@ export async function getAccessScoped<
     throw notFound();
   }
   return { contextId: context.contextId, level };
+}
+
+export interface VisibleIdsInput {
+  readonly workspaceId: string;
+  readonly memberId: string;
+  /** A type that owns its own context: `goal`, `initiative`, `task`, `space`. */
+  readonly resourceType: string;
+  readonly ids: readonly string[];
+  /** Defaults to view. */
+  readonly requires?: number;
+}
+
+/**
+ * The subset of `ids` the member may see, decided in one statement (P7-T01b).
+ *
+ * **Why this exists.** A list of protected aggregates cannot be trusted from
+ * its own query: §4.1 sends every read through the getter, so `goals.list`,
+ * `tasks.list` and `initiatives.list` each called `getAccessScoped` once per
+ * row. That is correct and it is an N+1. The query-count budget P7-T01a added
+ * measured it: `goals.list` cost 15 statements at five goals and 105 at fifty,
+ * two per row, because the getter resolves the context and then the level. At
+ * §13.1's hundred thousand goals that is two hundred thousand round trips for
+ * one page.
+ *
+ * **What it does not change.** The rules are `resolveMemberAccessLevel`'s,
+ * copied deliberately rather than approximated: the same actor test, the same
+ * three group tiers, the same restriction of the two blanket tiers to a human
+ * member so an agent or a guest inherits nothing. A row whose context is
+ * missing is absent from the answer, which is the set-shaped form of the
+ * getter's not-found. The one thing that changes is the number of round trips.
+ *
+ * **Own-context types only.** A sub-resource that inherits a parent's context
+ * (a comment, a check-in) is not resolvable this way and its caller resolves
+ * the parent first, exactly as it does today. `SUBJECT_RESOLVERS` says which
+ * types own a context; passing another one returns nothing rather than
+ * guessing, and the caller keeps the per-row path.
+ */
+export async function visibleResourceIds<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: VisibleIdsInput): Promise<Set<string>> {
+  if (input.ids.length === 0) {
+    return new Set();
+  }
+  const requires = input.requires ?? ACCESS_LEVELS.view;
+  const result = await tx.execute<{ resource_id: string }>(sql`
+    with actor as (
+      select kind from workspace_members
+       where id = ${input.memberId}
+         and workspace_id = ${input.workspaceId}
+         and status = 'active'
+         and deleted_at is null
+    )
+    select c.resource_id
+      from access_contexts c
+      join access_bindings b
+        on b.context_id = c.id
+       and b.workspace_id = ${input.workspaceId}
+       and b.deleted_at is null
+      join access_groups g
+        on g.id = b.group_id
+       and g.deleted_at is null
+       and g.workspace_id = ${input.workspaceId}
+     where c.workspace_id = ${input.workspaceId}
+       and c.resource_type = ${input.resourceType}
+       and c.deleted_at is null
+       -- sql.param, not the bare array: Drizzle expands a plain array into a
+       -- row of values, which Postgres then refuses to cast to uuid[].
+       and c.resource_id = any(${sql.param([...input.ids])}::uuid[])
+       and exists (select 1 from actor)
+       and (
+         (g.kind = 'member' and g.member_id = ${input.memberId})
+         or (
+           g.kind = 'workspace_standard'
+           and exists (select 1 from actor where kind = 'human')
+         )
+         or (
+           g.kind = 'space_standard'
+           and exists (select 1 from actor where kind = 'human')
+           and exists (
+             select 1 from access_group_memberships gm
+              where gm.group_id = g.id
+                and gm.member_id = ${input.memberId}
+                and gm.deleted_at is null
+           )
+         )
+       )
+     group by c.resource_id
+    having max(b.level) >= ${requires}
+  `);
+  return new Set(result.rows.map((row) => row.resource_id));
 }
 
 /**

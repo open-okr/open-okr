@@ -31,6 +31,7 @@ import { type PrimaryChannel, resolveDelivery } from "../channels/routing.ts";
 import { whatsAppEnvelope } from "../channels/whatsapp-window.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
 import { primaryChannelSchema } from "../settings/registry.ts";
+import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { blockerDraft, isBlockerRule } from "./blocker-card.ts";
 
 export interface DeliveryResult {
@@ -233,6 +234,7 @@ export async function deliverDueNudges(
   let toChannel = 0;
   const unreachable = new Set<string>();
 
+  const metrics = defaultMetrics();
   for (const row of due) {
     const member = members.get(row.recipientMemberId);
     if (!member) {
@@ -243,6 +245,10 @@ export async function deliverDueNudges(
         .update(nudges)
         .set({ suppressedReason: "disabled", updatedAt: input.now })
         .where(activeOnly(nudges, eq(nudges.id, row.id)));
+      metrics.count(METRIC.nudgesTotal, {
+        rule: row.ruleKey,
+        outcome: "disabled",
+      });
       continue;
     }
 
@@ -264,11 +270,26 @@ export async function deliverDueNudges(
         .update(nudges)
         .set({ scheduledFor: delivery.sendAt, updatedAt: input.now })
         .where(activeOnly(nudges, eq(nudges.id, row.id)));
+      // **`deferred`, not `suppressed`.** AI-NATIVE-PLAN §5.4 is explicit
+      // that quiet hours queue to the next open window, and a counter that
+      // called this a suppression would put a delivery that is going to
+      // happen in the same bucket as one that never will. That distinction
+      // was already got wrong once in the code this measures (P5-T01b-b).
+      metrics.count(METRIC.nudgesTotal, {
+        rule: row.ruleKey,
+        outcome: "deferred",
+      });
       continue;
     }
 
     if (delivery.fallbackReason) {
       unreachable.add(member.memberId);
+      // The reason is a fixed word from the resolver, never a member's
+      // address or a provider's error text.
+      metrics.count(METRIC.nudgesTotal, {
+        rule: row.ruleKey,
+        outcome: `fallback_${delivery.fallbackReason}`,
+      });
     }
 
     // The inbox row first, because it is the obligation and it is written
@@ -387,6 +408,13 @@ export async function deliverDueNudges(
         updatedAt: input.now,
       })
       .where(activeOnly(nudges, eq(nudges.id, row.id)));
+    // The channel is a label because there are six of them and the set is
+    // fixed. The recipient is not, and never will be.
+    metrics.count(METRIC.nudgesTotal, {
+      rule: row.ruleKey,
+      outcome: "sent",
+      channel: delivery.channel,
+    });
   }
 
   const delivered = await tx

@@ -27,8 +27,16 @@ export async function verifyWorkspaceChain(
     tx.select().from(auditEvents).orderBy(asc(auditEvents.seq)),
   );
 
+  // **Unchained rows are counted, not verified, and not a break** (P7-T02a).
+  // The chain is built behind the write path, so a busy workspace always has
+  // a short tail of rows that are recorded and have no position yet. Feeding
+  // them to `verifyChain` would report a hole at the first one; dropping them
+  // silently would let a verifier say "ok" about rows it never looked at.
+  const chained = rows.filter((row) => row.seq !== null);
+  const pending = rows.length - chained.length;
+
   return verifyChain(
-    rows.map((row) => ({
+    chained.map((row) => ({
       workspaceId: row.workspaceId,
       seq: Number(row.seq),
       actorMemberId: row.actorMemberId,
@@ -38,9 +46,10 @@ export async function verifyWorkspaceChain(
       targetId: row.targetId,
       payload: row.payload,
       at: row.at,
-      prevHash: row.prevHash,
-      rowHash: row.rowHash,
+      prevHash: row.prevHash as string,
+      rowHash: row.rowHash as string,
     })) satisfies (AuditRow & { rowHash: string })[],
+    pending,
   );
 }
 

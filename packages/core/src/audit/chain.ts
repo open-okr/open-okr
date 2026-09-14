@@ -81,6 +81,16 @@ export interface ChainVerdict {
   readonly ok: boolean;
   /** How many rows were checked. */
   readonly checked: number;
+  /**
+   * Rows recorded but not yet chained (P7-T02a).
+   *
+   * Never counted as verified, and never treated as a break. The chain is
+   * built behind the write path, so a busy workspace always has a short tail
+   * of rows that exist and have no position yet. Reporting them as broken
+   * would cry wolf on every healthy instance; reporting them as checked would
+   * be the lie this field exists to prevent.
+   */
+  readonly pending: number;
   /** The first sequence number that did not add up. */
   readonly brokenAtSeq?: number;
   readonly reason?: string;
@@ -97,6 +107,7 @@ export interface ChainVerdict {
  */
 export function verifyChain(
   rows: readonly (AuditRow & { rowHash: string })[],
+  pending = 0,
 ): ChainVerdict {
   let expectedPrev = GENESIS_HASH;
   let expectedSeq = 1;
@@ -106,6 +117,7 @@ export function verifyChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        pending,
         brokenAtSeq: row.seq,
         reason: `expected sequence ${expectedSeq} but found ${row.seq}: a row is missing or was reordered`,
       };
@@ -114,6 +126,7 @@ export function verifyChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        pending,
         brokenAtSeq: row.seq,
         reason: "this row does not follow the one before it",
       };
@@ -122,6 +135,7 @@ export function verifyChain(
       return {
         ok: false,
         checked: expectedSeq - 1,
+        pending,
         brokenAtSeq: row.seq,
         reason: "this row's contents do not match its recorded hash",
       };
@@ -130,5 +144,5 @@ export function verifyChain(
     expectedSeq++;
   }
 
-  return { ok: true, checked: rows.length };
+  return { ok: true, checked: rows.length, pending };
 }

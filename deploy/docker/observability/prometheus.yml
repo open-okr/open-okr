@@ -1,0 +1,38 @@
+# What scrapes this instance when the observability profile is running
+# (P7-T06c).
+#
+# Two targets, and the split is the point. OpenOKR serves its own domain
+# metrics from `/api/metrics`; Caddy serves the HTTP ones. Request rate,
+# status codes and latency at the edge belong to the reverse proxy because
+# `apps/web/proxy.ts` cannot measure them: it is synchronous and returns
+# before the handler that produces the status and the duration has run.
+#
+# Nothing here reaches outside the compose network. There is no remote_write
+# and no alertmanager address, deliberately: an operator who wants either
+# adds it, and until they do this stack cannot talk to anything.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The product's own series. The endpoint needs an instance-administrator
+  # session, so the token below is a bearer for a machine account the
+  # operator creates at /account/api-tokens. Without it Prometheus reads a
+  # not-found, which is the same answer any unauthorised caller gets.
+  - job_name: openokr
+    metrics_path: /api/metrics
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/openokr-token
+    static_configs:
+      - targets: ["app:3000"]
+
+  # The edge. Caddy's own metrics carry request count, status class and
+  # duration per handler, which is the HTTP half this product deliberately
+  # does not measure in application code.
+  - job_name: caddy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["proxy:2019"]

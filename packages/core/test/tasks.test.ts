@@ -261,14 +261,16 @@ describe("ordering, and the problem it actually solves", () => {
     const first = await createTask("First", { status: "todo" });
     const second = await createTask("Second", { status: "todo" });
     const wb = await workerDb();
-    // Force the two neighbours one apart, which is the state a hundred drags
-    // would reach. The next insertion between them has nowhere to go.
+    // Force the two neighbours to within `MINIMUM_GAP`, which since positions
+    // went fractional (migration 0081) takes about forty drops into the same
+    // slot rather than ten. The next insertion between them has nowhere to go.
     await wb.admin.query("update tasks set position = 10 where id = $1", [
       first.id,
     ]);
-    await wb.admin.query("update tasks set position = 11 where id = $1", [
-      second.id,
-    ]);
+    await wb.admin.query(
+      "update tasks set position = 10.0000000001 where id = $1",
+      [second.id],
+    );
     const third = await createTask("Third", { status: "todo" });
 
     const outcome = (await call("tasks.move", {
@@ -283,6 +285,91 @@ describe("ordering, and the problem it actually solves", () => {
       "Third",
       "Second",
     ]);
+  });
+
+  it("drops into the same slot ten times without renumbering the column", async () => {
+    // The state that used to be expensive. Whole-number positions spaced 1024
+    // apart closed after ten halvings, and the renumber rewrote every card in
+    // the column: on the §13.1 dataset that is nineteen thousand rows in one
+    // transaction, and it is what took a drag to twenty seconds at the 95th
+    // percentile. Fractional positions (migration 0081) make the same ten
+    // drops write one row each.
+    const first = await createTask("First", { status: "todo" });
+    const second = await createTask("Second", { status: "todo" });
+    const wb = await workerDb();
+    const positionOf = async (id: string) =>
+      (
+        await wb.admin.query<{ position: number }>(
+          "select position from tasks where id = $1",
+          [id],
+        )
+      ).rows[0]?.position;
+
+    const firstBefore = await positionOf(first.id);
+    const secondBefore = await positionOf(second.id);
+
+    for (let drop = 0; drop < 10; drop += 1) {
+      const card = await createTask(`Drop ${drop}`, { status: "todo" });
+      const outcome = (await call("tasks.move", {
+        id: card.id,
+        status: "todo",
+        afterTaskId: first.id,
+      })) as { normalised: boolean; position: number };
+      expect(outcome.normalised).toBe(false);
+      expect(outcome.position).toBeGreaterThan(firstBefore as number);
+      expect(outcome.position).toBeLessThan(secondBefore as number);
+    }
+
+    // Nothing but the moved cards was written, which is the whole point.
+    expect(await positionOf(first.id)).toBe(firstBefore);
+    expect(await positionOf(second.id)).toBe(secondBefore);
+    expect((await column()).map((card) => card.title)).toEqual([
+      "First",
+      "Drop 9",
+      "Drop 8",
+      "Drop 7",
+      "Drop 6",
+      "Drop 5",
+      "Drop 4",
+      "Drop 3",
+      "Drop 2",
+      "Drop 1",
+      "Drop 0",
+      "Second",
+    ]);
+  });
+
+  it("takes the top of the column below the first card rather than half way to zero", async () => {
+    // Dropping at the top is the commonest drag there is, and halving the
+    // head's position would run out exactly the way halving a gap does. The
+    // column grows downwards instead, so this never renumbers however long
+    // somebody keeps dragging cards to the top.
+    const anchor = await createTask("Anchor", { status: "todo" });
+    const wb = await workerDb();
+    const positions: number[] = [];
+    for (let drop = 0; drop < 12; drop += 1) {
+      const card = await createTask(`Top ${drop}`, { status: "todo" });
+      const outcome = (await call("tasks.move", {
+        id: card.id,
+        status: "todo",
+      })) as { normalised: boolean; position: number };
+      expect(outcome.normalised).toBe(false);
+      positions.push(outcome.position);
+    }
+
+    // Strictly descending, so each card really did land above the last.
+    for (let i = 1; i < positions.length; i += 1) {
+      expect(positions[i] as number).toBeLessThan(positions[i - 1] as number);
+    }
+    // And the anchor never moved.
+    const anchorPosition = (
+      await wb.admin.query<{ position: number }>(
+        "select position from tasks where id = $1",
+        [anchor.id],
+      )
+    ).rows[0]?.position;
+    expect(anchorPosition).toBeGreaterThan(positions[0] as number);
+    expect((await column())[0]?.title).toBe("Top 11");
   });
 
   it("lands a card at the end when the card it was dropped after has gone", async () => {

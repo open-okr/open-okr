@@ -15,11 +15,17 @@
  * them every task under it; binding them on the space would hand them the space.
  *
  * **Ordering is the part with a real problem in it.** Two people drag two cards
- * at the same moment. The move below takes a row lock over the column's own set
- * before it reads neighbours, so two moves serialise instead of interleaving,
- * and it renumbers in the same transaction when the gaps close. Never as a
+ * at the same moment. The move below takes a transaction-scoped advisory lock
+ * on the space and status, so two moves serialise instead of interleaving, and
+ * it renumbers in the same transaction when the gaps close. Never as a
  * background job: a board that renumbers itself while somebody drags is worse
  * than a slow drag.
+ *
+ * **It reads two neighbours, not the column** (P7-T02). It used to take a row
+ * lock over every card in the column before reading them, which is nineteen
+ * thousand rows in a space from §13.1's dataset and measured a drag at 20
+ * seconds at the 95th percentile under load. The advisory lock is what makes
+ * the gap arithmetic safe; the row locks were belt over braces.
  *
  * **Nothing here writes a key result.** Completing every task under a measure
  * moves no number. That is TECHNICAL-PLAN §4.9 and the whole reason the product
@@ -57,17 +63,20 @@ import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
 
-/**
- * The gap left between neighbouring cards.
- *
- * Large enough that a column can be dragged into ten deep before two
- * neighbours sit one apart and a renumber is needed, small enough that a
- * thousand cards stay inside a plain integer.
- */
+/** The gap left between neighbouring cards when a column is written out. */
 export const TASK_POSITION_SPACING = 1024;
 
-/** The gap below which the column is renumbered rather than squeezed again. */
-const MINIMUM_GAP = 2;
+/**
+ * The gap below which the column is renumbered rather than halved again.
+ *
+ * Positions are fractional since migration 0081, so halving a gap is no longer
+ * limited to the ten steps a whole number allowed. One part in a billion is
+ * about forty halvings of `TASK_POSITION_SPACING`, and it sits four orders of
+ * magnitude above the 2.3e-13 step a double can represent near 1024, so the
+ * midpoint is always strictly between the two neighbours rather than equal to
+ * one of them.
+ */
+const MINIMUM_GAP = 1e-9;
 
 export interface CreateTaskInput {
   readonly workspaceId: string;
@@ -428,76 +437,167 @@ export async function moveTaskInTx<
     )
   `);
 
-  // The row lock, underneath the advisory one. Raw because Drizzle has no
-  // `for update` on a select builder here, and the ordering matters: rows come
-  // back in the order the move reasons about, and the lock is held until this
-  // Operation's transaction commits.
-  const locked = await tx.execute<{ id: string; position: number }>(sql`
-    select id, position from tasks
-     where workspace_id = ${input.workspaceId}
-       and space_id = ${task.spaceId}
-       and status = ${input.status}
-       and deleted_at is null
-     order by position asc
-     for update
-  `);
-  const column = locked.rows as { id: string; position: number }[];
-  const others = column.filter((row) => row.id !== input.taskId);
+  // **Two neighbours, not the whole column** (P7-T02).
+  //
+  // This locked every card in the column with `select ... for update` so it
+  // could find the two positions the drop sits between. In §13.1's dataset a
+  // column holds 18,937 cards, so one drag row-locked nineteen thousand rows
+  // and held them until commit: the load run measured `drag` at 20,394ms at
+  // the 95th percentile while every read stayed under two seconds.
+  //
+  // The arithmetic below never needed the column. It needed the card the drop
+  // landed after and the one after that, and the advisory lock above already
+  // serialises every drag in this space and status, which is what makes the
+  // gap arithmetic safe. The row locks were belt over braces, and the belt
+  // cost nineteen thousand rows.
+  //
+  // `normaliseAndPlace` still reads the whole column, and still should: a
+  // renumber is about every card by definition. What changed is how often it
+  // is reached. With whole-number positions a gap of 1024 closed after ten
+  // drops into the same slot, and the load run found 187,285 rows carrying a
+  // renumber stamp: that was the fifteen-to-twenty-second tail on one drag in
+  // ten. Positions are fractional since migration 0081, so the same gap takes
+  // about forty halvings to close, and a renumber is rare rather than routine.
+  const neighbours = await columnNeighbours(tx, {
+    workspaceId: input.workspaceId,
+    spaceId: task.spaceId,
+    status: input.status,
+    taskId: input.taskId,
+    afterTaskId: input.afterTaskId ?? null,
+  });
 
-  const afterIndex = input.afterTaskId
-    ? others.findIndex((row) => row.id === input.afterTaskId)
-    : -1;
-  if (input.afterTaskId && afterIndex === -1) {
+  if (neighbours.kind === "renumber") {
+    const column = await lockColumn(tx, {
+      workspaceId: input.workspaceId,
+      spaceId: task.spaceId,
+      status: input.status,
+    });
+    const others = column.filter((row) => row.id !== input.taskId);
+    const afterIndex = input.afterTaskId
+      ? others.findIndex((row) => row.id === input.afterTaskId)
+      : -1;
+    return normaliseAndPlace(tx, input, others, afterIndex);
+  }
+
+  if (neighbours.kind === "after-is-gone") {
     // The card it was dropped after is not in this column any more, which
     // happens when two people drag at once. Refusing is wrong (the drag was
     // real) and guessing is worse, so it lands at the end.
     return writePosition(tx, input, {
-      position:
-        (others[others.length - 1]?.position ?? 0) + TASK_POSITION_SPACING,
-      normalised: false,
-    });
-  }
-
-  const before = afterIndex >= 0 ? others[afterIndex]?.position : undefined;
-  const after = others[afterIndex + 1]?.position;
-
-  if (before === undefined && after === undefined) {
-    return writePosition(tx, input, {
-      position: TASK_POSITION_SPACING,
-      normalised: false,
-    });
-  }
-  if (before === undefined && after !== undefined) {
-    // The top of the column. Half the gap below the current first card, unless
-    // there is no room left above it.
-    if (after < MINIMUM_GAP) {
-      return normaliseAndPlace(tx, input, others, afterIndex);
-    }
-    return writePosition(tx, input, {
-      position: Math.floor(after / 2),
-      normalised: false,
-    });
-  }
-  if (after === undefined && before !== undefined) {
-    return writePosition(tx, input, {
-      position: before + TASK_POSITION_SPACING,
-      normalised: false,
-    });
-  }
-  if (before !== undefined && after !== undefined) {
-    if (after - before < MINIMUM_GAP) {
-      return normaliseAndPlace(tx, input, others, afterIndex);
-    }
-    return writePosition(tx, input, {
-      position: before + Math.floor((after - before) / 2),
+      position: neighbours.last + TASK_POSITION_SPACING,
       normalised: false,
     });
   }
 
   return writePosition(tx, input, {
-    position: TASK_POSITION_SPACING,
+    position: neighbours.position,
     normalised: false,
   });
+}
+
+interface NeighbourInput {
+  readonly workspaceId: string;
+  readonly spaceId: string;
+  readonly status: TaskStatus;
+  readonly taskId: string;
+  readonly afterTaskId: string | null;
+}
+
+type Neighbours =
+  | { readonly kind: "place"; readonly position: number }
+  | { readonly kind: "after-is-gone"; readonly last: number }
+  | { readonly kind: "renumber" };
+
+/**
+ * Where the dropped card goes, read with three bounded queries.
+ *
+ * Each one is a `limit 1` against `(workspace_id, space_id, status, position)`,
+ * so the cost is a handful of index lookups whatever the column holds.
+ */
+async function columnNeighbours<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(tx: AnyTx<TSchema>, input: NeighbourInput): Promise<Neighbours> {
+  const scope = sql`
+    workspace_id = ${input.workspaceId}
+      and space_id = ${input.spaceId}
+      and status = ${input.status}
+      and deleted_at is null
+      and id <> ${input.taskId}
+  `;
+
+  if (!input.afterTaskId) {
+    // **The top of the column goes below the first card, not half way to
+    // zero** (P7-T02). Halving the head's position is the same arithmetic as
+    // halving a gap and it runs out the same way, except that dropping at the
+    // top of a column is the commonest drag there is: the load run's own drag
+    // scenario does nothing else, and it was still reaching a renumber and a
+    // ten-second write. Nothing requires a position to be positive, so the
+    // column grows downwards and this branch never renumbers.
+    const first = await tx.execute<{ position: number }>(sql`
+      select position from tasks where ${scope} order by position asc limit 1
+    `);
+    const top = first.rows[0]?.position;
+    if (top === undefined) {
+      return { kind: "place", position: TASK_POSITION_SPACING };
+    }
+    return { kind: "place", position: top - TASK_POSITION_SPACING };
+  }
+
+  const before = await tx.execute<{ position: number }>(sql`
+    select position from tasks
+     where ${scope} and id = ${input.afterTaskId}
+     limit 1
+  `);
+  const beforePosition = before.rows[0]?.position;
+  if (beforePosition === undefined) {
+    const last = await tx.execute<{ position: number }>(sql`
+      select position from tasks where ${scope} order by position desc limit 1
+    `);
+    return { kind: "after-is-gone", last: last.rows[0]?.position ?? 0 };
+  }
+
+  const next = await tx.execute<{ position: number }>(sql`
+    select position from tasks
+     where ${scope} and position > ${beforePosition}
+     order by position asc limit 1
+  `);
+  const afterPosition = next.rows[0]?.position;
+  if (afterPosition === undefined) {
+    return {
+      kind: "place",
+      position: beforePosition + TASK_POSITION_SPACING,
+    };
+  }
+  if (afterPosition - beforePosition < MINIMUM_GAP) {
+    return { kind: "renumber" };
+  }
+  return {
+    kind: "place",
+    position: beforePosition + (afterPosition - beforePosition) / 2,
+  };
+}
+
+/**
+ * The whole column, locked, for the renumber that genuinely needs it.
+ *
+ * Only reached when two neighbours have closed to within `MINIMUM_GAP`.
+ */
+async function lockColumn<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: { workspaceId: string; spaceId: string; status: TaskStatus },
+): Promise<{ id: string; position: number }[]> {
+  const locked = await tx.execute<{ id: string; position: number }>(sql`
+    select id, position from tasks
+     where workspace_id = ${input.workspaceId}
+       and space_id = ${input.spaceId}
+       and status = ${input.status}
+       and deleted_at is null
+     order by position asc
+     for update
+  `);
+  return locked.rows as { id: string; position: number }[];
 }
 
 /**

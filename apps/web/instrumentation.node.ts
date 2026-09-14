@@ -1,6 +1,7 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
+import { installTelemetry } from "./lib/telemetry";
 
 /**
  * Node-only boot checks. Kept out of `instrumentation.ts` so the edge bundle
@@ -68,6 +69,34 @@ export function startRecurringWork(): void {
   } catch (error) {
     process.stderr.write(
       `scheduler: could not start: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Installs the meter every action is measured through (P7-T06a).
+ *
+ * Before the relay and the scheduler rather than after, because both of them
+ * do work this instance should be able to see from its first second. Skipped
+ * during `next build` for the reason the other two are: a build worker has
+ * nothing to measure and should not hold a meter open.
+ *
+ * Constructing a meter opens no socket and reads no database. An instance
+ * with `observability.metrics` off gets the driver that does nothing, which
+ * is why there is no branch here.
+ */
+export function startTelemetry(): void {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    installTelemetry();
+  } catch (error) {
+    // Non-fatal, and for a stronger reason than the relay's. A product that
+    // refused to serve because it could not measure itself would have turned
+    // an observability feature into an availability risk.
+    process.stderr.write(
+      `telemetry: could not start: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
 }

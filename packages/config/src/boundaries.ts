@@ -99,6 +99,16 @@ const VENDOR_SDKS: readonly string[] = [
   // Payments and analytics
   "stripe",
   "posthog-node",
+  // Observability (PLAN.md §183, P7-T06a). Listed for the same reason every
+  // other vendor is: the meter belongs behind the Telemetry port, so a
+  // counter added straight into a route handler or a core service fails the
+  // build instead of quietly coupling the product to one SDK.
+  "@opentelemetry/api",
+  "@opentelemetry/sdk-metrics",
+  "@opentelemetry/sdk-trace-node",
+  "@opentelemetry/exporter-prometheus",
+  "@opentelemetry/exporter-trace-otlp-http",
+  "@opentelemetry/resources",
   // Databases this product does not run on. Postgres is the only required
   // service, so a client for anything else is a vendor SDK like any other.
   // `mysql2` is here rather than absent because the FlowyTeam importer does

@@ -31,7 +31,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import {
   blocksPublish,
   loadAlignmentGraph,
@@ -42,6 +42,7 @@ import {
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
 
@@ -917,16 +918,21 @@ export const readAlignmentGraph = defineReadAction({
           return { nodes: [], edges: [] };
         }
 
-        const keyResultRows = await tx
-          .select({ id: keyResults.id, goalId: keyResults.goalId })
-          .from(keyResults)
-          .where(
-            activeOnly(
-              keyResults,
-              eq(keyResults.workspaceId, context.workspaceId),
-              inArray(keyResults.goalId, ids),
+        // Chunked (P7-T01b): `inArray` sends one placeholder per id and
+        // Postgres refuses a statement over 65,535 parameters, so the graph
+        // failed outright on a workspace with a hundred thousand goals.
+        const keyResultRows = await selectInChunks(ids, (batch) =>
+          tx
+            .select({ id: keyResults.id, goalId: keyResults.goalId })
+            .from(keyResults)
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, context.workspaceId),
+                inArray(keyResults.goalId, batch),
+              ),
             ),
-          );
+        );
         const countByGoal = new Map<string, number>();
         const ownerOfKeyResult = new Map<string, string>();
         for (const row of keyResultRows) {
@@ -1148,71 +1154,62 @@ export const readAlignment = defineReadAction({
         // A finding on a goal the reader cannot see is not shown, the same way
         // the goal itself would not be. The score still counts it, because the
         // structure is a fact about the cycle rather than about the reader.
-        const visible = [];
-        for (const row of rows) {
-          if (row.subjectGoalId) {
-            try {
-              await getAccessScoped(tx, {
-                workspaceId: context.workspaceId,
-                memberId,
-                resourceType: "goal",
-                resourceId: row.subjectGoalId,
-                requires: ACCESS_LEVELS.view as never,
-              });
-            } catch (error) {
-              if (
-                error instanceof OperationError &&
-                error.code === "not_found"
-              ) {
-                continue;
-              }
-              throw error;
-            }
-          }
-          visible.push(row);
-        }
+        // One statement for the whole set (P7-T01b). A finding names a goal at
+        // most once, but a cycle holds ten thousand of them, and asking the
+        // getter per row cost two statements each.
+        const allowedFindingGoals = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: [
+            ...new Set(
+              rows.flatMap((row) =>
+                row.subjectGoalId ? [row.subjectGoalId] : [],
+              ),
+            ),
+          ],
+        });
+        const visible = rows.filter(
+          (row) =>
+            !row.subjectGoalId || allowedFindingGoals.has(row.subjectGoalId),
+        );
 
         // The register, for the goals this reader can see. §5.4's four columns:
         // the key result that depends, the providing team, whether they have
         // confirmed, and if not, a named risk owner.
-        const visibleGoalIds: string[] = [];
-        for (const goal of graph.goals) {
-          try {
-            await getAccessScoped(tx, {
-              workspaceId: context.workspaceId,
-              memberId,
-              resourceType: "goal",
-              resourceId: goal.id,
-              requires: ACCESS_LEVELS.view as never,
-            });
-            visibleGoalIds.push(goal.id);
-          } catch (error) {
-            if (error instanceof OperationError && error.code === "not_found") {
-              continue;
-            }
-            throw error;
-          }
-        }
+        // The same set filter, over every goal in the cycle (P7-T01b). This
+        // was the expensive half of the whole read: ten thousand goals asked
+        // the getter one at a time is twenty thousand statements, and §13.1
+        // allows two seconds for the entire recomputation.
+        const allowedGraphGoals = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: graph.goals.map((goal) => goal.id),
+        });
+        const visibleGoalIds = graph.goals
+          .filter((goal) => allowedGraphGoals.has(goal.id))
+          .map((goal) => goal.id);
 
-        const keyResultRows =
-          visibleGoalIds.length === 0
-            ? []
-            : await tx
-                .select({
-                  id: keyResults.id,
-                  title: keyResults.title,
-                  goalId: keyResults.goalId,
-                  goalTitle: goals.title,
-                })
-                .from(keyResults)
-                .innerJoin(goals, eq(goals.id, keyResults.goalId))
-                .where(
-                  activeOnly(
-                    keyResults,
-                    eq(keyResults.workspaceId, context.workspaceId),
-                    inArray(keyResults.goalId, visibleGoalIds),
-                  ),
-                );
+        // Chunked, for the reason the graph above is (P7-T01b).
+        const keyResultRows = await selectInChunks(visibleGoalIds, (batch) =>
+          tx
+            .select({
+              id: keyResults.id,
+              title: keyResults.title,
+              goalId: keyResults.goalId,
+              goalTitle: goals.title,
+            })
+            .from(keyResults)
+            .innerJoin(goals, eq(goals.id, keyResults.goalId))
+            .where(
+              activeOnly(
+                keyResults,
+                eq(keyResults.workspaceId, context.workspaceId),
+                inArray(keyResults.goalId, batch),
+              ),
+            ),
+        );
         const byKeyResult = new Map(keyResultRows.map((row) => [row.id, row]));
 
         const registerRows = await loadDependencyRegister(

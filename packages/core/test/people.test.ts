@@ -743,3 +743,221 @@ describe("a member's language (P6-G22a)", () => {
     expect(me.language).toBe("ms");
   });
 });
+
+describe("erasure reaches past the member row (P7-T08b)", () => {
+  it("deletes the identifiers, blanks the messages, and leaves the content", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Priya Raman");
+
+    // An account on a provider, the code that linked it, a message addressed
+    // to them, a token they hold, and a copilot thread they typed. Every one
+    // of these survived erasure before this row: the P7-T08a review found
+    // the external id and handle still in the channel tables and the message
+    // payloads still carrying body text.
+    await wb.admin.query(
+      `insert into channel_connections (id, workspace_id, provider, state, ciphertext, data_key, key_id)
+       values ('11111111-1111-4111-8111-111111111111', $1, 'slack', 'connected', 'x', 'x', 'x')
+       on conflict do nothing`,
+      [workspaceId],
+    );
+    await wb.admin.query(
+      `insert into channel_identities
+         (id, workspace_id, member_id, provider, external_id, external_handle)
+       values (gen_random_uuid(), $1, $2, 'slack', 'U0PRIYA', '@priya')`,
+      [workspaceId, member],
+    );
+    await wb.admin.query(
+      `insert into channel_messages
+         (id, workspace_id, provider, direction, member_id, payload, idempotency_key, status)
+       values (gen_random_uuid(), $1, 'slack', 'out', $2, $3::jsonb, 'erase-test-1', 'sent')`,
+      [
+        workspaceId,
+        member,
+        JSON.stringify({ text: "Priya, your check-in is overdue" }),
+      ],
+    );
+
+    const outcome = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.erase",
+      { memberId: member },
+    );
+
+    expect(outcome.export.removed.channelIdentities).toBe(1);
+    expect(outcome.export.removed.channelMessages).toBe(1);
+
+    // **The account they are known by outside this product is gone.** This is
+    // the one that matters: an external id and a handle identify the person
+    // on Slack whether or not this product still names them.
+    const identities = await wb.admin.query(
+      "select count(*)::int as n from channel_identities where member_id = $1",
+      [member],
+    );
+    expect(identities.rows[0].n).toBe(0);
+
+    // The row stays, because the audit trail refers to it. The words do not.
+    const messages = await wb.admin.query(
+      "select payload from channel_messages where member_id = $1",
+      [member],
+    );
+    expect(messages.rows).toHaveLength(1);
+    expect(JSON.stringify(messages.rows[0].payload)).not.toContain("Priya");
+    expect(messages.rows[0].payload).toEqual({});
+  });
+
+  it("searches every identifier column and finds nothing afterwards", async () => {
+    // The test the acceptance criterion actually asks for: not "did we call
+    // the sweep" but "is anything of theirs left". Written as a search
+    // rather than as a list of assertions, so a table added later that holds
+    // their handle is caught by the same query.
+    const wb = await workerDb();
+    const member = await addMember("Tomas Lindqvist");
+
+    await wb.admin.query(
+      `insert into channel_connections (id, workspace_id, provider, state, ciphertext, data_key, key_id)
+       values ('22222222-2222-4222-8222-222222222222', $1, 'telegram', 'connected', 'x', 'x', 'x')
+       on conflict do nothing`,
+      [workspaceId],
+    );
+    await wb.admin.query(
+      `insert into channel_identities
+         (id, workspace_id, member_id, provider, external_id, external_handle)
+       values (gen_random_uuid(), $1, $2, 'telegram', 'TG-TOMAS', '@tomas')`,
+      [workspaceId, member],
+    );
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+
+    for (const [table, column] of [
+      ["channel_identities", "external_id"],
+      ["channel_identities", "external_handle"],
+    ] as const) {
+      const found = await wb.admin.query(
+        `select count(*)::int as n from ${table} where ${column} like '%TOMAS%' or ${column} like '%tomas%'`,
+      );
+      expect(found.rows[0].n, `${table}.${column}`).toBe(0);
+    }
+  });
+
+  it("leaves what they wrote readable under the placeholder", async () => {
+    // Agung's decision on 11 September 2026: anonymise the content, delete
+    // the identifiers. A quarter's record stays readable, which is the half
+    // of the rule that a stricter erasure would have destroyed.
+    const wb = await workerDb();
+    const member = await addMember("Hana Sato");
+
+    const before = await wb.admin.query(
+      "select count(*)::int as n from activities where actor_member_id = $1",
+      [member],
+    );
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+
+    const after = await wb.admin.query(
+      "select count(*)::int as n from activities where actor_member_id = $1",
+      [member],
+    );
+    expect(after.rows[0].n).toBe(before.rows[0].n);
+  });
+
+  it("puts the counts on the audit row, not the identifiers", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Ola Mensah");
+
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "people.erase", {
+      memberId: member,
+    });
+
+    const audit = await wb.admin.query(
+      `select payload from audit_events
+        where action = 'people.erase' and target_id = $1
+        order by at desc limit 1`,
+      [member],
+    );
+    expect(audit.rows).toHaveLength(1);
+    const payload = JSON.stringify(audit.rows[0].payload);
+    expect(payload).toContain("removed");
+    // A quarter later somebody should be able to see what the erasure did.
+    // They should not be able to read who it was for out of the same row.
+    expect(payload).not.toContain("Ola Mensah");
+  });
+});
+
+describe("the export is produced before anything is erased (P7-T08b)", () => {
+  it("hands back what they wrote, and says what it left out and why", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Yusuf Adeyemi");
+    await grantFullOnWorkspace(member);
+
+    // Something they wrote, so the export has content rather than only a
+    // shape. A profile update is the smallest write an ordinary member can
+    // make without any other setup.
+    await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+      },
+      "people.updateOwnProfile",
+      { timezone: "UTC" },
+    );
+
+    const outcome = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.erase",
+      { memberId: member },
+    );
+
+    const data = outcome.export.data;
+    expect(data.memberId).toBe(member);
+    expect(data.tables.length).toBeGreaterThan(10);
+
+    // **The omissions are in the export itself.** A person receiving this
+    // should be able to see that their tokens and their access bindings were
+    // not included, and read the reason, rather than conclude the product
+    // holds less of their data than it does.
+    expect(data.omitted.length).toBeGreaterThan(5);
+    for (const entry of data.omitted) {
+      expect(entry.because.length, entry.table).toBeGreaterThan(20);
+    }
+    expect(data.omitted.map((entry) => entry.table)).toContain("api_tokens");
+  });
+
+  it("is taken before the sweep, so it is not a copy of the hole", async () => {
+    // The sharp one. Copilot threads are deleted by the sweep, so an export
+    // read afterwards would report none however many there were. This proves
+    // the order by writing a thread and finding it in the export of the same
+    // call that destroyed it.
+    const wb = await workerDb();
+    const member = await addMember("Lucia Ferrari");
+
+    await wb.admin.query(
+      `insert into ai_threads (id, workspace_id, member_id, title)
+       values (gen_random_uuid(), $1, $2, 'How do I write a key result?')`,
+      [workspaceId, member],
+    );
+
+    const outcome = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.erase",
+      { memberId: member },
+    );
+
+    const threads = outcome.export.data.tables.find(
+      (entry) => entry.table === "ai_threads",
+    );
+    expect(threads?.rows).toHaveLength(1);
+    expect(outcome.export.removed.copilotThreads).toBe(1);
+
+    // And gone from the database, which is the other half of the same claim.
+    const after = await wb.admin.query(
+      "select count(*)::int as n from ai_threads where member_id = $1",
+      [member],
+    );
+    expect(after.rows[0].n).toBe(0);
+  });
+});

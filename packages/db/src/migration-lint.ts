@@ -34,6 +34,15 @@ const NOT_TENANT_SCOPED = "openokr:not-tenant-scoped";
 const HARD_DELETE = "openokr:hard-delete";
 const TENANT_ROOT = "openokr:tenant-root";
 const INSTANCE_SCOPE = "openokr:instance-scope";
+/**
+ * Waives the expand-then-contract rule for one drop or rename, naming the
+ * earlier release that added the replacement (PLAN.md §5.1, P7-T09a).
+ *
+ * The same shape as the markers above and for the same reason: an exception
+ * that has to be written down with a reason is deliberate, and one that does
+ * not is an omission nobody notices.
+ */
+const CONTRACT_OF = "openokr:replaces";
 
 interface TableStatement {
   readonly name: string;
@@ -277,6 +286,109 @@ export function lintMigrationSql(fileName: string, sql: string): string[] {
     }
   }
 
+  problems.push(...contractProblems(fileName, sql));
+
+  return problems;
+}
+
+/**
+ * Every `drop column` and `rename column` in the file, with whatever comment
+ * markers sit above it.
+ *
+ * `alter table ... drop constraint` and `drop index` are deliberately not
+ * matched. A constraint or an index is not something the previous release
+ * reads by name, so removing one cannot break a pod of release N serving
+ * against the N+1 schema, which is the only thing this rule exists to
+ * prevent.
+ */
+const REMOVALS =
+  /\b(?:drop\s+column(?:\s+if\s+exists)?|rename\s+column)\s+("?[\w.]+"?)/gi;
+
+/**
+ * The expand-then-contract rule (PLAN.md §5.1, P7-T09a).
+ *
+ * **The rule this enforces is a deployment constraint that binds every
+ * migration.** On Kubernetes, pods of release N and N+1 serve traffic
+ * together against the N+1 schema for the length of a rollout. A migration
+ * that drops a column the previous release still selects breaks every
+ * request that pod serves, for as long as the rollout takes, and the
+ * failure looks like an application error rather than like a schema change.
+ *
+ * So removing or renaming spans two releases: the first adds the
+ * replacement and writes both, the second removes the old. No release both
+ * stops writing a column and drops it.
+ *
+ * **A linter cannot verify that a previous release added the replacement**,
+ * because it cannot know which migrations have already shipped to anybody.
+ * What it can do is refuse a silent drop. A drop carrying an
+ * `openokr:replaces` marker with a reason is somebody stating that the
+ * first half happened and saying where; a drop with no marker is the case
+ * this exists to catch. The alternative, parsing every earlier migration to
+ * guess whether a replacement exists, would be a guess that fails safe in
+ * the wrong direction.
+ */
+/**
+ * Where the statement containing `index` begins.
+ *
+ * The first character after the previous `;`, skipping the whitespace and
+ * newlines between them. Comments above a statement sit above that point,
+ * which is what `markersAbove` needs handed to it.
+ */
+function statementStart(sql: string, index: number): number {
+  let at = sql.lastIndexOf(";", index) + 1;
+  // Skip forward over the blank lines and the comment block between the
+  // previous statement and this one. **Past the comments, not up to them**:
+  // `markersAbove` reads the lines above the index it is given, so stopping
+  // at the first comment line would hand it nothing above and find no
+  // marker, which is the bug the two accepting tests caught.
+  while (at < index) {
+    const character = sql[at] as string;
+    if (/\s/.test(character)) {
+      at += 1;
+      continue;
+    }
+    if (sql.startsWith("--", at)) {
+      const newline = sql.indexOf("\n", at);
+      if (newline === -1 || newline >= index) {
+        break;
+      }
+      at = newline + 1;
+      continue;
+    }
+    break;
+  }
+  return at;
+}
+
+function contractProblems(fileName: string, sql: string): string[] {
+  const problems: string[] = [];
+  for (const match of sql.matchAll(REMOVALS)) {
+    const column = stripQuotes(match[1] as string);
+    // **From the start of the statement, not the line and not the match.**
+    // `markersAbove` walks upward from the index it is given and stops at the
+    // first line that is not a comment, so it has to be handed the point
+    // where the statement begins. A `drop column` is neither: it sits inside
+    // `alter table`, which may be on the same line or the one above it. Pass
+    // the match index and it is handed "alter table goals drop " as the line
+    // above; pass the line start and the two-line form hands it "alter table
+    // goals". Both break out before seeing the marker. Every other caller
+    // passes a `create table`, which begins its own statement and its own
+    // line, which is why this only ever bit here.
+    const { markers } = markersAbove(sql, statementStart(sql, match.index));
+    const reason = markers.get(CONTRACT_OF);
+    if (reason !== undefined && reason.trim() !== "") {
+      continue;
+    }
+    problems.push(
+      `${fileName}: drops or renames "${column}" with no ` +
+        `"-- ${CONTRACT_OF}: <the release that added the replacement>" marker. ` +
+        `PLAN.md §5.1: removing anything spans two releases, because pods of ` +
+        `release N and N+1 serve together against the N+1 schema during a ` +
+        `rollout. If the replacement shipped earlier, say so in the marker. ` +
+        `If it did not, this migration is the first half and the drop belongs ` +
+        `in the next release`,
+    );
+  }
   return problems;
 }
 

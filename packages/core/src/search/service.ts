@@ -22,7 +22,7 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { accessScopeFilter } from "../access/reads.ts";
+import { accessFilterMember, accessScopeFilter } from "../access/reads.ts";
 import { EmbeddingService } from "../embeddings/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 
@@ -74,6 +74,10 @@ export async function searchWorkspace(
         workspaceId: input.workspaceId,
         memberId: input.memberId,
         minLevel: ACCESS_LEVELS.view,
+        member: await accessFilterMember(tx, {
+          workspaceId: input.workspaceId,
+          memberId: input.memberId,
+        }),
       });
       /**
        * The type filter, as bound values rather than one array parameter.
