@@ -29,6 +29,17 @@ export interface ProvisionMemberInput {
    * something other than edit.
    */
   readonly level?: AccessLevel;
+  /**
+   * What kind of member this is. Defaults to `human`, which every joining
+   * path wants.
+   *
+   * `guest` is the cloud support session (P8-T04a), and widening this by one
+   * parameter is deliberately cheaper than a second insert path: a support
+   * session that wrote its own member row would be a second place that
+   * decides what a member is, and the whole point of this funnel is that
+   * there is one.
+   */
+  readonly kind?: "human" | "guest";
 }
 
 export interface ProvisionedMember {
@@ -64,7 +75,7 @@ export async function provisionMemberForInvite<
       workspaceId: input.workspaceId,
       userId: input.user.id,
       name: input.user.name,
-      kind: "human",
+      kind: input.kind ?? "human",
       status: "active",
       primaryChannel:
         memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,

@@ -424,6 +424,12 @@ export {
   oauthRefreshTokens,
 } from "./schema/oauth.ts";
 export {
+  OPERATOR_SESSION_END_REASONS,
+  type OperatorSession,
+  type OperatorSessionEndReason,
+  operatorSessions,
+} from "./schema/operator-sessions.ts";
+export {
   type OperatorWorkspaceUsage,
   operatorWorkspaceUsage,
 } from "./schema/operator-usage.ts";

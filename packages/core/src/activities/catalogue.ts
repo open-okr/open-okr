@@ -42,6 +42,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // above rather than replacing them. Both are recorded: this one says what
   // a customer was told, and `workspace.state_changed` says what the freeze
   // overlay will read.
+  // P8-T04a. Both appear in the workspace own feed, because somebody from
+  // outside entering is news for everybody in it, not only the owner.
+  "support.granted": z.object({
+    hours: z.number(),
+    level: z.number(),
+  }),
+  "support.ended": z.object({ reason: z.string() }),
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),

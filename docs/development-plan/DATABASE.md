@@ -821,7 +821,21 @@ Built at P8-T03c, migration 0088. Both sit above the tenant floor, because one m
 Anybody signed in may read a live message, because that is what one is for. Writing is instance administration. A dismissal is read and written through the `app.user_id` key, so a person reaches their own rows and nobody else's.
 
 ### operator_sessions *(cloud only)*
-`operator_user_id` to users, `workspace_id` to workspaces, `reason`, `granted_at`, `expires_at`, `ended_at?`.
+`id`, `workspace_id`, `operator_user_id`, `reason`, `requested_at`, `granted_at?`, `granted_by_member_id?`, `expires_at?`, `ended_at?`, `ended_reason?`, `member_id?`, `level`.
+
+Built at P8-T04a, migration 0089.
+
+**`requested_at` is separate from `granted_at` on purpose.** The gap between them is the customer's decision, and it is what an auditor looks at. One timestamp would lose the fact that a request was ever made and refused.
+
+**`member_id` names a real `guest` member row**, created through the one member-provisioning funnel. That is what makes the session a binding rather than a bypass: `can()` answers for an operator exactly as it answers for anybody else, and there is no second authorisation path that could disagree with the first. Ending the session suspends that member rather than deleting it, because everything the operator did is attributed to them and an author who no longer exists is a falsified record.
+
+`level` is an `ACCESS_LEVELS` value constrained to 10, 40 or 70. **`full` is deliberately absent**: it includes changing who else has access, so an operator holding it could extend their own session, and a session that can extend itself has no time box.
+
+Two check constraints stop a grant half-applying: a granted session has an expiry and a granting member, an ungranted one has neither; an ended session has a reason and a live one has neither. A partial unique index allows one live session per workspace per operator, because two would make the audit trail ambiguous about which one an action belonged to.
+
+Three policies: the workspace reads and writes its own, an operator reads and writes their own requests across workspaces, and instance administration reads them all so the expiry sweep can find what is due. The third is the same select-only shape `tenants` got at 0083 and `workspaces` at 0086.
+
+**Expiry is refused at use, in `resolveMemberAccessLevel`.** That one function answers for both paths, because `resolveActor` computes a writer's level with it and every read goes through it too. The first attempt put the check in the Operation pipeline, which covered writes and left reads open; the suite caught it.
 
 ## 17. Index notes
 

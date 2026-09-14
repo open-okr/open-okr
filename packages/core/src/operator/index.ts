@@ -7,6 +7,14 @@
 export { readInstanceFlags } from "./flags.ts";
 export { setLifecycleAsOperator } from "./lifecycle.ts";
 export {
+  endSupportSession,
+  grantSupportSession,
+  listSupportSessions,
+  liveSupportSession,
+  requestSupportSession,
+  sweepExpiredSessions,
+} from "./sessions.ts";
+export {
   createSiteMessage,
   deleteSiteMessage,
   dismissSiteMessage,
