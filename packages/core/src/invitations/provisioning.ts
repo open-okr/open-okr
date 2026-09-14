@@ -14,6 +14,7 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
+import { requireSeatInTx } from "../tenancy/plans.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -63,6 +64,23 @@ export async function provisionMemberForInvite<
     .limit(1);
   if (existing) {
     return { memberId: existing.id, created: false };
+  }
+
+  // **The seat check that must be right**, because this is the one place a
+  // member row is inserted. Checking only at the invitation would let one
+  // reusable link overflow a plan by any amount: the link admits everybody
+  // who holds it, and nobody checks again.
+  //
+  // Above the insert and inside the caller's transaction, so the count and
+  // the insert cannot disagree under concurrency. A guest is not a seat, so a
+  // support session is never refused for one.
+  if ((input.kind ?? "human") === "human") {
+    await requireSeatInTx(
+      tx,
+      input.workspaceId,
+      (used, limit) =>
+        `This workspace is full: ${used} of ${limit} seats are in use. Ask an administrator to free one or add seats.`,
+    );
   }
 
   const memberSettings = resolveMemberSettings({});

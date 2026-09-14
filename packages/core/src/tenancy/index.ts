@@ -12,6 +12,12 @@
 
 export { setTenantStateInTx } from "./lifecycle.ts";
 export {
+  countSeats,
+  readOwnUsage,
+  readPlans,
+  seatState,
+} from "./plans.ts";
+export {
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,

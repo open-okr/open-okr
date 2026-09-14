@@ -968,7 +968,13 @@ export {
   type Outcome,
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
-export { isCloudEnabled } from "./tenancy/index.ts";
+export {
+  countSeats,
+  isCloudEnabled,
+  readOwnUsage,
+  readPlans,
+  seatState,
+} from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,
