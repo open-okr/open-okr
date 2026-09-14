@@ -517,6 +517,12 @@ export {
   tasks,
 } from "./schema/tasks.ts";
 export {
+  TENANT_STATES,
+  type Tenant,
+  type TenantState,
+  tenants,
+} from "./schema/tenants.ts";
+export {
   type WhatsAppTemplateMapping,
   whatsappTemplateMappings,
 } from "./schema/whatsapp-mappings.ts";

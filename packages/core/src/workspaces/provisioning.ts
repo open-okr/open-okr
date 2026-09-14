@@ -56,6 +56,7 @@ import {
 } from "../settings/registry.ts";
 import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 import { createSpaceInTx } from "../spaces/service.ts";
+import { resolveCloudTenancy, seedTenantInTx } from "../tenancy/index.ts";
 
 export interface WorkspaceUser {
   readonly id: string;
@@ -147,6 +148,14 @@ export async function createWorkspace(
   const language =
     input.language ?? (await resolveInstanceDefaultLanguage(pool));
 
+  // Resolved here rather than inside the transaction, for the reason the
+  // language above has the same shape: `system_settings` sits above the
+  // tenant floor and Postgres refuses to read it without
+  // `app.instance_admin`, which a tenant-scoped transaction never sets. On
+  // a self-hosted instance this resolves to off and the seed below writes
+  // nothing (P8-T02a).
+  const cloud = await resolveCloudTenancy(pool);
+
   // A bootstrap operation: it creates the workspace it runs in, so there is no
   // member to authorise against and no workspace to load. Everything else is
   // the ordinary pipeline, including the audit row, which is why the first
@@ -168,6 +177,10 @@ export async function createWorkspace(
           ...input,
           language,
         });
+        // One statement, in the shape every other module contributes
+        // (TECHNICAL-PLAN §4.14). Returns immediately when the cloud is off,
+        // so the self-hosted path executes a call and writes nothing.
+        await seedTenantInTx(tx, { workspaceId, cloud });
         return {
           result: provisioned,
           activity: {

@@ -36,7 +36,8 @@ export interface BoundaryViolation {
     | "driver-import"
     | "write-path-side-effect"
     | "mutation-outside-operation"
-    | "protected-read-outside-getter";
+    | "protected-read-outside-getter"
+    | "tenant-read-on-product-path";
   readonly message: string;
 }
 
@@ -621,6 +622,98 @@ const checkProtectedReads = (file: BoundarySourceFile): BoundaryViolation[] => {
   return violations;
 };
 
+/**
+ * The tenancy rule (P8-T02a, design in
+ * docs/design/p8-t01a-tenant-lifecycle.md).
+ *
+ * REQUIREMENTS §5 and PLAN.md risk row R8 both say the cloud is the same
+ * release plus a thin overlay, with no forked code path. A plan key, a seat
+ * count and a region are facts the vendor knows about a customer, not facts
+ * the product needs in order to run an OKR practice, and a self-hosted
+ * instance has none of them.
+ *
+ * So the moment a goal list, a check-in or a nudge reads `tenants`, the two
+ * halves have forked, and the fork stays invisible until a self-hosted
+ * instance meets the null. This rule is what makes that a build failure
+ * rather than a review comment nobody made.
+ */
+const TENANCY_ALLOWED_PREFIXES: readonly string[] = [
+  "packages/db/",
+  "packages/core/src/tenancy/",
+  "packages/core/src/operator/",
+];
+
+/** Packages whose product paths must not know a tenant exists. */
+const TENANCY_CHECKED_PREFIXES: readonly string[] = [
+  "packages/core/",
+  "packages/agents/",
+  "packages/importer/",
+  "packages/cli/",
+  "apps/",
+];
+
+/**
+ * Both ways in: selecting from the table, and importing its schema at all.
+ * The import check is the one that matters, because a file that imports the
+ * table and uses it in a join never selects from it directly.
+ *
+ * The example is written out rather than shown, because the soft-delete
+ * linter reads comments too and a literal select in this one is a violation
+ * it reports against this file.
+ *
+ * **The import rule is anchored on an import statement**, not on the bare
+ * word. The first version matched `tenants` followed by a comma anywhere in
+ * a file and fired on two comments in `packages/core/src/audit` that use
+ * the word in a sentence. A rule that fires on prose is one somebody
+ * silences with a marker, and a silenced rule catches nothing.
+ *
+ * The word boundaries are load-bearing either way: without them the rule
+ * fires on any identifier that merely starts with the table name.
+ */
+const TENANCY_READ = /\.from\s*\(\s*tenants\s*\)/g;
+const TENANCY_IMPORT = /import[^;]*?{[^}]*?\btenants\b[^}]*?}[^;]*?from/g;
+
+/** Checks the tenancy rule for one file. */
+const checkTenancy = (file: BoundarySourceFile): BoundaryViolation[] => {
+  if (!TENANCY_CHECKED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+  if (TENANCY_ALLOWED_PREFIXES.some((p) => file.path.startsWith(p))) {
+    return [];
+  }
+
+  const violations: BoundaryViolation[] = [];
+  const lines = file.text.split("\n");
+  const seen = new Set<number>();
+  const message =
+    "reads or imports the tenants table. It is vendor knowledge and is " +
+    "absent on every self-hosted instance, so a product path that asks " +
+    "forks self-host from cloud. Go through packages/core/src/tenancy.";
+
+  const record = (index: number) => {
+    const line = lineOf(file.text, index);
+    if (seen.has(line) || hasMarkerAbove(lines, line, "allow-tenant-read")) {
+      return;
+    }
+    seen.add(line);
+    violations.push({
+      path: file.path,
+      line,
+      rule: "tenant-read-on-product-path",
+      message,
+    });
+  };
+
+  for (const match of file.text.matchAll(TENANCY_READ)) {
+    record(match.index);
+  }
+  for (const match of file.text.matchAll(TENANCY_IMPORT)) {
+    record(match.index);
+  }
+
+  return violations;
+};
+
 export function checkBoundaries(
   files: readonly BoundarySourceFile[],
 ): BoundaryViolation[] {
@@ -629,5 +722,6 @@ export function checkBoundaries(
     ...checkWritePathSideEffects(file),
     ...checkMutations(file),
     ...checkProtectedReads(file),
+    ...checkTenancy(file),
   ]);
 }

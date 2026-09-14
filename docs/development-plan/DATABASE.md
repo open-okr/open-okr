@@ -786,7 +786,13 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 Archive manifest, checksum, status, progress.
 
 ### tenants *(cloud only)*
-`workspace_id` to workspaces, `plan_key?`, `seats?`, `state`, `trial_ends_at?`, `region`.
+`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`.
+
+Built at P8-T02a, migration 0082. Design: `docs/design/p8-t01a-tenant-lifecycle.md`.
+
+The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
+
+**Absent on every self-hosted instance**, where the table exists and holds no rows. `pnpm check:boundaries` refuses a read or an import of it from any product path, because a plan key read on the product path forks self-host from cloud and the fork stays invisible until a self-hosted instance meets the null.
 
 ### operator_sessions *(cloud only)*
 `operator_user_id` to users, `workspace_id` to workspaces, `reason`, `granted_at`, `expires_at`, `ended_at?`.

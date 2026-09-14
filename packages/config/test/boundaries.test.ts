@@ -527,3 +527,76 @@ describe("protected-read rule (P2-T02)", () => {
     ).toEqual([]);
   });
 });
+
+describe("tenancy rule (P8-T02a)", () => {
+  const READ = `const rows = await tx.select().from(tenants);\n`;
+  const IMPORT = `import { tenants } from "@openokr/db";\n`;
+
+  test("fails a read of tenants from an action file", () => {
+    const violations = check("packages/core/src/actions/goals.ts", READ);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({
+      rule: "tenant-read-on-product-path",
+    });
+  });
+
+  test("fails an import of the tenants schema from a page", () => {
+    expect(check("apps/web/app/dashboard/page.tsx", IMPORT)).toHaveLength(1);
+  });
+
+  test("fails a read from an agent, which is product code too", () => {
+    expect(check("packages/agents/src/runs/coach.ts", READ)).toHaveLength(1);
+  });
+
+  test("allows the read inside the tenancy module that owns it", () => {
+    expect(check("packages/core/src/tenancy/store.ts", READ)).toEqual([]);
+  });
+
+  test("allows the read inside the operator console's own actions", () => {
+    expect(check("packages/core/src/operator/console.ts", READ)).toEqual([]);
+  });
+
+  test("allows the read inside packages/db, which implements the table", () => {
+    expect(check("packages/db/src/schema/tenants.ts", READ)).toEqual([]);
+  });
+
+  test("does not fire on a word that merely contains it", () => {
+    expect(
+      check(
+        "packages/core/src/actions/goals.ts",
+        `const rows = await tx.select().from(tenantsHistory);\n`,
+      ),
+    ).toEqual([]);
+  });
+
+  test("does not fire on the word in a comment", () => {
+    // The first version of this rule matched `tenants` followed by a comma
+    // anywhere in a file, and fired on two real comments in
+    // packages/core/src/audit that use the word in a sentence. A boundary
+    // rule that fires on prose is one somebody silences with a marker.
+    expect(
+      check(
+        "packages/core/src/audit/verify.ts",
+        `// Only a superuser can enumerate tenants, which is the right bar.\n`,
+      ),
+    ).toEqual([]);
+  });
+
+  test("does not fire on an unrelated import that happens to sit near the word", () => {
+    expect(
+      check(
+        "packages/core/src/actions/goals.ts",
+        `// Counts every one of the tenants, for the operator.\nimport { goals } from "@openokr/db";\n`,
+      ),
+    ).toEqual([]);
+  });
+
+  test("fires on tenants imported alongside other names", () => {
+    expect(
+      check(
+        "packages/core/src/actions/goals.ts",
+        `import { eq, goals, tenants, workspaces } from "@openokr/db";\n`,
+      ),
+    ).toHaveLength(1);
+  });
+});
