@@ -1,4 +1,5 @@
 import {
+  Armchair,
   BarChart3,
   Bell,
   Bot,
@@ -13,6 +14,7 @@ import {
   Inbox,
   KeyRound,
   Layers,
+  LifeBuoy,
   MessageSquare,
   Palette,
   Plug,
@@ -76,6 +78,16 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // wears it, and the section a reader lands on should not repeat the row
   // that brought them there.
   "admin-general": <SlidersHorizontal className="size-full" />,
+  // A seat, because a seat is the only unit a plan counts here. P8-T05's own
+  // finding is that no field in a plan can name a feature, so a billing card
+  // would draw the wrong idea: changing plan changes how many people can be
+  // in the workspace and nothing else.
+  "admin-plan": <Armchair className="size-full" />,
+  // The conventional ring, and deliberately not a second person-shape:
+  // `UserPlus` sits four rows below for Invitations, and two people icons in
+  // one column at sidebar size is the "unreadable at a glance" this file
+  // exists to prevent.
+  "admin-support": <LifeBuoy className="size-full" />,
   "admin-branding": <Palette className="size-full" />,
   // Thresholds are the readable half of "rhythm and thresholds", and a dial
   // is what a threshold looks like. Cycle already holds the arrows.
