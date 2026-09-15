@@ -86,6 +86,26 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Days to keep a closed workspace before erasing it. Zero means never erase, because not configured must never mean delete everything (P7-T08c).",
   },
+  // The two admission limits (P8-T06a). Instance scope, because they
+  // describe the deployment rather than any customer, and both default to
+  // unlimited so a self-hosted instance is never limited by a number nobody
+  // chose. Design: docs/design/p8-t01a-tenant-limits.md §4.
+  {
+    key: "cloud.limits.actionsPerMinute",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_ACTIONS_PER_MINUTE",
+    summary:
+      "Actions one workspace may call a minute, across every surface. Zero means unlimited, which is every self-hosted instance. Below 60 is refused: one action a minute is an outage rather than a limit.",
+  },
+  {
+    key: "cloud.limits.concurrentActions",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_CONCURRENT_ACTIONS",
+    summary:
+      "Actions one workspace may have running at once. Zero means unlimited. This is the one a per-minute window cannot see: sixty calls in one second pass a per-minute limit and empty the connection pool.",
+  },
   {
     key: "instance.telemetry",
     kind: "boolean",

@@ -10,6 +10,13 @@
  * that re-exports everything is how that gate stops meaning anything.
  */
 
+export {
+  type Admission,
+  AdmissionError,
+  type AdmissionLimits,
+  AdmissionSettingError,
+  setDefaultAdmission,
+} from "./admission.ts";
 export { setTenantStateInTx } from "./lifecycle.ts";
 export {
   countSeats,
@@ -22,6 +29,7 @@ export {
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,
   isCloudEnabled,
+  resolveAdmissionLimits,
   resolveCloudTenancy,
 } from "./settings.ts";
 export { readTenant, seedTenantInTx } from "./store.ts";

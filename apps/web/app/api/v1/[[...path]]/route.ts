@@ -46,14 +46,36 @@ import { getPool } from "../../../../lib/pool";
 
 export const dynamic = "force-dynamic";
 
-const json = (body: unknown, status: number): Response =>
+const json = (
+  body: unknown,
+  status: number,
+  extra?: Readonly<Record<string, string>>,
+): Response =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...extra,
+    },
   });
 
+/**
+ * A refusal, with `Retry-After` when the refusal knows when (P8-T06a).
+ *
+ * The header is what makes a 429 actionable: a client that is told to wait
+ * waits, and a client that is only told no retries immediately, which turns
+ * one limited tenant into a limited instance. The seconds come from the
+ * admission refusal itself rather than from a constant here, because the
+ * window that is full is the one that knows when it empties.
+ */
 const fail = (error: ApiError): Response =>
-  json({ error }, statusFor(error.code));
+  json(
+    { error },
+    statusFor(error.code),
+    error.retryAfterSeconds === undefined
+      ? undefined
+      : { "retry-after": String(Math.max(1, error.retryAfterSeconds)) },
+  );
 
 /**
  * What to say about a token that did not resolve.

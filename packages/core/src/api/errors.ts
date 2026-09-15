@@ -20,6 +20,7 @@
  */
 import { ZodError } from "zod";
 import { OperationError } from "../operations/errors.ts";
+import { AdmissionError } from "../tenancy/admission.ts";
 
 export const API_ERROR_CODES = [
   /** No token, or not one that resolves. */
@@ -61,6 +62,15 @@ export interface ApiError {
   readonly message: string;
   /** Field paths to messages, for `invalid_input` only. */
   readonly fields?: Readonly<Record<string, string>>;
+  /**
+   * Seconds until the caller may try again, for `rate_limited` only
+   * (P8-T06a).
+   *
+   * Carried so a surface can set `Retry-After`. A refusal that does not say
+   * when is a refusal that gets retried in a loop, which is the shape that
+   * turns one limited tenant into a limited instance.
+   */
+  readonly retryAfterSeconds?: number;
 }
 
 export function statusFor(code: ApiErrorCode): number {
@@ -95,6 +105,15 @@ export function errorFor(thrown: unknown): ApiError {
       }
     }
     return apiError("invalid_input", "That input is not valid.", fields);
+  }
+  if (thrown instanceof AdmissionError) {
+    // Third recognised shape, and it is a refusal like the other two: the
+    // tenant is over a limit its operator set, which is not a fault.
+    return {
+      code: "rate_limited",
+      message: thrown.message,
+      retryAfterSeconds: thrown.resetSeconds,
+    };
   }
   if (thrown instanceof OperationError) {
     return apiError(thrown.code, thrown.message);

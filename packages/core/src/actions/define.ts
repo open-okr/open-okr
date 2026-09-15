@@ -26,6 +26,7 @@ import {
 } from "../operations/operation.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
 import type { MetricRecorder } from "../telemetry/recorder.ts";
+import type { Admission } from "../tenancy/admission.ts";
 
 /** Read, write, or write that removes something a person can see. */
 export type SafetyClass = "read" | "write" | "destructive";
@@ -139,6 +140,21 @@ export interface ActionCallContext {
    * who finds a branch that does should treat it as the bug it is.
    */
   readonly metrics?: MetricRecorder;
+  /**
+   * The tenant's admission limits and the counters that enforce them, when
+   * the host has them to give (P8-T06a).
+   *
+   * Structural, like `storage` and `metrics` above and for the same
+   * reason: the cache driver lives in `packages/adapters`, which this
+   * package may not import, so the two methods are declared in
+   * `../tenancy/admission.ts` and the app passes the driver it already
+   * built.
+   *
+   * Absent means unlimited, which is every self-hosted instance and every
+   * test that does not care. Present with both limits at zero means the same
+   * thing and costs two comparisons: `admit` returns before any round trip.
+   */
+  readonly admission?: Admission;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

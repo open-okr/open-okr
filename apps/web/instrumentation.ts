@@ -16,12 +16,16 @@ export async function register(): Promise<void> {
     startTelemetry,
     startOutboxRelay,
     startRecurringWork,
+    resolveAdmission,
     resolveAuthPolicy,
   } = await import("./instrumentation.node");
   validateEnvironment();
   // Before the relay and the scheduler, so the work they do from the first
   // second is measured rather than missed (P7-T06a).
   startTelemetry();
+  // Before the relay and the scheduler, because both call actions and an
+  // unlimited first minute is the minute a burst arrives in (P8-T06a).
+  await resolveAdmission();
   startOutboxRelay();
   startRecurringWork();
   // Last, and awaited: the first request must not reach Better Auth with

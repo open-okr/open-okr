@@ -1,4 +1,5 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
@@ -118,4 +119,29 @@ export async function resolveAuthPolicy(): Promise<void> {
     return;
   }
   await resolveSignupPolicy();
+}
+
+/**
+ * Resolves this instance's per-tenant admission limits (P8-T06a).
+ *
+ * One database read, before anything is served, for the same reason the
+ * signup policy is resolved here: admission runs on every action from every
+ * surface and reading a setting per call would cost the connection the limit
+ * exists to protect.
+ *
+ * **Its failure is fatal to the boot and deliberately so.** A number below
+ * its floor means an operator asked for a limit the product refuses to
+ * apply, and carrying on would serve traffic unlimited while the settings
+ * screen says otherwise. Every other step here logs and continues because
+ * the product still works without a relay or a meter; it does not work
+ * honestly with a limit somebody set and nothing enforcing.
+ *
+ * A build worker has the placeholder `DATABASE_URL` the Dockerfile sets and
+ * no database behind it, the same reason the relay skips that phase.
+ */
+export async function resolveAdmission(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  await installAdmission();
 }

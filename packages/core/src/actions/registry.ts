@@ -21,6 +21,7 @@ import {
   OUTCOME,
   type Outcome,
 } from "../telemetry/recorder.ts";
+import { admit, defaultAdmission } from "../tenancy/admission.ts";
 import {
   goalFeed,
   profileFeed,
@@ -838,6 +839,42 @@ export async function callAction<K extends ActionName>(
   // The context wins when it names one, which is how a test measures a single
   // call without touching the process. Otherwise the host's, which is how the
   // other four hundred call sites are measured without being edited.
+  // **Admission first, before the span and before the handler** (P8-T06a).
+  //
+  // The ordering is the design rather than a detail. A limiter that runs
+  // after the action has started has already let the action take a pool
+  // connection and hold it for the length of its query, which is the
+  // resource one tenant takes from another. Refusing here costs the cache
+  // round trip and nothing else.
+  //
+  // It wraps the metrics branch rather than sitting inside it, because an
+  // instance that is not measuring itself is still an instance whose tenants
+  // share a database. Tying admission to telemetry would mean turning off
+  // the meter turned off the protection.
+  const admission = context.admission ?? defaultAdmission();
+  if (admission === undefined) {
+    return callMeasured(context, name, action, call);
+  }
+  const release = await admit(admission, context.workspaceId);
+  try {
+    return await callMeasured(context, name, action, call);
+  } finally {
+    await release();
+  }
+}
+
+/**
+ * The measured call, which is everything `callAction` used to be.
+ *
+ * Split out at P8-T06a so admission can wrap it without indenting two
+ * hundred lines of comment that explain the measurement.
+ */
+async function callMeasured<K extends ActionName>(
+  context: ActionCallContext,
+  name: K,
+  action: ActionDefinition,
+  call: () => Promise<ActionOutput<K>>,
+): Promise<ActionOutput<K>> {
   const metrics = context.metrics ?? defaultMetrics();
   if (metrics === NO_METRICS) {
     // The instance is not measuring itself. Skip the timer and the labels

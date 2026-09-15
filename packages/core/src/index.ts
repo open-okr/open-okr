@@ -969,11 +969,17 @@ export {
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
 export {
+  type Admission,
+  AdmissionError,
+  type AdmissionLimits,
+  AdmissionSettingError,
   countSeats,
   isCloudEnabled,
   readOwnUsage,
   readPlans,
+  resolveAdmissionLimits,
   seatState,
+  setDefaultAdmission,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
