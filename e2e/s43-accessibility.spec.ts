@@ -70,6 +70,23 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
   "/setup":
     "the first-run wizard, which redirects on a claimed instance and has no app shell; first-run-wizard.spec.ts drives it on the unclaimed second instance",
   "/setup/account": "the second wizard step, same instance and same reason",
+  // **The four P8 screens this instance does not have** (P8-G01). The scan
+  // walks the route tree, which is what makes a screen added tomorrow
+  // scanned tomorrow, and it picked these up the moment P8 landed them. None
+  // of the four renders here: the plan screen calls notFound() with the cloud
+  // flag off, and an operator route answers not-found to anybody without a
+  // live grant, which on a self-hosted instance is everybody, because
+  // instance_operators holds no rows there by design (P8-T01b §7). The scan
+  // was waiting fifteen seconds for an application shell that a 404 never
+  // draws. Scanning them needs a cloud fixture, which is P8's own row.
+  "/admin/plan":
+    "cloud only, and notFound() with the flag off, so this instance does not have the screen",
+  "/operator":
+    "an operator route, and not-found to everybody on a self-hosted instance",
+  "/operator/[workspaceId]":
+    "an operator route, and not-found to everybody on a self-hosted instance",
+  "/operator/instance":
+    "an operator route, and not-found to everybody on a self-hosted instance",
 };
 
 /** The impacts that fail the build. Advisory levels are reported, not fatal. */
