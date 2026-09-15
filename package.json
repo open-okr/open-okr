@@ -47,14 +47,14 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@biomejs/biome": "2.5.12",
+    "@biomejs/biome": "2.5.13",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.2",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/pg": "catalog:",
-    "knip": "6.34.0",
+    "knip": "6.35.1",
     "pg": "catalog:",
     "turbo": "2.10.12",
     "vitest": "catalog:"
