@@ -59,6 +59,33 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "'auto' is open until the instance is claimed and closed afterwards. 'open' and 'invite_only' fix it either way.",
   },
+  // The cloud tenancy settings (P8-T02a). All three default to the
+  // self-hosted answer, so an instance that never touches them is a
+  // self-hosted one. Design: docs/design/p8-t01a-tenant-lifecycle.md.
+  {
+    key: "cloud.enabled",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_CLOUD",
+    summary:
+      "Vendor operation. Off means no tenant row is written, no operator console exists and no billing surface appears. The one setting that separates a cloud instance from a self-hosted one.",
+  },
+  {
+    key: "cloud.region",
+    kind: "string",
+    fallback: "local",
+    environment: "OPENOKR_CLOUD_REGION",
+    summary:
+      "Recorded on every tenant this deployment provisions. Recorded and never routed on: a residency claim is a contract, not a column.",
+  },
+  {
+    key: "cloud.closureRetentionDays",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS",
+    summary:
+      "Days to keep a closed workspace before erasing it. Zero means never erase, because not configured must never mean delete everything (P7-T08c).",
+  },
   {
     key: "instance.telemetry",
     kind: "boolean",

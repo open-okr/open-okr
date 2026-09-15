@@ -7,6 +7,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
+import { users } from "./auth.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
 
 /**
@@ -32,6 +33,16 @@ export const auditEvents = pgTable("audit_events", {
    */
   seq: bigint("seq", { mode: "number" }),
   actorMemberId: uuid("actor_member_id").references(() => workspaceMembers.id),
+  /**
+   * The cloud operator who acted, when `actorKind` is `operator` (P8-T03b).
+   * Null for every other kind. An operator is not a member of the workspace
+   * they act on, so `actorMemberId` is null for them and this is what the
+   * customer sees instead of an empty actor.
+   */
+  actorOperatorUserId: text("actor_operator_user_id").references(
+    () => users.id,
+    { onDelete: "set null" },
+  ),
   actorKind: text("actor_kind", {
     enum: ["human", "agent", "system", "operator"],
   }).notNull(),

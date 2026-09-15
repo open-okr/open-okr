@@ -44,6 +44,17 @@ const REACHED_FROM_OUTSIDE: Readonly<Record<string, string>> = {
   "/setup/account": "the first-run wizard's own next step",
   "/dev/components": "development only; the page is notFound() in production",
   "/dev/rich-text": "development only; the page is notFound() in production",
+  // **An operator is not a member, and the console is deliberately not
+  // advertised** (P8-T01b §7). Every operator route answers not-found to
+  // anybody without a live grant, "so the instance does not advertise a door
+  // it will not open", and an in-app link would be exactly that door. The
+  // vendor's own people reach these by URL. This is the one case where the
+  // absence of a link is the security property rather than the oversight the
+  // rest of this file exists to catch, which is why both entries say so
+  // rather than naming a screen that sends somebody here.
+  "/operator": "the vendor's own operators, by URL; no link advertises it",
+  "/operator/instance":
+    "the vendor's own operators, by URL; no link advertises it",
 };
 
 /** `app/(auth)/sign-in/page.tsx` is `/sign-in`. Route groups are not path segments. */

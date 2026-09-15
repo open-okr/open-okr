@@ -56,6 +56,15 @@ export interface NavigationItem {
   readonly group?: NavigationGroup;
   /** The member's resolved level on the workspace must be at least this. */
   readonly minLevel: AccessLevel;
+  /**
+   * Absent on a self-hosted instance (P8-T05).
+   *
+   * Declared here rather than filtered by a magic id in the shell, so the
+   * one place that lists the item is also the place that says where it
+   * belongs. `navigationFor` does not read it, because it has no database:
+   * the caller that already knows whether this is a cloud passes the answer.
+   */
+  readonly cloudOnly?: boolean;
 }
 
 export interface ModuleDefinition {
@@ -328,6 +337,24 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "General",
         href: "/admin/general",
         section: "admin",
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-plan",
+        label: "Plan and seats",
+        href: "/admin/plan",
+        section: "admin",
+        cloudOnly: true,
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-support",
+        label: "Support access",
+        href: "/admin/support",
+        section: "admin",
+        // Letting somebody from outside the organisation into it is the
+        // largest version of managing who has access, so it takes the level
+        // that manages access rather than a smaller one (P8-T04b).
         minLevel: ACCESS_LEVELS.full,
       },
       {

@@ -86,6 +86,13 @@ export interface ResolvedActor {
   readonly kind: ActorInput["kind"];
   readonly memberId: string | null;
   /**
+   * The cloud operator's user id, when `kind` is `operator` (P8-T03b).
+   * Null for every other kind. An operator is a member of nothing, so
+   * `memberId` is null for them and this is what the audit row records
+   * instead of an empty actor.
+   */
+  readonly operatorUserId: string | null;
+  /**
    * A plain number rather than `AccessLevel`: the resolved level can be `0`
    * when the member reaches none of the three tiers on the workspace's own
    * context, and `0` is not one of the four declared levels.
@@ -340,7 +347,43 @@ async function resolveActor(
   actor: ActorInput,
 ): Promise<ResolvedActor> {
   if (actor.kind === "system") {
-    return { kind: "system", memberId: null, level: ACCESS_LEVELS.full };
+    return {
+      kind: "system",
+      memberId: null,
+      operatorUserId: null,
+      level: ACCESS_LEVELS.full,
+    };
+  }
+
+  // A cloud operator (P8-T03b). `operator` has been in `ActorInput` and in
+  // `audit_events.actor_kind` since both were written and has never had a
+  // branch here, so an operator actor fell through to the member lookup and
+  // was refused for having no member id. This is that branch.
+  //
+  // **The grant is verified before the Operation opens, not here.**
+  // `instance_operators` sits above the tenant floor and is reached with
+  // `app.operator_user_id`, which a tenant-scoped transaction deliberately
+  // never sets, so this cannot check it without loosening something. The
+  // operator module's own door calls `isLiveOperator` first and refuses
+  // there. That is the same arrangement `system` has: an `ActorInput` is
+  // constructed server-side and is never taken from a request.
+  //
+  // The member id stays null, because an operator is a member of nothing.
+  // What the audit row records instead is `actorOperatorUserId`, so the
+  // customer sees who acted rather than an empty actor.
+  if (actor.kind === "operator") {
+    if (!actor.userId) {
+      throw new OperationError(
+        "forbidden",
+        "An operator actor needs the operator's user id.",
+      );
+    }
+    return {
+      kind: "operator",
+      memberId: null,
+      operatorUserId: actor.userId,
+      level: ACCESS_LEVELS.full,
+    };
   }
 
   const conditions = actor.memberId
@@ -408,7 +451,9 @@ async function resolveActor(
       })
     : 0;
 
-  return { kind: actor.kind, memberId: member.id, level };
+  // A human or an agent resolved to a real member. Neither is an operator,
+  // so the operator column stays null and the audit row names the member.
+  return { kind: actor.kind, memberId: member.id, operatorUserId: null, level };
 }
 
 /**
@@ -448,6 +493,7 @@ async function appendAudit(
     workspaceId,
     seq: null,
     actorMemberId: actor.memberId,
+    actorOperatorUserId: actor.operatorUserId,
     actorKind: actor.kind,
     action: audit.action,
     targetType: audit.targetType,
@@ -515,6 +561,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
         ? ({
             kind: spec.actor.kind,
             memberId: null,
+            operatorUserId: null,
             level: ACCESS_LEVELS.full,
           } satisfies ResolvedActor)
         : await resolveActor(tx, spec.workspaceId, spec.actor);

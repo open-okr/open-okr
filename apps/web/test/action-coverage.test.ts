@@ -107,6 +107,16 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "the sessions screen creates through `sessions.schedule`, which is the one a person uses",
   "sessions.votes":
     "a read the session screen does not need: the stage panels carry their own tallies",
+  // **A fifth reason, and the first of its kind: the caller is real and this
+  // test cannot see it.** `app/operator/[workspaceId]/lifecycle-form.tsx`
+  // suspends, closes and reopens a workspace, so a person does press this.
+  // It goes through the typed `setLifecycleAsOperator` rather than through
+  // `callAction("workspace.setLifecycle", …)`, and this file looks for the
+  // action's name in quotes, so the door is open and the scan walks past it.
+  // Recorded rather than worked around: rewriting the caller to name the
+  // string would be changing product code to satisfy a grep.
+  "workspace.setLifecycle":
+    "the operator console presses it, on the workspace detail screen, through the typed `setLifecycleAsOperator` rather than by naming the action",
 };
 
 function sources(dir: string): string[] {

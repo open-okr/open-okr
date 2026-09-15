@@ -344,6 +344,10 @@ export {
   instanceAuditEvents,
 } from "./schema/instance-audit.ts";
 export {
+  type InstanceOperator,
+  instanceOperators,
+} from "./schema/instance-operators.ts";
+export {
   type InviteLink,
   type InviteMode,
   inviteLinks,
@@ -419,6 +423,16 @@ export {
   oauthGrants,
   oauthRefreshTokens,
 } from "./schema/oauth.ts";
+export {
+  OPERATOR_SESSION_END_REASONS,
+  type OperatorSession,
+  type OperatorSessionEndReason,
+  operatorSessions,
+} from "./schema/operator-sessions.ts";
+export {
+  type OperatorWorkspaceUsage,
+  operatorWorkspaceUsage,
+} from "./schema/operator-usage.ts";
 export { outbox } from "./schema/outbox.ts";
 export {
   type ManagementAnswer,
@@ -492,6 +506,13 @@ export {
   sessions as okrSessions,
 } from "./schema/sessions.ts";
 export {
+  SITE_MESSAGE_LEVELS,
+  type SiteMessage,
+  type SiteMessageLevel,
+  siteMessageDismissals,
+  siteMessages,
+} from "./schema/site-messages.ts";
+export {
   SPACE_ROLES,
   type Space,
   type SpaceMember,
@@ -516,6 +537,12 @@ export {
   taskAssignees,
   tasks,
 } from "./schema/tasks.ts";
+export {
+  TENANT_STATES,
+  type Tenant,
+  type TenantState,
+  tenants,
+} from "./schema/tenants.ts";
 export {
   type WhatsAppTemplateMapping,
   whatsappTemplateMappings,
@@ -560,6 +587,7 @@ export {
   withInstanceAdmin,
   withInviteToken,
   withOAuthSecret,
+  withOperator,
   withProviderTeam,
   withUser,
   withWorkspace,

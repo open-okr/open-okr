@@ -88,6 +88,27 @@ export interface AuthOptions {
    */
   readonly rateLimit?: { readonly enabled: boolean };
   /**
+   * Whether a sign-in must wait for a verified address (P8-T02b).
+   *
+   * Resolved by the caller from `mail.transport`, because Better Auth reads
+   * this off an options object built once per process and the resolution is
+   * a database read. `resolveRequireEmailVerification` is the one place that
+   * decides; this is only where the answer arrives.
+   *
+   * Defaults to false, which is what every instance did before this option
+   * existed. A caller that forgets it gets the old behaviour rather than a
+   * locked-out instance.
+   */
+  readonly requireEmailVerification?: boolean;
+  /**
+   * Sends the verification link. Absent means no verification mail is ever
+   * sent, which is the right pairing for a console transport.
+   */
+  readonly sendVerificationEmail?: (message: {
+    to: string;
+    url: string;
+  }) => Promise<void>;
+  /**
    * Framework glue, supplied by the caller.
    *
    * `packages/core` knows nothing about Next.js, so the plugin that lets a
@@ -148,10 +169,13 @@ export function createAuth(options: AuthOptions) {
 
     emailAndPassword: {
       enabled: true,
-      // Verification is not required to sign in: a self-hosted first run has
-      // no mail server, and blocking the first login on an email nobody can
-      // receive would make the product unusable out of the box.
-      requireEmailVerification: false,
+      // Verification is not required to sign in unless the instance can
+      // actually send mail. A self-hosted first run has no mail server, and
+      // blocking the first login on an email nobody can receive would make
+      // the product unusable out of the box. `mail.transport` is what
+      // decides, resolved by the caller at boot (P8-T02b): the question is
+      // whether a link can arrive, not whether this is a managed cloud.
+      requireEmailVerification: options.requireEmailVerification ?? false,
       minPasswordLength: 12,
       sendResetPassword: async ({ user, url }) => {
         // openokr:allow-side-effect: Better Auth owns this request's
@@ -160,6 +184,21 @@ export function createAuth(options: AuthOptions) {
         // sent in response to a request, not as a consequence of a domain
         // write.
         await sendResetPassword({ to: user.email, url });
+      },
+    },
+
+    emailVerification: {
+      // Sent on sign-up only where a link can arrive. With a console
+      // transport there is no callback, so nothing is sent and nothing is
+      // written to the log either.
+      sendOnSignUp: Boolean(options.sendVerificationEmail),
+      sendVerificationEmail: async ({ user, url }) => {
+        // openokr:allow-side-effect: the same arrangement `sendResetPassword`
+        // has above. Better Auth owns this request's transaction and calls
+        // back outside the Operation pipeline, so there is no outbox row to
+        // attach the mail to. The link is sent in response to a request, not
+        // as a consequence of a domain write.
+        await options.sendVerificationEmail?.({ to: user.email, url });
       },
     },
 

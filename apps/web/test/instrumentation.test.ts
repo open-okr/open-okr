@@ -1,6 +1,7 @@
 import { resetEnvCache } from "@openokr/config";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
+import { resolveSignupPolicy } from "../lib/auth";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
 import { installTelemetry } from "../lib/telemetry";
@@ -17,6 +18,14 @@ vi.mock("../lib/scheduler", () => ({ startScheduler: vi.fn() }));
 // two tests past the five-second timeout. The other two mocks above already
 // cut the same graph out, so an unmocked third route to it put the cost back.
 vi.mock("../lib/telemetry", () => ({ installTelemetry: vi.fn() }));
+// **The fourth route, and the comment above predicted it.** P8-T02b added
+// `resolveSignupPolicy` to the boot sequence, so `instrumentation.node`
+// imports `./lib/auth`, which carries Better Auth and `@openokr/core` behind
+// it. The first test to trigger the dynamic import paid that load and went
+// past the five-second timeout; the rest passed because the module was cached
+// by then, which is why this reads as one flaky test rather than as a boot
+// that got heavier. Mocked for the import cost, like the three above.
+vi.mock("../lib/auth", () => ({ resolveSignupPolicy: vi.fn() }));
 
 const original = { ...process.env };
 
@@ -33,6 +42,7 @@ afterEach(() => {
   vi.mocked(startRelay).mockClear();
   vi.mocked(startScheduler).mockClear();
   vi.mocked(installTelemetry).mockClear();
+  vi.mocked(resolveSignupPolicy).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -148,4 +158,31 @@ test("a scheduler that cannot start is logged, not fatal", async () => {
 
   expect(exit).not.toHaveBeenCalled();
   expect(stderr.mock.calls.join()).toMatch(/pgboss schema is not reachable/);
+});
+
+test("the signup policy resolves last, and boot waits for it (P8-T02b)", async () => {
+  // `instrumentation.ts` says this call is last and awaited so that the first
+  // request cannot reach Better Auth with the answer still unresolved: a
+  // mail-capable instance would otherwise serve one sign-in without the
+  // requirement it is configured for. Nothing asserted that until now, so the
+  // call could have moved up the sequence and no test would have noticed.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+
+  await register();
+
+  expect(resolveSignupPolicy).toHaveBeenCalled();
+  expect(
+    vi.mocked(resolveSignupPolicy).mock.invocationCallOrder[0],
+  ).toBeGreaterThan(
+    vi.mocked(startScheduler).mock.invocationCallOrder[0] as number,
+  );
+});
+
+test("a build worker resolves no signup policy, because it reaches no database", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.NEXT_PHASE = "phase-production-build";
+
+  await register();
+
+  expect(resolveSignupPolicy).not.toHaveBeenCalled();
 });

@@ -2175,6 +2175,14 @@ Deliverables: METHOD.md §4.1 gains an end-state shape alongside its state-word 
 Test plan: every one of the twenty drafts that landed in "Cannot tell" only because of its shape now passes OBJ-1, and every draft that genuinely starts with an output verb or names a bare metric still fails; the shape matcher is compared against §4.1 by the conformance suite, so a phrase added to the document and not the package fails the build; a deliberately vague objective that names no end state at all still reaches the fallback, because the fallback is not being removed.
 Acceptance: Given the twenty drafts in `pnpm method:verdicts`, when the shape is recognised, then the objectives written deliberately as outcomes pass OBJ-1 and the ones written as deliverables still do not.
 
+### P7-T07b: KR-4 was warning at the fixture, not at the drafts [S]
+Depends on: P7-T07
+Goal: the audit's finding 2 is answered by the number being wrong, not by a rule change.
+**Written after Agung re-ran `pnpm method:verdicts` and got the same twenty.** The audit offered KR-4's twenty-of-twenty as a finding about METHOD.md. It is a finding about the harness: `scripts/method-verdicts.ts` tagged every key result `lagging`, KR-4 warns when a set is all lagging, and so the rule was reporting the fixture back to itself. Leading or lagging is a judgement about the business and cannot be read off a sentence, which the harness comment already said and then did not act on.
+Deliverables: each draft names which of its key results a reader would call leading, in `Draft.leading`, carrying the tags the measures earn rather than a blanket default; `pnpm method:verdicts` re-run and its counts recorded, because the point of the change is the count; `docs/design/p7-t07-conformance-audit.md` brought up to date, with finding 1 marked settled by P7-T07a, finding 2 withdrawn with its reason, and the acceptance section listing the questions that are actually left. No METHOD.md change and no `packages/method` change.
+Test plan: the counts are the test; every draft that still draws KR-4 is named and its reason written down, so a surviving warning is one somebody argued for rather than one nobody looked at; the drafts written deliberately to pass clean do pass clean; the conformance suite stays green, because nothing in the canon moved.
+Acceptance: Given the twenty drafts with honest indicator tags, when KR-4 runs, then it fires only on sets that genuinely hold no outcome measure, and any remaining case is recorded as a METHOD.md question for a human rather than changed here.
+
 ### P7-T08a: Where personal data actually goes [S]
 Depends on: P7-T03
 Goal: know what reaches logs, prompts and telemetry before deciding what to delete.
@@ -2247,31 +2255,104 @@ should already have refused. Cut 11 September 2026.
 
 # Phase 8: Cloud, enterprise and launch
 
-### P8-T01: Cloud design gate [DESIGN GATE] [M]
+### P8-T01a: The tenant, its lifecycle and its limits [DESIGN GATE] [M]
 Depends on: Phase 7 complete
-Goal: the design documents for vendor operation.
-Deliverables: design documents covering tenant provisioning and lifecycle, per-tenant limits and noisy-neighbour protection, the operator console's surface and its boundaries, the support-access contract, and the plan and seat model behind its flag.
+Goal: the design documents P8-T02 and P8-T06 stand on.
+**P8-T01 was cut in two on 14 September 2026, approved by Agung.** The original card asked for five design documents in one session. Two of them (the tenant and its limits) block P8-T02, which is the next implementation task, and three of them (the operator console, support access, the plan model) block nothing until P8-T03. Splitting at that seam lets the review of the first two start while the second three are written, rather than holding both behind one approval.
+Deliverables: `docs/design/p8-t01a-tenant-lifecycle.md` covering the `tenants` table, the active / suspended / closed lifecycle and how it projects onto the existing `workspaces.state` freeze overlay, what the cloud adds to the one provisioning Operation, the cloud flag, region, and closure with its retention rule; `docs/design/p8-t01a-tenant-limits.md` covering the four contended resources, where a per-tenant limit is enforced, the settings and their unlimited defaults, noisy-neighbour fairness in the relay and the pool, and what a member sees when a limit engages.
+Test plan: a design gate has no suite, so its test plan is that every acceptance criterion in both documents is written as a Given / When / Then the downstream task can lift into a test unchanged, and every one names the file or the gate that would prove it; both documents state what they refuse and why, because a design that only says yes cannot be argued with; every decision that belongs to PLAN.md §13 or to METHOD.md is listed as open rather than taken, and the documents are checked against that list before review.
 Acceptance: the human approves with an explicit statement.
 
-### P8-T02: Tenant provisioning, signup and onboarding [L]
-Depends on: P8-T01
-Deliverables: the tenant table and provisioning Operation; cloud signup with email verification and workspace creation; the onboarding flow (screen S-34) shared with self-host, every step skippable over the TECHNICAL-PLAN.md §4.14 defaults; the workspace lifecycle of active, suspended and closed with data retention on closure; region recorded per tenant.
+### P8-T01b: The operator console, support access and the plan model [DESIGN GATE] [M]
+Depends on: P8-T01a
+Goal: the design documents P8-T03, P8-T04 and P8-T05 stand on.
+Deliverables: the operator console's surface and its boundaries, added to UIUX-PLAN.md §6 as screens S-45 to S-49 so P8-T03 and P8-T05 cite a screen like every other interface task, numbered from S-45 rather than S-41 because the end-to-end suite already took those four prefixes for specs that are not screens; the instance-operator role and how it reads past the tenant floor without becoming a service account with ambient authority; the support-access contract covering the explicit grant, the time box, the owner's visibility and the automatic expiry, against the `operator_sessions` columns TECHNICAL-PLAN §4.13 already fixes; the plan catalogue, seat counting at the member-provisioning funnel, and the upgrade and downgrade paths, all behind the flag that is off for self-host.
+Test plan: as P8-T01a, with one addition that only this half needs. Every operator capability is written with the workspace-side evidence beside it, because the support-access acceptance criterion is about what the customer can see rather than what the operator can do, and a design that lists only the operator's powers cannot be checked against it.
+Acceptance: the human approves with an explicit statement.
+
+### P8-T02a: The tenant record and its provisioning [M]
+Depends on: P8-T01a
+Goal: a cloud instance writes a tenant row, a self-hosted one does not, and no product code can tell the difference.
+**P8-T02 was cut into three on 14 September 2026.** The original [L] card held a migration with its policy, a public route touching Better Auth and email verification, and a path that erases stored user data. Those three fail in different ways, the third is one CLAUDE.md puts in a human's hands, and none of the three is reviewable inside the other two. The seam is drawn at what P8-T02's own acceptance criterion needs first: the record has to exist before a signup can land in one.
+Deliverables: the `tenants` table with its row-level security policy in the same migration, the primary key being the workspace id; the Drizzle schema and its export; `packages/core/src/tenancy` with `resolveCloudTenancy`, `seedTenantInTx` and `readTenant`; the three instance settings `cloud.enabled`, `cloud.region` and `cloud.closureRetentionDays`, every one defaulting to the self-hosted answer; the seed contributed to the existing `workspace.provision` transaction as one statement; a `check:boundaries` rule refusing a read or an import of `tenants` from any product path; the §7.2 mapping row marking it as having no legacy source, and DATABASE.md.
+Test plan: a self-hosted instance writes no tenant row and every product read is unchanged; a cloud instance writes exactly one, on the free tier, in the named region, sharing the workspace's creation instant because one transaction wrote both; `readTenant` answers undefined rather than throwing for a workspace with no row, so no caller learns to wrap it; the tenant floor is proved against the table itself and by the P7-T03a fuzz suite, which enumerates from `information_schema` and therefore covers it without being edited; the boundary rule is proved in both directions, including that it does not fire on the word in a comment.
+Acceptance: Given a self-hosted instance, when a workspace is provisioned, then no tenant row exists and nothing about the product has changed; and given a cloud instance, then exactly one exists, carrying its plan and its region.
+
+### P8-T02b: Cloud signup, and where it lands [M]
+Depends on: P8-T02a
+Goal: somebody with no account reaches a working workspace.
+Deliverables: cloud signup with email verification and workspace creation, over the existing registration Operation rather than a second provisioning implementation; the public route and its rate limit; the onboarding flow (screen S-34) reached from it, which P6-G26 already built and which this task wires up rather than rebuilds; an end-to-end path proving the acceptance criterion.
+Test plan: the criterion is about what somebody gets without answering anything, so the end-to-end path dismisses every onboarding step and then asserts the workspace is whole: a default space, the current cycle, the running rhythm, the Coach and the Champion, and a tenant row. An unverified email reaches no workspace. The same registration on a self-hosted instance is unchanged, because it is the same Operation.
 Acceptance: Given a new cloud signup, when the member dismisses onboarding entirely, then they land in a working workspace running the default rhythm with the coach and gates active, and the tenant record carries its plan and region.
 
-### P8-T03: Operator console [L]
-Depends on: P8-T02
-Deliverables: the instance-operator role separate from every workspace role; list, inspect and suspend workspaces; instance feature flags; site messages that are dismissible, targeted and expiring; per-tenant health and usage. Every action audited. Absent entirely on self-hosted instances.
-Acceptance: Given an operator suspending a workspace, when a member of it signs in, then they see a clear message, the workspace is read-only, and the suspension is recorded with its actor and reason.
+### P8-T02c: Suspension, closure and the retention that never runs by default [M]
+Depends on: P8-T02a
+Goal: the lifecycle transitions, and a retention sweep that destroys nothing until somebody sets a number.
+**Touches stored user data, so the erasure half is a human's decision before it is written** (CLAUDE.md). The design is `docs/design/p8-t01a-tenant-lifecycle.md` §6 and the default is already chosen there: zero, meaning never erase.
+Deliverables: the active, suspended and closed transitions, each writing `tenants.state` and `workspaces.state` in one transaction so the P2-T09 freeze overlay is the only enforcement point; the closure banner and the portability archive offered to every workspace admin on close; the retention sweep on the scheduler host, which reads `cloud.closureRetentionDays` and returns without touching a row when it is zero; the erasure itself as a data-change script, batched and resumable, never as a migration and never inside the sweep.
+Test plan: a suspended workspace refuses every write that is not on the freeze overlay's recovery list, and refuses it in `freeze.ts` rather than in new code; a closed workspace is still readable by its members and can still build its archive; the sweep over a workspace closed four hundred days ago deletes zero rows while the setting is zero, and enqueues exactly one data-change when it is ninety; the decision is audited with the retention number that caused it.
+Acceptance: Given `cloud.closureRetentionDays` unset, when the closure sweep runs against a workspace closed any number of days ago, then zero rows are deleted and the sweep says so.
 
-### P8-T04: Transparent support access [M]
-Depends on: P8-T03
-Deliverables: time-boxed, reason-recorded operator access to a workspace, requiring an explicit grant, visible to the workspace owner in their inbox and in the audit log, with every action attributed to the operator and an automatic expiry.
+### P8-T03a: The operator identity, and the wall [M]
+Depends on: P8-T02a, P8-T01b
+Goal: an operator can see which tenants exist and cannot see anything inside one.
+**P8-T03 was cut into three on 14 September 2026.** The [L] card held a new principal reaching past the tenant floor, two screens, and an instance-settings surface. The first is a security boundary and the other two stand on it, so it goes alone and is proved before anything is drawn on top.
+Deliverables: `instance_operators` above the tenant floor, with a grant that is stamped rather than deleted on revocation; `app.operator_user_id` as a seventh narrow policy key in `packages/db/src/tenant.ts`, with `withOperator`; select-only operator policies on `tenants`, `workspaces` and `instance_operators`, each through one `app_is_live_operator()` function so a later policy cannot get the liveness check subtly wrong; `packages/core/src/operator` with the tenant list; no policy on any content table.
+Test plan: the load-bearing test is not about any function. It points one real operator connection at every table carrying a `workspace_id` and requires zero rows from all of them, derived from `information_schema` so a table added next month is covered without anybody remembering. It is paired with an assertion that the probe can fail, by reading the one table an operator may see, because a wall test that cannot tell a reachable table from an unreachable one is decoration. Revocation is proved to take effect on the next query rather than at the next sign-in, on the same pool with no sign-out in between.
+Acceptance: Given an operator connection with no support session, when it selects from any content table, then it returns zero rows, and the proof covers every such table rather than a fixture.
+
+### P8-T03b: The operator's list and one workspace [L]
+Depends on: P8-T03a
+Deliverables: screens S-45 and S-46; suspend and reactivate through the P8-T02c lifecycle action; **per-tenant health and usage, which P8-T03a could not deliver**; the operator's action recorded in both the instance chain and the workspace's own `audit_events`, which needs a nullable `actor_operator_user_id` beside the not-null member column, expand then contract with P7-T09a's linter watching.
+Test plan: an operator suspending a workspace is refused every ordinary write as a member of it, in `freeze.ts` and not in new code; the workspace's owner sees the row in their own audit log without anybody sending it to them; the usage panel is asserted on its column list, so a leaky column fails a test rather than passing review.
+Acceptance: Given an operator suspending a workspace, when a member of it signs in, then they see a message naming the reason, the workspace is read-only, and the suspension is recorded with its actor and reason.
+
+### P8-T03c: Instance flags and site messages [M]
+Depends on: P8-T03b
+Deliverables: screen S-47; instance feature flags; site messages that are dismissible, targeted and expiring, with the window required rather than optional; the `cloud.plans` catalogue surface P8-T05 reads.
+Test plan: a site message with no end date is refused at the boundary rather than stored; a dismissal is per member and does not hide it from anybody else; a targeted message reaches only the named workspaces.
+Acceptance: Given a site message with a window that has passed, when any member loads any screen, then it is absent without anybody having removed it.
+
+### P8-T04a: The support session, and the wall it is the one door through [M]
+Depends on: P8-T03a
+Goal: an operator can be let into a workspace, and only by somebody already in it.
+**P8-T04 was cut in two on 14 September 2026.** The session is a security boundary and screen S-48 stands on it, so it goes alone and is proved before anything is drawn on top.
+Deliverables: `operator_sessions` with its policies, the one-live-session index and the two check constraints that stop a grant half-applying; request, grant and end; the grant creating a real `guest` member row through `provisionMemberForInvite`, the one funnel, widened by a `kind` parameter rather than duplicated; expiry refused at use in `resolveMemberAccessLevel`, which is the one function both the read and the write path go through; the sweep that tidies what has expired.
+Test plan: an operator with no grant is refused and told nothing, including whether the workspace exists; a request grants nothing on its own, which is the product promise; a view-level grant is refused a write, asked through `callAction` the way any member is asked, so the assertion is about `can()` rather than about a second code path; a grant at `full` is refused however it is asked for; an expired session is refused on the next action with no sweep in between, and the sweep then suspends the member; the workspace keeps the whole record with how it ended.
 Acceptance: Given a support session, when it expires, then access ends automatically and the owner can see who was in their workspace, when, and what they did.
 
+### P8-T04b: Screen S-48, the banner and the inbox [M]
+Depends on: P8-T04a
+Deliverables: screen S-48, both halves: the operator's request, and the customer's grant decision in their inbox; the banner that runs for the length of a live session on every screen in the workspace, naming the operator and the remaining time, with a revoke control; the workspace's own view of every session it has ever had.
+Test plan: the banner is present for every member and not only the owner, and **cannot be dismissed**, because the cost of forgetting it is that somebody outside the organisation is reading the organisation's objectives; revoking ends the session on the next action; the owner's inbox carries the request with its reason before anything is granted.
+Acceptance: Given an operator in a live session, when any member of the workspace opens any screen, then they see who is in their workspace and how long for.
+
 ### P8-T05: Plans, seats and limits [M]
-Depends on: P8-T04
-Deliverables: plan definitions, seat counting and workspace limits behind a flag that is off for self-host; enforcement at the member-provisioning funnel; upgrade and downgrade paths; no feature gating anywhere.
+Depends on: P8-T04a
+Deliverables: screen S-49; plan definitions in the `cloud.plans` instance setting rather than a table, with no field able to name a feature; seat counting where an invited human counts and a guest, an agent and a placeholder never do; workspace limits behind a flag that is off for self-host; enforcement at both the invitation and the member-provisioning funnel, because a reusable invite link overflows a plan that is only checked at invite time; upgrade and downgrade paths; no feature gating anywhere.
 Acceptance: Given the flag off, when any limit is evaluated, then it is unlimited and no billing surface appears; and given it on, then seat limits apply at invitation while every feature stays available.
+
+### P8-G01: A loading state for the screens outside the shell [S]
+Depends on: P6-G24c
+Deliverables: `loading.tsx` for the authentication group, the first-run wizard, onboarding, the invitation screen, the operator console and the development pages, six files covering thirteen routes because Next resolves to the nearest ancestor directory; a centred card shape in `lib/segment-loading.tsx` for a screen that draws its own frame, since the existing skeleton is sized for a panel inside the shell; `segment-boundaries.test.ts` split so the loading rule stops being a consequence of the error rule.
+
+**Why this is a row rather than part of P6-G24c.** That task asked every
+segment owning an `error.tsx` to own a `loading.tsx`, which was the right
+pairing for the screens inside the shell and silently answered a second
+question for the screens outside it. A screen outside the shell inherits the
+root error boundary on purpose, because a reader there has no navigation to
+keep, and that reasoning says nothing about whether a wait should be visible.
+Fourteen routes had no loading state as a result, including every
+authentication screen and the first-run wizard, which is the first thing a
+fresh deployment serves.
+
+Test plan: the boundary test asserts every page segment resolves a loading
+state, separately from the error rule; the end-to-end suite runs whole,
+because P6-G24a is the precedent for this change breaking specs that assert
+immediately after a navigation.
+Acceptance: Given any route in the application, when it is navigated to,
+then a loading state resolves from somewhere above it; and given the
+end-to-end suite, when it runs, then no spec fails on a streamed segment.
 
 ### P8-T06: Cloud operations [M]
 Depends on: P8-T05
@@ -2332,9 +2413,9 @@ Acceptance: Given the end-to-end suite run ten times, when the reports are merge
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (9). Phase 8: P8-T01 to T15 (15: P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day). **137 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (22: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission). **156 tasks.**
 
-Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
+Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01a, P8-T01b. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 
 Specification authority per task type: user interface to UIUX-PLAN.md, schema to TECHNICAL-PLAN.md §4 with the §7.2 mapping, engines to TECHNICAL-PLAN.md §6, rules and rituals to METHOD.md, AI and agents to AI-NATIVE-PLAN.md, security to TECHNICAL-PLAN.md §8.2, performance to TECHNICAL-PLAN.md §13.
 

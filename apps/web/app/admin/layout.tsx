@@ -1,7 +1,8 @@
-import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
+import { ACCESS_LEVELS, isCloudEnabled, navigationFor } from "@openokr/core";
 import type { ReactNode } from "react";
 import { requireAccessLevel } from "../../lib/access.ts";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
+import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { AdminSections } from "./admin-sections.tsx";
 
@@ -49,14 +50,21 @@ export default async function AdminLayout({
   const { t } = await getTranslations();
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
+  // A cloud-only card is absent on a self-hosted instance rather than
+  // disabled, because a disabled control is still an appearance and the
+  // acceptance criterion says no billing surface appears (P8-T05). The route
+  // answers not-found as well, so the two cannot disagree.
+  const cloud = await isCloudEnabled(getPool());
   // Narrowed to what the list needs before it crosses the client boundary.
   // The registry entry also carries the level that filtered it, which is a
   // server-side fact and has no business in a browser bundle.
-  const sections = navigationFor("admin", access.level).map((item) => ({
-    id: item.id,
-    label: item.label,
-    href: item.href,
-  }));
+  const sections = navigationFor("admin", access.level)
+    .filter((item) => cloud || !item.cloudOnly)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      href: item.href,
+    }));
 
   return (
     <AppShellLayout>

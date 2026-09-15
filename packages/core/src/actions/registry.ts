@@ -417,6 +417,7 @@ import {
   finishOnboarding,
   provisionWorkspace,
   renameWorkspace,
+  setWorkspaceLifecycle,
   setWorkspaceState,
 } from "./workspace.ts";
 
@@ -428,6 +429,7 @@ export const ACTION_MAP = {
   "workspace.overview": workspaceOverview,
   "workspace.rename": renameWorkspace,
   "workspace.finishOnboarding": finishOnboarding,
+  "workspace.setLifecycle": setWorkspaceLifecycle,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,
   "people.updateOwnProfile": updateOwnProfile,

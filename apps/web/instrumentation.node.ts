@@ -1,4 +1,5 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { installTelemetry } from "./lib/telemetry";
@@ -99,4 +100,22 @@ export function startTelemetry(): void {
       `telemetry: could not start: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
+}
+
+/**
+ * Resolves whether a sign-in must wait for a verified address (P8-T02b).
+ *
+ * One database read, before anything is served, because Better Auth reads the
+ * answer off an options object built once per process and `getAuth()` is
+ * synchronous. Nothing else in the boot sequence depends on it, so it runs
+ * last and its own failure is handled inside.
+ *
+ * A build worker has the placeholder `DATABASE_URL` the Dockerfile sets and
+ * no database behind it, the same reason the relay skips that phase.
+ */
+export async function resolveAuthPolicy(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  await resolveSignupPolicy();
 }

@@ -41,8 +41,18 @@ test("the front door no longer diverts, because the workspace is set up", async 
 test("asking for it directly is refused, rather than shown again", async () => {
   // A redirect, not an empty state: there is no version of this screen that is
   // useful to somebody whose workspace is already set up.
+  //
+  // **Awaited rather than read** (P8-G01). This read `page.url()` straight
+  // after the navigation and passed for as long as `welcome` had no loading
+  // state. A `loading.tsx` makes Next stream the segment, so `page.goto`
+  // returns once the fallback is painted, which is before the redirect has
+  // happened, and a plain value assertion has no retry to wait it out.
+  // `toHaveURL` does, and the fixture's own settling only wraps matchers, so
+  // the assertion had to become one.
   await goTo(page, "/welcome");
-  expect(new URL(page.url()).pathname).toBe("/");
+  // Anchored on the whole url rather than on a trailing slash, which
+  // `/welcome/` would also satisfy: host, then nothing but the root.
+  await expect(page).toHaveURL(/^https?:\/\/[^/]+\/$/, { timeout: 15_000 });
   await expect(page.getByTestId("welcome-progress")).toHaveCount(0);
 });
 

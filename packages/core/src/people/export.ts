@@ -248,6 +248,20 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "Trend notes",
   },
   {
+    table: "operator_sessions",
+    column: "granted_by_member_id",
+    skip: "workspace_record",
+    because:
+      "Who said yes to somebody from the vendor coming in, and when. The same shape as `proposed_changes.decided_by_member_id`: the record is the workspace's and the member's part in it is one decision. The workspace keeps it on the Support access screen, where it is meant to be read.",
+  },
+  {
+    table: "operator_sessions",
+    column: "member_id",
+    skip: "access",
+    because:
+      "The membership a granted session creates for the operator, suspended again when the session ends. It is never a real member's own row, and exporting it would be exporting the access model rather than anything a person wrote.",
+  },
+  {
     table: "performance_snapshots",
     column: "member_id",
     skip: "derived",

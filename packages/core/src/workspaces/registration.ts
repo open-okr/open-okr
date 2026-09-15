@@ -21,6 +21,7 @@ import type { Pool } from "pg";
 import { inviteTokenFromCookies } from "../invitations/pending.ts";
 import { previewInvite } from "../invitations/preview.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
+import { isCloudEnabled } from "../tenancy/index.ts";
 
 /** The computed half: an instance nobody has claimed is open. */
 async function isUnclaimed(pool: Pool): Promise<boolean> {
@@ -40,6 +41,20 @@ export async function isRegistrationOpen(pool: Pool): Promise<boolean> {
   // 'auto', an unset value, or anything unrecognised. An unrecognised policy
   // falls back to the safe computed answer rather than throwing: a typo in a
   // settings row must not take the sign-in page down.
+  //
+  // **A cloud instance is open however many people have claimed it**
+  // (P8-T02b). The computed answer above exists because a self-hosted
+  // instance belongs to whoever set it up, so the first registration closing
+  // the door behind itself is right. A cloud belongs to nobody, and the same
+  // rule there would mean exactly one customer ever signed up.
+  //
+  // This reads the instance's own flag, not a tenant row, which is why it is
+  // allowed on a product path at all: `cloud.enabled` is a fact about the
+  // deployment, and `tenants` is vendor knowledge about a customer. The
+  // boundary gate draws the line in the same place.
+  if (await isCloudEnabled(pool)) {
+    return true;
+  }
   return isUnclaimed(pool);
 }
 

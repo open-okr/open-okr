@@ -14,6 +14,7 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
+import { requireSeatInTx } from "../tenancy/plans.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -29,6 +30,17 @@ export interface ProvisionMemberInput {
    * something other than edit.
    */
   readonly level?: AccessLevel;
+  /**
+   * What kind of member this is. Defaults to `human`, which every joining
+   * path wants.
+   *
+   * `guest` is the cloud support session (P8-T04a), and widening this by one
+   * parameter is deliberately cheaper than a second insert path: a support
+   * session that wrote its own member row would be a second place that
+   * decides what a member is, and the whole point of this funnel is that
+   * there is one.
+   */
+  readonly kind?: "human" | "guest";
 }
 
 export interface ProvisionedMember {
@@ -54,6 +66,23 @@ export async function provisionMemberForInvite<
     return { memberId: existing.id, created: false };
   }
 
+  // **The seat check that must be right**, because this is the one place a
+  // member row is inserted. Checking only at the invitation would let one
+  // reusable link overflow a plan by any amount: the link admits everybody
+  // who holds it, and nobody checks again.
+  //
+  // Above the insert and inside the caller's transaction, so the count and
+  // the insert cannot disagree under concurrency. A guest is not a seat, so a
+  // support session is never refused for one.
+  if ((input.kind ?? "human") === "human") {
+    await requireSeatInTx(
+      tx,
+      input.workspaceId,
+      (used, limit) =>
+        `This workspace is full: ${used} of ${limit} seats are in use. Ask an administrator to free one or add seats.`,
+    );
+  }
+
   const memberSettings = resolveMemberSettings({});
   // openokr:allow-mutation: this helper is called only from inside an
   // Operation's execute (invitations.acceptLink, invitations
@@ -64,7 +93,7 @@ export async function provisionMemberForInvite<
       workspaceId: input.workspaceId,
       userId: input.user.id,
       name: input.user.name,
-      kind: "human",
+      kind: input.kind ?? "human",
       status: "active",
       primaryChannel:
         memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
