@@ -667,11 +667,24 @@ const TENANCY_CHECKED_PREFIXES: readonly string[] = [
  * the word in a sentence. A rule that fires on prose is one somebody
  * silences with a marker, and a silenced rule catches nothing.
  *
+ * **It was not actually anchored, and the same class came back** (P8, and
+ * caught by continuous integration rather than here). `import` is a common
+ * enough English word that `portability/policy.ts` carries it in a sentence,
+ * "in the order an import may write them", and the pattern then ran forward
+ * across a table entry naming `tenants` and out to the word "from" in a
+ * later sentence, because `[^;]` happily crosses newlines and that file goes
+ * two hundred lines without a semicolon. The reported line was the comment.
+ *
+ * So the match now has to begin at a line's own `import`. A real import
+ * statement does, including the multi-line kind; a word inside a block
+ * comment sits behind an asterisk and does not.
+ *
  * The word boundaries are load-bearing either way: without them the rule
  * fires on any identifier that merely starts with the table name.
  */
 const TENANCY_READ = /\.from\s*\(\s*tenants\s*\)/g;
-const TENANCY_IMPORT = /import[^;]*?{[^}]*?\btenants\b[^}]*?}[^;]*?from/g;
+const TENANCY_IMPORT =
+  /^[ \t]*import\b[^;]*?\{[^}]*?\btenants\b[^}]*?\}[^;]*?\bfrom\b/gm;
 
 /** Checks the tenancy rule for one file. */
 const checkTenancy = (file: BoundarySourceFile): BoundaryViolation[] => {

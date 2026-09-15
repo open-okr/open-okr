@@ -548,6 +548,37 @@ describe("tenancy rule (P8-T02a)", () => {
     expect(check("packages/agents/src/runs/coach.ts", READ)).toHaveLength(1);
   });
 
+  test("still fails a multi-line import, which is the shape people write", () => {
+    expect(
+      check(
+        "packages/core/src/actions/goals.ts",
+        `import {
+  goals,
+  tenants,
+} from "@openokr/db";
+`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("does not fire on prose that happens to say import, then names the table", () => {
+    // **The regression that reached continuous integration.** `import` is an
+    // ordinary English word, `[^;]` crosses newlines, and a policy list goes
+    // hundreds of lines without a semicolon, so the pattern ran from a word in
+    // a comment, through a table entry, to a "from" in a later sentence. It
+    // reported the comment. The match must start at a line's own `import`
+    // now, which a word behind an asterisk never is.
+    const prose = `/**
+ * Every table, in the order an import may write them.
+ */
+export const POLICY = [
+  { table: "tenants", decision: "exclude", reason: "Vendor knowledge." },
+  { table: "cache_entries", decision: "exclude", reason: "Derived from rows." },
+];
+`;
+    expect(check("packages/core/src/portability/policy.ts", prose)).toEqual([]);
+  });
+
   test("allows the read inside the tenancy module that owns it", () => {
     expect(check("packages/core/src/tenancy/store.ts", READ)).toEqual([]);
   });
