@@ -168,9 +168,21 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Start the test database stack
+        # **All three, because `db:up` starts all three.** This block asked
+        # Docker to choose the Postgres and PgBouncer ports and left MySQL on
+        # its default, and the job above it is the one that got the rule
+        # right. The stack this job boots carries MySQL whether or not the
+        # end-to-end suite has any use for it, so the one port nobody chose is
+        # the one that collided:
+        #
+        #   failed to bind host port for 0.0.0.0:53306: address already in use
+        #
+        # The comment on this job already said "the ports are whatever Docker
+        # gives it". It was one line short of being true.
         env:
           TEST_DB_PORT: 0
           TEST_PGBOUNCER_PORT: 0
+          TEST_MYSQL_PORT: 0
         run: |
           pnpm db:up
           pnpm db:ports >> "$GITHUB_ENV"
