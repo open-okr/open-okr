@@ -65,3 +65,52 @@ export function SegmentLoading({
     </div>
   );
 }
+
+/**
+ * One route segment's loading state, for a screen that draws its own frame.
+ *
+ * **`SegmentLoading` above is the wrong shape outside the shell.** It renders
+ * two stacked cards at the full width of a content panel, which is right when
+ * the sidebar, the topbar and the cycle strip are already on screen and only
+ * the panel is waiting. The sign-in screen, the first-run wizard, onboarding,
+ * an invitation and the operator console have none of that: each is a single
+ * card in the middle of an empty page, and a full-width two-card skeleton
+ * resolving into one centred card is a larger jump than no skeleton at all.
+ *
+ * **Two widths, written out rather than passed as a class.** Tailwind scans
+ * source for literal class names, so a width arriving as a prop is a class
+ * that never gets generated. `narrow` is the authentication card's own
+ * `max-w-sm`; `wide` is the operator console's reading column.
+ */
+export function CentredLoading({
+  width = "narrow",
+}: {
+  /** `narrow` for a single-decision card, `wide` for a reading column. */
+  readonly width?: "narrow" | "wide";
+}) {
+  return (
+    <main
+      className="flex min-h-screen items-center justify-center bg-bg p-4.5"
+      aria-busy="true"
+      aria-live="polite"
+      data-testid="segment-loading"
+    >
+      <div
+        className={
+          width === "narrow"
+            ? "w-full max-w-sm rounded-lg border border-line bg-surface p-4.5"
+            : "w-full max-w-3xl rounded-lg border border-line bg-surface p-4.5"
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="h-5 w-40 animate-pulse rounded bg-raised" />
+          <div className="h-3 w-56 animate-pulse rounded bg-raised" />
+          <div className="mt-3 flex flex-col gap-2.5">
+            <div className="h-9 animate-pulse rounded bg-raised" />
+            <div className="h-9 animate-pulse rounded bg-raised" />
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -16,6 +16,7 @@ export async function register(): Promise<void> {
     startTelemetry,
     startOutboxRelay,
     startRecurringWork,
+    resolveAuthPolicy,
   } = await import("./instrumentation.node");
   validateEnvironment();
   // Before the relay and the scheduler, so the work they do from the first
@@ -23,4 +24,8 @@ export async function register(): Promise<void> {
   startTelemetry();
   startOutboxRelay();
   startRecurringWork();
+  // Last, and awaited: the first request must not reach Better Auth with
+  // the answer still unresolved, or a mail-capable instance would serve one
+  // sign-in without the requirement it is configured for (P8-T02b).
+  await resolveAuthPolicy();
 }

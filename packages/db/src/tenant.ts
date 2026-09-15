@@ -128,6 +128,28 @@ const DEVICE_CODE_HASH_SETTING = "app.device_code_hash";
 const OAUTH_SECRET_HASH_SETTING = "app.oauth_secret_hash";
 
 /**
+ * Names the operator asking, for the cloud operator console (P8-T03a).
+ *
+ * **The seventh narrow key, and the only one that is about a person rather
+ * than a secret they already hold.** The others reveal one row whose own
+ * digest equals the setting. This one reveals a fixed, named set of tables:
+ * `tenants`, the `workspaces` row, `instance_operators`,
+ * `operator_sessions` and the aggregate views. It reveals no content table,
+ * and the way that is enforced is that no content table has a policy naming
+ * it. An operator's connection returns zero rows from `goals` even if every
+ * line of application code above it were wrong.
+ *
+ * A privileged connection for the console was considered and refused at the
+ * P8-T01b design gate: it would put that wall back into application code and
+ * break TECHNICAL-PLAN §8.2's control 1, which says the application role
+ * cannot bypass the floor.
+ *
+ * Every policy using this also checks the grant is live, so revoking an
+ * operator takes effect at the database rather than at their next sign-in.
+ */
+const OPERATOR_USER_SETTING = "app.operator_user_id";
+
+/**
  * Names one invitation token's hash, for accepting an invitation (P6-G06b).
  *
  * A visitor following `/join/<token>` has no session, no member row and no
@@ -149,6 +171,14 @@ export interface TenantContext {
   readonly userId?: string;
   /** Opens instance-settings writes. Never set from a request handler. */
   readonly instanceAdmin?: boolean;
+  /**
+   * Names the cloud operator asking (P8-T03a).
+   *
+   * Reveals the tenant rows, the workspace rows, the operator tables and the
+   * aggregate views, and no content table anywhere. Never set from an
+   * ordinary request handler: the operator console sets it on purpose.
+   */
+  readonly operatorUserId?: string;
   /**
    * Names one provider workspace, for the installation lookup only (P5-T02a).
    *
@@ -308,6 +338,25 @@ export async function withInstanceAdmin<
  * Both values are validated before any query runs. They come from the session,
  * never from client input, but this wrapper does not trust its callers either.
  */
+/**
+ * Runs `fn` as a cloud operator (P8-T03a).
+ *
+ * No workspace is applied, deliberately. An operator is not a member of
+ * anything, and giving them a workspace setting would hand them a tenant's
+ * content through the ordinary policy. What they can read is whatever the
+ * operator policies name, and nothing else.
+ */
+export async function withOperator<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  operatorUserId: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { operatorUserId }, fn);
+}
+
 export async function withContext<
   T,
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -325,6 +374,7 @@ export async function withContext<
     deviceCodeHash,
     oauthSecretHash,
     inviteTokenHash,
+    operatorUserId,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -368,6 +418,12 @@ export async function withContext<
     );
   }
   if (
+    operatorUserId !== undefined &&
+    (operatorUserId === "" || operatorUserId.length > 255)
+  ) {
+    throw new Error("Invalid operator id: expected a non-empty identifier.");
+  }
+  if (
     workspaceId === undefined &&
     userId === undefined &&
     channelTeamId === undefined &&
@@ -375,10 +431,11 @@ export async function withContext<
     deviceCodeHash === undefined &&
     oauthSecretHash === undefined &&
     inviteTokenHash === undefined &&
+    operatorUserId === undefined &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, or instance admin.",
     );
   }
 
@@ -398,6 +455,11 @@ export async function withContext<
     if (instanceAdmin) {
       await tx.execute(
         sql`select set_config(${INSTANCE_ADMIN_SETTING}, 'on', true)`,
+      );
+    }
+    if (operatorUserId !== undefined) {
+      await tx.execute(
+        sql`select set_config(${OPERATOR_USER_SETTING}, ${operatorUserId}, true)`,
       );
     }
     if (channelTeamId !== undefined) {

@@ -18,7 +18,9 @@
     "seed": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed.ts",
     "seed:large": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed-large.ts",
     "perf:budgets": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/perf-budgets.ts",
-    "perf:load": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/perf-load.ts"
+    "perf:load": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/perf-load.ts",
+    "cloud:sweep": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-closures.ts",
+    "cloud:usage": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/measure-usage.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",

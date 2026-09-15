@@ -12,6 +12,13 @@ export interface CurrentAccess {
   readonly workspaceId: string;
   readonly memberId: string;
   readonly level: number;
+  /**
+   * The signed-in user behind the member (P8-T04b). Carried here because
+   * `requireWorkspace` already resolved it and a caller that needs both
+   * would otherwise pay for a second round trip to learn something this
+   * function already knew.
+   */
+  readonly userId: string;
 }
 
 /** The level a given member holds on their own workspace's context. Split
@@ -26,7 +33,7 @@ export async function resolveAccessLevelFor(
 }
 
 async function currentAccessLevel(): Promise<CurrentAccess> {
-  const { workspace } = await requireWorkspace();
+  const { session, workspace } = await requireWorkspace();
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
     workspace.memberId,
@@ -36,6 +43,7 @@ async function currentAccessLevel(): Promise<CurrentAccess> {
     workspaceId: workspace.workspaceId,
     memberId: workspace.memberId,
     level,
+    userId: session.user.id,
   };
 }
 

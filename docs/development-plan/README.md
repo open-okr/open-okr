@@ -48,7 +48,7 @@ METHOD.md            what good OKR practice is: every rule, band, corridor and r
 PLAN.md              principles, packages, deployment, phases, risks
 TECHNICAL-PLAN.md    schema, access model, outbox, engines, importers, security, budgets
 AI-NATIVE-PLAN.md    providers, governance, channels, the Coach and the Champion, MCP
-UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40)
+UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40, plus the cloud operator screens S-45 to S-49)
       |              ...eleven of which are drawn in ../stakeholder/mockups/
       |
 IMPLEMENTATION-PLAN.md   105 ordered tasks in eight phases: P1-* to P8-*

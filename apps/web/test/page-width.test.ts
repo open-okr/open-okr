@@ -54,8 +54,22 @@ const BOUNDED = ["account/device", "oauth/authorize"];
  * membership anywhere yet, so there is no workspace to render a shell for and
  * nothing in the sidebar they could reach. It is the same shape as sign-in and
  * the first-run wizard, and it is centred for the same reason.
+ *
+ * `operator/` joined them at P8-T03b-fix, and this test is what found that it
+ * had never been classified. The operator console has no layout of its own
+ * and never calls `AppShellLayout`, so it draws its own frame like the four
+ * above: an operator is not a member of the workspace on the screen and there
+ * is no sidebar of that workspace's goals for them to be offered. The test was
+ * counting it as in-shell, which is the same miscategorisation that left it
+ * with no error boundary.
+ *
+ * One thing left alone rather than fixed here: the three operator pages carry
+ * two different widths, `max-w-6xl` on the list and `max-w-3xl` on the two
+ * detail screens. That is the "three screens side by side looked like three
+ * products" this file opens with, in miniature, and settling it is a P8
+ * decision rather than a correction to a gate.
  */
-const OUTSIDE_SHELL = ["(auth)/", "join/", "setup/", "welcome/"];
+const OUTSIDE_SHELL = ["(auth)/", "join/", "operator/", "setup/", "welcome/"];
 
 // Resolved from this file, not from `process.cwd()`. Under `pnpm test` the cwd
 // is this package; under `pnpm test:ci` it is the repository root, which made

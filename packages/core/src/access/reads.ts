@@ -57,6 +57,22 @@ export async function resolveMemberAccessLevel<
          and workspace_id = ${input.workspaceId}
          and status = 'active'
          and deleted_at is null
+         -- A support session that has run out reaches nothing, from the
+         -- instant it runs out rather than at the next sweep (P8-T04a).
+         -- Here rather than in the Operation pipeline, because this one
+         -- function answers for both paths: resolveActor computes a
+         -- writer's level with it, and every read goes through it too. In
+         -- the pipeline it covered writes and left reads open, which is
+         -- what the first attempt did and what the suite caught.
+         -- No backticks in this comment: it sits inside a tagged template.
+         and not exists (
+           select 1 from operator_sessions s
+            where s.member_id = workspace_members.id
+              and s.ended_at is null
+              and s.deleted_at is null
+              and s.expires_at is not null
+              and s.expires_at <= now()
+         )
     )
     select coalesce(max(b.level), 0)::int as level
       from access_bindings b

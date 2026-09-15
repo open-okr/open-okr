@@ -412,6 +412,7 @@ export {
   hashSessionToken,
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
+export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   type ClaimBlobInput,
   type ClaimedBlob,
@@ -778,6 +779,27 @@ export {
   type ResolvedActor,
   runOperation,
 } from "./operations/operation.ts";
+// The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
+// boundary gate lets only these touch `tenants`.
+export {
+  createSiteMessage,
+  deleteSiteMessage,
+  dismissSiteMessage,
+  endSupportSession,
+  grantSupportSession,
+  isLiveOperator,
+  listSiteMessages,
+  listSupportSessions,
+  listTenantsAsOperator,
+  liveSiteMessagesFor,
+  liveSupportSession,
+  measureAllWorkspaces,
+  readInstanceFlags,
+  readUsageAsOperator,
+  requestSupportSession,
+  setLifecycleAsOperator,
+  sweepExpiredSessions,
+} from "./operator/index.ts";
 export {
   dispatchOutbox,
   memberEmail,
@@ -946,6 +968,13 @@ export {
   type Outcome,
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
+export {
+  countSeats,
+  isCloudEnabled,
+  readOwnUsage,
+  readPlans,
+  seatState,
+} from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {
   listMembershipsForUser,

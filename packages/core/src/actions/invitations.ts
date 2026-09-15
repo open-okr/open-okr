@@ -25,6 +25,7 @@ import {
   hashInviteToken,
 } from "../invitations/tokens.ts";
 import { OperationError } from "../operations/operation.ts";
+import { requireSeatInTx } from "../tenancy/plans.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const linkSummary = z.object({
@@ -130,6 +131,18 @@ export const createWorkspaceLink = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      // **The seat check that must be kind**, because this is the one a
+      // person can act on. The funnel checks again when somebody actually
+      // joins, and that is the one that must be right; this one exists so
+      // the refusal reaches the administrator who caused it rather than the
+      // colleague who clicked a link.
+      await requireSeatInTx(
+        tx,
+        workspaceId,
+        (used, limit) =>
+          `This workspace has ${used} of ${limit} seats in use. Free one, or add seats, before inviting anybody else.`,
+      );
+
       const token = generateInviteToken();
       const expiresAt = input.expiresInDays
         ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
@@ -189,6 +202,18 @@ export const createPersonalLink = defineWriteAction({
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      // **The seat check that must be kind**, because this is the one a
+      // person can act on. The funnel checks again when somebody actually
+      // joins, and that is the one that must be right; this one exists so
+      // the refusal reaches the administrator who caused it rather than the
+      // colleague who clicked a link.
+      await requireSeatInTx(
+        tx,
+        workspaceId,
+        (used, limit) =>
+          `This workspace has ${used} of ${limit} seats in use. Free one, or add seats, before inviting anybody else.`,
+      );
+
       const token = generateInviteToken();
       const expiresAt = input.expiresInDays
         ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)

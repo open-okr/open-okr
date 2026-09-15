@@ -119,7 +119,29 @@ describe("route segment boundaries", () => {
     expect(orphans).toEqual([]);
   });
 
-  test("every segment has a loading state, and the staged copy is handled", async () => {
+  test("every segment resolves a loading state, whatever its error boundary", async () => {
+    // **The two were one rule until P8-G01, and that was the wrong shape.**
+    // This test used to ask only that a segment owning an `error.tsx` also
+    // owned a `loading.tsx`, which made the loading question inherit every
+    // decision the error question had made. The screens outside the shell
+    // inherit the root error boundary deliberately, because a reader there
+    // has no navigation to keep, and that reasoning says nothing at all
+    // about whether a wait should be visible. So sign-in, the first-run
+    // wizard, onboarding, an invitation and the operator console had no
+    // loading state, and a navigation to any of them left the previous page
+    // on screen with nothing moving.
+    //
+    // The two rules are separate now. Errors: an in-shell segment owns a
+    // boundary, and the rest inherit the root. Loading: every page segment
+    // resolves one, from wherever Next finds it.
+    const loading = await has("loading.tsx");
+    const orphans = (await segments()).filter(
+      (segment) => resolvedFrom(segment, loading) === null,
+    );
+    expect(orphans).toEqual([]);
+  });
+
+  test("a segment owning an error boundary owns a loading state too", async () => {
     // **The inverse of what stood here between P6-G24a and P6-G24c.**
     //
     // The duplicate render is explained, from a trace: a `loading.tsx` makes

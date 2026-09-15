@@ -786,10 +786,56 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 Archive manifest, checksum, status, progress.
 
 ### tenants *(cloud only)*
-`workspace_id` to workspaces, `plan_key?`, `seats?`, `state`, `trial_ends_at?`, `region`.
+`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`.
+
+Built at P8-T02a, migration 0082. Design: `docs/design/p8-t01a-tenant-lifecycle.md`.
+
+The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
+
+Migration 0083 changed two things about its policies (P8-T02c). The tenant policy now reads `nullif(current_setting('app.workspace_id', true), '')::uuid`, because on a pooled connection that has already served a tenant-scoped transaction the setting reads back as the empty string rather than as NULL and the bare cast raises. Both behaviours are fail-closed and nothing ever leaked, but the error is raised before Postgres can OR in a second permissive policy. **Corrected at P8-T03a**: this paragraph first said every other business table carried the original expression, and the number 106 was asserted without being counted. 234 policies already use `nullif`, and exactly two did not: this one, and `workspace_imports` from P6-T05b, which migration 0085 fixes. The operator wall suite is what found the second, by pointing one connection at every table carrying a `workspace_id` and getting an exception from exactly one of them. A select-only instance-admin policy was added beside it, so the closure sweep can list closed tenants and cannot change one.
+
+**Absent on every self-hosted instance**, where the table exists and holds no rows. `pnpm check:boundaries` refuses a read or an import of it from any product path, because a plan key read on the product path forks self-host from cloud and the fork stays invisible until a self-hosted instance meets the null.
+
+**Migration 0087 adds `audit_events.actor_operator_user_id`** (P8-T03b). `actor_kind` has carried `operator` since the table was created and had nothing to point at: an operator is a member of nothing, so `actor_member_id` is null for them and the row said only that somebody outside did something. The customer has to be able to see who, in their own audit log, without asking anybody. No expand-then-contract was needed because `actor_member_id` was already nullable.
+
+### operator_workspace_usage *(cloud only)*
+`workspace_id` to workspaces (and it is the primary key), `member_count`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at?`, `measured_at`.
+
+Built at P8-T03b, migration 0086. A snapshot, refreshed by `pnpm cloud:usage` and replaced rather than appended.
+
+**It exists because a view could not do the job.** The P8-T01b design asked for counts an operator reads with no policy on any content table, answered by a named read-only view. `force row level security` applies to the table owner too, and migrations run as the owner rather than as a superuser, so a `security_invoker = off` view and a `security definer` function over one are both filtered and always count zero. Giving the owner BYPASSRLS would disable the floor for every table to make one count work. So the counts are taken one workspace at a time through the ordinary tenant setting, by a job that sees exactly what a member of that workspace would see.
+
+Three policies: an operator reads it, instance administration writes it, and the workspace itself reads its own row. The last one is there because the P7-T03a fuzz suite requires a tenant policy on every table carrying a `workspace_id` and refused this one without it. A universal claim with one exemption is not a universal claim.
+
+**Migration 0086 also gives `workspaces` a select-only instance-admin policy.** Enumerating workspaces needs a way past the floor, and `listWorkspaces` in the scheduler and `pnpm audit:chain` have both been working around that by requiring a database role that can see past it. This is a smaller privilege than BYPASSRLS on a whole connection, and both existing callers could use it.
+
+### site_messages, site_message_dismissals
+`site_messages`: `body`, `level` (`info` / `warn` / `bad`), `starts_at`, `ends_at`, `target_workspace_ids?`, `dismissible`, `created_by_user_id?`. `site_message_dismissals`: `message_id`, `user_id`, `at`, keyed on the pair.
+
+Built at P8-T03c, migration 0088. Both sit above the tenant floor, because one message is shown in many workspaces and a copy per workspace would be the same sentence written a thousand times.
+
+**Two corrections to the P8-T01b design, recorded in the migration.** The body is plain text rather than editor JSON: a site message reaches every customer at once, which is the worst place to add a sanitising surface. And a dismissal is keyed on the **user** rather than a member, because a member is per workspace and somebody in three workspaces would otherwise meet the same instance-wide sentence three times.
+
+**The window is required.** A check constraint refuses a missing or backwards window at the database, and the Zod schema refuses it at the boundary so the refusal names the field. A message with no end is a banner everybody learns to ignore.
+
+Anybody signed in may read a live message, because that is what one is for. Writing is instance administration. A dismissal is read and written through the `app.user_id` key, so a person reaches their own rows and nobody else's.
 
 ### operator_sessions *(cloud only)*
-`operator_user_id` to users, `workspace_id` to workspaces, `reason`, `granted_at`, `expires_at`, `ended_at?`.
+`id`, `workspace_id`, `operator_user_id`, `reason`, `requested_at`, `granted_at?`, `granted_by_member_id?`, `expires_at?`, `ended_at?`, `ended_reason?`, `member_id?`, `level`.
+
+Built at P8-T04a, migration 0089.
+
+**`requested_at` is separate from `granted_at` on purpose.** The gap between them is the customer's decision, and it is what an auditor looks at. One timestamp would lose the fact that a request was ever made and refused.
+
+**`member_id` names a real `guest` member row**, created through the one member-provisioning funnel. That is what makes the session a binding rather than a bypass: `can()` answers for an operator exactly as it answers for anybody else, and there is no second authorisation path that could disagree with the first. Ending the session suspends that member rather than deleting it, because everything the operator did is attributed to them and an author who no longer exists is a falsified record.
+
+`level` is an `ACCESS_LEVELS` value constrained to 10, 40 or 70. **`full` is deliberately absent**: it includes changing who else has access, so an operator holding it could extend their own session, and a session that can extend itself has no time box.
+
+Two check constraints stop a grant half-applying: a granted session has an expiry and a granting member, an ungranted one has neither; an ended session has a reason and a live one has neither. A partial unique index allows one live session per workspace per operator, because two would make the audit trail ambiguous about which one an action belonged to.
+
+Three policies: the workspace reads and writes its own, an operator reads and writes their own requests across workspaces, and instance administration reads them all so the expiry sweep can find what is due. The third is the same select-only shape `tenants` got at 0083 and `workspaces` at 0086.
+
+**Expiry is refused at use, in `resolveMemberAccessLevel`.** That one function answers for both paths, because `resolveActor` computes a writer's level with it and every read goes through it too. The first attempt put the check in the Operation pipeline, which covered writes and left reads open; the suite caught it.
 
 ## 17. Index notes
 

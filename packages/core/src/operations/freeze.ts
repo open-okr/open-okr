@@ -17,7 +17,15 @@
  * one write that must survive a freeze is the one that lifts it.
  */
 
-const RECOVERY_ACTIONS: ReadonlySet<string> = new Set(["workspace.setState"]);
+const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
+  "workspace.setState",
+  // P8-T02c, and for exactly the reason the line above exists. A suspended
+  // workspace is `read_only` and a closed one is `frozen`, so without this
+  // the write that lifts a suspension would be refused by the suspension it
+  // is lifting, and a cloud workspace could be suspended and never
+  // reactivated.
+  "workspace.setLifecycle",
+]);
 
 const RECOVERY_PREFIXES: readonly string[] = ["people.", "settings."];
 
