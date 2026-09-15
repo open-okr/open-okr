@@ -110,6 +110,51 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason:
       "The instance's own audit log, covering every workspace on it. Not this workspace's to export.",
   },
+  // ── The cloud's own records, added at Phase 8 ────────────────────────
+  //
+  // Six tables, one reason with six shapes: an archive is a workspace's
+  // data, and these are the vendor's side of the relationship rather than
+  // anything the workspace produced. A receiving instance is usually
+  // somebody's own server, where none of them means anything: there is no
+  // vendor, `instance_operators` holds no rows by design, and a plan is a
+  // commercial arrangement that did not travel with the objectives.
+  {
+    table: "tenants",
+    decision: "exclude",
+    reason:
+      "The cloud's record of a workspace as a customer: plan, state, region, trial and closure dates. The commercial relationship, not the work. A self-hosted instance receiving this archive has no such relationship.",
+  },
+  {
+    table: "instance_operators",
+    decision: "exclude",
+    reason:
+      "Who the vendor's own staff are. Instance-wide, not scoped to a workspace, and naming them on another instance would hand over the vendor's people rather than the customer's.",
+  },
+  {
+    table: "operator_sessions",
+    decision: "exclude",
+    reason:
+      "Who from the vendor asked to come in and what was granted. Scoped to the workspace, and still excluded: it names vendor staff by user id, and `users` is excluded too, so it would arrive pointing at nobody. What they did while inside is in `audit_events`, which is exported.",
+  },
+  {
+    table: "operator_workspace_usage",
+    decision: "exclude",
+    reason:
+      "The usage snapshot the operator console reads. Derived from the rows beside it and refreshed by `pnpm cloud:usage`, so carrying it would only let it drift, the same as the search index.",
+  },
+  {
+    table: "site_messages",
+    decision: "exclude",
+    reason:
+      "Instance-wide banners the vendor writes, about their own maintenance and incidents. Not the workspace's, and untrue the moment they arrive somewhere else.",
+  },
+  {
+    table: "site_message_dismissals",
+    decision: "exclude",
+    reason:
+      "Who closed one of those banners. It only means anything beside the message it dismissed, which is excluded.",
+  },
+
   {
     table: "search_documents",
     decision: "exclude",
