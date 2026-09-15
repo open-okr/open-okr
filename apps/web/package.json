@@ -23,16 +23,16 @@
     "lucide-react": "catalog:",
     "next": "16.3.4",
     "pg": "catalog:",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.7",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "jsdom": "catalog:",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
