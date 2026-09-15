@@ -115,6 +115,23 @@ const envSchema = z
      * when you want one dedicated drainer instead of all of them polling. */
     OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
 
+    /** How many database connections one process may hold (P8-T06b).
+     *
+     * **It had no ceiling at all until now**, which meant `pg`'s own default
+     * of ten, chosen by a library rather than by anybody here. Ten is below
+     * what this product measured itself needing: P7-T02 held every §13.1
+     * budget at twenty concurrent members with a pool of twenty, and found
+     * twenty-five putting the drag on the line.
+     *
+     * Twenty is that measurement and not a round number. Raise it when a
+     * deployment runs more than one thing per process or fewer processes than
+     * it has cores; lower it when the database's own `max_connections` is
+     * shared with something else, because every process multiplies this.
+     *
+     * The per-tenant concurrency limit (P8-T06a) sits below this on purpose,
+     * so no single workspace can hold every slot. */
+    OPENOKR_DB_POOL_MAX: optional(z.coerce.number().int().min(1).default(20)),
+
     /** Whether this process runs the recurring work (P6-G01a). On by default,
      * because a deployment that schedules nothing never chases a check-in, never
      * sends a morning summary, never ages a blocker and never flips a neglected
