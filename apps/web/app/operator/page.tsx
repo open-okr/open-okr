@@ -3,6 +3,7 @@ import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireOperator } from "../../lib/operator";
 import { getPool } from "../../lib/pool";
+import { getTranslations } from "../../lib/translations";
 
 /**
  * S-45 Operator workspaces: the list, and the only screen that shows more
@@ -54,16 +55,19 @@ export default async function OperatorWorkspacesPage() {
     readUsageAsOperator(pool, operator.userId),
   ]);
   const byWorkspace = new Map(usage.map((row) => [row.workspaceId, row]));
+  const { t } = await getTranslations();
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="font-bold text-ink text-lg">Workspaces</h1>
+        <h1 className="font-bold text-ink text-lg">
+          {t("operator.workspaces.title")}
+        </h1>
         <p className="text-ink-2 text-sm">
           {tenants.length === 1
             ? "1 tenant on this instance."
             : `${tenants.length} tenants on this instance.`}{" "}
-          Counts are from the last measurement, not live.
+          {t("operator.workspaces.countsAreStale")}
         </p>
       </header>
 
@@ -71,7 +75,7 @@ export default async function OperatorWorkspacesPage() {
         // An empty state that is a statement rather than an error. A fresh
         // cloud instance has no tenants, and that is not a problem.
         <p className="rounded-lg border border-line bg-surface p-6 text-ink-2 text-sm">
-          No workspace has been provisioned yet. The first signup creates one.
+          {t("operator.workspaces.none")}
         </p>
       ) : (
         /* The one place this screen may scroll sideways. Everything else
@@ -81,17 +85,27 @@ export default async function OperatorWorkspacesPage() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-line border-b text-left">
-                <th className="p-3 font-medium text-ink-2">Workspace</th>
-                <th className="p-3 font-medium text-ink-2">State</th>
-                <th className="p-3 font-medium text-ink-2">Plan</th>
-                <th className="p-3 text-right font-medium text-ink-2">
-                  Members
+                <th className="p-3 font-medium text-ink-2">
+                  {t("operator.workspaces.columnWorkspace")}
                 </th>
-                <th className="p-3 text-right font-medium text-ink-2">Goals</th>
-                <th className="p-3 text-right font-medium text-ink-2">
-                  Storage
+                <th className="p-3 font-medium text-ink-2">
+                  {t("operator.workspaces.columnState")}
                 </th>
-                <th className="p-3 font-medium text-ink-2">Region</th>
+                <th className="p-3 font-medium text-ink-2">
+                  {t("operator.workspaces.columnPlan")}
+                </th>
+                <th className="p-3 text-right font-medium text-ink-2">
+                  {t("operator.workspaces.columnMembers")}
+                </th>
+                <th className="p-3 text-right font-medium text-ink-2">
+                  {t("operator.workspaces.columnGoals")}
+                </th>
+                <th className="p-3 text-right font-medium text-ink-2">
+                  {t("operator.workspaces.columnStorage")}
+                </th>
+                <th className="p-3 font-medium text-ink-2">
+                  {t("operator.workspaces.columnRegion")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -148,9 +162,7 @@ export default async function OperatorWorkspacesPage() {
        * the command that fixes it. */}
       {usage.length < tenants.length ? (
         <p className="text-ink-2 text-sm">
-          Some counts have never been measured. Run{" "}
-          <code className="rounded bg-raised px-1">pnpm cloud:usage</code> to
-          take them.
+          {t("operator.workspaces.neverMeasured")}
         </p>
       ) : null}
     </div>

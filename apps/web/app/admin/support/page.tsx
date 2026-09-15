@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, listSupportSessions } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { GrantDecision } from "./grant-decision";
 
 /**
@@ -40,6 +41,7 @@ function when(value: Date | string): string {
 
 export default async function SupportAccessPage() {
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
+  const { t } = await getTranslations();
   const sessions = await listSupportSessions(getPool(), access.workspaceId);
 
   const pending = sessions.filter(
@@ -53,18 +55,19 @@ export default async function SupportAccessPage() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
-        <h1 className="font-bold text-ink text-lg">Support access</h1>
-        <p className="text-ink-2 text-sm">
-          Nobody from OpenOKR can enter this workspace unless somebody here lets
-          them in, and everything they do while inside is in your audit log.
-        </p>
+        <h1 className="font-bold text-ink text-lg">
+          {t("admin.support.title")}
+        </h1>
+        <p className="text-ink-2 text-sm">{t("admin.support.intro")}</p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Waiting for you</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.support.waiting")}
+        </h2>
         {pending.length === 0 ? (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            Nobody has asked to come in.
+            {t("admin.support.nobodyAsked")}
           </p>
         ) : (
           pending.map((session) => (
@@ -80,20 +83,22 @@ export default async function SupportAccessPage() {
 
       {live.length > 0 ? (
         <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-ink text-sm">In here now</h2>
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.support.inHereNow")}
+          </h2>
           {live.map((session) => (
             <div
               className="rounded-lg border border-bad-dot bg-surface px-4 py-3"
               key={session.id}
             >
               <p className="text-ink text-sm">
-                Granted {when(session.grantedAt as Date)}, until{" "}
-                {when(session.expiresAt as Date)},{" "}
+                {t("admin.support.granted")} {when(session.grantedAt as Date)}
+                {t("admin.support.until")} {when(session.expiresAt as Date)},{" "}
                 {LEVEL_NAME[session.level] ?? "read only"}.
               </p>
               <p className="mt-1 text-ink-2 text-sm">{session.reason}</p>
               <p className="mt-1 text-ink-3 text-xs">
-                The banner at the top of every screen ends this too.
+                {t("admin.support.bannerEndsIt")}
               </p>
             </div>
           ))}
@@ -101,10 +106,12 @@ export default async function SupportAccessPage() {
       ) : null}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Everything before</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.support.everythingBefore")}
+        </h2>
         {past.length === 0 ? (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            Nobody from OpenOKR has been in this workspace.
+            {t("admin.support.nobodyHasBeen")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -118,7 +125,7 @@ export default async function SupportAccessPage() {
                     {session.endedReason}
                   </Chip>
                   <span className="text-ink-3 text-xs">
-                    asked {when(session.requestedAt)}
+                    {t("admin.support.asked")} {when(session.requestedAt)}
                     {session.grantedAt
                       ? `, in from ${when(session.grantedAt)} to ${when(session.endedAt as Date)}`
                       : ", never granted"}
@@ -130,8 +137,7 @@ export default async function SupportAccessPage() {
           </ul>
         )}
         <p className="text-ink-3 text-xs">
-          Every action taken during a session is in the audit log, attributed to
-          the person who took it rather than to anybody here.
+          {t("admin.support.everythingAudited")}
         </p>
       </section>
     </div>

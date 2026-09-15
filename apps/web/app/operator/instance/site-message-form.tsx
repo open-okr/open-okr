@@ -2,6 +2,7 @@ import { createSiteMessage } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * Writing a site message, on S-47 (P8-T03c).
@@ -46,7 +47,7 @@ async function publish(formData: FormData): Promise<void> {
   revalidatePath("/operator/instance");
 }
 
-export function SiteMessageForm({
+export async function SiteMessageForm({
   workspaces,
 }: {
   readonly workspaces: readonly {
@@ -54,6 +55,8 @@ export function SiteMessageForm({
     readonly name: string;
   }[];
 }) {
+  const { t } = await getTranslations();
+
   return (
     <form
       action={publish}
@@ -61,27 +64,26 @@ export function SiteMessageForm({
     >
       <div className="flex flex-col gap-1.5">
         <label className="font-medium text-ink text-sm" htmlFor="body">
-          Message
+          {t("operator.siteMessage.message")}
         </label>
         <textarea
           className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
           id="body"
           maxLength={1000}
           name="body"
-          placeholder="Maintenance on Sunday, 02:00 to 04:00 UTC. Nothing will be lost."
+          placeholder={t("operator.siteMessage.placeholder")}
           required
           rows={3}
         />
         <p className="text-ink-3 text-xs">
-          Plain text, and everybody it reaches sees the same sentence. Say what
-          is happening and what it means for them.
+          {t("operator.siteMessage.plainText")}
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-ink text-sm" htmlFor="level">
-            Tone
+            {t("operator.siteMessage.tone")}
           </label>
           <select
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -89,14 +91,20 @@ export function SiteMessageForm({
             id="level"
             name="level"
           >
-            <option value="info">Information</option>
-            <option value="warn">Warning</option>
-            <option value="bad">Incident</option>
+            <option value="info">
+              {t("operator.siteMessage.toneInformation")}
+            </option>
+            <option value="warn">
+              {t("operator.siteMessage.toneWarning")}
+            </option>
+            <option value="bad">
+              {t("operator.siteMessage.toneIncident")}
+            </option>
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-ink text-sm" htmlFor="startsAt">
-            Shows from
+            {t("operator.siteMessage.showsFrom")}
           </label>
           <input
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -108,7 +116,7 @@ export function SiteMessageForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-ink text-sm" htmlFor="endsAt">
-            Stops at
+            {t("operator.siteMessage.stopsAt")}
           </label>
           <input
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -120,15 +128,17 @@ export function SiteMessageForm({
           {/* Said once, here, rather than left for somebody to meet as a
            * refusal after typing everything else. */}
           <p className="text-ink-3 text-xs">
-            Required. A message with no end is one everybody learns to ignore.
+            {t("operator.siteMessage.endRequired")}
           </p>
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="font-medium text-ink text-sm">Who sees it</span>
+        <span className="font-medium text-ink text-sm">
+          {t("operator.siteMessage.whoSeesIt")}
+        </span>
         <p className="text-ink-3 text-xs">
-          Everybody, unless you name workspaces here.
+          {t("operator.siteMessage.everybodyUnlessNamed")}
         </p>
         {workspaces.length > 0 ? (
           <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-line p-2">
@@ -161,14 +171,14 @@ export function SiteMessageForm({
           name="dismissible"
           type="checkbox"
         />
-        People can dismiss it
+        {t("operator.siteMessage.canDismiss")}
       </label>
 
       <button
         className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong"
         type="submit"
       >
-        Show this message
+        {t("operator.siteMessage.submit")}
       </button>
     </form>
   );

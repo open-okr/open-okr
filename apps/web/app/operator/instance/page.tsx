@@ -8,6 +8,7 @@ import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { SiteMessageForm } from "./site-message-form";
 
 /**
@@ -50,6 +51,7 @@ export default async function OperatorInstancePage() {
   ]);
 
   const now = Date.now();
+  const { t } = await getTranslations();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -57,19 +59,20 @@ export default async function OperatorInstancePage() {
         className="w-fit text-ink-2 text-sm hover:text-ink hover:underline"
         href="/operator"
       >
-        Back to workspaces
+        {t("operator.instance.back")}
       </Link>
 
       <header className="flex flex-col gap-1">
-        <h1 className="font-bold text-ink text-xl">This instance</h1>
-        <p className="text-ink-2 text-sm">
-          What is true of the deployment, and what you are telling the people on
-          it.
-        </p>
+        <h1 className="font-bold text-ink text-xl">
+          {t("operator.instance.title")}
+        </h1>
+        <p className="text-ink-2 text-sm">{t("operator.instance.intro")}</p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Say something</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("operator.instance.saySomething")}
+        </h2>
         <SiteMessageForm
           workspaces={tenants.map((tenant) => ({
             id: tenant.workspaceId,
@@ -79,12 +82,13 @@ export default async function OperatorInstancePage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Messages</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("operator.instance.messages")}
+        </h2>
         {messages.length === 0 ? (
           // An empty screen is an invitation, not an error.
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            Nothing is being shown to anybody. Write a message above when there
-            is something people need to know.
+            {t("operator.instance.noMessages")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -115,14 +119,17 @@ export default async function OperatorInstancePage() {
                           : `${message.targetWorkspaceIds.length} workspaces`}
                       </span>
                     ) : (
-                      <span className="text-ink-3 text-xs">everybody</span>
+                      <span className="text-ink-3 text-xs">
+                        {t("operator.instance.everybody")}
+                      </span>
                     )}
                   </div>
                   <p className={`text-sm ${past ? "text-ink-3" : "text-ink"}`}>
                     {message.body}
                   </p>
                   <p className="text-ink-3 text-xs">
-                    {when(message.startsAt)} to {when(message.endsAt)}
+                    {when(message.startsAt)} {t("operator.instance.to")}{" "}
+                    {when(message.endsAt)}
                     {message.dismissible ? "" : ", not dismissible"}
                   </p>
                 </li>
@@ -133,7 +140,9 @@ export default async function OperatorInstancePage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Flags</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("operator.instance.flags")}
+        </h2>
         {/* Read-only, deliberately. Every row is declared in the settings
          * registry with a default, and changing a mail host or a root key
          * from here is a different task with a different blast radius. */}
@@ -157,7 +166,7 @@ export default async function OperatorInstancePage() {
                       {flag.value ? "on" : "off"}
                     </Chip>
                     <span className="block text-ink-3 text-xs">
-                      from the {flag.source}
+                      {t("operator.instance.fromThe")} {flag.source}
                     </span>
                   </td>
                 </tr>
@@ -165,10 +174,7 @@ export default async function OperatorInstancePage() {
             </tbody>
           </table>
         </div>
-        <p className="text-ink-3 text-xs">
-          Read-only here. Change one through instance administration, where the
-          setting's own screen explains what it does.
-        </p>
+        <p className="text-ink-3 text-xs">{t("operator.instance.readOnly")}</p>
       </section>
     </div>
   );

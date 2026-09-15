@@ -6,6 +6,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * One pending request, and the decision (P8-T04b).
@@ -58,7 +59,7 @@ async function decide(formData: FormData): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-export function GrantDecision({
+export async function GrantDecision({
   reason,
   requestedAt,
   sessionId,
@@ -67,6 +68,8 @@ export function GrantDecision({
   readonly requestedAt: string;
   readonly sessionId: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <form
       action={decide}
@@ -75,7 +78,9 @@ export function GrantDecision({
       <input name="sessionId" type="hidden" value={sessionId} />
 
       <div className="flex flex-col gap-1">
-        <p className="text-ink-3 text-xs">Asked {requestedAt}</p>
+        <p className="text-ink-3 text-xs">
+          {t("admin.support.grant.asked")} {requestedAt}
+        </p>
         {/* The sentence the operator wrote, at reading size and first. */}
         <p className="text-ink text-sm">{reason}</p>
       </div>
@@ -83,7 +88,7 @@ export function GrantDecision({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-ink text-sm" htmlFor="level">
-            They may
+            {t("admin.support.grant.theyMay")}
           </label>
           <select
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -91,18 +96,24 @@ export function GrantDecision({
             id="level"
             name="level"
           >
-            <option value={ACCESS_LEVELS.view}>Read only</option>
-            <option value={ACCESS_LEVELS.comment}>Read and comment</option>
-            <option value={ACCESS_LEVELS.edit}>Read and change things</option>
+            <option value={ACCESS_LEVELS.view}>
+              {t("admin.support.grant.readOnly")}
+            </option>
+            <option value={ACCESS_LEVELS.comment}>
+              {t("admin.support.grant.readAndComment")}
+            </option>
+            <option value={ACCESS_LEVELS.edit}>
+              {t("admin.support.grant.readAndChange")}
+            </option>
           </select>
           {/* Said here so nobody goes looking for the option. */}
           <p className="text-ink-3 text-xs">
-            Support is never given control of who has access.
+            {t("admin.support.grant.neverAccessControl")}
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="font-medium text-ink text-sm" htmlFor="hours">
-            For
+            {t("admin.support.grant.for")}
           </label>
           <select
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -110,13 +121,15 @@ export function GrantDecision({
             id="hours"
             name="hours"
           >
-            <option value="1">1 hour</option>
-            <option value="4">4 hours</option>
-            <option value="8">8 hours</option>
-            <option value="24">24 hours</option>
+            <option value="1">{t("admin.support.grant.oneHour")}</option>
+            <option value="4">{t("admin.support.grant.fourHours")}</option>
+            <option value="8">{t("admin.support.grant.eightHours")}</option>
+            <option value="24">
+              {t("admin.support.grant.twentyFourHours")}
+            </option>
           </select>
           <p className="text-ink-3 text-xs">
-            It ends on its own, and you can end it sooner from any screen.
+            {t("admin.support.grant.endsOnItsOwn")}
           </p>
         </div>
       </div>
@@ -128,7 +141,7 @@ export function GrantDecision({
           type="submit"
           value="grant"
         >
-          Let them in
+          {t("admin.support.grant.letThemIn")}
         </button>
         <button
           className="rounded-md border border-line px-4 py-2 font-medium text-ink text-sm"
@@ -136,7 +149,7 @@ export function GrantDecision({
           type="submit"
           value="refuse"
         >
-          No
+          {t("admin.support.grant.no")}
         </button>
       </div>
     </form>

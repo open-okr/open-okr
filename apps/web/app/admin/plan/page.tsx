@@ -8,6 +8,7 @@ import {
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * S-49 Plan and seats: the customer's own side (P8-T05).
@@ -35,6 +36,7 @@ export default async function PlanPage() {
   }
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
+  const { t } = await getTranslations();
   const [seats, plans, usage] = await Promise.all([
     seatState(pool, access.workspaceId),
     readPlans(pool),
@@ -44,15 +46,14 @@ export default async function PlanPage() {
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
-        <h1 className="font-bold text-ink text-lg">Plan and seats</h1>
-        <p className="text-ink-2 text-sm">
-          Every plan includes every feature. What changes is how many people can
-          be here and how much the AI may spend.
-        </p>
+        <h1 className="font-bold text-ink text-lg">{t("admin.plan.title")}</h1>
+        <p className="text-ink-2 text-sm">{t("admin.plan.intro")}</p>
       </header>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Seats</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.plan.seats")}
+        </h2>
         <div className="rounded-lg border border-line bg-surface px-4 py-3">
           <p className="font-semibold text-ink text-xl tabular-nums">
             {seats.limit === null
@@ -69,8 +70,7 @@ export default async function PlanPage() {
           {/* Said here rather than left to surprise somebody: an invitation
            * holds a seat from the moment it is sent. */}
           <p className="mt-2 text-ink-3 text-xs">
-            Somebody invited holds a seat before they accept. Guests and the
-            built-in agents never do.
+            {t("admin.plan.invitedHoldsSeat")}
           </p>
         </div>
       </section>
@@ -78,9 +78,11 @@ export default async function PlanPage() {
       {usage ? (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4">
-            <h2 className="font-semibold text-ink text-sm">This workspace</h2>
+            <h2 className="font-semibold text-ink text-sm">
+              {t("admin.plan.thisWorkspace")}
+            </h2>
             <span className="text-ink-3 text-xs">
-              measured{" "}
+              {t("admin.plan.measured")}{" "}
               {new Date(usage.measuredAt)
                 .toISOString()
                 .replace("T", " ")
@@ -105,11 +107,12 @@ export default async function PlanPage() {
       ) : null}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Plans</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("admin.plan.plans")}
+        </h2>
         {plans.length === 0 ? (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            No plans have been configured on this instance, so nothing is
-            limited.
+            {t("admin.plan.noPlans")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -134,10 +137,7 @@ export default async function PlanPage() {
           </ul>
         )}
         {/* The one sentence that matters most on this screen. */}
-        <p className="text-ink-3 text-xs">
-          No feature is ever behind a plan. Changing plan changes how many
-          people can be here, and nothing else.
-        </p>
+        <p className="text-ink-3 text-xs">{t("admin.plan.noFeatureGate")}</p>
       </section>
     </div>
   );

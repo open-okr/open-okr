@@ -2,6 +2,7 @@ import { OperationError, setLifecycleAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * The lifecycle control on S-46 (P8-T03b).
@@ -69,7 +70,7 @@ const OPTIONS: readonly {
   { value: "closed", label: "Closed. Frozen, and the retention clock starts." },
 ];
 
-export function LifecycleForm({
+export async function LifecycleForm({
   currentState,
   workspaceId,
   workspaceName,
@@ -78,10 +79,12 @@ export function LifecycleForm({
   readonly workspaceId: string;
   readonly workspaceName: string;
 }) {
+  const { t } = await getTranslations();
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="font-semibold text-ink text-sm">
-        Change what members can do
+        {t("operator.lifecycle.title")}
       </h2>
       <form
         action={move}
@@ -96,17 +99,14 @@ export function LifecycleForm({
       >
         <input name="workspaceId" type="hidden" value={workspaceId} />
 
-        <p className="text-ink-2 text-sm">
-          Everyone in this workspace sees the change immediately, and the reason
-          you give, in their own audit log.
-        </p>
+        <p className="text-ink-2 text-sm">{t("operator.lifecycle.intro")}</p>
 
         <div className="flex flex-col gap-1.5">
           <label
             className="font-medium text-ink text-sm"
             htmlFor="lifecycle-state"
           >
-            Move to
+            {t("operator.lifecycle.moveTo")}
           </label>
           <select
             className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
@@ -127,7 +127,7 @@ export function LifecycleForm({
             className="font-medium text-ink text-sm"
             htmlFor="lifecycle-reason"
           >
-            Reason
+            {t("operator.lifecycle.reason")}
           </label>
           {/* Written for the customer rather than as an internal note: this
            * is the sentence the workspace's own members are shown, and it
@@ -137,7 +137,7 @@ export function LifecycleForm({
             id="lifecycle-reason"
             maxLength={500}
             name="reason"
-            placeholder="Why, in words a customer would understand"
+            placeholder={t("operator.lifecycle.reasonPlaceholder")}
             required
             type="text"
           />
@@ -149,7 +149,7 @@ export function LifecycleForm({
           className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong"
           type="submit"
         >
-          Apply to {workspaceName}
+          {t("operator.lifecycle.applyTo")} {workspaceName}
         </button>
       </form>
     </section>

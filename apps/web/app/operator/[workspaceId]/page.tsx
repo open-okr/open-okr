@@ -8,6 +8,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { getTranslations } from "../../../lib/translations";
 import { LifecycleForm } from "./lifecycle-form";
 import { SupportRequest } from "./support-request";
 
@@ -155,6 +156,7 @@ export default async function OperatorWorkspacePage({
       one.endedAt === null,
   );
   const consequence = STATE_CONSEQUENCE[tenant.tenantState];
+  const { t } = await getTranslations();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6">
@@ -162,7 +164,7 @@ export default async function OperatorWorkspacePage({
         className="w-fit text-ink-2 text-sm hover:text-ink hover:underline"
         href="/operator"
       >
-        Back to workspaces
+        {t("operator.instance.back")}
       </Link>
 
       {/* Identity. The one question an operator must answer before acting is
@@ -198,7 +200,9 @@ export default async function OperatorWorkspacePage({
 
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="font-semibold text-ink text-sm">Usage</h2>
+          <h2 className="font-semibold text-ink text-sm">
+            {t("operator.workspace.usage")}
+          </h2>
           {/* Inside the section heading rather than floating beside the
            * numbers: it qualifies every one of them, and a reader who
            * misses it reads a stale figure as a live one. */}
@@ -238,37 +242,52 @@ export default async function OperatorWorkspacePage({
           </div>
         ) : (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            Never measured, which is not the same as empty. Run{" "}
-            <code className="rounded bg-raised px-1">pnpm cloud:usage</code>.
+            {t("operator.workspace.neverMeasured")}
           </p>
         )}
 
         <p className="text-ink-3 text-xs">
-          Counts only. Nothing a member of this workspace wrote can be read from
-          here, and the database enforces that rather than this page.
+          {t("operator.workspace.countsOnly")}
         </p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Tenant</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("operator.workspace.tenant")}
+        </h2>
         {/* A definition list, because a label and a value is what these are.
          * A fact with no value is absent: no trial and no closure date are
          * not worth a row saying "no". */}
         <dl className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-2 rounded-lg border border-line bg-surface px-4 py-3">
-          <Fact label="Plan" value={tenant.planKey ?? "free"} />
           <Fact
-            label="Seats"
-            value={tenant.seats === null ? "unlimited" : String(tenant.seats)}
+            label={t("operator.workspace.factPlan")}
+            value={tenant.planKey ?? t("operator.workspace.planFree")}
           />
-          <Fact label="Region" value={tenant.region} />
+          <Fact
+            label={t("operator.workspace.factSeats")}
+            value={
+              tenant.seats === null
+                ? t("operator.workspace.seatsUnlimited")
+                : String(tenant.seats)
+            }
+          />
+          <Fact
+            label={t("operator.workspace.factRegion")}
+            value={tenant.region}
+          />
           {tenant.closedAt ? (
-            <Fact label="Closed" value={day(tenant.closedAt)} />
+            <Fact
+              label={t("operator.workspace.factClosed")}
+              value={day(tenant.closedAt)}
+            />
           ) : null}
         </dl>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">Going inside</h2>
+        <h2 className="font-semibold text-ink text-sm">
+          {t("operator.workspace.goingInside")}
+        </h2>
         {/* Asking is all this does. There is no path in this product that
          * lets an operator into a workspace on their own, and the form says
          * so rather than leaving somebody to find out. */}
