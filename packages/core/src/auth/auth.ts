@@ -34,6 +34,7 @@ import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
+import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
 import {
@@ -412,6 +413,17 @@ export function createAuth(options: AuthOptions) {
             // disagreeing is its own bug: the page refused a form this hook
             // would have accepted, so the invitation was redeemable and
             // unreachable at once. Previewed, not accepted, so nothing is
+            // **A directory-sync token is the second exception** (P8-T08a).
+            // It is an authorisation the workspace itself issued, verified
+            // before this call was made, and it arrives in the async context
+            // rather than in a cookie because a directory has no browser. An
+            // invitation-only instance is exactly the kind that runs a
+            // directory, so without this the rule refused every account SCIM
+            // tried to provision.
+            if (currentProvisioningAuthority()) {
+              return;
+            }
+
             // consumed by an attempt that may still fail on a taken address.
             const allowed = await registrationOpenOrInvited(
               options.pool,
@@ -465,14 +477,25 @@ export function createAuth(options: AuthOptions) {
             // Until this existed, every just-in-time account landed alone in
             // a fresh empty workspace and never saw the one whose provider
             // they had used, which is the opposite of the P8-T07 deliverable.
-            const workspaceId = workspaceByProvider.get(
-              providerIdFromCallback(hookContext?.path, hookContext?.params),
-            );
+            //
+            // A directory-sync token says the same thing about the account it
+            // is provisioning, so the two land in one place rather than the
+            // SCIM path repeating this afterwards and leaving a stray
+            // workspace in between (P8-T08a).
+            const authority = currentProvisioningAuthority();
+            const workspaceId =
+              authority?.workspaceId ??
+              workspaceByProvider.get(
+                providerIdFromCallback(hookContext?.path, hookContext?.params),
+              );
             if (workspaceId) {
               await tryJoinWorkspaceForIdentity(options.pool, {
                 workspaceId,
                 user: { id: user.id, name: user.name },
-                via: "sso",
+                via: authority ? "directory_sync" : "sso",
+                ...(authority?.externalId
+                  ? { externalId: authority.externalId }
+                  : {}),
               });
             }
 

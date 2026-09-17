@@ -15,11 +15,10 @@
  * acceptance criterion, and suspension already removes every access: both
  * `resolveMemberAccessLevel` and `resolveActor` exclude non-active members.
  *
- * **The table above is the target, not the state.** Today only Create User
- * and the member list exist, and they write with raw SQL rather than through
- * those actions. Deactivation, reactivation and groups have no code at all,
- * so the acceptance criterion is unmet. Recorded here rather than left to be
- * discovered, and P8-T08a is the row that closes it.
+ * **The table above is the state for Users** (P8-T08a): create, list, read,
+ * deactivate and reactivate all go through those actions now. **Groups are
+ * still unbuilt**, so space membership is not mapped from the directory yet;
+ * P8-T08b is the row that closes that.
  */
 import { withWorkspace } from "@openokr/db";
 import { sql } from "drizzle-orm";
@@ -142,6 +141,31 @@ export function scimError(status: number, detail: string): SCIMError {
     schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
     status: String(status),
     detail,
+  };
+}
+
+/**
+ * One member as a SCIM User resource (P8-T08a).
+ *
+ * Written once rather than at each of the four places that answer with a
+ * user, because an identity provider reconciles on these fields and two
+ * copies drifting is a directory that disagrees with itself.
+ */
+export function scimUserResource(member: {
+  readonly id: string;
+  readonly externalId: string;
+  readonly userName: string;
+  readonly displayName: string;
+  readonly active: boolean;
+}): SCIMUser & { id: string; active: boolean } {
+  return {
+    schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    id: member.id,
+    externalId: member.externalId,
+    userName: member.userName,
+    displayName: member.displayName,
+    active: member.active,
+    emails: [{ value: member.userName, primary: true, type: "work" }],
   };
 }
 

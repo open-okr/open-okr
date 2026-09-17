@@ -617,11 +617,24 @@ export {
   type SCIMUser,
   scimError,
   scimList,
+  scimUserResource,
 } from "./directory-sync/scim.ts";
 export {
   createSCIMToken,
   resolveToken as resolveSCIMToken,
 } from "./directory-sync/tokens.ts";
+export {
+  type DirectoryDeps,
+  type DirectoryMember,
+  listDirectoryUsers,
+  memberById,
+  type ProvisionDirectoryUserInput,
+  type ProvisionDirectoryUserResult,
+  parseScimFilter,
+  provisionDirectoryUser,
+  type ScimFilter,
+  setDirectoryUserActive,
+} from "./directory-sync/users.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
