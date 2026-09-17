@@ -1,0 +1,170 @@
+{
+  "title": "OpenOKR: capacity and limits",
+  "uid": "openokr-capacity",
+  "schemaVersion": 39,
+  "editable": false,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "description": "Resource utilization and limit engagement (P8-T06c). How much room is left, and how often limits fire. No per-workspace breakdown: that data lives in the operator console behind authentication.",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Connection pool",
+      "description": "Database connections by state. If 'waiting' is consistently above zero, OPENOKR_DB_POOL_MAX is set too low.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "stacking": { "mode": "normal" }, "fillOpacity": 30 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "active" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "idle" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "waiting" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "openokr_pool_connections{state=\"active\"}",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "openokr_pool_connections{state=\"idle\"}",
+          "legendFormat": "idle"
+        },
+        {
+          "expr": "openokr_pool_connections{state=\"waiting\"}",
+          "legendFormat": "waiting"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Concurrent actions",
+      "description": "Actions in flight across the whole process. The limit line appears only when cloud.limits.concurrentActions is set.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "targets": [
+        {
+          "expr": "openokr_concurrent_actions",
+          "legendFormat": "in flight"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Admission refusals per minute",
+      "description": "How often per-tenant limits are engaging. Zero is normal on a self-hosted instance with limits at zero.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cpm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(openokr_admission_refusals_total{reason=\"rate\"}[5m]) * 60",
+          "legendFormat": "rate limit"
+        },
+        {
+          "expr": "rate(openokr_admission_refusals_total{reason=\"concurrency\"}[5m]) * 60",
+          "legendFormat": "concurrency"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox backpressure",
+      "description": "Pending rows and the age of the oldest. A growing lag means the relay is behind or stopped.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "pending" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "custom.axisPlacement", "value": "left" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "oldest age" },
+            "properties": [
+              { "id": "unit", "value": "s" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "openokr_outbox_pending",
+          "legendFormat": "pending"
+        },
+        {
+          "expr": "openokr_outbox_oldest_pending_seconds",
+          "legendFormat": "oldest age"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Relay throughput",
+      "description": "Outbox rows dispatched per minute, by outcome.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cpm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(openokr_outbox_dispatched_total{outcome=\"ok\"}[5m]) * 60",
+          "legendFormat": "delivered"
+        },
+        {
+          "expr": "rate(openokr_outbox_dispatched_total{outcome=\"error\"}[5m]) * 60",
+          "legendFormat": "failed"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request throughput",
+      "description": "Actions called per minute, by outcome. The denominator the pool and admission charts are fractions of.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cpm"
+        }
+      },
+      "targets": [
+        {
+          "expr": "rate(openokr_actions_total{outcome=\"ok\"}[5m]) * 60",
+          "legendFormat": "ok"
+        },
+        {
+          "expr": "rate(openokr_actions_total{outcome=\"refused\"}[5m]) * 60",
+          "legendFormat": "refused"
+        },
+        {
+          "expr": "rate(openokr_actions_total{outcome=\"error\"}[5m]) * 60",
+          "legendFormat": "error"
+        }
+      ]
+    }
+  ]
+}

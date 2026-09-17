@@ -412,7 +412,39 @@ async function runOne(
 
 const globals = globalThis as typeof globalThis & {
   openokrScheduler?: PgBossJobQueue;
+  /** Updated after each successful scheduler sweep (P8-T06c). */
+  openokrSchedulerLastRunAt?: number;
+  /** Set to `Date.now()` at boot so the status endpoint does not report
+   *  degraded before the first sweep has had a chance to run. */
+  openokrSchedulerBootedAt?: number;
 };
+
+/**
+ * Records that the scheduler completed a sweep (P8-T06c).
+ *
+ * Called after `runScheduledJob` finishes, regardless of per-workspace
+ * failures, because the scheduler itself ran. The status endpoint reads
+ * this to decide whether the scheduler component is operational.
+ */
+function recordSchedulerHeartbeat(): void {
+  globals.openokrSchedulerLastRunAt = Date.now();
+}
+
+/**
+ * When the scheduler last completed a run, as a Unix epoch in milliseconds.
+ * Null means it has never completed one since this process started.
+ */
+export function schedulerLastRunAt(): number | null {
+  return globals.openokrSchedulerLastRunAt ?? null;
+}
+
+/**
+ * When this process booted the scheduler, as a Unix epoch in milliseconds.
+ * Null means the scheduler was never started (disabled or build worker).
+ */
+export function schedulerBootedAt(): number | null {
+  return globals.openokrSchedulerBootedAt ?? null;
+}
 
 /**
  * Starts the scheduler once per process.
@@ -441,6 +473,7 @@ export function startScheduler(): PgBossJobQueue | null {
     },
   });
   globals.openokrScheduler = queue;
+  globals.openokrSchedulerBootedAt = Date.now();
 
   void (async () => {
     try {
@@ -457,6 +490,7 @@ export function startScheduler(): PgBossJobQueue | null {
               );
             },
           });
+          recordSchedulerHeartbeat();
           log(
             `${run.job} ran ${outcome.ran}, skipped ${outcome.skipped}, ` +
               `failed ${outcome.failed}`,

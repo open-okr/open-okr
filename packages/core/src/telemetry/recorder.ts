@@ -211,6 +211,18 @@ export const METRIC = {
    * stores an integer and this passes it through unchanged.
    */
   aiCostTotal: "openokr_ai_cost_total",
+
+  // Capacity metrics (P8-T06c). The three series below answer "how much
+  // room is left" and "are limits engaging", which is a different question
+  // from "is each action inside its budget" (the existing sixteen).
+  // Design: docs/design/p8-t06c-status-and-capacity.md §3.2.
+
+  /** Database connection pool utilization, by state (active, idle, waiting). */
+  poolConnections: "openokr_pool_connections",
+  /** Actions currently in flight across the whole process. Read at scrape time. */
+  concurrentActions: "openokr_concurrent_actions",
+  /** Admission refusals, by reason (rate or concurrency). */
+  admissionRefusalsTotal: "openokr_admission_refusals_total",
 } as const;
 
 /**

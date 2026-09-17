@@ -137,7 +137,35 @@ export function validateAdmissionLimits(limits: AdmissionLimits): void {
 /** Released in a `finally`, whatever the action did. */
 export type AdmissionRelease = () => Promise<void>;
 
-const NOTHING_TO_RELEASE: AdmissionRelease = async () => {};
+/**
+ * Process-local concurrent-actions counter (P8-T06c).
+ *
+ * Separate from the per-workspace counters in the cache. Those enforce the
+ * per-tenant concurrency cap keyed by workspace id. This one tracks how many
+ * actions the whole process is running, across every workspace, for the
+ * `openokr_concurrent_actions` gauge on the capacity dashboard.
+ *
+ * The per-workspace counter is the enforcement point and cannot be replaced
+ * by this: it lives in the cache so two web processes agree on one number,
+ * and it is keyed per workspace. This is an observation for a gauge, not an
+ * enforcement mechanism, and it is cheaper (one integer, no round trip).
+ *
+ * On `globalThis` for the same reason the metrics recorder and the admission
+ * singleton are: Next bundles `instrumentation.ts` separately from route code.
+ */
+const concurrencyGlobals = globalThis as typeof globalThis & {
+  openokrConcurrentActions?: number;
+};
+
+export function bumpConcurrentActions(delta: number): void {
+  concurrencyGlobals.openokrConcurrentActions =
+    (concurrencyGlobals.openokrConcurrentActions ?? 0) + delta;
+}
+
+/** How many actions are in flight right now, across every workspace. */
+export function currentConcurrentActions(): number {
+  return concurrencyGlobals.openokrConcurrentActions ?? 0;
+}
 
 /**
  * Takes a tenant's place in the queue, or refuses.
@@ -145,10 +173,15 @@ const NOTHING_TO_RELEASE: AdmissionRelease = async () => {};
  * Returns what to call when the action is finished, whether it threw or not.
  * The caller is `callAction` and nothing else: an action that admitted itself
  * would be admitted twice when another action called it.
+ *
+ * `onRefusal` is called on every refusal with the reason label, so the
+ * capacity dashboard can chart admission refusals without coupling the
+ * admission module to the metrics recorder. The host wires it at boot.
  */
 export async function admit(
   admission: Admission,
   workspaceId: string,
+  onRefusal?: (reason: string) => void,
 ): Promise<AdmissionRelease> {
   const { actionsPerMinute, concurrentActions, counters } = admission;
 
@@ -157,7 +190,10 @@ export async function admit(
   // branch that is present and cheap is safer than one that is absent,
   // because the absent one is the one nobody tests.
   if (actionsPerMinute === 0 && concurrentActions === 0) {
-    return NOTHING_TO_RELEASE;
+    bumpConcurrentActions(1);
+    return async () => {
+      bumpConcurrentActions(-1);
+    };
   }
 
   if (actionsPerMinute > 0) {
@@ -167,6 +203,7 @@ export async function admit(
       RATE_WINDOW_SECONDS,
     );
     if (!window.allowed) {
+      onRefusal?.("rate");
       throw new AdmissionError(
         `This workspace is over ${actionsPerMinute} actions a minute. ` +
           `Try again in ${window.resetSeconds} second(s).`,
@@ -176,7 +213,10 @@ export async function admit(
   }
 
   if (concurrentActions === 0) {
-    return NOTHING_TO_RELEASE;
+    bumpConcurrentActions(1);
+    return async () => {
+      bumpConcurrentActions(-1);
+    };
   }
 
   // **A burst is what the per-minute window cannot see.** Sixty calls spread
@@ -189,6 +229,7 @@ export async function admit(
     // next one more likely, which is how a limiter turns a burst into a
     // wedged tenant.
     await counters.incr(key, -1);
+    onRefusal?.("concurrency");
     throw new AdmissionError(
       `This workspace already has ${concurrentActions} action(s) running. ` +
         `Try again shortly.`,
@@ -196,6 +237,7 @@ export async function admit(
     );
   }
 
+  bumpConcurrentActions(1);
   let released = false;
   return async () => {
     // Guarded because `callAction` releases in a `finally` and a caller that
@@ -205,6 +247,7 @@ export async function admit(
       return;
     }
     released = true;
+    bumpConcurrentActions(-1);
     await counters.incr(key, -1);
   };
 }

@@ -240,6 +240,28 @@ export class OutboxRelay {
     }
   }
 
+  /**
+   * The oldest-pending-seconds query, exposed for the status endpoint
+   * (P8-T06c). The relay registers it as a gauge at construction; the
+   * status endpoint needs the same number without constructing a relay.
+   */
+  static async oldestPendingSeconds(pool: RelayPool): Promise<number> {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `select coalesce(
+                  extract(epoch from (now() - min(created_at))), 0
+                )::double precision as lag
+           from outbox
+          where delivered_at is null
+            and dead_lettered_at is null`,
+      );
+      return Math.max(0, Number(result.rows[0]?.lag ?? 0));
+    } finally {
+      client.release();
+    }
+  }
+
   #count(name: string, labels: MetricLabels): void {
     this.#options.metrics?.count(name, labels);
   }

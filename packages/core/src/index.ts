@@ -974,6 +974,7 @@ export {
   type AdmissionLimits,
   AdmissionSettingError,
   countSeats,
+  currentConcurrentActions,
   isCloudEnabled,
   readOwnUsage,
   readPlans,

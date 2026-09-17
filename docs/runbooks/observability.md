@@ -57,7 +57,8 @@ The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Sixteen series. Every one is a count, a duration or a queue reading.
+Nineteen series. Every one is a count, a duration, a queue reading or a
+capacity gauge.
 
 **On the request's own thread**
 
@@ -87,13 +88,25 @@ Sixteen series. Every one is a count, a duration or a queue reading.
 | `openokr_ai_tokens_total` | provider, model, direction |
 | `openokr_ai_cost_total` | provider, model |
 
-### The two readings that are taken at scrape time
+**Capacity (P8-T06c)**
 
-`openokr_outbox_pending` and `openokr_outbox_oldest_pending_seconds` are
-queried when you read the endpoint, not written when the relay drains. That
-is the only shape that answers the question worth asking. A counter written
-during a drain says nothing once draining stops, so a dead relay produces a
-flat line and the outage reads as a quiet queue. These two keep climbing.
+| Series | Labels |
+|---|---|
+| `openokr_pool_connections` | state (active, idle, waiting) |
+| `openokr_concurrent_actions` | none |
+| `openokr_admission_refusals_total` | reason (rate, concurrency) |
+
+### The four readings that are taken at scrape time
+
+`openokr_outbox_pending`, `openokr_outbox_oldest_pending_seconds`,
+`openokr_pool_connections` and `openokr_concurrent_actions` are queried when
+you read the endpoint, not written when an event happens. For the outbox pair,
+that is the only shape that answers the question worth asking: a counter
+written during a drain says nothing once draining stops, so a dead relay
+produces a flat line and the outage reads as a quiet queue. Those two keep
+climbing. For the pool and concurrency gauges, the scrape-time read reflects
+the world at the moment somebody asks rather than a snapshot from a moment
+that may have passed.
 
 The age is measured from the row's own `created_at`, not from `available_at`.
 A row being retried has `available_at` in the future, so measuring from that
@@ -141,7 +154,7 @@ docker compose --profile observability up -d
 open http://localhost:3001          # Grafana, admin/admin on first run
 ```
 
-Two dashboards are provisioned from files in
+Three dashboards are provisioned from files in
 `deploy/docker/observability/dashboards/`, so they are reviewable in a diff
 and an edit in the browser is not silently kept.
 
@@ -149,6 +162,10 @@ and an edit in the browser is not silently kept.
   series, each with its budget drawn as a threshold line.
 - **Delivery and the background.** Queue lag, dead letters, nudges, channels,
   scheduled jobs, agent runs, AI spend, and authorisation refusals.
+- **Capacity and limits (P8-T06c).** Connection pool utilization, concurrent
+  actions, admission refusals, outbox backpressure and relay throughput. The
+  admission panels read zero on a self-hosted instance with limits at zero,
+  which is the correct reading.
 
 Nothing in the profile talks to anything outside the compose network.
 Grafana's update check, plugin check, usage reporting and news feed are all

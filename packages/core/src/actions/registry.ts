@@ -21,7 +21,11 @@ import {
   OUTCOME,
   type Outcome,
 } from "../telemetry/recorder.ts";
-import { admit, defaultAdmission } from "../tenancy/admission.ts";
+import {
+  admit,
+  bumpConcurrentActions,
+  defaultAdmission,
+} from "../tenancy/admission.ts";
 import {
   goalFeed,
   profileFeed,
@@ -853,9 +857,20 @@ export async function callAction<K extends ActionName>(
   // the meter turned off the protection.
   const admission = context.admission ?? defaultAdmission();
   if (admission === undefined) {
-    return callMeasured(context, name, action, call);
+    // Self-hosted with no admission installed. Still track the process-local
+    // concurrent-actions counter for the capacity gauge (P8-T06c).
+    bumpConcurrentActions(1);
+    try {
+      return await callMeasured(context, name, action, call);
+    } finally {
+      bumpConcurrentActions(-1);
+    }
   }
-  const release = await admit(admission, context.workspaceId);
+  const metrics = context.metrics ?? defaultMetrics();
+  const onRefusal = (reason: string): void => {
+    metrics.count(METRIC.admissionRefusalsTotal, { reason });
+  };
+  const release = await admit(admission, context.workspaceId, onRefusal);
   try {
     return await callMeasured(context, name, action, call);
   } finally {

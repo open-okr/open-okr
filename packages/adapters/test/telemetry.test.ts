@@ -447,7 +447,7 @@ describe("the operator guide agrees with the code", () => {
       ),
     );
 
-    expect(recorded.size).toBeGreaterThanOrEqual(14);
+    expect(recorded.size).toBeGreaterThanOrEqual(17);
     for (const name of recorded) {
       expect(
         documented.has(name),
@@ -479,7 +479,7 @@ describe("the operator guide agrees with the code", () => {
     await telemetry.stop();
   });
 
-  it("is right that the two queue readings are taken at scrape time", async () => {
+  it("is right that the scrape-time readings are taken at scrape time", async () => {
     const guide = await readFile(GUIDE, "utf8");
     expect(guide).toContain("queried when you read the endpoint");
 

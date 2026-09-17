@@ -188,6 +188,43 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_MAIL_FROM",
     summary: "The From address on everything the instance sends.",
   },
+  // The status endpoint thresholds (P8-T06c). The relay and scheduler
+  // checks compare their lag against these to decide whether a component
+  // is operational, degraded or unavailable. All four default to a value
+  // that fires on a stopped process and not on a busy one.
+  // Design: docs/design/p8-t06c-status-and-capacity.md §2.5 and §2.6.
+  {
+    key: "status.relayDegradedSeconds",
+    kind: "number",
+    fallback: 300,
+    environment: "OPENOKR_STATUS_RELAY_DEGRADED_SECONDS",
+    summary:
+      "Oldest pending outbox row age, in seconds, above which /api/status reports the relay as degraded. Default 300 (5 minutes).",
+  },
+  {
+    key: "status.relayUnavailableSeconds",
+    kind: "number",
+    fallback: 1800,
+    environment: "OPENOKR_STATUS_RELAY_UNAVAILABLE_SECONDS",
+    summary:
+      "Oldest pending outbox row age, in seconds, above which /api/status reports the relay as unavailable. Default 1800 (30 minutes).",
+  },
+  {
+    key: "status.schedulerDegradedSeconds",
+    kind: "number",
+    fallback: 7200,
+    environment: "OPENOKR_STATUS_SCHEDULER_DEGRADED_SECONDS",
+    summary:
+      "Seconds without a successful scheduler run before /api/status reports it as degraded. Default 7200 (2 hours).",
+  },
+  {
+    key: "status.schedulerUnavailableSeconds",
+    kind: "number",
+    fallback: 14400,
+    environment: "OPENOKR_STATUS_SCHEDULER_UNAVAILABLE_SECONDS",
+    summary:
+      "Seconds without a successful scheduler run before /api/status reports it as unavailable. Default 14400 (4 hours).",
+  },
   {
     key: "ai.deployment.provider",
     kind: "string",

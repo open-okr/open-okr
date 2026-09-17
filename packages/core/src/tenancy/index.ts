@@ -15,6 +15,7 @@ export {
   AdmissionError,
   type AdmissionLimits,
   AdmissionSettingError,
+  currentConcurrentActions,
   setDefaultAdmission,
 } from "./admission.ts";
 export { setTenantStateInTx } from "./lifecycle.ts";
