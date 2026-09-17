@@ -420,6 +420,15 @@ export {
   type SSOProviderInfo,
 } from "./auth/sso.ts";
 export {
+  type EnforcingConnection,
+  type EnforcingProvider,
+  enforcedProviderForEmail,
+  enforcedProviderForUser,
+  enforcementMessage,
+  enforcingProviderFor,
+  listEnforcingConnections,
+} from "./auth/sso-enforcement.ts";
+export {
   type ClaimBlobInput,
   type ClaimedBlob,
   claimBlob,

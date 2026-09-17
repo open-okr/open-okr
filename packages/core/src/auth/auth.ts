@@ -17,7 +17,7 @@ import { authSchema } from "@openokr/db";
 import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -34,6 +34,31 @@ import {
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
+import {
+  enforcedProviderForEmail,
+  enforcedProviderForUser,
+  enforcementMessage,
+  isProviderSignInPath,
+} from "./sso-enforcement.ts";
+
+/**
+ * The paths that establish or recover a local credential (P8-T07a).
+ *
+ * Each of them carries the address in its body, so an enforced account is
+ * refused before a password is checked, which also keeps the refusal from
+ * saying whether the password was right.
+ *
+ * Sign-up is on the list because an account created locally on an enforced
+ * domain would be exactly the credential enforcement exists to prevent, and
+ * the two reset paths are because a reset link is a way to set a password on
+ * an account that had none.
+ */
+const CREDENTIAL_PATHS = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/forget-password",
+  "/request-password-reset",
+]);
 
 /**
  * Accepts the invitation a freshly created account arrived with (P6-G06b).
@@ -271,7 +296,74 @@ export function createAuth(options: AuthOptions) {
       },
     },
 
+    hooks: {
+      /**
+       * Single-sign-on enforcement, at the paths that carry an address
+       * (P8-T07a).
+       *
+       * Before the endpoint rather than inside it, so one rule covers a
+       * sign-in, a sign-up and both reset paths, and so a future local factor
+       * that posts an address has to be added here deliberately rather than
+       * quietly becoming a way around the policy.
+       *
+       * The session hook below is the other half, for the factors that carry
+       * no address.
+       */
+      before: createAuthMiddleware(async (hookContext) => {
+        if (!CREDENTIAL_PATHS.has(hookContext.path)) {
+          return;
+        }
+        const email = (hookContext.body as { email?: unknown } | undefined)
+          ?.email;
+        if (typeof email !== "string" || email === "") {
+          return;
+        }
+        const provider = await enforcedProviderForEmail(options.pool, email);
+        if (provider) {
+          throw new APIError("FORBIDDEN", {
+            message: enforcementMessage(provider),
+          });
+        }
+      }),
+    },
+
     databaseHooks: {
+      session: {
+        create: {
+          /**
+           * The enforcement backstop (P8-T07a).
+           *
+           * A passkey assertion carries no address, so the middleware above
+           * cannot see whose sign-in it is. Every sign-in ends in a session
+           * row, though, whatever factor produced it, so this is the one
+           * place that catches all of them: the account is looked up by id,
+           * and a session for an enforced address is refused unless it is the
+           * identity provider's own callback that is creating it.
+           *
+           * It costs one small query per sign-in on an instance with no
+           * enforcement configured, and that query answers before the
+           * account is ever read.
+           */
+          before: async (session, hookContext) => {
+            if (isProviderSignInPath(hookContext?.path)) {
+              return;
+            }
+            const userId = (session as { userId?: unknown }).userId;
+            if (typeof userId !== "string") {
+              return;
+            }
+            const provider = await enforcedProviderForUser(
+              options.pool,
+              userId,
+            );
+            if (provider) {
+              throw new APIError("FORBIDDEN", {
+                message: enforcementMessage(provider),
+              });
+            }
+          },
+        },
+      },
       user: {
         create: {
           /**
