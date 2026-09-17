@@ -74,16 +74,31 @@ export async function loadSSOConnections(
   // boot process has no workspace context and needs every provider from
   // every workspace. The query runs once, at startup, and row-level
   // security would hide everything behind an unset tenant setting.
-  const { rows } = await pool.query<SSORow>(
-    `select id, workspace_id, provider_id, display_name,
-            discovery_url, authorization_url, token_url, user_info_url,
-            client_id, secret_ciphertext, secret_data_key, secret_key_id,
-            scopes, enforce, email_domains
-       from sso_connections
-      where enabled = true
-        and deleted_at is null
-      order by created_at`,
-  );
+  let rows: SSORow[];
+  try {
+    const result = await pool.query<SSORow>(
+      `select id, workspace_id, provider_id, display_name,
+              discovery_url, authorization_url, token_url, user_info_url,
+              client_id, secret_ciphertext, secret_data_key, secret_key_id,
+              scopes, enforce, email_domains
+         from sso_connections
+        where enabled = true
+          and deleted_at is null
+        order by created_at`,
+    );
+    rows = result.rows;
+  } catch (error) {
+    // Graceful degradation: if the table does not exist yet (migration
+    // 0091 not applied), return no providers rather than crashing the
+    // boot sequence. The instance works without SSO.
+    if (
+      error instanceof Error &&
+      error.message.includes("sso_connections")
+    ) {
+      return [];
+    }
+    throw error;
+  }
 
   return rows.map((row) => {
     const sealed: SealedSecret = {
@@ -121,24 +136,37 @@ export async function loadSSOConnections(
 export async function listSSOProviders(
   pool: Pool,
 ): Promise<readonly SSOProviderInfo[]> {
-  const { rows } = await pool.query<{
-    provider_id: string;
-    display_name: string;
-    workspace_id: string;
-    email_domains: string;
-    enforce: boolean;
-  }>(
-    `select provider_id, display_name, workspace_id, email_domains, enforce
-       from sso_connections
-      where enabled = true
-        and deleted_at is null
-      order by display_name`,
-  );
-  return rows.map((row) => ({
-    id: `sso-${row.provider_id}-${row.workspace_id.slice(0, 8)}`,
-    displayName: row.display_name,
-    workspaceId: row.workspace_id,
-    emailDomains: row.email_domains,
-    enforce: row.enforce,
-  }));
+  try {
+    const { rows } = await pool.query<{
+      provider_id: string;
+      display_name: string;
+      workspace_id: string;
+      email_domains: string;
+      enforce: boolean;
+    }>(
+      `select provider_id, display_name, workspace_id, email_domains, enforce
+         from sso_connections
+        where enabled = true
+          and deleted_at is null
+        order by display_name`,
+    );
+    return rows.map((row) => ({
+      id: `sso-${row.provider_id}-${row.workspace_id.slice(0, 8)}`,
+      displayName: row.display_name,
+      workspaceId: row.workspace_id,
+      emailDomains: row.email_domains,
+      enforce: row.enforce,
+    }));
+  } catch (error) {
+    // Graceful degradation: if the table does not exist yet (migration
+    // 0091 not applied), return no providers. The sign-in page renders
+    // without SSO buttons and nothing crashes.
+    if (
+      error instanceof Error &&
+      error.message.includes("sso_connections")
+    ) {
+      return [];
+    }
+    throw error;
+  }
 }
