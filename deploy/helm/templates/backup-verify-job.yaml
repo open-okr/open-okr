@@ -1,0 +1,166 @@
+{{- if .Values.backup.enabled }}
+{{- include "openokr.validate" . -}}
+# Per-tenant backup verification (P8-T06d).
+#
+# Runs on `helm test openokr`, not on install or upgrade. Restores the
+# newest backup into a temporary database, checks every workspace, and
+# drops the temporary database.
+#
+# Design: docs/design/p8-t06d-backup-verification.md §4.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "openokr.fullname" . }}-backup-verify
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup-verify
+  annotations:
+    "helm.sh/hook": test
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "openokr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backup-verify
+    spec:
+      restartPolicy: Never
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: verify
+          image: postgres:17-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              # Find the newest backup directory (timestamp-named, lexicographic).
+              BACKUP_DIR="$(ls -1d /backups/*/ 2>/dev/null | sort | tail -1)"
+              if [ -z "$BACKUP_DIR" ]; then
+                echo "verify: no backup directories found in /backups"
+                exit 2
+              fi
+              echo "verify: checking $BACKUP_DIR"
+
+              # Checksum.
+              if ! (cd "$BACKUP_DIR" && sha256sum -c checksum.sha256 --quiet 2>/dev/null); then
+                echo "verify: FAIL checksum verification failed"
+                exit 2
+              fi
+              echo "verify: checksum OK"
+
+              # Decrypt.
+              apk add --no-cache openssl >/dev/null 2>&1 || true
+              DECRYPTED=0
+              if openssl enc -d -aes-256-cbc -pbkdf2 \
+                   -pass "pass:$OPENOKR_ENCRYPTION_KEY" \
+                   -in "$BACKUP_DIR/db.dump.enc" \
+                   -out /tmp/db.dump 2>/dev/null; then
+                DECRYPTED=1
+              fi
+              if [ "$DECRYPTED" -eq 0 ]; then
+                echo "verify: FAIL could not decrypt with the current key"
+                exit 2
+              fi
+              echo "verify: decrypted"
+
+              # Temporary database with a random suffix.
+              VERIFY_DB="openokr_verify_$$_${RANDOM:-0}"
+              cleanup() { rm -f /tmp/db.dump; psql "$DATABASE_URL" -c "DROP DATABASE IF EXISTS \"$VERIFY_DB\"" 2>/dev/null || true; }
+              trap cleanup EXIT INT TERM
+
+              # Derive a connection string for the verify database.
+              # Replace the database name at the end of DATABASE_URL.
+              VERIFY_URL="$(echo "$DATABASE_URL" | sed "s|/[^/?]*\([?].*\)\{0,1\}$|/$VERIFY_DB\1|")"
+
+              psql "$DATABASE_URL" -c "CREATE DATABASE \"$VERIFY_DB\"" || {
+                echo "verify: FAIL could not create temporary database"
+                exit 2
+              }
+
+              pg_restore -d "$VERIFY_URL" --no-owner --no-privileges /tmp/db.dump 2>/dev/null || {
+                echo "verify: FAIL pg_restore failed"
+                exit 2
+              }
+              rm -f /tmp/db.dump
+              echo "verify: restored into $VERIFY_DB"
+
+              # Schema version from manifest.
+              MANIFEST_SCHEMA="$(sed -n 's/.*"schemaVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$BACKUP_DIR/manifest.json")"
+              ACTUAL_SCHEMA="$(psql "$VERIFY_URL" -t -A -c "SELECT name FROM _migrations ORDER BY name DESC LIMIT 1" 2>/dev/null)"
+
+              FAILURES=0
+
+              if [ -n "$MANIFEST_SCHEMA" ] && [ "$MANIFEST_SCHEMA" != "unknown" ]; then
+                if [ "$ACTUAL_SCHEMA" = "$MANIFEST_SCHEMA" ]; then
+                  echo "verify: schema $ACTUAL_SCHEMA matches manifest"
+                else
+                  echo "verify: FAIL schema '$ACTUAL_SCHEMA' != manifest '$MANIFEST_SCHEMA'"
+                  FAILURES=$((FAILURES + 1))
+                fi
+              fi
+
+              # Workspace checks.
+              WS_COUNT="$(psql "$VERIFY_URL" -t -A -c "SELECT count(*) FROM workspaces WHERE deleted_at IS NULL" 2>/dev/null)"
+              echo "verify: $WS_COUNT live workspace(s)"
+
+              if [ "${WS_COUNT:-0}" -gt 0 ]; then
+                ZERO_MEMBERS="$(psql "$VERIFY_URL" -t -A -c "
+                  SELECT count(*) FROM workspaces w
+                  WHERE w.deleted_at IS NULL
+                    AND NOT EXISTS (
+                      SELECT 1 FROM workspace_members m
+                      WHERE m.workspace_id = w.id AND m.deleted_at IS NULL
+                    )" 2>/dev/null)"
+                ZERO_AUDIT="$(psql "$VERIFY_URL" -t -A -c "
+                  SELECT count(*) FROM workspaces w
+                  WHERE w.deleted_at IS NULL
+                    AND NOT EXISTS (
+                      SELECT 1 FROM audit_events a
+                      WHERE a.workspace_id = w.id
+                    )" 2>/dev/null)"
+
+                if [ "${ZERO_MEMBERS:-0}" -gt 0 ]; then
+                  echo "verify: FAIL $ZERO_MEMBERS workspace(s) with zero members"
+                  FAILURES=$((FAILURES + ZERO_MEMBERS))
+                fi
+                if [ "${ZERO_AUDIT:-0}" -gt 0 ]; then
+                  echo "verify: FAIL $ZERO_AUDIT workspace(s) with zero audit events"
+                  FAILURES=$((FAILURES + ZERO_AUDIT))
+                fi
+              fi
+
+              if [ "$FAILURES" -gt 0 ]; then
+                echo "verify: FAILED ($FAILURES issue(s))"
+                exit 1
+              fi
+              echo "verify: PASSED ($WS_COUNT workspace(s), schema $ACTUAL_SCHEMA)"
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openokr.fullname" . }}
+                  key: database-url
+            - name: OPENOKR_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openokr.fullname" . }}
+                  key: encryption-key
+          volumeMounts:
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+      volumes:
+        - name: backups
+          {{- if .Values.backup.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.backup.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

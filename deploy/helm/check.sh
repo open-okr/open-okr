@@ -309,6 +309,36 @@ else
   fail "an existing key secret was ignored"
 fi
 
+# --- backup verification Job (P8-T06d) ------------------------------------
+if render --set backup.enabled=true --set backup.existingClaim=my-backups 2>&1 \
+  | grep -q "backup-verify"; then
+  pass "the verify Job renders when backups are enabled"
+else
+  fail "the verify Job does not render when backups are enabled"
+fi
+
+if render --set backup.enabled=true --set backup.existingClaim=my-backups 2>&1 \
+  | grep -q 'helm.sh/hook.*test'; then
+  pass "the verify Job is a helm test hook"
+else
+  fail "the verify Job is not a helm test hook"
+fi
+
+if echo "$defaults" | grep -q "backup-verify"; then
+  fail "the verify Job renders when backups are disabled"
+else
+  pass "the verify Job does not render when backups are disabled"
+fi
+
+# The verify Job must mount the PVC read-only.
+verify_job=$(render_one backup-verify-job.yaml --set backup.enabled=true \
+  --set backup.existingClaim=my-backups 2>&1)
+if printf '%s' "$verify_job" | grep -q "readOnly: true"; then
+  pass "the verify Job mounts the backup PVC read-only"
+else
+  fail "the verify Job does not mount the backup PVC read-only"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2

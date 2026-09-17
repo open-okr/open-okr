@@ -107,9 +107,7 @@ describe("exclusions from §6 criterion 6", () => {
 describe("new settings in the instance registry", () => {
   it("all four status thresholds are declared", async () => {
     // Dynamic import so the test does not drag core's full module graph.
-    const { INSTANCE_SETTINGS } = await import(
-      "@openokr/core"
-    );
+    const { INSTANCE_SETTINGS } = await import("@openokr/core");
     const keys = INSTANCE_SETTINGS.map((s: { key: string }) => s.key);
     expect(keys).toContain("status.relayDegradedSeconds");
     expect(keys).toContain("status.relayUnavailableSeconds");
@@ -118,9 +116,7 @@ describe("new settings in the instance registry", () => {
   });
 
   it("unavailable defaults are greater than degraded defaults", async () => {
-    const { INSTANCE_SETTINGS } = await import(
-      "@openokr/core"
-    );
+    const { INSTANCE_SETTINGS } = await import("@openokr/core");
     const byKey = new Map(
       INSTANCE_SETTINGS.map((s: { key: string; fallback: unknown }) => [
         s.key,

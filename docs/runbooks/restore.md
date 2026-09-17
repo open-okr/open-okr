@@ -16,7 +16,7 @@ the instance's root key, plus blob storage if the backup included it.
 
 ## Verifying a backup before restore
 
-Every backup directory contains `checksum.sha256`. Verify it first:
+**File-level check.** Every backup directory contains `checksum.sha256`:
 
 ```sh
 cd /path/to/backup/20260908T020000Z
@@ -24,6 +24,24 @@ sha256sum -c checksum.sha256
 ```
 
 If this fails, the backup is damaged. Do not proceed.
+
+**Database-level check (P8-T06d).** The checksum proves files are intact.
+`verify-backup` proves the dump actually restores and every workspace's
+data is present. It loads the dump into a temporary database, runs
+per-workspace checks, and drops the temporary database without touching
+the live one:
+
+```sh
+# Docker Compose
+./openokr verify-backup /path/to/backup/20260908T020000Z
+
+# Helm
+helm test openokr    # runs against the newest backup on the PVC
+```
+
+Exit 0 means every workspace passed. Exit 1 means a data issue was found
+(the report names which workspaces). Exit 2 means the backup could not
+be loaded at all.
 
 ## Docker Compose
 
