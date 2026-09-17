@@ -60,3 +60,30 @@ export const directorySyncLog = pgTable("directory_sync_log", {
 });
 
 export type DirectorySyncLogEntry = typeof directorySyncLog.$inferSelect;
+
+/**
+ * A directory group mapped to a space (P8-T08b).
+ *
+ * The mapping is a row rather than a name match, because a renamed group is
+ * the same group: matching on the display name would leave a workspace with
+ * two spaces holding the same people the first time somebody renames one.
+ *
+ * See migration 0095 for the two unique indexes and the policy.
+ */
+export const directorySyncGroups = pgTable("directory_sync_groups", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  externalId: text("external_id").notNull(),
+  displayName: text("display_name").notNull(),
+  spaceId: uuid("space_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type DirectorySyncGroup = typeof directorySyncGroups.$inferSelect;

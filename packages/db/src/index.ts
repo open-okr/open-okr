@@ -273,8 +273,10 @@ export {
   digests,
 } from "./schema/digests.ts";
 export {
+  type DirectorySyncGroup,
   type DirectorySyncLogEntry,
   type DirectorySyncToken,
+  directorySyncGroups,
   directorySyncLog,
   directorySyncTokens,
 } from "./schema/directory-sync.ts";

@@ -29,6 +29,8 @@ let api: APIRequestContext;
 let token = "";
 /** The member id SCIM gave the person it provisioned. */
 let memberId = "";
+/** The group id the Groups resource gave the space it mapped. */
+let groupId = "";
 
 const SCIM = "/api/scim/v2/Users";
 const ADDRESS = "grace@directory.test";
@@ -140,6 +142,68 @@ test("the provider looks somebody up the way it actually does", async () => {
 test("the person appears in the workspace, as a member", async () => {
   await goTo(page, "/people");
   await expect(page.getByText(ADDRESS).first()).toBeVisible({
+    timeout: 10_000,
+  });
+});
+
+test("a group becomes a space with that membership", async () => {
+  const response = await api.post("/api/scim/v2/Groups", {
+    headers: authed(),
+    data: {
+      schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+      externalId: "okta-group-e2e",
+      displayName: "Directory Engineering",
+      members: [{ value: memberId }],
+    },
+  });
+
+  expect(response.status()).toBe(201);
+  const group = await response.json();
+  expect(group.displayName).toBe("Directory Engineering");
+  expect(group.members).toHaveLength(1);
+  groupId = group.id;
+
+  // The space is a real one, and the browser can see it.
+  await goTo(page, "/spaces");
+  await expect(page.getByText("Directory Engineering").first()).toBeVisible({
+    timeout: 10_000,
+  });
+});
+
+test("a member removed from the group leaves the space", async () => {
+  const response = await api.patch(`/api/scim/v2/Groups/${groupId}`, {
+    headers: authed(),
+    data: {
+      schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+      Operations: [
+        { op: "remove", path: `members[value eq "${memberId}"]` },
+      ],
+    },
+  });
+
+  expect(response.status()).toBe(200);
+  expect((await response.json()).members).toHaveLength(0);
+
+  // Out of the space, still in the workspace: the Users resource is what
+  // decides that, and it was not asked.
+  const user = await api.get(`${SCIM}/${memberId}`, { headers: authed() });
+  expect(user.status()).toBe(200);
+});
+
+test("deleting the group leaves the space standing", async () => {
+  const deleted = await api.delete(`/api/scim/v2/Groups/${groupId}`, {
+    headers: authed(),
+  });
+  expect(deleted.status()).toBe(204);
+
+  expect(
+    (await api.get(`/api/scim/v2/Groups/${groupId}`, { headers: authed() })).status(),
+  ).toBe(404);
+
+  // A directory deleting a group is a statement about who works together,
+  // not permission to put a workspace's work out of reach.
+  await goTo(page, "/spaces");
+  await expect(page.getByText("Directory Engineering").first()).toBeVisible({
     timeout: 10_000,
   });
 });

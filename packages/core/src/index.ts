@@ -610,6 +610,14 @@ export {
   type DemoContext,
 } from "./demo/builder.ts";
 export {
+  type DirectoryGroup,
+  directoryGroupById,
+  listDirectoryGroups,
+  type SyncDirectoryGroupInput,
+  syncDirectoryGroup,
+  unmapDirectoryGroup,
+} from "./directory-sync/groups.ts";
+export {
   displayName as scimDisplayName,
   logSyncOperation,
   primaryEmail as scimPrimaryEmail,
