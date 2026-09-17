@@ -522,6 +522,7 @@ export {
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";
+export { type SSOConnection, ssoConnections } from "./schema/sso.ts";
 export {
   type Streak,
   streaks,

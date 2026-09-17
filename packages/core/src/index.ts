@@ -414,6 +414,12 @@ export {
 } from "./auth/session-hashing.ts";
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
+  listSSOProviders,
+  loadSSOConnections,
+  type SSOProviderConfig,
+  type SSOProviderInfo,
+} from "./auth/sso.ts";
+export {
   type ClaimBlobInput,
   type ClaimedBlob,
   claimBlob,

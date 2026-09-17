@@ -18,6 +18,7 @@ import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -108,6 +109,25 @@ export interface AuthOptions {
     to: string;
     url: string;
   }) => Promise<void>;
+  /**
+   * SSO provider configurations loaded from `sso_connections` at boot
+   * (P8-T07). Each entry becomes a genericOAuth provider that appears on
+   * the sign-in page and flows through Better Auth's social-provider path.
+   *
+   * An empty array means no SSO providers are configured. The plugin is
+   * only included when at least one provider is present, so an instance
+   * with no SSO pays nothing.
+   */
+  readonly ssoProviders?: ReadonlyArray<{
+    readonly providerId: string;
+    readonly clientId: string;
+    readonly clientSecret: string;
+    readonly discoveryUrl?: string;
+    readonly authorizationUrl?: string;
+    readonly tokenUrl?: string;
+    readonly userInfoUrl?: string;
+    readonly scopes?: readonly string[];
+  }>;
   /**
    * Framework glue, supplied by the caller.
    *
@@ -335,6 +355,29 @@ export function createAuth(options: AuthOptions) {
         rpName: "OpenOKR",
         origin: options.baseUrl,
       }),
+      // SSO providers (P8-T07). Each entry loaded from `sso_connections` at
+      // boot and passed through `genericOAuth`, which registers them as
+      // social providers on the standard `signIn.social` flow. Only included
+      // when at least one provider is configured: an instance with no SSO
+      // carries no plugin, no route and no schema contribution.
+      ...(options.ssoProviders && options.ssoProviders.length > 0
+        ? [
+            genericOAuth({
+              config: options.ssoProviders.map((p) => ({
+                providerId: p.providerId,
+                clientId: p.clientId,
+                clientSecret: p.clientSecret,
+                ...(p.discoveryUrl ? { discoveryUrl: p.discoveryUrl } : {}),
+                ...(p.authorizationUrl
+                  ? { authorizationUrl: p.authorizationUrl }
+                  : {}),
+                ...(p.tokenUrl ? { tokenUrl: p.tokenUrl } : {}),
+                ...(p.userInfoUrl ? { userInfoUrl: p.userInfoUrl } : {}),
+                ...(p.scopes ? { scopes: [...p.scopes] } : {}),
+              })),
+            }),
+          ]
+        : []),
       ...(options.plugins ?? []),
     ],
   });

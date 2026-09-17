@@ -3,6 +3,7 @@ import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
+import { resolveSSOProviders } from "./lib/sso";
 import { installTelemetry } from "./lib/telemetry";
 
 /**
@@ -144,4 +145,29 @@ export async function resolveAdmission(): Promise<void> {
     return;
   }
   await installAdmission();
+}
+
+/**
+ * Loads SSO connections from the database and caches them for `getAuth()`
+ * (P8-T07).
+ *
+ * Non-fatal on failure: an instance that cannot read its SSO connections
+ * still serves password and passkey sign-in. The SSO buttons do not appear.
+ *
+ * A build worker has the placeholder `DATABASE_URL` and no key ring, so
+ * this is skipped during `next build`.
+ */
+export async function resolveSSO(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    const { getPool } = await import("./lib/pool");
+    const { getKeyRing } = await import("./lib/secrets");
+    await resolveSSOProviders(getPool(), getKeyRing());
+  } catch (error) {
+    process.stderr.write(
+      `sso: could not load SSO connections: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
 }

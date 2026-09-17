@@ -88,6 +88,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // one column at sidebar size is the "unreadable at a glance" this file
   // exists to prevent.
   "admin-support": <LifeBuoy className="size-full" />,
+  "admin-sso": <Shield className="size-full" />,
   "admin-branding": <Palette className="size-full" />,
   // Thresholds are the readable half of "rhythm and thresholds", and a dial
   // is what a threshold looks like. Cycle already holds the arrows.

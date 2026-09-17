@@ -358,6 +358,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-sso",
+        label: "Single sign-on",
+        href: "/admin/sso",
+        section: "admin",
+        // Configuring SSO is about who can access the workspace. Takes the
+        // same level as invitations and support access (P8-T07).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-branding",
         label: "Branding",
         href: "/admin/branding",

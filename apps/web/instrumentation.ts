@@ -18,6 +18,7 @@ export async function register(): Promise<void> {
     startRecurringWork,
     resolveAdmission,
     resolveAuthPolicy,
+    resolveSSO,
   } = await import("./instrumentation.node");
   validateEnvironment();
   // Before the relay and the scheduler, so the work they do from the first
@@ -28,6 +29,9 @@ export async function register(): Promise<void> {
   await resolveAdmission();
   startOutboxRelay();
   startRecurringWork();
+  // Before resolveAuthPolicy, because getAuth() is built once and SSO
+  // providers must be cached before it runs (P8-T07).
+  await resolveSSO();
   // Last, and awaited: the first request must not reach Better Auth with
   // the answer still unresolved, or a mail-capable instance would serve one
   // sign-in without the requirement it is configured for (P8-T02b).

@@ -2,6 +2,7 @@ import { loadEnv } from "@openokr/config";
 import { createAuth, resolveRequireEmailVerification } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
 import { getPool } from "./pool";
+import { getSSOProviders } from "./sso";
 
 export { getPool };
 
@@ -99,6 +100,8 @@ export function getAuth(): ReturnType<typeof createAuth> {
             });
           }
         : undefined,
+      // SSO providers loaded at boot from sso_connections (P8-T07).
+      ssoProviders: getSSOProviders(),
       // Lets a server action set and clear the session cookie. Framework glue,
       // so it lives here rather than in packages/core, and Better Auth
       // requires it last in the plugin list.
