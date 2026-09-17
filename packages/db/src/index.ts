@@ -592,11 +592,13 @@ export {
   withApiToken,
   withContext,
   withDeviceCode,
+  withDirectoryToken,
   withInstanceAdmin,
   withInviteToken,
   withOAuthSecret,
   withOperator,
   withProviderTeam,
+  withSSOLookup,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

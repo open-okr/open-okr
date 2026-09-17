@@ -9,6 +9,9 @@
  * instance on every sign-in would put a database read and a decryption on
  * the hot path of every request.
  */
+import { withSSOLookup } from "@openokr/db";
+import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   decryptSecret,
@@ -41,7 +44,7 @@ export interface SSOProviderConfig {
   readonly enforce: boolean;
 }
 
-interface SSORow {
+type SSORow = {
   id: string;
   workspace_id: string;
   provider_id: string;
@@ -57,7 +60,7 @@ interface SSORow {
   scopes: string;
   enforce: boolean;
   email_domains: string;
-}
+};
 
 /**
  * Loads all enabled SSO connections from the database and decrypts their
@@ -70,21 +73,25 @@ export async function loadSSOConnections(
   pool: Pool,
   ring: KeyRing,
 ): Promise<readonly SSOProviderConfig[]> {
-  // A raw read, because SSO connections are above the tenant floor: the
-  // boot process has no workspace context and needs every provider from
-  // every workspace. The query runs once, at startup, and row-level
-  // security would hide everything behind an unset tenant setting.
+  // **Through `app.sso_lookup`, because the tenant floor applies here too**
+  // (P8-T07a). The boot process has no workspace context and needs every
+  // provider on the instance, and the application role is `nobypassrls` on a
+  // table with `force row level security`. The first version of this read ran
+  // unscoped and returned nothing on every correctly provisioned deployment,
+  // so no provider was ever configured. Migration 0094 is the policy this
+  // opens; it is `for select` on this one table.
   let rows: SSORow[];
   try {
-    const result = await pool.query<SSORow>(
-      `select id, workspace_id, provider_id, display_name,
-              discovery_url, authorization_url, token_url, user_info_url,
-              client_id, secret_ciphertext, secret_data_key, secret_key_id,
-              scopes, enforce, email_domains
-         from sso_connections
-        where enabled = true
-          and deleted_at is null
-        order by created_at`,
+    const result = await withSSOLookup(drizzle(pool), (tx) =>
+      tx.execute<SSORow>(sql`
+        select id, workspace_id, provider_id, display_name,
+               discovery_url, authorization_url, token_url, user_info_url,
+               client_id, secret_ciphertext, secret_data_key, secret_key_id,
+               scopes, enforce, email_domains
+          from sso_connections
+         where enabled = true
+           and deleted_at is null
+         order by created_at`),
     );
     rows = result.rows;
   } catch (error) {
@@ -127,25 +134,29 @@ export async function loadSSOConnections(
  * Returns the public SSO provider info (no secrets) for the sign-in page.
  *
  * This is a database read rather than a cached value because the sign-in
- * page needs to reflect newly added providers without a restart. The query
- * runs outside the tenant floor (no workspace context on the sign-in page).
+ * page needs to reflect newly added providers without a restart.
+ *
+ * Through `app.sso_lookup` for the reason the boot read is: a visitor who has
+ * not signed in has no workspace, and the tenant floor answers an unscoped
+ * read with nothing (P8-T07a).
  */
 export async function listSSOProviders(
   pool: Pool,
 ): Promise<readonly SSOProviderInfo[]> {
   try {
-    const { rows } = await pool.query<{
-      provider_id: string;
-      display_name: string;
-      workspace_id: string;
-      email_domains: string;
-      enforce: boolean;
-    }>(
-      `select provider_id, display_name, workspace_id, email_domains, enforce
-         from sso_connections
-        where enabled = true
-          and deleted_at is null
-        order by display_name`,
+    const { rows } = await withSSOLookup(drizzle(pool), (tx) =>
+      tx.execute<{
+        provider_id: string;
+        display_name: string;
+        workspace_id: string;
+        email_domains: string;
+        enforce: boolean;
+      }>(sql`
+        select provider_id, display_name, workspace_id, email_domains, enforce
+          from sso_connections
+         where enabled = true
+           and deleted_at is null
+         order by display_name`),
     );
     return rows.map((row) => ({
       id: `sso-${row.provider_id}-${row.workspace_id.slice(0, 8)}`,

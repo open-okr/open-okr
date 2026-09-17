@@ -14,7 +14,16 @@
  * **Deactivation maps to suspension and never to deletion.** That is the
  * acceptance criterion, and suspension already removes every access: both
  * `resolveMemberAccessLevel` and `resolveActor` exclude non-active members.
+ *
+ * **The table above is the target, not the state.** Today only Create User
+ * and the member list exist, and they write with raw SQL rather than through
+ * those actions. Deactivation, reactivation and groups have no code at all,
+ * so the acceptance criterion is unmet. Recorded here rather than left to be
+ * discovered, and P8-T08a is the row that closes it.
  */
+import { withWorkspace } from "@openokr/db";
+import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 
 export interface SCIMUser {
@@ -93,28 +102,37 @@ export async function logSyncOperation(
   },
 ): Promise<void> {
   try {
-    // openokr:allow-mutation: the sync log is an operational record of
-    // what the identity provider asked for. It is not a domain write and
-    // has no audit row, activity row or outbox row of its own.
-    await pool.query(
-      `INSERT INTO directory_sync_log
-        (workspace_id, resource_type, operation, external_id, local_id,
-         success, error_message, request_body)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        workspaceId,
-        entry.resourceType,
-        entry.operation,
-        entry.externalId,
-        entry.localId ?? null,
-        entry.success,
-        entry.errorMessage ?? null,
-        entry.requestBody ? JSON.stringify(entry.requestBody) : null,
-      ],
+    // **Under the workspace the token named** (P8-T07a). `directory_sync_log`
+    // carries the tenant floor like every other business table, and the first
+    // version of this insert ran unscoped, so the policy refused it and the
+    // catch below swallowed the refusal. Nothing was ever logged and nothing
+    // ever said so.
+    //
+    // openokr:allow-mutation: the sync log is an operational record of what
+    // the identity provider asked for. It is not a domain write and has no
+    // audit row, activity row or outbox row of its own.
+    await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+      tx.execute(sql`
+        insert into directory_sync_log
+          (workspace_id, resource_type, operation, external_id, local_id,
+           success, error_message, request_body)
+        values (${workspaceId}, ${entry.resourceType}, ${entry.operation},
+                ${entry.externalId}, ${entry.localId ?? null}, ${entry.success},
+                ${entry.errorMessage ?? null},
+                ${entry.requestBody ? JSON.stringify(entry.requestBody) : null})`),
     );
-  } catch {
-    // The log must not fail the operation. If the log table is missing
-    // (unmigrated database), swallow silently.
+  } catch (error) {
+    // The log must not fail the operation: an identity provider retrying a
+    // provisioning call because the record of it failed to write would be a
+    // worse outcome than a missing line.
+    //
+    // **It is said out loud, though.** Swallowing this silently is what kept
+    // the policy refusal above invisible, and an unmigrated database is only
+    // one of the reasons this can fail.
+    process.stderr.write(
+      `directory-sync: could not record ${entry.operation} on ` +
+        `${entry.resourceType}: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
   }
 }
 
