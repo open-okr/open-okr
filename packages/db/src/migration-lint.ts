@@ -450,3 +450,50 @@ export async function lintMigrationDirs(
 
   return { results, filesChecked, emptyDirs };
 }
+
+/**
+ * Tables the migrations declare are deliberately off the tenant floor
+ * (P8-T06b).
+ *
+ * **One source of truth, because there were three.** The linter above reads
+ * the `openokr:not-tenant-scoped` marker and waives its own checks;
+ * `tenant-fuzz.test.ts` and `operator-wall.test.ts` each enumerated
+ * workspace-scoped tables by looking for a `workspace_id` column, which was
+ * the same set right up until `outbox` gained one for the relay's fair read
+ * order. Two hand-kept lists and a marker, all meaning the same thing and
+ * free to drift, is how a tenant-floor exemption gets added in one place and
+ * missed in the other two.
+ *
+ * So the marker is the answer everywhere. A table added tomorrow with an
+ * exemption nobody agreed to still fails the linter, which is where that
+ * argument belongs; the tests read the outcome rather than re-deciding it.
+ *
+ * **Carrying a workspace identifier is not the same as being tenant
+ * scoped**, and `outbox` is the case that makes the difference visible: only
+ * the relay reads it and it must drain every workspace in one pass, so a
+ * row-level policy there would stop delivery. Its column orders a queue and
+ * authorises nothing, which migration 0001's marker has said since the table
+ * was created.
+ */
+export async function notTenantScopedTables(
+  dirs: readonly string[],
+): Promise<ReadonlySet<string>> {
+  const marked = new Set<string>();
+  for (const dir of dirs) {
+    const entries = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") {
+        return [] as string[];
+      }
+      throw error;
+    });
+    for (const entry of entries.filter((name) => name.endsWith(".sql"))) {
+      const sql = await readFile(join(dir, entry), "utf8");
+      for (const table of tableStatements(sql)) {
+        if (table.markers.has(NOT_TENANT_SCOPED)) {
+          marked.add(table.name);
+        }
+      }
+    }
+  }
+  return marked;
+}

@@ -26,6 +26,7 @@ export {
   lintMigrationDirs,
   lintMigrationSql,
   type MigrationLintResult,
+  notTenantScopedTables,
 } from "./migration-lint.ts";
 export {
   enqueueOutbox,

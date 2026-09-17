@@ -1,5 +1,12 @@
-import { newId } from "@openokr/db";
+import { fileURLToPath } from "node:url";
+import { newId, notTenantScopedTables } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
+
+/** The real schema, resolved from this file rather than from the cwd. */
+const MIGRATIONS_DIR = fileURLToPath(
+  new URL("../../db/migrations/", import.meta.url),
+);
+
 import { beforeAll, describe, expect, it } from "vitest";
 import { inTenantTransaction } from "../src/perf/bulk.ts";
 import { buildLargeDataset } from "../src/perf/large-dataset.ts";
@@ -34,7 +41,22 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 let workspaceA: string;
 let tables: string[];
 
-/** Every table the tenant floor is supposed to cover. */
+/**
+ * Every table the tenant floor is supposed to cover.
+ *
+ * **Carrying `workspace_id` is the proxy, and the migrations are the
+ * authority** (corrected at P8-T06b). The column was the whole definition
+ * until `outbox` gained one for the relay's fair read order: only the relay
+ * reads that table and it must drain every workspace in one pass, so a
+ * row-level policy there would stop delivery, and the column orders a queue
+ * rather than authorising anything.
+ *
+ * The exemption is not restated here. Migration 0001 already marks the table
+ * `openokr:not-tenant-scoped` with its reason, `db:lint` already reads that
+ * marker, and `notTenantScopedTables` is that same parse. A second list
+ * kept by hand is a second list free to drift, and the drift would be an
+ * exemption nobody agreed to.
+ */
 async function workspaceTables(): Promise<string[]> {
   const wb = await workerDb();
   const rows = await wb.admin.query<{ table_name: string }>(
@@ -48,7 +70,10 @@ async function workspaceTables(): Promise<string[]> {
       where ns.nspname = 'public' and c.relkind = 'r'
       order by c.relname`,
   );
-  return rows.rows.map((row) => row.table_name);
+  const exempt = await notTenantScopedTables([MIGRATIONS_DIR]);
+  return rows.rows
+    .map((row) => row.table_name)
+    .filter((name) => !exempt.has(name));
 }
 
 beforeAll(async () => {

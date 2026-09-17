@@ -1,4 +1,12 @@
+import { fileURLToPath } from "node:url";
+import { notTenantScopedTables } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
+
+/** The real schema, resolved from this file rather than from the cwd. */
+const MIGRATIONS_DIR = fileURLToPath(
+  new URL("../../db/migrations/", import.meta.url),
+);
+
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   isLiveOperator,
@@ -55,6 +63,31 @@ const NAMED_FOR_OPERATORS = new Set(["tenants"]);
 
 beforeAll(async () => {
   const wb = await workerDb();
+  // **The floor is the policy, not the column** (corrected at P8-T06b).
+  //
+  // This asked for every table carrying a `workspace_id`, which was the same
+  // set as "every table the floor covers" right up until `outbox` gained
+  // one. It has no policy and deliberately never will: only the relay reads
+  // it, and it must drain every workspace in one pass, so a policy there
+  // would stop delivery dead. The column orders a queue and authorises
+  // nothing.
+  //
+  // So the exemption comes from the migrations, which is where it was
+  // already written: migration 0001 marks the table `openokr:not-tenant-
+  // scoped` with its reason and `db:lint` reads that marker.
+  // `notTenantScopedTables` is the same parse, so this file and
+  // `tenant-fuzz.test.ts` stop keeping lists of their own. Agung chose that
+  // over a hand-kept exclusion on 15 September 2026: three places meaning
+  // the same thing is three places free to drift, and the drift would be an
+  // exemption from the tenant floor that nobody agreed to.
+  //
+  // **What this does not do is close a gap, and the gap is worth saying out
+  // loud.** `outbox` has no policy and its payloads carry workspace
+  // identifiers and entity identifiers. An operator connection can read
+  // them, and could before this column existed, because the payload has
+  // always carried `workspaceId`. The wall has never covered the outbox.
+  // That is a question for the P8-T01b design rather than something to
+  // settle by editing a query in a test file.
   const { rows } = await wb.admin.query<{ table_name: string }>(
     `select c.relname as table_name
        from pg_class c
@@ -66,9 +99,10 @@ beforeAll(async () => {
       where ns.nspname = 'public' and c.relkind = 'r'
       order by c.relname`,
   );
+  const exempt = await notTenantScopedTables([MIGRATIONS_DIR]);
   contentTables = rows
     .map((row) => row.table_name)
-    .filter((name) => !NAMED_FOR_OPERATORS.has(name));
+    .filter((name) => !NAMED_FOR_OPERATORS.has(name) && !exempt.has(name));
 });
 
 beforeEach(async () => {

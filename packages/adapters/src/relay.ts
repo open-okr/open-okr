@@ -15,10 +15,18 @@
  * Rows are claimed with FOR UPDATE SKIP LOCKED so several relay processes can
  * run at once without handing one row to two of them.
  *
- * Ordering is oldest first, but it is not a promise. Rows created in the same
- * instant have no defined order between them, and several relays draining
- * concurrently deliver in parallel by design. A consumer that needs ordering
- * gets it from the data it receives, never from arrival order.
+ * **Ordering is round-robin by workspace, and it is not a promise**
+ * (P8-T06b). It was oldest first until then, which is FIFO, and FIFO is what
+ * let one import's forty thousand rows sit in front of every other
+ * workspace's nudge. Each workspace's pending rows are ranked by age and the
+ * batch takes rank one of every workspace, then rank two, and so on; with a
+ * single workspace holding rows that is the old order exactly, so nothing
+ * slows down when there is nobody to be fair to.
+ *
+ * Rows created in the same instant have no defined order between them, and
+ * several relays draining concurrently deliver in parallel by design. A
+ * consumer that needs ordering gets it from the data it receives, never from
+ * arrival order.
  */
 
 import type { MetricLabels, MetricRecorder } from "./ports/telemetry.ts";
@@ -117,6 +125,32 @@ const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_LEASE_SECONDS = 60;
 const DEFAULT_MAX_ATTEMPTS = 10;
+
+/**
+ * How many rows ahead of the batch the fair read looks for candidates
+ * (P8-T06b).
+ *
+ * **Concurrent relays are the reason, and the first version of this change
+ * had it wrong.** The fair order needs a window function, a window function
+ * cannot share a query level with `FOR UPDATE`, so the ranking and the claim
+ * are two statements. Ask the ranking for exactly one batch and every relay
+ * draining at the same moment proposes the same ids: one of them locks all
+ * of them and the rest claim nothing. Four relays then deliver a quarter of
+ * what one delivers, which is not a smaller pass, it is three idle passes.
+ * The suite measured it: fifteen rows delivered where twenty exist.
+ *
+ * So the ranking hands back this many batches' worth of ids, in rank order,
+ * and the claim takes the first `batchSize` of them nothing else holds. A
+ * relay that arrives second skips what is locked and takes the next
+ * candidates, which are still the fair ones.
+ *
+ * **It costs almost nothing.** The ranking already ranks every pending row
+ * to order any of them, so a wider limit transfers more ids and scans no
+ * further. Past this many concurrent relays a latecomer gets a short batch
+ * and picks the rest up on its next poll a second later, which is the
+ * smaller pass the original comment claimed.
+ */
+const CLAIM_CANDIDATE_BATCHES = 8;
 
 /** 2s, 4s, 8s ... capped at five minutes. */
 const defaultBackoff = (attempts: number): number =>
@@ -316,6 +350,30 @@ export class OutboxRelay {
    * pushes its `available_at` beyond the lease, so a concurrent relay no
    * longer sees it as due.
    *
+   * **Round-robin by workspace, not oldest first** (P8-T06b, design §5).
+   * Oldest first is FIFO, and FIFO is the unfair part: one import writing
+   * forty thousand rows put every other workspace's nudge behind forty
+   * thousand jobs, and not one of those jobs had exceeded any limit. Ranking
+   * each workspace's pending rows and ordering by that rank takes the first
+   * row of every workspace, then the second of every workspace, and so on.
+   *
+   * **It costs nothing when there is nobody to be fair to**, which is design
+   * §8 criterion 7 and the reason there is no per-workspace cap in this
+   * query. With one workspace holding rows, every rank is distinct and
+   * ascending, so the order is exactly what it was before this change and
+   * the batch fills at full speed. Fairness that slowed a single-tenant
+   * instance down would be a tax every self-hosted deployment paid for a
+   * problem it does not have.
+   *
+   * **Why the join rather than one query level.** Postgres refuses
+   * `FOR UPDATE` in a query that has a window function, so the ranking sits
+   * in a subquery and the locking clause names the outer table by alias.
+   *
+   * Rows with no workspace share one bucket. That is the honest answer for a
+   * row written outside a tenant-scoped transaction: it belongs to no
+   * workspace, so it queues with the others like it rather than being given
+   * a bucket of its own and an unfair share.
+   *
    * The row lock alone is not enough. It lives only as long as the claim
    * transaction, and that transaction has to commit before dispatch begins —
    * holding it across a driver call would pin a database connection for the
@@ -328,6 +386,49 @@ export class OutboxRelay {
   async #claim(): Promise<OutboxRecord[]> {
     const client = await this.#pool.connect();
     try {
+      // **Two statements, and the first one takes no lock.** The fair order
+      // needs a window function, and a window function cannot sit in the
+      // same query level as `FOR UPDATE`. Putting it in a joined subquery
+      // compiles and is wrong: the locking clause then applies above the
+      // `LIMIT`, so two relays pick the same ids, the second blocks on the
+      // row lock rather than skipping it, and when it unblocks it updates
+      // rows the first already claimed. Measured, not reasoned about: the
+      // concurrency test in this suite delivered twenty-five rows where
+      // twenty exist.
+      //
+      // So the ranking picks the ids and the claim locks them, on a single
+      // table, exactly as it did before this change.
+      //
+      // **The ranking asks for more than one batch, and that is not a
+      // performance tweak.** With one batch of candidates, relays draining
+      // at the same moment all propose the same ids, the first locks every
+      // one and the others claim nothing: four relays delivered fifteen
+      // rows where twenty existed. `CLAIM_CANDIDATE_BATCHES` says why the
+      // window is wider. The claim keeps the `limit`, so a relay still takes
+      // one batch; it just takes the first batch of candidates nothing else
+      // is holding.
+      const fair = await client.query(
+        `select id
+           from (
+             select id, created_at,
+                    row_number() over (
+                      partition by workspace_id
+                      order by created_at, id
+                    ) as rank
+               from outbox
+              where delivered_at is null
+                and dead_lettered_at is null
+                and available_at <= now()
+           ) ranked
+          order by rank, created_at, id
+          limit $1`,
+        [this.#options.batchSize * CLAIM_CANDIDATE_BATCHES],
+      );
+      const ids = fair.rows.map((row) => row.id as string);
+      if (ids.length === 0) {
+        return [];
+      }
+
       const result = await client.query(
         `update outbox
             set attempts = attempts + 1,
@@ -335,34 +436,73 @@ export class OutboxRelay {
           where id in (
             select id
               from outbox
-             where delivered_at is null
+             where id = any($1::uuid[])
+               and delivered_at is null
                and dead_lettered_at is null
                and available_at <= now()
-             order by created_at, id
-             limit $1
+             order by array_position($1::uuid[], id)
+             limit $3
                for update skip locked
           )
-          returning id, topic, payload, idempotency_key, attempts, created_at`,
-        [this.#options.batchSize, this.#options.leaseSeconds],
+          returning id, topic, payload, idempotency_key, attempts, created_at,
+                    workspace_id`,
+        [ids, this.#options.leaseSeconds, this.#options.batchSize],
       );
 
-      // The subquery picks the oldest rows, but UPDATE ... RETURNING hands
-      // them back in whatever order it processed them. Sort here so dispatch
-      // is oldest first too, rather than depending on the query plan.
-      return result.rows
-        .map((row) => ({
-          id: row.id as string,
-          topic: row.topic as string,
-          payload: (row.payload ?? {}) as Record<string, unknown>,
-          idempotencyKey: row.idempotency_key as string,
-          attempts: row.attempts as number,
-          createdAt: row.created_at as Date,
-        }))
+      // **The subquery's order has to be rebuilt here, and this is where the
+      // fair read would have been undone** (P8-T06b). `UPDATE ... RETURNING`
+      // hands rows back in whatever order it processed them, so this sort
+      // decides the dispatch order. It sorted oldest first, which is exactly
+      // the FIFO the claim query stopped doing: the interleaving would have
+      // been computed and then thrown away, and the change would have looked
+      // like it worked because the right rows were claimed.
+      //
+      // So the rank is recomputed over what came back: each workspace's rows
+      // in age order, then taken one workspace at a time.
+      const claimed = result.rows.map((row) => ({
+        id: row.id as string,
+        topic: row.topic as string,
+        payload: (row.payload ?? {}) as Record<string, unknown>,
+        idempotencyKey: row.idempotency_key as string,
+        attempts: row.attempts as number,
+        createdAt: row.created_at as Date,
+        workspaceId: (row.workspace_id ?? null) as string | null,
+      }));
+
+      const seen = new Map<string, number>();
+      const ranked = claimed
+        .slice()
         .sort((a, b) => {
           const byAge = a.createdAt.getTime() - b.createdAt.getTime();
           return byAge !== 0 ? byAge : a.id.localeCompare(b.id);
         })
-        .map(({ createdAt: _createdAt, ...record }) => record);
+        .map((record) => {
+          // Null is its own bucket, named rather than skipped: a row with no
+          // workspace still queues fairly against the other rows with none.
+          const bucket = record.workspaceId ?? "";
+          const rank = (seen.get(bucket) ?? 0) + 1;
+          seen.set(bucket, rank);
+          return { record, rank };
+        });
+
+      return ranked
+        .sort((a, b) => {
+          if (a.rank !== b.rank) {
+            return a.rank - b.rank;
+          }
+          const byAge =
+            a.record.createdAt.getTime() - b.record.createdAt.getTime();
+          return byAge !== 0 ? byAge : a.record.id.localeCompare(b.record.id);
+        })
+        .map(
+          ({
+            record: {
+              createdAt: _createdAt,
+              workspaceId: _workspaceId,
+              ...record
+            },
+          }) => record,
+        );
     } finally {
       client.release();
     }
