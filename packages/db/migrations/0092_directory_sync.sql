@@ -13,6 +13,8 @@
 -- event (those are per-domain-write); it is an operational log that says
 -- what the directory asked for and what the instance did about it.
 
+-- openokr:hard-delete: tokens are revoked (revoked_at), not soft-deleted.
+-- A revoked token is a fact about the past, not a row to restore.
 create table directory_sync_tokens (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,
@@ -45,7 +47,8 @@ create policy directory_sync_tokens_tenant
   on directory_sync_tokens
   using (workspace_id = current_setting('app.workspace_id', true)::uuid);
 
--- The sync log: what the directory asked for and what happened.
+-- openokr:hard-delete: operational log, not domain data. Rows are retained
+-- for a window and then cleared by the retention sweep, not soft-deleted.
 create table directory_sync_log (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,

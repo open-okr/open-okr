@@ -93,6 +93,9 @@ export async function logSyncOperation(
   },
 ): Promise<void> {
   try {
+    // openokr:allow-mutation: the sync log is an operational record of
+    // what the identity provider asked for. It is not a domain write and
+    // has no audit row, activity row or outbox row of its own.
     await pool.query(
       `INSERT INTO directory_sync_log
         (workspace_id, resource_type, operation, external_id, local_id,

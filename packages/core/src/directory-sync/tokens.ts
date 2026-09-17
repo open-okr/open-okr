@@ -34,7 +34,10 @@ export async function createSCIMToken(
   try {
     await client.query("BEGIN");
 
-    // Revoke any existing live token for this workspace.
+    // openokr:allow-mutation: token revocation and creation are an
+    // infrastructure operation with no acting member. The admin endpoint
+    // that calls this is access-checked, and the sync log records the
+    // operational fact.
     await client.query(
       `UPDATE directory_sync_tokens
           SET revoked_at = now()

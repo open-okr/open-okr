@@ -76,6 +76,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const sealed = encryptSecret(ring, clientSecret);
 
     const pool = getPool();
+    // openokr:allow-mutation: SSO connection creation is an admin
+    // configuration write. The sealed secret must be written directly
+    // because the Operation pipeline cannot carry envelope-encrypted
+    // columns through a generic input schema.
     await pool.query(
       `insert into sso_connections (
         workspace_id, provider_id, display_name,

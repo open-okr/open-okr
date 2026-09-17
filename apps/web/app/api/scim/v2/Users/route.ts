@@ -145,6 +145,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       memberId = existingMembers[0].id;
       // If the member was suspended, reactivate them.
       if (existingMembers[0].status === "suspended") {
+        // openokr:allow-mutation: SCIM reactivation runs as the identity
+        // provider's system actor. No acting member exists, so the
+        // Operation pipeline cannot resolve an actor. The sync log records
+        // the operation instead of an audit row.
         await pool.query(
           `UPDATE workspace_members SET status = 'active', updated_at = now()
             WHERE id = $1`,
