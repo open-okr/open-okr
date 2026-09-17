@@ -599,6 +599,19 @@ export {
   buildDemoWorkspace,
   type DemoContext,
 } from "./demo/builder.ts";
+export {
+  displayName as scimDisplayName,
+  logSyncOperation,
+  primaryEmail as scimPrimaryEmail,
+  type SCIMGroup,
+  type SCIMUser,
+  scimError,
+  scimList,
+} from "./directory-sync/scim.ts";
+export {
+  createSCIMToken,
+  resolveToken as resolveSCIMToken,
+} from "./directory-sync/tokens.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.

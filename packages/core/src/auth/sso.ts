@@ -91,10 +91,7 @@ export async function loadSSOConnections(
     // Graceful degradation: if the table does not exist yet (migration
     // 0091 not applied), return no providers rather than crashing the
     // boot sequence. The instance works without SSO.
-    if (
-      error instanceof Error &&
-      error.message.includes("sso_connections")
-    ) {
+    if (error instanceof Error && error.message.includes("sso_connections")) {
       return [];
     }
     throw error;
@@ -161,10 +158,7 @@ export async function listSSOProviders(
     // Graceful degradation: if the table does not exist yet (migration
     // 0091 not applied), return no providers. The sign-in page renders
     // without SSO buttons and nothing crashes.
-    if (
-      error instanceof Error &&
-      error.message.includes("sso_connections")
-    ) {
+    if (error instanceof Error && error.message.includes("sso_connections")) {
       return [];
     }
     throw error;

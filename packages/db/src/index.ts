@@ -273,6 +273,12 @@ export {
   digests,
 } from "./schema/digests.ts";
 export {
+  type DirectorySyncLogEntry,
+  type DirectorySyncToken,
+  directorySyncLog,
+  directorySyncTokens,
+} from "./schema/directory-sync.ts";
+export {
   ATTACHMENT_SUBJECT_TYPES,
   type Attachment,
   type AttachmentSubjectType,

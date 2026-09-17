@@ -367,6 +367,14 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-directory",
+        label: "Directory sync",
+        href: "/admin/directory",
+        section: "admin",
+        // Directory provisioning decides who is a member (P8-T08).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-branding",
         label: "Branding",
         href: "/admin/branding",

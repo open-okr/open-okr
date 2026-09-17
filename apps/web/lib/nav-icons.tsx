@@ -89,6 +89,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // exists to prevent.
   "admin-support": <LifeBuoy className="size-full" />,
   "admin-sso": <Shield className="size-full" />,
+  "admin-directory": <RefreshCw className="size-full" />,
   "admin-branding": <Palette className="size-full" />,
   // Thresholds are the readable half of "rhythm and thresholds", and a dial
   // is what a threshold looks like. Cycle already holds the arrows.
