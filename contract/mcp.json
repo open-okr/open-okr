@@ -2610,7 +2610,7 @@
     },
     {
       "name": "settings.updateWorkspaceGeneral",
-      "description": "Change the workspace's timezone, language or trusted email domains.",
+      "description": "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2629,6 +2629,9 @@
               "type": "string",
               "pattern": "^(?!-)[a-z0-9-]{1,63}(?<!-)(\\.(?!-)[a-z0-9-]{1,63}(?<!-))+$"
             }
+          },
+          "requireSecondFactor": {
+            "type": "boolean"
           }
         }
       },

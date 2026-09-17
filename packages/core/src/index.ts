@@ -403,6 +403,13 @@ export {
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export {
+  ENROLMENT_PATH,
+  heldForEnrolment,
+  identityProviderManaged,
+  requiresSecondFactor,
+  type SecondFactorHoldInput,
+} from "./auth/second-factor.ts";
+export {
   type CurrentSession,
   getCurrentSession,
   listUserSessions,

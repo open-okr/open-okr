@@ -1780,7 +1780,7 @@
       "method": "POST",
       "path": "/settings/updateWorkspaceGeneral",
       "scope": "write",
-      "summary": "Change the workspace's timezone, language or trusted email domains.",
+      "summary": "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
       "flags": [
         {
           "name": "timezone",
@@ -1798,6 +1798,12 @@
           "name": "trusted-email-domains",
           "field": "trustedEmailDomains",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "require-second-factor",
+          "field": "requireSecondFactor",
+          "type": "boolean",
           "required": false
         }
       ],

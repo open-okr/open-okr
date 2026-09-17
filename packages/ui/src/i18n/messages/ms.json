@@ -202,6 +202,8 @@
   "admin.general.consoleMail.what": "Instance ini belum punya server mail, jadi ia memakai driver console. Driver itu menulis setiap pesan ke log proses beserta alamat penerima, subjek dan isinya. Tidak ada yang terkirim: undangan, ringkasan mingguan dan tautan reset kata sandi semuanya mengendap di log.",
   "admin.general.general": "General",
   "admin.general.generalSettingsForm.language": "Language",
+  "admin.general.generalSettingsForm.requireSecondFactor": "Require a second factor for everybody in this workspace",
+  "admin.general.generalSettingsForm.requireSecondFactorHint": "Members without a one-time code or a passkey are held in their security settings at their next sign-in until they enrol. Accounts managed by an identity provider are exempt, because the provider enforces its own.",
   "admin.general.generalSettingsForm.trustedEmailDomainsComma": "Trusted email domains (comma-separated)",
   "admin.imports.archiveImportCard.analyzingArchive": "Analyzing archive...",
   "admin.imports.archiveImportCard.archiveExportedFromAnother": "archive exported from another instance. A\n          preview shows what will change before anything is written.",
