@@ -214,6 +214,24 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "A device login in progress. Short-lived and instance-bound.",
   },
   {
+    table: "sso_connections",
+    decision: "exclude",
+    reason:
+      "SSO provider configuration with envelope-encrypted client secrets. §7.3 excludes secrets, and the connection is between this instance and a specific identity provider.",
+  },
+  {
+    table: "directory_sync_tokens",
+    decision: "exclude",
+    reason:
+      "SCIM bearer tokens, hashed at rest and scoped to this instance. §7.3 excludes tokens.",
+  },
+  {
+    table: "directory_sync_log",
+    decision: "exclude",
+    reason:
+      "Operational log of what the identity provider pushed to this instance. Facts about this instance's sync history, not about the workspace's content.",
+  },
+  {
     table: "invite_links",
     decision: "exclude",
     reason:
