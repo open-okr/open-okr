@@ -17,9 +17,10 @@
  * passwords were already identical; only the address differed, which is exactly
  * the kind of accidental agreement a shared constant turns into a real one.
  *
- * The first-run wizard spec is not a caller. It runs against its own separate
- * instance, one that has never been set up, which is the entire point of the
- * second database.
+ * The first-run wizard spec does not sign in as this account. It runs against
+ * its own separate instance, one that has never been set up, which is the
+ * entire point of the second database. It does share `skipOnboarding` below,
+ * because both instances owe their first owner the same four questions.
  */
 
 /**
@@ -184,3 +185,47 @@ export async function goTo(
 }
 
 
+
+/**
+ * Skips every step of onboarding (S-34), synchronised on the wizard's own state.
+ *
+ * **The wizard is briefly mounted twice on arrival, and a click in that
+ * window is a strict-mode violation.** A fresh owner reaches `/welcome`
+ * through a chain: sign-up lands on `/`, and the front door answers with a
+ * server redirect. Two navigations resolving into one segment is the case the
+ * comment on `goTo` describes, the App Router settling a fresh page with a
+ * navigation of its own, and since P8-G01 put a `loading.tsx` on this route
+ * the segment sits behind a Suspense boundary, which is what lets the previous
+ * subtree and the incoming one share the document for a moment. Playwright's
+ * `getByTestId("welcome-skip")` then resolves to two buttons and refuses to
+ * choose. The snapshot it saves shows one button and `1 / 4` a moment later,
+ * so this is a window, not a state, and the four-click loop that used to live
+ * in two specs fell into it on 15 September 2026, taking twenty-six sign-ins
+ * with it because nobody had claimed the instance.
+ *
+ * So arrival is waited out before the first click, and every click after that
+ * is placed against the progress counter rather than counted. A click that
+ * landed on the subtree being torn down would leave the counter where it was,
+ * and the next iteration says so in those terms instead of timing out on the
+ * front door.
+ */
+export async function skipOnboarding(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  const { expect } = await import("@playwright/test");
+
+  await expect(page).toHaveURL("/welcome");
+  // The redirect chain has finished when its fetches have. This page is
+  // outside the shell and polls nothing, so idle here means settled.
+  await page.waitForLoadState("networkidle");
+  const skip = page.getByTestId("welcome-skip");
+  await expect(skip).toHaveCount(1);
+
+  const steps = 4;
+  for (let step = 1; step <= steps; step += 1) {
+    await expect(page.getByTestId("welcome-progress")).toContainText(
+      `${step} / ${steps}`,
+    );
+    await skip.click();
+  }
+}
