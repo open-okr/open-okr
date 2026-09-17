@@ -99,8 +99,9 @@ capacity gauge.
 ### The four readings that are taken at scrape time
 
 `openokr_outbox_pending`, `openokr_outbox_oldest_pending_seconds`,
-`openokr_pool_connections` and `openokr_concurrent_actions` are queried when
-you read the endpoint, not written when an event happens. For the outbox pair,
+`openokr_pool_connections` and `openokr_concurrent_actions` are
+queried when you read the endpoint, not written when an event happens.
+For the outbox pair,
 that is the only shape that answers the question worth asking: a counter
 written during a drain says nothing once draining stops, so a dead relay
 produces a flat line and the outage reads as a quiet queue. Those two keep
