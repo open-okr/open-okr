@@ -32,6 +32,9 @@ vi.mock("../lib/auth", () => ({ resolveSignupPolicy: vi.fn() }));
 // same graph. Mocked for the import cost, and the mock is what makes the two
 // ordering assertions below possible at all.
 vi.mock("../lib/admission", () => ({ installAdmission: vi.fn() }));
+// The sixth route (P8-T07). `lib/sso` reaches the pool and the key ring
+// to decrypt SSO connections at boot. Mocked for the import cost.
+vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
 
 const original = { ...process.env };
 
