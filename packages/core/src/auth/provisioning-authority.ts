@@ -29,7 +29,33 @@ export interface ProvisioningAuthority {
   readonly externalId?: string;
 }
 
-const storage = new AsyncLocalStorage<ProvisioningAuthority>();
+/**
+ * **One store for the whole process, held on `globalThis`.**
+ *
+ * Next bundles every route separately, so `packages/core` exists as several
+ * module instances in one server and a plain module-level store is several
+ * stores. The Better Auth instance is built once and cached on `globalThis`,
+ * so its hooks close over whichever copy created it, while the SCIM route
+ * sets the authority through its own. They never met, and the registration
+ * rule refused every account SCIM tried to provision with "this instance is
+ * invitation-only", which is exactly the rule the authority exists to answer.
+ *
+ * Found by the end-to-end spec on 17 September 2026, in the sync log's own
+ * `error_message` column. The unit tests could not see it: one process, one
+ * module graph, one store.
+ *
+ * `lib/auth.ts` caches the auth instance the same way and for the same
+ * reason.
+ */
+const globals = globalThis as typeof globalThis & {
+  openokrProvisioningAuthority?: AsyncLocalStorage<ProvisioningAuthority>;
+};
+
+if (!globals.openokrProvisioningAuthority) {
+  globals.openokrProvisioningAuthority =
+    new AsyncLocalStorage<ProvisioningAuthority>();
+}
+const storage = globals.openokrProvisioningAuthority;
 
 /** Runs `fn` with this authority in scope. */
 export function withProvisioningAuthority<T>(

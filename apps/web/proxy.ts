@@ -85,6 +85,17 @@ const PUBLIC_PREFIXES = [
   // authenticates itself, and a path that did not would have to say so by
   // living somewhere else.
   "/api/mcp",
+  // **The SCIM surface, and the fourth time this list has been the defect**
+  // (P8-T08a). An identity provider sends a bearer token and no cookie, so
+  // every request it made was answered with a 307 to the sign-in page, which
+  // an HTTP client reads as success at status 200. The two comments above
+  // say exactly this about the REST surface and the channel webhooks, and
+  // P8-T08 shipped a third surface without adding its line.
+  //
+  // It authenticates itself: `resolveSCIMToken` refuses without a live token
+  // and the route answers 401 in SCIM's own error shape. Found by this task's
+  // first end-to-end request, the same way the channel webhooks were.
+  "/api/scim",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

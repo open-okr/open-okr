@@ -16,8 +16,22 @@
  */
 import { createHmac } from "node:crypto";
 import type { BrowserContext, Page } from "@playwright/test";
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
+import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+
+/**
+ * The database this server owns, named the way `prepare-database.ts` names it.
+ *
+ * **Repeated rather than imported, and not out of laziness.** That module ends
+ * in a top-level `await prepareDatabase()`: it is a script as well as a
+ * module, so importing it for one constant drops and rebuilds the database in
+ * the middle of the run. It did exactly that on 17 September 2026, and the
+ * symptom was every spec after this one failing to sign in, because the
+ * account that had claimed the instance no longer existed.
+ */
+const E2E_DATABASE = process.env.E2E_DATABASE_NAME ?? "openokr_e2e";
 
 test.describe.configure({ mode: "serial" });
 
@@ -72,10 +86,36 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
-  // Whatever happened above, the instance is handed back with the policy off.
+  // **Handed back exactly as it was found, through the database rather than
+  // through the product.**
+  //
+  // This spec does two things to the one instance the suite builds: it turns
+  // on a workspace-wide policy, and it enrols a real second factor on the
+  // account every other spec signs in with. An enrolled account answers a
+  // password sign-in with a challenge instead of a session, so leaving either
+  // behind fails every spec that sorts after this one, and the failure reads
+  // as a sign-in bug rather than as this file's litter. It did exactly that
+  // on 17 September 2026: thirty-one specs failed with "nobody has claimed
+  // this instance".
+  //
+  // The cleanup is deliberately not driven through the screens. A spec that
+  // failed half way can leave the browser held at enrolment, which is the one
+  // state that cannot reach the admin screen the policy is turned off from,
+  // so a teardown that needs that screen is a teardown that fails when it is
+  // needed most. Two statements on the same database the harness built cannot
+  // fail that way.
+  const client = new pg.Client(
+    connectionOptions(E2E_DATABASE, testDbEnv.superuser),
+  );
   try {
-    await setPolicy(false);
+    await client.connect();
+    await client.query(
+      "update workspaces set settings = settings - 'requireSecondFactor'",
+    );
+    await client.query("delete from two_factors");
+    await client.query("update users set two_factor_enabled = false");
   } finally {
+    await client.end().catch(() => undefined);
     await context?.close();
   }
 });

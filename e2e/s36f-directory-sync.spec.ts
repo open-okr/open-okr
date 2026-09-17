@@ -141,7 +141,9 @@ test("the provider looks somebody up the way it actually does", async () => {
 
 test("the person appears in the workspace, as a member", async () => {
   await goTo(page, "/people");
-  await expect(page.getByText(ADDRESS).first()).toBeVisible({
+  // By the name the directory sent, which is what the list shows: a member's
+  // address is theirs and the roster is not where it is published.
+  await expect(page.getByText("Grace Hopper").first()).toBeVisible({
     timeout: 10_000,
   });
 });
