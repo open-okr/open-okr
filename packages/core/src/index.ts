@@ -34,6 +34,7 @@ export {
   resolveSubjectContext,
   type SubjectContext,
 } from "./access/reads.ts";
+export { AUDIT_EXPORT_CEILING } from "./actions/audit.ts";
 export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
 export {
   type ActionCallContext,
@@ -393,6 +394,16 @@ export {
   chainWorkspace,
   countPending,
 } from "./audit/chainer.ts";
+export {
+  AUDIT_EXPORT_COLUMNS,
+  type AuditExport,
+  type AuditExportFilter,
+  type AuditExportRow,
+  auditCsv,
+  auditCsvFile,
+  auditExportFilename,
+  exportAuditRows,
+} from "./audit/export.ts";
 export {
   type InstanceAuditRow,
   instanceAuditRowHash,

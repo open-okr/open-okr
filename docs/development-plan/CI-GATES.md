@@ -20,6 +20,7 @@ pnpm dead-code        # knip
 pnpm db:lint          # migration rules, then soft-delete usage
 pnpm check:boundaries # the architecture gate
 pnpm check:licences   # dependency licences
+pnpm check:air-gap    # the air-gap checklist, against the guide
 pnpm check:contract   # the committed OpenAPI document against the registry
 pnpm method:check     # packages/method against METHOD.md
 pnpm test             # unit and integration, needs a database. One at a time
@@ -70,7 +71,7 @@ If all of those pass locally, CI passes, with one exception named under
 
 | Job | Steps | Skipped when |
 |---|---|---|
-| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
+| Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm check:air-gap`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, sharded, against a real Postgres | The push changed no code |
 | End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e` | The push changed no code |
 | Accessibility and web vitals | Part of the same end-to-end job (P7-T05). `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
@@ -137,6 +138,23 @@ create policy tenant_isolation on t
   using (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
   with check (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid);
 ```
+
+### `pnpm check:air-gap`
+
+| It refuses | Because |
+|---|---|
+| A CDN or font service named in shipped source | An isolated instance cannot reach one, and the page that names it fails with nothing to show |
+| `next/font/google` on any screen | It fetches while it builds, so an air-gapped build fails |
+| `curl`, `wget`, `apk add` or a package install in the image's runtime stage | A container that installs at boot needs a registry it does not have |
+| `ai_providers.enabled` defaulting to true | An instance nobody configured would call out |
+| `fetch` on an absolute address outside `packages/adapters` | `outboundFetch` validates the literal host and the resolved address, follows no redirect and caps size and time. A direct call does none of that |
+| A component registry fetched at render time | Components are added at build time, so an air-gapped install already carries them |
+| A checklist row in `docs/runbooks/air-gap.md` with no check, or a check with no row | The guide is a claim about the product, and a claim nothing tests stops being true without anybody noticing |
+
+Two of the guide's claims are deliberately not here: watching for egress with
+`tcpdump`, and proving a restarted container still works without the network.
+Both are about a machine on an isolated network, and this repository is not on
+that network. The guide writes them out for whoever commissions the instance.
 
 ### `pnpm check:boundaries`
 

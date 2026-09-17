@@ -21,6 +21,7 @@ import {
   Plug,
   Radio,
   RefreshCw,
+  ScrollText,
   Search,
   Shield,
   SlidersHorizontal,
@@ -92,6 +93,7 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-support": <LifeBuoy className="size-full" />,
   "admin-sso": <Lock className="size-full" />,
   "admin-directory": <Users className="size-full" />,
+  "admin-audit": <ScrollText className="size-full" />,
   "admin-branding": <Palette className="size-full" />,
   // Thresholds are the readable half of "rhythm and thresholds", and a dial
   // is what a threshold looks like. Cycle already holds the arrows.

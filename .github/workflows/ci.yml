@@ -90,6 +90,13 @@ jobs:
         # the outbox.
         run: pnpm check:boundaries
 
+      - name: Air-gap checklist
+        # docs/runbooks/air-gap.md claims an instance with no route out is
+        # whole. Six of those claims are about the source, and this checks
+        # them in both directions: a row there with no check here fails, and
+        # a check here with no row there fails too.
+        run: pnpm check:air-gap
+
       - name: Method conformance
         # METHOD.md and packages/method have to agree: every rule key the
         # documents cite resolves, every SS11 parameter exists in the registry
