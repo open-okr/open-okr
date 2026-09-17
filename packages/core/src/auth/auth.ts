@@ -28,12 +28,14 @@ import {
   inviteTokenFromCookies,
 } from "../invitations/pending.ts";
 import { previewInvite } from "../invitations/preview.ts";
+import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
+import { providerIdFromCallback } from "./sso.ts";
 import {
   enforcedProviderForEmail,
   enforcedProviderForUser,
@@ -145,6 +147,19 @@ export interface AuthOptions {
    */
   readonly ssoProviders?: ReadonlyArray<{
     readonly providerId: string;
+    /**
+     * The workspace that configured this provider (P8-T07b).
+     *
+     * What makes just-in-time provisioning land where it was meant to. The
+     * field was loaded from `sso_connections` at boot and dropped here, so
+     * the first person to sign in through their company's provider got a
+     * fresh empty workspace of their own instead of the one that had
+     * configured it.
+     *
+     * Optional, because an instance whose caller does not supply it keeps the
+     * old behaviour rather than refusing to sign anybody in.
+     */
+    readonly workspaceId?: string;
     readonly clientId: string;
     readonly clientSecret: string;
     readonly discoveryUrl?: string;
@@ -170,6 +185,19 @@ const SIGN_IN_WINDOW_SECONDS = 60;
 export function createAuth(options: AuthOptions) {
   const database = drizzle(options.pool, { schema: authSchema });
   const origin = new URL(options.baseUrl);
+
+  /**
+   * Which workspace each SSO provider belongs to (P8-T07b).
+   *
+   * Built once, because the after-create hook has to answer it while a
+   * browser waits mid-redirect and the providers are fixed for the life of
+   * the process anyway.
+   */
+  const workspaceByProvider = new Map<string, string>(
+    (options.ssoProviders ?? []).flatMap((provider) =>
+      provider.workspaceId ? [[provider.providerId, provider.workspaceId]] : [],
+    ),
+  );
 
   const sendResetPassword =
     options.sendResetPassword ??
@@ -426,6 +454,28 @@ export function createAuth(options: AuthOptions) {
                 () => undefined,
               );
             }
+
+            // **An identity provider vouching for somebody works the same
+            // way, and for the same reason** (P8-T07b). The provider was
+            // configured by one workspace, so the person signing in through
+            // it belongs there, and joining before the line below means
+            // `provisionWorkspaceForUser` finds that membership instead of
+            // making a workspace of their own.
+            //
+            // Until this existed, every just-in-time account landed alone in
+            // a fresh empty workspace and never saw the one whose provider
+            // they had used, which is the opposite of the P8-T07 deliverable.
+            const workspaceId = workspaceByProvider.get(
+              providerIdFromCallback(hookContext?.path, hookContext?.params),
+            );
+            if (workspaceId) {
+              await tryJoinWorkspaceForIdentity(options.pool, {
+                workspaceId,
+                user: { id: user.id, name: user.name },
+                via: "sso",
+              });
+            }
+
             await provisionWorkspaceForUser(options.pool, {
               id: user.id,
               name: user.name,

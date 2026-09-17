@@ -44,6 +44,31 @@ export interface SSOProviderConfig {
   readonly enforce: boolean;
 }
 
+/**
+ * The provider id out of an OAuth callback, or "" (P8-T07b).
+ *
+ * Better Auth completes every social and genericOAuth sign-in at
+ * `/callback/:id`, so the id is either in the route parameters or is the last
+ * segment of the path. Both are read, because a hook receiving a context it
+ * did not construct should not depend on which one is populated.
+ *
+ * Anything that is not a callback answers "", which matches no provider. A
+ * pure function, so the parsing is tested without an identity provider.
+ */
+export function providerIdFromCallback(
+  path: string | undefined,
+  params: unknown,
+): string {
+  if (path === undefined || !path.startsWith("/callback/")) {
+    return "";
+  }
+  const fromParams = (params as { id?: unknown } | undefined)?.id;
+  if (typeof fromParams === "string" && fromParams !== "") {
+    return fromParams;
+  }
+  return path.slice("/callback/".length).split("/")[0] ?? "";
+}
+
 type SSORow = {
   id: string;
   workspace_id: string;

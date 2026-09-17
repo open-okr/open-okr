@@ -416,6 +416,7 @@ export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   listSSOProviders,
   loadSSOConnections,
+  providerIdFromCallback,
   type SSOProviderConfig,
   type SSOProviderInfo,
 } from "./auth/sso.ts";
