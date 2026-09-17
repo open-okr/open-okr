@@ -9,21 +9,13 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Pool } from "pg";
 
 /** Hashes a token for storage. Same algorithm as session tokens. */
-export function hashToken(token: string): string {
+function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
 /** Generates a random bearer token, 32 bytes hex-encoded. */
-export function generateToken(): string {
+function generateToken(): string {
   return randomBytes(32).toString("hex");
-}
-
-export interface SCIMTokenInfo {
-  readonly id: string;
-  readonly workspaceId: string;
-  readonly label: string;
-  readonly createdAt: Date;
-  readonly expiresAt: Date | null;
 }
 
 /**
