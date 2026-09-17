@@ -79,7 +79,12 @@ export async function exportAuditRows(
   workspaceId: string,
   filter: AuditExportFilter,
 ): Promise<AuditExport> {
-  const clauses: SQL[] = [];
+  // **The workspace is named here as well as in the tenant setting.** The
+  // floor is the floor, not the only scope: a connection that bypasses
+  // row-level security would otherwise hand an export one workspace asked for
+  // and every other workspace as well. The verifier beside this had the same
+  // shape and the same correction (P8-T10).
+  const clauses: SQL[] = [eq(auditEvents.workspaceId, workspaceId)];
   if (filter.from) {
     clauses.push(gte(auditEvents.at, filter.from));
   }

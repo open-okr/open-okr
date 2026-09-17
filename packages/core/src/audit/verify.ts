@@ -6,7 +6,7 @@
  * one workspace cannot see another's rows.
  */
 import { auditEvents, withWorkspace } from "@openokr/db";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type AuditRow, type ChainVerdict, verifyChain } from "./chain.ts";
@@ -23,8 +23,21 @@ export async function verifyWorkspaceChain(
   workspaceId: string,
 ): Promise<ChainVerdict> {
   const db = drizzle(pool);
+  // **The workspace is named in the query as well as in the setting**
+  // (P8-T10). The tenant floor is the floor, not the only scope: a connection
+  // that bypasses row-level security, which a superuser does and every
+  // development `DATABASE_URL` tends to be, saw every workspace's rows through
+  // this read and reported the chain broken at the first row of the second
+  // workspace. Found by opening the screen on 17 September 2026 against a
+  // development database. The production role is `nobypassrls`, so this was
+  // never a leak there; it was a verifier that answered about the wrong set
+  // whenever the floor was not doing the scoping.
   const rows = await withWorkspace(db, workspaceId, (tx) =>
-    tx.select().from(auditEvents).orderBy(asc(auditEvents.seq)),
+    tx
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.workspaceId, workspaceId))
+      .orderBy(asc(auditEvents.seq)),
   );
 
   // **Unchained rows are counted, not verified, and not a break** (P7-T02a).
