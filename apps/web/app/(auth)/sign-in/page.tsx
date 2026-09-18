@@ -12,6 +12,13 @@ interface SSOProvider {
   displayName: string;
 }
 
+/** One of the people a visitor may be on a demo instance (P8-T13c). */
+interface DemoPersona {
+  name: string;
+  email: string;
+  title: string;
+}
+
 /**
  * Sign in (screen S-35): password, passkey, SSO where configured, and the
  * one-time code challenge when a second factor is enrolled.
@@ -25,6 +32,8 @@ export default function SignInPage() {
   const [challenge, setChallenge] = useState(false);
   const [code, setCode] = useState("");
   const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
+  const [personas, setPersonas] = useState<DemoPersona[]>([]);
+  const [demoPassword, setDemoPassword] = useState<string | null>(null);
 
   // Load SSO providers for buttons. Non-blocking: the password form renders
   // immediately and the buttons appear when the fetch completes.
@@ -40,6 +49,53 @@ export default function SignInPage() {
         // SSO buttons simply do not appear if the fetch fails.
       });
   }, []);
+
+  /**
+   * Who a visitor may sign in as, on a demo instance (P8-T13c).
+   *
+   * Empty on every other kind of instance, and the panel then does not render
+   * at all. Non-blocking, like the provider list above: the password form is
+   * what this page is for and it must not wait on anything.
+   */
+  useEffect(() => {
+    fetch("/api/demo-personas")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.personas) && data.personas.length > 0) {
+          setPersonas(data.personas);
+          setDemoPassword(
+            typeof data.password === "string" ? data.password : null,
+          );
+        }
+      })
+      .catch(() => {
+        // Not a demo, or the instance could not say. Either way, no panel.
+      });
+  }, []);
+
+  /**
+   * Fills the form rather than signing in, so the visitor sees what it did.
+   *
+   * Not named `usePersona`: the hook rule reads a `use` prefix as a hook and
+   * refuses it inside a callback, which is right about the convention and
+   * wrong about this function.
+   */
+  const fillForPersona = (email: string) => {
+    const form = document.querySelector("form");
+    const address = form?.querySelector<HTMLInputElement>(
+      'input[name="email"]',
+    );
+    const secret = form?.querySelector<HTMLInputElement>(
+      'input[name="password"]',
+    );
+    if (address) {
+      address.value = email;
+    }
+    if (secret && demoPassword) {
+      secret.value = demoPassword;
+    }
+    secret?.focus();
+  };
 
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -194,6 +250,43 @@ export default function SignInPage() {
               {provider.displayName}
             </Button>
           ))}
+        </div>
+      )}
+
+      {personas.length > 0 && (
+        <div
+          className="flex flex-col gap-2 border-t border-ink/10 pt-3"
+          data-testid="demo-personas"
+        >
+          <p className="text-xs text-ink-3">
+            This is a demonstration instance. Sign in as anybody here; the
+            workspace is rebuilt on a schedule and nothing in it is real.
+          </p>
+          <div className="flex flex-col gap-1">
+            {personas.map((persona) => (
+              <button
+                key={persona.email}
+                type="button"
+                data-testid={`persona-${persona.email}`}
+                onClick={() => fillForPersona(persona.email)}
+                className="flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-1.5 text-left hover:border-ink-4"
+              >
+                <span className="text-xs font-semibold text-ink">
+                  {persona.name}
+                </span>
+                <span className="text-xs text-ink-3">
+                  {persona.title} · {persona.email}
+                </span>
+              </button>
+            ))}
+          </div>
+          {demoPassword ? (
+            <p className="text-xs text-ink-3">
+              The password is{" "}
+              <code className="font-mono text-ink-2">{demoPassword}</code> for
+              all of them.
+            </p>
+          ) : null}
         </div>
       )}
 

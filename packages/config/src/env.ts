@@ -142,6 +142,14 @@ const envSchema = z
      * handed to one worker. Set `off` on the replicas you do not want polling. */
     OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
 
+    /** Whether this instance is a public demonstration (P8-T13c). Off by
+     * default, and it is a claim about the deployment rather than a feature
+     * flag: on, the sign-in page names the personas anybody may sign in as and
+     * publishes their shared password, which is correct for a demo instance
+     * that resets itself and wrong for every other kind. Nothing else in the
+     * product reads it, so turning it on cannot weaken a rule. */
+    OPENOKR_DEMO: optional(z.enum(["on", "off"]).default("off")),
+
     /** Where the local-disk storage driver keeps files (P5-T15). Relative to the
      * working directory, and `storage` is what the compose file already mounts a
      * named volume at, so a container keeps its files across an upgrade with

@@ -629,6 +629,8 @@ export {
 } from "./demo/builder.ts";
 export {
   DEMO_PERSONA_PASSWORD,
+  DEMO_PERSONAS,
+  type DemoPersona,
   type PrepareDemoPersonasInput,
   type PrepareDemoPersonasResult,
   type PreparedPersona,

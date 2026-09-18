@@ -96,6 +96,23 @@ const PUBLIC_PREFIXES = [
   // and the route answers 401 in SCIM's own error shape. Found by this task's
   // first end-to-end request, the same way the channel webhooks were.
   "/api/scim",
+  // **Two unauthenticated reads the sign-in page makes before anybody has a
+  // session**, which is the fifth time this list has been the defect and the
+  // first time it was found by reading rather than by a failed request.
+  //
+  // `/api/sso-providers` has been fetched by the sign-in page since P8-T07
+  // and has never been on this list, so on a deployed instance every request
+  // for it was answered with a 307 to the sign-in page. The page catches the
+  // failure and renders no buttons, which is exactly why nobody noticed: an
+  // instance with single sign-on configured showed no way to use it and no
+  // error either.
+  //
+  // `/api/demo-personas` is the same shape (P8-T13c) and would have had the
+  // same defect. Neither returns anything a visitor could not be told; the
+  // provider list is ids and display names, and the persona list is only
+  // populated when the deployment says it is a demo.
+  "/api/sso-providers",
+  "/api/demo-personas",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

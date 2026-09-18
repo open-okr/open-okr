@@ -21,6 +21,7 @@ Start where you are.
 | [Kubernetes with Helm](install/kubernetes.md) | What the chart does, what it deliberately does not, and the secret to back up |
 | [The managed cloud](install/cloud.md) | Signing up, and what the vendor operates |
 | [The first run](install/first-run.md) | The wizard, the owner account, and the five things to do next |
+| [A public demonstration instance](install/demo.md) | The seeded, self-resetting instance anybody can sign into |
 | [Running with no internet](runbooks/air-gap.md) | What works air-gapped, and how to validate it |
 
 ## Administering an instance

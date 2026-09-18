@@ -52,6 +52,29 @@ type Auth = ReturnType<typeof createAuth>;
  */
 export const DEMO_PERSONA_PASSWORD = "explore-openokr";
 
+/** One persona a visitor may sign in as, for the sign-in page (P8-T13c). */
+export interface DemoPersona {
+  readonly name: string;
+  readonly email: string;
+  readonly title: string;
+}
+
+/**
+ * Who a visitor can be on a demo instance.
+ *
+ * The same seven the seed writes and `demo:prepare` gives accounts to, in the
+ * cast's own order so the list reads top-down through the organisation. The
+ * page that shows this cannot ask the database who has an account, because it
+ * is rendered before anybody is signed in.
+ */
+export const DEMO_PERSONAS: readonly DemoPersona[] = INVENTED_CAST.map(
+  (person) => ({
+    name: person.name,
+    email: person.email,
+    title: person.title,
+  }),
+);
+
 export interface PrepareDemoPersonasInput {
   readonly pool: Pool;
   readonly workspaceId: string;
