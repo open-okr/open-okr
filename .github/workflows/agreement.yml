@@ -47,7 +47,15 @@ jobs:
         run: |
           set -uo pipefail
           missing=""
-          for sha in $(git rev-list "${BASE}..HEAD"); do
+          # **Merges are excluded, the way `scripts/check-signoff.ts` excludes
+          # them.** A merge commit certifies nothing: it introduces no work of
+          # its own, and the commits it brings in were each signed off by
+          # whoever wrote them. GitHub also synthesises its own merge of the
+          # branch into the base to run a pull request on, which nobody
+          # authored and nobody could sign. This workflow flagged both on its
+          # very first run, which is the one thing it was there to avoid doing
+          # to somebody else.
+          for sha in $(git rev-list --no-merges "${BASE}..HEAD"); do
             author="$(git show -s --format='%an <%ae>' "$sha")"
             if ! git show -s --format='%B' "$sha" \
               | grep -qiF "Signed-off-by: ${author}"; then
