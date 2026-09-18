@@ -28,8 +28,18 @@ export interface SSOProviderInfo {
   readonly enforce: boolean;
 }
 
-/** The full configuration for the genericOAuth plugin. */
+/** The full configuration for a provider, whichever protocol it speaks. */
 export interface SSOProviderConfig {
+  /**
+   * Which protocol (P8-T07c-a).
+   *
+   * `oidc` goes to `genericOAuth`, `saml` to `@better-auth/sso`. Defaults to
+   * `oidc` on any row written before the column existed, which is every row
+   * written before 18 September 2026.
+   */
+  readonly kind: "oidc" | "saml";
+  /** The row's own id, which is what the SAML plugin is registered under. */
+  readonly id: string;
   readonly providerId: string;
   readonly displayName: string;
   readonly workspaceId: string;
@@ -42,6 +52,15 @@ export interface SSOProviderConfig {
   readonly scopes: string[];
   readonly emailDomains: string[];
   readonly enforce: boolean;
+  /** Where the browser is sent to authenticate. SAML only. */
+  readonly samlEntryPoint?: string;
+  /** The provider's entity id, which it signs its assertions as. */
+  readonly samlIssuer?: string;
+  /** The provider's signing certificate. A public key, so never sealed. */
+  readonly samlCertificate?: string;
+  /** What this instance calls itself to the provider. */
+  readonly samlAudience?: string;
+  readonly samlWantAssertionsSigned?: boolean;
 }
 
 /**
@@ -71,6 +90,7 @@ export function providerIdFromCallback(
 
 type SSORow = {
   id: string;
+  kind: string;
   workspace_id: string;
   provider_id: string;
   display_name: string;
@@ -85,6 +105,11 @@ type SSORow = {
   scopes: string;
   enforce: boolean;
   email_domains: string;
+  saml_entry_point: string | null;
+  saml_issuer: string | null;
+  saml_certificate: string | null;
+  saml_audience: string | null;
+  saml_want_assertions_signed: boolean;
 };
 
 /**
@@ -109,10 +134,12 @@ export async function loadSSOConnections(
   try {
     const result = await withSSOLookup(drizzle(pool), (tx) =>
       tx.execute<SSORow>(sql`
-        select id, workspace_id, provider_id, display_name,
+        select id, kind, workspace_id, provider_id, display_name,
                discovery_url, authorization_url, token_url, user_info_url,
                client_id, secret_ciphertext, secret_data_key, secret_key_id,
-               scopes, enforce, email_domains
+               scopes, enforce, email_domains,
+               saml_entry_point, saml_issuer, saml_certificate,
+               saml_audience, saml_want_assertions_signed
           from sso_connections
          where enabled = true
            and deleted_at is null
@@ -136,6 +163,11 @@ export async function loadSSOConnections(
       keyId: row.secret_key_id,
     };
     return {
+      // `oidc` on anything written before the column existed, which is what
+      // the default in migration 0096 already guarantees. Read defensively
+      // anyway: a row from a database at an older migration answers the same.
+      kind: row.kind === "saml" ? ("saml" as const) : ("oidc" as const),
+      id: row.id,
       providerId: `sso-${row.provider_id}-${row.workspace_id.slice(0, 8)}`,
       displayName: row.display_name,
       workspaceId: row.workspace_id,
@@ -151,6 +183,13 @@ export async function loadSSOConnections(
         .map((d) => d.trim().toLowerCase())
         .filter(Boolean),
       enforce: row.enforce,
+      ...(row.saml_entry_point ? { samlEntryPoint: row.saml_entry_point } : {}),
+      ...(row.saml_issuer ? { samlIssuer: row.saml_issuer } : {}),
+      ...(row.saml_certificate
+        ? { samlCertificate: row.saml_certificate }
+        : {}),
+      ...(row.saml_audience ? { samlAudience: row.saml_audience } : {}),
+      samlWantAssertionsSigned: row.saml_want_assertions_signed,
     };
   });
 }

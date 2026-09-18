@@ -13,6 +13,7 @@
  */
 
 import { passkey } from "@better-auth/passkey";
+import { sso } from "@better-auth/sso";
 import { authSchema } from "@openokr/db";
 import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
@@ -147,6 +148,16 @@ export interface AuthOptions {
    * with no SSO pays nothing.
    */
   readonly ssoProviders?: ReadonlyArray<{
+    /**
+     * Which protocol this provider speaks (P8-T07c-a).
+     *
+     * Absent means `oidc`, which is what every caller written before SAML
+     * existed supplies and what every row written before migration 0096
+     * means.
+     */
+    readonly kind?: "oidc" | "saml";
+    /** The `sso_connections` row id, which the derived plugin row carries. */
+    readonly id?: string;
     readonly providerId: string;
     /**
      * The workspace that configured this provider (P8-T07b).
@@ -197,6 +208,28 @@ export function createAuth(options: AuthOptions) {
   const workspaceByProvider = new Map<string, string>(
     (options.ssoProviders ?? []).flatMap((provider) =>
       provider.workspaceId ? [[provider.providerId, provider.workspaceId]] : [],
+    ),
+  );
+
+  /**
+   * The SAML providers, and which workspace each belongs to (P8-T07c-a).
+   *
+   * Built once beside `workspaceByProvider` above and for the same reason: the
+   * plugin's `provisionUser` has to answer "which workspace" while a browser
+   * waits mid-redirect, and the answer is fixed for the life of the process.
+   */
+  const samlProviders = (options.ssoProviders ?? []).filter(
+    (provider) => provider.kind === "saml",
+  );
+  const samlWorkspaceByProvider = new Map<string, string>(
+    samlProviders.flatMap((provider) =>
+      // A provider with no workspace cannot provision anybody, so it is left
+      // out of the map rather than mapped to nothing. `provisionUser` reads a
+      // miss as "the authority is gone" and joins nothing, which is the same
+      // answer and one fewer state.
+      provider.workspaceId
+        ? [[provider.providerId, provider.workspaceId] as [string, string]]
+        : [],
     ),
   );
 
@@ -552,6 +585,58 @@ export function createAuth(options: AuthOptions) {
                 ...(p.userInfoUrl ? { userInfoUrl: p.userInfoUrl } : {}),
                 ...(p.scopes ? { scopes: [...p.scopes] } : {}),
               })),
+            }),
+          ]
+        : []),
+      /**
+       * SAML (P8-T07c-a).
+       *
+       * **Mounted only when a SAML provider is configured**, the same rule
+       * `genericOAuth` follows above: an instance with none carries no
+       * plugin, no route and no schema contribution.
+       *
+       * The plugin reads its providers from `sso_providers`, which
+       * `saml-sync.ts` derives from `sso_connections`. Nothing is passed in
+       * here, because a provider added while the process runs must work
+       * without a restart, which is the one thing the OIDC path cannot do.
+       */
+      ...(samlProviders.length > 0
+        ? [
+            sso({
+              /**
+               * **Where a SAML arrival meets the member funnel** (P8-T07c-a).
+               *
+               * P8-T07b built one path that both single sign-on and directory
+               * sync call, so that somebody arriving through a provider lands
+               * in the workspace that configured it rather than alone in a new
+               * one. This is that path, reached from the plugin's own seam, so
+               * a SAML arrival and an OIDC arrival are the same arrival.
+               *
+               * The workspace comes from the provider, not from anything the
+               * assertion carries. An identity provider says who somebody is;
+               * it does not get to say which workspace they join.
+               */
+              provisionUser: async ({ user, provider }) => {
+                const workspaceId = samlWorkspaceByProvider.get(
+                  provider.providerId,
+                );
+                if (!workspaceId) {
+                  // A provider with no workspace behind it is a derived row
+                  // whose authority is gone. Joining nothing is right; the
+                  // sign-in still fails, because the session has no member.
+                  return;
+                }
+                await tryJoinWorkspaceForIdentity(options.pool, {
+                  workspaceId,
+                  user: { id: user.id, name: user.name },
+                  via: "sso",
+                });
+              },
+              /**
+               * Off. Better Auth's organization plugin is not what this
+               * product uses for membership; `provisionUser` above is.
+               */
+              organizationProvisioning: { disabled: true },
             }),
           ]
         : []),

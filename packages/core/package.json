@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",
+    "@better-auth/sso": "catalog:",
     "@openokr/config": "workspace:*",
     "@openokr/db": "workspace:*",
     "@openokr/method": "workspace:*",

@@ -2499,21 +2499,32 @@ well, which is a removal spanning two releases per PLAN.md §5.1, or it is added
 for SAML alone and both are fed from `sso_connections`. That is settled at the
 design note below before any code.
 
-Deliverables: a design note recording which of the two, and why; the
-`@better-auth/sso` plugin mounted; SAML provider configuration per workspace,
-carrying the identity provider's entry point and signing certificate; the
-service-provider metadata document a provider needs to configure its side; JIT
-provisioning through `provisionUser` into the same member funnel P8-T07b built,
-so a SAML arrival and an OIDC arrival land identically; the admin screen
-extended to configure a SAML provider; enforcement covering SAML the way
-P8-T07a covers OIDC.
+**Cut into a and b on 18 September 2026, after the design note, the dependency,
+migration 0096 and the schema, and before the code that would not have fit.**
+The split is by what fails rather than by what is convenient. The path that
+accepts an assertion and the path that refuses a bad one land together, because
+shipping the first without the second is the exact shape of the P8-T07 mistake
+this row exists to correct. What is left over is the surfaces: a screen, a
+metadata document, and enforcement, none of which can let a bad assertion in.
+
+### P8-T07c-a: the SAML sign-in path, with its refusals [M]
+Depends on: P8-T07b
+
+Deliverables: the design note recording which of the two storage shapes and
+why; the SAML columns on `sso_connections` with the constraint that a SAML row
+is complete; the `@better-auth/sso` plugin mounted; the sync that writes the
+plugin's derived row whenever `sso_connections` is written, so the product's
+table stays the authority; JIT provisioning through `provisionUser` into the
+same member funnel P8-T07b built, so a SAML arrival and an OIDC arrival land
+identically.
 
 Test plan: unit, against a fixture identity provider. An assertion with a valid
 signature provisions and lands in the right workspace. **An assertion with a
 broken signature, a wrapped signature, an expired condition window and a wrong
 audience are each refused**, because SAML is a protocol where signature
 verification is easy to get subtly wrong and `samlify` has carried three
-advisories of exactly that shape. An end-to-end pass for the sign-in.
+advisories of exactly that shape. The refusals are the point of this row, not a
+postscript to it.
 
 Acceptance: Given a workspace with a SAML provider configured, when somebody
 signs in through it for the first time, then they are a member of that
@@ -2521,6 +2532,24 @@ workspace at the level every other joining path gives, no second workspace is
 created, and their session behaves identically to a password session. Given an
 assertion whose signature does not verify, when it arrives, then it is refused
 and nobody is provisioned.
+
+### P8-T07c-b: the surfaces around it [S]
+Depends on: P8-T07c-a
+
+Deliverables: the admin screen extended to configure a SAML provider, refusing
+an incomplete one rather than storing it; the service-provider metadata
+document a provider needs to configure its side; enforcement covering SAML the
+way P8-T07a covers OIDC, so an enforced domain sends somebody to their SAML
+provider as readily as to their OIDC one.
+
+Test plan: the screen stores and reads back a provider; an incomplete one is
+refused with the field named; the metadata document parses and carries this
+instance's entity id; an enforced SAML domain refuses a password sign-in and
+names the provider. An end-to-end pass for the configuration and the sign-in.
+
+Acceptance: Given an administrator on the SSO screen, when they configure a
+SAML provider and hand its metadata document to the identity provider, then
+somebody on that provider can sign in without anybody editing the database.
 
 ### P8-T08a: The SCIM Users resource, through the Operation pipeline [M]
 Depends on: P8-T07a

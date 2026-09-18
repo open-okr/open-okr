@@ -153,6 +153,7 @@ export {
   authSchema,
   passkeys,
   sessions,
+  ssoProviders,
   twoFactors,
   users,
   verifications,
