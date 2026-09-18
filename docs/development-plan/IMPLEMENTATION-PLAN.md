@@ -2403,6 +2403,27 @@ Depends on: Phase 7 complete
 Deliverables: OIDC and SAML through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
 Acceptance: Given a configured identity provider, when a user signs in through it, then they are provisioned with default access and their session behaves identically to a password session.
 
+**SAML shipped as a bridge rather than a flow, and that is a deviation from
+this line awaiting a decision.** What was built supports OIDC natively and
+reaches SAML only through a SAML-to-OIDC bridge: Keycloak, Auth0, Okta or
+Entra sits in front and speaks OIDC to the instance.
+
+The reason is sound. Better Auth 1.x has no native SAML, and building one
+beside it would break the hard rule that authentication goes through Better
+Auth only. A bridge is also how most instances would deploy this anyway, since
+every provider named above offers one.
+
+**What was wrong was where it was written down.** The decision lived in a
+comment in migration 0091 and in a sentence on the admin screen, so a named
+deliverable stopped being built and nobody reading the plan could see it. It is
+here now, on 18 September 2026, so the choice is visible where the deliverable
+is stated.
+
+It is Agung's to settle, three ways: accept the bridge and amend the
+deliverable line to say so; keep the line and open a row for native SAML,
+which needs a decision about the Better Auth rule first; or keep the line and
+accept the gap openly. Nothing else in Phase 8 depends on which.
+
 ### P8-T08: Directory sync and provisioning [L]
 Depends on: P8-T07
 Deliverables: directory synchronisation of users and groups mapped to members and space membership, plus the provisioning protocol where deactivation maps to suspension and never to deletion.
