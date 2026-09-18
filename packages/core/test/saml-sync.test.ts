@@ -1,6 +1,10 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { domainFor, syncAllSamlProviders, syncSamlProvider } from "../src/auth/saml-sync.ts";
+import {
+  domainFor,
+  syncAllSamlProviders,
+  syncSamlProvider,
+} from "../src/auth/saml-sync.ts";
 import type { SSOProviderConfig } from "../src/auth/sso.ts";
 
 /**
@@ -89,9 +93,11 @@ describe("syncing one provider", () => {
     expect(config.entryPoint).toBe("https://idp.example/sso");
     expect(config.cert).toBe("MIIC-not-a-real-certificate");
     expect(config.wantAssertionsSigned).toBe(true);
-    // The callback the identity provider posts back to, on this instance.
-    expect(config.callbackUrl).toContain(BASE);
-    expect(config.callbackUrl).toContain("sso-okta-abcd1234");
+    // Where the browser lands afterwards, which is this instance's front
+    // door. The assertion consumer endpoint is a different thing and the
+    // plugin derives it; P8-T07c-b's metadata document is what hands it to
+    // the identity provider.
+    expect(config.callbackUrl).toBe(`${BASE}/`);
   });
 
   it("is idempotent, which every boot depends on", async () => {
@@ -151,7 +157,10 @@ describe("syncing everything at boot", () => {
     await syncSamlProvider(wb.appPool, saml(), BASE);
     await syncSamlProvider(
       wb.appPool,
-      saml({ id: "33333333-3333-4333-8333-333333333333", providerId: "sso-entra-abcd1234" }),
+      saml({
+        id: "33333333-3333-4333-8333-333333333333",
+        providerId: "sso-entra-abcd1234",
+      }),
       BASE,
     );
     expect(await rows()).toHaveLength(2);

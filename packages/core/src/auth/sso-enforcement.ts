@@ -191,3 +191,62 @@ export function enforcementMessage(provider: EnforcingProvider): string {
     "passkey will not work for this address."
   );
 }
+
+/**
+ * Whether a path is the callback of a provider this instance has configured
+ * (P8-T07c-a).
+ *
+ * **What this answers is "did a provider we trust just vouch for somebody",
+ * and it is why just-in-time provisioning can work on a closed instance.**
+ * Configuring a provider is a workspace saying it will admit the people that
+ * provider vouches for. Without this, the registration rule refuses every
+ * arrival on an invitation-only instance, which is every instance after its
+ * first account.
+ *
+ * **It is not a way in.** Reaching either path means the provider's signature
+ * or its token exchange has already been verified, and Better Auth builds the
+ * path from the route it dispatched rather than from anything a caller sends.
+ * An unknown provider id matches nothing.
+ *
+ * Two shapes, because the two protocols land in different places: OIDC
+ * completes at `/callback/:id` through `genericOAuth`, and SAML at
+ * `/sso/saml2/sp/acs/:id` through the SSO plugin.
+ *
+ * **The id comes from the parameters, and the path may be the route template
+ * rather than the request.** Better Auth hands the hook `/sso/saml2/sp/acs/
+ * :providerId` verbatim with the value in `params`, which is why reading the
+ * path alone matched nothing and every arrival was still refused.
+ * `providerIdFromCallback` reads both for the same reason, discovered the same
+ * way.
+ */
+export function isSSOCallbackPath(
+  path: string | undefined,
+  params: unknown,
+  providerIds: ReadonlySet<string>,
+): boolean {
+  if (!path || providerIds.size === 0) {
+    return false;
+  }
+  const isCallback =
+    path.startsWith("/callback/") || path.startsWith("/sso/saml2/sp/acs/");
+  if (!isCallback) {
+    return false;
+  }
+
+  const fromParams = params as
+    | { id?: unknown; providerId?: unknown }
+    | undefined;
+  for (const candidate of [fromParams?.providerId, fromParams?.id]) {
+    if (typeof candidate === "string" && providerIds.has(candidate)) {
+      return true;
+    }
+  }
+
+  // A literal path, which is what a request rather than a route template
+  // looks like.
+  const prefix = path.startsWith("/callback/")
+    ? "/callback/"
+    : "/sso/saml2/sp/acs/";
+  const id = path.slice(prefix.length).split("/")[0] ?? "";
+  return providerIds.has(id);
+}

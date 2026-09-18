@@ -78,14 +78,27 @@ export function providerIdFromCallback(
   path: string | undefined,
   params: unknown,
 ): string {
-  if (path === undefined || !path.startsWith("/callback/")) {
+  // **Both protocols, since P8-T07c-a.** OIDC completes at `/callback/:id`
+  // and SAML at `/sso/saml2/sp/acs/:id`. Reading only the first meant the
+  // after-create hook resolved no workspace for a SAML arrival, so nothing
+  // joined them there and `provisionWorkspaceForUser` gave them a private
+  // workspace instead. They ended up in two: the right one, joined later by
+  // the plugin, and one of their own that nobody ever opens. That is the
+  // defect P8-T07b was cut to fix, reappearing through a different door.
+  const prefixes = ["/callback/", "/sso/saml2/sp/acs/"];
+  const prefix = prefixes.find((one) => path?.startsWith(one));
+  if (path === undefined || prefix === undefined) {
     return "";
   }
-  const fromParams = (params as { id?: unknown } | undefined)?.id;
-  if (typeof fromParams === "string" && fromParams !== "") {
-    return fromParams;
+  // Better Auth hands a hook the route template with the value in `params`,
+  // so the parameters are read first and the literal path is the fallback.
+  const bag = params as { id?: unknown; providerId?: unknown } | undefined;
+  for (const candidate of [bag?.id, bag?.providerId]) {
+    if (typeof candidate === "string" && candidate !== "") {
+      return candidate;
+    }
   }
-  return path.slice("/callback/".length).split("/")[0] ?? "";
+  return path.slice(prefix.length).split("/")[0] ?? "";
 }
 
 type SSORow = {

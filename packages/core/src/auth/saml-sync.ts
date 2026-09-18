@@ -30,11 +30,35 @@ import type { SSOProviderConfig } from "./sso.ts";
  * never parses this.
  */
 interface StoredSamlConfig {
+  /** The identity provider's single sign-on URL. */
   readonly entryPoint: string;
+  /**
+   * **This instance's entity id, not the identity provider's.**
+   *
+   * The plugin uses it as the service provider's name in its own metadata and
+   * as the expected audience of an incoming assertion. The first version of
+   * this wrote the identity provider's entity id here, and the plugin refused
+   * the whole configuration with "issuer identifies the service provider and
+   * cannot identify the IdP". It read plausibly and could never have worked,
+   * which is the same shape as the defect P8-T07c exists to correct; what
+   * caught it was driving a real sign-in rather than reading a round-trip.
+   */
   readonly issuer: string;
+  /** The identity provider's signing certificate. */
   readonly cert: string;
+  /** Who the identity provider is. Named here, never in `issuer`. */
+  readonly idpMetadata: { readonly entityID: string };
   readonly audience?: string;
   readonly wantAssertionsSigned: boolean;
+  /**
+   * Where the browser lands after a successful sign-in.
+   *
+   * **Not the assertion consumer endpoint.** The first version of this wrote
+   * an ACS-shaped URL here, which is a different thing: the plugin derives its
+   * own ACS as `<base>/sso/saml2/sp/acs/<providerId>` and that is what the
+   * identity provider posts to. Found by reading the plugin rather than by a
+   * failure, because nothing configured a provider yet.
+   */
   readonly callbackUrl: string;
 }
 
@@ -92,14 +116,16 @@ export async function syncSamlProvider(
 
   const samlConfig: StoredSamlConfig = {
     entryPoint: connection.samlEntryPoint,
-    issuer: connection.samlIssuer,
+    // This instance. The identity provider goes in `idpMetadata` below.
+    issuer: baseUrl,
     cert: connection.samlCertificate,
+    idpMetadata: { entityID: connection.samlIssuer },
     ...(connection.samlAudience ? { audience: connection.samlAudience } : {}),
     // Defaults true in the schema, and the admin screen does not offer false.
     // An identity provider that cannot sign its assertions is one this
     // instance should refuse rather than quietly accommodate.
     wantAssertionsSigned: connection.samlWantAssertionsSigned !== false,
-    callbackUrl: `${baseUrl}/api/auth/sso/saml2/callback/${connection.providerId}`,
+    callbackUrl: `${baseUrl}/`,
   };
 
   const row = {

@@ -37,6 +37,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "samlify": "catalog:",
     "@opentelemetry/api": "^1.9.1",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",

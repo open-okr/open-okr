@@ -43,6 +43,7 @@ import {
   enforcedProviderForUser,
   enforcementMessage,
   isProviderSignInPath,
+  isSSOCallbackPath,
 } from "./sso-enforcement.ts";
 
 /**
@@ -218,6 +219,16 @@ export function createAuth(options: AuthOptions) {
    * plugin's `provisionUser` has to answer "which workspace" while a browser
    * waits mid-redirect, and the answer is fixed for the life of the process.
    */
+  /**
+   * Every configured provider id, whichever protocol it speaks.
+   *
+   * Read by the registration rule to tell an arrival vouched for by a
+   * provider this instance configured from a stranger signing up.
+   */
+  const ssoCallbackProviders = new Set(
+    (options.ssoProviders ?? []).map((provider) => provider.providerId),
+  );
+
   const samlProviders = (options.ssoProviders ?? []).filter(
     (provider) => provider.kind === "saml",
   );
@@ -454,6 +465,38 @@ export function createAuth(options: AuthOptions) {
             // directory, so without this the rule refused every account SCIM
             // tried to provision.
             if (currentProvisioningAuthority()) {
+              return;
+            }
+
+            // **A configured identity provider is the third** (P8-T07c-a).
+            //
+            // Configuring a provider is a workspace saying "admit the people
+            // this provider vouches for", which is the same kind of statement
+            // a directory token makes and is made by the same people. Without
+            // it, just-in-time provisioning cannot work on an
+            // invitation-only instance, which is every instance after its
+            // first account: the assertion verifies, the audience matches,
+            // and the account is refused at the last step. That is the
+            // P8-T07 acceptance criterion, "when a user signs in through it,
+            // then they are provisioned with default access", and it could
+            // not hold.
+            //
+            // Found on 18 September 2026 by driving a real SAML assertion all
+            // the way through rather than by reading, which is the only way
+            // this was ever going to surface: every layer before it answered
+            // correctly.
+            //
+            // The path is the evidence and it cannot be forged from outside:
+            // Better Auth builds it from the route it dispatched, and these
+            // two routes are reached only after the provider's own signature
+            // or token exchange has been verified.
+            if (
+              isSSOCallbackPath(
+                hookContext?.path,
+                hookContext?.params,
+                ssoCallbackProviders,
+              )
+            ) {
               return;
             }
 
