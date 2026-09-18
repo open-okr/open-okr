@@ -126,12 +126,33 @@ test("narrowing to a type is a link somebody can send", async () => {
   await expect(page.getByTestId("search-results")).toContainText(goalTitle);
 });
 
+/**
+ * Opens the palette, retrying the keystroke rather than the assertion (P8-T15).
+ *
+ * **The shortcut is registered at hydration, and a keypress before that goes
+ * nowhere.** Nothing is listening yet, so the key is delivered to the document
+ * and discarded, and an assertion afterwards waits ten seconds for a palette
+ * that was never asked to open. Waiting longer cannot help: the press has
+ * already happened and there is nothing to arrive.
+ *
+ * Same shape as the quiet-hours fix in `s36-channels`, and the same reasoning:
+ * when a race is lost at the moment of the interaction, the interaction is what
+ * has to be retried.
+ *
+ * Found on 18 September 2026 by the flakiness report P8-T15 added, on run six
+ * of ten. Before that report existed this failed, was retried by continuous
+ * integration, passed, and left no record.
+ */
+async function openPalette() {
+  await expect(async () => {
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(page.getByTestId("palette")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
 test("acceptance: the palette opens anywhere, and the keyboard drives it", async () => {
   await goTo(page, "/");
-  await page.keyboard.press("ControlOrMeta+k");
-
-  const palette = page.getByTestId("palette");
-  await expect(palette).toBeVisible({ timeout: 10_000 });
+  await openPalette();
 
   const word = goalTitle.split(" ").find((one) => one.length > 4) ?? goalTitle;
   await page.getByRole("textbox", { name: "Search everything" }).fill(word);
@@ -146,13 +167,12 @@ test("acceptance: the palette opens anywhere, and the keyboard drives it", async
 });
 
 test("escape closes it and it forgets what was typed", async () => {
-  await page.keyboard.press("ControlOrMeta+k");
-  await expect(page.getByTestId("palette")).toBeVisible({ timeout: 10_000 });
+  await openPalette();
   await page.getByRole("textbox", { name: "Search everything" }).fill("hello");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("palette")).toHaveCount(0);
 
-  await page.keyboard.press("ControlOrMeta+k");
+  await openPalette();
   await expect(
     page.getByRole("textbox", { name: "Search everything" }),
   ).toHaveValue("");

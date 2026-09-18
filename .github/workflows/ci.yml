@@ -214,6 +214,19 @@ jobs:
       - name: Run the end-to-end suite
         run: pnpm test:e2e
 
+      # The flakiness report, which is not the Playwright report and is uploaded
+      # whether the run passed or not (P8-T15). Playwright retries once here,
+      # and until this existed a spec that failed and recovered left no record
+      # at all: green run, nothing to read, nobody learns the spec is rotting.
+      - name: Upload the flakiness report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: flaky-report-e2e
+          path: .flaky/report-e2e.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload the Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
@@ -285,7 +298,10 @@ jobs:
 
   flakiness:
     name: Flakiness report
-    needs: [scope, test]
+    # The browser suite reports too since P8-T15, so this waits for it as well.
+    # `always()` already covers a failing end-to-end job: its report is what
+    # says which spec recovered and which did not.
+    needs: [scope, test, e2e]
     if: always() && needs.scope.outputs.code == 'true' && needs.test.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
