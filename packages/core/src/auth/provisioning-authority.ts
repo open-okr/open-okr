@@ -21,8 +21,18 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface ProvisioningAuthority {
-  /** What authorised this. One value today, and the name says who may add. */
-  readonly kind: "directory_sync";
+  /**
+   * What authorised this, and the name says who may add.
+   *
+   * `demo` is the second (P8-T13a). A demo instance's cast are members before
+   * they are accounts, so the command that gives them one is attaching an
+   * account to a member that already exists rather than provisioning a person
+   * who has just arrived. That difference matters to the join below: a
+   * `directory_sync` account joins the workspace, a `demo` account is attached
+   * by the caller to the member it belongs to, and joining as well would give
+   * Priya two rows in the directory.
+   */
+  readonly kind: "directory_sync" | "demo";
   /** The workspace the arriving person belongs to. */
   readonly workspaceId: string;
   /** The identity provider's own id for them, for the audit row. */

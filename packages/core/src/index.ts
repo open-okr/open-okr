@@ -628,6 +628,13 @@ export {
   type DemoContext,
 } from "./demo/builder.ts";
 export {
+  DEMO_PERSONA_PASSWORD,
+  type PrepareDemoPersonasInput,
+  type PrepareDemoPersonasResult,
+  type PreparedPersona,
+  prepareDemoPersonas,
+} from "./demo/personas.ts";
+export {
   type DirectoryGroup,
   directoryGroupById,
   listDirectoryGroups,

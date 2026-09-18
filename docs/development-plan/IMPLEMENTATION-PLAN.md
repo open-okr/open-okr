@@ -2486,6 +2486,54 @@ Depends on: P8-T12
 Deliverables: the demo builder on a public instance, reset on a schedule, with sign-in as a sample persona and the agents running visibly in sandbox mode.
 Acceptance: a visitor can explore a realistic workspace, see a coach nudge and a diagnostic, and the instance resets cleanly.
 
+**Cut into a, b and c on 18 September 2026, before any code.** The row bundles
+three kinds of work that fail in three ways and are tested with three different
+things. Letting a visitor sign in as one of the cast is an identity question,
+answered against a database. The closing diagnostic the acceptance criterion
+asks for does not exist in the demo at all: P3-T17 wrote "the scorecard stays
+empty" because scoring was P4-T10 and unbuilt, so the demo has never held a
+finished quarter, and putting one there is a builder change tested against a
+database too but failing as a cycle rather than as an account. The public
+instance and its reset are a machine, tested with a container. A single commit
+holding all three would be reviewed as none of them.
+
+### P8-T13a: A visitor can sign in as one of the cast [M]
+Depends on: P8-T12
+Deliverables: `pnpm demo:prepare`, which turns a seeded workspace into one a
+visitor can walk around: an account for each of the seven invented people, both
+agent members set to sandbox autonomy, and one run of the Coach and of the
+Champion, so the nudges on screen are ones the product produced rather than rows
+something inserted. Refuses a workspace not marked as a demo, and refuses to
+touch a member who already has a real person behind them.
+Test plan: unit, against a seeded workspace. A persona's account exists and is
+attached to their member row; a workspace without `demoEnabled` is refused;
+running twice changes nothing; both agents read back as sandbox; the Coach's run
+recorded nudges and committed nothing outside the review queue.
+Acceptance: Given a prepared demo workspace, when somebody signs in as a
+persona, then they see the workspace as that person, with at least one coach
+nudge that cites a rule key.
+
+### P8-T13b: The finished quarter the demo has never had [M]
+Depends on: P8-T13a
+Deliverables: a closed cycle in the demo with graded key results, a quarterly
+review whose process-health survey has been answered, and §8.6's diagnostic
+recorded from those two numbers. Written through the ordinary actions, so the
+verdict is one `packages/method` produced.
+Test plan: unit. The scorecard is no longer empty; the diagnostic reads back
+with a verdict, a diagnosis and a prescription; the numbers behind it are the
+graded scores rather than invented ones.
+Acceptance: Given a seeded demo workspace, when the review of the closed cycle
+is opened, then a cycle score, a rhythm score and §8.6's verdict are on screen.
+
+### P8-T13c: The public instance and its reset [M]
+Depends on: P8-T13b
+Deliverables: a demo deployment overlay on the Compose target, a reset that
+rebuilds the instance from nothing on a schedule, the page that tells a visitor
+who they can sign in as, and the documentation for whoever operates it.
+Test plan: the reset script run twice against a local stack.
+Acceptance: the instance resets cleanly, and a visitor arriving after a reset
+sees the same workspace the last visitor did.
+
 ### P8-T14: Launch [S]
 Depends on: P8-T13
 Deliverables: the release, changelog, announcement, contributor onboarding with good first issues and the agreement bot live.
@@ -2505,7 +2553,7 @@ Acceptance: Given the end-to-end suite run ten times, when the reports are merge
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (30: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all). **164 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (32: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all). **166 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01a, P8-T01b. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

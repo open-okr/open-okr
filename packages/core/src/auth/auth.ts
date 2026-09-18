@@ -483,6 +483,18 @@ export function createAuth(options: AuthOptions) {
             // SCIM path repeating this afterwards and leaving a stray
             // workspace in between (P8-T08a).
             const authority = currentProvisioningAuthority();
+
+            // **A demo persona is attached, not provisioned** (P8-T13a). The
+            // cast are members of the demo workspace before they have
+            // accounts, so the command that gives Priya one is filling in the
+            // `user_id` of a row that already exists. Joining her as well
+            // would put her in the directory twice, and provisioning below
+            // would hand her a private workspace of her own that nobody ever
+            // opens. The caller does the attaching, inside its own operation.
+            if (authority?.kind === "demo") {
+              return;
+            }
+
             const workspaceId =
               authority?.workspaceId ??
               workspaceByProvider.get(
