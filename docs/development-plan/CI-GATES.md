@@ -147,6 +147,8 @@ create policy tenant_isolation on t
 | A relative link in `docs/` that resolves to nothing | A reader follows it and believes the page exists. Renaming a page is the usual cause |
 | A page under `docs/install`, `docs/admin` or `docs/runbooks` that nothing in `docs/README.md` leads to | A page nobody can find is a page nobody wrote |
 | `pnpm <script>` on a page when `package.json` defines no such script | An instruction that cannot be followed, which is worse than no instruction |
+| A threshold `docs/handbook/numbers.md` quotes that the method registry disagrees with | A handbook telling a practitioner something the product does not do |
+| `docs/api/reference.md` drifting from the contract | The registry moved and the page did not. `pnpm gen:docs` rewrites it |
 
 `docs/development-plan`, `docs/design` and `docs/stakeholder` are out of
 scope: they are working papers between the people building this, not pages a

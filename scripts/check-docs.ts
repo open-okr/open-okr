@@ -14,6 +14,12 @@
  * does for METHOD.md: the document is compared against the thing it describes,
  * in both directions.
  *
+ * Two more things are checked, because both are claims about the product
+ * rather than prose: every threshold the handbook quotes has to match the
+ * method registry it came from, and the generated API reference has to match
+ * the contract. A handbook quoting a number nobody uses is worse than one that
+ * quotes none.
+ *
  * **The plan set is out of scope on purpose.** `docs/development-plan/`,
  * `docs/design/` and `docs/stakeholder/` are working papers between the people
  * building this, not pages a reader is sent to, and they cross-reference each
@@ -28,7 +34,15 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(
 );
 
 /** The trees this gate owns. Everything else under `docs/` is working papers. */
-const OWNED = ["docs/install", "docs/admin", "docs/runbooks"];
+const OWNED = [
+  "docs/install",
+  "docs/admin",
+  "docs/runbooks",
+  "docs/api",
+  "docs/handbook",
+  "docs/use",
+  "docs/import",
+];
 const INDEX = "docs/README.md";
 
 /** Working papers, linked from the index but not indexed page by page. */
@@ -182,6 +196,81 @@ for (const page of pages) {
       `${page} exists and nothing in docs/README.md leads to it, so nobody will find it`,
     );
   }
+}
+
+// 4. Every threshold the handbook quotes matches the method registry.
+//
+// The handbook's numbers page is a table of `key | value | section` rows. A
+// row naming a key the registry does not hold, or holding a value the registry
+// disagrees with, is a page telling a practitioner something the product does
+// not do.
+const NUMBERS = "docs/handbook/numbers.md";
+try {
+  const page = await readFile(join(ROOT, NUMBERS), "utf8");
+  const { THRESHOLDS } = await import(
+    `file://${join(ROOT, "packages/method/src/thresholds.ts")}`
+  );
+  const registry = THRESHOLDS as Record<string, { default: unknown }>;
+
+  let quoted = 0;
+  page.split("\n").forEach((line, index) => {
+    const row = /^\|\s*`([a-z]+\.[A-Za-z]+)`\s*\|\s*([^|]+?)\s*\|/.exec(line);
+    if (!row) {
+      return;
+    }
+    const [, key, value] = row as unknown as [string, string, string];
+    const entry = registry[key];
+    if (!entry) {
+      problems.push(
+        `${NUMBERS}:${index + 1} quotes \`${key}\`, which the method registry does not hold`,
+      );
+      return;
+    }
+    quoted += 1;
+    const actual = String(entry.default);
+    if (actual !== value) {
+      problems.push(
+        `${NUMBERS}:${index + 1} says \`${key}\` is ${value}; the registry says ${actual}`,
+      );
+    }
+  });
+
+  if (quoted === 0) {
+    problems.push(
+      `${NUMBERS} quotes no threshold at all, so this check is agreeing with nothing`,
+    );
+  }
+} catch (error) {
+  problems.push(
+    `could not check the handbook's numbers: ${error instanceof Error ? error.message : String(error)}`,
+  );
+}
+
+// 5. The generated API reference matches the contract.
+//
+// Run as a child process rather than imported, because the generator is a
+// script with a mode flag and running it is exactly what proves the committed
+// page could be regenerated. One program in two modes, so a generator and a
+// checker cannot disagree about what the file should hold.
+const { execFile } = await import("node:child_process");
+const { promisify } = await import("node:util");
+const run = promisify(execFile);
+try {
+  await run(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "--no-warnings",
+      join(ROOT, "scripts/gen-api-reference.ts"),
+      "--check",
+    ],
+    { cwd: ROOT },
+  );
+} catch (error) {
+  const failure = error as { stderr?: string };
+  problems.push(
+    (failure.stderr ?? "the API reference check failed").trim().split("\n").join(" "),
+  );
 }
 
 if (problems.length > 0) {

@@ -8,9 +8,9 @@ Start where you are.
 | Putting it on Kubernetes | [Install on Kubernetes](install/kubernetes.md) |
 | Using the managed cloud | [Start on the cloud](install/cloud.md) |
 | Running an instance somebody installed | [Administrator guide](admin/README.md) |
-| Using OpenOKR day to day | The user guide, at P8-T11b |
-| Running the OKR practice | The handbook, at P8-T11b |
-| Calling the API or writing an agent | The reference, at P8-T11b |
+| Using OpenOKR day to day | [User guide](use/README.md) |
+| Running the OKR practice | [The OKR handbook](handbook/README.md) |
+| Calling the API or writing an agent | [The API](api/README.md) |
 | Building OpenOKR itself | [CONTRIBUTING.md](../CONTRIBUTING.md) and [the plan set](development-plan/) |
 
 ## Install
@@ -32,6 +32,25 @@ Start where you are.
 | [Security](admin/security.md) | Single sign-on, directory sync, the second-factor policy, the audit trail |
 | [Settings](admin/settings.md) | Every setting that changes behaviour, and its default |
 | [Operations](admin/operations.md) | Health, logs, upgrades, backups, restores, key rotation |
+
+## Using it
+
+| Page | What it covers |
+|---|---|
+| [User guide](use/README.md) | What each screen is for, checking in, the review inbox, KPIs |
+| [The OKR handbook](handbook/README.md) | The practice itself, for practitioners rather than builders |
+| [Writing objectives and key results](handbook/writing.md) | What a good one looks like, and the checks that fire on a bad one |
+| [The weekly rhythm](handbook/weekly.md) | The four-step session, blockers and commitments |
+| [The quarterly cycle](handbook/quarterly.md) | Eight phases, six gates, scoring and the closing diagnostic |
+| [The numbers](handbook/numbers.md) | Every threshold the practice runs on |
+
+## Building on it
+
+| Page | What it covers |
+|---|---|
+| [The API](api/README.md) | Tokens, scopes, errors, the command line and the agent surface |
+| [API reference](api/reference.md) | Every action, generated from the contract |
+| [Importing](import/README.md) | Spreadsheets and FlowyTeam, and the rules both obey |
 
 ## Runbooks
 
@@ -55,9 +74,10 @@ Written for the person holding the pager, not for a reader.
 | [Governance](../GOVERNANCE.md) | Who decides what |
 | [Contributing](../CONTRIBUTING.md) | Getting a development instance running |
 
-## What is not here yet
+## How this stays true
 
-The user guide, the OKR handbook, the generated API reference and the importer
-runbook arrive at P8-T11b. This page links to them from the moment they exist,
-and `pnpm check:docs` fails if it names a page that is missing, so nothing here
-can point at a document nobody wrote.
+`pnpm check:docs` refuses a link that resolves to nothing, a page nothing leads
+to, and an instruction naming a command that does not exist. It also checks
+every threshold [the numbers](handbook/numbers.md) quotes against the method
+registry, and the [API reference](api/reference.md) against the contract it is
+generated from. A page here cannot quietly stop being true.

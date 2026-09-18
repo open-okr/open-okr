@@ -47,7 +47,8 @@
     "cloud:sweep": "pnpm --filter @openokr/core cloud:sweep",
     "cloud:usage": "pnpm --filter @openokr/core cloud:usage",
     "check:air-gap": "node --experimental-strip-types --no-warnings scripts/check-air-gap.ts",
-    "check:docs": "node --experimental-strip-types --no-warnings scripts/check-docs.ts"
+    "check:docs": "node --experimental-strip-types --no-warnings scripts/check-docs.ts",
+    "gen:docs": "node --experimental-strip-types --no-warnings scripts/gen-api-reference.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
