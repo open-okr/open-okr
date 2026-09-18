@@ -2400,7 +2400,9 @@ Acceptance: to be written in the design.
 
 ### P8-T07: Single sign-on [L]
 Depends on: Phase 7 complete
-Deliverables: OIDC and SAML through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
+Deliverables: OIDC through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
+
+**This line read "OIDC and SAML" until 18 September 2026.** SAML was never built and the row shipped anyway; the correction is below, and P8-T07c is the row that builds it. The line is narrowed rather than left standing, because a plan that claims what the product does not do is worse than one that admits a gap.
 Acceptance: Given a configured identity provider, when a user signs in through it, then they are provisioned with default access and their session behaves identically to a password session.
 
 **SAML shipped as a bridge rather than a flow, and that is a deviation from
@@ -2408,21 +2410,40 @@ this line awaiting a decision.** What was built supports OIDC natively and
 reaches SAML only through a SAML-to-OIDC bridge: Keycloak, Auth0, Okta or
 Entra sits in front and speaks OIDC to the instance.
 
-The reason is sound. Better Auth 1.x has no native SAML, and building one
-beside it would break the hard rule that authentication goes through Better
-Auth only. A bridge is also how most instances would deploy this anyway, since
-every provider named above offers one.
+**The reason given for it is not true, and this line said it was until
+18 September 2026.** Migration 0091 records that "a native SAML flow is not in
+Better Auth 1.x and building one outside it would violate the authentication
+goes through Better Auth only rule", and this paragraph repeated that as sound.
+It is not. `@better-auth/sso` is a first-party Better Auth plugin, published at
+1.7.4 against a peer range of `better-auth ^1.7.4`, which is exactly the version
+this repository pins. It is MIT, and it implements SAML natively through
+`samlify`. Native SAML is available **inside** the hard rule, not outside it.
 
-**What was wrong was where it was written down.** The decision lived in a
-comment in migration 0091 and in a sentence on the admin screen, so a named
-deliverable stopped being built and nobody reading the plan could see it. It is
-here now, on 18 September 2026, so the choice is visible where the deliverable
-is stated.
+So the deliverable was dropped on a fact that does not hold, and the drop was
+recorded in a SQL comment and a sentence on an admin screen rather than here,
+where a reader of the plan would see a named deliverable go.
 
-It is Agung's to settle, three ways: accept the bridge and amend the
-deliverable line to say so; keep the line and open a row for native SAML,
-which needs a decision about the Better Auth rule first; or keep the line and
-accept the gap openly. Nothing else in Phase 8 depends on which.
+**Why this is not a small omission.** PLAN.md §142 is the authority above this
+document and it says "single sign-on through OIDC and SAML in the open core,
+because institutions will not adopt without it". That is a positioning claim,
+not a preference. A bridge does not satisfy it as a buyer reads it: it tells an
+institution to run and operate a Keycloak in front of the product. The
+customers who actually need SAML are the ones whose identity provider does not
+offer OIDC at all, which is exactly the set a bridge serves worst.
+
+**The honest cost, on the other side.** It is a new runtime dependency with
+three transitive XML libraries, and `samlify` has carried three advisories, a
+signature-wrapping bypass, a token-replay bypass and an XML injection in a
+signed assertion. All are patched at or below 2.13.0 and the current release is
+2.13.1, so the version is clean today. SAML is a protocol where signature
+verification is easy to get subtly wrong and where even maintained libraries
+have had to fix it repeatedly. That is an argument for pinning it, watching its
+advisories and testing the refusals, not for avoiding it.
+
+Agung's to settle. The recommendation on the table is to correct this
+deliverable line to describe what ships today, and open a row for native SAML
+through `@better-auth/sso` rather than leave the plan claiming something the
+product does not do. Nothing else in Phase 8 depends on which way it goes.
 
 ### P8-T08: Directory sync and provisioning [L]
 Depends on: P8-T07
@@ -2450,6 +2471,56 @@ Depends on: P8-T07a
 Deliverables: the provider carries its workspace into the auth options; the after-create hook joins that workspace through the member funnel before provisioning runs, the same order an invitation uses; one path that both single sign-on and directory sync call.
 
 Acceptance: Given a configured provider, when somebody signs in through it for the first time, then they are a member of the workspace that configured it, at the level every other joining path gives, and no second workspace is created.
+
+### P8-T07c: SAML, natively rather than through a bridge [M]
+Depends on: P8-T07b
+
+**Cut on 18 September 2026, after the deliverable it restores was found to have
+been dropped on a premise that does not hold.** Migration 0091 records that "a
+native SAML flow is not in Better Auth 1.x". `@better-auth/sso` is a
+first-party plugin, published at 1.7.4 against a peer range of
+`better-auth ^1.7.4`, which is exactly the pinned version. It is MIT and it
+implements SAML through `samlify`. Native SAML is inside the "authentication
+goes through Better Auth only" rule, not outside it. Agung approved the
+dependency and this row on 18 September 2026.
+
+PLAN.md §142 is why it matters: "single sign-on through OIDC and SAML in the
+open core, because institutions will not adopt without it". The customers who
+need SAML are the ones whose provider offers no OIDC at all, and a bridge
+serves exactly them worst by asking them to run a Keycloak.
+
+**One decision this row carries, and it is an architecture decision.** The
+plugin owns an `ssoProvider` table with its own `oidcConfig` and `samlConfig`,
+written through its own `/sso/register` endpoint. This repository already has
+`sso_connections`, workspace-scoped with a tenant policy and an
+envelope-encrypted secret, feeding `genericOAuth` at boot. Two providers of one
+concept is not a state to ship. Either the plugin replaces the OIDC path as
+well, which is a removal spanning two releases per PLAN.md §5.1, or it is added
+for SAML alone and both are fed from `sso_connections`. That is settled at the
+design note below before any code.
+
+Deliverables: a design note recording which of the two, and why; the
+`@better-auth/sso` plugin mounted; SAML provider configuration per workspace,
+carrying the identity provider's entry point and signing certificate; the
+service-provider metadata document a provider needs to configure its side; JIT
+provisioning through `provisionUser` into the same member funnel P8-T07b built,
+so a SAML arrival and an OIDC arrival land identically; the admin screen
+extended to configure a SAML provider; enforcement covering SAML the way
+P8-T07a covers OIDC.
+
+Test plan: unit, against a fixture identity provider. An assertion with a valid
+signature provisions and lands in the right workspace. **An assertion with a
+broken signature, a wrapped signature, an expired condition window and a wrong
+audience are each refused**, because SAML is a protocol where signature
+verification is easy to get subtly wrong and `samlify` has carried three
+advisories of exactly that shape. An end-to-end pass for the sign-in.
+
+Acceptance: Given a workspace with a SAML provider configured, when somebody
+signs in through it for the first time, then they are a member of that
+workspace at the level every other joining path gives, no second workspace is
+created, and their session behaves identically to a password session. Given an
+assertion whose signature does not verify, when it arrives, then it is refused
+and nobody is provisioned.
 
 ### P8-T08a: The SCIM Users resource, through the Operation pipeline [M]
 Depends on: P8-T07a
