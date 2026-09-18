@@ -46,10 +46,13 @@ describe("the setting", () => {
   });
 });
 
-describe("the four steps", () => {
-  test("are four, and each one is skippable", () => {
+describe("the five steps", () => {
+  test("are five, and each one is skippable", () => {
+    // Four until P8-T12, which put the starting templates between the people
+    // question and the demo: a template is a first quarter somebody edits, the
+    // demo is a cast to look at, and the order asks the smaller one first.
     expect(wizard).toContain(
-      'const STEPS = ["basics", "rhythm", "people", "demo"] as const;',
+      'const STEPS = ["basics", "rhythm", "people", "template", "demo"] as const;',
     );
     expect(wizard).toContain('data-testid="welcome-skip"');
     // Skipping advances without writing anything, which is what makes the
@@ -72,6 +75,9 @@ describe("the four steps", () => {
     // The demo is the builder P3-T17 wrote, called as a function. The plan row
     // says P3-T17 built "an in-product, flag-gated action" and it did not.
     expect(actions).toContain("buildDemoWorkspace(");
+    // The template applier is the same shape: it writes only through
+    // callAction, so a template cannot write a row the product would not.
+    expect(actions).toContain("applyTemplate(");
   });
 
   test("leave demoEnabled alone, because it gates the command", () => {

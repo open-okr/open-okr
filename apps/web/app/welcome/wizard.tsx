@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
+  applyStartingTemplate,
   buildDemo,
   finishOnboarding,
   inviteSomebody,
@@ -38,8 +39,33 @@ import {
  * the demo was built.
  */
 
-const STEPS = ["basics", "rhythm", "people", "demo"] as const;
+const STEPS = ["basics", "rhythm", "people", "template", "demo"] as const;
 type Step = (typeof STEPS)[number];
+
+/**
+ * The starting templates, and the fourth answer (P8-T12).
+ *
+ * Skipping is the fourth answer rather than a missing one: §4.14 says every
+ * step is skippable and skipping is not a lesser path, so the empty workspace
+ * is offered as plainly as the three templates are.
+ */
+const STARTING_TEMPLATES = [
+  {
+    value: "starter",
+    key: "welcome.template.starter",
+    help: "welcome.template.starterHelp",
+  },
+  {
+    value: "company-onboarding",
+    key: "welcome.template.company",
+    help: "welcome.template.companyHelp",
+  },
+  {
+    value: "product-team",
+    key: "welcome.template.product",
+    help: "welcome.template.productHelp",
+  },
+] as const;
 
 const FREQUENCIES = [
   { value: "weekly", key: "welcome.rhythm.weekly" },
@@ -66,6 +92,9 @@ export function Wizard({
   const [frequency, setFrequency] =
     useState<(typeof FREQUENCIES)[number]["value"]>("weekly");
   const [email, setEmail] = useState("");
+  const [template, setTemplate] = useState<
+    (typeof STARTING_TEMPLATES)[number]["value"] | "none"
+  >("starter");
 
   const index = STEPS.indexOf(step);
 
@@ -181,6 +210,38 @@ export function Wizard({
           </div>
         ) : null}
 
+        {step === "template" ? (
+          <div className="flex flex-col gap-2.5" data-testid="step-template">
+            <span className="text-xs text-ink-3">
+              {t("welcome.template.question")}
+            </span>
+            <div className="flex flex-col gap-1.5">
+              {STARTING_TEMPLATES.map((one) => (
+                <button
+                  key={one.value}
+                  type="button"
+                  data-testid={`template-${one.value}`}
+                  aria-pressed={template === one.value}
+                  onClick={() => setTemplate(one.value)}
+                  className={
+                    template === one.value
+                      ? "flex flex-col gap-0.5 rounded-md border border-brand-600 bg-brand-bg px-2.5 py-2 text-left"
+                      : "flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-2 text-left hover:border-ink-4"
+                  }
+                >
+                  <span className="text-xs font-semibold text-ink">
+                    {t(one.key)}
+                  </span>
+                  <span className="text-xs text-ink-3">{t(one.help)}</span>
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-ink-3">
+              {t("welcome.template.help")}
+            </span>
+          </div>
+        ) : null}
+
         {step === "demo" ? (
           <div className="flex flex-col gap-2.5" data-testid="step-demo">
             <span className="text-xs text-ink-3">
@@ -211,12 +272,18 @@ export function Wizard({
                 );
               } else if (step === "people") {
                 advance(() => inviteSomebody({ email }));
+              } else if (step === "template") {
+                advance(() => applyStartingTemplate({ template }));
               } else {
                 advance(buildDemo);
               }
             }}
           >
-            {step === "demo" ? t("welcome.demo.build") : t("welcome.continue")}
+            {step === "demo"
+              ? t("welcome.demo.build")
+              : step === "template"
+                ? t("welcome.template.apply")
+                : t("welcome.continue")}
           </Button>
           <Button
             type="button"
@@ -224,7 +291,11 @@ export function Wizard({
             data-testid="welcome-skip"
             onClick={skip}
           >
-            {step === "demo" ? t("welcome.demo.empty") : t("common.skip")}
+            {step === "demo"
+              ? t("welcome.demo.empty")
+              : step === "template"
+                ? t("welcome.template.empty")
+                : t("common.skip")}
           </Button>
         </div>
       </CardBody>

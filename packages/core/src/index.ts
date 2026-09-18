@@ -1037,6 +1037,19 @@ export {
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
 export {
+  type ApplyTemplateInput,
+  type ApplyTemplateResult,
+  applyTemplate,
+  firstWeeklySession,
+} from "./templates/apply.ts";
+export {
+  STARTING_TEMPLATE_KEYS,
+  STARTING_TEMPLATES,
+  type StartingTemplate,
+  type StartingTemplateKey,
+  startingTemplateFor,
+} from "./templates/catalogue.ts";
+export {
   type Admission,
   AdmissionError,
   type AdmissionLimits,

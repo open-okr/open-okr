@@ -14,6 +14,7 @@ the product.
 | [The weekly rhythm](weekly.md) | The four-step session, blockers, commitments, and what happens between sessions |
 | [The quarterly cycle](quarterly.md) | Eight phases, the publish gates, scoring and the closing diagnostic |
 | [The numbers](numbers.md) | Every threshold the practice runs on, and where each comes from |
+| [Ways of working](ways-of-working.md) | Four shapes of organisation mapped onto spaces, cycles and initiatives |
 
 ## The five ideas underneath it
 
@@ -48,3 +49,5 @@ Running your first cycle: [the quarterly cycle](quarterly.md).
 Running your first week: [the weekly rhythm](weekly.md).
 
 Fixing objectives you already have: [writing](writing.md).
+
+Deciding how to lay the workspace out: [ways of working](ways-of-working.md).

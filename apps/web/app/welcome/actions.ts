@@ -18,7 +18,13 @@
  * still what writes, and the CLI already has its own way in.
  */
 
-import { buildDemoWorkspace, callAction, OperationError } from "@openokr/core";
+import {
+  applyTemplate,
+  buildDemoWorkspace,
+  callAction,
+  OperationError,
+  type StartingTemplateKey,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { requireWorkspace } from "../../lib/workspace";
@@ -136,6 +142,35 @@ export async function finishOnboarding(): Promise<StepResult> {
   const { userId, ...ctx } = await context();
   try {
     await callAction(ctx, "workspace.finishOnboarding", {});
+  } catch (error) {
+    return refusal(error);
+  }
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+/**
+ * Applies a starting template, or nothing (P8-T12).
+ *
+ * A template is the smallest real quarter a team can edit, rather than the
+ * demo's whole cast with months of history. Both are offered, and neither is
+ * the default: skipping the step starts empty, which §4.14 says has to be a
+ * first-class answer rather than a lesser one.
+ *
+ * Idempotent by the applier's own check, which asks whether the workspace
+ * already holds goals. Pressing this twice costs one read.
+ */
+export async function applyStartingTemplate(input: {
+  template: StartingTemplateKey;
+}): Promise<StepResult> {
+  const { userId, ...ctx } = await context();
+  try {
+    await applyTemplate({
+      pool: ctx.pool,
+      workspaceId: ctx.workspaceId,
+      adminUserId: userId,
+      template: input.template,
+    });
   } catch (error) {
     return refusal(error);
   }

@@ -88,11 +88,14 @@ test("creating the first account finishes setup", async ({ page }) => {
   /**
    * **Into onboarding first, since P6-G26.** Finishing setup provisions a
    * workspace, and a provisioned workspace owes its owner S-34, so the front
-   * door diverts once. Skipped four times here: this spec is about the wizard
-   * that configures the *instance*, and the four questions that configure the
-   * *workspace* have their own specs.
+   * door diverts once. Every question that configures the *workspace* is
+   * skipped here except the template, which is answered: this instance's
+   * workspace is otherwise unused, and P8-T12's criterion is about what a
+   * workspace *started from a template* holds, which is the one thing the
+   * application instance cannot show because it spends its single workspace
+   * on P6-G26's all-skip criterion.
    */
-  await skipOnboarding(page);
+  await skipOnboarding(page, { template: "starter" });
 
   // Straight into the product, signed in, with a workspace already provisioned.
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
@@ -103,6 +106,7 @@ test("creating the first account finishes setup", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText(ADMIN.name).first()).toBeVisible();
 });
+
 
 test("the wizard is shut afterwards, and says why", async ({ page }) => {
   // The property that matters most here: a setup route that stayed open on a
@@ -130,14 +134,18 @@ test("registration is closed behind the first account", async ({ page }) => {
   await expect(page.getByText(/invitation-only/i)).toBeVisible();
 });
 
-test("the admin can sign in again", async ({ page }) => {
-  // The acceptance criterion's actual words: a secured instance with an admin
-  // exists. Proven by signing in as them on a fresh browser context.
+async function signInAsAdmin(page: import("@playwright/test").Page) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(ADMIN.email);
   await page.getByLabel("Password").fill(ADMIN.password);
   // Exact, because "Sign in with a passkey" is also a button on this page.
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+}
+
+test("the admin can sign in again", async ({ page }) => {
+  // The acceptance criterion's actual words: a secured instance with an admin
+  // exists. Proven by signing in as them on a fresh browser context.
+  await signInAsAdmin(page);
 
   await expect(page).toHaveURL(/\/$/);
   // The Work Map, since P3-T11 replaced the proving dashboard this used to
@@ -146,4 +154,32 @@ test("the admin can sign in again", async ({ page }) => {
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible();
   await expect(page.getByText(ADMIN.name).first()).toBeVisible();
+});
+
+/**
+ * P8-T12's acceptance criterion, walked in a browser.
+ *
+ * Given a fresh workspace created from the starter template, when it opens,
+ * then goals with a cadence exist, the Work Map is populated, and the first
+ * weekly session is scheduled. All three are read from the screens rather than
+ * from the tables, because a row nobody's screen shows is not a populated Work
+ * Map.
+ */
+test("the starter template left a first quarter to work from", async ({
+  page,
+}) => {
+  await signInAsAdmin(page);
+  await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });
+
+  // The objective the starter template writes, on the Work Map.
+  await expect(
+    page.getByText("Make onboarding the reason new customers stay").first(),
+  ).toBeVisible({ timeout: 15_000 });
+
+  // And the session in the calendar, which is the cadence half of the
+  // criterion: goals with a cadence, not goals on their own.
+  await page.goto("/sessions");
+  await expect(page.getByText("Weekly session").first()).toBeVisible({
+    timeout: 15_000,
+  });
 });
