@@ -25,27 +25,27 @@ catalog:
   drizzle-orm: ^0.45.2
   pg: ^8.23.0
   "@types/pg": ^8.23.1
-  pg-boss: ^12.30.0
+  pg-boss: ^12.31.0
   ws: ^8.21.3
   "@types/ws": ^8.18.1
-  better-auth: ^1.7.3
-  "@better-auth/passkey": ^1.7.3
+  better-auth: ^1.7.4
+  "@better-auth/passkey": ^1.7.4
   # The SMTP client, approved in P1-T09. MIT-0, and it carries no runtime
   # dependencies of its own. Confined to packages/adapters like every vendor
   # SDK, behind the Mailer port.
-  nodemailer: ^10.0.0
+  nodemailer: ^10.0.8
   "@types/nodemailer": ^8.0.1
   # Already used by the environment schema. Shared here so the action contract
   # registry validates against the same version the boundary does.
-  zod: 4.5.4
+  zod: 4.6.2
   # AIProvider drivers (P2-T13), approved by the human, confined to
   # packages/adapters like every vendor SDK. `openai`'s client also drives
   # openrouter, ollama and openai-compatible: all three speak the same
   # OpenAI-shaped chat completions API, just a different base URL and key,
   # so one client covers four of the six real drivers.
-  "@anthropic-ai/sdk": ^0.124.0
-  openai: ^7.10.0
-  "@google/genai": ^2.21.0
+  "@anthropic-ai/sdk": ^0.125.0
+  openai: ^7.15.0
+  "@google/genai": ^2.22.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -59,7 +59,7 @@ catalog:
   postcss: ^8.5.28
   "@base-ui-components/react": 1.0.0-rc.0
   motion: ^13.2.0
-  lucide-react: ^1.41.0
+  lucide-react: ^1.45.0
   clsx: ^2.1.1
   tailwind-merge: ^3.6.0
   class-variance-authority: ^0.7.1
