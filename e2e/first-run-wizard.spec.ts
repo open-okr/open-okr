@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { skipOnboarding } from "./instance-account.ts";
 
 /**
  * The first-run wizard, in a browser (P1-T09).
@@ -91,10 +92,7 @@ test("creating the first account finishes setup", async ({ page }) => {
    * that configures the *instance*, and the four questions that configure the
    * *workspace* have their own specs.
    */
-  await expect(page).toHaveURL("/welcome");
-  for (let step = 0; step < 4; step += 1) {
-    await page.getByTestId("welcome-skip").click();
-  }
+  await skipOnboarding(page);
 
   // Straight into the product, signed in, with a workspace already provisioned.
   await expect(page).toHaveURL(/\/$/, { timeout: 15_000 });

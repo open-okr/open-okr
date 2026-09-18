@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
 
 /**
  * Registration to dashboard, in a real browser (P1-T08).
@@ -54,10 +54,7 @@ test("registering provisions a workspace and lands on the dashboard", async () =
    * the time it runs the instance has been onboarded once and the wizard
    * refuses to appear again, which is itself the behaviour it does prove.
    */
-  await expect(page).toHaveURL("/welcome");
-  for (let step = 0; step < 4; step += 1) {
-    await page.getByTestId("welcome-skip").click();
-  }
+  await skipOnboarding(page);
 
   // Provisioning runs between the account committing and this page rendering,
   // so arriving here at all means the workspace and its first member exist.
