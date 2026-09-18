@@ -1,6 +1,7 @@
 import { resetEnvCache } from "@openokr/config";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
+import { installAdmission } from "../lib/admission";
 import { resolveSignupPolicy } from "../lib/auth";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
@@ -26,6 +27,14 @@ vi.mock("../lib/telemetry", () => ({ installTelemetry: vi.fn() }));
 // by then, which is why this reads as one flaky test rather than as a boot
 // that got heavier. Mocked for the import cost, like the three above.
 vi.mock("../lib/auth", () => ({ resolveSignupPolicy: vi.fn() }));
+// The fifth route, arriving one task after the fourth (P8-T06a).
+// `lib/admission` reaches the cache driver and the pool, so it carries the
+// same graph. Mocked for the import cost, and the mock is what makes the two
+// ordering assertions below possible at all.
+vi.mock("../lib/admission", () => ({ installAdmission: vi.fn() }));
+// The sixth route (P8-T07). `lib/sso` reaches the pool and the key ring
+// to decrypt SSO connections at boot. Mocked for the import cost.
+vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
 
 const original = { ...process.env };
 
@@ -43,6 +52,7 @@ afterEach(() => {
   vi.mocked(startScheduler).mockClear();
   vi.mocked(installTelemetry).mockClear();
   vi.mocked(resolveSignupPolicy).mockClear();
+  vi.mocked(installAdmission).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -185,4 +195,44 @@ test("a build worker resolves no signup policy, because it reaches no database",
   await register();
 
   expect(resolveSignupPolicy).not.toHaveBeenCalled();
+});
+
+test("admission is installed before the relay and the scheduler (P8-T06a)", async () => {
+  // Both of them call actions from their first tick. Installing the limits
+  // after they start would leave the first minute of every boot unlimited,
+  // and the first minute after a restart is exactly when a backlog arrives.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+
+  await register();
+
+  expect(installAdmission).toHaveBeenCalled();
+  expect(vi.mocked(installAdmission).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(startRelay).mock.invocationCallOrder[0] as number,
+  );
+  expect(vi.mocked(installAdmission).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(startScheduler).mock.invocationCallOrder[0] as number,
+  );
+});
+
+test("a boot that cannot resolve its limits fails, rather than serving unlimited", async () => {
+  // **The one step here whose failure is fatal, and deliberately so.** A
+  // relay or a meter that cannot start leaves a product that still works.
+  // A limit an operator set and nothing enforcing is a product that says one
+  // thing on its settings screen and does another, which is worse than a
+  // process that refuses to start and says why.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  vi.mocked(installAdmission).mockRejectedValueOnce(
+    new Error("cloud.limits.actionsPerMinute is 1, which is below the floor"),
+  );
+
+  await expect(register()).rejects.toThrow(/below the floor/);
+});
+
+test("a build worker installs no admission, because it reaches no database", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.NEXT_PHASE = "phase-production-build";
+
+  await register();
+
+  expect(installAdmission).not.toHaveBeenCalled();
 });

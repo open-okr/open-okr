@@ -152,15 +152,24 @@ fairness rather than a ceiling.
 forty thousand outbox rows puts every other tenant's nudge behind forty
 thousand jobs, and not one of those jobs exceeded any limit. The fix is in
 the relay, not in a limit: the relay reads outbox rows **round-robin by
-workspace** rather than by insertion order, taking a bounded slice per
-workspace per pass. A tenant with forty thousand rows still gets through
-them; it just stops being first forty thousand times running.
+workspace** rather than by insertion order. A tenant with forty thousand
+rows still gets through them; it just stops being first forty thousand
+times running.
 
 This changes the relay's read, so it is the one part of this design that
 touches shipped code on the self-hosted path. It is a fairness
 improvement there too, between a workspace that just ran an import and the
 other workspaces on the same self-hosted instance, so it is not flagged by
 the cloud flag and runs everywhere.
+
+**Built at P8-T06b, and two lines of this section were wrong.** Recorded
+here rather than left for a reader to find by diffing the code:
+
+| What this section said | What was built, and why |
+|---|---|
+| "round-robin by workspace", with no partition key named | `outbox` had ten columns and none of them was a workspace. Migration 0090 adds `workspace_id`, defaulted from the transaction's own `app.workspace_id` setting, so `enqueueOutbox` and its call sites do not change and no write path can forget it. Agung chose that on 15 September 2026 over partitioning on `payload->>'workspaceId'`, which no index can serve cheaply and which is absent on the rows an action spec supplies through `outcome.outbox`. The column is nullable, is never backfilled, and **authorises nothing**: the table stays `openokr:not-tenant-scoped`, because only the relay reads it and it must drain every workspace in one pass |
+| "taking a bounded slice per workspace per pass" | No cap was built, and the cap is what criterion 7 forbids. Each workspace's pending rows are ranked by age and the batch is ordered by rank, so it takes rank one of every workspace, then rank two. With one workspace holding rows every rank is distinct and ascending, which is the old order exactly and the old throughput exactly. A slice of, say, five per workspace would have capped that instance at five rows a pass for nothing |
+| Nothing said about the tenant floor | Two test files defined "tenant-scoped" as "has a `workspace_id` column", which stopped being true the moment `outbox` gained one. The marker in migration 0001 is now the single authority, read by `db:lint` and by both tests through `notTenantScopedTables`. **The gap this does not close**: `outbox` has no row-level policy and its payloads carry workspace and entity identifiers, so an operator connection can read them, as it could before this column existed. That is P8-T01b's question |
 
 **The pool needs a ceiling that is not a limit.** `apps/web/lib/pool.ts`
 sets no `max`. It should, on every deployment, cloud or not, because the
@@ -245,6 +254,6 @@ Written as the test plan P8-T06 inherits.
 |---|---|---|
 | 1 | The actual numbers for each limit | They depend on the instance size a real cloud runs, which nobody has measured because no cloud exists. P7-T02's twenty concurrent members is a per-machine figure, not a per-tenant one. The settings exist so the numbers are operations rather than design |
 | 2 | Whether limits vary by plan | That is PLAN.md §13 #1 territory and it is a human's call. The design holds the limits at instance scope, so making them per-plan later means reading the tenant's plan in one function rather than reshaping anything |
-| 3 | The pool `max` default | Named as a gap here and proposed as an environment setting. Changing it changes behaviour on every existing deployment, so it wants its own decision rather than riding in on a cloud task |
-| 4 | Whether the relay's round-robin read should ship before Phase 8 | It is a fairness fix that helps self-host too, and it is the one part of this design that touches code on the shipped path. It could reasonably be its own task in Phase 7's tail rather than waiting for P8-T06 |
+| 3 | ~~The pool `max` default~~ **Answered at P8-T06b** | `OPENOKR_DB_POOL_MAX`, default twenty, which is P7-T02's measured figure rather than a round number: twenty concurrent members held every §13.1 budget and twenty-five put the drag on the line. It does change behaviour on every existing deployment, upward, from the ten `pg` picks by itself |
+| 4 | ~~Whether the relay's round-robin read should ship before Phase 8~~ **Answered by events** | It did not ship in Phase 7's tail. It shipped at P8-T06b with the partition key decided there, and it runs on every deployment rather than behind the cloud flag |
 | 5 | A public status surface and per-tenant backup verification | Both are in P8-T06's deliverables and neither is a limit. They need their own design, and it is not written here because this document is about contention |

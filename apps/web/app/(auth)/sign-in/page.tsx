@@ -3,13 +3,18 @@
 import { Button, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { AuthCard, Field, FormError } from "../auth-card";
 
+interface SSOProvider {
+  id: string;
+  displayName: string;
+}
+
 /**
- * Sign in (screen S-35): password, passkey, and the one-time code challenge
- * when a second factor is enrolled.
+ * Sign in (screen S-35): password, passkey, SSO where configured, and the
+ * one-time code challenge when a second factor is enrolled.
  */
 export default function SignInPage() {
   const { t } = useTranslations();
@@ -19,6 +24,22 @@ export default function SignInPage() {
   const [pending, setPending] = useState(false);
   const [challenge, setChallenge] = useState(false);
   const [code, setCode] = useState("");
+  const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
+
+  // Load SSO providers for buttons. Non-blocking: the password form renders
+  // immediately and the buttons appear when the fetch completes.
+  useEffect(() => {
+    fetch("/api/sso-providers")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.providers)) {
+          setSsoProviders(data.providers);
+        }
+      })
+      .catch(() => {
+        // SSO buttons simply do not appear if the fetch fails.
+      });
+  }, []);
 
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -153,6 +174,28 @@ export default function SignInPage() {
       <Button type="button" variant="default" onClick={signInWithPasskey}>
         {t("auth.signIn.signInWithA")}
       </Button>
+
+      {ssoProviders.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-ink/10 pt-3">
+          <p className="text-center text-xs text-ink-3">or sign in with</p>
+          {ssoProviders.map((provider) => (
+            <Button
+              key={provider.id}
+              type="button"
+              variant="default"
+              onClick={async () => {
+                setError("");
+                await authClient.signIn.social({
+                  provider: provider.id as "github",
+                  callbackURL: "/",
+                });
+              }}
+            >
+              {provider.displayName}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <FormError>{error}</FormError>
     </AuthCard>

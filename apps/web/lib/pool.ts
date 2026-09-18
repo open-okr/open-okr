@@ -25,8 +25,20 @@ const globals = globalThis as typeof globalThis & {
 };
 
 export function getPool(): Pool {
+  const env = loadEnv();
   globals.openokrPool ??= new Pool({
-    connectionString: loadEnv().DATABASE_URL,
+    connectionString: env.DATABASE_URL,
+    // **A ceiling, because there was none** (P8-T06b). Without `max`, `pg`
+    // uses its own default of ten, which is a number a library chose rather
+    // than a number this product measured. P7-T02 held every §13.1 budget at
+    // twenty concurrent members with a pool of twenty and put the drag on
+    // the line at twenty-five, so twenty is the measurement.
+    //
+    // It is a ceiling rather than a limit: the per-tenant concurrency cap
+    // (P8-T06a) sits below it, so one workspace cannot hold every slot, and
+    // this stops the process as a whole from asking the database for more
+    // connections than it agreed to serve.
+    max: env.OPENOKR_DB_POOL_MAX,
   });
   return globals.openokrPool;
 }

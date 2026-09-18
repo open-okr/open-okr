@@ -26,6 +26,7 @@ export {
   lintMigrationDirs,
   lintMigrationSql,
   type MigrationLintResult,
+  notTenantScopedTables,
 } from "./migration-lint.ts";
 export {
   enqueueOutbox,
@@ -271,6 +272,12 @@ export {
   type DigestScope,
   digests,
 } from "./schema/digests.ts";
+export {
+  type DirectorySyncLogEntry,
+  type DirectorySyncToken,
+  directorySyncLog,
+  directorySyncTokens,
+} from "./schema/directory-sync.ts";
 export {
   ATTACHMENT_SUBJECT_TYPES,
   type Attachment,
@@ -521,6 +528,7 @@ export {
   spaceMembers,
   spaces,
 } from "./schema/spaces.ts";
+export { type SSOConnection, ssoConnections } from "./schema/sso.ts";
 export {
   type Streak,
   streaks,

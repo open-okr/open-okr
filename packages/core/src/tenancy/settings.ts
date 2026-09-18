@@ -24,6 +24,7 @@ import {
   getInstanceSetting,
 } from "../secrets/instance-registry.ts";
 import { readSetting, resolveSetting } from "../secrets/instance-settings.ts";
+import { type AdmissionLimits, validateAdmissionLimits } from "./admission.ts";
 
 export const CLOUD_ENABLED_KEY = "cloud.enabled";
 export const CLOUD_REGION_KEY = "cloud.region";
@@ -74,4 +75,39 @@ export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
       CLOUD_CLOSURE_RETENTION_KEY,
     ),
   };
+}
+
+// Not exported, unlike the three above. Nothing outside this file names
+// either key: the operator console lists settings from the registry and the
+// only reader is the resolver below. `pnpm dead-code` refuses an export
+// nothing imports, and it is right to.
+const CLOUD_ACTIONS_PER_MINUTE_KEY = "cloud.limits.actionsPerMinute";
+const CLOUD_CONCURRENT_ACTIONS_KEY = "cloud.limits.concurrentActions";
+
+/**
+ * The two admission limits, resolved and validated (P8-T06a).
+ *
+ * **Resolved once by the host, never per call.** Reading a setting is a
+ * database read, and admission runs on every action from every surface, so
+ * resolving here per call would cost the connection the whole design exists
+ * to protect. The host resolves and passes the answer into
+ * `ActionCallContext.admission`, the same arrangement `resolveCloudTenancy`
+ * uses and for the same reason.
+ *
+ * **Validated here rather than at the call.** A number below its floor fails
+ * this read, which happens at boot or on a settings change, instead of
+ * failing every action afterwards with a message about configuration.
+ */
+export async function resolveAdmissionLimits(
+  pool: Pool,
+): Promise<AdmissionLimits> {
+  const limits: AdmissionLimits = {
+    actionsPerMinute: await resolve<number>(pool, CLOUD_ACTIONS_PER_MINUTE_KEY),
+    concurrentActions: await resolve<number>(
+      pool,
+      CLOUD_CONCURRENT_ACTIONS_KEY,
+    ),
+  };
+  validateAdmissionLimits(limits);
+  return limits;
 }

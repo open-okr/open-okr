@@ -86,6 +86,26 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Days to keep a closed workspace before erasing it. Zero means never erase, because not configured must never mean delete everything (P7-T08c).",
   },
+  // The two admission limits (P8-T06a). Instance scope, because they
+  // describe the deployment rather than any customer, and both default to
+  // unlimited so a self-hosted instance is never limited by a number nobody
+  // chose. Design: docs/design/p8-t01a-tenant-limits.md §4.
+  {
+    key: "cloud.limits.actionsPerMinute",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_ACTIONS_PER_MINUTE",
+    summary:
+      "Actions one workspace may call a minute, across every surface. Zero means unlimited, which is every self-hosted instance. Below 60 is refused: one action a minute is an outage rather than a limit.",
+  },
+  {
+    key: "cloud.limits.concurrentActions",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_CONCURRENT_ACTIONS",
+    summary:
+      "Actions one workspace may have running at once. Zero means unlimited. This is the one a per-minute window cannot see: sixty calls in one second pass a per-minute limit and empty the connection pool.",
+  },
   {
     key: "instance.telemetry",
     kind: "boolean",
@@ -167,6 +187,43 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "openokr@localhost",
     environment: "OPENOKR_MAIL_FROM",
     summary: "The From address on everything the instance sends.",
+  },
+  // The status endpoint thresholds (P8-T06c). The relay and scheduler
+  // checks compare their lag against these to decide whether a component
+  // is operational, degraded or unavailable. All four default to a value
+  // that fires on a stopped process and not on a busy one.
+  // Design: docs/design/p8-t06c-status-and-capacity.md §2.5 and §2.6.
+  {
+    key: "status.relayDegradedSeconds",
+    kind: "number",
+    fallback: 300,
+    environment: "OPENOKR_STATUS_RELAY_DEGRADED_SECONDS",
+    summary:
+      "Oldest pending outbox row age, in seconds, above which /api/status reports the relay as degraded. Default 300 (5 minutes).",
+  },
+  {
+    key: "status.relayUnavailableSeconds",
+    kind: "number",
+    fallback: 1800,
+    environment: "OPENOKR_STATUS_RELAY_UNAVAILABLE_SECONDS",
+    summary:
+      "Oldest pending outbox row age, in seconds, above which /api/status reports the relay as unavailable. Default 1800 (30 minutes).",
+  },
+  {
+    key: "status.schedulerDegradedSeconds",
+    kind: "number",
+    fallback: 7200,
+    environment: "OPENOKR_STATUS_SCHEDULER_DEGRADED_SECONDS",
+    summary:
+      "Seconds without a successful scheduler run before /api/status reports it as degraded. Default 7200 (2 hours).",
+  },
+  {
+    key: "status.schedulerUnavailableSeconds",
+    kind: "number",
+    fallback: 14400,
+    environment: "OPENOKR_STATUS_SCHEDULER_UNAVAILABLE_SECONDS",
+    summary:
+      "Seconds without a successful scheduler run before /api/status reports it as unavailable. Default 14400 (4 hours).",
   },
   {
     key: "ai.deployment.provider",

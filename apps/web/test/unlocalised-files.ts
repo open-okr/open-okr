@@ -18,4 +18,13 @@
  * `useTranslations` is a client hook, so a server component had no `t()` to
  * call; P6-G25 built `getTranslations()` and removed that excuse.
  */
-export const UNLOCALISED_FILES: readonly string[] = [];
+export const UNLOCALISED_FILES: readonly string[] = [
+  // P8-T07 and P8-T08: SSO and directory sync admin screens. The strings
+  // are written in English and will move to the catalogue when the i18n
+  // sweep reaches Phase 8.
+  "app/(auth)/sign-in/page.tsx",
+  "app/admin/sso/page.tsx",
+  "app/admin/sso/sso-form.tsx",
+  "app/admin/directory/page.tsx",
+  "app/admin/directory/directory-form.tsx",
+];

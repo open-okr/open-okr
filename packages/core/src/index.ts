@@ -414,6 +414,12 @@ export {
 } from "./auth/session-hashing.ts";
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
+  listSSOProviders,
+  loadSSOConnections,
+  type SSOProviderConfig,
+  type SSOProviderInfo,
+} from "./auth/sso.ts";
+export {
   type ClaimBlobInput,
   type ClaimedBlob,
   claimBlob,
@@ -593,6 +599,19 @@ export {
   buildDemoWorkspace,
   type DemoContext,
 } from "./demo/builder.ts";
+export {
+  displayName as scimDisplayName,
+  logSyncOperation,
+  primaryEmail as scimPrimaryEmail,
+  type SCIMGroup,
+  type SCIMUser,
+  scimError,
+  scimList,
+} from "./directory-sync/scim.ts";
+export {
+  createSCIMToken,
+  resolveToken as resolveSCIMToken,
+} from "./directory-sync/tokens.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
@@ -969,11 +988,18 @@ export {
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
 export {
+  type Admission,
+  AdmissionError,
+  type AdmissionLimits,
+  AdmissionSettingError,
   countSeats,
+  currentConcurrentActions,
   isCloudEnabled,
   readOwnUsage,
   readPlans,
+  resolveAdmissionLimits,
   seatState,
+  setDefaultAdmission,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export {

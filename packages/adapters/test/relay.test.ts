@@ -395,3 +395,147 @@ describe("OutboxRelay", () => {
     expect(sink.delivered).toHaveLength(1);
   });
 });
+
+/**
+ * The fair read (P8-T06b). Design: `p8-t01a-tenant-limits.md` §5 and §8
+ * criteria 4 and 7.
+ *
+ * These insert `workspace_id` directly rather than through a tenant
+ * transaction, because the column's default reads `app.workspace_id` and
+ * this suite talks to the database as the admin. What is under test is the
+ * relay's read order, not where the column's value comes from.
+ */
+const enqueueFor = async (
+  admin: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+  workspaceId: string | null,
+  key: string,
+  ageSeconds: number,
+) => {
+  await admin.query(
+    `insert into outbox (topic, payload, idempotency_key, workspace_id, created_at)
+     values ('t', '{}'::jsonb, $1, $2::uuid,
+             now() - make_interval(secs => $3::double precision))`,
+    [key, workspaceId, ageSeconds],
+  );
+};
+
+const WS_A = "00000000-0000-4000-8000-00000000a001";
+const WS_B = "00000000-0000-4000-8000-00000000b002";
+
+describe("the relay is fair between workspaces", () => {
+  it("does not put one workspace's nudge behind another's import", async () => {
+    // **§8 criterion 4, and the whole reason this change exists.** Workspace
+    // A wrote twenty rows, the way an import does. Workspace B then wrote
+    // one. Oldest first would deliver all twenty before B's, which is how a
+    // nudge arrives after an import that took an hour; not one of those rows
+    // exceeded any limit, so no limiter could have helped.
+    const wb = await workerDb();
+    for (let n = 0; n < 20; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `import-${n}`, 600 - n);
+    }
+    await enqueueFor(wb.admin, WS_B, "nudge", 1);
+
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 5,
+    });
+    await relay.drainOnce();
+
+    // Second in the batch: A's oldest row is rank 1 and B's only row is
+    // rank 1 too, and A's is older, so A goes first and B goes next. Before
+    // this change B was twenty-first.
+    expect(sink.delivered[0]?.idempotencyKey).toBe("import-0");
+    expect(sink.delivered[1]?.idempotencyKey).toBe("nudge");
+  });
+
+  it("delivers one workspace's rows at full speed when there is nobody to be fair to", async () => {
+    // **§8 criterion 7.** Fairness that slowed a single-tenant instance down
+    // would be a tax every self-hosted deployment paid for a problem it does
+    // not have. With one workspace holding rows every rank is distinct and
+    // ascending, so the order is exactly what it was before this change.
+    const wb = await workerDb();
+    for (let n = 0; n < 6; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `only-${n}`, 600 - n);
+    }
+
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 4,
+    });
+    await relay.drainOnce();
+
+    expect(sink.delivered.map((one) => one.idempotencyKey)).toEqual([
+      "only-0",
+      "only-1",
+      "only-2",
+      "only-3",
+    ]);
+  });
+
+  it("interleaves three workspaces rather than draining one at a time", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 3; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `a-${n}`, 300 - n);
+      await enqueueFor(wb.admin, WS_B, `b-${n}`, 200 - n);
+      // Null is its own bucket, not a skipped one: a row written outside a
+      // tenant-scoped transaction still queues fairly against its own kind.
+      await enqueueFor(wb.admin, null, `none-${n}`, 100 - n);
+    }
+
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 9,
+    });
+    await relay.drainOnce();
+
+    const order = sink.delivered.map((one) => one.idempotencyKey);
+    // Rank 1 of each, then rank 2, then rank 3. Inside a rank, oldest first.
+    expect(order).toEqual([
+      "a-0",
+      "b-0",
+      "none-0",
+      "a-1",
+      "b-1",
+      "none-1",
+      "a-2",
+      "b-2",
+      "none-2",
+    ]);
+  });
+
+  it("gives a second relay draining at the same moment a batch of its own", async () => {
+    // **The regression the first version of the fair read shipped with.**
+    // The ranking and the claim have to be two statements, and the first
+    // version asked the ranking for exactly one batch. Every relay draining
+    // at the same moment then proposed the same ids, one locked all of them
+    // and the rest claimed nothing: four relays delivered fifteen rows where
+    // twenty existed, which the concurrency test above caught by its total.
+    // This one names the cause, so a future narrowing of the candidate
+    // window fails here saying what it broke rather than looking flaky.
+    const wb = await workerDb();
+    for (let n = 0; n < 12; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `race-${n}`, 600 - n);
+    }
+
+    const first = collector();
+    const second = collector();
+    const relays = [
+      new OutboxRelay(wb.appPool, { dispatch: first.dispatch, batchSize: 4 }),
+      new OutboxRelay(wb.appPool, { dispatch: second.dispatch, batchSize: 4 }),
+    ];
+    await Promise.all(relays.map((relay) => relay.drainOnce()));
+
+    // Eight rows between them, no row twice. Which relay got which batch is
+    // a race and is not asserted; that both got one is the point.
+    const keys = [...first.delivered, ...second.delivered].map(
+      (one) => one.idempotencyKey,
+    );
+    expect(keys).toHaveLength(8);
+    expect(new Set(keys).size).toBe(8);
+    expect(first.delivered).toHaveLength(4);
+    expect(second.delivered).toHaveLength(4);
+  });
+});

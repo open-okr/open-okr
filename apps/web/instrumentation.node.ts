@@ -1,7 +1,9 @@
 import { EnvironmentError, loadEnv } from "@openokr/config";
+import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
+import { resolveSSOProviders } from "./lib/sso";
 import { installTelemetry } from "./lib/telemetry";
 
 /**
@@ -118,4 +120,54 @@ export async function resolveAuthPolicy(): Promise<void> {
     return;
   }
   await resolveSignupPolicy();
+}
+
+/**
+ * Resolves this instance's per-tenant admission limits (P8-T06a).
+ *
+ * One database read, before anything is served, for the same reason the
+ * signup policy is resolved here: admission runs on every action from every
+ * surface and reading a setting per call would cost the connection the limit
+ * exists to protect.
+ *
+ * **Its failure is fatal to the boot and deliberately so.** A number below
+ * its floor means an operator asked for a limit the product refuses to
+ * apply, and carrying on would serve traffic unlimited while the settings
+ * screen says otherwise. Every other step here logs and continues because
+ * the product still works without a relay or a meter; it does not work
+ * honestly with a limit somebody set and nothing enforcing.
+ *
+ * A build worker has the placeholder `DATABASE_URL` the Dockerfile sets and
+ * no database behind it, the same reason the relay skips that phase.
+ */
+export async function resolveAdmission(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  await installAdmission();
+}
+
+/**
+ * Loads SSO connections from the database and caches them for `getAuth()`
+ * (P8-T07).
+ *
+ * Non-fatal on failure: an instance that cannot read its SSO connections
+ * still serves password and passkey sign-in. The SSO buttons do not appear.
+ *
+ * A build worker has the placeholder `DATABASE_URL` and no key ring, so
+ * this is skipped during `next build`.
+ */
+export async function resolveSSO(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    const { getPool } = await import("./lib/pool");
+    const { getKeyRing } = await import("./lib/secrets");
+    await resolveSSOProviders(getPool(), getKeyRing());
+  } catch (error) {
+    process.stderr.write(
+      `sso: could not load SSO connections: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
 }

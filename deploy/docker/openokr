@@ -1,15 +1,16 @@
 #!/bin/sh
-# The OpenOKR lifecycle helper (P1-T09, backup/restore P6-T06).
+# The OpenOKR lifecycle helper (P1-T09, backup/restore P6-T06, verify P8-T06d).
 #
-#   ./openokr up          start, generating every secret on first run
-#   ./openokr status      what is running, and whether it is healthy
-#   ./openokr logs        follow the application log
-#   ./openokr upgrade     pull, restart, re-run migrations, report
-#   ./openokr rotate-key  re-wrap stored secrets under a new root key
-#   ./openokr backup      encrypted database dump + blob copy, with checksum
-#   ./openokr restore F   restore from a backup directory created by backup
-#   ./openokr down        stop, keeping data
-#   ./openokr destroy     stop and delete every volume
+#   ./openokr up              start, generating every secret on first run
+#   ./openokr status          what is running, and whether it is healthy
+#   ./openokr logs            follow the application log
+#   ./openokr upgrade         pull, restart, re-run migrations, report
+#   ./openokr rotate-key      re-wrap stored secrets under a new root key
+#   ./openokr backup          encrypted database dump + blob copy, with checksum
+#   ./openokr restore F       restore from a backup directory created by backup
+#   ./openokr verify-backup F prove a backup would restore, without touching the live database
+#   ./openokr down            stop, keeping data
+#   ./openokr destroy         stop and delete every volume
 #
 # Written in POSIX shell on purpose. It has to run before the application does,
 # including when the application will not start, so it cannot be a Node script
@@ -148,6 +149,73 @@ reconcile_public_url() {
   if [ -n "$current" ]; then
     log "note: passkeys registered against $current must be re-enrolled"
   fi
+}
+
+# Shared validation for a backup directory. Used by both `restore` and
+# `verify-backup` (P8-T06d).
+validate_backup_dir() {
+  dir="$1"
+  [ -n "$dir" ] || { echo "openokr: usage: ./openokr $2 <backup-directory>" >&2; exit 3; }
+  [ -d "$dir" ] || { echo "openokr: $dir is not a directory" >&2; exit 3; }
+  [ -f "$dir/checksum.sha256" ] || { echo "openokr: $dir has no checksum file" >&2; exit 3; }
+  [ -f "$dir/db.dump.enc" ] || { echo "openokr: $dir has no database dump" >&2; exit 3; }
+  [ -f "$dir/manifest.json" ] || { echo "openokr: $dir has no manifest" >&2; exit 3; }
+  [ -f "$APP_ENV" ] || { echo "openokr: no $APP_ENV. Cannot decrypt without the root key." >&2; exit 3; }
+}
+
+# Verify a backup directory's checksum. Used by both `restore` and
+# `verify-backup`.
+verify_checksum() {
+  dir="$1"
+  log "verifying checksum..."
+  if ! (cd "$dir" && sha256sum -c checksum.sha256 --quiet 2>/dev/null); then
+    echo "openokr: checksum verification failed. The backup is damaged or was altered." >&2
+    return 1
+  fi
+  log "checksum OK"
+}
+
+# Decrypt a backup's database dump, trying the current key and then any
+# previous keys (P8-T06d). Sets $dump_path to the decrypted file on success.
+#
+# Extracted from the restore case so restore and verify-backup use the same
+# logic. A second copy would be the one that gets the key fallback wrong.
+#
+# Arguments: $1 = backup directory
+# Reads: $APP_ENV for OPENOKR_ENCRYPTION_KEY and OPENOKR_PREVIOUS_ENCRYPTION_KEYS
+# Writes: $1/db.dump (caller is responsible for cleanup)
+decrypt_dump() {
+  _dd_dir="$1"
+  _dd_enc_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
+  _dd_prev_keys="$(grep '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' "$APP_ENV" | cut -d= -f2- || true)"
+
+  _dd_try() {
+    openssl enc -d -aes-256-cbc -pbkdf2 \
+      -pass "pass:$1" \
+      -in "$_dd_dir/db.dump.enc" \
+      -out "$_dd_dir/db.dump" 2>/dev/null
+  }
+
+  if _dd_try "$_dd_enc_key"; then
+    log "decrypted with current key"
+    return 0
+  fi
+
+  # Try previous keys (comma-separated).
+  _dd_old_ifs="$IFS"
+  IFS=','
+  for _dd_key in $_dd_prev_keys; do
+    _dd_key="$(echo "$_dd_key" | tr -d ' ')"
+    if [ -n "$_dd_key" ] && _dd_try "$_dd_key"; then
+      IFS="$_dd_old_ifs"
+      log "decrypted with a previous key"
+      return 0
+    fi
+  done
+  IFS="$_dd_old_ifs"
+
+  echo "openokr: could not decrypt the database dump with any known key" >&2
+  return 1
 }
 
 case "${1:-help}" in
@@ -410,51 +478,14 @@ MANIFEST
     # Verifies the checksum before decrypting anything. Supports decryption
     # with a previous key (after a key rotation) by trying
     # OPENOKR_PREVIOUS_ENCRYPTION_KEYS if the current one fails.
+    #
+    # Decryption uses the shared decrypt_dump function (P8-T06d) so the
+    # key-fallback logic is defined once for both restore and verify-backup.
     shift
     backup_dir="${1:-}"
-    [ -n "$backup_dir" ] || fail "usage: ./openokr restore <backup-directory>"
-    [ -d "$backup_dir" ] || fail "$backup_dir is not a directory"
-    [ -f "$backup_dir/checksum.sha256" ] || fail "$backup_dir has no checksum file"
-    [ -f "$backup_dir/db.dump.enc" ] || fail "$backup_dir has no database dump"
-    [ -f "$backup_dir/manifest.json" ] || fail "$backup_dir has no manifest"
-    [ -f "$APP_ENV" ] || fail "no $APP_ENV. Cannot decrypt without the root key."
-
-    # Verify checksum before touching anything.
-    log "verifying checksum..."
-    if ! (cd "$backup_dir" && sha256sum -c checksum.sha256 --quiet 2>/dev/null); then
-      fail "checksum verification failed. The backup is damaged or was altered."
-    fi
-    log "checksum OK"
-
-    # Try decryption with the current key, then previous keys.
-    encryption_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
-    previous_keys="$(grep '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' "$APP_ENV" | cut -d= -f2- || true)"
-
-    decrypt_db() {
-      openssl enc -d -aes-256-cbc -pbkdf2 \
-        -pass "pass:$1" \
-        -in "$backup_dir/db.dump.enc" \
-        -out "$backup_dir/db.dump" 2>/dev/null
-    }
-
-    decrypted=0
-    if decrypt_db "$encryption_key"; then
-      decrypted=1
-      log "decrypted with current key"
-    else
-      # Try previous keys (comma-separated).
-      IFS=','
-      for key in $previous_keys; do
-        key="$(echo "$key" | tr -d ' ')"
-        if [ -n "$key" ] && decrypt_db "$key"; then
-          decrypted=1
-          log "decrypted with a previous key"
-          break
-        fi
-      done
-      unset IFS
-    fi
-    [ "$decrypted" -eq 1 ] || fail "could not decrypt the database dump with any known key"
+    validate_backup_dir "$backup_dir" "restore"
+    verify_checksum "$backup_dir" || fail "checksum verification failed"
+    decrypt_dump "$backup_dir" || fail "decryption failed"
 
     # Restore database.
     log "restoring database..."
@@ -482,7 +513,112 @@ MANIFEST
     log "verify with: ./openokr status"
     ;;
 
+  verify-backup)
+    # Prove a backup would restore, without touching the live database
+    # (P8-T06d). Decrypts, loads into a temporary database, checks every
+    # workspace, and drops the temporary database.
+    #
+    # Design: docs/design/p8-t06d-backup-verification.md
+    #
+    # Exit codes:
+    #   0  every workspace passed every check
+    #   1  at least one workspace failed (data issue, not a load failure)
+    #   2  the backup could not be loaded (decrypt, restore, or query failure)
+    #   3  usage error (missing argument, missing files)
+    shift
+    backup_dir="${1:-}"
+    validate_backup_dir "$backup_dir" "verify-backup"
+
+    verify_checksum "$backup_dir" || exit 2
+
+    decrypt_dump "$backup_dir" || exit 2
+
+    # A temporary database that is dropped on exit, success or failure.
+    verify_db="openokr_verify_$(date -u +%Y%m%dT%H%M%SZ)"
+    cleanup_verify() {
+      rm -f "$backup_dir/db.dump"
+      compose exec -T db dropdb -U openokr --if-exists "$verify_db" 2>/dev/null || true
+    }
+    trap cleanup_verify EXIT INT TERM
+
+    log "loading into temporary database $verify_db..."
+    compose exec -T db createdb -U openokr "$verify_db" || {
+      echo "openokr: could not create temporary database $verify_db" >&2
+      exit 2
+    }
+    cat "$backup_dir/db.dump" | compose exec -T db pg_restore -U openokr -d "$verify_db" --no-owner --no-privileges 2>/dev/null || {
+      echo "openokr: pg_restore failed against $verify_db" >&2
+      exit 2
+    }
+    rm -f "$backup_dir/db.dump"
+    log "restore into $verify_db succeeded"
+
+    # Read the expected schema version from the manifest.
+    manifest_schema="$(sed -n 's/.*"schemaVersion"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$backup_dir/manifest.json")"
+
+    # Helper: run a query against the temporary database.
+    vq() {
+      compose exec -T db psql -U openokr -d "$verify_db" -t -A -c "$1" 2>/dev/null
+    }
+
+    failures=0
+
+    # Check 1: schema version matches the manifest.
+    actual_schema="$(vq "SELECT name FROM _migrations ORDER BY name DESC LIMIT 1")"
+    if [ -n "$manifest_schema" ] && [ "$manifest_schema" != "unknown" ]; then
+      if [ "$actual_schema" = "$manifest_schema" ]; then
+        log "  schema version: $actual_schema (matches manifest)"
+      else
+        log "  FAIL schema version: dump has '$actual_schema', manifest says '$manifest_schema'"
+        failures=$((failures + 1))
+      fi
+    else
+      log "  schema version: $actual_schema (manifest has no version to compare)"
+    fi
+
+    # Check 2: workspaces exist.
+    workspace_rows="$(vq "SELECT id, slug FROM workspaces WHERE deleted_at IS NULL ORDER BY created_at")"
+    workspace_count="$(echo "$workspace_rows" | grep -c '|' || true)"
+    if [ "$workspace_count" -eq 0 ]; then
+      log "  WARN no live workspaces found in the backup"
+    else
+      log "  workspaces: $workspace_count live"
+    fi
+
+    # Check 3 and 4: per-workspace member count and audit events.
+    if [ "$workspace_count" -gt 0 ]; then
+      echo "$workspace_rows" | while IFS='|' read -r ws_id ws_slug; do
+        [ -n "$ws_id" ] || continue
+        member_count="$(vq "SELECT count(*) FROM workspace_members WHERE workspace_id = '$ws_id' AND deleted_at IS NULL")"
+        audit_count="$(vq "SELECT count(*) FROM audit_events WHERE workspace_id = '$ws_id'")"
+
+        if [ "${member_count:-0}" -eq 0 ]; then
+          log "  FAIL $ws_slug: 0 members (every workspace has at least its founding admin)"
+          failures=$((failures + 1))
+        elif [ "${audit_count:-0}" -eq 0 ]; then
+          log "  FAIL $ws_slug: 0 audit events (provisioning writes audit events)"
+          failures=$((failures + 1))
+        else
+          log "  ok   $ws_slug: $member_count member(s), $audit_count audit event(s)"
+        fi
+      done
+      # The while-read runs in a subshell, so $failures inside it is lost.
+      # Re-check by querying for the failure conditions.
+      zero_members="$(vq "SELECT count(*) FROM workspaces w WHERE w.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace_id = w.id AND m.deleted_at IS NULL)")"
+      zero_audit="$(vq "SELECT count(*) FROM workspaces w WHERE w.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.workspace_id = w.id)")"
+      failures=$((failures + ${zero_members:-0} + ${zero_audit:-0}))
+    fi
+
+    # Report.
+    if [ "$failures" -gt 0 ]; then
+      log "verification FAILED: $failures issue(s) found"
+      exit 1
+    fi
+    log "verification passed: $workspace_count workspace(s), schema $actual_schema"
+    exit 0
+    ;;
+
   *)
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

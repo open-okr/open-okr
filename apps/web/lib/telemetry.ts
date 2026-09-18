@@ -1,5 +1,10 @@
 import { createTelemetry, type Telemetry } from "@openokr/adapters";
-import { setDefaultMetrics } from "@openokr/core";
+import {
+  currentConcurrentActions,
+  METRIC,
+  setDefaultMetrics,
+} from "@openokr/core";
+import { getPool } from "./pool";
 
 /**
  * This process's meter (P7-T06a).
@@ -100,5 +105,29 @@ export function isMetricsEnabled(): boolean {
  * instead of assembling the pieces itself.
  */
 export function installTelemetry(): void {
-  setDefaultMetrics(getTelemetry());
+  const telemetry = getTelemetry();
+  setDefaultMetrics(telemetry);
+
+  // Capacity gauges (P8-T06c). Registered here because this is the one
+  // function that runs after the meter exists and before the first request.
+  //
+  // Pool connections: reads from `pg`'s pool statistics at scrape time.
+  // Three separate registrations with the `state` label, so each becomes
+  // its own series line on the capacity dashboard.
+  telemetry.gauge(
+    METRIC.poolConnections,
+    () => getPool().totalCount - getPool().idleCount,
+    { state: "active" },
+  );
+  telemetry.gauge(METRIC.poolConnections, () => getPool().idleCount, {
+    state: "idle",
+  });
+  telemetry.gauge(METRIC.poolConnections, () => getPool().waitingCount, {
+    state: "waiting",
+  });
+
+  // Concurrent actions: the process-local counter that admission.ts
+  // maintains. On a self-hosted instance with no admission installed, the
+  // counter is still bumped by `callAction` for this gauge.
+  telemetry.gauge(METRIC.concurrentActions, () => currentConcurrentActions());
 }
