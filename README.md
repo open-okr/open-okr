@@ -14,6 +14,7 @@
 
 [Product overview (PDF)](docs/stakeholder/OpenOKR-Overview.pdf) ·
 [Pitch deck (PDF)](docs/stakeholder/OpenOKR-Deck.pdf) ·
+[Documentation](docs/README.md) ·
 [The method](docs/development-plan/METHOD.md) ·
 [The plan](docs/development-plan/) ·
 [Live status](docs/development-plan/STATUS.md)

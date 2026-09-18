@@ -90,6 +90,13 @@ jobs:
         # the outbox.
         run: pnpm check:boundaries
 
+      - name: Documentation gate
+        # Every link in docs/ resolves, every page is reachable from the
+        # index, and every command a page tells somebody to run exists. A
+        # link nobody can follow is worse than a missing page: the reader
+        # believes it.
+        run: pnpm check:docs
+
       - name: Air-gap checklist
         # docs/runbooks/air-gap.md claims an instance with no route out is
         # whole. Six of those claims are about the source, and this checks

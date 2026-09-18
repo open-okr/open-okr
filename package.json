@@ -46,7 +46,8 @@
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep",
     "cloud:sweep": "pnpm --filter @openokr/core cloud:sweep",
     "cloud:usage": "pnpm --filter @openokr/core cloud:usage",
-    "check:air-gap": "node --experimental-strip-types --no-warnings scripts/check-air-gap.ts"
+    "check:air-gap": "node --experimental-strip-types --no-warnings scripts/check-air-gap.ts",
+    "check:docs": "node --experimental-strip-types --no-warnings scripts/check-docs.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
