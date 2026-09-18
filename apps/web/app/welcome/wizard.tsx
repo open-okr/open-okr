@@ -225,7 +225,7 @@ export function Wizard({
                   onClick={() => setTemplate(one.value)}
                   className={
                     template === one.value
-                      ? "flex flex-col gap-0.5 rounded-md border border-brand-600 bg-brand-bg px-2.5 py-2 text-left"
+                      ? "flex flex-col gap-0.5 rounded-md border border-brand-600 bg-brand-weak px-2.5 py-2 text-left"
                       : "flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-2 text-left hover:border-ink-4"
                   }
                 >
