@@ -1,0 +1,31 @@
+name: Feature
+description: Something the product should do and does not
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The OKR practice itself is specified in
+        `docs/development-plan/METHOD.md`. A change to a rule, a threshold, a
+        band, a corridor or a coaching message is a decision about the method
+        rather than about the software, and it is made by a maintainer. Say so
+        plainly if that is what you are asking for; it is a legitimate ask.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What you were trying to do, and what stopped you. Not the solution you
+        have in mind: the situation that made you want one.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do today instead
+      description: The workaround, if there is one. "Nothing, we gave up" is an answer.
+  - type: textarea
+    id: shape
+    attributes:
+      label: What you think it should look like
+      description: Optional. A rough shape is more useful than a precise one you are not attached to.

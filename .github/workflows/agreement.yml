@@ -1,0 +1,110 @@
+name: Agreement
+
+# The developer certificate of origin, checked on every pull request and
+# explained when it fails (P8-T14).
+#
+# **The gate already existed; the explanation did not.** `pnpm check:signoff`
+# has failed unsigned commits since P7-T09, inside the compliance job, alongside
+# five other checks. A first-time contributor met a red cross on a job named
+# "Licences and sign-off" and had to open the log to find out which of the two
+# it was and what to do about it. That is a bad first experience of a project
+# and it costs a maintainer a comment every time.
+#
+# So this job does one thing, says which commits are unsigned, and says exactly
+# how to fix it. It is not a second gate: `check:signoff` in `ci.yml` is still
+# what blocks the merge.
+#
+# **The contributor licence agreement is not checked here.** It is signed
+# through an app installed on the repository, which is an account-level act
+# rather than a file in it, and a workflow claiming to check something it
+# cannot see would be worse than one that says nothing. CONTRIBUTING.md is
+# where the agreement is described.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  sign-off:
+    name: Developer certificate of origin
+    runs-on: ubuntu-latest
+    # Bots do not sign off; their commits are covered by the maintainer who
+    # merges them. The same exemption `ci.yml` applies.
+    if: ${{ !endsWith(github.actor, '[bot]') }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check every commit on this branch
+        id: check
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          missing=""
+          for sha in $(git rev-list "${BASE}..HEAD"); do
+            author="$(git show -s --format='%an <%ae>' "$sha")"
+            if ! git show -s --format='%B' "$sha" \
+              | grep -qiF "Signed-off-by: ${author}"; then
+              missing="${missing}- \`$(git show -s --format='%h %s' "$sha")\`"$'\n'
+            fi
+          done
+          if [ -n "$missing" ]; then
+            {
+              echo "missing<<EOF"
+              printf '%s' "$missing"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            printf 'Commits with no sign-off from their author:\n%s' "$missing"
+            exit 1
+          fi
+          echo "Every commit is signed off by its author."
+
+      - name: Say how to fix it
+        if: failure() && steps.check.outputs.missing != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          MISSING: ${{ steps.check.outputs.missing }}
+        run: |
+          set -euo pipefail
+          cat > comment.md <<'HEADER'
+          These commits carry no `Signed-off-by` line matching their author:
+
+          HEADER
+          printf '%s\n' "$MISSING" >> comment.md
+          cat >> comment.md <<'FOOTER'
+          The sign-off is the [Developer Certificate of
+          Origin](https://developercertificate.org/): a one-line statement that
+          you have the right to contribute the code you are committing. It is
+          your name and email, and nothing else.
+
+          To fix the most recent commit:
+
+          ```
+          git commit --amend -s --no-edit
+          git push --force-with-lease
+          ```
+
+          To fix every commit on the branch:
+
+          ```
+          git rebase --signoff origin/main
+          git push --force-with-lease
+          ```
+
+          And so it does not happen again:
+
+          ```
+          git config --global format.signOff true
+          ```
+
+          This comment is written by a workflow, not by a person. Nobody is
+          waiting on you to apologise for it.
+          FOOTER
+          gh pr comment "$NUMBER" --body-file comment.md

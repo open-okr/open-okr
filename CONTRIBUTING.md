@@ -128,6 +128,14 @@ moved into `test-quarantine.json` with `pnpm flaky quarantine`. A quarantined
 test no longer fails the build, which makes it a debt to pay, not a fix. Fix or
 delete it.
 
+## Where to start
+
+Issues labelled `good first issue` are real work with a named file to start in. [The list](docs/runbooks/good-first-issues.md) says what makes one and which are open.
+
+Nobody assigns them. Say on the issue that you are starting, so two people do not do it twice, and open the pull request when it is ready rather than when it is perfect.
+
+Tasks from `docs/development-plan/IMPLEMENTATION-PLAN.md` are deliberately never labelled that way. They have a Definition of Ready, design gates behind some of them, and an execution protocol; they are not an introduction to the project.
+
 ## Code rules
 
 - TypeScript strict mode everywhere. No loose types without a comment justifying them.
@@ -143,11 +151,19 @@ Every commit must carry a `Signed-off-by` line with your real name and email:
 git commit -s
 ```
 
-This is the Developer Certificate of Origin (DCO), a short statement that you have the right to contribute the code you are committing. Continuous integration rejects unsigned commits.
+This is the [Developer Certificate of Origin](https://developercertificate.org/), a short statement that you have the right to contribute the code you are committing. Continuous integration rejects unsigned commits, and a workflow comments on the pull request naming which commits are missing it and the two commands that fix it.
+
+So it never happens again:
+
+```sh
+git config --global format.signOff true
+```
 
 ## Contributor licence agreement
 
 Before your first pull request merges, you sign the contributor licence agreement (CLA). Signing is one click through a bot on the pull request. The agreement lets the project relicense contributions later, which keeps two doors open: offering the code under a more permissive licence one day, and running a managed cloud. You keep the copyright to your work.
+
+The sign-off and the agreement are two different things and both are needed. The sign-off says the code is yours to give; the agreement says what the project may do with it.
 
 ## Licence
 

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security
+    url: https://github.com/open-okr/open-okr/security/policy
+    about: Report a vulnerability privately. Never in an issue.
+  - name: How the product decides things
+    url: https://github.com/open-okr/open-okr/blob/main/docs/development-plan/METHOD.md
+    about: The OKR practice canon. Every rule, threshold and gate the product runs.
+  - name: Where to start contributing
+    url: https://github.com/open-okr/open-okr/blob/main/CONTRIBUTING.md
+    about: Getting a development instance running, and the gates your change has to pass.

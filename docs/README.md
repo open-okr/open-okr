@@ -66,6 +66,9 @@ Written for the person holding the pager, not for a reader.
 | [Observability](runbooks/observability.md) | What the instance reports about itself |
 | [Migration cutover](runbooks/migration-cutover.md) | Moving from another system |
 | [Air gap](runbooks/air-gap.md) | No route to the internet |
+| [Cutting a release](runbooks/release.md) | Tagging a version, and the three checks nobody else will do |
+| [The announcement](runbooks/announcement.md) | The text to post when a release goes out |
+| [Good first issues](runbooks/good-first-issues.md) | What makes one, and the ones that are open now |
 
 ## About the project
 

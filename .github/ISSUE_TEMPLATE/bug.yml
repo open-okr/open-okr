@@ -1,0 +1,49 @@
+name: Bug
+description: Something does not work the way it says it does
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you start: if this is a security problem, do not open an issue.
+        Follow `SECURITY.md` instead.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The tag you are running, or the commit if you built it yourself.
+      placeholder: v1.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How it is deployed
+      options:
+        - Docker Compose, one server
+        - Kubernetes, Helm chart
+        - The managed cloud
+        - A development checkout
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead. One of each.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >
+        The error, the log lines around it, or the screenshot. Redact anything
+        personal. Never paste a token, a provider key or a connection string.
+  - type: checkboxes
+    id: rule
+    attributes:
+      label: If the product refused something
+      options:
+        - label: The message cited a rule key, and I have included it
+          required: false
