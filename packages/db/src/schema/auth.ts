@@ -127,6 +127,33 @@ export const twoFactors = pgTable("two_factors", {
 });
 
 /**
+ * The SSO plugin's provider table (P8-T07c-a).
+ *
+ * **Derived from `sso_connections`, which is the authority.** Better Auth owns
+ * the shape and the writes here, the way it owns `passkeys` and `two_factors`;
+ * the product feeds it and never reads it to answer a question. See migration
+ * 0097 and `docs/design/p8-t07c-saml.md`.
+ *
+ * The property names are Better Auth's field names, because its Drizzle
+ * adapter looks columns up by them. The database columns are snake_case, the
+ * same split `passkeys.credentialID` already carries.
+ */
+export const ssoProviders = pgTable("sso_providers", {
+  id: text("id").primaryKey(),
+  /** The `sso_connections.id`, not its `provider_id`. Unique instance-wide,
+   * which the plugin requires and a per-workspace provider id is not. */
+  providerId: text("provider_id").notNull().unique(),
+  issuer: text("issuer").notNull(),
+  domain: text("domain").notNull(),
+  oidcConfig: text("oidc_config"),
+  samlConfig: text("saml_config"),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  /** Better Auth's organization plugin, which this product does not use.
+   * Declared because the adapter looks it up; it stays null. */
+  organizationId: text("organization_id"),
+});
+
+/**
  * The mapping Better Auth's Drizzle adapter expects: its model names on the
  * left, our tables on the right.
  */
@@ -137,4 +164,5 @@ export const authSchema = {
   verification: verifications,
   passkey: passkeys,
   twoFactor: twoFactors,
+  ssoProvider: ssoProviders,
 } as const;

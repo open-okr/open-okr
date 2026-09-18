@@ -61,6 +61,11 @@ import {
   type SpaceKey,
 } from "./cast.ts";
 import {
+  LAST_QUARTER,
+  LAST_QUARTER_PROCESS_HEALTH,
+  LAST_QUARTER_REVIEW_TITLE,
+} from "./last-quarter.ts";
+import {
   KPI_CATEGORIES,
   KPI_TREES,
   KPIS,
@@ -106,6 +111,8 @@ export interface BuildDemoResult {
   readonly checkInsPublished: number;
   readonly kpisCreated: number;
   readonly kpiRecordsWritten: number;
+  /** §8.6's verdict for the quarter that is already over (P8-T13b). */
+  readonly lastQuarterVerdict: string | null;
   /**
    * Things the seed could not do and the reason, in words a presenter can
    * repeat. Printed by `pnpm db:seed` so nobody discovers them on stage.
@@ -122,6 +129,7 @@ const EMPTY: BuildDemoResult = {
   checkInsPublished: 0,
   kpisCreated: 0,
   kpiRecordsWritten: 0,
+  lastQuarterVerdict: null,
   notes: [],
 };
 
@@ -370,9 +378,12 @@ async function runCycleWorkflow(
     // Gate 6 asks for a deadline before day one of the cycle, which is what a
     // set published on time looks like from the inside.
     publicationDeadline: addDays(cycle.startsOn, -3),
-    // True on a fresh instance, and it is what lets phase 2 read honestly:
-    // there is no prior cycle to score, rather than a prior cycle nobody
-    // scored.
+    // **Set here and cleared below, since P8-T13b.** It was true because a
+    // fresh instance has no prior cycle to score, which was the honest reading
+    // when the demo held one quarter. It now holds a finished one as well, so
+    // `runLastQuarter` flips this to false once that quarter exists: a cycle
+    // claiming to be the first with a scored quarter behind it would make
+    // phase 2 read a lie.
     firstCycle: true,
     levels: ["company", "department", "team", "individual"],
     // Phase 5, Align and commit, because that is where the work below actually
@@ -863,6 +874,171 @@ async function seedDiscussion(
 
 // ── Entry point ─────────────────────────────────────────────────────────
 
+/**
+ * The quarter that is already over (P8-T13b).
+ *
+ * Runs a whole review of the previous cycle through the actions a room uses,
+ * so the scorecard has a row, the goal pages have scores, and §8.6's diagnostic
+ * is on screen with the two numbers it was derived from. The story, the grades
+ * and the reasons are in `last-quarter.ts`; this is the machinery.
+ *
+ * **Everything here goes through the ordinary actions**, including the order
+ * they have to happen in: a session is created and opened before anything can
+ * be graded, grades become facts on the key results only when the session is
+ * closed, and the scorecard row exists only once the cycle is snapshotted.
+ * Writing any of it directly would seed a state the product cannot reach.
+ */
+async function runLastQuarter(
+  context: Ctx,
+  cast: Map<CastKey, string>,
+  spaces: Map<SpaceKey, string>,
+  now: Date,
+): Promise<LastQuarterResult> {
+  const facilitatorId = cast.get("admin");
+  const productSpaceId = spaces.get("product");
+  if (!(facilitatorId && productSpaceId)) {
+    throw new Error("The demo cast or its spaces are missing.");
+  }
+
+  // A date inside the previous quarter. `cycles.create` takes a day in the
+  // period rather than the period's own start, so a hundred days back is
+  // comfortably inside the one before this.
+  const lastQuarterDay = addDays(isoDate(now), -100);
+  const cycle = await callAction(context, "cycles.create", {
+    on: lastQuarterDay,
+    cadence: "quarterly",
+    // The one before the first is not a cycle, and this is the first.
+    firstCycle: true,
+    sponsorId: facilitatorId,
+    facilitatorId,
+  });
+
+  let objectivesCreated = 0;
+  const keyResultIds: string[] = [];
+  const goalIds: string[] = [];
+
+  for (const objective of LAST_QUARTER) {
+    const championId = cast.get(objective.championKey);
+    if (!championId) {
+      throw new Error(
+        `Last quarter's objective "${objective.title}" names a missing member.`,
+      );
+    }
+    const goal = await callAction(context, "goals.create", {
+      title: objective.title,
+      description: richTextFromPlainText(objective.description),
+      cycleId: cycle.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId,
+      reviewerId: facilitatorId,
+      weight: 1,
+    });
+    goalIds.push(goal.id);
+    objectivesCreated += 1;
+
+    for (const keyResult of objective.keyResults) {
+      const added = await callAction(context, "goals.addKeyResult", {
+        goalId: goal.id,
+        title: keyResult.title,
+        ...(keyResult.unit ? { unit: keyResult.unit } : {}),
+        direction: keyResult.direction,
+        indicatorType: keyResult.indicatorType,
+        baselineValue: keyResult.baselineValue,
+        targetValue: keyResult.targetValue,
+        weight: 1,
+        dueOn: cycle.endsOn,
+        ownerId: championId,
+        // Where it finished, which is the evidence the room grades against.
+        currentValue: keyResult.finalValue,
+      });
+      keyResultIds.push(added.id);
+    }
+  }
+
+  // The review itself. Scheduled on the last day of the quarter, which is
+  // where a quarterly review belongs and is in the past by definition.
+  const session = await callAction(context, "sessions.create", {
+    spaceId: productSpaceId,
+    cycleId: cycle.id,
+    kind: "quarterly",
+    title: LAST_QUARTER_REVIEW_TITLE,
+    scheduledFor: new Date(`${cycle.endsOn}T09:00:00.000Z`).toISOString(),
+    facilitatorId,
+  });
+  await callAction(context, "sessions.open", { id: session.id });
+
+  let index = 0;
+  for (const objective of LAST_QUARTER) {
+    for (const keyResult of objective.keyResults) {
+      const keyResultId = keyResultIds[index];
+      index += 1;
+      if (!keyResultId) {
+        continue;
+      }
+      await callAction(context, "sessions.scoreKeyResult", {
+        sessionId: session.id,
+        keyResultId,
+        score: keyResult.score,
+        reason: keyResult.reason,
+      });
+    }
+  }
+
+  // §8.3 has the room grading and the room revealing together. Revealed here,
+  // so the goal pages show the number rather than a blank where it goes.
+  for (const goalId of goalIds) {
+    await callAction(context, "sessions.revealObjectiveScore", {
+      sessionId: session.id,
+      goalId,
+    });
+  }
+
+  // §8.5's five statements, from one respondent. See `last-quarter.ts` for why
+  // the seed does not invent four more.
+  await callAction(context, "sessions.submitProcessHealth", {
+    sessionId: session.id,
+    scores: [...LAST_QUARTER_PROCESS_HEALTH],
+  });
+
+  // §8.6. The verdict comes from `packages/method`, out of the two numbers
+  // above. Nothing here chooses it.
+  const diagnostic = await callAction(context, "sessions.recordDiagnostic", {
+    sessionId: session.id,
+  });
+
+  // Closing is what turns the grades into facts on the key results, which is
+  // what the goal pages and the snapshot both read.
+  await callAction(context, "sessions.close", { id: session.id });
+
+  // And the snapshot is what puts a row on the scorecard.
+  const snapshot = await callAction(context, "cycles.snapshot", {
+    cycleId: cycle.id,
+  });
+
+  return {
+    cycleId: cycle.id,
+    sessionId: session.id,
+    objectivesScored: objectivesCreated,
+    keyResultsScored: keyResultIds.length,
+    verdict: diagnostic.verdict,
+    cycleScore: diagnostic.cycleScore,
+    rhythmScore: diagnostic.rhythmScore,
+    portfolioVerdict: snapshot.verdict,
+  };
+}
+
+interface LastQuarterResult {
+  readonly cycleId: string;
+  readonly sessionId: string;
+  readonly objectivesScored: number;
+  readonly keyResultsScored: number;
+  readonly verdict: string;
+  readonly cycleScore: number;
+  readonly rhythmScore: number;
+  readonly portfolioVerdict: string | null;
+}
+
 export async function buildDemoWorkspace(
   demo: DemoContext,
 ): Promise<BuildDemoResult> {
@@ -899,6 +1075,16 @@ export async function buildDemoWorkspace(
   if (!launcherId) {
     throw new Error("The demo cast is missing its administrator.");
   }
+  // The quarter that is already over (P8-T13b), after the current one, so
+  // `cycles.current` in the workflow above still resolves to this quarter
+  // rather than to the one being backfilled behind it.
+  const lastQuarter = await runLastQuarter(context, cast, spaces, now);
+  // No longer the first cycle: there is a scored quarter behind it now.
+  await callAction(context, "cycles.update", {
+    id: cycle.id,
+    firstCycle: false,
+  });
+
   const recoveryLaunched = await launchRecovery(
     context,
     metrics.ids,
@@ -915,7 +1101,8 @@ export async function buildDemoWorkspace(
     "Key result history is stamped now; the note on each value carries the week it belongs to. KPI readings are real month starts, so the KPI charts are genuine six-month trends.",
     "The set is not published, and publish gate 5 says why: one key result is still marked as exceeding capacity. Change it to tight on the goal page and watch the gate turn green.",
     "Publish gate 2 is red for one reason, and the Draft Coach names it: the cohort key result is worded as the activity rather than the outcome it is there to prove. §4.2's KR-5 asks for impact, not effort. Reword it on the goal page and watch the gate turn green.",
-    "The scorecard is empty. It reads key result scores, and scoring at the quarterly review is P4-T10. Seeding invented scores would put a number on screen that no review agreed.",
+    `The scorecard has last quarter on it, and the closing diagnostic reads "${lastQuarter.verdict}" from a cycle score of ${lastQuarter.cycleScore.toFixed(2)} against a rhythm score of ${lastQuarter.rhythmScore.toFixed(1)}. Both numbers came from the review: five key results graded with their reasons, and the five process-health statements answered. The verdict is derived by packages/method, so changing either threshold changes what the demo says.`,
+    "The rhythm score is one respondent's, because every write in this seed is authored by whoever ran it and the survey is anonymous per member. Submitting four more would be putting words in the mouths of people who have no accounts.",
   ];
   if (recoveryLaunched) {
     notes.push(
@@ -925,6 +1112,7 @@ export async function buildDemoWorkspace(
 
   return {
     alreadySeeded: false,
+    lastQuarterVerdict: lastQuarter.verdict,
     membersCreated: INVENTED_CAST.length,
     spacesCreated: SPACES.length,
     goalsCreated: GOALS.length + (recoveryLaunched ? 1 : 0),

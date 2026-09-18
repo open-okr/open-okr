@@ -57,6 +57,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "invitation.accepted": () => "An invitation was accepted",
   "invitation.joined_by_trusted_domain": () =>
     "Someone joined through a trusted email domain",
+  "member.joined_by_directory": (payload) =>
+    (payload as { via: string }).via === "sso"
+      ? "Someone joined by signing in through the identity provider"
+      : "The directory added someone",
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
   "space.settingsChanged": (payload) =>

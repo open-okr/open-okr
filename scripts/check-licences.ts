@@ -45,7 +45,20 @@ const ALLOWED = new Set([
 
 /** Packages cleared by a human despite an unrecognised licence field. Each needs
  * a reason. Keep this list short and audited. */
-const EXCEPTIONS = new Map<string, string>();
+const EXCEPTIONS = new Map<string, string>([
+  [
+    "xml-escape",
+    "The `license` field reads \"MIT License\" rather than the SPDX " +
+      "identifier \"MIT\", which this gate cannot recognise. The LICENSE file " +
+      "is the MIT text verbatim, with no added clause and nothing taken away, " +
+      "so the policy is unchanged and this is a spelling. Reached under " +
+      "@better-auth/sso through samlify, which is how P8-T07c gets native " +
+      "SAML. Cleared narrowly rather than by teaching the parser that " +
+      "spelling: a future package writing the same string would then pass " +
+      "with nobody having read its licence. Read in full on 1.1.0, " +
+      "2026-09-18.",
+  ],
+]);
 
 /**
  * Whole packages a human read and cleared, mirroring the workflow's

@@ -61,7 +61,10 @@ export function DirectoryTokenForm() {
             Copy this token now. It will not be shown again.
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <code className="flex-1 rounded bg-white px-3 py-2 font-mono text-xs text-ink break-all">
+            <code
+              data-testid="scim-token"
+              className="flex-1 rounded bg-white px-3 py-2 font-mono text-xs text-ink break-all"
+            >
               {token}
             </code>
             <Button type="button" variant="default" onClick={copyToClipboard}>

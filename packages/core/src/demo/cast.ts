@@ -28,6 +28,15 @@ interface CastMember {
   /** Who they report to. `null` is the top of the chain. */
   readonly managerKey: CastKey | null;
   readonly timezone: string;
+  /**
+   * The address a visitor signs in as on a demo instance (P8-T13a).
+   *
+   * `.example` is reserved by RFC 2606 and can never be registered, so these
+   * cannot collide with a real person's address and cannot receive mail.
+   * Empty for `admin`, who is whoever registered the instance and already
+   * has one.
+   */
+  readonly email: string;
 }
 
 /**
@@ -47,6 +56,7 @@ const CAST: readonly CastMember[] = [
     title: "Chief Executive",
     managerKey: null,
     timezone: "Europe/London",
+    email: "",
   },
   {
     key: "priya",
@@ -54,6 +64,7 @@ const CAST: readonly CastMember[] = [
     title: "Chief Product Officer",
     managerKey: "admin",
     timezone: "Europe/London",
+    email: "priya@northwind.example",
   },
   {
     key: "daniel",
@@ -61,6 +72,7 @@ const CAST: readonly CastMember[] = [
     title: "VP Sales",
     managerKey: "admin",
     timezone: "America/New_York",
+    email: "daniel@northwind.example",
   },
   {
     key: "tomas",
@@ -68,6 +80,7 @@ const CAST: readonly CastMember[] = [
     title: "Head of Customer Success",
     managerKey: "admin",
     timezone: "Europe/Madrid",
+    email: "tomas@northwind.example",
   },
   {
     key: "mei",
@@ -75,6 +88,7 @@ const CAST: readonly CastMember[] = [
     title: "Head of Engineering",
     managerKey: "priya",
     timezone: "Asia/Singapore",
+    email: "mei@northwind.example",
   },
   {
     key: "sara",
@@ -82,6 +96,7 @@ const CAST: readonly CastMember[] = [
     title: "Product Manager, Onboarding",
     managerKey: "priya",
     timezone: "Europe/London",
+    email: "sara@northwind.example",
   },
   {
     key: "jonas",
@@ -89,6 +104,7 @@ const CAST: readonly CastMember[] = [
     title: "Account Executive",
     managerKey: "daniel",
     timezone: "Europe/Berlin",
+    email: "jonas@northwind.example",
   },
   {
     key: "amara",
@@ -96,6 +112,7 @@ const CAST: readonly CastMember[] = [
     title: "Data Analyst",
     managerKey: "admin",
     timezone: "Africa/Dakar",
+    email: "amara@northwind.example",
   },
 ];
 

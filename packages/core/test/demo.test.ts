@@ -2,6 +2,7 @@ import { workerDb } from "@openokr/test-support/db";
 import { beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { buildDemoWorkspace } from "../src/demo/builder.ts";
+import { LAST_QUARTER } from "../src/demo/last-quarter.ts";
 import { GOALS } from "../src/demo/okrs.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -71,9 +72,9 @@ describe("the demo builder", () => {
     const ctx = { pool: wb.appPool, ...context() };
 
     // One objective per entry in the data file, plus the recovery objective the
-    // §6.5 engine launched.
+    // §6.5 engine launched, plus last quarter's two (P8-T13b).
     const goals = await callAction(ctx, "goals.list", { includeClosed: true });
-    expect(goals.goals).toHaveLength(GOALS.length + 1);
+    expect(goals.goals).toHaveLength(GOALS.length + 1 + LAST_QUARTER.length);
 
     // All four levels, so the cascade and the explorer's scope tabs have
     // something to show at each.

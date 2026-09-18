@@ -166,6 +166,8 @@ export const trustedEmailDomainsSchema = z.array(
   z.string().trim().toLowerCase().regex(DOMAIN_PATTERN, "not a domain"),
 );
 
+export const requireSecondFactorSchema = z.boolean();
+
 const storageQuotaBytesSchema = z.number().int().positive();
 
 const exportInlineRowLimitSchema = z.number().int().positive();
@@ -328,6 +330,19 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     why: "None. Joining is by invitation, so an open domain is never the default.",
     resolve: () => [],
     schema: trustedEmailDomainsSchema,
+    card: "general",
+  },
+  {
+    key: "requireSecondFactor",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "Off. A second factor that an organisation has not asked for would " +
+      "lock its members out of their own workspace on the day they upgrade, " +
+      "and P8-T09's row is a policy an organisation chooses rather than a " +
+      "default the product imposes.",
+    resolve: () => false,
+    schema: requireSecondFactorSchema,
     card: "general",
   },
   {
@@ -643,6 +658,7 @@ export function resolveWorkspaceSettings(context: ProvisioningContext): {
   readonly language: string;
   readonly branding: Record<string, unknown>;
   readonly trustedEmailDomains: readonly string[];
+  readonly requireSecondFactor: boolean;
   readonly storageQuotaBytes: number;
   readonly [key: string]: unknown;
 } {

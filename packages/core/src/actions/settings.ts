@@ -28,6 +28,7 @@ import {
   brandingSchema,
   findWorkspaceSetting,
   languageSchema,
+  requireSecondFactorSchema,
   settingsByCard,
   timezoneSchema,
   trustedEmailDomainsSchema,
@@ -111,12 +112,17 @@ export const readWorkspaceSettings = defineReadAction({
 export const updateWorkspaceGeneralSettings = defineWriteAction({
   name: "settings.updateWorkspaceGeneral",
   summary:
-    "Change the workspace's timezone, language or trusted email domains.",
+    "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
   input: z
     .object({
       timezone: timezoneSchema.optional(),
       language: languageSchema.optional(),
       trustedEmailDomains: trustedEmailDomainsSchema.optional(),
+      /**
+       * Everybody in this workspace holds a second factor (P8-T09). A member
+       * who does not is held in the enrolment screen at their next sign-in.
+       */
+      requireSecondFactor: requireSecondFactorSchema.optional(),
     })
     .refine((value) => Object.keys(value).length > 0, {
       message: "nothing to update",
@@ -145,6 +151,9 @@ export const updateWorkspaceGeneralSettings = defineWriteAction({
       }
       if (input.trustedEmailDomains !== undefined) {
         patch.trustedEmailDomains = input.trustedEmailDomains;
+      }
+      if (input.requireSecondFactor !== undefined) {
+        patch.requireSecondFactor = input.requireSecondFactor;
       }
       const nextSettings: WorkspaceSettings = { ...loaded, ...patch };
 

@@ -13,11 +13,12 @@
  */
 
 import { passkey } from "@better-auth/passkey";
+import { sso } from "@better-auth/sso";
 import { authSchema } from "@openokr/db";
 import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -28,12 +29,41 @@ import {
   inviteTokenFromCookies,
 } from "../invitations/pending.ts";
 import { previewInvite } from "../invitations/preview.ts";
+import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
 } from "../workspaces/registration.ts";
+import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
+import { providerIdFromCallback } from "./sso.ts";
+import {
+  enforcedProviderForEmail,
+  enforcedProviderForUser,
+  enforcementMessage,
+  isProviderSignInPath,
+  isSSOCallbackPath,
+} from "./sso-enforcement.ts";
+
+/**
+ * The paths that establish or recover a local credential (P8-T07a).
+ *
+ * Each of them carries the address in its body, so an enforced account is
+ * refused before a password is checked, which also keeps the refusal from
+ * saying whether the password was right.
+ *
+ * Sign-up is on the list because an account created locally on an enforced
+ * domain would be exactly the credential enforcement exists to prevent, and
+ * the two reset paths are because a reset link is a way to set a password on
+ * an account that had none.
+ */
+const CREDENTIAL_PATHS = new Set([
+  "/sign-in/email",
+  "/sign-up/email",
+  "/forget-password",
+  "/request-password-reset",
+]);
 
 /**
  * Accepts the invitation a freshly created account arrived with (P6-G06b).
@@ -119,7 +149,30 @@ export interface AuthOptions {
    * with no SSO pays nothing.
    */
   readonly ssoProviders?: ReadonlyArray<{
+    /**
+     * Which protocol this provider speaks (P8-T07c-a).
+     *
+     * Absent means `oidc`, which is what every caller written before SAML
+     * existed supplies and what every row written before migration 0096
+     * means.
+     */
+    readonly kind?: "oidc" | "saml";
+    /** The `sso_connections` row id, which the derived plugin row carries. */
+    readonly id?: string;
     readonly providerId: string;
+    /**
+     * The workspace that configured this provider (P8-T07b).
+     *
+     * What makes just-in-time provisioning land where it was meant to. The
+     * field was loaded from `sso_connections` at boot and dropped here, so
+     * the first person to sign in through their company's provider got a
+     * fresh empty workspace of their own instead of the one that had
+     * configured it.
+     *
+     * Optional, because an instance whose caller does not supply it keeps the
+     * old behaviour rather than refusing to sign anybody in.
+     */
+    readonly workspaceId?: string;
     readonly clientId: string;
     readonly clientSecret: string;
     readonly discoveryUrl?: string;
@@ -145,6 +198,51 @@ const SIGN_IN_WINDOW_SECONDS = 60;
 export function createAuth(options: AuthOptions) {
   const database = drizzle(options.pool, { schema: authSchema });
   const origin = new URL(options.baseUrl);
+
+  /**
+   * Which workspace each SSO provider belongs to (P8-T07b).
+   *
+   * Built once, because the after-create hook has to answer it while a
+   * browser waits mid-redirect and the providers are fixed for the life of
+   * the process anyway.
+   */
+  const workspaceByProvider = new Map<string, string>(
+    (options.ssoProviders ?? []).flatMap((provider) =>
+      provider.workspaceId ? [[provider.providerId, provider.workspaceId]] : [],
+    ),
+  );
+
+  /**
+   * The SAML providers, and which workspace each belongs to (P8-T07c-a).
+   *
+   * Built once beside `workspaceByProvider` above and for the same reason: the
+   * plugin's `provisionUser` has to answer "which workspace" while a browser
+   * waits mid-redirect, and the answer is fixed for the life of the process.
+   */
+  /**
+   * Every configured provider id, whichever protocol it speaks.
+   *
+   * Read by the registration rule to tell an arrival vouched for by a
+   * provider this instance configured from a stranger signing up.
+   */
+  const ssoCallbackProviders = new Set(
+    (options.ssoProviders ?? []).map((provider) => provider.providerId),
+  );
+
+  const samlProviders = (options.ssoProviders ?? []).filter(
+    (provider) => provider.kind === "saml",
+  );
+  const samlWorkspaceByProvider = new Map<string, string>(
+    samlProviders.flatMap((provider) =>
+      // A provider with no workspace cannot provision anybody, so it is left
+      // out of the map rather than mapped to nothing. `provisionUser` reads a
+      // miss as "the authority is gone" and joins nothing, which is the same
+      // answer and one fewer state.
+      provider.workspaceId
+        ? [[provider.providerId, provider.workspaceId] as [string, string]]
+        : [],
+    ),
+  );
 
   const sendResetPassword =
     options.sendResetPassword ??
@@ -271,7 +369,74 @@ export function createAuth(options: AuthOptions) {
       },
     },
 
+    hooks: {
+      /**
+       * Single-sign-on enforcement, at the paths that carry an address
+       * (P8-T07a).
+       *
+       * Before the endpoint rather than inside it, so one rule covers a
+       * sign-in, a sign-up and both reset paths, and so a future local factor
+       * that posts an address has to be added here deliberately rather than
+       * quietly becoming a way around the policy.
+       *
+       * The session hook below is the other half, for the factors that carry
+       * no address.
+       */
+      before: createAuthMiddleware(async (hookContext) => {
+        if (!CREDENTIAL_PATHS.has(hookContext.path)) {
+          return;
+        }
+        const email = (hookContext.body as { email?: unknown } | undefined)
+          ?.email;
+        if (typeof email !== "string" || email === "") {
+          return;
+        }
+        const provider = await enforcedProviderForEmail(options.pool, email);
+        if (provider) {
+          throw new APIError("FORBIDDEN", {
+            message: enforcementMessage(provider),
+          });
+        }
+      }),
+    },
+
     databaseHooks: {
+      session: {
+        create: {
+          /**
+           * The enforcement backstop (P8-T07a).
+           *
+           * A passkey assertion carries no address, so the middleware above
+           * cannot see whose sign-in it is. Every sign-in ends in a session
+           * row, though, whatever factor produced it, so this is the one
+           * place that catches all of them: the account is looked up by id,
+           * and a session for an enforced address is refused unless it is the
+           * identity provider's own callback that is creating it.
+           *
+           * It costs one small query per sign-in on an instance with no
+           * enforcement configured, and that query answers before the
+           * account is ever read.
+           */
+          before: async (session, hookContext) => {
+            if (isProviderSignInPath(hookContext?.path)) {
+              return;
+            }
+            const userId = (session as { userId?: unknown }).userId;
+            if (typeof userId !== "string") {
+              return;
+            }
+            const provider = await enforcedProviderForUser(
+              options.pool,
+              userId,
+            );
+            if (provider) {
+              throw new APIError("FORBIDDEN", {
+                message: enforcementMessage(provider),
+              });
+            }
+          },
+        },
+      },
       user: {
         create: {
           /**
@@ -292,6 +457,49 @@ export function createAuth(options: AuthOptions) {
             // disagreeing is its own bug: the page refused a form this hook
             // would have accepted, so the invitation was redeemable and
             // unreachable at once. Previewed, not accepted, so nothing is
+            // **A directory-sync token is the second exception** (P8-T08a).
+            // It is an authorisation the workspace itself issued, verified
+            // before this call was made, and it arrives in the async context
+            // rather than in a cookie because a directory has no browser. An
+            // invitation-only instance is exactly the kind that runs a
+            // directory, so without this the rule refused every account SCIM
+            // tried to provision.
+            if (currentProvisioningAuthority()) {
+              return;
+            }
+
+            // **A configured identity provider is the third** (P8-T07c-a).
+            //
+            // Configuring a provider is a workspace saying "admit the people
+            // this provider vouches for", which is the same kind of statement
+            // a directory token makes and is made by the same people. Without
+            // it, just-in-time provisioning cannot work on an
+            // invitation-only instance, which is every instance after its
+            // first account: the assertion verifies, the audience matches,
+            // and the account is refused at the last step. That is the
+            // P8-T07 acceptance criterion, "when a user signs in through it,
+            // then they are provisioned with default access", and it could
+            // not hold.
+            //
+            // Found on 18 September 2026 by driving a real SAML assertion all
+            // the way through rather than by reading, which is the only way
+            // this was ever going to surface: every layer before it answered
+            // correctly.
+            //
+            // The path is the evidence and it cannot be forged from outside:
+            // Better Auth builds it from the route it dispatched, and these
+            // two routes are reached only after the provider's own signature
+            // or token exchange has been verified.
+            if (
+              isSSOCallbackPath(
+                hookContext?.path,
+                hookContext?.params,
+                ssoCallbackProviders,
+              )
+            ) {
+              return;
+            }
+
             // consumed by an attempt that may still fail on a taken address.
             const allowed = await registrationOpenOrInvited(
               options.pool,
@@ -334,6 +542,51 @@ export function createAuth(options: AuthOptions) {
                 () => undefined,
               );
             }
+
+            // **An identity provider vouching for somebody works the same
+            // way, and for the same reason** (P8-T07b). The provider was
+            // configured by one workspace, so the person signing in through
+            // it belongs there, and joining before the line below means
+            // `provisionWorkspaceForUser` finds that membership instead of
+            // making a workspace of their own.
+            //
+            // Until this existed, every just-in-time account landed alone in
+            // a fresh empty workspace and never saw the one whose provider
+            // they had used, which is the opposite of the P8-T07 deliverable.
+            //
+            // A directory-sync token says the same thing about the account it
+            // is provisioning, so the two land in one place rather than the
+            // SCIM path repeating this afterwards and leaving a stray
+            // workspace in between (P8-T08a).
+            const authority = currentProvisioningAuthority();
+
+            // **A demo persona is attached, not provisioned** (P8-T13a). The
+            // cast are members of the demo workspace before they have
+            // accounts, so the command that gives Priya one is filling in the
+            // `user_id` of a row that already exists. Joining her as well
+            // would put her in the directory twice, and provisioning below
+            // would hand her a private workspace of her own that nobody ever
+            // opens. The caller does the attaching, inside its own operation.
+            if (authority?.kind === "demo") {
+              return;
+            }
+
+            const workspaceId =
+              authority?.workspaceId ??
+              workspaceByProvider.get(
+                providerIdFromCallback(hookContext?.path, hookContext?.params),
+              );
+            if (workspaceId) {
+              await tryJoinWorkspaceForIdentity(options.pool, {
+                workspaceId,
+                user: { id: user.id, name: user.name },
+                via: authority ? "directory_sync" : "sso",
+                ...(authority?.externalId
+                  ? { externalId: authority.externalId }
+                  : {}),
+              });
+            }
+
             await provisionWorkspaceForUser(options.pool, {
               id: user.id,
               name: user.name,
@@ -375,6 +628,58 @@ export function createAuth(options: AuthOptions) {
                 ...(p.userInfoUrl ? { userInfoUrl: p.userInfoUrl } : {}),
                 ...(p.scopes ? { scopes: [...p.scopes] } : {}),
               })),
+            }),
+          ]
+        : []),
+      /**
+       * SAML (P8-T07c-a).
+       *
+       * **Mounted only when a SAML provider is configured**, the same rule
+       * `genericOAuth` follows above: an instance with none carries no
+       * plugin, no route and no schema contribution.
+       *
+       * The plugin reads its providers from `sso_providers`, which
+       * `saml-sync.ts` derives from `sso_connections`. Nothing is passed in
+       * here, because a provider added while the process runs must work
+       * without a restart, which is the one thing the OIDC path cannot do.
+       */
+      ...(samlProviders.length > 0
+        ? [
+            sso({
+              /**
+               * **Where a SAML arrival meets the member funnel** (P8-T07c-a).
+               *
+               * P8-T07b built one path that both single sign-on and directory
+               * sync call, so that somebody arriving through a provider lands
+               * in the workspace that configured it rather than alone in a new
+               * one. This is that path, reached from the plugin's own seam, so
+               * a SAML arrival and an OIDC arrival are the same arrival.
+               *
+               * The workspace comes from the provider, not from anything the
+               * assertion carries. An identity provider says who somebody is;
+               * it does not get to say which workspace they join.
+               */
+              provisionUser: async ({ user, provider }) => {
+                const workspaceId = samlWorkspaceByProvider.get(
+                  provider.providerId,
+                );
+                if (!workspaceId) {
+                  // A provider with no workspace behind it is a derived row
+                  // whose authority is gone. Joining nothing is right; the
+                  // sign-in still fails, because the session has no member.
+                  return;
+                }
+                await tryJoinWorkspaceForIdentity(options.pool, {
+                  workspaceId,
+                  user: { id: user.id, name: user.name },
+                  via: "sso",
+                });
+              },
+              /**
+               * Off. Better Auth's organization plugin is not what this
+               * product uses for membership; `provisionUser` above is.
+               */
+              organizationProvisioning: { disabled: true },
             }),
           ]
         : []),

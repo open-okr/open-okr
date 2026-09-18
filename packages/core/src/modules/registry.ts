@@ -375,6 +375,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-audit",
+        label: "Audit trail",
+        href: "/admin/audit",
+        section: "admin",
+        // The trail names every actor and every change, and the export carries
+        // the payloads with it. An administrator's to read (P8-T10).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-branding",
         label: "Branding",
         href: "/admin/branding",
