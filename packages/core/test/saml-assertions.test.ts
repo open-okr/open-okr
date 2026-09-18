@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 import { workerDb } from "@openokr/test-support/db";
 import * as saml from "samlify";
@@ -8,6 +6,10 @@ import { createAuth } from "../src/auth/auth.ts";
 import { syncSamlProvider } from "../src/auth/saml-sync.ts";
 import type { SSOProviderConfig } from "../src/auth/sso.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import {
+  generateSigningPairs,
+  type SigningPairs,
+} from "./saml-fixture-keys.ts";
 
 /**
  * What a SAML assertion has to survive to sign somebody in (P8-T07c-a).
@@ -41,6 +43,12 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
  *
  * **Each bad assertion is wrong in exactly one way** and is otherwise a
  * genuinely signed document from a real identity provider.
+ *
+ * **The signing pairs are generated per run, not committed.** The first
+ * version wrote them into `test/fixtures/saml/` and passed locally while
+ * continuous integration could not find them: `.gitignore` refuses `*.pem`,
+ * so they had never been committed. `saml-fixture-keys.ts` says why forcing
+ * them in would have been the wrong fix.
  */
 
 const IDP_ENTITY = "https://idp.example/entity";
@@ -48,9 +56,6 @@ const PROVIDER = "sso-fixture-idp";
 const OWNER = "saml-owner";
 const BASE = "http://localhost:3000";
 const ACS = `${BASE}/api/auth/sso/saml2/sp/acs/${PROVIDER}`;
-
-const FIXTURES = join(import.meta.dirname, "fixtures", "saml");
-const read = (name: string) => readFileSync(join(FIXTURES, name), "utf8");
 
 /**
  * Schema validation is skipped, and the tests are written knowing it.
@@ -64,8 +69,7 @@ saml.setSchemaValidator({ validate: async () => "skipped" });
 
 let workspaceId: string;
 let auth: ReturnType<typeof createAuth>;
-
-const certificate = read("idp-cert.pem");
+let keys: SigningPairs;
 
 const connection = (): SSOProviderConfig =>
   ({
@@ -81,15 +85,15 @@ const connection = (): SSOProviderConfig =>
     enforce: false,
     samlEntryPoint: "https://idp.example/sso",
     samlIssuer: IDP_ENTITY,
-    samlCertificate: certificate,
+    samlCertificate: keys.trusted.certificate,
     samlWantAssertionsSigned: true,
   }) as SSOProviderConfig;
 
-const identityProvider = (key: string, cert: string) =>
+const identityProvider = (pair: { privateKey: string; certificate: string }) =>
   saml.IdentityProvider({
     entityID: IDP_ENTITY,
-    privateKey: read(key),
-    signingCert: read(cert),
+    privateKey: pair.privateKey,
+    signingCert: pair.certificate,
     isAssertionEncrypted: false,
     singleSignOnService: [
       {
@@ -112,6 +116,8 @@ const serviceProvider = (entityID: string) =>
   });
 
 beforeAll(async () => {
+  keys = generateSigningPairs();
+
   const wb = await workerDb();
   await wb.admin.query("delete from sso_providers");
   await wb.admin.query(
@@ -137,6 +143,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  keys?.cleanUp();
   const wb = await workerDb();
   await wb.close();
 });
@@ -151,8 +158,8 @@ afterAll(async () => {
  * nothing.
  */
 async function signIn(options: {
-  key?: string;
-  cert?: string;
+  /** Whose key signs it. The trusted pair unless a test says otherwise. */
+  signedBy?: "trusted" | "stranger";
   audience?: string;
   tamper?: (xml: string) => string;
 }): Promise<Response> {
@@ -176,8 +183,7 @@ async function signIn(options: {
   expect(requestId).not.toBe("");
 
   const issued = await identityProvider(
-    options.key ?? "idp-key.pem",
-    options.cert ?? "idp-cert.pem",
+    keys[options.signedBy ?? "trusted"],
   ).createLoginResponse(
     serviceProvider(options.audience ?? BASE),
     { extract: { request: { id: requestId } } } as never,
@@ -278,10 +284,7 @@ describe("assertions that must be refused", () => {
     // by a real certificate, and not the certificate the workspace
     // configured. If the product wired the wrong field through to the plugin,
     // this is the one that lets somebody in.
-    const response = await signIn({
-      key: "stranger-key.pem",
-      cert: "stranger-cert.pem",
-    });
+    const response = await signIn({ signedBy: "stranger" });
 
     expect(signedIn(response)).toBe(false);
   });
