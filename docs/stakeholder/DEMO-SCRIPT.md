@@ -163,13 +163,21 @@ The other six unhealthy measures each carry a **Launch recovery** button. Click 
 
 > "Every space is visible to everyone. Being in one is what lets you work in it. That is the access model, not a setting."
 
-### Beat 8 — The scorecard, and what is honestly missing (1 min)
+### Beat 8 — The scorecard, and the question every executive asks (2 min)
 
-Go to `/scorecard`. It is empty, and it explains itself:
+Go to `/scorecard`. Last quarter is on it, with its result and its portfolio verdict.
 
-> "Nothing is written before a cycle is archived, because a score is a judgement somebody makes rather than a number the product computes."
+Then open the quarterly review of that cycle and go to its diagnostic.
 
-> "I could have seeded numbers here. I did not, because scoring happens at the quarterly review and that session is the next phase of the build. A number on this screen that no review agreed on would be the exact failure mode this product exists to prevent."
+> "The quarter scored 0.58. Five key results, each graded with a one-line reason by the room, not computed by the product."
+
+> "The rhythm score is 4.0. That is the team's own answer to two statements: whether the weekly rhythm held, and whether blockers got resolved."
+
+> "So the product says: strategy or OKR-quality problem. The team ran the rhythm and still missed, so fix the key results before you push the team."
+
+> "Every executive asks whether a miss was the plan or the execution. Almost no tool answers it. This one reads the two numbers against each other and returns a verdict with a prescription, and both come from §8.6 of the method document rather than from anybody's opinion."
+
+The screen also carries what the diagnostic is made of, so nobody has to take the verdict on trust.
 
 ---
 
@@ -185,7 +193,7 @@ If you have sixty seconds, do beat 3 only. Open `/cycle`, point at gate 5 naming
 
 Say these before somebody notices them. Each one is a consequence of a rule worth defending, and each is a better answer than a workaround would have been.
 
-**Nobody can sign in as Priya.** The demo people are members with no user accounts. Registration closes once an instance is claimed, so inventing sign-in credentials would mean working around a rule rather than demonstrating it. They own objectives, champion and review them, hold space roles and appear in the org chart. There is just nobody behind them.
+**Nobody can sign in as Priya, unless you ran `pnpm demo:prepare`.** After `pnpm db:seed` the demo people are members with no user accounts: they own objectives, champion and review them, hold space roles and appear in the org chart, and there is nobody behind them. That is the right state for a seed on a laptop, where you are signed in and they are names on a screen. `pnpm demo:prepare` is the other state, built for a public demo instance where the visitor is nobody: it gives each of them an account at `@northwind.example` with a published password, puts both agents in sandbox, and runs the Coach and the Champion once. It refuses a workspace the demo builder did not build.
 
 **Every row was written by you.** An action resolves its author from the acting user, so the audit trail and the activity feed name you rather than naming Priya for something Priya did not do. The narratives are written in each person's voice; the authorship is honest about who typed them.
 
@@ -195,7 +203,7 @@ Say these before somebody notices them. Each one is a consequence of a rule wort
 
 **The strip says the set is 51 days overdue.** Publish gate 6 asks for a publication deadline before day one of the cycle, and the demo sits mid-quarter, so a compliant deadline is necessarily in the past. It is a true statement about a set that has not been published, and it stops counting the moment you publish. You cannot publish today, because gates 2 and 5 are each red for a reason the screen names.
 
-**The scorecard is empty.** It reads key result scores, and scoring at the quarterly review arrives with that session.
+**The rhythm score is one person's.** The §8.5 survey is anonymous per member and every write in the seed is authored by whoever ran it, so last quarter's rhythm score comes from one respondent rather than from a room. Submitting four more answers would be putting words in the mouths of people who have no accounts. Say it before somebody asks; the arithmetic is the same either way.
 
 **Four of the six review-inbox sources are not built.** The page names each one and the task it arrives at, rather than looking complete.
 
