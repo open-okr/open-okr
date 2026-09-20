@@ -12,6 +12,7 @@
   "dependencies": {
     "@base-ui-components/react": "catalog:",
     "@better-auth/passkey": "catalog:",
+    "@better-auth/sso": "catalog:",
     "@openokr/adapters": "workspace:*",
     "@openokr/agents": "workspace:*",
     "@openokr/config": "workspace:*",

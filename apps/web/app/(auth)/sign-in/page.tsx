@@ -10,6 +10,14 @@ import { AuthCard, Field, FormError } from "../auth-card";
 interface SSOProvider {
   id: string;
   displayName: string;
+  /**
+   * Which protocol, because the two start differently (P8-T07c-b).
+   *
+   * Absent on an instance that has not been upgraded, and `oidc` is the
+   * right reading of that: every provider configured before the column
+   * existed is one.
+   */
+  kind?: "oidc" | "saml";
 }
 
 /** One of the people a visitor may be on a demo instance (P8-T13c). */
@@ -241,10 +249,26 @@ export default function SignInPage() {
               variant="default"
               onClick={async () => {
                 setError("");
-                await authClient.signIn.social({
-                  provider: provider.id as "github",
-                  callbackURL: "/",
-                });
+                // **Two protocols, two calls** (P8-T07c-b). SAML starts at
+                // `signIn.sso`, and sending it to `signIn.social` reached a
+                // provider `genericOAuth` had never been given, which failed
+                // with nothing a person could act on.
+                const result =
+                  provider.kind === "saml"
+                    ? await authClient.signIn.sso({
+                        providerId: provider.id,
+                        callbackURL: "/",
+                      })
+                    : await authClient.signIn.social({
+                        provider: provider.id as "github",
+                        callbackURL: "/",
+                      });
+                if (result?.error) {
+                  setError(
+                    `${provider.displayName} could not be reached. Try again, ` +
+                      "or ask an administrator to check the configuration.",
+                  );
+                }
               }}
             >
               {provider.displayName}

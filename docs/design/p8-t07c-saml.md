@@ -129,3 +129,101 @@ with a fixture assertion built to fail in exactly that way.
 It does not change how OIDC works. It does not move enforcement. It does not
 touch the member funnel, beyond pointing the plugin's `provisionUser` at the
 same function the OIDC path already calls.
+
+---
+
+## What P8-T07c-b added, 20 September 2026
+
+The surfaces. The part above is the path an assertion travels; this is how a
+provider comes to exist and how enforcement treats it once it does.
+
+### The defect this row found first
+
+**`syncAllSamlProviders` had no caller in the application.** It was written at
+P8-T07c-a, tested, and never run outside a test. The SAML plugin reads
+`sso_providers` and that table is derived, so on every running instance it was
+empty and the plugin had no provider to answer a sign-in with. The path P8-T07c-a
+proved works was unreachable for the same reason the whole P8-T07 family has
+been unreachable twice before: something that is built, green, and not wired to
+anything.
+
+It is called in two places now, and the two answer different questions:
+
+| Where | Question it answers |
+|---|---|
+| `apps/web/lib/sso.ts`, at boot | Is the derived table in step with the authority, including rows removed while this process was not running |
+| `createSSOConnection`, on the write | Does a provider configured just now exist for the plugin, without waiting for somebody to notice |
+
+### The screen
+
+| Field | OIDC | SAML |
+|---|---|---|
+| Provider ID, display name, email domains, enforce | yes | yes |
+| Discovery, authorization, token, user info URL | yes | no |
+| Client ID and secret | yes | no |
+| Sign-on URL, issuer, signing certificate | no | yes |
+| Audience | no | optional |
+
+**One protocol's fields on screen at a time**, because a SAML provider has no
+client secret and an OIDC provider has no certificate, so a combined form is
+always half wrong.
+
+**What may be stored is decided in one pure function.** The route held its own
+rules and they covered one protocol, so a SAML provider posted to it was
+refused for having no client secret, which it cannot have.
+`validateSSOConnectionInput` answers for both and names the field, the endpoint
+returns that name, and the form puts the message under the field it is about.
+
+**The certificate is parsed, not pattern-matched.** Migration 0096's constraint
+asks that the column is not null, so any string satisfies it and the failure
+surfaces at somebody's sign-in. A bare base64 block is accepted too and stored
+as PEM, because that is how a certificate copied out of a metadata document
+looks.
+
+### The metadata document
+
+**It is the plugin's, served at
+`/api/auth/sso/saml2/sp/metadata?providerId=<id>`, and unauthenticated.** An
+identity provider fetching it has no session. Writing a second document here
+would mean two descriptions of one service provider and no way to tell which
+one somebody handed over.
+
+`samlServiceProviderUrls` derives the three addresses an administrator needs
+and the screen prints them beside the connection. All three are computed from
+the base URL and the provider id, never stored, because a stored copy is the
+one that drifts and the symptom would be an identity provider posting a valid
+assertion to an address that answers 404.
+
+**The document is served after the next restart**, because the plugin is
+mounted at boot and only when a SAML provider already exists. That is the same
+restart every connection on this screen already waits for, and the screen says
+so.
+
+### Enforcement
+
+| Path | Before | Now |
+|---|---|---|
+| `/sign-in/social`, `/callback/:id` | a provider sign-in | unchanged |
+| `/sign-in/sso` | a local factor, refused | a provider sign-in |
+| `/sso/saml2/sp/acs/:id` | a local factor, refused | a provider sign-in |
+
+The backstop refuses a local factor for a claimed address, so reading the two
+SAML paths as local factors meant an enforced domain with a SAML provider could
+not sign in **by any route at all**: the password was refused because
+enforcement claimed the address, and the provider was refused because the
+backstop did not recognise it.
+
+`EnforcingConnection` and `SSOProviderInfo` carry the protocol now, so the
+sign-in page calls `signIn.sso` for a SAML provider instead of `signIn.social`.
+Every provider went to `signIn.social`, which for a SAML one reached a provider
+`genericOAuth` had never been given.
+
+### What this still does not do
+
+- **No editing or removal from the screen.** A connection is created and then
+  changed in the database. That was true of OIDC before this row and is not
+  made worse by it, but it is the obvious next row.
+- **No signed authentication requests.** As above: `authnRequestsSigned` stays
+  false and no private key of ours is stored.
+- **No IdP-initiated sign-in.** Service-provider initiated only, which is what
+  a person pressing a button does.

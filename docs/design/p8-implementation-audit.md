@@ -279,12 +279,20 @@ and all nine are split parents, which is the convention.
 
 | Row | Why it is still open |
 |---|---|
-| `P8-T07c-b` | The admin screen for SAML, the metadata document, enforcement. Until it lands, SAML cannot be configured even though the sign-in path works |
+| ~~`P8-T07c-b`~~ | Closed 20 September 2026. It found a fourth occurrence of this audit's own pattern on the way: `syncAllSamlProviders` was built, tested and never called by anything in the application, so the table the SAML plugin reads was empty on every instance |
 | `P6-G22d` | A message can carry a value |
 | `P4-T14b-b` | Copilot background runs, blocked |
 
 The seven rows named in finding 4 are closed: two headings written, five already present a level down.
 
-**Finding 1 unblocked OIDC, not SAML.** An administrator can configure an OIDC
-provider now. SAML still has no screen, so P8-T07c-b remains the row that makes
-that half reachable.
+**Both protocols can be configured now.** Finding 1 unblocked OIDC on
+18 September and P8-T07c-b unblocked SAML on 20 September, which was the
+sentence this audit most wanted to be able to write: neither could be
+configured on a running instance on the day it was written.
+
+**The eighth occurrence was found by hand, not by the new rule.**
+`unscoped-read-of-guarded-table` refuses a read that runs without a tenant
+setting, and `syncAllSamlProviders` was not that. It was a correct function
+with no caller: built, tested, green, and wired to nothing. Same symptom,
+different cause, and no gate this repository has can see it. What found it was
+asking, of each thing P8-T07c-a said it built, which running process calls it.

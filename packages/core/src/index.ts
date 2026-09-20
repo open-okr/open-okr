@@ -415,6 +415,10 @@ export {
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export {
+  syncAllSamlProviders,
+  syncSamlProvider,
+} from "./auth/saml-sync.ts";
+export {
   ENROLMENT_PATH,
   heldForEnrolment,
   identityProviderManaged,
@@ -435,11 +439,18 @@ export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   type CreateSSOConnectionInput,
   createSSOConnection,
+  derivedProviderId,
   listSSOProviders,
   loadSSOConnections,
+  normaliseCertificate,
   providerIdFromCallback,
+  type SamlServiceProviderUrls,
+  type SSOConnectionProblem,
+  SSOConnectionRejected,
   type SSOProviderConfig,
   type SSOProviderInfo,
+  samlServiceProviderUrls,
+  validateSSOConnectionInput,
 } from "./auth/sso.ts";
 export {
   type EnforcingConnection,

@@ -1,7 +1,10 @@
+import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
+  type CreateSSOConnectionInput,
   createSSOConnection,
   type KeyRing,
+  SSOConnectionRejected,
 } from "@openokr/core";
 import { NextResponse } from "next/server";
 import { requireAccessLevel } from "../../../../../lib/access";
@@ -9,10 +12,16 @@ import { getPool } from "../../../../../lib/auth";
 import { getKeyRing } from "../../../../../lib/secrets";
 
 /**
- * SSO connection management endpoint (P8-T07).
+ * SSO connection management endpoint (P8-T07, extended at P8-T07c-b).
  *
- * POST creates a new connection. The client secret is envelope-encrypted
- * before it reaches the database.
+ * POST creates a connection, OIDC or SAML. The client secret is
+ * envelope-encrypted before it reaches the database.
+ *
+ * **What may be stored is decided in `packages/core`, not here.** The route
+ * used to hold its own rules and they covered one protocol, so a SAML
+ * provider posted to it was refused for having no client secret, which it
+ * cannot have. One validator now answers for both and names the field, and
+ * the screen shows what it said.
  */
 export const dynamic = "force-dynamic";
 
@@ -25,81 +34,53 @@ export async function POST(request: Request): Promise<NextResponse> {
     // any instance. `requireAccessLevel` has returned the workspace all
     // along; the route discarded it and asked the database instead.
     const { workspaceId } = await requireAccessLevel(ACCESS_LEVELS.full);
-    const body = await request.json();
+    const body = (await request.json()) as Partial<CreateSSOConnectionInput>;
 
-    const {
-      providerId,
-      displayName,
-      discoveryUrl,
-      authorizationUrl,
-      tokenUrl,
-      userInfoUrl,
-      clientId,
-      clientSecret,
-      scopes,
-      emailDomains,
-      enforce,
-    } = body as {
-      providerId?: string;
-      displayName?: string;
-      discoveryUrl?: string;
-      authorizationUrl?: string;
-      tokenUrl?: string;
-      userInfoUrl?: string;
-      clientId?: string;
-      clientSecret?: string;
-      scopes?: string;
-      emailDomains?: string;
-      enforce?: boolean;
+    const input: CreateSSOConnectionInput = {
+      kind: body.kind === "saml" ? "saml" : "oidc",
+      providerId: String(body.providerId ?? ""),
+      displayName: String(body.displayName ?? ""),
+      clientId: body.clientId ? String(body.clientId) : "",
+      clientSecret: body.clientSecret ? String(body.clientSecret) : "",
+      discoveryUrl: body.discoveryUrl ? String(body.discoveryUrl) : null,
+      authorizationUrl: body.authorizationUrl
+        ? String(body.authorizationUrl)
+        : null,
+      tokenUrl: body.tokenUrl ? String(body.tokenUrl) : null,
+      userInfoUrl: body.userInfoUrl ? String(body.userInfoUrl) : null,
+      ...(body.scopes ? { scopes: String(body.scopes) } : {}),
+      emailDomains: body.emailDomains ? String(body.emailDomains) : "",
+      enforce: body.enforce === true,
+      samlEntryPoint: body.samlEntryPoint ? String(body.samlEntryPoint) : null,
+      samlIssuer: body.samlIssuer ? String(body.samlIssuer) : null,
+      samlCertificate: body.samlCertificate
+        ? String(body.samlCertificate)
+        : null,
+      samlAudience: body.samlAudience ? String(body.samlAudience) : null,
     };
 
-    if (!providerId || !displayName || !clientId || !clientSecret) {
-      return NextResponse.json(
-        {
-          error:
-            "providerId, displayName, clientId and clientSecret are required",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Validate provider ID format: alphanumeric and hyphens only.
-    if (!/^[a-z0-9-]+$/.test(providerId)) {
-      return NextResponse.json(
-        { error: "Provider ID must be lowercase alphanumeric with hyphens" },
-        { status: 400 },
-      );
-    }
-
-    // At least one of discoveryUrl or authorizationUrl+tokenUrl is required.
-    if (!discoveryUrl && (!authorizationUrl || !tokenUrl)) {
-      return NextResponse.json(
-        {
-          error:
-            "Either a discovery URL or both authorization URL and token URL are required",
-        },
-        { status: 400 },
-      );
-    }
-
     const ring: KeyRing = getKeyRing();
+    const created = await createSSOConnection(
+      getPool(),
+      workspaceId,
+      ring,
+      input,
+      loadEnv().BETTER_AUTH_URL,
+    );
 
-    await createSSOConnection(getPool(), workspaceId, ring, {
-      providerId,
-      displayName,
-      clientId,
-      clientSecret,
-      discoveryUrl: discoveryUrl || null,
-      authorizationUrl: authorizationUrl || null,
-      tokenUrl: tokenUrl || null,
-      userInfoUrl: userInfoUrl || null,
-      ...(scopes ? { scopes } : {}),
-      ...(emailDomains ? { emailDomains } : {}),
-      ...(enforce === undefined ? {} : { enforce }),
-    });
-
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json(
+      { ok: true, providerId: created.providerId },
+      { status: 201 },
+    );
   } catch (error) {
+    // A configuration the product will not store, with the field to correct.
+    // The screen puts the message beside that field rather than at the top.
+    if (error instanceof SSOConnectionRejected) {
+      return NextResponse.json(
+        { error: error.message, field: error.field },
+        { status: 400 },
+      );
+    }
     // Duplicate provider ID.
     if (
       error instanceof Error &&

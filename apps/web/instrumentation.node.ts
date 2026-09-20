@@ -164,7 +164,12 @@ export async function resolveSSO(): Promise<void> {
   try {
     const { getPool } = await import("./lib/pool");
     const { getKeyRing } = await import("./lib/secrets");
-    await resolveSSOProviders(getPool(), getKeyRing());
+    const { loadEnv } = await import("@openokr/config");
+    await resolveSSOProviders(
+      getPool(),
+      getKeyRing(),
+      loadEnv().BETTER_AUTH_URL,
+    );
   } catch (error) {
     process.stderr.write(
       `sso: could not load SSO connections: ${error instanceof Error ? error.message : String(error)}\n`,

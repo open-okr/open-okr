@@ -30,6 +30,8 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const OWNER = "tenant-scope-owner";
 const SECOND = "tenant-scope-other";
+/** Only reached by a SAML row, which neither of these is. */
+const BASE = "http://localhost:3000";
 
 let workspaceId: string;
 let otherWorkspaceId: string;
@@ -70,14 +72,20 @@ describe("configuring an OIDC provider", () => {
   it("writes the connection, which no route could do before", async () => {
     const wb = await workerDb();
 
-    const created = await createSSOConnection(wb.appPool, workspaceId, ring(), {
-      providerId: "okta",
-      displayName: "Okta",
-      clientId: "client-id",
-      clientSecret: "the-secret",
-      discoveryUrl: "https://idp.example/.well-known/openid-configuration",
-      emailDomains: "acme.example",
-    });
+    const created = await createSSOConnection(
+      wb.appPool,
+      workspaceId,
+      ring(),
+      {
+        providerId: "okta",
+        displayName: "Okta",
+        clientId: "client-id",
+        clientSecret: "the-secret",
+        discoveryUrl: "https://idp.example/.well-known/openid-configuration",
+        emailDomains: "acme.example",
+      },
+      BASE,
+    );
 
     expect(created.id).toBeTruthy();
 
@@ -94,12 +102,22 @@ describe("configuring an OIDC provider", () => {
   it("lands in the workspace it was told, not the one the connection guessed", async () => {
     const wb = await workerDb();
 
-    await createSSOConnection(wb.appPool, otherWorkspaceId, ring(), {
-      providerId: "entra",
-      displayName: "Entra",
-      clientId: "client-id",
-      clientSecret: "another-secret",
-    });
+    await createSSOConnection(
+      wb.appPool,
+      otherWorkspaceId,
+      ring(),
+      {
+        providerId: "entra",
+        displayName: "Entra",
+        clientId: "client-id",
+        clientSecret: "another-secret",
+        // Required since P8-T07c-b moved the rules out of the route and into
+        // one validator, so that a SAML provider could be refused by the same
+        // sentence an OIDC one is.
+        discoveryUrl: "https://entra.example/.well-known/openid-configuration",
+      },
+      BASE,
+    );
 
     const { rows } = await wb.admin.query(
       "select workspace_id from sso_connections where provider_id = 'entra'",

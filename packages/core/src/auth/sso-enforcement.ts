@@ -26,11 +26,19 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { emailDomain } from "../invitations/tokens.ts";
+import { derivedProviderId } from "./sso.ts";
 
 /** A provider that claims the address somebody is trying to sign in with. */
 export interface EnforcingProvider {
-  /** The genericOAuth provider id, which is what `signIn.social` is given. */
+  /** The provider id, which is what the sign-in call is given. */
   readonly providerId: string;
+  /**
+   * Which protocol, because the two are started differently (P8-T07c-b).
+   *
+   * `oidc` goes to `signIn.social` and `saml` to `signIn.sso`. Carried
+   * here so that whatever refuses somebody can also say which button to press.
+   */
+  readonly kind: "oidc" | "saml";
   readonly displayName: string;
   /** The claimed domain that matched. */
   readonly domain: string;
@@ -39,6 +47,7 @@ export interface EnforcingProvider {
 /** One enforcing connection, as the database holds it. */
 export interface EnforcingConnection {
   readonly providerId: string;
+  readonly kind: "oidc" | "saml";
   readonly displayName: string;
   readonly domains: readonly string[];
 }
@@ -70,6 +79,7 @@ export function enforcingProviderFor(
     if (connection.domains.includes(domain)) {
       return {
         providerId: connection.providerId,
+        kind: connection.kind,
         displayName: connection.displayName,
         domain,
       };
@@ -90,12 +100,13 @@ export async function listEnforcingConnections(
   try {
     const { rows } = await withSSOLookup(drizzle(pool), (tx) =>
       tx.execute<{
+        kind: string;
         provider_id: string;
         workspace_id: string;
         display_name: string;
         email_domains: string;
       }>(sql`
-        select provider_id, workspace_id, display_name, email_domains
+        select kind, provider_id, workspace_id, display_name, email_domains
           from sso_connections
          where enabled = true
            and enforce = true
@@ -103,7 +114,8 @@ export async function listEnforcingConnections(
            and deleted_at is null`),
     );
     return rows.map((row) => ({
-      providerId: `sso-${row.provider_id}-${row.workspace_id.slice(0, 8)}`,
+      providerId: derivedProviderId(row.provider_id, row.workspace_id),
+      kind: row.kind === "saml" ? ("saml" as const) : ("oidc" as const),
       displayName: row.display_name,
       domains: row.email_domains
         .split(",")
@@ -171,6 +183,13 @@ export async function enforcedProviderForUser(
  * else that reaches session creation is a local factor: a password, a
  * passkey, a one-time code. The backstop refuses those for a claimed address.
  *
+ * **SAML has its own two, and they were missing** (P8-T07c-b). A SAML sign-in
+ * starts at `/sign-in/sso` and completes at `/sso/saml2/sp/acs/:id`, so the
+ * backstop read both as local factors and refused the very sign-in enforcement
+ * exists to insist on. An enforced domain with a SAML provider could not sign
+ * in by any route at all, which is what this function is one line away from in
+ * either direction.
+ *
  * Written here rather than beside the hook that calls it, so the rule that
  * decides which sign-ins escape enforcement is tested on its own. An
  * undefined path is not a provider sign-in: a caller that cannot say where it
@@ -180,7 +199,12 @@ export function isProviderSignInPath(path: string | undefined): boolean {
   if (path === undefined) {
     return false;
   }
-  return path.startsWith("/callback/") || path === "/sign-in/social";
+  return (
+    path.startsWith("/callback/") ||
+    path.startsWith("/sso/saml2/sp/acs/") ||
+    path === "/sign-in/social" ||
+    path === "/sign-in/sso"
+  );
 }
 
 /** What somebody refused by enforcement is told. */
