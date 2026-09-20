@@ -164,6 +164,7 @@ export {
   type ResolveAICredentialInput,
   type ResolvedAICredential,
   type ResolvedDeploymentAI,
+  resolveAgentRunCostCap,
   resolveAICredential,
   resolveDeploymentAISettings,
 } from "./ai/resolve.ts";
@@ -432,6 +433,8 @@ export {
 } from "./auth/session-hashing.ts";
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
+  type CreateSSOConnectionInput,
+  createSSOConnection,
   listSSOProviders,
   loadSSOConnections,
   providerIdFromCallback,

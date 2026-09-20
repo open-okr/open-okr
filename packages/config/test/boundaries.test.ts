@@ -631,3 +631,117 @@ export const POLICY = [
     ).toHaveLength(1);
   });
 });
+
+describe("unscoped reads of a guarded table (implementation audit)", () => {
+  /**
+   * The rule that would have caught seven defects, six of which reached a
+   * release and one of which made single sign-on unconfigurable on every
+   * instance. The table set is derived from the migrations by the gate; here
+   * it is supplied directly so the rule can be exercised on its own.
+   */
+  const guardedTables = new Set(["sso_connections", "workspaces", "goals"]);
+  const scan = (path: string, text: string) =>
+    checkBoundaries([{ path, text }], { guardedTables });
+
+  const unscoped = (violations: ReturnType<typeof scan>) =>
+    violations.filter((one) => one.rule === "unscoped-read-of-guarded-table");
+
+  test("catches a read of a guarded table on a bare pool", () => {
+    const found = unscoped(
+      scan(
+        "packages/core/src/auth/example.ts",
+        `export async function read(pool: Pool) {
+           const { rows } = await pool.query("select id from sso_connections");
+           return rows;
+         }`,
+      ),
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain("sso_connections");
+  });
+
+  test("catches a write, which is the shape that made SSO unconfigurable", () => {
+    const found = unscoped(
+      scan(
+        "apps/web/app/api/v1/admin/sso/route.ts",
+        `export async function POST() {
+           await pool.query(
+             "insert into sso_connections (workspace_id) values (current_setting('app.workspace_id')::uuid)",
+           );
+         }`,
+      ),
+    );
+
+    expect(found).toHaveLength(1);
+  });
+
+  test("allows a query inside a tenant wrapper", () => {
+    const found = unscoped(
+      scan(
+        "packages/core/src/auth/example.ts",
+        `export async function read(pool: Pool, workspaceId: string) {
+           return withWorkspace(drizzle(pool), workspaceId, async () => {
+             const { rows } = await pool.query("select id from sso_connections");
+             return rows;
+           });
+         }`,
+      ),
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  test("allows a query on a table that carries no policy", () => {
+    // `users` is Better Auth's and global. A rule that fired on it would be
+    // one somebody silences everywhere, and a silenced rule catches nothing.
+    const found = unscoped(
+      scan(
+        "packages/core/src/auth/example.ts",
+        `export async function read(pool: Pool) {
+           return pool.query("select id from users where email = $1", [email]);
+         }`,
+      ),
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  test("allows the command line, which runs as an operator", () => {
+    const found = unscoped(
+      scan(
+        "packages/core/src/bin/seed.ts",
+        `const result = await pool.query("select id from workspaces limit 1");`,
+      ),
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  test("takes a written reason as the escape, not a bare silence", () => {
+    const found = unscoped(
+      scan(
+        "packages/core/src/audit/example.ts",
+        `// openokr:allow-unscoped-read: refuses rather than falling back when
+         // the role cannot see past the floor.
+         const rows = await pool.query("select id from workspaces");`,
+      ),
+    );
+
+    expect(found).toEqual([]);
+  });
+
+  test("checks nothing when the caller supplies no tables, rather than passing quietly", () => {
+    // The gate itself refuses to run with an empty set. This is the library
+    // half of that: no tables means no opinion, and the script is what turns
+    // that into a failure.
+    const found = checkBoundaries([
+      {
+        path: "packages/core/src/auth/example.ts",
+        text: `await pool.query("select id from sso_connections");`,
+      },
+    ]).filter((one) => one.rule === "unscoped-read-of-guarded-table");
+
+    expect(found).toEqual([]);
+  });
+});

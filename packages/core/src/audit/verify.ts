@@ -111,6 +111,11 @@ export async function verifyAllChains(
     );
   }
 
+  // openokr:allow-unscoped-read: this is the one read that is meant to see
+  // past the tenant floor, and it refuses rather than falling back when it
+  // cannot. `canEnumerateWorkspaces` above is the check, and the error it
+  // raises names the role a caller needs. That is the opposite of the class
+  // this rule exists for, where an empty answer is read as data.
   const workspaces = await pool.query<{ id: string }>(
     "select id from workspaces order by created_at",
   );

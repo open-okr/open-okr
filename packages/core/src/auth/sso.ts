@@ -9,12 +9,13 @@
  * instance on every sign-in would put a database read and a decryption on
  * the hot path of every request.
  */
-import { withSSOLookup } from "@openokr/db";
+import { withSSOLookup, withWorkspace } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   decryptSecret,
+  encryptSecret,
   type KeyRing,
   type SealedSecret,
 } from "../secrets/key-ring.ts";
@@ -251,4 +252,73 @@ export async function listSSOProviders(
     }
     throw error;
   }
+}
+
+/** What an administrator supplies when configuring a provider. */
+export interface CreateSSOConnectionInput {
+  readonly providerId: string;
+  readonly displayName: string;
+  readonly clientId: string;
+  /** Sealed here rather than by the caller, so one place owns the key ring. */
+  readonly clientSecret: string;
+  readonly discoveryUrl?: string | null;
+  readonly authorizationUrl?: string | null;
+  readonly tokenUrl?: string | null;
+  readonly userInfoUrl?: string | null;
+  readonly scopes?: string;
+  readonly emailDomains?: string;
+  readonly enforce?: boolean;
+}
+
+/**
+ * Creates an OIDC connection for a workspace.
+ *
+ * **This exists because the route that used to do it could never work**
+ * (audit, 18 September 2026). It inserted with
+ * `current_setting('app.workspace_id')::uuid` on a bare pool, and
+ * `current_setting` without the missing-ok flag raises rather than returning
+ * null, so every attempt ended in `unrecognized configuration parameter`. The
+ * admin screen posts there and nowhere else, so no OIDC provider could be
+ * configured on any instance, which made P8-T07a, P8-T07b and P8-T07c-a all
+ * unreachable: each of them is downstream of a provider existing.
+ *
+ * The workspace is passed in rather than asked of the connection, which is the
+ * same shape `createSCIMToken` has used since P8-T08a. That row fixed one of
+ * the pair and left this one.
+ */
+export async function createSSOConnection(
+  pool: Pool,
+  workspaceId: string,
+  ring: KeyRing,
+  input: CreateSSOConnectionInput,
+): Promise<{ id: string }> {
+  const sealed = encryptSecret(ring, input.clientSecret);
+
+  const row = await withWorkspace(drizzle(pool), workspaceId, async (tx) => {
+    // openokr:allow-mutation: an instance configuration write with no acting
+    // member, the same arrangement `createSCIMToken` uses. The admin endpoint
+    // that calls this is access-checked before it is reached.
+    const inserted = await tx.execute<{ id: string }>(sql`
+      insert into sso_connections (
+        workspace_id, provider_id, display_name,
+        discovery_url, authorization_url, token_url, user_info_url,
+        client_id, secret_ciphertext, secret_data_key, secret_key_id,
+        scopes, email_domains, enforce
+      ) values (
+        ${workspaceId}, ${input.providerId}, ${input.displayName},
+        ${input.discoveryUrl ?? null}, ${input.authorizationUrl ?? null},
+        ${input.tokenUrl ?? null}, ${input.userInfoUrl ?? null},
+        ${input.clientId}, ${sealed.ciphertext}, ${sealed.dataKey},
+        ${sealed.keyId},
+        ${input.scopes ?? "openid email profile"},
+        ${input.emailDomains ?? ""}, ${input.enforce ?? false}
+      )
+      returning id`);
+    return inserted.rows[0];
+  });
+
+  if (!row) {
+    throw new Error("The SSO connection insert returned no row");
+  }
+  return row;
 }

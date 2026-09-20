@@ -24,7 +24,7 @@ import {
   aiProviders,
   withWorkspace,
 } from "@openokr/db";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
@@ -225,4 +225,39 @@ export async function resolveAICredential(
   }
 
   return { source: "off" };
+}
+
+/**
+ * §4.14's per-run spend cap for a workspace.
+ *
+ * **It was never read until the audit of 18 September 2026.** `apps/web`
+ * asked for it on a bare pool, `workspaces` carries `tenant_isolation` from
+ * migration 0005, and the application role is `nobypassrls`, so the read
+ * matched nothing on every instance and the caller's fallback took over.
+ * `agentRunCostCapUsd` did nothing: every workspace ran on the default
+ * whatever an administrator set, a higher cap ignored and a lower one ignored
+ * too. Nothing threw, because no rows is what a correct tenant floor looks
+ * like from above.
+ *
+ * It lives here rather than in the web app for the second half of the same
+ * reason: `apps/web` has no Drizzle and should not be writing SQL.
+ *
+ * Zero is a real answer and means the agent may not spend. The default is two,
+ * which is what every instance has effectively been running on.
+ */
+export async function resolveAgentRunCostCap(
+  pool: Pool,
+  workspaceId: string,
+  fallback = 2,
+): Promise<number> {
+  const rows = await withWorkspace(drizzle(pool), workspaceId, async (tx) => {
+    const result = await tx.execute<{ cap: string | null }>(sql`
+      select (settings->>'agentRunCostCapUsd')::numeric as cap
+        from workspaces
+       where id = ${workspaceId}`);
+    return result.rows;
+  });
+
+  const stored = rows[0]?.cap;
+  return stored === null || stored === undefined ? fallback : Number(stored);
 }

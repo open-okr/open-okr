@@ -20,6 +20,7 @@ import { loadEnv } from "@openokr/config";
 import {
   type AgentDrafter,
   findSeededModel,
+  resolveAgentRunCostCap,
   resolveAICredential,
   resolveTierRoute,
 } from "@openokr/core";
@@ -37,12 +38,13 @@ async function runCostCapFor(
   pool: ReturnType<typeof getPool>,
   workspaceId: string,
 ): Promise<number> {
-  const { rows } = await pool.query<{ cap: number | null }>(
-    "select (settings->>'agentRunCostCapUsd')::numeric as cap from workspaces where id = $1",
-    [workspaceId],
-  );
-  const stored = rows[0]?.cap;
-  return stored === null || stored === undefined ? 2 : Number(stored);
+  // **Through core, and inside the tenant setting, since the audit of
+  // 18 September 2026.** This read ran on a bare pool against a table that
+  // carries `tenant_isolation`, so it matched nothing on every instance and
+  // the fallback took over: `agentRunCostCapUsd` did nothing whatever an
+  // administrator set. It lives in core now for the second half of the same
+  // reason, which is that this app has no Drizzle and should not write SQL.
+  return resolveAgentRunCostCap(pool, workspaceId);
 }
 
 /** The drafter for this workspace, or nothing when the provider is off. */

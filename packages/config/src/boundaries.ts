@@ -37,7 +37,8 @@ export interface BoundaryViolation {
     | "write-path-side-effect"
     | "mutation-outside-operation"
     | "protected-read-outside-getter"
-    | "tenant-read-on-product-path";
+    | "tenant-read-on-product-path"
+    | "unscoped-read-of-guarded-table";
   readonly message: string;
 }
 
@@ -727,14 +728,142 @@ const checkTenancy = (file: BoundarySourceFile): BoundaryViolation[] => {
   return violations;
 };
 
+/**
+ * Paths where a query on a bare pool is a defect rather than a tool.
+ *
+ * The command line under `src/bin` is excluded because those run as an
+ * operator, sometimes as a role that sees past the floor on purpose, and they
+ * are invoked deliberately rather than served to anybody.
+ */
+const UNSCOPED_CHECKED_PREFIXES: readonly string[] = [
+  "apps/web/",
+  "packages/core/src/",
+  "packages/agents/src/",
+];
+
+const UNSCOPED_ALLOWED_PREFIXES: readonly string[] = ["packages/core/src/bin/"];
+
+/** The wrappers that apply a tenant setting, or a pre-tenant key. */
+const TENANT_WRAPPERS: readonly string[] = [
+  "withWorkspace(",
+  "withContext(",
+  "withSSOLookup(",
+  "withDirectoryToken(",
+  "withApiToken(",
+  "withChannelTeam(",
+  "withInstanceAdmin(",
+  "runOperation(",
+  "callAction(",
+];
+
+/** A query issued straight on a pool, which carries no tenant setting. */
+const POOL_QUERY = /\b(?:pool|appPool)\.query\s*[<(]/g;
+
+/**
+ * A pool query naming a table that is behind the tenant floor.
+ *
+ * **This is the rule that would have caught seven defects** (implementation
+ * audit, 18 September 2026). The application role is `nosuperuser
+ * nobypassrls`, so a read on a connection with no tenant setting answers with
+ * no rows and a write is refused. Nothing throws on the read path, a
+ * sensible-looking fallback takes over, and the feature is inert while every
+ * gate stays green. No rows is also exactly what a correct tenant floor looks
+ * like from above, which is why nobody can tell the two apart by reading.
+ *
+ * It has happened seven times: `loadSSOConnections`, `listSSOProviders`,
+ * `resolveToken`, `createSCIMToken`, `logSyncOperation`, the SSO connection
+ * write, and the per-workspace spend cap. Six were found by somebody
+ * exercising the feature, and the seventh by an audit. None by a gate.
+ *
+ * **The table list is derived, not written down.** `check-boundaries.ts` reads
+ * every migration and passes the tables that carry a policy, so a table added
+ * tomorrow is covered tomorrow and there is no second list to drift.
+ *
+ * The escape is `openokr:allow-unscoped-read` with a reason, for a genuinely
+ * global table or a path that runs before any workspace exists.
+ */
+const checkUnscopedTenantQuery = (
+  file: BoundarySourceFile,
+  guardedTables: ReadonlySet<string>,
+): BoundaryViolation[] => {
+  if (guardedTables.size === 0) {
+    return [];
+  }
+  if (!UNSCOPED_CHECKED_PREFIXES.some((one) => file.path.startsWith(one))) {
+    return [];
+  }
+  if (UNSCOPED_ALLOWED_PREFIXES.some((one) => file.path.startsWith(one))) {
+    return [];
+  }
+
+  const violations: BoundaryViolation[] = [];
+  const lines = file.text.split("\n");
+  const seen = new Set<number>();
+
+  for (const match of file.text.matchAll(POOL_QUERY)) {
+    const at = match.index ?? 0;
+    // The statement, roughly. Long enough for any query here and short enough
+    // not to run into the next one.
+    const statement = file.text.slice(at, at + 800);
+    const table = [...guardedTables].find((name) =>
+      new RegExp(`\\b(?:from|into|update|join)\\s+${name}\\b`, "i").test(
+        statement,
+      ),
+    );
+    if (!table) {
+      continue;
+    }
+
+    // Already inside a wrapper, in the same function.
+    const before = file.text.slice(Math.max(0, at - 1500), at);
+    if (TENANT_WRAPPERS.some((one) => before.includes(one))) {
+      continue;
+    }
+
+    const line = lineOf(file.text, at);
+    if (seen.has(line) || hasMarkerAbove(lines, line, "allow-unscoped-read")) {
+      continue;
+    }
+    seen.add(line);
+    violations.push({
+      path: file.path,
+      line,
+      rule: "unscoped-read-of-guarded-table",
+      message:
+        `queries ${table} on a bare pool, which carries no tenant setting. ` +
+        "The application role is nobypassrls, so the read answers with no " +
+        "rows and the write is refused, and neither says so. Open the " +
+        "transaction with withWorkspace and pass the workspace id, or mark " +
+        "it openokr:allow-unscoped-read with the reason it is global.",
+    });
+  }
+
+  return violations;
+};
+
+export interface BoundaryOptions {
+  /**
+   * Tables that carry a row-level security policy.
+   *
+   * Derived by the caller from the migrations rather than listed here, so a
+   * table added tomorrow is covered without anybody remembering. An empty set
+   * turns the unscoped-query rule off, which is what a caller that cannot read
+   * the migrations gets.
+   */
+  readonly guardedTables?: ReadonlySet<string>;
+}
+
 export function checkBoundaries(
   files: readonly BoundarySourceFile[],
+  options: BoundaryOptions = {},
 ): BoundaryViolation[] {
+  const guarded = options.guardedTables ?? new Set<string>();
   return files.flatMap((file) => [
     ...checkImports(file),
     ...checkWritePathSideEffects(file),
     ...checkMutations(file),
     ...checkProtectedReads(file),
     ...checkTenancy(file),
+    ...checkUnscopedTenantQuery(file, guarded),
   ]);
 }

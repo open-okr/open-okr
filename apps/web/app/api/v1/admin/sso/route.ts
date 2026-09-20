@@ -1,4 +1,8 @@
-import { ACCESS_LEVELS, encryptSecret, type KeyRing } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  createSSOConnection,
+  type KeyRing,
+} from "@openokr/core";
 import { NextResponse } from "next/server";
 import { requireAccessLevel } from "../../../../../lib/access";
 import { getPool } from "../../../../../lib/auth";
@@ -14,7 +18,13 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    await requireAccessLevel(ACCESS_LEVELS.full);
+    // **The workspace comes from here, not from the connection** (audit,
+    // 18 September 2026). This route used to insert with
+    // `current_setting('app.workspace_id')` on a bare pool, which raises
+    // rather than returning null, so no SSO provider could ever be created on
+    // any instance. `requireAccessLevel` has returned the workspace all
+    // along; the route discarded it and asked the database instead.
+    const { workspaceId } = await requireAccessLevel(ACCESS_LEVELS.full);
     const body = await request.json();
 
     const {
@@ -73,41 +83,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const ring: KeyRing = getKeyRing();
-    const sealed = encryptSecret(ring, clientSecret);
 
-    const pool = getPool();
-    // openokr:allow-mutation: SSO connection creation is an admin
-    // configuration write. The sealed secret must be written directly
-    // because the Operation pipeline cannot carry envelope-encrypted
-    // columns through a generic input schema.
-    await pool.query(
-      `insert into sso_connections (
-        workspace_id, provider_id, display_name,
-        discovery_url, authorization_url, token_url, user_info_url,
-        client_id, secret_ciphertext, secret_data_key, secret_key_id,
-        scopes, email_domains, enforce
-      ) values (
-        current_setting('app.workspace_id')::uuid, $1, $2,
-        $3, $4, $5, $6,
-        $7, $8, $9, $10,
-        $11, $12, $13
-      )`,
-      [
-        providerId,
-        displayName,
-        discoveryUrl || null,
-        authorizationUrl || null,
-        tokenUrl || null,
-        userInfoUrl || null,
-        clientId,
-        sealed.ciphertext,
-        sealed.dataKey,
-        sealed.keyId,
-        scopes || "openid email profile",
-        emailDomains || "",
-        enforce ?? false,
-      ],
-    );
+    await createSSOConnection(getPool(), workspaceId, ring, {
+      providerId,
+      displayName,
+      clientId,
+      clientSecret,
+      discoveryUrl: discoveryUrl || null,
+      authorizationUrl: authorizationUrl || null,
+      tokenUrl: tokenUrl || null,
+      userInfoUrl: userInfoUrl || null,
+      ...(scopes ? { scopes } : {}),
+      ...(emailDomains ? { emailDomains } : {}),
+      ...(enforce === undefined ? {} : { enforce }),
+    });
 
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {

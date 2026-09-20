@@ -204,3 +204,65 @@ Said plainly, so the clean sections above are not read as wider than they are.
 3. Fix finding 2.
 4. Add the seven missing plan headings.
 5. Decide `P8-T07c-b`, `P6-G22d` and `P4-T14b-b`.
+
+---
+
+## What was done about it, 18 September 2026
+
+Appended rather than folded into the findings above, so they still read as they
+were found.
+
+### Findings 1 and 2 are fixed, and the tests fail against the old code
+
+`createSSOConnection` moved into `packages/core/src/auth/sso.ts` and takes the
+workspace as an argument, inside `withWorkspace`. That is the shape
+`createSCIMToken` has had since P8-T08a, which is the sibling that worked. The
+route passes the workspace `requireAccessLevel` was already returning and
+discarding.
+
+`resolveAgentRunCostCap` moved into `packages/core/src/ai/resolve.ts` for two
+reasons: it has to run inside the tenant setting, and `apps/web` has no Drizzle
+and should not be writing SQL. The web app calls it.
+
+`packages/core/test/tenant-scoped-writes.test.ts` holds six tests. Two of them
+fail against the code as it was, with
+`unrecognized configuration parameter "app.workspace_id"`; the cap tests
+returned 2 instead of what was stored. Zero is covered too, because a falsy
+check would read "may not spend" as "not set" and hand back the default, which
+is the opposite instruction.
+
+### The rule that stops the eighth
+
+`unscoped-read-of-guarded-table`, in the boundary gate. It refuses a
+`pool.query` naming a policy-guarded table outside a tenant wrapper.
+
+**The table set is derived from the migrations by the gate**, not written down.
+A table added tomorrow is covered tomorrow, and there is no second list to
+drift. The gate refuses to run at all if it finds no guarded tables, because a
+rule that checks nothing must not report success: that exact failure has hit
+this repository twice before, in the migration lint and the soft-delete gate.
+
+It found one thing on its first run, and it was a true positive that wanted
+documenting rather than fixing: `audit/verify.ts` reads `workspaces` on a bare
+pool on purpose, and refuses with a clear error when the role cannot see past
+the floor. It carries `openokr:allow-unscoped-read` with that reason now, which
+is the point of the escape being a written sentence rather than a silence.
+
+Seven tests in `packages/config/test/boundaries.test.ts` hold it in both
+directions: it catches a read and a write, it stays quiet inside a wrapper, on
+an unguarded table, in the command line, and behind a marker, and it has no
+opinion when the caller supplies no tables.
+
+### Still open
+
+| Row | Why it is still open |
+|---|---|
+| `P8-T07c-b` | The admin screen for SAML, the metadata document, enforcement. Until it lands, SAML cannot be configured even though the sign-in path works |
+| `P6-G22d` | A message can carry a value |
+| `P4-T14b-b` | Copilot background runs, blocked |
+
+The seven plan headings named in finding 4 are not added yet.
+
+**Finding 1 unblocked OIDC, not SAML.** An administrator can configure an OIDC
+provider now. SAML still has no screen, so P8-T07c-b remains the row that makes
+that half reachable.
