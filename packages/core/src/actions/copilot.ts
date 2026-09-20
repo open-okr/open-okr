@@ -189,13 +189,24 @@ export const ask = defineWriteAction({
     subjectType: z.string().trim().min(1).max(40).optional(),
     subjectId: z.uuid().optional(),
     question: z.string().trim().min(1).max(4000),
+    /**
+     * Answer this in the background (P4-T14b-b).
+     *
+     * Writes the empty assistant message the run fills and enqueues the job,
+     * in the same transaction as the question, so there is no moment where a
+     * question is recorded with nothing coming. False answers inline, which is
+     * what an instance draining no queue falls back to.
+     */
+    background: z.boolean().default(false),
   }),
   output: z.object({
     threadId: z.uuid(),
     messageId: z.uuid(),
+    /** The message the background run writes into. Null when not one. */
+    answerMessageId: z.uuid().nullable(),
   }),
   access: ACCESS_LEVELS.comment,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     requires: ACCESS_LEVELS.comment,
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
@@ -261,8 +272,33 @@ export const ask = defineWriteAction({
         throw new OperationError("not_found", "That did not save.");
       }
 
+      // **The empty answer and the job, in this transaction** (P4-T14b-b).
+      // A question recorded with no run enqueued is a thread that waits for
+      // ever, and a job enqueued against a question that rolled back is a run
+      // with nothing to answer. One transaction is the only arrangement where
+      // neither can happen.
+      let answerMessageId: string | null = null;
+      if (input.background) {
+        const [answer] = await tx
+          .insert(aiMessages)
+          .values({
+            workspaceId,
+            threadId,
+            role: "assistant",
+            // Empty until the run finishes. The reader sees the run is in
+            // flight from `runStartedAt`, not from the content.
+            content: "",
+            runStartedAt: new Date(),
+          })
+          .returning({ id: aiMessages.id });
+        if (!answer) {
+          throw new OperationError("not_found", "That did not save.");
+        }
+        answerMessageId = answer.id;
+      }
+
       return {
-        result: { threadId, messageId: message.id },
+        result: { threadId, messageId: message.id, answerMessageId },
         activity: {
           kind: "copilot.asked",
           subjectType: "workspace",
@@ -281,6 +317,189 @@ export const ask = defineWriteAction({
           targetType: "ai_thread",
           targetId: threadId,
           payload: { messageId: message.id },
+        },
+        ...(answerMessageId
+          ? {
+              outbox: [
+                {
+                  topic: "copilot.run",
+                  idempotencyKey: `copilot.run:${answerMessageId}`,
+                  payload: {
+                    workspaceId,
+                    threadId,
+                    questionMessageId: message.id,
+                    answerMessageId,
+                    // The person, so the run acts as them and the audit row
+                    // names somebody rather than a queue. `ResolvedActor`
+                    // carries the member; the user is on the call context.
+                    userId: context.actor.userId ?? "",
+                    question: input.question,
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+    },
+  }),
+});
+
+/**
+ * Finishes a background run's answer (P4-T14b-b).
+ *
+ * **An update, not an insert, and that is the whole difference from
+ * `copilot.recordAnswer`.** A background run's assistant message was written
+ * empty when the member asked, because a reader who comes back needs a row to
+ * come back to and a run to rejoin. This fills it in.
+ *
+ * **It refuses a message that has already completed**, which is what makes a
+ * redelivered outbox row cost one refused write rather than a second answer
+ * charged to the workspace. The relay delivers at least once by design.
+ *
+ * **`haltedReason` with no text is a run that produced nothing**, and the
+ * reader is told why: the provider would not answer, the copilot had nothing
+ * to add, or the workspace's cost cap says a run may not spend. A run that
+ * stopped silently leaves a short answer that looks finished, which is the one
+ * outcome this row exists to prevent.
+ */
+export const completeRun = defineWriteAction({
+  name: "copilot.completeRun",
+  summary: "Records the answer a background copilot run produced.",
+  input: z.object({
+    answerMessageId: z.uuid(),
+    /** Empty when the run produced no prose, which `haltedReason` explains. */
+    text: z.string().max(20000).default(""),
+    citations: z.array(citationSchema).max(50).default([]),
+    model: z.string().trim().min(1).max(120).optional(),
+    tokensIn: z.number().int().min(0).optional(),
+    tokensOut: z.number().int().min(0).optional(),
+    cost: z.number().min(0).optional(),
+    /** Why it ended early, in the words the reader is shown. */
+    haltedReason: z.string().trim().min(1).max(500).optional(),
+  }),
+  output: z.object({ messageId: z.uuid(), completed: z.boolean() }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      const [message] = await tx
+        .select({
+          id: aiMessages.id,
+          threadId: aiMessages.threadId,
+          runStartedAt: aiMessages.runStartedAt,
+          runCompletedAt: aiMessages.runCompletedAt,
+        })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, input.answerMessageId),
+          ),
+        )
+        .limit(1);
+      if (!message || !message.runStartedAt) {
+        throw new OperationError("not_found", "There is no such run.");
+      }
+      // The thread is the member's own, which is what authorises this beyond
+      // the workspace floor. A run belongs to the conversation that started it.
+      await ownThread(tx, workspaceId, memberId, message.threadId);
+
+      if (message.runCompletedAt) {
+        // Already finished. Not an error: the relay delivers at least once,
+        // and the second delivery finding the work done is the arrangement
+        // working rather than failing.
+        return {
+          result: { messageId: message.id, completed: false },
+          activity: {
+            kind: "copilot.answered",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: {
+              threadId: message.threadId,
+              stopped: false,
+              redelivered: true,
+            },
+          },
+          audit: {
+            action: "copilot.completeRun",
+            targetType: "ai_message",
+            targetId: message.id,
+            payload: { threadId: message.threadId, redelivered: true },
+          },
+        };
+      }
+
+      const citations: AiCitation[] = input.citations.filter((citation) =>
+        isEmbeddableType(citation.entityType),
+      );
+
+      await tx
+        .update(aiMessages)
+        .set({
+          content: input.text,
+          citations,
+          model: input.model ?? null,
+          tokensIn: input.tokensIn ?? null,
+          tokensOut: input.tokensOut ?? null,
+          cost: input.cost === undefined ? null : String(input.cost),
+          runCompletedAt: new Date(),
+          runHaltedReason: input.haltedReason ?? null,
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, message.id),
+          ),
+        );
+
+      await tx
+        .update(aiThreads)
+        .set({ updatedAt: new Date() })
+        .where(
+          activeOnly(
+            aiThreads,
+            eq(aiThreads.workspaceId, workspaceId),
+            eq(aiThreads.id, message.threadId),
+          ),
+        );
+
+      return {
+        result: { messageId: message.id, completed: true },
+        activity: {
+          kind: "copilot.answered",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: {
+            threadId: message.threadId,
+            // Never true here: a reader cannot cut a run short, because the
+            // run is not attached to their request. The field stays because
+            // this is the same activity the inline path writes.
+            stopped: false,
+            halted: Boolean(input.haltedReason),
+          },
+        },
+        audit: {
+          action: "copilot.completeRun",
+          targetType: "ai_message",
+          targetId: message.id,
+          // The cost of the turn, which is what an auditor asks about, and
+          // whether it stopped early. Not the answer's words.
+          payload: {
+            threadId: message.threadId,
+            model: input.model ?? null,
+            tokensIn: input.tokensIn ?? null,
+            tokensOut: input.tokensOut ?? null,
+            cost: input.cost ?? null,
+            haltedReason: input.haltedReason ?? null,
+          },
         },
       };
     },
@@ -426,6 +645,16 @@ const messageOutput = z.object({
   cost: z.string().nullable(),
   /** Set when the reader stopped this answer before it finished. */
   stopped: z.boolean(),
+  /**
+   * A background run is still producing this answer (P4-T14b-b).
+   *
+   * What a page that has just loaded reads to decide whether to rejoin. True
+   * means the run started and has not finished, which is the one question a
+   * reader coming back asks.
+   */
+  running: z.boolean(),
+  /** Why the run stopped early, in words for the reader. Null when it did not. */
+  haltedReason: z.string().nullable(),
   createdAt: z.string(),
 });
 
@@ -468,6 +697,9 @@ export const readThread = defineReadAction({
             tokensOut: aiMessages.tokensOut,
             cost: aiMessages.cost,
             stoppedAt: aiMessages.stoppedAt,
+            runStartedAt: aiMessages.runStartedAt,
+            runCompletedAt: aiMessages.runCompletedAt,
+            runHaltedReason: aiMessages.runHaltedReason,
             createdAt: aiMessages.createdAt,
           })
           .from(aiMessages)
@@ -496,6 +728,13 @@ export const readThread = defineReadAction({
             tokensOut: row.tokensOut,
             cost: row.cost,
             stopped: row.stoppedAt !== null,
+            // In flight when the run started and has not finished. The one
+            // question a reader coming back to a page asks (P4-T14b-b).
+            running:
+              row.runStartedAt !== null &&
+              row.runCompletedAt === null &&
+              row.stoppedAt === null,
+            haltedReason: row.runHaltedReason,
             createdAt: row.createdAt.toISOString(),
           });
         }

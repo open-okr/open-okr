@@ -53,6 +53,7 @@ import {
   resolveAICredential,
   resolveTierRoute,
 } from "@openokr/core";
+import { drafterFor } from "./drafter";
 import { getMailSettings, mailerFrom } from "./mail";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
@@ -139,6 +140,14 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
   return {
     pool: getPool(),
     ...(workspaceId ? { embed: await embedFor(workspaceId) } : {}),
+    /**
+     * The workspace AI drafter, for a copilot run (P4-T14b-b).
+     *
+     * Resolved per delivery rather than per process, for the reason every
+     * other dependency here is: provider keys and tier routing live in the
+     * database and an administrator can change either while this runs.
+     */
+    drafterFor: (id: string) => drafterFor(id),
     async publish(channel, event, data) {
       await getRealtime().publish(channel, { name: event, data });
     },

@@ -152,6 +152,7 @@ import {
 } from "./comments.ts";
 import {
   ask,
+  completeRun,
   readAvailability,
   readThread,
   readThreads,
@@ -480,6 +481,7 @@ export const ACTION_MAP = {
   "tokens.pendingDevice": readPendingDevice,
   "tokens.approveDevice": decideDevice,
   "copilot.ask": ask,
+  "copilot.completeRun": completeRun,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,
   "copilot.threads": readThreads,

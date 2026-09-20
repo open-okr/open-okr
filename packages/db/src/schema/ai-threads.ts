@@ -59,6 +59,13 @@ export const aiMessages = pgTable("ai_messages", {
     .notNull()
     .references(() => aiThreads.id, { onDelete: "cascade" }),
   role: text("role", { enum: AI_MESSAGE_ROLES }).notNull(),
+  /**
+   * The words. Empty only while a background run owns the row.
+   *
+   * Migration 0098 narrowed `ai_messages_content_present` to permit that and
+   * nothing else: a run writes its message before there is an answer, and a
+   * run that halts writes none at all with `runHaltedReason` saying why.
+   */
   content: text("content").notNull(),
   /**
    * What the answer was grounded in.
@@ -76,6 +83,25 @@ export const aiMessages = pgTable("ai_messages", {
   cost: numeric("cost", { precision: 12, scale: 6 }),
   /** Set when a stream was stopped before finishing (P4-T14a-b writes it). */
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+  /**
+   * When a background run began (P4-T14b-b).
+   *
+   * Null on a message a synchronous answer wrote, which is what an instance
+   * with no relay draining its queue falls back to, and on every message
+   * written before migration 0098. Null means there was never a run to
+   * rejoin.
+   */
+  runStartedAt: timestamp("run_started_at", { withTimezone: true }),
+  /**
+   * When it finished, however it finished.
+   *
+   * **A run is in flight when `runStartedAt` is set and this is null.** That
+   * is the one question every reader of this table asks, and the partial
+   * index in 0098 is on exactly it.
+   */
+  runCompletedAt: timestamp("run_completed_at", { withTimezone: true }),
+  /** Why it stopped early, in words for the reader. Null when it did not. */
+  runHaltedReason: text("run_halted_reason"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

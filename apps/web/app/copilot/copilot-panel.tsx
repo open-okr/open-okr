@@ -64,6 +64,10 @@ interface Message {
   readonly content: string;
   readonly citations: readonly Citation[];
   readonly stopped: boolean;
+  /** A background run is still producing this answer (P4-T14b-b). */
+  readonly running?: boolean;
+  /** Why the run stopped early, in words. Null when it did not. */
+  readonly haltedReason?: string | null;
 }
 
 interface ThreadSummary {
@@ -151,6 +155,16 @@ function Turn({ message }: { readonly message: Message }) {
         }`}
       >
         {message.content}
+        {message.running ? (
+          <span className="mt-1 block">
+            <Chip tone="info">{t("copilot.copilotPanel.stillWriting")}</Chip>
+          </span>
+        ) : null}
+        {message.haltedReason ? (
+          <span className="mt-1 block text-xs text-ink-3">
+            {message.haltedReason}
+          </span>
+        ) : null}
         {message.stopped ? (
           <span className="mt-1 block">
             <Chip tone="warn">{t("copilot.copilotPanel.stopped")}</Chip>
@@ -332,6 +346,49 @@ export function CopilotPanel({
     setSources([]);
     setNotice(null);
   }, []);
+
+  /**
+   * Rejoins a run that is still going (P4-T14b-b).
+   *
+   * **This is the acceptance criterion.** The member asked something that
+   * takes a minute, the run went to the background, and the page they come
+   * back to has an answer still being written. The thread read says so, and
+   * this subscribes to the rest of it.
+   *
+   * What it cannot do is replay: prose already published is gone, and the
+   * whole answer arrives when the run completes and the thread is re-read.
+   * The chip says the answer is still being written, which is true and is
+   * better than an empty bubble that looks finished.
+   */
+  const running = messages.some(
+    (message) => message.role === "assistant" && message.running,
+  );
+  useEffect(() => {
+    if (!open || !threadId || !running) {
+      return;
+    }
+    const source = new EventSource(
+      `/api/copilot/live?threadId=${encodeURIComponent(threadId)}`,
+    );
+    const onText = (event: MessageEvent) => {
+      const data = JSON.parse(event.data) as { text?: string };
+      setStreaming((was) => (was ?? "") + (data.text ?? ""));
+    };
+    const onDone = () => {
+      source.close();
+      // Re-read rather than assembling the final message here: the thread read
+      // is what resolves citations against this reader's access, and a message
+      // built in the browser would be one that skipped that.
+      void loadThread(threadId);
+    };
+    source.addEventListener("text", onText);
+    source.addEventListener("done", onDone);
+    return () => {
+      source.removeEventListener("text", onText);
+      source.removeEventListener("done", onDone);
+      source.close();
+    };
+  }, [open, threadId, running, loadThread]);
 
   /**
    * Applies, dismisses or undoes one, then re-reads.

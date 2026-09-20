@@ -620,6 +620,14 @@ export {
   streamAnswer,
 } from "./copilot/answer.ts";
 export {
+  type CopilotRunDeps,
+  type CopilotRunJob,
+  type CopilotRunOutcome,
+  copilotThreadChannel,
+  parseCopilotRunJob,
+  runCopilotAnswer,
+} from "./copilot/background.ts";
+export {
   citationLabel,
   type ResolvedCitation,
   readableCitations,
