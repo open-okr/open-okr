@@ -236,8 +236,10 @@ export function NarrativesPanel({
             {t("common.objectiveNarratives")}
           </h2>
           <Chip tone={narratives.complete ? "ok" : "neutral"}>
-            {narratives.spoken} {t("common.of")} {narratives.total}{" "}
-            {t("session.detail.narratives.spokenFor")}
+            {t("common.ofSpokenFor", {
+              spoken: narratives.spoken,
+              total: narratives.total,
+            })}
           </Chip>
         </span>
       </CardHeader>

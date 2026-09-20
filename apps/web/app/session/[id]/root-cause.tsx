@@ -184,8 +184,10 @@ export function RootCausePanel({
             {t("session.detail.rootCause.rootCause")}
           </h2>
           <Chip tone={rootCauses.complete ? "ok" : "neutral"}>
-            {rootCauses.named} {t("common.of")} {rootCauses.keyResults.length}{" "}
-            {t("common.named")}
+            {t("common.ofNamed", {
+              named: rootCauses.named,
+              length: rootCauses.keyResults.length,
+            })}
           </Chip>
         </span>
       </CardHeader>
@@ -193,9 +195,9 @@ export function RootCausePanel({
         {rootCauses.keyResults.length === 0 ? (
           <p className="text-sm text-ink-3">
             {/* Two different empty states, and they mean opposite things. */}
-            {t("session.detail.rootCause.nothingCameInBelow")}{" "}
-            {rootCauses.threshold.toFixed(1)}
-            {t("session.detail.rootCause.eitherTheRoomHas")}
+            {t("session.detail.rootCause.nothingCameInBelowEither", {
+              threshold: rootCauses.threshold.toFixed(1),
+            })}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -218,9 +220,9 @@ export function RootCausePanel({
 
         {rootCauses.keyResults.length === 0 ? null : (
           <p className="text-xs text-ink-4">
-            {t("session.detail.rootCause.onePrimaryCauseEach")}{" "}
-            {rootCauses.threshold.toFixed(1)}
-            {t("session.detail.rootCause.lookForTheSystem")}
+            {t("session.detail.rootCause.onePrimaryCauseEachBelow", {
+              threshold: rootCauses.threshold.toFixed(1),
+            })}
           </p>
         )}
       </CardBody>

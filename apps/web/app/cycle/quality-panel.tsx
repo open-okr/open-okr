@@ -158,7 +158,7 @@ export function QualityPanel({
         </h2>
         {mustFix > 0 ? (
           <span className="rounded-full bg-bad-bg px-2 py-0.5 text-xs font-semibold text-bad">
-            {mustFix} {t("cycle.qualityPanel.mustFix")}
+            {t("cycle.qualityPanel.mustFix", { mustFix })}
           </span>
         ) : null}
       </div>
@@ -169,19 +169,20 @@ export function QualityPanel({
         </p>
       ) : total === 0 ? (
         <p className="text-xs text-ok">
-          {t("cycle.qualityPanel.everyCheckPassesAcross")} {set.length}{" "}
-          {t("common.objective")}
-          {set.length === 1 ? "" : "s"}
-          {t("cycle.qualityPanel.nothingHereIsBlocking")}
+          {t("cycle.qualityPanel.everyCheckPassesAcrossObjective", {
+            length: set.length,
+            length2: set.length === 1 ? "" : "s",
+          })}
         </p>
       ) : (
         <p className="text-xs text-ink-3">
-          {total} {t("cycle.qualityPanel.issue")}
-          {total === 1 ? "" : "s"} {t("cycle.qualityPanel.across")}{" "}
-          {groups.filter((g) => g.issues.length > 0).length}{" "}
-          {t("common.objective")}
-          {groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s"}
-          {t("cycle.qualityPanel.eachOneLinksAt")}
+          {t("cycle.qualityPanel.issueAcrossObjectiveEachOne", {
+            total,
+            total2: total === 1 ? "" : "s",
+            length: groups.filter((g) => g.issues.length > 0).length,
+            length2:
+              groups.filter((g) => g.issues.length > 0).length === 1 ? "" : "s",
+          })}
         </p>
       )}
 
@@ -211,7 +212,7 @@ export function QualityPanel({
                     </span>
                     <span className="text-xs text-ink-3">{issue.prompt}</span>
                     <span className="text-xs text-ink-4">
-                      {t("cycle.qualityPanel.in")} {issue.where}
+                      {t("cycle.qualityPanel.in", { where: issue.where })}
                     </span>
                   </Link>
                 </li>

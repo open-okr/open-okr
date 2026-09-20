@@ -170,7 +170,7 @@ export default async function KpisPage({
             <h2 className="text-sm font-bold text-ink">
               {t("kpis.byCategory")}
             </h2>
-            <p className="text-xs text-ink-3">{t("kpis.aTallyOf6")}</p>
+            <p className="text-xs text-ink-3">{t("kpis.aTallyOf")}</p>
           </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">

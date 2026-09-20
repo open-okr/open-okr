@@ -189,9 +189,9 @@ export function ProcessHealthPanel({
 
         {health.lowest === null ? null : (
           <p className="text-xs text-ink-3">
-            {t("session.detail.processHealth.lowestStatement")}{" "}
-            {health.lowest.statementKey}
-            {t("session.detail.processHealth.85MakesIt")}
+            {t("session.detail.processHealth.lowestStatement85Makes", {
+              statementKey: health.lowest.statementKey,
+            })}
           </p>
         )}
       </CardBody>

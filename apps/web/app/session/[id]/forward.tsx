@@ -121,7 +121,7 @@ export function ForwardPanel({
             {t("session.detail.forward.learningsAndWhatHappens")}
           </h2>
           <Chip tone="neutral">
-            {forward.carried} {t("common.carried")}
+            {t("common.carried2", { carried: forward.carried })}
           </Chip>
           <Chip tone={forward.actions.length === 0 ? "warn" : "ok"}>
             {forward.actions.length}{" "}
@@ -136,7 +136,7 @@ export function ForwardPanel({
           </h3>
           {forward.learnings.length === 0 ? (
             <p className="text-xs text-ink-4">
-              {t("session.detail.forward.nothingCapturedYet8")}
+              {t("session.detail.forward.nothingCapturedYet")}
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">

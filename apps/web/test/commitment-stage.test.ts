@@ -40,12 +40,11 @@ describe("the commitment stage", () => {
     const bounds = resolveThresholds()["sessions.weeklyCommitmentBounds"];
     expect(bounds).toEqual({ low: 2, high: 3 });
     expect(panel).not.toContain(`${bounds.low} to ${bounds.high} a week`);
-    // The sentence is assembled from catalogue pieces since P6-G22c, so the
-    // whole of it is no longer one literal to match. What the test is actually
-    // about survives that: the bounds arrive as values and are interpolated.
-    expect(panel).toContain("{low}");
-    expect(panel).toContain("{high}");
-    expect(panel).toContain("a week");
+    // The sentence is one catalogue message with named holes since P6-G22d-b,
+    // so neither the words nor the numbers are in this file. What the test is
+    // actually about survives that: the bounds arrive as values the panel was
+    // given rather than as anything it knows.
+    expect(panel).toContain("{ low, high }");
     expect(page).toContain('"sessions.weeklyCommitmentBounds"');
   });
 

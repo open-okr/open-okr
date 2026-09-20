@@ -131,7 +131,9 @@ export function ProposalQueue({
           </p>
         </div>
         <Chip tone={proposals.length > 0 ? "warn" : "ok"}>
-          {proposals.length} {t("admin.agents.proposalQueue.pending")}
+          {t("admin.agents.proposalQueue.pending", {
+            length: proposals.length,
+          })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
@@ -186,7 +188,9 @@ export function ProposalQueue({
                   })
                 }
               >
-                {t("common.apply")} {ids.length > 0 ? ids.length : ""}
+                {t("common.apply2", {
+                  length: ids.length > 0 ? ids.length : "",
+                })}
               </Button>
               <Button
                 disabled={pending || ids.length === 0}

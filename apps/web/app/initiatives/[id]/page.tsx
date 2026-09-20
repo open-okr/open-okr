@@ -141,13 +141,16 @@ export default async function InitiativePage({
             </Link>
             <h1 className="text-lg font-bold text-ink">{initiative.title}</h1>
             <p className="text-xs text-ink-3">
-              {initiative.spaceName} {t("initiatives.detail.ownedBy")}{" "}
-              {initiative.ownerName}
-              {initiative.startsOn || initiative.endsOn
-                ? ` · ${[initiative.startsOn, initiative.endsOn]
-                    .filter(Boolean)
-                    .join(" to ")}`
-                : ""}
+              {t("initiatives.detail.ownedBy", {
+                spaceName: initiative.spaceName,
+                ownerName: initiative.ownerName,
+                to:
+                  initiative.startsOn || initiative.endsOn
+                    ? ` · ${[initiative.startsOn, initiative.endsOn]
+                        .filter(Boolean)
+                        .join(" to ")}`
+                    : "",
+              })}
             </p>
           </div>
           <div className="flex flex-wrap items-start gap-2">
@@ -283,9 +286,10 @@ export default async function InitiativePage({
         <CardHeader>
           <div className="flex min-w-0 flex-col">
             <h2 className="text-sm font-bold text-ink">
-              {t("initiatives.detail.tasks")}
-              {initiative.tasks.done} {t("common.of")} {initiative.tasks.total}{" "}
-              {t("initiatives.detail.done")}
+              {t("initiatives.detail.tasksOfDone", {
+                done: initiative.tasks.done,
+                total: initiative.tasks.total,
+              })}
             </h2>
             <p className="text-xs text-ink-3">
               {t("initiatives.detail.theWorkThisInitiative")}

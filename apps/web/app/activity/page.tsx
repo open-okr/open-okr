@@ -132,7 +132,9 @@ export default async function ActivityPage({
                   </span>
                   {item.aggregatedCount > 1 ? (
                     <Chip tone="neutral">
-                      {item.aggregatedCount} {t("activity.editsTogether")}
+                      {t("activity.editsTogether", {
+                        aggregatedCount: item.aggregatedCount,
+                      })}
                     </Chip>
                   ) : null}
                 </li>

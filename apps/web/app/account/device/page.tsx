@@ -55,11 +55,10 @@ export default async function DevicePage({
         </CardHeader>
         <CardBody className="flex flex-col gap-2">
           <p className="text-sm text-ink-3">
-            {t("account.device.aTerminalRunning")}{" "}
-            <code className="font-mono text-xs">{t("account.device.okr")}</code>{" "}
-            {t("account.device.askedToActAs")}{" "}
-            <span className="font-medium text-ink">{workspace.name}</span>
-            {t("account.device.itWillGetA")}
+            {t("account.device.aTerminalAskedToActAsYou", {
+              command: "okr",
+              workspace: workspace.name,
+            })}
           </p>
         </CardBody>
       </Card>

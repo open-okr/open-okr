@@ -23,7 +23,7 @@ export default async function SecurityPage() {
         </CardHeader>
         <CardBody>
           <p className="text-sm text-ink-3">
-            {t("account.security.signedInAs")} {session.user.email}
+            {t("account.security.signedInAs", { email: session.user.email })}
           </p>
         </CardBody>
       </Card>

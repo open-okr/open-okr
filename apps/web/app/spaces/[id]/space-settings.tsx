@@ -79,14 +79,18 @@ export function SpaceSettingsCard({
         </CardHeader>
         <CardBody className="flex flex-col gap-1 text-sm text-ink-2">
           <p>
-            {t("spaces.detail.spaceSettings.coachingStrictness")}{" "}
-            {settings.coachStrictness ??
-              `the workspace's (${workspaceStrictness})`}
+            {t("spaces.detail.spaceSettings.coachingStrictness3", {
+              workspaceStrictness:
+                settings.coachStrictness ??
+                `the workspace's (${workspaceStrictness})`,
+            })}
           </p>
           <p>
-            {t("spaces.detail.spaceSettings.defaultCheckInFrequency")}{" "}
-            {settings.defaultCheckInFrequency ??
-              `the workspace's (${workspaceFrequency})`}
+            {t("spaces.detail.spaceSettings.defaultCheckInFrequency3", {
+              workspaceFrequency:
+                settings.defaultCheckInFrequency ??
+                `the workspace's (${workspaceFrequency})`,
+            })}
           </p>
           <p className="text-xs text-ink-3">
             {t("spaces.detail.spaceSettings.changingTheseIsThe")}
@@ -133,7 +137,7 @@ export function SpaceSettingsCard({
 
           <label className="flex flex-col gap-1">
             <span className="text-ink">
-              {t("spaces.detail.spaceSettings.coachingStrictness2")}
+              {t("spaces.detail.spaceSettings.coachingStrictness")}
             </span>
             <select
               name="coachStrictness"
@@ -141,8 +145,9 @@ export function SpaceSettingsCard({
               className="w-72 rounded-md border border-line bg-bg px-2 py-1"
             >
               <option value="">
-                {t("spaces.detail.spaceSettings.theWorkspaceS")}
-                {workspaceStrictness})
+                {t("spaces.detail.spaceSettings.theWorkspaceS", {
+                  workspaceStrictness,
+                })}
               </option>
               {COACH_STRICTNESS.map((option) => (
                 <option key={option} value={option}>
@@ -157,7 +162,7 @@ export function SpaceSettingsCard({
 
           <label className="flex flex-col gap-1">
             <span className="text-ink">
-              {t("spaces.detail.spaceSettings.defaultCheckInFrequency2")}
+              {t("spaces.detail.spaceSettings.defaultCheckInFrequency")}
             </span>
             <select
               name="defaultCheckInFrequency"
@@ -165,8 +170,9 @@ export function SpaceSettingsCard({
               className="w-72 rounded-md border border-line bg-bg px-2 py-1"
             >
               <option value="">
-                {t("spaces.detail.spaceSettings.theWorkspaceS")}
-                {workspaceFrequency})
+                {t("spaces.detail.spaceSettings.theWorkspaceS3", {
+                  workspaceFrequency,
+                })}
               </option>
               {CHECK_IN_FREQUENCIES.map((option) => (
                 <option key={option} value={option}>

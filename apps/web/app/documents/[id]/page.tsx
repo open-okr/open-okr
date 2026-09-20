@@ -96,13 +96,15 @@ export default async function DocumentPage({
                   href={back}
                   className="text-xs text-ink-3 hover:text-brand-text"
                 >
-                  {t("documents.detail.backToThe")}{" "}
-                  {document.subjectType.replace("_", " ")}
+                  {t("documents.detail.backToThe", {
+                    replace: document.subjectType.replace("_", " "),
+                  })}
                 </Link>
               ) : (
                 <span className="text-xs text-ink-3">
-                  {t("documents.detail.onA")}{" "}
-                  {document.subjectType.replace("_", " ")}
+                  {t("documents.detail.onA", {
+                    replace: document.subjectType.replace("_", " "),
+                  })}
                 </span>
               )}
               <h1 className="text-lg font-bold text-ink">{document.title}</h1>
@@ -178,7 +180,9 @@ export default async function DocumentPage({
                     className="flex items-center justify-between gap-2 text-xs"
                   >
                     <span className="text-ink-2">
-                      {t("documents.detail.version")} {version.version}
+                      {t("documents.detail.version", {
+                        version: version.version,
+                      })}
                     </span>
                     <span className="truncate text-ink-3">
                       {version.authorName} · {version.createdAt.slice(0, 10)}
@@ -191,12 +195,16 @@ export default async function DocumentPage({
             {difference.to !== null && difference.from !== null ? (
               <div className="flex flex-col gap-1" data-testid="doc-difference">
                 <p className="text-xs font-semibold text-ink-2">
-                  {t("documents.detail.whatChangedBetweenVersion")}{" "}
-                  {difference.from} {t("documents.detail.and")} {difference.to}
+                  {t("documents.detail.whatChangedBetweenVersionAnd", {
+                    from: difference.from,
+                    to: difference.to,
+                  })}
                 </p>
                 <p className="text-xs text-ink-3">
-                  {difference.added} {t("documents.detail.added")}{" "}
-                  {difference.removed} {t("documents.detail.removed")}
+                  {t("documents.detail.addedRemoved", {
+                    added: difference.added,
+                    removed: difference.removed,
+                  })}
                 </p>
                 {difference.truncated ? (
                   <p className="text-xs text-ink-3">

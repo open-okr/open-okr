@@ -132,7 +132,7 @@ export function CycleAdmin({
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-ink-3">
-                {t("common.archive")} {currentName ?? ""}
+                {t("common.archive2", { currentName: currentName ?? "" })}
               </span>
               <div>
                 <Button

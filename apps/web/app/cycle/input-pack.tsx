@@ -51,7 +51,7 @@ export async function InputPack({
             {t("cycle.inputPack.inputPack")}
           </h2>
           <Chip tone={gathered === items.length ? "ok" : "warn"}>
-            {gathered} {t("common.of")} {items.length}
+            {t("common.of", { gathered, length: items.length })}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col divide-y divide-line p-0">
@@ -165,7 +165,9 @@ export async function InputPack({
           <p className="text-sm text-ink-2">{t("cycle.inputPack.26AsksFor")}</p>
           {distributedAt ? (
             <p className="text-xs text-ink-3">
-              {t("common.sent")} {new Date(distributedAt).toLocaleString()}
+              {t("common.sent", {
+                distributedAt: new Date(distributedAt).toLocaleString(),
+              })}
             </p>
           ) : null}
           {canEdit ? (

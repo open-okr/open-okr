@@ -149,7 +149,7 @@ export async function LifecycleForm({
           className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong"
           type="submit"
         >
-          {t("operator.lifecycle.applyTo")} {workspaceName}
+          {t("operator.lifecycle.applyTo", { workspaceName })}
         </button>
       </form>
     </section>

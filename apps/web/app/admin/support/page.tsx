@@ -92,9 +92,11 @@ export default async function SupportAccessPage() {
               key={session.id}
             >
               <p className="text-ink text-sm">
-                {t("admin.support.granted")} {when(session.grantedAt as Date)}
-                {t("admin.support.until")} {when(session.expiresAt as Date)},{" "}
-                {LEVEL_NAME[session.level] ?? "read only"}.
+                {t("admin.support.grantedUntil", {
+                  Date: when(session.grantedAt as Date),
+                  Date2: when(session.expiresAt as Date),
+                  only: LEVEL_NAME[session.level] ?? "read only",
+                })}
               </p>
               <p className="mt-1 text-ink-2 text-sm">{session.reason}</p>
               <p className="mt-1 text-ink-3 text-xs">
@@ -125,10 +127,12 @@ export default async function SupportAccessPage() {
                     {session.endedReason}
                   </Chip>
                   <span className="text-ink-3 text-xs">
-                    {t("admin.support.asked")} {when(session.requestedAt)}
-                    {session.grantedAt
-                      ? `, in from ${when(session.grantedAt)} to ${when(session.endedAt as Date)}`
-                      : ", never granted"}
+                    {t("admin.support.asked", {
+                      requestedAt: when(session.requestedAt),
+                      granted: session.grantedAt
+                        ? `, in from ${when(session.grantedAt)} to ${when(session.endedAt as Date)}`
+                        : ", never granted",
+                    })}
                   </span>
                 </div>
                 <p className="text-ink text-sm">{session.reason}</p>

@@ -185,22 +185,25 @@ export function CoachStrip({
         {suggestion === null ? null : (
           <div className="flex flex-col gap-1.5 rounded-md border border-line bg-raised p-2">
             <span className="text-xs font-medium text-ink-3">
-              {t("goals.detail.coachStrip.suggestedFor")} {suggestion.ruleId}
+              {t("goals.detail.coachStrip.suggestedFor", {
+                ruleId: suggestion.ruleId,
+              })}
             </span>
             <span className="text-sm text-ink">{suggestion.text}</span>
             {suggestion.fixesTheRule ? (
               <span className="text-xs text-ok">
-                {t("goals.detail.coachStrip.checkedAgainstTheCatalogue")}{" "}
-                {suggestion.nowPassing.join(", ")}.
+                {t("goals.detail.coachStrip.checkedAgainstTheCatalogueThis", {
+                  nowPassing: suggestion.nowPassing.join(", "),
+                })}
               </span>
             ) : (
               // The model's claim is not the product's claim. §4 was run over
               // the suggestion and disagreed, and saying so is the honest
               // outcome rather than presenting it as a fix.
               <span className="text-xs text-warn">
-                {t("goals.detail.coachStrip.checkedAgainstTheCatalogue2")}{" "}
-                {suggestion.ruleId}
-                {t("goals.detail.coachStrip.useItAsA")}
+                {t("goals.detail.coachStrip.checkedAgainstTheCatalogueThis2", {
+                  ruleId: suggestion.ruleId,
+                })}
               </span>
             )}
             {canEdit ? (

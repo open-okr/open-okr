@@ -278,9 +278,11 @@ export function Canvas({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-ink-3">
-          {nodes.length} {t("goals.studio.canvas.node")}
-          {nodes.length === 1 ? "" : "s"}, {visible.length}{" "}
-          {t("goals.studio.canvas.drawn")}
+          {t("goals.studio.canvas.nodeDrawn", {
+            length: nodes.length,
+            length2: nodes.length === 1 ? "" : "s",
+            length3: visible.length,
+          })}
         </span>
         <span className="flex items-center gap-1">
           <button
@@ -454,12 +456,17 @@ export function Canvas({
                 </span>
                 <span className="flex items-center gap-1.5 text-[10.5px] text-ink-4">
                   <span>
-                    {entry.node.keyResultCount} {t("goals.studio.canvas.kr")}
-                    {entry.node.keyResultCount === 1 ? "" : "s"}
+                    {t("goals.studio.canvas.kr", {
+                      keyResultCount: entry.node.keyResultCount,
+                      keyResultCount2:
+                        entry.node.keyResultCount === 1 ? "" : "s",
+                    })}
                   </span>
                   <span>·</span>
                   <span>
-                    {entry.node.dependencyCount} {t("goals.studio.canvas.dep")}
+                    {t("goals.studio.canvas.dep", {
+                      dependencyCount: entry.node.dependencyCount,
+                    })}
                   </span>
                   {entry.node.unaligned ? (
                     <span className="rounded bg-bad-bg px-1 font-semibold text-bad">

@@ -97,13 +97,16 @@ export async function ReviewAndLearn({
               {t("cycle.reviewAndLearn.reviewAndLearn")}
             </h2>
             <p className="text-xs text-ink-3">
-              {t("cycle.reviewAndLearn.closing")} {cycleName}
-              {t("cycle.reviewAndLearn.everyKeyResultCarries")}
+              {t("cycle.reviewAndLearn.closingEveryKeyResultCarries", {
+                cycleName,
+              })}
             </p>
           </div>
           {archivedAt ? (
             <Chip tone="ok">
-              {t("cycle.reviewAndLearn.archived")} {archivedAt.slice(0, 10)}
+              {t("cycle.reviewAndLearn.archived", {
+                archivedAt: archivedAt.slice(0, 10),
+              })}
             </Chip>
           ) : (
             <Chip tone="neutral">{t("common.open")}</Chip>
@@ -120,7 +123,10 @@ export async function ReviewAndLearn({
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tabular-nums text-ink">
-              {scored.length} {t("common.of")} {keyResults.length}
+              {t("common.of4", {
+                length: scored.length,
+                length2: keyResults.length,
+              })}
             </span>
             <span className="text-xs text-ink-3">
               {t("cycle.reviewAndLearn.scored")}

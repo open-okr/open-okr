@@ -115,8 +115,7 @@ export async function UsageCard({
       <CardHeader className="justify-between">
         <div className="flex min-w-0 flex-col">
           <h2 className="text-sm font-bold text-ink">
-            {t("admin.ai.governance.spendLast")} {days}{" "}
-            {t("admin.ai.governance.days")}
+            {t("admin.ai.governance.spendLastDays", { days })}
           </h2>
           <p className="text-xs text-ink-3">
             {t("admin.ai.governance.meteredFromTheEvent")}
@@ -124,7 +123,9 @@ export async function UsageCard({
         </div>
         {usage.flaggedCalls > 0 ? (
           <Chip tone="warn">
-            {usage.flaggedCalls} {t("admin.ai.governance.flagged")}
+            {t("admin.ai.governance.flagged", {
+              flaggedCalls: usage.flaggedCalls,
+            })}
           </Chip>
         ) : (
           <Chip tone="ok">{t("admin.ai.governance.nothingFlagged")}</Chip>
@@ -387,7 +388,9 @@ export async function PromptsCard({
                 <Chip tone="neutral">{t("admin.ai.governance.builtIn")}</Chip>
               ) : (
                 <Chip tone="info">
-                  {t("admin.ai.governance.version")} {prompt.version}
+                  {t("admin.ai.governance.version", {
+                    version: prompt.version,
+                  })}
                 </Chip>
               )}
             </span>
@@ -418,8 +421,9 @@ export async function PromptsCard({
             {prompt.history.length > 0 ? (
               <details className="text-xs text-ink-3">
                 <summary className="cursor-pointer">
-                  {prompt.history.length}{" "}
-                  {t("admin.ai.governance.earlierVersionS")}
+                  {t("admin.ai.governance.earlierVersionS", {
+                    length: prompt.history.length,
+                  })}
                 </summary>
                 <ul className="mt-1 flex flex-col gap-1">
                   {prompt.history.map((entry) => (

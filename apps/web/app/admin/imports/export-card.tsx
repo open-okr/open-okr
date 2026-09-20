@@ -96,8 +96,9 @@ export function ExportCard() {
                 {t("admin.imports.exportCard.size")}
               </dt>
               <dd className="text-ink">
-                {(result.bytes / 1024).toFixed(1)}{" "}
-                {t("admin.imports.exportCard.kb")}
+                {t("admin.imports.exportCard.kb", {
+                  bytes: (result.bytes / 1024).toFixed(1),
+                })}
               </dd>
               <dt className="text-ink-3">
                 {t("admin.imports.exportCard.rows")}
@@ -106,7 +107,7 @@ export function ExportCard() {
               <dt className="text-ink-3">{t("attachments.title")}</dt>
               <dd className="text-ink">{result.blobs.count}</dd>
               <dt className="text-ink-3">
-                {t("admin.imports.exportCard.sha256")}
+                {t("admin.imports.exportCard.sha")}
               </dt>
               <dd className="font-mono text-xs text-ink-3 break-all">
                 {result.digest}
@@ -115,8 +116,9 @@ export function ExportCard() {
 
             {result.missingFiles.length > 0 ? (
               <p className="text-xs text-warn">
-                {result.missingFiles.length}{" "}
-                {t("admin.imports.exportCard.fileSCouldNot")}
+                {t("admin.imports.exportCard.fileSCouldNotBe", {
+                  length: result.missingFiles.length,
+                })}
               </p>
             ) : null}
 

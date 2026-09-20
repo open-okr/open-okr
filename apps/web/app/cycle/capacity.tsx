@@ -54,7 +54,7 @@ export async function Capacity({
           <h2 className="text-sm font-bold text-ink">
             {t("cycle.capacity.capacity")}
           </h2>
-          <p className="text-xs text-ink-3">{t("cycle.capacity.methodMd55")}</p>
+          <p className="text-xs text-ink-3">{t("cycle.capacity.methodMd")}</p>
         </div>
         <Link
           href="/initiatives"
@@ -71,10 +71,12 @@ export async function Capacity({
             data-testid="capacity-over"
           >
             <p className="font-semibold">
-              {overCommitted.length === 1
-                ? "One initiative is over capacity."
-                : `${overCommitted.length} initiatives are over capacity.`}{" "}
-              {t("cycle.capacity.gateFiveRefusesThis")}
+              {t("cycle.capacity.gateFiveRefusesThisSet", {
+                capacity:
+                  overCommitted.length === 1
+                    ? "One initiative is over capacity."
+                    : `${overCommitted.length} initiatives are over capacity.`,
+              })}
             </p>
             <ul className="mt-1 flex flex-col gap-0.5">
               {overCommitted.map((one) => (
@@ -93,10 +95,12 @@ export async function Capacity({
 
         {unjudged.length > 0 ? (
           <p className="rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-2">
-            {unjudged.length === 1
-              ? "One initiative has no capacity verdict yet."
-              : `${unjudged.length} initiatives have no capacity verdict yet.`}{" "}
-            {t("cycle.capacity.55IfThe")}
+            {t("cycle.capacity.55IfTheAnswer", {
+              yet:
+                unjudged.length === 1
+                  ? "One initiative has no capacity verdict yet."
+                  : `${unjudged.length} initiatives have no capacity verdict yet.`,
+            })}
           </p>
         ) : null}
 

@@ -83,7 +83,7 @@ export async function Gates({
           {t("cycle.gates.publishGates")}
         </h2>
         <Chip tone={publishable ? "ok" : "warn"}>
-          {green} {t("cycle.gates.of6Green")}
+          {t("cycle.gates.of6Green", { green })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
@@ -118,7 +118,9 @@ export async function Gates({
                   ) : null
                 ) : (
                   <span className="text-xs text-ink-3">
-                    {t("cycle.gates.cannotBeJudgedYet")} {gate.blocked}
+                    {t("cycle.gates.cannotBeJudgedYet", {
+                      blocked: gate.blocked ?? "",
+                    })}
                   </span>
                 )}
                 {gate.evaluable && gate.passed ? null : (
@@ -136,8 +138,9 @@ export async function Gates({
 
         {publishedAt ? (
           <p className="text-sm text-ok">
-            {t("cycle.gates.published")}{" "}
-            {new Date(publishedAt).toLocaleString()}.
+            {t("cycle.gates.published", {
+              publishedAt: new Date(publishedAt).toLocaleString(),
+            })}
           </p>
         ) : canPublish ? (
           <ActionForm action={publishCycle} className="flex flex-col gap-1.5">
@@ -165,17 +168,16 @@ export async function Gates({
               <input type="hidden" name="cycleId" value={cycleId} />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-2">
-                  {t("cycle.gates.whyIsThisSet")}{" "}
-                  {
-                    gates.filter((gate) => !gate.evaluable || !gate.passed)
-                      .length
-                  }{" "}
-                  {t("cycle.gates.gate")}
-                  {gates.filter((gate) => !gate.evaluable || !gate.passed)
-                    .length === 1
-                    ? ""
-                    : "s"}{" "}
-                  {t("cycle.gates.unmet")}
+                  {t("cycle.gates.whyIsThisSetBeing", {
+                    length: gates.filter(
+                      (gate) => !gate.evaluable || !gate.passed,
+                    ).length,
+                    length2:
+                      gates.filter((gate) => !gate.evaluable || !gate.passed)
+                        .length === 1
+                        ? ""
+                        : "s",
+                  })}
                 </span>
                 <textarea
                   name="override.reason"

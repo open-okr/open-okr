@@ -68,7 +68,7 @@ function Verdicts({
     <span className="flex flex-wrap items-center gap-1">
       {failing.map((id) => (
         <Chip key={id} tone="warn">
-          {id} {t("cycle.assists.fails")}
+          {t("cycle.assists.fails", { id })}
         </Chip>
       ))}
       {passing.map((id) => (
@@ -238,9 +238,13 @@ export function DraftFromAmbition({
                 <li key={measure.title} className="text-xs">
                   <p className="text-ink-2">{measure.title}</p>
                   <p className="text-ink-4">
-                    {measure.baseline} {t("common.to")} {measure.target}
-                    {measure.unit ? ` ${measure.unit}` : ""} ·{" "}
-                    {measure.direction} · {measure.indicatorType}
+                    {t("common.to2", {
+                      baseline: measure.baseline,
+                      target: measure.target,
+                      unit: measure.unit ? ` ${measure.unit}` : "",
+                      direction: measure.direction,
+                      indicatorType: measure.indicatorType,
+                    })}
                   </p>
                   <Verdicts
                     passing={measure.passing}
@@ -348,9 +352,13 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
           aria-label={t("cycle.assists.suggestedMeasure")}
           className="text-xs text-ink-3"
         >
-          {suggested.baseline} {t("common.to")} {suggested.target}
-          {suggested.unit ? ` ${suggested.unit}` : ""} · {suggested.direction} ·{" "}
-          {suggested.indicatorType}{" "}
+          {t("common.to3", {
+            baseline: suggested.baseline,
+            target: suggested.target,
+            unit: suggested.unit ? ` ${suggested.unit}` : "",
+            direction: suggested.direction,
+            indicatorType: suggested.indicatorType,
+          })}{" "}
           <Verdicts passing={suggested.passing} failing={suggested.failing} />
         </section>
       ) : null}

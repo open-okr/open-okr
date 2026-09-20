@@ -39,8 +39,7 @@ export async function QuickCheckIn({
         className="text-xs font-semibold text-ink-2"
         htmlFor={`map-value-${keyResultId}`}
       >
-        {t("quickCheckIn.recordAValue")}
-        {unit ? ` (${unit})` : ""}
+        {t("quickCheckIn.recordAValue", { unit: unit ? ` (${unit})` : "" })}
       </label>
       <span className="flex items-center gap-1.5">
         <input

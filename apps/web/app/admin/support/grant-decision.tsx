@@ -79,7 +79,7 @@ export async function GrantDecision({
 
       <div className="flex flex-col gap-1">
         <p className="text-ink-3 text-xs">
-          {t("admin.support.grant.asked")} {requestedAt}
+          {t("admin.support.grant.asked", { requestedAt })}
         </p>
         {/* The sentence the operator wrote, at reading size and first. */}
         <p className="text-ink text-sm">{reason}</p>

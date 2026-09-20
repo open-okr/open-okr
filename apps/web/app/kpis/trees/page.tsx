@@ -204,8 +204,11 @@ export default async function KpiTreesPage({
                       href={`/goals/${node.recoveryGoalId}`}
                       className="text-xs font-semibold text-brand-text hover:underline"
                     >
-                      {t("kpis.trees.recovery")}{" "}
-                      {Math.round(node.recoveryProgressPct ?? 0)}%
+                      {t("kpis.trees.recovery", {
+                        recoveryProgressPct: Math.round(
+                          node.recoveryProgressPct ?? 0,
+                        ),
+                      })}
                     </Link>
                   ) : node.state === "unhealthy" && canEdit ? (
                     <LaunchRecovery kpiId={node.id} />
@@ -240,9 +243,11 @@ export default async function KpiTreesPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("kpis.trees.addADriverUnder")}{" "}
-              {tree.nodes.find((node) => node.id === params.under)?.title ??
-                "this KPI"}
+              {t("kpis.trees.addADriverUnder", {
+                KPI:
+                  tree.nodes.find((node) => node.id === params.under)?.title ??
+                  "this KPI",
+              })}
             </h2>
           </CardHeader>
           <CardBody>

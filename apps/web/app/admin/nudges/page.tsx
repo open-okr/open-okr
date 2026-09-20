@@ -99,8 +99,9 @@ export default async function NudgeVolumePage() {
         {t("admin.nudges.nudgeVolume")}
       </h1>
       <p className="text-sm text-ink-3">
-        {t("admin.nudges.theLast")} {volume.windowDays}{" "}
-        {t("admin.nudges.daysNoiseIsBounded")}
+        {t("admin.nudges.theLastDaysNoiseIs", {
+          windowDays: volume.windowDays,
+        })}
       </p>
 
       <Card>
@@ -108,9 +109,7 @@ export default async function NudgeVolumePage() {
           <h2 className="text-sm font-bold text-ink">
             {t("admin.nudges.theNoisiestRules")}
           </h2>
-          <Chip tone="neutral">
-            {total} {t("admin.nudges.inTheWindow")}
-          </Chip>
+          <Chip tone="neutral">{t("admin.nudges.inTheWindow", { total })}</Chip>
         </CardHeader>
         <CardBody className="p-0">
           {volume.rules.length === 0 ? (
@@ -132,11 +131,11 @@ export default async function NudgeVolumePage() {
                   </a>
                   <span className="flex items-center gap-2 text-xs tabular-nums">
                     <span className="text-ink">
-                      {rule.sent} {t("admin.nudges.sent")}
+                      {t("admin.nudges.sent", { sent: rule.sent })}
                     </span>
                     {rule.suppressed > 0 ? (
                       <span className="text-ink-3">
-                        {rule.suppressed} {t("common.held")}
+                        {t("common.held", { suppressed: rule.suppressed })}
                       </span>
                     ) : null}
                   </span>
@@ -183,7 +182,9 @@ export default async function NudgeVolumePage() {
             {t("admin.nudges.overTheWeeklyCeiling")}
           </h2>
           <Chip tone={volume.loudestMembers.length > 0 ? "warn" : "ok"}>
-            {volume.ceilingPerWeek} {t("admin.nudges.perMemberPerWeek")}
+            {t("admin.nudges.perMemberPerWeek", {
+              ceilingPerWeek: volume.ceilingPerWeek,
+            })}
           </Chip>
         </CardHeader>
         <CardBody>
@@ -200,7 +201,9 @@ export default async function NudgeVolumePage() {
                 >
                   <span className="text-ink">{member.name}</span>
                   <span className="tabular-nums text-bad">
-                    {member.sentThisWeek} {t("admin.nudges.thisWeek")}
+                    {t("admin.nudges.thisWeek", {
+                      sentThisWeek: member.sentThisWeek,
+                    })}
                   </span>
                 </li>
               ))}

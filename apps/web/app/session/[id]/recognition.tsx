@@ -95,7 +95,7 @@ export function RecognitionPanel({
             {t("session.detail.recognition.recognitionAndWins")}
           </h2>
           <Chip tone={recognition.entries.length === 0 ? "neutral" : "ok"}>
-            {recognition.entries.length} {t("common.named")}
+            {t("common.named2", { length: recognition.entries.length })}
           </Chip>
         </span>
       </CardHeader>
@@ -116,7 +116,7 @@ export function RecognitionPanel({
                     {entry.toName}
                   </span>
                   <span className="text-xs text-ink-4">
-                    {t("common.namedBy")} {entry.fromName}
+                    {t("common.namedBy3", { fromName: entry.fromName })}
                   </span>
                   {entry.mine ? (
                     <Chip tone="info">

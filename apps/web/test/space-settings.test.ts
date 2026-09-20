@@ -53,7 +53,11 @@ describe("the space settings card", () => {
     // one the moment somebody pressed save, and the space would then keep it
     // after the workspace changed.
     expect(card).toContain('<option value="">');
-    expect(card).toContain("The workspace's (");
+    // The words moved into one catalogue message at P6-G22d-b, so what this
+    // file can see is the empty option carrying the workspace value as a hole
+    // rather than as a selection.
+    expect(card).toContain("theWorkspaceS");
+    expect(card).toContain("workspaceStrictness");
     expect(actions).toContain('strictness === ""\n          ? null');
   });
 

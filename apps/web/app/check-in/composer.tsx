@@ -98,7 +98,7 @@ export async function Composer({
               className="w-40"
             />
             <span className="text-xs text-ink-4">
-              {t("checkIn.composer.0To1")}
+              {t("checkIn.composer.0To")}
             </span>
           </div>
 
@@ -119,16 +119,20 @@ export async function Composer({
                         {keyResult.title}
                       </span>
                       <span className="text-xs text-ink-3">
-                        {keyResult.direction} · {keyResult.baselineValue}{" "}
-                        {t("common.to")} {keyResult.targetValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""} ·{" "}
-                        {Math.round(keyResult.progressPct)}
-                        {t("checkIn.composer.now")}
+                        {t("common.toNow", {
+                          direction: keyResult.direction,
+                          baselineValue: keyResult.baselineValue,
+                          targetValue: keyResult.targetValue,
+                          unit: keyResult.unit ? ` ${keyResult.unit}` : "",
+                          progressPct: Math.round(keyResult.progressPct),
+                        })}
                       </span>
                     </span>
                     <span className="flex flex-none items-center gap-1.5">
                       <span className="text-xs text-ink-4">
-                        {t("checkIn.composer.was")} {keyResult.currentValue}
+                        {t("checkIn.composer.was", {
+                          currentValue: keyResult.currentValue,
+                        })}
                       </span>
                       {keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
@@ -138,7 +142,9 @@ export async function Composer({
                             className="sr-only"
                             htmlFor={`value-${keyResult.id}`}
                           >
-                            {t("common.newValueFor")} {keyResult.title}
+                            {t("common.newValueFor", {
+                              title: keyResult.title,
+                            })}
                           </label>
                           <input
                             id={`value-${keyResult.id}`}
@@ -197,8 +203,11 @@ export async function Composer({
               {t("checkIn.composer.publish")}
             </Button>
             <span className="text-xs text-ink-4">
-              {t("checkIn.composer.publishingAdvancesTheCadence")}
-              {nextGoalId ? " The walker moves to your next due goal." : ""}
+              {t("checkIn.composer.publishingAdvancesTheCadenceAnd", {
+                goal: nextGoalId
+                  ? " The walker moves to your next due goal."
+                  : "",
+              })}
             </span>
           </div>
         </ActionForm>

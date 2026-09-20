@@ -110,8 +110,9 @@ function LadderEditor({
       data-testid={`ladder-${rule.key}`}
     >
       <span className="text-xs text-ink-3">
-        {t("admin.nudges.ruleCards.thisRuleOwns11")} {ladder.governs.join(", ")}
-        {t("admin.nudges.ruleCards.leaveEveryFieldEmpty")}
+        {t("admin.nudges.ruleCards.thisRuleOwns11Apos", {
+          governs: ladder.governs.join(", "),
+        })}
       </span>
       <div className="flex flex-wrap items-end gap-2.5">
         {ladder.rungs.map((rung) => (
@@ -205,8 +206,10 @@ function Rule({
         </span>
         <span className="flex flex-none items-center gap-2 text-xs text-ink-3">
           <span data-testid={`volume-${rule.key}`}>
-            {rule.sent} {t("admin.nudges.ruleCards.sent")} {rule.suppressed}{" "}
-            {t("common.held")}
+            {t("admin.nudges.ruleCards.sentHeld", {
+              sent: rule.sent,
+              suppressed: rule.suppressed,
+            })}
           </span>
         </span>
       </div>
@@ -351,8 +354,7 @@ export function NudgeRuleCards({
         <CardHeader>
           <div className="flex min-w-0 flex-col">
             <h2 className="font-semibold text-ink">
-              {t("admin.nudges.ruleCards.rules")}
-              {rules.length})
+              {t("admin.nudges.ruleCards.rules", { length: rules.length })}
             </h2>
             <p className="text-sm text-ink-3">
               {t("admin.nudges.ruleCards.everyTriggerMethodMd")}

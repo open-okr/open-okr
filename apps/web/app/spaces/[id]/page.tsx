@@ -156,8 +156,7 @@ export default async function SpacePage({
           <SpaceMembership spaceId={space.id} ownRole={space.ownRole} />
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-ink-2">
-              {t("spaces.detail.members")}
-              {space.memberCount})
+              {t("spaces.detail.members", { memberCount: space.memberCount })}
             </h2>
             <ul className="flex flex-col gap-1.5">
               {space.members.map((member) => (
@@ -229,7 +228,7 @@ export default async function SpacePage({
           <span>{t("common.lastWeek")}</span>
           {lastWeek ? (
             <span className="text-xs text-ink-3">
-              {t("spaces.detail.weekOf")} {lastWeek.weekStart}
+              {t("spaces.detail.weekOf", { weekStart: lastWeek.weekStart })}
             </span>
           ) : null}
           <WatchControl subjectType="space" subjectId={id} initial={watch} />
@@ -317,7 +316,9 @@ export default async function SpacePage({
                     ) : null}
                     {blocker.escalation === "none" ? null : (
                       <Chip tone="warn">
-                        {t("spaces.detail.escalatedTo")} {blocker.escalation}
+                        {t("spaces.detail.escalatedTo", {
+                          escalation: blocker.escalation,
+                        })}
                       </Chip>
                     )}
                     <span className="text-xs text-ink-4">

@@ -86,8 +86,10 @@ export default async function ImportsPage() {
                       {run.entity ? ` · ${run.entity}` : ""}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {run.rowsWritten} {t("admin.imports.written")}{" "}
-                      {run.rowsSkipped} {t("admin.imports.skipped")}
+                      {t("admin.imports.writtenSkipped", {
+                        rowsWritten: run.rowsWritten,
+                        rowsSkipped: run.rowsSkipped,
+                      })}
                     </span>
                     <Chip
                       tone={

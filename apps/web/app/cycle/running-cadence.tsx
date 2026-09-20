@@ -126,8 +126,10 @@ export async function RunningCadence({
         <CardHeader className="justify-between">
           <h3 className="text-sm font-bold text-ink">{t("common.sessions")}</h3>
           <Chip tone={held.length > 0 ? "ok" : "neutral"}>
-            {held.length} {t("cycle.runningCadence.held")} {upcoming.length}{" "}
-            {t("cycle.runningCadence.toCome")}
+            {t("cycle.runningCadence.heldToCome", {
+              length: held.length,
+              length2: upcoming.length,
+            })}
           </Chip>
         </CardHeader>
         <CardBody className="flex flex-col gap-1.5">
@@ -231,7 +233,9 @@ export async function RunningCadence({
                   </span>
                 </span>
                 <Chip tone={blocker.ageDays >= 14 ? "bad" : "warn"}>
-                  {blocker.ageDays} {t("cycle.runningCadence.daysOld")}
+                  {t("cycle.runningCadence.daysOld", {
+                    ageDays: blocker.ageDays,
+                  })}
                 </Chip>
               </div>
             ))
@@ -246,7 +250,9 @@ export async function RunningCadence({
           </h3>
           {calibratedAt ? (
             <Chip tone="ok">
-              {t("cycle.runningCadence.calibrated")} {calibratedAt.slice(0, 10)}
+              {t("cycle.runningCadence.calibrated", {
+                calibratedAt: calibratedAt.slice(0, 10),
+              })}
             </Chip>
           ) : (
             <Chip tone="neutral">

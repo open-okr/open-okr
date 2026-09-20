@@ -69,25 +69,30 @@ export function NudgeProvenance({
             </span>
             {nudge.escalationStep > 1 ? (
               <span className="rounded-full bg-warn-bg px-2 py-0.5 text-[0.65rem] font-semibold text-warn">
-                {t("review.nudgeProvenance.escalationStep")}{" "}
-                {nudge.escalationStep}
+                {t("review.nudgeProvenance.escalationStep", {
+                  escalationStep: nudge.escalationStep,
+                })}
               </span>
             ) : null}
             <span className="text-xs text-ink-3">
-              {t("review.nudgeProvenance.via")} {nudge.channel}
+              {t("review.nudgeProvenance.via", { channel: nudge.channel })}
             </span>
           </div>
 
           {nudge.suppressedReason ? (
             <p className="text-xs text-ink-3">
-              {t("review.nudgeProvenance.heldBackBecause")}{" "}
-              {REASON[nudge.suppressedReason] ?? nudge.suppressedReason}
-              {t("review.nudgeProvenance.itIsRecordedHere")}
+              {t("review.nudgeProvenance.heldBackBecauseItIs", {
+                suppressedReason:
+                  REASON[nudge.suppressedReason] ?? nudge.suppressedReason,
+              })}
             </p>
           ) : (
             <p className="text-xs text-ink-3">
-              {t("common.sent")}{" "}
-              {nudge.sentAt ? new Date(nudge.sentAt).toLocaleString() : ""}.
+              {t("common.sent3", {
+                sentAt: nudge.sentAt
+                  ? new Date(nudge.sentAt).toLocaleString()
+                  : "",
+              })}
             </p>
           )}
 

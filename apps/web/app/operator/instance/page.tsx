@@ -128,9 +128,13 @@ export default async function OperatorInstancePage() {
                     {message.body}
                   </p>
                   <p className="text-ink-3 text-xs">
-                    {when(message.startsAt)} {t("operator.instance.to")}{" "}
-                    {when(message.endsAt)}
-                    {message.dismissible ? "" : ", not dismissible"}
+                    {t("operator.instance.to", {
+                      startsAt: when(message.startsAt),
+                      endsAt: when(message.endsAt),
+                      dismissible: message.dismissible
+                        ? ""
+                        : ", not dismissible",
+                    })}
                   </p>
                 </li>
               );
@@ -166,7 +170,7 @@ export default async function OperatorInstancePage() {
                       {flag.value ? "on" : "off"}
                     </Chip>
                     <span className="block text-ink-3 text-xs">
-                      {t("operator.instance.fromThe")} {flag.source}
+                      {t("operator.instance.fromThe", { source: flag.source })}
                     </span>
                   </td>
                 </tr>

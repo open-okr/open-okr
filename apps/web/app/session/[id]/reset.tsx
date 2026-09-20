@@ -191,8 +191,10 @@ export function ResetPanel({
             {t("common.keepModifyOrAbandon")}
           </h2>
           <Chip tone={reset.complete ? "ok" : "neutral"}>
-            {reset.decided} {t("common.of")} {reset.total}{" "}
-            {t("session.detail.reset.decided")}
+            {t("common.ofDecided", {
+              decided: reset.decided,
+              total: reset.total,
+            })}
           </Chip>
         </span>
       </CardHeader>

@@ -206,9 +206,11 @@ export function ImportWizard({
         {step === "mapping" && loaded && template ? (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-ink-3">
-              {loaded.filename}, {loaded.rows.length}{" "}
-              {loaded.rows.length === 1 ? "row" : "rows"}
-              {t("admin.imports.wizard.sayWhatEachColumn")}
+              {t("admin.imports.wizard.sayWhatEachColumnIs", {
+                filename: loaded.filename,
+                length: loaded.rows.length,
+                rows: loaded.rows.length === 1 ? "row" : "rows",
+              })}
             </p>
             {aiOn && loaded.notes ? (
               <p
@@ -280,10 +282,10 @@ export function ImportWizard({
                 data-testid="import-missing"
                 className="rounded-md bg-warn-bg px-2.5 py-2 text-xs text-warn"
               >
-                {t("admin.imports.wizard.nothingCarries")} {missing.join(", ")}
-                {t("admin.imports.wizard.and")}{" "}
-                {missing.length === 1 ? "it is" : "they are"}{" "}
-                {t("admin.imports.wizard.required")}
+                {t("admin.imports.wizard.nothingCarriesAndRequired", {
+                  missing: missing.join(", "),
+                  are: missing.length === 1 ? "it is" : "they are",
+                })}
               </p>
             ) : null}
             <div className="flex gap-2">
@@ -307,8 +309,9 @@ export function ImportWizard({
             <Counts report={report} />
             {report.unmappedHeaders.length > 0 ? (
               <p className="text-xs text-ink-3">
-                {t("admin.imports.wizard.notImported")}{" "}
-                {report.unmappedHeaders.join(", ")}.
+                {t("admin.imports.wizard.notImported", {
+                  unmappedHeaders: report.unmappedHeaders.join(", "),
+                })}
               </p>
             ) : null}
             <RowTable report={report} />
@@ -417,7 +420,9 @@ function RowTable({ report }: { readonly report: ReportView }) {
               <td className="px-2.5 py-1.5">
                 {row.outcome === "skipped" ? (
                   <span className="text-bad">
-                    {t("admin.imports.wizard.skipped")} {row.reason}
+                    {t("admin.imports.wizard.skipped", {
+                      reason: row.reason ?? "",
+                    })}
                   </span>
                 ) : (
                   <span className="text-ink-2">

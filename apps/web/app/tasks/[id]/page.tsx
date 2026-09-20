@@ -121,8 +121,10 @@ export default async function TaskPage({
               {t("tasks.detail.checklist")}
             </h2>
             <span className="text-xs text-ink-3">
-              {task.checklist.done} {t("common.of")} {task.checklist.total}{" "}
-              {t("common.done")}
+              {t("common.ofDone2", {
+                done: task.checklist.done,
+                total: task.checklist.total,
+              })}
             </span>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">

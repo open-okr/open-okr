@@ -153,8 +153,7 @@ function EraseControl({
         >
           <input type="hidden" name="memberId" value={memberId} />
           <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.type")} {memberName}{" "}
-            {t("people.detail.lifecycleControls.toConfirm")}
+            {t("common.typeToConfirm", { memberName })}
             <input
               name="confirmName"
               autoComplete="off"

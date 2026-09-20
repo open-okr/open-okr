@@ -88,7 +88,7 @@ export async function PhaseRail({
           {t("cycle.phaseRail.theCycle")}
         </h2>
         <Chip tone={done === applicable.length ? "ok" : "brand"}>
-          {done} {t("common.of")} {applicable.length} {t("common.done")}
+          {t("common.ofDone", { done, length: applicable.length })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-1 p-2">
@@ -132,7 +132,7 @@ export async function PhaseRail({
                         phase is. */}
                     <Bar value={(met / total) * 100} className="h-1.5 flex-1" />
                     <span className="text-xs font-semibold text-ink-3">
-                      {met} {t("common.of")} {total}
+                      {t("common.of3", { met, total })}
                     </span>
                   </span>
                 ) : null}

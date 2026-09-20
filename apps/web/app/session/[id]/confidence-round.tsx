@@ -114,7 +114,9 @@ function KrVoteCard({
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-ink">{kr.title}</h4>
           <span className="text-sm font-semibold text-good">
-            {kr.confirmedConfidence?.toFixed(1)} {t("common.confirmed")}
+            {t("common.confirmed2", {
+              confirmedConfidence: kr.confirmedConfidence?.toFixed(1) ?? "",
+            })}
           </span>
         </div>
         {kr.whatChanged && (

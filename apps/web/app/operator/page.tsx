@@ -64,10 +64,12 @@ export default async function OperatorWorkspacesPage() {
           {t("operator.workspaces.title")}
         </h1>
         <p className="text-ink-2 text-sm">
-          {tenants.length === 1
-            ? "1 tenant on this instance."
-            : `${tenants.length} tenants on this instance.`}{" "}
-          {t("operator.workspaces.countsAreStale")}
+          {t("operator.workspaces.countsAreFromTheLast", {
+            instance:
+              tenants.length === 1
+                ? "1 tenant on this instance."
+                : `${tenants.length} tenants on this instance.`,
+          })}
         </p>
       </header>
 

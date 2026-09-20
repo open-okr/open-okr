@@ -82,11 +82,12 @@ export default async function PlanPage() {
               {t("admin.plan.thisWorkspace")}
             </h2>
             <span className="text-ink-3 text-xs">
-              {t("admin.plan.measured")}{" "}
-              {new Date(usage.measuredAt)
-                .toISOString()
-                .replace("T", " ")
-                .slice(0, 16)}
+              {t("admin.plan.measured", {
+                replace: new Date(usage.measuredAt)
+                  .toISOString()
+                  .replace("T", " ")
+                  .slice(0, 16),
+              })}
             </span>
           </div>
           <div className="grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface sm:grid-cols-3 sm:divide-y-0">

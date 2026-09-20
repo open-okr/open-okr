@@ -403,7 +403,7 @@ export const completeRun = defineWriteAction({
           ),
         )
         .limit(1);
-      if (!message || !message.runStartedAt) {
+      if (!message?.runStartedAt) {
         throw new OperationError("not_found", "There is no such run.");
       }
       // The thread is the member's own, which is what authorises this beyond

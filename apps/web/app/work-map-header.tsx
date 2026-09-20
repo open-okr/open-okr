@@ -61,7 +61,10 @@ export async function WorkMapContextStrip({
         href={cycleHref}
         className="rounded-full border border-line px-2.5 py-1 font-semibold text-ink-2 hover:border-brand"
       >
-        {t("common.phase")} {context.phase} · {context.phaseTitle}
+        {t("common.phase3", {
+          phase: context.phase,
+          phaseTitle: context.phaseTitle,
+        })}
       </Link>
 
       {context.published ? (
@@ -168,10 +171,13 @@ export async function WorkMapHeader({
         </h1>
         <p className="truncate text-xl font-bold text-ink">{workspaceName}</p>
         <p className="text-xs text-ink-3">
-          {scopeLabel} · {stats.objectiveCount} {t("common.objective")}
-          {stats.objectiveCount === 1 ? "" : "s"} · {stats.keyResultCount}{" "}
-          {t("workMapHeader.keyResult")}
-          {stats.keyResultCount === 1 ? "" : "s"}
+          {t("common.objectiveKeyResult", {
+            scopeLabel,
+            objectiveCount: stats.objectiveCount,
+            objectiveCount2: stats.objectiveCount === 1 ? "" : "s",
+            keyResultCount: stats.keyResultCount,
+            keyResultCount2: stats.keyResultCount === 1 ? "" : "s",
+          })}
         </p>
       </div>
 
