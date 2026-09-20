@@ -28,6 +28,15 @@ coverage/
 # Next.js generates this and its contents differ between dev and build.
 next-env.d.ts
 
+# What the self-hosted lifecycle helper writes when it is run from inside a
+# checkout. Both are real secrets: secrets/app.env carries the instance root
+# key, and a backup directory carries an encrypted dump of whatever was in the
+# database. Neither was ignored until the smoke test was first run on this
+# machine, on 20 September 2026, and left a pair of backups sitting untracked
+# where git offers to commit them.
+/deploy/docker/secrets/
+/deploy/docker/backups/
+
 # Playwright
 /playwright-report/
 /test-results/
