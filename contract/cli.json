@@ -1765,6 +1765,69 @@
       "pages": false
     },
     {
+      "name": "audit export",
+      "action": "audit.export",
+      "method": "POST",
+      "path": "/audit/export",
+      "scope": "write",
+      "summary": "Exports the audit trail as a CSV file, narrowed by date, action, actor or target. Audited.",
+      "flags": [
+        {
+          "name": "from",
+          "field": "from",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "to",
+          "field": "to",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "action",
+          "field": "action",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "actor-member-id",
+          "field": "actorMemberId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-type",
+          "field": "targetType",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "target-id",
+          "field": "targetId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "audit verify",
+      "action": "audit.verify",
+      "method": "GET",
+      "path": "/audit/verify",
+      "scope": "read",
+      "summary": "Checks the workspace's audit chain and says where it breaks, if it does.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "settings readWorkspaceSettings",
       "action": "settings.readWorkspaceSettings",
       "method": "GET",
@@ -1780,7 +1843,7 @@
       "method": "POST",
       "path": "/settings/updateWorkspaceGeneral",
       "scope": "write",
-      "summary": "Change the workspace's timezone, language or trusted email domains.",
+      "summary": "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
       "flags": [
         {
           "name": "timezone",
@@ -1798,6 +1861,12 @@
           "name": "trusted-email-domains",
           "field": "trustedEmailDomains",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "require-second-factor",
+          "field": "requireSecondFactor",
+          "type": "boolean",
           "required": false
         }
       ],

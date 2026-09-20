@@ -92,6 +92,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "invitation.link_revoked": z.object({}),
   "invitation.accepted": z.object({}).catchall(z.unknown()),
   "invitation.joined_by_trusted_domain": z.object({}).catchall(z.unknown()),
+  /**
+   * A member an identity provider or a directory put here (P8-T07b).
+   *
+   * Separate from the invitation kinds because nobody invited them: the
+   * workspace configured a provider, or issued a directory-sync token, and
+   * that is what vouched for the person.
+   */
+  "member.joined_by_directory": z.object({
+    via: z.enum(["sso", "directory_sync"]),
+  }),
   // Channels (P5-T01b-a). The provider, never a credential and never a
   // message body: an activity row is read by people.
   "channel.connected": z.object({ provider: z.string() }),

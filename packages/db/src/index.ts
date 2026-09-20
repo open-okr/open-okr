@@ -153,6 +153,7 @@ export {
   authSchema,
   passkeys,
   sessions,
+  ssoProviders,
   twoFactors,
   users,
   verifications,
@@ -273,8 +274,10 @@ export {
   digests,
 } from "./schema/digests.ts";
 export {
+  type DirectorySyncGroup,
   type DirectorySyncLogEntry,
   type DirectorySyncToken,
+  directorySyncGroups,
   directorySyncLog,
   directorySyncTokens,
 } from "./schema/directory-sync.ts";
@@ -592,11 +595,13 @@ export {
   withApiToken,
   withContext,
   withDeviceCode,
+  withDirectoryToken,
   withInstanceAdmin,
   withInviteToken,
   withOAuthSecret,
   withOperator,
   withProviderTeam,
+  withSSOLookup,
   withUser,
   withWorkspace,
 } from "./tenant.ts";

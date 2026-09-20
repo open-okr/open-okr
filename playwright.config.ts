@@ -54,7 +54,20 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  /**
+   * **The flakiness report is not optional, and it did not exist** (P8-T15).
+   *
+   * Playwright retries once in continuous integration and reported nothing, so
+   * a spec that failed and recovered was indistinguishable from one that
+   * passed first time. The unit suites have recorded that since P7-T09; this
+   * is the browser suite catching up, and it is the reason two specs failing
+   * one run in four went unnoticed until somebody ran the suite eleven times
+   * in a day. Written locally too, because a report that only exists in CI is
+   * a report nobody can check before pushing.
+   */
+  reporter: process.env.CI
+    ? [["github"], ["list"], ["./e2e/flaky-reporter.ts"]]
+    : [["list"], ["./e2e/flaky-reporter.ts"]],
   timeout: 30_000,
   expect: { timeout: 10_000 },
 

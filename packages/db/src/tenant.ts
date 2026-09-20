@@ -165,6 +165,45 @@ const OPERATOR_USER_SETTING = "app.operator_user_id";
  */
 const INVITE_TOKEN_HASH_SETTING = "app.invite_token_hash";
 
+/**
+ * Opens the single-sign-on provider list, for the two reads that run before
+ * any workspace is known (P8-T07a).
+ *
+ * **Not a narrow key, and the only one here that is not.** The others name a
+ * digest and reveal the one row holding it. This names no row, because
+ * neither caller is asking about a row: the boot sequence needs every enabled
+ * provider on the instance to configure the OAuth client, and the sign-in
+ * page needs every enabled provider to draw its buttons. A visitor who has
+ * not signed in yet has no workspace to be scoped to.
+ *
+ * So what keeps it honest is its narrowness in the other direction. It is
+ * `for select` on `sso_connections` and nothing else: no other table names
+ * it, writes still go through the tenant policy, and the columns a caller
+ * reaches carry no secret in plaintext. The client secret sitting in those
+ * rows is envelope-encrypted and useless without the root key.
+ *
+ * `app.instance_admin` would also have opened this read and was refused: it
+ * additionally opens `system_settings` writes and the `tenants` rows, and the
+ * transaction asking here is an unauthenticated page load. A setting that
+ * says one thing is safer than a setting that says four.
+ */
+const SSO_LOOKUP_SETTING = "app.sso_lookup";
+
+/**
+ * Names one directory-sync token's hash, for the SCIM lookup only (P8-T07a).
+ *
+ * An identity provider's SCIM request carries a bearer token and nothing
+ * else, so which workspace it provisions into is the question rather than the
+ * context. The same arrangement `api_tokens` has had since P5-T07a, and for
+ * the same reason: the caller reaches exactly the row whose token they
+ * already hold, and somebody without the token learns nothing, including
+ * whether it exists.
+ *
+ * The eighth pre-tenant key. Migration 0092 shipped without one, so every
+ * SCIM request resolved to no workspace and answered 401. Corrected by 0094.
+ */
+const DIRECTORY_TOKEN_HASH_SETTING = "app.directory_token_hash";
+
 /** What a transaction is scoped to. At least one of the three is required. */
 export interface TenantContext {
   readonly workspaceId?: string;
@@ -217,6 +256,22 @@ export interface TenantContext {
    * nothing else in the database.
    */
   readonly inviteTokenHash?: string;
+  /**
+   * Opens the enabled `sso_connections` rows for reading only (P8-T07a).
+   *
+   * Reveals that one table and no other, and never a write. Set by the boot
+   * sequence and by the sign-in page's provider list, both of which run
+   * before any workspace is known.
+   */
+  readonly ssoLookup?: boolean;
+  /**
+   * Names one directory-sync token's hash, for the SCIM lookup only
+   * (P8-T07a).
+   *
+   * Reveals exactly the `directory_sync_tokens` row whose `token_hash` equals
+   * it, and nothing else in the database.
+   */
+  readonly directoryTokenHash?: string;
 }
 
 /**
@@ -313,6 +368,40 @@ export async function withOAuthSecret<
 }
 
 /**
+ * Opens a transaction that can list the instance's SSO providers (P8-T07a).
+ *
+ * Use it for that list and nothing else. It reads `sso_connections` and
+ * reaches no other table, and it cannot write.
+ */
+export async function withSSOLookup<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { ssoLookup: true }, fn);
+}
+
+/**
+ * Opens a transaction that can resolve one SCIM bearer token (P8-T07a).
+ *
+ * Use it for that lookup and nothing else. The row it can reach is the one
+ * the caller already named by hash, and the tenant setting for the workspace
+ * that token names is applied afterwards, for the provisioning itself.
+ */
+export async function withDirectoryToken<
+  T,
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  db: NodePgDatabase<TSchema>,
+  tokenHash: string,
+  fn: (tx: WorkspaceTx<TSchema>) => Promise<T> | T,
+): Promise<T> {
+  return withContext(db, { directoryTokenHash: tokenHash }, fn);
+}
+
+/**
  * Opens a transaction that may write instance settings.
  *
  * Deliberately separate from `withWorkspace` and `withUser`: instance settings
@@ -375,6 +464,8 @@ export async function withContext<
     oauthSecretHash,
     inviteTokenHash,
     operatorUserId,
+    ssoLookup,
+    directoryTokenHash,
   } = context;
 
   if (workspaceId !== undefined && !UUID.test(workspaceId)) {
@@ -424,6 +515,14 @@ export async function withContext<
     throw new Error("Invalid operator id: expected a non-empty identifier.");
   }
   if (
+    directoryTokenHash !== undefined &&
+    !/^[0-9a-f]{64}$/.test(directoryTokenHash)
+  ) {
+    throw new Error(
+      "Invalid directory token hash: expected a SHA-256 hex digest.",
+    );
+  }
+  if (
     workspaceId === undefined &&
     userId === undefined &&
     channelTeamId === undefined &&
@@ -432,10 +531,12 @@ export async function withContext<
     oauthSecretHash === undefined &&
     inviteTokenHash === undefined &&
     operatorUserId === undefined &&
+    directoryTokenHash === undefined &&
+    !ssoLookup &&
     !instanceAdmin
   ) {
     throw new Error(
-      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, or instance admin.",
+      "A tenant context needs a workspace id, a user id, a provider team id, a token hash, a device code hash, an OAuth secret hash, an invitation token hash, an operator id, a directory token hash, the SSO provider list, or instance admin.",
     );
   }
 
@@ -485,6 +586,16 @@ export async function withContext<
     if (inviteTokenHash !== undefined) {
       await tx.execute(
         sql`select set_config(${INVITE_TOKEN_HASH_SETTING}, ${inviteTokenHash}, true)`,
+      );
+    }
+    if (ssoLookup) {
+      await tx.execute(
+        sql`select set_config(${SSO_LOOKUP_SETTING}, 'on', true)`,
+      );
+    }
+    if (directoryTokenHash !== undefined) {
+      await tx.execute(
+        sql`select set_config(${DIRECTORY_TOKEN_HASH_SETTING}, ${directoryTokenHash}, true)`,
       );
     }
     return fn(tx);

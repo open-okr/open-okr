@@ -8,6 +8,7 @@
     "./db": "./src/db-harness.ts",
     "./db-env": "./src/db-env.ts",
     "./db-fixtures": "./fixtures/db/schema.ts",
+    "./flaky": "./src/flaky.ts",
     "./golden-table": "./src/golden-table.ts",
     "./query-overlap": "./src/query-overlap.ts"
   },

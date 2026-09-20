@@ -2594,6 +2594,73 @@
       }
     },
     {
+      "name": "audit.export",
+      "description": "Exports the audit trail as a CSV file, narrowed by date, action, actor or target. Audited.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "actorMemberId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "targetType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "limit": {
+            "default": 10000,
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 10000
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
+    },
+    {
+      "name": "audit.verify",
+      "description": "Checks the workspace's audit chain and says where it breaks, if it does.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "settings.readWorkspaceSettings",
       "description": "The workspace's own settings map, for the admin cards.",
       "inputSchema": {
@@ -2610,7 +2677,7 @@
     },
     {
       "name": "settings.updateWorkspaceGeneral",
-      "description": "Change the workspace's timezone, language or trusted email domains.",
+      "description": "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -2629,6 +2696,9 @@
               "type": "string",
               "pattern": "^(?!-)[a-z0-9-]{1,63}(?<!-)(\\.(?!-)[a-z0-9-]{1,63}(?<!-))+$"
             }
+          },
+          "requireSecondFactor": {
+            "type": "boolean"
           }
         }
       },

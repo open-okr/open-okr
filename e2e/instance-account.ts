@@ -198,8 +198,8 @@ export async function goTo(
  * the segment sits behind a Suspense boundary, which is what lets the previous
  * subtree and the incoming one share the document for a moment. Playwright's
  * `getByTestId("welcome-skip")` then resolves to two buttons and refuses to
- * choose. The snapshot it saves shows one button and `1 / 4` a moment later,
- * so this is a window, not a state, and the four-click loop that used to live
+ * choose. The snapshot it saves shows one button and `1 / 5` a moment later,
+ * so this is a window, not a state, and the click loop that used to live
  * in two specs fell into it on 15 September 2026, taking twenty-six sign-ins
  * with it because nobody had claimed the instance.
  *
@@ -208,9 +208,18 @@ export async function goTo(
  * landed on the subtree being torn down would leave the counter where it was,
  * and the next iteration says so in those terms instead of timing out on the
  * front door.
+ *
+ * **`template` is the one step that can be answered rather than skipped**
+ * (P8-T12). The application instance skips it, because P6-G26's criterion is
+ * that skipping everything lands on a working workspace at the documented
+ * defaults, and that instance has one workspace to spend. The setup-wizard
+ * instance answers it, because its workspace is otherwise unused and applying
+ * a template is the only place the P8-T12 criterion can be walked in a
+ * browser: an instance has no second workspace to make a fresh one in.
  */
 export async function skipOnboarding(
   page: import("@playwright/test").Page,
+  options: { readonly template?: "starter" } = {},
 ): Promise<void> {
   const { expect } = await import("@playwright/test");
 
@@ -221,11 +230,18 @@ export async function skipOnboarding(
   const skip = page.getByTestId("welcome-skip");
   await expect(skip).toHaveCount(1);
 
-  const steps = 4;
+  const steps = 5;
+  // Fourth of five since P8-T12 put the starting templates before the demo.
+  const templateStep = 4;
   for (let step = 1; step <= steps; step += 1) {
     await expect(page.getByTestId("welcome-progress")).toContainText(
       `${step} / ${steps}`,
     );
+    if (step === templateStep && options.template) {
+      await page.getByTestId(`template-${options.template}`).click();
+      await page.getByTestId("welcome-continue").click();
+      continue;
+    }
     await skip.click();
   }
 }

@@ -1,0 +1,36 @@
+# The public demonstration instance (P8-T13c).
+#
+# An overlay on deploy/docker/compose.yaml, not a copy of it. A second compose
+# file would drift from the one every self-hosted install runs, and the whole
+# claim of a demo instance is that it is the product rather than a version of
+# it.
+#
+#     cd deploy/docker
+#     docker compose -f compose.yaml -f ../demo/compose.demo.yaml \
+#       -p openokr-demo up -d
+#
+# `reset.sh` beside this file does that, and everything around it.
+#
+# Two changes, and no third:
+#
+#   1. OPENOKR_DEMO=on, which makes the sign-in page name the personas and
+#      publish their shared password. Nothing else in the product reads it.
+#   2. Postgres is published on the loopback address, so the seed and the
+#      persona command can reach it from the host running the reset. It is
+#      still not reachable from anywhere else.
+#
+# Nothing here weakens a rule, turns a gate off, or grants anything. A demo
+# that ran a different product would be worth nothing.
+
+services:
+  app:
+    environment:
+      OPENOKR_DEMO: "on"
+      OPENOKR_INSTANCE_NAME: ${OPENOKR_INSTANCE_NAME:-OpenOKR demo}
+
+  db:
+    # Loopback only, and deliberately not 5432: a host running the demo is
+    # likely to have its own Postgres, and binding over it is a bad first
+    # surprise.
+    ports:
+      - "127.0.0.1:${OPENOKR_DEMO_DB_PORT:-55433}:5432"

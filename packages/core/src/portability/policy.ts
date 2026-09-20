@@ -232,6 +232,18 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "Operational log of what the identity provider pushed to this instance. Facts about this instance's sync history, not about the workspace's content.",
   },
   {
+    table: "sso_providers",
+    decision: "exclude",
+    reason:
+      "Better Auth's own provider table, derived from sso_connections rather than written by anybody. It carries no workspace_id at all, so there is nothing in it to attribute to a workspace, and a restored instance rebuilds it from the authority table on its next boot.",
+  },
+  {
+    table: "directory_sync_groups",
+    decision: "exclude",
+    reason:
+      "The mapping between one identity provider's group and a space here. It names a group in a directory this instance syncs with, and the token that sync runs on is excluded above, so a restored copy would hold half an integration pointing at a directory it cannot reach.",
+  },
+  {
     table: "invite_links",
     decision: "exclude",
     reason:

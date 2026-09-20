@@ -34,6 +34,7 @@ export {
   resolveSubjectContext,
   type SubjectContext,
 } from "./access/reads.ts";
+export { AUDIT_EXPORT_CEILING } from "./actions/audit.ts";
 export { CHANNEL_MESSAGE_TOPIC } from "./actions/channels.ts";
 export {
   type ActionCallContext,
@@ -394,6 +395,16 @@ export {
   countPending,
 } from "./audit/chainer.ts";
 export {
+  AUDIT_EXPORT_COLUMNS,
+  type AuditExport,
+  type AuditExportFilter,
+  type AuditExportRow,
+  auditCsv,
+  auditCsvFile,
+  auditExportFilename,
+  exportAuditRows,
+} from "./audit/export.ts";
+export {
   type InstanceAuditRow,
   instanceAuditRowHash,
   type RecordInstanceAuditEventInput,
@@ -402,6 +413,13 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
+export {
+  ENROLMENT_PATH,
+  heldForEnrolment,
+  identityProviderManaged,
+  requiresSecondFactor,
+  type SecondFactorHoldInput,
+} from "./auth/second-factor.ts";
 export {
   type CurrentSession,
   getCurrentSession,
@@ -416,9 +434,19 @@ export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   listSSOProviders,
   loadSSOConnections,
+  providerIdFromCallback,
   type SSOProviderConfig,
   type SSOProviderInfo,
 } from "./auth/sso.ts";
+export {
+  type EnforcingConnection,
+  type EnforcingProvider,
+  enforcedProviderForEmail,
+  enforcedProviderForUser,
+  enforcementMessage,
+  enforcingProviderFor,
+  listEnforcingConnections,
+} from "./auth/sso-enforcement.ts";
 export {
   type ClaimBlobInput,
   type ClaimedBlob,
@@ -600,6 +628,23 @@ export {
   type DemoContext,
 } from "./demo/builder.ts";
 export {
+  DEMO_PERSONA_PASSWORD,
+  DEMO_PERSONAS,
+  type DemoPersona,
+  type PrepareDemoPersonasInput,
+  type PrepareDemoPersonasResult,
+  type PreparedPersona,
+  prepareDemoPersonas,
+} from "./demo/personas.ts";
+export {
+  type DirectoryGroup,
+  directoryGroupById,
+  listDirectoryGroups,
+  type SyncDirectoryGroupInput,
+  syncDirectoryGroup,
+  unmapDirectoryGroup,
+} from "./directory-sync/groups.ts";
+export {
   displayName as scimDisplayName,
   logSyncOperation,
   primaryEmail as scimPrimaryEmail,
@@ -607,11 +652,24 @@ export {
   type SCIMUser,
   scimError,
   scimList,
+  scimUserResource,
 } from "./directory-sync/scim.ts";
 export {
   createSCIMToken,
   resolveToken as resolveSCIMToken,
 } from "./directory-sync/tokens.ts";
+export {
+  type DirectoryDeps,
+  type DirectoryMember,
+  listDirectoryUsers,
+  memberById,
+  type ProvisionDirectoryUserInput,
+  type ProvisionDirectoryUserResult,
+  parseScimFilter,
+  provisionDirectoryUser,
+  type ScimFilter,
+  setDirectoryUserActive,
+} from "./directory-sync/users.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
@@ -987,6 +1045,19 @@ export {
   type Outcome,
   setDefaultMetrics,
 } from "./telemetry/recorder.ts";
+export {
+  type ApplyTemplateInput,
+  type ApplyTemplateResult,
+  applyTemplate,
+  firstWeeklySession,
+} from "./templates/apply.ts";
+export {
+  STARTING_TEMPLATE_KEYS,
+  STARTING_TEMPLATES,
+  type StartingTemplate,
+  type StartingTemplateKey,
+  startingTemplateFor,
+} from "./templates/catalogue.ts";
 export {
   type Admission,
   AdmissionError,

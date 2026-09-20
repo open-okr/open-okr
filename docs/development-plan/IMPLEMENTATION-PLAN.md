@@ -2400,13 +2400,174 @@ Acceptance: to be written in the design.
 
 ### P8-T07: Single sign-on [L]
 Depends on: Phase 7 complete
-Deliverables: OIDC and SAML through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
+Deliverables: OIDC through the authentication layer, with just-in-time provisioning landing in the one member funnel; per-workspace configuration; enforcement options.
+
+**This line read "OIDC and SAML" until 18 September 2026.** SAML was never built and the row shipped anyway; the correction is below, and P8-T07c is the row that builds it. The line is narrowed rather than left standing, because a plan that claims what the product does not do is worse than one that admits a gap.
 Acceptance: Given a configured identity provider, when a user signs in through it, then they are provisioned with default access and their session behaves identically to a password session.
+
+**SAML shipped as a bridge rather than a flow, and that is a deviation from
+this line awaiting a decision.** What was built supports OIDC natively and
+reaches SAML only through a SAML-to-OIDC bridge: Keycloak, Auth0, Okta or
+Entra sits in front and speaks OIDC to the instance.
+
+**The reason given for it is not true, and this line said it was until
+18 September 2026.** Migration 0091 records that "a native SAML flow is not in
+Better Auth 1.x and building one outside it would violate the authentication
+goes through Better Auth only rule", and this paragraph repeated that as sound.
+It is not. `@better-auth/sso` is a first-party Better Auth plugin, published at
+1.7.4 against a peer range of `better-auth ^1.7.4`, which is exactly the version
+this repository pins. It is MIT, and it implements SAML natively through
+`samlify`. Native SAML is available **inside** the hard rule, not outside it.
+
+So the deliverable was dropped on a fact that does not hold, and the drop was
+recorded in a SQL comment and a sentence on an admin screen rather than here,
+where a reader of the plan would see a named deliverable go.
+
+**Why this is not a small omission.** PLAN.md §142 is the authority above this
+document and it says "single sign-on through OIDC and SAML in the open core,
+because institutions will not adopt without it". That is a positioning claim,
+not a preference. A bridge does not satisfy it as a buyer reads it: it tells an
+institution to run and operate a Keycloak in front of the product. The
+customers who actually need SAML are the ones whose identity provider does not
+offer OIDC at all, which is exactly the set a bridge serves worst.
+
+**The honest cost, on the other side.** It is a new runtime dependency with
+three transitive XML libraries, and `samlify` has carried three advisories, a
+signature-wrapping bypass, a token-replay bypass and an XML injection in a
+signed assertion. All are patched at or below 2.13.0 and the current release is
+2.13.1, so the version is clean today. SAML is a protocol where signature
+verification is easy to get subtly wrong and where even maintained libraries
+have had to fix it repeatedly. That is an argument for pinning it, watching its
+advisories and testing the refusals, not for avoiding it.
+
+Agung's to settle. The recommendation on the table is to correct this
+deliverable line to describe what ships today, and open a row for native SAML
+through `@better-auth/sso` rather than leave the plan claiming something the
+product does not do. Nothing else in Phase 8 depends on which way it goes.
 
 ### P8-T08: Directory sync and provisioning [L]
 Depends on: P8-T07
 Deliverables: directory synchronisation of users and groups mapped to members and space membership, plus the provisioning protocol where deactivation maps to suspension and never to deletion.
 Acceptance: Given a user removed from the directory, when the next synchronisation runs, then the member is suspended and every token and grant of theirs stops working.
+
+### P8-T07a: The reads that run before a workspace is known, and enforcement [M]
+Depends on: P8-T07, P8-T08
+
+**Cut on 17 September 2026, after the work was reviewed and found inert.** P8-T07 and P8-T08 both shipped reads that run with no tenant setting against tables carrying `force row level security`, over an application role that is `nosuperuser nobypassrls` and owns nothing. All three answered with no rows, so no SSO provider was ever configured, no SSO button ever appeared and every SCIM request answered 401. Nothing failed loudly, because returning nothing is what a correct tenant floor looks like from above, and no test touched any of it.
+
+P8-T07 also left its third deliverable, enforcement options, stored in two columns and read by nothing.
+
+Deliverables: a policy for each of the two tables, following the arrangement `channel_installations` (P5-T02a) and `invite_links` (P6-G06b) already use; the three reads through a named wrapper each; enforcement wired at the sign-in paths, with a member on an enforced domain refused the local factors and sent to their provider; a test for each read and each refusal, plus a test that neither new key widens anything else.
+
+Test plan: the floor suite fails against the code as shipped and passes after. The negative half holds each key to the one table and the one row it is meant to reach.
+
+Acceptance: Given a configured provider, when the instance boots and the sign-in page loads, then the provider is configured and its button appears. Given a SCIM request carrying a live token, when it arrives, then it resolves to that workspace and no other. Given an enforced email domain, when somebody signs in with a password, then they are refused and told which provider to use.
+
+### P8-T07b: Just-in-time provisioning lands where it was meant to [S]
+Depends on: P8-T07a
+
+**Cut on 17 September 2026.** P8-T07 deliverable: "just-in-time provisioning landing in the one member funnel". It landed in `provisionWorkspaceForUser`, which gives a person with no membership anywhere a workspace of their own, so the first employee to sign in through their company provider arrived alone in an empty workspace and never saw the one that had configured it. The workspace was loaded from `sso_connections` at boot and dropped before it reached the auth options.
+
+Deliverables: the provider carries its workspace into the auth options; the after-create hook joins that workspace through the member funnel before provisioning runs, the same order an invitation uses; one path that both single sign-on and directory sync call.
+
+Acceptance: Given a configured provider, when somebody signs in through it for the first time, then they are a member of the workspace that configured it, at the level every other joining path gives, and no second workspace is created.
+
+### P8-T07c: SAML, natively rather than through a bridge [M]
+Depends on: P8-T07b
+
+**Cut on 18 September 2026, after the deliverable it restores was found to have
+been dropped on a premise that does not hold.** Migration 0091 records that "a
+native SAML flow is not in Better Auth 1.x". `@better-auth/sso` is a
+first-party plugin, published at 1.7.4 against a peer range of
+`better-auth ^1.7.4`, which is exactly the pinned version. It is MIT and it
+implements SAML through `samlify`. Native SAML is inside the "authentication
+goes through Better Auth only" rule, not outside it. Agung approved the
+dependency and this row on 18 September 2026.
+
+PLAN.md §142 is why it matters: "single sign-on through OIDC and SAML in the
+open core, because institutions will not adopt without it". The customers who
+need SAML are the ones whose provider offers no OIDC at all, and a bridge
+serves exactly them worst by asking them to run a Keycloak.
+
+**One decision this row carries, and it is an architecture decision.** The
+plugin owns an `ssoProvider` table with its own `oidcConfig` and `samlConfig`,
+written through its own `/sso/register` endpoint. This repository already has
+`sso_connections`, workspace-scoped with a tenant policy and an
+envelope-encrypted secret, feeding `genericOAuth` at boot. Two providers of one
+concept is not a state to ship. Either the plugin replaces the OIDC path as
+well, which is a removal spanning two releases per PLAN.md §5.1, or it is added
+for SAML alone and both are fed from `sso_connections`. That is settled at the
+design note below before any code.
+
+**Cut into a and b on 18 September 2026, after the design note, the dependency,
+migration 0096 and the schema, and before the code that would not have fit.**
+The split is by what fails rather than by what is convenient. The path that
+accepts an assertion and the path that refuses a bad one land together, because
+shipping the first without the second is the exact shape of the P8-T07 mistake
+this row exists to correct. What is left over is the surfaces: a screen, a
+metadata document, and enforcement, none of which can let a bad assertion in.
+
+### P8-T07c-a: the SAML sign-in path, with its refusals [M]
+Depends on: P8-T07b
+
+Deliverables: the design note recording which of the two storage shapes and
+why; the SAML columns on `sso_connections` with the constraint that a SAML row
+is complete; the `@better-auth/sso` plugin mounted; the sync that writes the
+plugin's derived row whenever `sso_connections` is written, so the product's
+table stays the authority; JIT provisioning through `provisionUser` into the
+same member funnel P8-T07b built, so a SAML arrival and an OIDC arrival land
+identically.
+
+Test plan: unit, against a fixture identity provider. An assertion with a valid
+signature provisions and lands in the right workspace. **An assertion with a
+broken signature, a wrapped signature, an expired condition window and a wrong
+audience are each refused**, because SAML is a protocol where signature
+verification is easy to get subtly wrong and `samlify` has carried three
+advisories of exactly that shape. The refusals are the point of this row, not a
+postscript to it.
+
+Acceptance: Given a workspace with a SAML provider configured, when somebody
+signs in through it for the first time, then they are a member of that
+workspace at the level every other joining path gives, no second workspace is
+created, and their session behaves identically to a password session. Given an
+assertion whose signature does not verify, when it arrives, then it is refused
+and nobody is provisioned.
+
+### P8-T07c-b: the surfaces around it [S]
+Depends on: P8-T07c-a
+
+Deliverables: the admin screen extended to configure a SAML provider, refusing
+an incomplete one rather than storing it; the service-provider metadata
+document a provider needs to configure its side; enforcement covering SAML the
+way P8-T07a covers OIDC, so an enforced domain sends somebody to their SAML
+provider as readily as to their OIDC one.
+
+Test plan: the screen stores and reads back a provider; an incomplete one is
+refused with the field named; the metadata document parses and carries this
+instance's entity id; an enforced SAML domain refuses a password sign-in and
+names the provider. An end-to-end pass for the configuration and the sign-in.
+
+Acceptance: Given an administrator on the SSO screen, when they configure a
+SAML provider and hand its metadata document to the identity provider, then
+somebody on that provider can sign in without anybody editing the database.
+
+### P8-T08a: The SCIM Users resource, through the Operation pipeline [M]
+Depends on: P8-T07a
+
+**Cut on the same day and for the same reason.** The P8-T08 acceptance criterion is that a user removed from the directory is suspended on the next synchronisation. No code path suspends anybody: the route exports `GET` and `POST` and nothing else. What it does export writes to `workspace_members` and `users` with raw SQL outside the Operation pipeline, so those writes carry no audit row, no activity row and no outbox row, and the account is created around Better Auth rather than through it.
+
+Cut again on the same day, before the code: the Users lifecycle and the Groups mapping fail differently, one at the member funnel and the other at space membership, and neither is reviewable inside the other.
+
+Deliverables: `PATCH`, `PUT` and `DELETE` on the Users resource, deactivation mapping to suspension and never to deletion; every write through the Operation pipeline with its audit and activity rows; account creation through Better Auth and membership through the one member funnel; `filter` on the list, because the identity providers send `userName eq` constantly and a surface that ignores it answers with everybody.
+
+Acceptance: Given a user removed from the directory, when the next synchronisation runs, then the member is suspended and every token and grant of theirs stops working.
+
+### P8-T08b: The SCIM Groups resource, mapped to space membership [M]
+Depends on: P8-T08a
+
+Deliverables: the Groups resource; a group mapped to a space; membership changes applied through the space membership action rather than written directly; the mapping recorded so a renamed group does not create a second space.
+
+Acceptance: Given a group with members, when it synchronises, then the space membership matches it, and a member removed from the group loses the space and keeps the workspace.
 
 ### P8-T09: Multi-factor policy [S]
 Depends on: P8-T07
@@ -2418,10 +2579,23 @@ Depends on: Phase 7 complete
 Deliverables: filtered audit export; the hash-chain verification tool with an admin action; the documented fully offline installation validated on an isolated machine with AI local or off and no external calls.
 Acceptance: Given a tampered audit row, when verification runs, then it is detected and located; and the air-gap checklist passes on an offline machine.
 
-### P8-T11: Documentation site [M]
+### P8-T11a: The documentation tree, the quickstarts and the administrator guide [M]
 Depends on: Phase 7 complete
-Deliverables: user, administrator and API documentation with the generated reference; the importer runbook; the deployment quickstarts for Compose, Helm and cloud; and the OKR handbook derived from METHOD.md, written for practitioners rather than builders.
+
+**Cut in two on 18 September 2026, before any writing.** P8-T11's deliverables are two audiences, not one. An administrator installing an instance and a practitioner running the practice need different documents, written from different facts: the first from what `deploy/` actually does, the second from METHOD.md. The acceptance criterion names only the first, which is what makes the split obvious rather than convenient.
+
+Deliverables: `docs/README.md` as the one index a reader starts from; the deployment quickstarts for Compose, Kubernetes and the managed cloud; what the first run does and what to do next; the administrator guide over people, security, settings and operations; and a gate that keeps all of it honest.
+
+Test plan: the gate fails on a dead link, on an unreachable page and on a command `package.json` does not define, each proved by planting one.
+
 Acceptance: a new administrator follows the quickstart to a working instance without reading the repository.
+
+### P8-T11b: The user guide, the handbook and the generated reference [M]
+Depends on: P8-T11a
+
+Deliverables: the user guide; the OKR handbook derived from METHOD.md, written for practitioners rather than builders, with a check that every number it quotes matches the §11 registry; the API reference generated from the action contract; and the importer runbook.
+
+Acceptance: a practitioner reads the handbook and runs a weekly session without opening the product's own screens for instructions; and the reference names every action the contract holds.
 
 ### P8-T12: Template gallery and rhythm guides [M]
 Depends on: P8-T11
@@ -2432,6 +2606,54 @@ Acceptance: Given a fresh workspace created from the starter template, when it o
 Depends on: P8-T12
 Deliverables: the demo builder on a public instance, reset on a schedule, with sign-in as a sample persona and the agents running visibly in sandbox mode.
 Acceptance: a visitor can explore a realistic workspace, see a coach nudge and a diagnostic, and the instance resets cleanly.
+
+**Cut into a, b and c on 18 September 2026, before any code.** The row bundles
+three kinds of work that fail in three ways and are tested with three different
+things. Letting a visitor sign in as one of the cast is an identity question,
+answered against a database. The closing diagnostic the acceptance criterion
+asks for does not exist in the demo at all: P3-T17 wrote "the scorecard stays
+empty" because scoring was P4-T10 and unbuilt, so the demo has never held a
+finished quarter, and putting one there is a builder change tested against a
+database too but failing as a cycle rather than as an account. The public
+instance and its reset are a machine, tested with a container. A single commit
+holding all three would be reviewed as none of them.
+
+### P8-T13a: A visitor can sign in as one of the cast [M]
+Depends on: P8-T12
+Deliverables: `pnpm demo:prepare`, which turns a seeded workspace into one a
+visitor can walk around: an account for each of the seven invented people, both
+agent members set to sandbox autonomy, and one run of the Coach and of the
+Champion, so the nudges on screen are ones the product produced rather than rows
+something inserted. Refuses a workspace not marked as a demo, and refuses to
+touch a member who already has a real person behind them.
+Test plan: unit, against a seeded workspace. A persona's account exists and is
+attached to their member row; a workspace without `demoEnabled` is refused;
+running twice changes nothing; both agents read back as sandbox; the Coach's run
+recorded nudges and committed nothing outside the review queue.
+Acceptance: Given a prepared demo workspace, when somebody signs in as a
+persona, then they see the workspace as that person, with at least one coach
+nudge that cites a rule key.
+
+### P8-T13b: The finished quarter the demo has never had [M]
+Depends on: P8-T13a
+Deliverables: a closed cycle in the demo with graded key results, a quarterly
+review whose process-health survey has been answered, and §8.6's diagnostic
+recorded from those two numbers. Written through the ordinary actions, so the
+verdict is one `packages/method` produced.
+Test plan: unit. The scorecard is no longer empty; the diagnostic reads back
+with a verdict, a diagnosis and a prescription; the numbers behind it are the
+graded scores rather than invented ones.
+Acceptance: Given a seeded demo workspace, when the review of the closed cycle
+is opened, then a cycle score, a rhythm score and §8.6's verdict are on screen.
+
+### P8-T13c: The public instance and its reset [M]
+Depends on: P8-T13b
+Deliverables: a demo deployment overlay on the Compose target, a reset that
+rebuilds the instance from nothing on a schedule, the page that tells a visitor
+who they can sign in as, and the documentation for whoever operates it.
+Test plan: the reset script run twice against a local stack.
+Acceptance: the instance resets cleanly, and a visitor arriving after a reset
+sees the same workspace the last visitor did.
 
 ### P8-T14: Launch [S]
 Depends on: P8-T13
@@ -2452,7 +2674,7 @@ Acceptance: Given the end-to-end suite run ten times, when the reports are merge
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (25: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them). **159 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (32: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all). **166 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01a, P8-T01b. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

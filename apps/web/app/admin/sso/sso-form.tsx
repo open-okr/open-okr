@@ -141,8 +141,16 @@ export function SSOForm() {
 
       <label className="flex items-center gap-2 text-sm text-ink-2">
         <input type="checkbox" name="enforce" className="rounded" />
-        Enforce SSO for matching email domains (disables password sign-in)
+        Enforce SSO for the email domains listed above
       </label>
+      <p className="text-sm text-ink-3">
+        Enforcing refuses a password, a reset link and a passkey for every
+        address on those domains, including your own. List at least one domain:
+        enforcing with the field empty does nothing, because an empty list would
+        otherwise claim every address on this instance. To undo an enforcement
+        that locked you out, clear <code>enforce</code> on the row in{" "}
+        <code>sso_connections</code>.
+      </p>
 
       {error && (
         <p className="text-sm text-red-600" role="alert">

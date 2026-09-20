@@ -94,6 +94,11 @@ try {
     write(
       `  ${outcome.kpisCreated} KPIs with ${outcome.kpiRecordsWritten} monthly readings`,
     );
+    if (outcome.lastQuarterVerdict) {
+      write(
+        `  last quarter scored and closed, diagnostic: ${outcome.lastQuarterVerdict}`,
+      );
+    }
     write("");
     write("Worth knowing before you present it:");
     for (const note of outcome.notes) {

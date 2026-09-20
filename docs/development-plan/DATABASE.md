@@ -169,6 +169,20 @@ The other half of `audit_events`: that chain is per workspace and requires one v
 
 Read and written through the same `app.instance_admin` transaction-local flag `system_settings` already uses, appended by `recordInstanceAuditEvent`, called from `apps/web/app/api/auth/[...all]/route.ts` whenever Better Auth's own rate limiter answers with a 429 — the only place that can see one, since Better Auth's router returns that response from inside itself before any hook or plugin callback runs. Append-only enforced the same two ways `audit_events` is: `grantAppPrivileges` revokes UPDATE and DELETE from the application role (`packages/db/src/grants.ts`'s `APPEND_ONLY_TABLES`), and a trigger refuses both from anybody at all, including the owner and a superuser.
 
+### sso_connections *(P8-T07, migration 0091)*
+`workspace_id`, `provider_id`, `display_name`, `discovery_url?`, `authorization_url?`, `token_url?`, `user_info_url?`, `client_id`, the three envelope-encryption columns for the client secret, `scopes`, `enforce`, `email_domains`, `enabled`. Partial unique on `(workspace_id, provider_id) where deleted_at is null`.
+
+One row is one OIDC provider. SAML arrives through a SAML-to-OIDC bridge rather than a native flow, because Better Auth 1.x has no SAML plugin and building one outside it would break the "authentication goes through Better Auth only" rule.
+
+**Two reads run before any workspace is known**, and neither is asking about a row: the boot sequence needs every enabled provider to build the OAuth client, and the sign-in page needs every enabled provider to draw its buttons. A visitor who has not signed in has no workspace to be scoped to. Migration 0091 shipped with a tenant-only policy, so both reads answered with nothing on every deployment whose application role is the ordinary one, and single sign-on could never have been configured at all. Migration 0094 adds a `for select` policy keyed on `app.sso_lookup`, set only by `withSSOLookup`. It is the one key here that names no row, and what keeps it narrow is the other direction: this table only, reads only, and the client secret in those rows is useless without the instance root key.
+
+### directory_sync_tokens, directory_sync_log *(P8-T08, migration 0092)*
+`directory_sync_tokens`: `workspace_id`, `token_hash`, `label`, `sso_connection_id?`, `expires_at?`, `revoked_at?`. Unique on `token_hash`, and a partial unique on `workspace_id where revoked_at is null`, so a workspace holds one live token and issuing a second revokes the first. **Hard-deleted**, not soft: a revoked token is a fact about the past.
+
+`directory_sync_log`: the operational record of what the identity provider asked for and what the instance did. Not an audit row, which is per domain write.
+
+**The eighth pre-tenant key.** A SCIM request carries a bearer token and nothing else, so which workspace it provisions into is the question rather than the context. Migration 0092 shipped with a tenant-only policy and the lookup ran unscoped, so every SCIM request resolved to no workspace and answered 401, and every log line was refused and swallowed. Migration 0094 admits a row through `app.workspace_id` or through `app.directory_token_hash` matching its own `token_hash`, the same arrangement `api_tokens` has had since P5-T07a, and writes out the `with check` clause the original policy omitted so the pre-tenant key opens a read and never a write. `withDirectoryToken` is the only wrapper that sets it.
+
 ## 5. Spaces (domain B)
 
 ### spaces *(importable)*

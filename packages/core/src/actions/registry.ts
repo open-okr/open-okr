@@ -97,6 +97,7 @@ import {
   readPendingDevice,
   revokeApiToken,
 } from "./api-tokens.ts";
+import { exportAudit, verifyAudit } from "./audit.ts";
 import {
   claimUpload,
   getBlobForDownload,
@@ -513,6 +514,9 @@ export const ACTION_MAP = {
   "workspace.exportArchive": exportArchive,
   // P6-T05b. An archive into another instance (§7.3).
   "workspace.importArchive": importArchive,
+  // P8-T10. The audit trail, filtered out as a file, and the chain checked.
+  "audit.export": exportAudit,
+  "audit.verify": verifyAudit,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,

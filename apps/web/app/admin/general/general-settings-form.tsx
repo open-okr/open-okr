@@ -52,6 +52,9 @@ async function save(formData: FormData): Promise<void> {
         timezone: timezone === "" ? undefined : timezone,
         language: language === "" ? undefined : language,
         trustedEmailDomains,
+        // A checkbox that is off sends nothing at all, so the absence is the
+        // value rather than a missing one (P8-T09).
+        requireSecondFactor: formData.get("requireSecondFactor") === "on",
       },
     );
   } catch (error) {
@@ -120,6 +123,24 @@ export async function GeneralSettingsForm({
               className={INPUT_CLASS}
             />
           </label>
+          <div className="flex flex-col gap-1 border-t border-line pt-3">
+            <label
+              htmlFor="requireSecondFactor"
+              className="flex items-center gap-2 text-sm text-ink-2"
+            >
+              <input
+                type="checkbox"
+                id="requireSecondFactor"
+                name="requireSecondFactor"
+                defaultChecked={settings.requireSecondFactor === true}
+                className="rounded"
+              />
+              {t("admin.general.generalSettingsForm.requireSecondFactor")}
+            </label>
+            <p className="text-xs text-ink-3">
+              {t("admin.general.generalSettingsForm.requireSecondFactorHint")}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
             <Button type="submit" variant="primary" size="sm">
               {t("common.save")}
