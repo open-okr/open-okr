@@ -253,6 +253,28 @@ directions: it catches a read and a write, it stays quiet inside a wrapper, on
 an unguarded table, in the command line, and behind a marker, and it has no
 opinion when the caller supplies no tables.
 
+### Finding 4 was two gaps and five false positives
+
+**The scan that produced it looked for `###` and the plan writes some parts as
+`####`.** P7-T01a, P7-T01b, P7-T02a, P7-T03a and P7-T03b each had a full
+heading all along, with deliverables and an acceptance line, one level further
+down. Only P6-G27a and P6-G27b were genuinely described by bullets under their
+parent and nowhere else.
+
+That is worth recording rather than quietly fixing, because it is the audit
+making the mistake the audit is about: a check that answers a narrower question
+than the one it is read as answering. The finding said "no heading" and what it
+could see was "no `###`".
+
+Both halves are closed now. P6-G27a and P6-G27b have headings in the shape
+every other lettered part uses, written from what the tracker records they
+turned out to be. The five `####` headings are `###`, which is the level every
+other split part in the document uses, so the inconsistency that made the scan
+wrong is gone rather than documented around.
+
+All 254 tracker rows now resolve to a heading. Nine headings still have no row
+and all nine are split parents, which is the convention.
+
 ### Still open
 
 | Row | Why it is still open |
@@ -261,7 +283,7 @@ opinion when the caller supplies no tables.
 | `P6-G22d` | A message can carry a value |
 | `P4-T14b-b` | Copilot background runs, blocked |
 
-The seven plan headings named in finding 4 are not added yet.
+The seven rows named in finding 4 are closed: two headings written, five already present a level down.
 
 **Finding 1 unblocked OIDC, not SAML.** An administrator can configure an OIDC
 provider now. SAML still has no screen, so P8-T07c-b remains the row that makes
