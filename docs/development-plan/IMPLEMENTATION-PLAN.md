@@ -1894,8 +1894,56 @@ nothing better to do. Giving it some is a design decision about the message
 format, not a mechanical change, which is why this is its own row rather than
 part of the one that found it.
 
-Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the 187 fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
+Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
 Test plan: a message with a placeholder renders with the value substituted; a missing parameter fails rather than rendering the placeholder; the fragment count is zero and stays there.
+Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
+
+**Cut in two on 20 September 2026, before the content was touched, and the
+seam is the one P6-G22b and P6-G22c already used here: the gate before the
+work it measures.** The row is marked [M] on an estimate of 187 entries,
+counted by reading the catalogue. Counting the call sites instead, with a
+parser rather than by eye, gives **213 keys rendered beside a value across 319
+places in 85 files**. That is the shape of P6-G22c, which is [L], and for the
+same reason: each site needs an English sentence rewritten with the hole in the
+right place, a Malay stub, and the dead keys removed. It is not one session.
+
+The estimate was low because it was made from the values. An entry reads as a
+fragment when it starts lowercase, so "pending" and "linked" were counted and
+they are labels; and "Held back, because" was not, and it is a fragment. The
+call site is what decides, and only a parser can see it.
+
+- **P6-G22d-a**: a message can carry a value, and a new fragment fails the
+  build. The 213 keys are listed by name as a debt that only shrinks.
+- **P6-G22d-b**: the 319 sites recombined, and the list emptied.
+
+### P6-G22d-a: A message can carry a value, and a new fragment fails [M]
+Depends on: P6-G22c
+Goal: the machinery exists and the debt stops growing.
+
+**Named holes and nothing else.** `{count}`, `{champion}`. No plural
+selection, no number or date formatting, no nesting: that is ICU
+MessageFormat, which is a library, a parser and a dependency to approve. What
+these sentences need is a hole with a name in it, and a sentence whose wording
+changes with a count picks its key at the call site, where a reader of the
+source can see it happen.
+
+**The gate is about the call site, not the value.** "A catalogue key may not be
+rendered next to an interpolation" is the defect itself; "an entry whose
+English begins mid-sentence" is a proxy for it that flags every lowercase
+label and misses every fragment starting with a capital. Both rules run: the
+second only for a value starting with punctuation, which no language begins a
+message with and which has no reading as a label.
+
+Deliverables: `translate(catalogue, key, values)` substituting named holes, failing on a hole with no value and on a value with no hole; the same parameter on `useTranslations` and `getTranslations`; the pseudo-locale transform leaving a hole intact; a parser-based check over every route that refuses a catalogue key rendered beside an interpolation; the 213 keys listed by name, with the list documented as a debt that only shrinks and a test that fails when it names a key that no longer qualifies.
+Test plan: a message with a hole renders with the value substituted; a missing value fails rather than rendering the hole; a value with no hole fails, which is a renamed hole; the pseudo catalogue keeps its holes; a newly fragmented message in an unlisted file fails; a stale entry in the list fails.
+Acceptance: Given a new message rendered beside a value in a route not on the list, when the check runs, then it fails naming the key and the file.
+
+### P6-G22d-b: The sentences themselves [L]
+Depends on: P6-G22d-a
+Goal: a translator sees whole sentences.
+
+Deliverables: the 319 sites recombined into whole messages with named holes, their keys renamed to say what the sentence is rather than how it started, the now-unused fragment keys removed from both catalogues, and the list from P6-G22d-a emptied.
+Test plan: the list is `[]`; every key still has a consumer; Bahasa Melayu carries every hole the English source does, by name.
 Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
 
 ### P6-G23: Theme and density control [S]

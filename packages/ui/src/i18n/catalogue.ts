@@ -32,13 +32,26 @@
  * catalogue of 1,354 entries that nobody can find a key in is a catalogue
  * nobody maintains.
  *
- * **187 of the 1,354 values are sentence fragments, and that is a known
- * defect** (P6-G22d). A sentence with a number or a name in the middle of it
- * became several keys on either side of the interpolation, so a catalogue now
- * holds entries like "at" and "minutes. A shorter window means…". Word order
- * differs between languages and a translator cannot put those back together.
- * Fixing it needs parameters in a message, which `translate` does not have and
- * which is a design decision rather than a mechanical one.
+ * **A message carries values, and a sentence stays whole** (P6-G22d-a). The
+ * move split every sentence that interleaved with an expression, because
+ * `translate` took a key and nothing else: a catalogue held entries like "at"
+ * and "minutes. A shorter window means…" on either side of a number. Word
+ * order differs between languages, so a translator handed the piece "at" has
+ * no way to know what it attaches to. A message now says `{hour}` where the
+ * value goes and the translator moves the hole to wherever their own language
+ * needs it.
+ *
+ * **Named holes and nothing else.** No plural selection, no number or date
+ * formatting, no nesting: that is ICU MessageFormat, and it is a library, a
+ * parser and a dependency. What these sentences need is a hole with a name in
+ * it. A sentence whose wording changes with a count picks its key at the call
+ * site instead, which is visible in the source rather than hidden in a format
+ * string.
+ *
+ * **213 keys are still fragments, in 319 places across 85 files.** They are
+ * listed by name in `apps/web/test/fragmented-messages.ts` as a debt that only
+ * shrinks, and emptying it is P6-G22d-b. The machinery above is what makes
+ * emptying it possible.
  */
 import en from "./messages/en.json";
 import ms from "./messages/ms.json";
@@ -59,7 +72,30 @@ export function missingKeys(locale: Locale): readonly string[] {
   return Object.keys(source).filter((key) => !(key in target));
 }
 
-export function translate(catalogue: Catalogue, key: string): string {
+/** What a message's named holes are filled with. */
+export type MessageValues = Readonly<Record<string, string | number>>;
+
+/**
+ * A named hole: `{count}`, `{champion}`.
+ *
+ * Deliberately narrow. `${a}` inside a message is a template literal somebody
+ * is describing rather than a hole, and `{` followed by anything that is not
+ * an identifier stays the character it is.
+ */
+const HOLE = /(?<!\$)\{([A-Za-z][A-Za-z0-9]*)\}/g;
+
+/** The holes a message has, in the order it has them, without duplicates. */
+export function messageHoles(message: string): readonly string[] {
+  return [
+    ...new Set([...message.matchAll(HOLE)].map((match) => match[1] ?? "")),
+  ];
+}
+
+export function translate(
+  catalogue: Catalogue,
+  key: string,
+  values?: MessageValues,
+): string {
   const value = catalogue[key];
   if (value === undefined) {
     // A missing key is a build-time defect (missingKeys above catches it
@@ -67,8 +103,36 @@ export function translate(catalogue: Catalogue, key: string): string {
     // one to hide behind a fallback string that looks like real content.
     throw new Error(`No catalogue entry for "${key}".`);
   }
-  return value;
+
+  const holes = messageHoles(value);
+  if (holes.length === 0 && values === undefined) {
+    return value;
+  }
+
+  const supplied = values ?? {};
+  // **Both directions, and the second one is the useful one.** A missing value
+  // would render "{count}" on a screen, which is the defect this replaces. A
+  // value nobody asked for means the message was reworded and its hole
+  // renamed, which otherwise fails silently in one locale at a time.
+  const missing = holes.filter((hole) => !(hole in supplied));
+  if (missing.length > 0) {
+    throw new Error(
+      `The message "${key}" has no value for ${missing.map((one) => `{${one}}`).join(", ")}.`,
+    );
+  }
+  const unused = Object.keys(supplied).filter((name) => !holes.includes(name));
+  if (unused.length > 0) {
+    throw new Error(
+      `The message "${key}" has no hole for ${unused.join(", ")}.`,
+    );
+  }
+
+  return value.replace(HOLE, (_, name: string) => String(supplied[name]));
 }
+
+/** Splits a message into its holes and the text between them. */
+const HOLE_SPLIT = /((?<!\$)\{[A-Za-z][A-Za-z0-9]*\})/;
+const HOLE_WHOLE = /^\{[A-Za-z][A-Za-z0-9]*\}$/;
 
 const PSEUDO_ACCENTS: Readonly<Record<string, string>> = {
   a: "ä",
@@ -92,10 +156,20 @@ const PSEUDO_ACCENTS: Readonly<Record<string, string>> = {
  * other half of the check.
  */
 export function toPseudoLocale(value: string): string {
-  const accented = value.replace(
-    /[aeiouAEIOU]/g,
-    (letter) => PSEUDO_ACCENTS[letter] ?? letter,
-  );
+  // **A hole is left alone** (P6-G22d). Accenting `{count}` into `{cöünt}`
+  // would make every parameterised message throw under the one check whose
+  // job is to find defects rather than to cause them.
+  const accented = value
+    .split(HOLE_SPLIT)
+    .map((part) =>
+      HOLE_WHOLE.test(part)
+        ? part
+        : part.replace(
+            /[aeiouAEIOU]/g,
+            (letter) => PSEUDO_ACCENTS[letter] ?? letter,
+          ),
+    )
+    .join("");
   const padding = "~".repeat(Math.max(1, Math.ceil(value.length * 0.3)));
   return `[${accented}${padding}]`;
 }
