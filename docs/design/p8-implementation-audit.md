@@ -275,15 +275,25 @@ wrong is gone rather than documented around.
 All 254 tracker rows now resolve to a heading. Nine headings still have no row
 and all nine are split parents, which is the convention.
 
-### Still open
+### Nothing is still open
 
-| Row | Why it is still open |
+All three rows finding 3 named were closed on 20 September 2026, so the
+sentence that opened this audit, that the plan is not fully built, stopped
+being true five days after it was written. What each one turned out to hold:
+
+| Row | What closing it found |
 |---|---|
-| ~~`P8-T07c-b`~~ | Closed 20 September 2026. It found a fourth occurrence of this audit's own pattern on the way: `syncAllSamlProviders` was built, tested and never called by anything in the application, so the table the SAML plugin reads was empty on every instance |
-| `P6-G22d` | A message can carry a value |
-| `P4-T14b-b` | Copilot background runs, blocked |
+| `P8-T07c-b` | A fourth occurrence of this audit's own pattern: `syncAllSamlProviders` was built, tested and called by nothing in the application, so the table the SAML plugin reads was empty on every instance |
+| `P6-G22d` | 213 keys rendered beside a value, not the 187 estimated, which made it two rows. The gate landed first and the 319 sites followed |
+| `P4-T14b-b` | Not blocked, and had not been since 27 August. The row said so and nobody had read it |
 
-The seven rows named in finding 4 are closed: two headings written, five already present a level down.
+The seven rows named in finding 4 are closed too: two headings written, five
+already present a level down.
+
+**One row was cut in two and one estimate was wrong by a third**, both because
+the count was made by reading rather than by parsing. That is the same mistake
+finding 4 made in this document, in the same week, and it is worth naming
+twice: a number obtained by eye is a guess wearing a number's clothes.
 
 **Both protocols can be configured now.** Finding 1 unblocked OIDC on
 18 September and P8-T07c-b unblocked SAML on 20 September, which was the
