@@ -90,10 +90,28 @@ jobs:
         run: |
           set -euo pipefail
           ./openokr up
-          # The seed goes through the same registration the smoke test uses,
-          # so the rows this asserts on afterwards were written by the
-          # product rather than inserted behind it.
-          bash ./smoke-test.sh
+
+          # **The registration happens here rather than by running the smoke
+          # test.** This step used to call `smoke-test.sh` to seed, and that
+          # script tears its own instance down on exit, volumes and secrets
+          # included: its `cleanup` says so. The seed was destroyed the
+          # moment it was made, and every step after this one met
+          # `service "db" is not running`. The job failed that way every
+          # night from at least 15 September and never once tested an
+          # upgrade.
+          #
+          # The request below is the one the smoke test makes internally, so
+          # the rows asserted on afterwards are still written by the product
+          # rather than inserted behind it.
+          code="$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST "http://localhost/api/auth/sign-up/email" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@example.com","password":"correct-horse-battery-staple","name":"Ada Lovelace"}')"
+          [ "$code" = "200" ] || {
+            echo "creating the first account on the baseline returned $code" >&2
+            exit 1
+          }
+          echo "baseline seeded: one account and one provisioned workspace"
 
       - name: Record what the baseline holds
         id: before
@@ -225,9 +243,21 @@ jobs:
         id: before
         run: |
           set -euo pipefail
-          pod="$(kubectl get pod -l app.kubernetes.io/component=postgresql -o name | head -1)"
+          # **The namespace, the label and the release name were all wrong,
+          # and each one alone was fatal.** `cluster-test.sh` installs into
+          # `openokr-test` as the release `okr`, and labels its stand-in
+          # Postgres `app: postgres`. This looked in `default` for
+          # `app.kubernetes.io/component=postgresql`, found nothing, and ran
+          # `kubectl exec` with an empty pod name, so the job died on
+          # "pod, type/name or --filename must be specified" before it
+          # upgraded anything. Every night from at least 15 September.
+          pod="$(kubectl get pod -n openokr-test -l app=postgres -o name | head -1)"
+          [ -n "$pod" ] || {
+            echo "no postgres pod in openokr-test: the baseline never installed" >&2
+            exit 1
+          }
           for table in workspaces workspace_members audit_events; do
-            n="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}")"
+            n="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}")"
             echo "${table}=$(echo "$n" | tr -d ' ')" >> "$GITHUB_OUTPUT"
           done
 
@@ -240,20 +270,26 @@ jobs:
         # it stops one container and starts another.
         run: |
           set -euo pipefail
-          helm upgrade openokr deploy/helm \
+          # The release is `okr` in `openokr-test`, and `--reuse-values` is
+          # not optional: without it the database URL, the replica count and
+          # the pull policy `cluster-test.sh` installed with are all dropped,
+          # and the upgrade rolls out a release that cannot reach a database.
+          helm upgrade okr deploy/helm \
+            --namespace openokr-test \
+            --reuse-values \
             --set image.tag=under-test \
             --wait --timeout 10m
 
       - name: The workspace is intact
         run: |
           set -euo pipefail
-          pod="$(kubectl get pod -l app.kubernetes.io/component=postgresql -o name | head -1)"
+          pod="$(kubectl get pod -n openokr-test -l app=postgres -o name | head -1)"
           for pair in \
             "workspaces=${{ steps.before.outputs.workspaces }}" \
             "workspace_members=${{ steps.before.outputs.workspace_members }}" ; do
             table="${pair%%=*}"
             was="${pair#*=}"
-            now="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}" | tr -d ' ')"
+            now="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from ${table}" | tr -d ' ')"
             [ "$now" = "$was" ] || {
               echo "${table}: ${was} before the upgrade, ${now} after" >&2
               exit 1
@@ -261,7 +297,7 @@ jobs:
           done
           # Append-only, so it may grow and must not shrink.
           was="${{ steps.before.outputs.audit_events }}"
-          now="$(kubectl exec "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from audit_events" | tr -d ' ')"
+          now="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc "select count(*) from audit_events" | tr -d ' ')"
           [ "$now" -ge "$was" ] || {
             echo "audit_events fell from ${was} to ${now}" >&2
             exit 1
@@ -270,5 +306,5 @@ jobs:
       - name: What went wrong
         if: failure()
         run: |
-          kubectl get pods -o wide || true
-          kubectl logs -l app.kubernetes.io/name=openokr --tail=200 || true
+          kubectl get pods -n openokr-test -o wide || true
+          kubectl logs -n openokr-test -l app.kubernetes.io/name=openokr --tail=200 || true
