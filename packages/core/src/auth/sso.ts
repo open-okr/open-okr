@@ -20,6 +20,7 @@ import {
   type KeyRing,
   type SealedSecret,
 } from "../secrets/key-ring.ts";
+import { withoutTrailingSlashes } from "../urls.ts";
 import { syncSamlProvider } from "./saml-sync.ts";
 
 /** The shape the sign-in page needs to show SSO buttons. No secrets. */
@@ -343,7 +344,11 @@ export function samlServiceProviderUrls(
   baseUrl: string,
   providerId: string,
 ): SamlServiceProviderUrls {
-  const base = baseUrl.replace(/\/+$/, "");
+  // Through the shared helper, never a fresh anchored quantifier over slashes.
+  // CodeQL classifies that as a polynomial denial of service, and `urls.ts`
+  // exists because the pattern had already been written four times and come
+  // back. This was the fifth, and CodeQL caught it on the pull request.
+  const base = withoutTrailingSlashes(baseUrl);
   return {
     entityId: base,
     acsUrl: `${base}/api/auth/sso/saml2/sp/acs/${providerId}`,
