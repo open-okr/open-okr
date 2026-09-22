@@ -81,7 +81,7 @@ export default async function ActivityPage({
       ...(cursor ? { cursor } : {}),
     }),
     callAction(context, "people.directory", {}),
-    callAction(context, "settings.readWorkspaceSettings", {}),
+    callAction(context, "settings.readForMember", {}),
   ]);
 
   const names = new Map(directory.map((member) => [member.id, member.name]));

@@ -56,21 +56,29 @@ export default async function HomePage({
    * The default is `true`, so a workspace nobody marked never comes here: only
    * one provisioning wrote `false` for is pending.
    */
-  const welcome = await callAction(
-    context,
-    "settings.readWorkspaceSettings",
-    {},
-  );
-  if (welcome.settings.onboardingDone === false) {
-    redirect("/welcome");
-  }
-  const query = await searchParams;
-
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+
+  const welcome = await callAction(context, "settings.readForMember", {});
+  // **Only somebody who can finish the setup is sent to it** (P8-G05a). S-34
+  // refuses anybody below `full` and sends them back here, so redirecting a
+  // member below it produces an infinite loop between the two screens rather
+  // than a wrong page. The pair has to agree on who the screen is for, and the
+  // welcome screen is the one that decides.
+  //
+  // This was hidden until P8-G05: the read above was declared `full`, so for an
+  // ordinary member it threw and this line was never reached. Fixing the read
+  // turned a broken screen into a loop, which is the worse failure of the two.
+  if (
+    level >= ACCESS_LEVELS.full &&
+    welcome.settings.onboardingDone === false
+  ) {
+    redirect("/welcome");
+  }
+  const query = await searchParams;
 
   const cycles = await callAction(context, "cycles.list", {});
   const current = await callAction(context, "cycles.current", {

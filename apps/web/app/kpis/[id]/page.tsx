@@ -103,11 +103,7 @@ export default async function KpiDetailPage({
     }
     throw error;
   }
-  const settings = await callAction(
-    context,
-    "settings.readWorkspaceSettings",
-    {},
-  );
+  const settings = await callAction(context, "settings.readForMember", {});
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());

@@ -127,6 +127,71 @@ export const readProviderConfig = defineReadAction({
   },
 });
 
+/**
+ * Whether the AI assists can offer anything at all (P8-G05).
+ *
+ * **One boolean, because that is the whole question a member's screen asks.**
+ * The goal detail called `ai.readProviderConfig` for it, which is declared
+ * `full` and correctly so: its own summary says it returns every provider's
+ * admin configuration with a masked hint for the workspace key. An ordinary
+ * member holds `edit` on the workspace, so the whole goal screen failed for
+ * anybody who did not create the workspace, over a question that carries no
+ * configuration in its answer.
+ *
+ * Nothing about which provider, which model, which key or whether one is valid
+ * leaves this. A member who may edit a goal may know whether the draft assist
+ * will do anything when they press it, and a disabled control that never says
+ * why is the alternative.
+ */
+export const readAiAvailability = defineReadAction({
+  name: "ai.readAvailability",
+  summary:
+    "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
+  input: z.object({}),
+  output: z.object({ available: z.boolean() }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (tx) => {
+      const providers = await tx
+        .select({
+          provider: aiProviders.provider,
+          enabled: aiProviders.enabled,
+        })
+        .from(aiProviders)
+        .where(
+          activeOnly(
+            aiProviders,
+            eq(aiProviders.workspaceId, context.workspaceId),
+            eq(aiProviders.enabled, true),
+          ),
+        );
+      if (providers.length === 0) {
+        return { available: false };
+      }
+
+      // A workspace credential, counted rather than returned. `isNull` on the
+      // owner is what separates the workspace's own key from a member's
+      // personal one, exactly as `readProviderConfig` does it; the row's key,
+      // hint and status never leave this function.
+      const credentials = await tx
+        .select({ provider: aiCredentials.provider })
+        .from(aiCredentials)
+        .where(
+          activeOnly(
+            aiCredentials,
+            eq(aiCredentials.workspaceId, context.workspaceId),
+            isNull(aiCredentials.ownerMemberId),
+          ),
+        );
+      const withKey = new Set(credentials.map((row) => row.provider));
+      return {
+        available: providers.some((row) => withKey.has(row.provider)),
+      };
+    });
+  },
+});
+
 export const updateProviderConfig = defineWriteAction({
   name: "ai.updateProviderConfig",
   summary:

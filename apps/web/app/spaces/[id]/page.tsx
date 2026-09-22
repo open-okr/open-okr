@@ -58,7 +58,7 @@ export default async function SpacePage({
       ...(feedCursor ? { cursor: feedCursor } : {}),
     }),
     callAction(actor, "people.directory", {}),
-    callAction(actor, "settings.readWorkspaceSettings", {}),
+    callAction(actor, "settings.readForMember", {}),
   ]);
   const feedNames = new Map(
     feedDirectory.map((member) => [member.id, member.name]),

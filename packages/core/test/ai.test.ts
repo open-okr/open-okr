@@ -299,6 +299,133 @@ describe("an admin can never read a stored key, personal or workspace-level", ()
   });
 });
 
+/**
+ * The availability boolean an ordinary member's screen asks for (P8-G05).
+ *
+ * The goal detail asked `ai.readProviderConfig` whether the draft assist could
+ * offer anything. That action is declared `full`, correctly, because it carries
+ * every provider's configuration and a masked key hint. An ordinary member
+ * holds `edit` on the workspace, so the whole goal screen failed for anybody
+ * who had not created the workspace, over a question whose answer is one bit.
+ *
+ * Every test here acts as a plain member rather than as the owner, which is the
+ * thing no suite in this repository was doing when the defect shipped.
+ */
+describe("ai.readAvailability", () => {
+  it("answers an ordinary member, where the admin read refuses them", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Ordinary");
+    const actor = {
+      pool: wb.appPool,
+      workspaceId,
+      actor: { kind: "human" as const, memberId: member },
+      ring,
+    };
+
+    await expect(
+      callAction(actor, "ai.readProviderConfig", {}),
+    ).rejects.toMatchObject({ code: "not_found" });
+
+    await expect(callAction(actor, "ai.readAvailability", {})).resolves.toEqual(
+      { available: false },
+    );
+  });
+
+  it("is true once a provider is enabled and the workspace holds a key", async () => {
+    const wb = await workerDb();
+    const member = await addMember("Ordinary2");
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.updateProviderConfig",
+      { provider: "anthropic", enabled: true },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.setWorkspaceCredential",
+      { provider: "anthropic", apiKey: "sk-ant-availability" },
+    );
+
+    const read = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+        ring,
+      },
+      "ai.readAvailability",
+      {},
+    );
+    expect(read).toEqual({ available: true });
+  });
+
+  it("carries no provider, key, hint or status in its answer", async () => {
+    // The whole reason this action may be `view`: there is nothing in the
+    // response to leak. A future field would have to pass this assertion.
+    const wb = await workerDb();
+    const member = await addMember("Ordinary3");
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.updateProviderConfig",
+      { provider: "anthropic", enabled: true },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.setWorkspaceCredential",
+      { provider: "anthropic", apiKey: "sk-ant-nothing-leaks" },
+    );
+
+    const read = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+        ring,
+      },
+      "ai.readAvailability",
+      {},
+    );
+    expect(Object.keys(read)).toEqual(["available"]);
+    const serialised = JSON.stringify(read);
+    expect(serialised).not.toContain("sk-ant-nothing-leaks");
+    expect(serialised).not.toContain("anthropic");
+  });
+
+  it("is false when the only key is a member's personal one", async () => {
+    // `hasWorkspaceCredential` is `isNull(owner_member_id)`, and this answers
+    // the same question the same way. A personal key is not the workspace
+    // having one.
+    const wb = await workerDb();
+    const member = await addMember("Ordinary4");
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "ai.updateProviderConfig",
+      { provider: "anthropic", enabled: true, allowUserKeys: true },
+    );
+    await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+        ring,
+      },
+      "ai.setPersonalCredential",
+      { provider: "anthropic", apiKey: "sk-ant-personal-availability" },
+    );
+
+    const read = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", memberId: member },
+        ring,
+      },
+      "ai.readAvailability",
+      {},
+    );
+    expect(read).toEqual({ available: false });
+  });
+});
+
 describe("rotation", () => {
   it("re-wraps every credential onto a new current key, and each stays usable throughout", async () => {
     const wb = await workerDb();

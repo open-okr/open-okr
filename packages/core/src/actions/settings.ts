@@ -109,6 +109,123 @@ export const readWorkspaceSettings = defineReadAction({
   },
 });
 
+/**
+ * The keys any member of a workspace may read, named one by one (P8-G05).
+ *
+ * **An allow-list rather than a filter over the stored map.** A filter would
+ * mean that the next setting somebody adds is member-visible until a reviewer
+ * notices, and the stored map holds administrative values. A list is the other
+ * way round: a new setting is invisible here until somebody adds it on purpose.
+ */
+const MEMBER_VISIBLE_SETTINGS = ["timezone", "onboardingDone"] as const;
+
+/**
+ * The few settings an ordinary member's own screens need (P8-G05).
+ *
+ * **Why this exists at all.** `settings.readWorkspaceSettings` is declared
+ * `full`, correctly: it returns the whole stored map and its summary says it is
+ * for the admin cards. Eight screens that are not admin screens called it
+ * anyway, six of them for `timezone` alone and two for `onboardingDone`.
+ * Provisioning gives an ordinary member `edit` on the workspace context and
+ * reserves `full` for the founder, so every member who did not create the
+ * workspace met "We could not load..." on the Overview, the activity feed, any
+ * goal, any KPI, any person and any space.
+ *
+ * **Why no test caught it**, which matters more than the fix: every suite signs
+ * in as the founding member, who holds `full`. It was found by giving the demo
+ * cast real accounts and signing in as one of them. The test beside this one
+ * acts as a member with `edit` and nothing more.
+ *
+ * Deliberately the same output shape as the read it replaces at those call
+ * sites, so the change at each is the action name and nothing else.
+ */
+export const readSettingsForMember = defineReadAction({
+  name: "settings.readForMember",
+  summary: "The workspace settings any member may read, for their own screens.",
+  input: z.object({}),
+  output: z.object({
+    workspaceId: z.uuid(),
+    settings: z.object({
+      timezone: z.string().optional(),
+      onboardingDone: z.boolean().optional(),
+    }),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError(
+        "not_found",
+        "No such workspace, or you are not a member of it.",
+      );
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+        if (!member) {
+          throw new OperationError(
+            "not_found",
+            "No such workspace, or you are not a member of it.",
+          );
+        }
+
+        await getAccessScoped(tx, {
+          workspaceId: context.workspaceId,
+          memberId: member.id,
+          resourceType: "workspace",
+          resourceId: context.workspaceId,
+          requires: ACCESS_LEVELS.view,
+        });
+
+        const [workspace] = await tx
+          .select({ settings: workspaces.settings })
+          // openokr:allow-raw-read: access was just confirmed above, same as
+          // the admin read above it. Only the listed keys leave this function.
+          .from(workspaces)
+          .where(activeOnly(workspaces, eq(workspaces.id, context.workspaceId)))
+          .limit(1);
+        if (!workspace) {
+          throw new OperationError(
+            "not_found",
+            "No such workspace, or you are not a member of it.",
+          );
+        }
+
+        const stored = workspace.settings as Record<string, unknown>;
+        const settings: { timezone?: string; onboardingDone?: boolean } = {};
+        for (const key of MEMBER_VISIBLE_SETTINGS) {
+          const value = stored[key];
+          // Typed on the way out rather than cast. A stored value of the wrong
+          // shape is left out, which every call site already handles: all six
+          // timezone readers carry their own `?? "UTC"`.
+          if (key === "timezone" && typeof value === "string") {
+            settings.timezone = value;
+          }
+          if (key === "onboardingDone" && typeof value === "boolean") {
+            settings.onboardingDone = value;
+          }
+        }
+
+        return { workspaceId: context.workspaceId, settings };
+      },
+    );
+  },
+});
+
 export const updateWorkspaceGeneralSettings = defineWriteAction({
   name: "settings.updateWorkspaceGeneral",
   summary:

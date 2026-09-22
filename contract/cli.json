@@ -1903,6 +1903,16 @@
       "pages": false
     },
     {
+      "name": "settings readForMember",
+      "action": "settings.readForMember",
+      "method": "GET",
+      "path": "/settings/readForMember",
+      "scope": "read",
+      "summary": "The workspace settings any member may read, for their own screens.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "settings updateWorkspaceGeneral",
       "action": "settings.updateWorkspaceGeneral",
       "method": "POST",
@@ -1971,6 +1981,16 @@
       "path": "/ai/readProviderConfig",
       "scope": "read",
       "summary": "Every provider's admin configuration, with a masked hint for its workspace key.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "ai readAvailability",
+      "action": "ai.readAvailability",
+      "method": "GET",
+      "path": "/ai/readAvailability",
+      "scope": "read",
+      "summary": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
       "flags": [],
       "pages": false
     },

@@ -66,7 +66,7 @@ export default async function MemberProfilePage({
       ...(feedCursor ? { cursor: feedCursor } : {}),
     }),
     callAction(context, "people.directory", {}),
-    callAction(context, "settings.readWorkspaceSettings", {}),
+    callAction(context, "settings.readForMember", {}),
   ]);
   const feedNames = new Map(
     feedDirectory.map((member) => [member.id, member.name]),

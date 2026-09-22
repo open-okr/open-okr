@@ -165,6 +165,101 @@ describe("settings.readWorkspaceSettings", () => {
   });
 });
 
+/**
+ * The member-visible half (P8-G05).
+ *
+ * **This describe exists because the one above it was right and still let a
+ * product-wide defect through.** `settings.readWorkspaceSettings` is declared
+ * `full` and the test above proves it refuses an edit-only member, which is
+ * correct. Nobody checked who called it: eight screens that an ordinary member
+ * opens every day did, six of them for `timezone` alone. Provisioning gives an
+ * ordinary member `edit` on the workspace and reserves `full` for the founder,
+ * so every member who did not create the workspace met an error page on the
+ * Overview, the activity feed, any goal, any KPI, any person and any space.
+ *
+ * It went unseen because every suite, and every end-to-end spec, signs in as
+ * the founding member. So every test here acts as a member holding `edit` and
+ * nothing more, which is what an invited colleague actually holds.
+ */
+describe("settings.readForMember", () => {
+  it("serves a member who holds edit but not full access", async () => {
+    const editor = await addMemberWithUser("Reader", "settings-reader");
+    await grantEditOnWorkspace(editor);
+
+    const read = await callAction(
+      { pool: (await workerDb()).appPool, ...context("settings-reader") },
+      "settings.readForMember",
+      {},
+    );
+
+    expect(read.workspaceId).toBe(workspaceId);
+    // Provisioning writes `false`, because a brand-new workspace has something
+    // to finish. The Overview redirects to /welcome on exactly this.
+    expect(read.settings.onboardingDone).toBe(false);
+  });
+
+  it("serves the timezone the six feed screens render timestamps in", async () => {
+    const editor = await addMemberWithUser("Reader2", "settings-reader-2");
+    await grantEditOnWorkspace(editor);
+
+    await callAction(
+      { pool: (await workerDb()).appPool, ...context(OWNER) },
+      "settings.updateWorkspaceGeneral",
+      { timezone: "Asia/Jakarta" },
+    );
+
+    const read = await callAction(
+      { pool: (await workerDb()).appPool, ...context("settings-reader-2") },
+      "settings.readForMember",
+      {},
+    );
+    expect(read.settings.timezone).toBe("Asia/Jakarta");
+  });
+
+  it("gives out the listed keys and nothing else", async () => {
+    // The allow-list is the point. A filter over the stored map would make the
+    // next setting somebody adds member-visible until a reviewer noticed; this
+    // asserts the opposite direction, that the admin map does not leak through.
+    const editor = await addMemberWithUser("Reader3", "settings-reader-3");
+    await grantEditOnWorkspace(editor);
+
+    await callAction(
+      { pool: (await workerDb()).appPool, ...context(OWNER) },
+      "settings.updateWorkspaceGeneral",
+      { trustedEmailDomains: ["northwind.example"] },
+    );
+
+    const stored = await readSettings();
+    expect(stored.trustedEmailDomains).toBeDefined();
+
+    const read = await callAction(
+      { pool: (await workerDb()).appPool, ...context("settings-reader-3") },
+      "settings.readForMember",
+      {},
+    );
+    expect(Object.keys(read.settings).sort()).toEqual([
+      "onboardingDone",
+      "timezone",
+    ]);
+  });
+
+  it("still refuses somebody who is not a member at all", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      ["settings-outsider", "Outsider", "settings-outsider@example.com"],
+    );
+
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context("settings-outsider") },
+        "settings.readForMember",
+        {},
+      ),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("settings.updateWorkspaceGeneral", () => {
   it("changes only the keys it was given", async () => {
     const before = await readSettings();

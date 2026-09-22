@@ -53,6 +53,7 @@ export {
   getAction,
 } from "./actions/registry.ts";
 export {
+  readSettingsForMember,
   readWorkspaceSettings,
   resetWorkspaceSettings,
   updateWorkspaceBranding,

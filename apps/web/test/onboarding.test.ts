@@ -112,4 +112,31 @@ describe("it refuses to be reachable when it should not be", () => {
     expect(home).toContain('redirect("/welcome")');
     expect(home).toContain("welcome.settings.onboardingDone === false");
   });
+
+  test("the front door sends only somebody who may finish the setup (P8-G05a)", () => {
+    // **The two screens have to agree on who this is for, or they loop.** S-34
+    // refuses anybody below `full` and sends them back to the front door; if
+    // the front door does not apply the same condition, a member below `full`
+    // on a pending workspace bounces between the two for ever.
+    //
+    // Live for a few minutes on 22 September 2026 and reported from a browser,
+    // not by a test. It was invisible before that day because the front door
+    // read the settings through an action declared `full`, so for an ordinary
+    // member it threw and this line was never reached: fixing that read turned
+    // a broken screen into an infinite loop, which is the worse of the two.
+    //
+    // Asserted as the two conditions in one expression rather than as their
+    // presence anywhere in the file, because that is the part that has to hold.
+    // Whitespace is collapsed first: the formatter breaks the expression across
+    // lines when it grows, and a test that failed for that reason would be
+    // measuring line length rather than the rule.
+    expect(home.replace(/\s+/g, " ")).toContain(
+      "level >= ACCESS_LEVELS.full && welcome.settings.onboardingDone === false",
+    );
+    // And the level has to be resolved before the redirect decides, or the
+    // expression above reads an undefined binding.
+    expect(
+      home.indexOf("const level = await resolveAccessLevelFor"),
+    ).toBeLessThan(home.indexOf('redirect("/welcome")'));
+  });
 });

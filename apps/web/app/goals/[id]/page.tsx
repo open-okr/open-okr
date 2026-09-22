@@ -80,7 +80,7 @@ export default async function GoalPage({
       ...(feedCursor ? { cursor: feedCursor } : {}),
     }),
     callAction(context, "people.directory", {}),
-    callAction(context, "settings.readWorkspaceSettings", {}),
+    callAction(context, "settings.readForMember", {}),
   ]);
   const feedNames = new Map(
     feedDirectory.map((member) => [member.id, member.name]),
@@ -146,9 +146,14 @@ export default async function GoalPage({
   // Whether the assist can offer anything, asked of the stored configuration
   // rather than assumed. With no provider the strip still shows every failing
   // rule and says the suggestion is what needs one.
-  const providers = await callAction(context, "ai.readProviderConfig", {});
-  const drafting = providers.some(
-    (entry) => entry.enabled && entry.hasWorkspaceCredential,
+  // One boolean rather than the provider table (P8-G05). This asked
+  // `ai.readProviderConfig`, which is declared `full` because it carries every
+  // provider's admin configuration and a masked key hint, so the whole screen
+  // failed for any member who did not create the workspace.
+  const { available: drafting } = await callAction(
+    context,
+    "ai.readAvailability",
+    {},
   );
 
   for (const keyResult of goal.keyResults) {
