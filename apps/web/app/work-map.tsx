@@ -5,6 +5,7 @@ import {
 } from "@openokr/method";
 import { Avatar, Bar, Card, CardBody, Chip } from "@openokr/ui";
 import type { ReactNode } from "react";
+import { progressCeiling } from "../lib/ceilings.ts";
 import { getTranslations } from "../lib/translations";
 import { HealthChip } from "./goals/health-chip.tsx";
 import { QuickCheckIn } from "./quick-check-in.tsx";
@@ -125,6 +126,9 @@ export async function GoalTable({
   readonly empty: ReactNode;
 }) {
   const { t } = await getTranslations();
+  // P8-G04. A bar drawn on a 0-to-100 track under a raised ceiling fills
+  // early and tells a screen reader 100 is the most there is.
+  const ceiling = await progressCeiling();
 
   const thresholds = canonThresholds();
 
@@ -222,6 +226,7 @@ export async function GoalTable({
                     <span className="flex items-center gap-2">
                       <Bar
                         value={node.progressPct}
+                        max={ceiling}
                         label={node.title}
                         className="h-1.5 w-20 lg:w-28"
                       />
@@ -263,6 +268,7 @@ export async function WorkMap({
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
   const { t } = await getTranslations();
+  const ceiling = await progressCeiling();
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
@@ -311,6 +317,7 @@ export async function WorkMap({
               <div className="flex items-center gap-2">
                 <Bar
                   value={selected.progressPct}
+                  max={ceiling}
                   label={selected.title}
                   className="h-1.5 flex-1"
                 />

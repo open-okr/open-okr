@@ -3,6 +3,7 @@ import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -190,7 +191,11 @@ export default async function KpiTreesPage({
                   <span className="text-xs text-ink-4">
                     {node.indicatorType} · {node.tier}
                   </span>
-                  <Bar value={node.achievementPct ?? 0} className="w-24" />
+                  <Bar
+                    value={node.achievementPct ?? 0}
+                    max={KPI_ACHIEVEMENT_MAX}
+                    className="w-24"
+                  />
                   <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
                     {node.achievementPct === null
                       ? "no data"

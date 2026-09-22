@@ -447,3 +447,30 @@
 .stagger > *:nth-child(n + 7) {
   animation-delay: 0.34s;
 }
+
+/* No form control below 16px under the 768 breakpoint (P8-G04, from the UI
+ * audit's proportions reference).
+ *
+ * **Safari on iOS zooms the page when a control smaller than 16px takes
+ * focus**, and it does not zoom back out, so tapping a field throws the
+ * layout somewhere the person did not ask to go. Every input in this product
+ * is `text-sm` (13px) or `text-xs` (12px).
+ *
+ * **One rule rather than several hundred edits.** There is no shared input
+ * class here: the field styling is written inline at every call site, in a
+ * dozen variants. Changing them one at a time would leave the ones nobody
+ * found still zooming, and would put the same decision in several hundred
+ * places. This is the whole fix, in the file that already owns what a
+ * control looks like.
+ *
+ * The three controls that carry no text are excluded, because a 16px
+ * checkbox is a different thing from 16px text and the zoom rule does not
+ * apply to them. Desktop is untouched: above the breakpoint every control
+ * keeps the size its own class gives it. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

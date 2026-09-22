@@ -16,6 +16,7 @@ import {
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { progressCeiling } from "../../../lib/ceilings.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -251,7 +252,11 @@ export default async function GoalPage({
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+              <Bar
+                value={goal.progressPct}
+                max={await progressCeiling()}
+                className="h-1.5 flex-1"
+              />
               <span className="text-xs font-semibold text-ink-3">
                 {Math.round(goal.progressPct)}%
               </span>

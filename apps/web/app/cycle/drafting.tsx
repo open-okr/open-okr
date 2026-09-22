@@ -188,7 +188,11 @@ export async function Drafting({
             />
 
             <div className="flex items-center gap-2.5">
-              <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+              <Bar
+                value={goal.progressPct}
+                max={thresholds["scoring.progressCeilingPct"]}
+                className="h-1.5 flex-1"
+              />
               <span className="text-xs font-semibold text-ink-3">
                 {Math.round(goal.progressPct)}%
               </span>
