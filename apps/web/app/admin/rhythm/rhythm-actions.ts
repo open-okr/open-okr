@@ -80,18 +80,34 @@ function composites(
   return found;
 }
 
+/**
+ * Saves whatever the submitted card carries, and nothing else (P8-G11).
+ *
+ * **Every field of `rhythm.update` is optional and `overrides` merges**, which
+ * is what lets one card submit its own thresholds without the other seven
+ * being present. `resetGroup` below has relied on that since P6-G20; this is
+ * the same property used for the save.
+ *
+ * So the payload is built from what arrived rather than read at fixed names.
+ * Reading `form.get("coachStrictness")` unconditionally, as this did while one
+ * form wrapped the whole screen, would send `null` for the three cadence
+ * settings on every save from any other card.
+ */
 export async function saveRhythm(
   _previous: RhythmState,
   form: FormData,
 ): Promise<RhythmState> {
   const overrides: Record<string, unknown> = {};
   const labels: Record<string, { singular: string; plural: string }> = {};
+  let sawThreshold = false;
+  let sawLabel = false;
 
   for (const [field, raw] of form.entries()) {
     const value = String(raw);
 
     if (field.startsWith("threshold:")) {
       overrides[field.slice("threshold:".length)] = numberOrNull(value);
+      sawThreshold = true;
       continue;
     }
     if (field.startsWith("label:")) {
@@ -101,10 +117,12 @@ export async function saveRhythm(
       }
       const existing = labels[term] ?? { singular: "", plural: "" };
       labels[term] = { ...existing, [shape]: value.trim() };
+      sawLabel = true;
     }
   }
 
   for (const [key, { parts, isList }] of composites(form.entries())) {
+    sawThreshold = true;
     // Every part blank means "return the whole parameter to the canon". Any
     // part blank while others are filled is a half-written ladder, and the
     // canon's is better than that, so the whole thing goes back.
@@ -136,22 +154,36 @@ export async function saveRhythm(
     ),
   );
 
+  // Absent means "this card does not hold that setting", which is different
+  // from "set it to nothing". Only what arrived is sent.
+  const patch: Parameters<typeof callAction<"rhythm.update">>[2] = {};
+  if (form.has("defaultCheckInFrequency")) {
+    patch.defaultCheckInFrequency = String(
+      form.get("defaultCheckInFrequency"),
+    ) as "daily" | "weekly" | "biweekly" | "monthly" | "quarterly";
+  }
+  if (form.has("checkInAnchorDay")) {
+    patch.checkInAnchorDay = Number(form.get("checkInAnchorDay"));
+  }
+  if (form.has("coachStrictness")) {
+    patch.coachStrictness = String(form.get("coachStrictness")) as
+      | "advisory"
+      | "warn"
+      | "strict";
+  }
+  if (sawThreshold) {
+    patch.overrides = overrides;
+  }
+  if (sawLabel) {
+    patch.labels = renames;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { error: "There was nothing on this card to save.", saved: null };
+  }
+
   try {
-    await callAction(await context(), "rhythm.update", {
-      defaultCheckInFrequency: form.get("defaultCheckInFrequency") as
-        | "daily"
-        | "weekly"
-        | "biweekly"
-        | "monthly"
-        | "quarterly",
-      checkInAnchorDay: Number(form.get("checkInAnchorDay")),
-      coachStrictness: form.get("coachStrictness") as
-        | "advisory"
-        | "warn"
-        | "strict",
-      overrides,
-      labels: renames,
-    });
+    await callAction(await context(), "rhythm.update", patch);
   } catch (error) {
     if (error instanceof OperationError) {
       return { error: error.message, saved: null };
@@ -160,6 +192,14 @@ export async function saveRhythm(
   }
 
   revalidatePath("/admin/rhythm");
+
+  // Counted over this card's thresholds rather than the workspace's, because
+  // that is what the sentence sits under. A card carrying no threshold at all
+  // gets the plain confirmation instead of "every threshold is the canon's",
+  // which would have been a claim about seven cards it never saw.
+  if (!sawThreshold) {
+    return { error: null, saved: "Saved." };
+  }
   const changed = Object.values(overrides).filter(
     (value) => value !== null,
   ).length;
@@ -167,17 +207,19 @@ export async function saveRhythm(
     error: null,
     saved:
       changed === 0
-        ? "Saved. Every threshold is the canon's."
-        : `Saved. ${changed} threshold${changed === 1 ? "" : "s"} differ${changed === 1 ? "s" : ""} from the canon.`,
+        ? "Saved. Every threshold on this card is the canon's."
+        : `Saved. ${changed} threshold${changed === 1 ? "" : "s"} on this card differ${changed === 1 ? "s" : ""} from the canon.`,
   };
 }
 
 /**
  * Returns one card's thresholds to the canon.
  *
- * Called from a button rather than submitted as a form, because the save form
- * wraps every card and a form inside a form is not markup a browser will
- * honour. The same reason the invitation revoke button is a button.
+ * Called from a button rather than submitted as a form. Each card is its own
+ * form since P8-G11, and reset sits inside that form beside the save, so a
+ * second form there would be a form inside a form, which is not markup a
+ * browser will honour. The same reason the invitation revoke button is a
+ * button.
  *
  * Sent as nulls rather than as the canon's numbers, which is the difference
  * between "this workspace has no opinion" and "this workspace has chosen

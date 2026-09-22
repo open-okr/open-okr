@@ -596,6 +596,8 @@
   "common.typeToConfirm": "Type {memberName} to confirm",
   "common.unlink": "Putus pautan",
   "common.unlinkHelp": "Nilai terakhir yang dilaporkan KPI kekal, sebagai nilai manual. Memutuskan pautan menghentikan KPI menulis di sini; ia tidak menetapkan semula ukuran.",
+  "common.unsaved": "Belum disimpan",
+  "common.unsavedChangesLeave": "Anda ada perubahan yang belum disimpan. Tinggalkan halaman ini dan hilangkannya?",
   "common.weak": "Weak",
   "common.weekly": "weekly",
   "common.whatHappens": "What happens",

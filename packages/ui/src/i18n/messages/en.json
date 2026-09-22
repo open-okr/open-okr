@@ -596,6 +596,8 @@
   "common.typeToConfirm": "Type {memberName} to confirm",
   "common.unlink": "Unlink",
   "common.unlinkHelp": "The last value the KPI reported stays, as a manual one. Unlinking stops the KPI writing here; it does not reset the measure.",
+  "common.unsaved": "Not saved",
+  "common.unsavedChangesLeave": "You have changes that have not been saved. Leave this page and lose them?",
   "common.weak": "Weak",
   "common.weekly": "weekly",
   "common.whatHappens": "What happens",

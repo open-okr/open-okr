@@ -83,6 +83,37 @@ describe("the rhythm and thresholds card", () => {
     expect(form).toContain("Reset to the canon");
   });
 
+  test("each card is its own form, so the save is beside what it saves", () => {
+    // Measured on 22 September 2026: one Save sat 7,785px below the first of
+    // the 123 fields it governed, which is 9.6 viewports on an 814px page.
+    // Every other long screen in this product already saves per card, so this
+    // was the one outlier rather than a pattern.
+    expect(form).toContain("function SettingsCard");
+    expect(form).toContain("data-testid={`rhythm-card-${id}`}");
+    // And the page itself no longer wraps everything in one form.
+    expect(form).not.toContain("<form action={submit} aria-busy={pending}");
+  });
+
+  test("a card sends only its own fields, and the action sends only what arrived", () => {
+    // `rhythm.update` takes every field as optional and merges `overrides`,
+    // which is what lets eight small saves replace one large one. Reading
+    // `form.get("coachStrictness")` unconditionally, as the single form did,
+    // would send null for the cadence settings on every save from any card
+    // that does not hold them.
+    expect(actions).toContain('form.has("coachStrictness")');
+    expect(actions).toContain("sawThreshold");
+    expect(actions).toContain("Object.keys(patch).length === 0");
+  });
+
+  test("unsaved work is guarded and ⌘⏎ saves", () => {
+    // Neither existed anywhere in this product: a grep for `beforeunload`
+    // across apps/web returned one comment, and no admin form bound the ⌘⏎
+    // that UIUX-PLAN.md §4 lists.
+    expect(form).toContain("useUnsavedGuard");
+    expect(form).toContain("useSubmitShortcut");
+    expect(form).toContain("useFormDirty");
+  });
+
   test("a blank box is the canon, not zero", () => {
     // `Number("")` is 0, which would have written a real override of zero
     // every time somebody cleared a field.

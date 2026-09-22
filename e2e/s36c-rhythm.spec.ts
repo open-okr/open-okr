@@ -18,6 +18,13 @@
  * the refusal and returned, so a value the method cannot accept and a
  * successful save looked exactly alike: the page came back, unchanged, saying
  * nothing.
+ *
+ * **Every assertion here is scoped to one card since P8-G11.** The screen used
+ * to be one form with a single Save at the bottom of 8,001 pixels; it is now
+ * eight forms, one per card, each saving its own thresholds. So "the Save
+ * button" is no longer a thing that exists on this page, and a page-level
+ * `getByRole("button", { name: "Save" })` matches eight elements and fails
+ * Playwright's strict mode rather than picking one.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -32,6 +39,16 @@ let page: Page;
 const GRACE = "input[name='threshold:cadence.stalenessGraceDays']";
 /** One rung of a ladder, which was read-only until P6-G20. */
 const LADDER_OWNER = "input[name='composite:cadence.blockerLadderHours:owner']";
+
+/**
+ * The card both fields live in. Every save, refusal and reset below belongs to
+ * this one form, and scoping to it is what keeps the assertions unambiguous
+ * now that seven sibling cards carry the same controls.
+ */
+const cadenceCard = (page: Page) => page.getByTestId("rhythm-card-cadence");
+const save = (page: Page) =>
+  cadenceCard(page).getByRole("button", { name: "Save" });
+const outcome = (page: Page) => cadenceCard(page).getByTestId("rhythm-save");
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
@@ -57,9 +74,9 @@ test("the card renders the registry, not a fixed list of fields", async () => {
 
 test("an impossible value is refused in words", async () => {
   await page.locator(GRACE).fill("99999");
-  await page.getByRole("button", { name: "Save" }).click();
+  await save(page).click();
 
-  const refusal = page.getByTestId("rhythm-save");
+  const refusal = outcome(page);
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("cadence.stalenessGraceDays");
 
@@ -70,8 +87,8 @@ test("an impossible value is refused in words", async () => {
 
 test("a grace this workspace asked for is written, and nothing else moves", async () => {
   await page.locator(GRACE).fill("5");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rhythm-save")).toContainText("Saved.", {
+  await save(page).click();
+  await expect(outcome(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -90,8 +107,8 @@ test("a ladder can be moved, which it could not before", async () => {
   await page
     .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
     .fill("60");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("rhythm-save")).toContainText("Saved.", {
+  await save(page).click();
+  await expect(outcome(page)).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -103,9 +120,9 @@ test("a half-written set is refused rather than stored", async () => {
   await page
     .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
     .fill("");
-  await page.getByRole("button", { name: "Save" }).click();
+  await save(page).click();
 
-  const refusal = page.getByTestId("rhythm-save");
+  const refusal = outcome(page);
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("every part");
 });
@@ -115,9 +132,8 @@ test("reset puts the whole card back to the canon", async () => {
   page.once("dialog", (dialog) => {
     void dialog.accept();
   });
-  await page
+  await cadenceCard(page)
     .getByRole("button", { name: "Reset to the canon" })
-    .first()
     .click();
 
   await expect(page.getByText("Returned")).toBeVisible({ timeout: 15_000 });

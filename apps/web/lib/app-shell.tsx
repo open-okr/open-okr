@@ -10,6 +10,7 @@ import {
   type SidebarGroup,
   Topbar,
   TopbarSearch,
+  UnsavedChangesProvider,
 } from "@openokr/ui";
 import { Settings } from "lucide-react";
 import { headers } from "next/headers";
@@ -185,101 +186,112 @@ export async function AppShellLayout({
 
   return (
     <KeyboardRegistryProvider>
-      <AppearanceSync theme={me.theme} density={me.density} />
-      <AppShell
-        skipToContentLabel={t("common.skipToContent")}
-        sidebar={
-          <Sidebar
-            groups={groups}
-            linkComponent={LinkComponent}
-            workspaceSwitcher={
-              <WorkspaceSwitcher memberships={memberships} active={workspace} />
-            }
-          />
-        }
-        topbar={
-          <Topbar
-            breadcrumb={workspace.name}
-            search={<TopbarSearch />}
-            askAi={<CopilotPanel initialAvailability={copilot} />}
-            avatarMenu={
-              <AvatarMenu
-                name={workspace.name}
-                // From the registry rather than a literal list. A literal one
-                // is how /account/channels shipped unlinked at P5-T02c and how
-                // /account/connections was still unlinked four tasks later:
-                // the page and the menu were two places to remember, and only
-                // one of them ever got opened. reachability.test.ts asserts
-                // the two agree.
-                items={accountItems.map((item) => ({
-                  href: item.href,
-                  label: item.label,
-                }))}
-                appearance={<AppearanceControl compact />}
-                signOut={<SignOut />}
-              />
-            }
-          />
-        }
-        cycleStrip={
-          strip ? (
-            <CycleStrip
-              phase={strip.phaseLabel}
-              blocking={strip.blocking}
-              dueInDays={strip.dueInDays}
-            />
-          ) : undefined
-        }
-        mobileTabBar={
-          <MobileTabBar
-            linkComponent={LinkComponent}
-            items={sidebarItems.slice(0, 4).map((item) => ({
-              id: item.id,
-              label: item.label,
-              href: item.href,
-              icon: iconFor(item.id),
-              active: item.id === active,
-            }))}
-          />
-        }
-      >
-        {/*
-         * A workspace that is not taking writes says so on every screen
-         * (P6-G25). Above the content rather than around it: reads are
-         * unaffected by design and the admin recovery list has to stay
-         * reachable, so this explains rather than blocks.
-         */}
-        {/* Somebody from outside the organisation is reading this workspace
-         * right now (P8-T04b). First of the three, because it is the only
-         * one that is about who is looking over the reader's shoulder, and
-         * the only one that cannot be dismissed. */}
-        <SupportBanner workspaceId={workspace.workspaceId} />
-        {/* What the vendor is saying, above the workspace's own state
-         * banner (P8-T03c). A site message is news from outside the
-         * organisation and the state banner is a fact about the workspace,
-         * so the outside one reads first. */}
-        <SiteMessages
-          userId={session.user.id}
-          workspaceId={workspace.workspaceId}
-        />
-        {workspace.state === "active" ? null : (
-          <div className="mb-4.5">
-            <WorkspaceStateBanner
-              state={workspace.state}
-              canRecover={level >= ACCESS_LEVELS.full}
-            />
-          </div>
-        )}
-        {children}
-      </AppShell>
       {/*
-       * Beside the shell rather than inside the topbar, because the palette is
-       * an overlay over the whole page. Mounted once here, so ⌘K works on every
-       * screen without each one remembering to render it (P5-T13).
+       * Around the whole shell rather than around each form, so a screen with
+       * unsaved work asks once however many forms it holds, and so a form
+       * added tomorrow is guarded without anybody remembering to mount
+       * anything (P8-G11).
        */}
-      <CommandPalette />
-      <ShortcutOverlay />
-      <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
+      <UnsavedChangesProvider message={t("common.unsavedChangesLeave")}>
+        <AppearanceSync theme={me.theme} density={me.density} />
+        <AppShell
+          skipToContentLabel={t("common.skipToContent")}
+          sidebar={
+            <Sidebar
+              groups={groups}
+              linkComponent={LinkComponent}
+              workspaceSwitcher={
+                <WorkspaceSwitcher
+                  memberships={memberships}
+                  active={workspace}
+                />
+              }
+            />
+          }
+          topbar={
+            <Topbar
+              breadcrumb={workspace.name}
+              search={<TopbarSearch />}
+              askAi={<CopilotPanel initialAvailability={copilot} />}
+              avatarMenu={
+                <AvatarMenu
+                  name={workspace.name}
+                  // From the registry rather than a literal list. A literal one
+                  // is how /account/channels shipped unlinked at P5-T02c and how
+                  // /account/connections was still unlinked four tasks later:
+                  // the page and the menu were two places to remember, and only
+                  // one of them ever got opened. reachability.test.ts asserts
+                  // the two agree.
+                  items={accountItems.map((item) => ({
+                    href: item.href,
+                    label: item.label,
+                  }))}
+                  appearance={<AppearanceControl compact />}
+                  signOut={<SignOut />}
+                />
+              }
+            />
+          }
+          cycleStrip={
+            strip ? (
+              <CycleStrip
+                phase={strip.phaseLabel}
+                blocking={strip.blocking}
+                dueInDays={strip.dueInDays}
+              />
+            ) : undefined
+          }
+          mobileTabBar={
+            <MobileTabBar
+              linkComponent={LinkComponent}
+              items={sidebarItems.slice(0, 4).map((item) => ({
+                id: item.id,
+                label: item.label,
+                href: item.href,
+                icon: iconFor(item.id),
+                active: item.id === active,
+              }))}
+            />
+          }
+        >
+          {/*
+           * A workspace that is not taking writes says so on every screen
+           * (P6-G25). Above the content rather than around it: reads are
+           * unaffected by design and the admin recovery list has to stay
+           * reachable, so this explains rather than blocks.
+           */}
+          {/* Somebody from outside the organisation is reading this workspace
+           * right now (P8-T04b). First of the three, because it is the only
+           * one that is about who is looking over the reader's shoulder, and
+           * the only one that cannot be dismissed. */}
+          <SupportBanner workspaceId={workspace.workspaceId} />
+          {/* What the vendor is saying, above the workspace's own state
+           * banner (P8-T03c). A site message is news from outside the
+           * organisation and the state banner is a fact about the workspace,
+           * so the outside one reads first. */}
+          <SiteMessages
+            userId={session.user.id}
+            workspaceId={workspace.workspaceId}
+          />
+          {workspace.state === "active" ? null : (
+            <div className="mb-4.5">
+              <WorkspaceStateBanner
+                state={workspace.state}
+                canRecover={level >= ACCESS_LEVELS.full}
+              />
+            </div>
+          )}
+          {children}
+        </AppShell>
+        {/*
+         * Beside the shell rather than inside the topbar, because the palette is
+         * an overlay over the whole page. Mounted once here, so ⌘K works on every
+         * screen without each one remembering to render it (P5-T13).
+         */}
+        <CommandPalette />
+        <ShortcutOverlay />
+        <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
+      </UnsavedChangesProvider>
     </KeyboardRegistryProvider>
   );
 }
