@@ -112,6 +112,45 @@ echo "$headers" | grep -qi "^Server:" \
   && fail "the proxy is still announcing itself"
 pass "the proxy set its security headers"
 
+# --- the public address carries the port it is published on ---------------
+# **This is checked as a written value, not as a request that worked** (P8-G06).
+# `public_url()` ignored OPENOKR_HTTP_PORT and wrote a bare http://localhost
+# into BETTER_AUTH_URL, and Better Auth then refused every sign-in with
+# "Invalid origin" because a browser's Origin header carries the port. This
+# script runs on 8088 and never noticed, because curl sends no Origin header at
+# all, so the sign-up below passed while a real browser could not sign in.
+#
+# Anything that drives this instance with curl will keep passing whatever this
+# value says, so the value itself is the check.
+written="$(grep '^BETTER_AUTH_URL=' secrets/app.env | cut -d= -f2-)"
+[ "$written" = "$BASE" ] \
+  || fail "BETTER_AUTH_URL is '$written', but the instance is served on $BASE"
+pass "the public address matches the port the instance is published on"
+
+# It must also survive a second `up`, because reconcile_public_url runs on every
+# start and used to overwrite a hand-fixed value with the portless one.
+./openokr up >/dev/null 2>&1 || fail "a second up failed"
+written="$(grep '^BETTER_AUTH_URL=' secrets/app.env | cut -d= -f2-)"
+[ "$written" = "$BASE" ] \
+  || fail "a second up rewrote BETTER_AUTH_URL to '$written'"
+pass "a second up leaves the public address alone"
+
+# --- the proxy forwards the host with its port --------------------------
+# **A configuration assertion, and it says so** (P8-G07). Caddy's `{host}` is
+# the hostname with the port stripped, so an instance on any port but 80 sent
+# `X-Forwarded-Host: localhost` while the browser sent `Origin: localhost:8088`.
+# Next.js compares those two on every forwarded Server Action and aborts when
+# they disagree, so every form and every write from the interface failed.
+#
+# **This cannot be checked behaviourally from here.** A Server Action is a
+# browser mechanism carrying headers this script cannot honestly reproduce, and
+# a curl POST to an API route is not one and never trips the check. So the
+# configuration is what is asserted, and the behaviour belongs to the
+# end-to-end suite the day it runs behind this proxy rather than in front of it.
+grep -q 'header_up X-Forwarded-Host {hostport}' Caddyfile \
+  || fail "the proxy forwards X-Forwarded-Host without the port; every Server Action will be refused"
+pass "the proxy forwards the host with its port"
+
 # --- an admin can be created and can use the instance ---------------------
 jar=$(mktemp)
 code=$(curl -s -c "$jar" -b "$jar" -o /dev/null -w '%{http_code}' \

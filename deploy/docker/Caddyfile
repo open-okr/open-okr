@@ -48,7 +48,16 @@
 		# it has to know how it was reached rather than that it was reached
 		# over plain HTTP inside the network.
 		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
+		# **`{hostport}`, not `{host}`** (P8-G06). `{host}` is the hostname
+		# with the port stripped off, so an instance published on any port but
+		# 80 sent `X-Forwarded-Host: localhost` while the browser sent
+		# `Origin: localhost:8088`. Next.js compares those two on every
+		# forwarded Server Action and aborts the request when they disagree, so
+		# **every form and every write from the interface failed**: signing out
+		# is simply the first one somebody presses. `{hostport}` carries the
+		# Host header as the browser sent it, which on port 80 has no port in
+		# it and is therefore unchanged for a standard deployment.
+		header_up X-Forwarded-Host {hostport}
 
 		# Long enough for a slow first paint on a cold instance, short enough
 		# that a hung request is not held open indefinitely.

@@ -135,9 +135,23 @@ EOF
 # documented variable is OPENOKR_DOMAIN, so a domain install wrote
 # http://localhost into app.env on its first run and kept it forever, because
 # secrets are generated once.
+# The address a browser actually reaches this instance on.
+#
+# **The port is part of it** (P8-G06). This returned a bare `http://localhost`
+# whatever `OPENOKR_HTTP_PORT` was set to, so an instance published on any port
+# but 80 wrote that address into BETTER_AUTH_URL and then refused every sign-in
+# with "Invalid origin", because the origin the browser sends carries the port.
+# Worse, `reconcile_public_url` runs on every `up`, so an operator who fixed
+# app.env by hand had it overwritten again on their next start. Found on
+# 22 September 2026 on an instance running on 8088.
+#
+# A domain is left alone: `OPENOKR_DOMAIN` turns on automatic HTTPS, which means
+# 443, and the standard port is never written into an origin.
 public_url() {
   if [ -n "${OPENOKR_DOMAIN:-}" ]; then
     echo "https://$OPENOKR_DOMAIN"
+  elif [ -n "${OPENOKR_HTTP_PORT:-}" ] && [ "${OPENOKR_HTTP_PORT}" != "80" ]; then
+    echo "http://localhost:${OPENOKR_HTTP_PORT}"
   else
     echo "http://localhost"
   fi
