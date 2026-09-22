@@ -94,8 +94,10 @@ export function RoomPulsePanel({
               {t("session.detail.roomPulse.yourPulse")}
             </h2>
             <Chip tone="neutral">
-              {pulse.given} {t("common.of")} {pulse.expected}{" "}
-              {t("session.detail.roomPulse.given")}
+              {t("common.ofGiven", {
+                given: pulse.given,
+                expected: pulse.expected,
+              })}
             </Chip>
           </span>
         </CardHeader>
@@ -161,7 +163,7 @@ export function RoomPulsePanel({
               </h2>
               <Chip tone={BAND_TONE[pulse.band ?? ""] ?? "neutral"}>
                 {/* One decimal, because §8.2's own bands are written to one. */}
-                {pulse.average?.toFixed(1)} {t("common.of5")}
+                {t("common.of52", { average: pulse.average?.toFixed(1) })}
               </Chip>
               <Chip tone="neutral">
                 {t("session.detail.roomPulse.yoursToRead")}

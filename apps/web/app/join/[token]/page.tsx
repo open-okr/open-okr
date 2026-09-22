@@ -90,7 +90,9 @@ export default async function JoinPage({
         <Card className="w-full">
           <CardBody className="flex flex-col gap-3.5">
             <h1 className="text-lg font-bold text-ink">
-              {t("join.detail.youHaveBeenInvited")} {invitation.workspaceName}
+              {t("join.detail.youHaveBeenInvitedTo", {
+                workspaceName: invitation.workspaceName,
+              })}
             </h1>
             <p className="text-sm text-ink-2">
               {invitation.email
@@ -124,17 +126,20 @@ export default async function JoinPage({
       <Card className="w-full">
         <CardBody className="flex flex-col gap-3.5">
           <h1 className="text-lg font-bold text-ink">
-            {t("common.join")} {invitation.workspaceName}
+            {t("common.join2", { workspaceName: invitation.workspaceName })}
           </h1>
           <p className="text-sm text-ink-2">
-            {t("join.detail.youAreSignedIn")} {session.user.email}.
-            {invitation.email && invitation.email !== session.user.email
-              ? " This invitation was issued to a different address, so it will be refused. Sign in as that person, or ask for one of your own."
-              : ""}
+            {t("join.detail.youAreSignedInAs", {
+              email: session.user.email,
+              own:
+                invitation.email && invitation.email !== session.user.email
+                  ? " This invitation was issued to a different address, so it will be refused. Sign in as that person, or ask for one of your own."
+                  : "",
+            })}
           </p>
           <JoinButton action={acceptInvitation} token={token}>
             <Button type="submit" variant="default" size="sm">
-              {t("common.join")} {invitation.workspaceName}
+              {t("common.join3", { workspaceName: invitation.workspaceName })}
             </Button>
           </JoinButton>
         </CardBody>

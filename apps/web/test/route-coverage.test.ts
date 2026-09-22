@@ -42,8 +42,6 @@ const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
     "development only, and notFound() in production, so there is nothing to open on the instance the suite builds",
   "/admin/plan":
     "cloud only, and notFound() with the flag off, so the self-hosted instance the suite builds does not have this screen at all",
-  "/admin/sso":
-    "P8-T07: SSO configuration needs an OIDC provider to test against, which the suite does not provision",
   // **The three operator routes, and the reason is the same one three times
   // because it is one fact.** P8-T01b §7: an operator route answers not-found
   // to anybody without a live grant, and `instance_operators` holds no rows on

@@ -105,8 +105,7 @@ export function CommentThread({
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium text-ink-2">
-        {t("goals.detail.comments.discussion")}
-        {comments.length})
+        {t("goals.detail.comments.discussion", { length: comments.length })}
       </h3>
 
       {comments.length === 0 && (

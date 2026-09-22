@@ -224,11 +224,15 @@ export default async function BoardPage({
                      * replaces the first.
                      */}
                     <Chip tone="neutral">
-                      {t("common.progress")} {Math.round(entry.progressPct)}%
+                      {t("common.progress2", {
+                        progressPct: Math.round(entry.progressPct),
+                      })}
                     </Chip>
                     <Chip tone="neutral">
-                      {t("board.linkedWork")} {entry.linkedWork.done}/
-                      {entry.linkedWork.total}
+                      {t("board.linkedWork", {
+                        done: entry.linkedWork.done,
+                        total: entry.linkedWork.total,
+                      })}
                     </Chip>
                   </div>
                   {entry.divergence ? (

@@ -86,8 +86,7 @@ export async function Rail({
             </p>
           ) : (
             <p className="text-xs text-ink-3">
-              {t("goals.detail.rail.nothingA")} {level}{" "}
-              {t("goals.detail.rail.goalWithNoParent")}
+              {t("goals.detail.rail.nothingAGoalWithNo", { level })}
             </p>
           )}
         </CardBody>
@@ -192,7 +191,9 @@ export async function Rail({
                     <Chip tone="ok">{t("common.confirmed")}</Chip>
                   ) : entry.riskOwnerName ? (
                     <Chip tone="warn">
-                      {t("goals.detail.rail.risk")} {entry.riskOwnerName}
+                      {t("goals.detail.rail.risk", {
+                        riskOwnerName: entry.riskOwnerName,
+                      })}
                     </Chip>
                   ) : (
                     <Chip tone="bad">

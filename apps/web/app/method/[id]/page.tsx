@@ -185,8 +185,10 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
           <div className="flex min-w-0 flex-col">
             <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
             <p className="text-xs text-ink-3">
-              {t("method.detail.proactiveMessageAiNative")}{" "}
-              {trigger.owner === "coach" ? "OKR Coach" : "OKR Champion"}
+              {t("method.detail.proactiveMessageAiNativePlan", {
+                Champion:
+                  trigger.owner === "coach" ? "OKR Coach" : "OKR Champion",
+              })}
             </p>
           </div>
           <Chip tone={trigger.escalates ? "warn" : "neutral"}>

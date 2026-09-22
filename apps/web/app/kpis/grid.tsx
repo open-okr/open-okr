@@ -338,8 +338,11 @@ export function KpiGrid({
         </table>
       </div>
       <p className="text-xs text-ink-4">
-        {pending ? "Saving…" : "Enter commits and moves down. Arrows move."}{" "}
-        {t("kpis.grid.calculatedKpisAreRead")}
+        {t("kpis.grid.calculatedKpisAreReadOnly", {
+          move: pending
+            ? "Saving…"
+            : "Enter commits and moves down. Arrows move.",
+        })}
       </p>
     </div>
   );

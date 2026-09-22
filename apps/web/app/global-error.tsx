@@ -82,7 +82,7 @@ export default function GlobalError({
                 color: "#5c6b80",
               }}
             >
-              {t("common.reference")} {error.digest}
+              {t("common.reference3", { digest: error.digest })}
             </p>
           ) : null}
         </main>

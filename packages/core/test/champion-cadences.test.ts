@@ -92,8 +92,22 @@ const runs = async () => {
   return rows;
 };
 
-/** A goal whose next check-in is already `daysAgo` days in the past. */
-const goalDueDaysAgo = async (daysAgo: number, title: string) => {
+/**
+ * A goal whose next check-in is already `daysAgo` days in the past.
+ *
+ * **`before` is the instant it is measured from, and it matters** (found
+ * 20 September 2026). Every caller but one measures from the database's own
+ * clock and runs the agent at that same clock, so the two agree whatever the
+ * date is. The one that runs the agent at a fixed instant has to backdate from
+ * that instant too, or the gap between them widens by a day every day until
+ * the goal is inside its grace at the moment under test and the sweep
+ * correctly flips nothing.
+ */
+const goalDueDaysAgo = async (
+  daysAgo: number,
+  title: string,
+  before?: Date,
+) => {
   const wb = await workerDb();
   const created = (await callAction(
     { pool: wb.appPool, ...context() },
@@ -115,10 +129,11 @@ const goalDueDaysAgo = async (daysAgo: number, title: string) => {
   // future, would also age every other row in the fixture.
   await wb.admin.query(
     `update goals
-        set next_check_in_at = now() - ($2 || ' days')::interval,
+        set next_check_in_at =
+              coalesce($3::timestamptz, now()) - ($2 || ' days')::interval,
             health = 'on_track'
       where id = $1`,
-    [created.id, String(daysAgo)],
+    [created.id, String(daysAgo), before?.toISOString() ?? null],
   );
   return created.id;
 };
@@ -802,16 +817,24 @@ describe("the per-cycle run: the countdown", () => {
     // and a deadline fourteen days out are both true at this instant; the daily
     // run must produce the sweep and no countdown, and the cycle run the
     // reverse.
+    // **One anchor for both halves.** The deadline is fourteen days after the
+    // instant the runs use and the goal fell due six days before it, so the
+    // two conditions the assertions rest on are true at that instant and stay
+    // true however long ago it was. They were anchored to two different
+    // clocks, the cycle's to a date written here and the goal's to the
+    // database's own, and the day the calendar passed 2026-09-17 the goal
+    // stopped being stale at the moment under test.
+    const at = new Date("2026-09-17T09:00:00Z");
     await cycleDates({ publicationDeadline: "2026-10-01" });
-    await goalDueDaysAgo(6, "Ship the migration tooling");
+    await goalDueDaysAgo(6, "Ship the migration tooling", at);
 
-    const daily = await runAt("daily", new Date("2026-09-17T09:00:00Z"));
+    const daily = await runAt("daily", at);
     expect(daily.staleFlipped).toBe(1);
     expect(
       (await sentNudges()).filter((row) => row.rule_key.startsWith("cycle.")),
     ).toEqual([]);
 
-    const cycle = await runAt("cycle", new Date("2026-09-17T09:00:00Z"));
+    const cycle = await runAt("cycle", at);
     expect(cycle.staleFlipped).toBe(0);
     expect(
       (await sentNudges()).filter((row) => row.rule_key === "cycle.deadline")

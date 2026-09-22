@@ -72,7 +72,7 @@ export default async function CheckInPage({
             </p>
           </div>
           <Chip tone={due.length === 0 ? "ok" : "brand"}>
-            {due.length} {t("checkIn.due")}
+            {t("checkIn.due", { length: due.length })}
           </Chip>
         </CardHeader>
         {due.length > 0 ? (
@@ -101,14 +101,17 @@ export default async function CheckInPage({
                       {goal.title}
                     </span>
                     <span className="text-xs text-ink-3">
-                      {goal.level} · {goal.keyResultCount}{" "}
-                      {t("common.keyResult")}
-                      {goal.keyResultCount === 1 ? "" : "s"} ·{" "}
-                      {goal.daysPastDue !== null && goal.daysPastDue > 0
-                        ? `${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                        : `due ${goal.nextCheckInOn}`}
-                      {goal.hasOpenDraft ? " · draft open" : ""} ·{" "}
-                      {goal.health.replace("_", " ")}
+                      {t("common.keyResult3", {
+                        level: goal.level,
+                        keyResultCount: goal.keyResultCount,
+                        keyResultCount2: goal.keyResultCount === 1 ? "" : "s",
+                        nextCheckInOn:
+                          goal.daysPastDue !== null && goal.daysPastDue > 0
+                            ? `${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
+                            : `due ${goal.nextCheckInOn}`,
+                        open: goal.hasOpenDraft ? " · draft open" : "",
+                        replace: goal.health.replace("_", " "),
+                      })}
                     </span>
                     <span className="flex items-center gap-2">
                       {/* No tone on the fill. Rule 2 of the colour system: progress is

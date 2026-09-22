@@ -96,9 +96,13 @@ function LastWeek({
           <span className="min-w-0 text-ink">
             {one.text}
             <span className="ml-1.5 text-xs text-ink-3">
-              {one.ownerName} {t("session.detail.commitments.weekOf")}{" "}
-              {one.weekStart}
-              {one.keyResultTitle ? ` · ${one.keyResultTitle}` : ""}
+              {t("session.detail.commitments.weekOf", {
+                ownerName: one.ownerName,
+                weekStart: one.weekStart,
+                keyResultTitle: one.keyResultTitle
+                  ? ` · ${one.keyResultTitle}`
+                  : "",
+              })}
             </span>
           </span>
           <span className="flex flex-none items-center gap-3 text-xs text-ink-2">
@@ -213,7 +217,7 @@ function ThisWeek({
             <select
               name="keyResultId"
               defaultValue=""
-              aria-label={t("common.keyResult2")}
+              aria-label={t("common.keyResult")}
               className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
             >
               <option value="">
@@ -244,10 +248,7 @@ function ThisWeek({
       </form>
 
       <p className="text-xs text-ink-3">
-        {low} {t("common.to")} {high}{" "}
-        {t("session.detail.commitments.aWeekFewerThan")} {low}{" "}
-        {t("session.detail.commitments.andTheDigestStage")} {high}{" "}
-        {t("session.detail.commitments.isAListNobody")}
+        {t("common.toAWeekFewerThan", { low, high })}
       </p>
     </div>
   );
@@ -319,7 +320,7 @@ export function Commitments({
             </p>
           </div>
           <Chip tone={already.length >= low ? "ok" : "neutral"}>
-            {already.length} {t("session.detail.commitments.set")}
+            {t("session.detail.commitments.set", { length: already.length })}
           </Chip>
         </CardHeader>
         <CardBody>

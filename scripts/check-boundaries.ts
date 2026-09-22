@@ -71,7 +71,44 @@ for (const root of ["apps", "packages"]) {
   }
 }
 
-const violations = checkBoundaries(sources);
+/**
+ * Tables that carry a row-level security policy, read from the migrations.
+ *
+ * **Derived rather than listed**, so a table added tomorrow is covered
+ * tomorrow. A second list would be a second thing to keep true, and the whole
+ * defect class this feeds exists because nobody could tell a guarded table
+ * from an unguarded one by looking.
+ */
+const guardedTables = new Set<string>();
+const migrationsDir = join(repoRoot, "packages/db/migrations");
+for (const name of await readdir(migrationsDir)) {
+  if (!name.endsWith(".sql")) {
+    continue;
+  }
+  const sql = await readFile(join(migrationsDir, name), "utf8");
+  for (const match of sql.matchAll(/create policy\s+\w+\s+on\s+(\w+)/gi)) {
+    if (match[1]) {
+      guardedTables.add(match[1]);
+    }
+  }
+  for (const match of sql.matchAll(
+    /alter table\s+(\w+)\s+enable row level security/gi,
+  )) {
+    if (match[1]) {
+      guardedTables.add(match[1]);
+    }
+  }
+}
+
+if (guardedTables.size === 0) {
+  process.stderr.write(
+    "No policy-guarded tables were found under packages/db/migrations. " +
+      "The unscoped-query rule would check nothing, which is not a pass.\n",
+  );
+  process.exit(1);
+}
+
+const violations = checkBoundaries(sources, { guardedTables });
 
 if (violations.length > 0) {
   const lines = violations.map(

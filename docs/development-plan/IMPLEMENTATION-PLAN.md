@@ -1894,8 +1894,56 @@ nothing better to do. Giving it some is a design decision about the message
 format, not a mechanical change, which is why this is its own row rather than
 part of the one that found it.
 
-Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the 187 fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
+Deliverables: a parameter form on `translate` and on both `useTranslations` and `getTranslations`; the fragmented entries recombined into whole sentences with named placeholders; a lint or test that refuses a new entry whose English begins mid-sentence.
 Test plan: a message with a placeholder renders with the value substituted; a missing parameter fails rather than rendering the placeholder; the fragment count is zero and stays there.
+Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
+
+**Cut in two on 20 September 2026, before the content was touched, and the
+seam is the one P6-G22b and P6-G22c already used here: the gate before the
+work it measures.** The row is marked [M] on an estimate of 187 entries,
+counted by reading the catalogue. Counting the call sites instead, with a
+parser rather than by eye, gives **213 keys rendered beside a value across 319
+places in 85 files**. That is the shape of P6-G22c, which is [L], and for the
+same reason: each site needs an English sentence rewritten with the hole in the
+right place, a Malay stub, and the dead keys removed. It is not one session.
+
+The estimate was low because it was made from the values. An entry reads as a
+fragment when it starts lowercase, so "pending" and "linked" were counted and
+they are labels; and "Held back, because" was not, and it is a fragment. The
+call site is what decides, and only a parser can see it.
+
+- **P6-G22d-a**: a message can carry a value, and a new fragment fails the
+  build. The 213 keys are listed by name as a debt that only shrinks.
+- **P6-G22d-b**: the 319 sites recombined, and the list emptied.
+
+### P6-G22d-a: A message can carry a value, and a new fragment fails [M]
+Depends on: P6-G22c
+Goal: the machinery exists and the debt stops growing.
+
+**Named holes and nothing else.** `{count}`, `{champion}`. No plural
+selection, no number or date formatting, no nesting: that is ICU
+MessageFormat, which is a library, a parser and a dependency to approve. What
+these sentences need is a hole with a name in it, and a sentence whose wording
+changes with a count picks its key at the call site, where a reader of the
+source can see it happen.
+
+**The gate is about the call site, not the value.** "A catalogue key may not be
+rendered next to an interpolation" is the defect itself; "an entry whose
+English begins mid-sentence" is a proxy for it that flags every lowercase
+label and misses every fragment starting with a capital. Both rules run: the
+second only for a value starting with punctuation, which no language begins a
+message with and which has no reading as a label.
+
+Deliverables: `translate(catalogue, key, values)` substituting named holes, failing on a hole with no value and on a value with no hole; the same parameter on `useTranslations` and `getTranslations`; the pseudo-locale transform leaving a hole intact; a parser-based check over every route that refuses a catalogue key rendered beside an interpolation; the 213 keys listed by name, with the list documented as a debt that only shrinks and a test that fails when it names a key that no longer qualifies.
+Test plan: a message with a hole renders with the value substituted; a missing value fails rather than rendering the hole; a value with no hole fails, which is a renamed hole; the pseudo catalogue keeps its holes; a newly fragmented message in an unlisted file fails; a stale entry in the list fails.
+Acceptance: Given a new message rendered beside a value in a route not on the list, when the check runs, then it fails naming the key and the file.
+
+### P6-G22d-b: The sentences themselves [L]
+Depends on: P6-G22d-a
+Goal: a translator sees whole sentences.
+
+Deliverables: the 319 sites recombined into whole messages with named holes, their keys renamed to say what the sentence is rather than how it started, the now-unused fragment keys removed from both catalogues, and the list from P6-G22d-a emptied.
+Test plan: the list is `[]`; every key still has a consumer; Bahasa Melayu carries every hole the English source does, by name.
 Acceptance: Given a sentence that contains a count, when it is translated, then the translator sees the whole sentence with a named hole in it and can put the hole wherever their language needs it.
 
 ### P6-G23: Theme and density control [S]
@@ -1974,14 +2022,56 @@ is a feature. `blobs.prepareUpload`, `claimUpload`, `getForDownload` and
 actions, a byte quota, an upload control and a download path, and none of them
 shares anything with a delete button.
 
-- **P6-G27a**: the writes that are one button. Delete on four entities,
-  checklist item removal, `goals.moveToCycle`, `goals.unlinkKpi` and
-  `reactions.remove`.
-- **P6-G27b**: `cycles.create`, `update` and `archive`, the attachment flow,
-  `workspace.overview` on the general card, and the written reason for every
-  action deliberately left without a browser path.
-Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a cycle created from the browser gets the §4.14 defaults; an attachment survives a page reload and respects the workspace byte quota.
+The whole row's test plan is unchanged and is split across the two parts: a
+soft-deleted goal leaves its history readable and drops out of every
+default-scoped read; a removed reaction is gone for everybody; a cycle created
+from the browser gets the §4.14 defaults; an attachment survives a page reload
+and respects the workspace byte quota.
+
+### P6-G27a: The writes that are one button [M]
+Depends on: none
+Goal: the detail-page writes a member performs by pressing something once.
+
+**One delete path, not four.** Goals, initiatives, tasks and documents take the
+same shape: one id, `full`, a soft delete. What differs is the word on the
+screen and where the reader goes afterwards, and both of those belong to the
+page rather than to the write. The allow-list over the four literals is the
+point, because a server action takes whatever the browser sends it.
+
+**The confirmation says what a delete is here rather than asking whether you
+are sure.** Nothing is destroyed, the history stays readable, and the row drops
+out of every default-scoped read. That sentence does not fit in a dialog title
+and does fit on a second press.
+
+Deliverables: delete on goals, initiatives, tasks and documents, with the soft-delete semantics stated on the confirmation rather than implied; checklist item removal, which is not the same gesture as ticking a line; `goals.moveToCycle`, `goals.reviewDecision` and `goals.unlinkKpi` on goal detail; `reactions.remove`, so a reaction given by mistake can be taken back; `workspace.rename` on the general card.
+Test plan: a soft-deleted goal leaves its history readable and drops out of every default-scoped read; a removed reaction is gone for everybody; a delete request naming an entity outside the allow-list is refused; a removed checklist line is distinguishable from a ticked one.
 Acceptance: Given a member with edit access on a goal, when they move it to the next cycle, then the move is audited and both cycles read correctly.
+
+### P6-G27b: Cycles, attachments, and the actions left without a path [M]
+Depends on: P6-G27a
+Goal: the half that is a decision rather than a button.
+
+**A workspace could plan exactly one cycle**, the one provisioning made.
+`cycles.create`, `update` and `archive` shipped with no browser caller, and the
+cycle screen's own empty state told the reader an administrator could create
+one from the rhythm settings, which no screen could do. Archiving sits beside
+creating, because separating them is how a workspace ends up with two open
+cycles.
+
+**The byte quota guarded a door nobody could open.** Seven attachment actions
+had no caller. The bytes go through the storage port on the server rather than
+by a presigned URL, because the port has two drivers and only one of them can
+sign anything: an instance on local disk has no object store to redirect to.
+
+**Every action deliberately left without a browser caller says why, in
+writing.** A reason is a deliverable here rather than a comment, and the list is
+held by three rules: an action added without a caller fails, a reason naming an
+action that has since gained one fails, and a reason too short to be a reason
+fails.
+
+Deliverables: `cycles.create`, `update` and `archive` on the cycle screen, with that screen's empty state corrected; the attachment flow on documents and initiatives, wiring the four `blobs.*` and three `attachments.*` actions, with `claimUpload` recording the size and digest actually written so a half-finished upload is distinguishable from a finished one; a download route that checks access, streams, and serves `Content-Disposition: attachment`; `workspace.overview` on the general card; the reason list covering every action with no browser path, and the three rules that hold it.
+Test plan: a cycle created from the browser gets the §4.14 defaults, and the screen that said it was impossible now does it; an attachment survives a page reload and respects the workspace byte quota; an upload abandoned between prepare and claim reads as an orphan; an action added with no caller and no reason fails the list.
+Acceptance: Given an administrator on the cycle screen with one cycle, when they create the next one, then both cycles read correctly and every action still without a browser path carries a written reason.
 
 ### P6-G28: The initiative's tasks and documents, S-26 [S]
 Depends on: P5-T11, P5-T12
@@ -2071,11 +2161,11 @@ below are two working sessions rather than one. The dataset has to exist before
 anything can be measured against it, and the query-count budget needs no
 dataset at all, so the seam is between building the instrument and using it.
 
-#### P7-T01a: The dataset and the query-count budget [M]
+### P7-T01a: The dataset and the query-count budget [M]
 Deliverables: the large seeded dataset of 100,000 goals and key results and 1,000,000 tasks in one workspace, built through the tenant floor with every goal's access context and four bindings, and refused on a production instance; `pnpm db:seed:large`; the query-count budget on list endpoints, enforcing both a ceiling and the stronger rule that the count may not grow with the row count.
 Acceptance: the full dataset builds into an empty workspace and its goals resolve through `resolveMemberAccessLevel`; the budget suite passes, and any list whose cost grows with its rows is named on a list that P7-T01b empties.
 
-#### P7-T01b: The budget harness, the index and plan review [M]
+### P7-T01b: The budget harness, the index and plan review [M]
 Depends on: P7-T01a
 Deliverables: every TECHNICAL-PLAN.md §13.1 budget measured against the large dataset and wired into continuous integration; `EXPLAIN (ANALYZE, BUFFERS)` over the list queries with the composite indexes §13.2 asks for; the three query-per-row lists P7-T01a found (`goals.list`, `tasks.list`, `initiatives.list`) fixed and removed from `KNOWN_QUERY_PER_ROW`.
 Acceptance: every budget row is green on the large dataset in continuous integration, and `KNOWN_QUERY_PER_ROW` is empty.
@@ -2085,7 +2175,7 @@ Depends on: P7-T01
 Deliverables: load scripts covering hundreds of concurrent members in one workspace with check-in bursts, a live session with twenty participants, feed reads, board drags, chat inbound and external agent traffic; a soak run; fixes.
 Acceptance: no errors and within budget at the target concurrency, with realtime fan-out bounded and nudge delivery inside its budget.
 
-#### P7-T02a: The audit chain leaves the write path [M]
+### P7-T02a: The audit chain leaves the write path [M]
 Depends on: P7-T02's measurement
 
 Added 2026-09-10. Not in the original plan, because the plan could not know the number: P1-T07 recorded the per-workspace audit lock as a follow-up "to measure", P7-T02 measured it at 14.8 seconds at the 95th percentile for a write at fifty concurrent members, and Agung chose the fix.
@@ -2100,11 +2190,11 @@ Depends on: Phase 6 complete
 schema; the control audit and the supply chain are a review producing a signed
 table. They share a heading and nothing else.
 
-#### P7-T03a: The tenant property and fuzz suite [M]
+### P7-T03a: The tenant property and fuzz suite [M]
 Deliverables: random cross-tenant probes at every table carrying `workspace_id`, requiring zero rows; the schema property that each one has row-level security enabled, forced, and a policy reading `app.workspace_id`; the with-check half exercised by a write naming another workspace; a policy-removal mutation check proving the suite can fail.
 Acceptance: every table is covered, a stranger reads zero rows everywhere, and disabling row-level security on one table makes the suite fail.
 
-#### P7-T03b: The §8.2 control audit, supply chain and outbound rules [M]
+### P7-T03b: The §8.2 control audit, supply chain and outbound rules [M]
 Depends on: P7-T03a
 Deliverables: every TECHNICAL-PLAN.md §8.2 control verified or ticketed; a header and policy audit; a dependency audit, bill of materials and signed-image verification; the outbound-request rules exercised.
 Acceptance: no high findings remain open, and every control row carries either a verified mark or an accepted-risk note signed off by the human.

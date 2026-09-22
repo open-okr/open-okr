@@ -49,12 +49,15 @@ export async function Direction({
         </h2>
         {mode === "annual" ? (
           <Chip tone={withinBounds ? "ok" : "warn"}>
-            {priorities.length} {t("common.of")} {bounds.low} {t("common.to")}{" "}
-            {bounds.high}
+            {t("common.ofTo", {
+              length: priorities.length,
+              low: bounds.low,
+              high: bounds.high,
+            })}
           </Chip>
         ) : (
           <Chip tone="neutral">
-            {priorities.length} {t("cycle.direction.chosen")}
+            {t("cycle.direction.chosen", { length: priorities.length })}
           </Chip>
         )}
       </CardHeader>
@@ -127,7 +130,10 @@ export async function Direction({
                 </option>
                 {unpromoted.map((issue) => (
                   <option key={issue.id} value={issue.id}>
-                    {t("common.impact")} {issue.impact} · {issue.text}
+                    {t("common.impact5", {
+                      impact: issue.impact,
+                      text: issue.text,
+                    })}
                   </option>
                 ))}
               </select>

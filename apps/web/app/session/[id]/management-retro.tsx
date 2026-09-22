@@ -189,8 +189,10 @@ export function ManagementRetroPanel({
             {t("common.managementRetro")}
           </h2>
           <Chip tone={retro.complete ? "ok" : "neutral"}>
-            {retro.answered} {t("common.of")} {retro.questions.length}{" "}
-            {t("session.detail.managementRetro.answered")}
+            {t("common.ofAnswered", {
+              answered: retro.answered,
+              length: retro.questions.length,
+            })}
           </Chip>
         </span>
       </CardHeader>

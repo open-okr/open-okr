@@ -316,8 +316,10 @@ export function TeamRetroPanel({
             {t("common.teamRetro")}
           </h2>
           <Chip tone={retro.dotsLeft === 0 ? "warn" : "neutral"}>
-            {retro.dotsLeft} {t("common.of")} {retro.dotsPerMember}{" "}
-            {t("session.detail.teamRetro.dotsLeft")}
+            {t("common.ofDotsLeft", {
+              dotsLeft: retro.dotsLeft,
+              dotsPerMember: retro.dotsPerMember,
+            })}
           </Chip>
         </span>
       </CardHeader>
@@ -387,8 +389,9 @@ export function TeamRetroPanel({
         <p className="text-xs text-ink-4">
           {/* One dot per note is what makes the vote about spread rather than
               volume, so it is worth saying out loud on the screen. */}
-          {t("session.detail.teamRetro.oneDotPerNote")} {retro.dotsPerMember}{" "}
-          {t("session.detail.teamRetro.inTotalSpendingA")}
+          {t("session.detail.teamRetro.oneDotPerNoteIn", {
+            dotsPerMember: retro.dotsPerMember,
+          })}
         </p>
       </CardBody>
     </Card>

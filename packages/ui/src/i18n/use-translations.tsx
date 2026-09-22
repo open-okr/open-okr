@@ -5,12 +5,19 @@ import {
   CATALOGUES,
   type Catalogue,
   type Locale,
+  type MessageValues,
   translate,
 } from "./catalogue.ts";
 
 interface TranslationsContextValue {
   readonly locale: Locale | "pseudo";
-  t(key: string): string;
+  /**
+   * The message, with its named holes filled (P6-G22d).
+   *
+   * `values` is optional because most messages have no holes, and passing
+   * one a message does not have throws rather than being ignored.
+   */
+  t(key: string, values?: MessageValues): string;
 }
 
 const TranslationsContext = createContext<TranslationsContextValue | null>(
@@ -33,7 +40,11 @@ export function TranslationsProvider({
 }: TranslationsProviderProps) {
   const value = useMemo<TranslationsContextValue>(() => {
     const catalogue = catalogueOverride ?? CATALOGUES[locale];
-    return { locale, t: (key: string) => translate(catalogue, key) };
+    return {
+      locale,
+      t: (key: string, values?: MessageValues) =>
+        translate(catalogue, key, values),
+    };
   }, [locale, catalogueOverride]);
 
   return (

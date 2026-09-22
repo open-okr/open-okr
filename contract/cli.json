@@ -997,6 +997,71 @@
           "field": "question",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "background",
+          "field": "background",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot completeRun",
+      "action": "copilot.completeRun",
+      "method": "POST",
+      "path": "/copilot/completeRun",
+      "scope": "write",
+      "summary": "Records the answer a background copilot run produced.",
+      "flags": [
+        {
+          "name": "answer-message-id",
+          "field": "answerMessageId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "citations",
+          "field": "citations",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "model",
+          "field": "model",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "tokens-in",
+          "field": "tokensIn",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "tokens-out",
+          "field": "tokensOut",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "cost",
+          "field": "cost",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "halted-reason",
+          "field": "haltedReason",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

@@ -102,7 +102,9 @@ export default async function RecoveryBoardPage() {
                 {percent(card.achievementPct)}
               </span>
               <span className="text-xs text-ink-4">
-                {t("common.healthyAt")} {Math.round(card.healthyPct)}%
+                {t("common.healthyAt", {
+                  healthyPct: Math.round(card.healthyPct),
+                })}
               </span>
             </div>
           </CardHeader>
@@ -124,16 +126,20 @@ export default async function RecoveryBoardPage() {
                 </div>
                 <Bar value={card.recovery.progressPct} />
                 <p className="text-xs text-ink-3">
-                  {card.recovery.keyResults} {t("common.keyResult")}
-                  {card.recovery.keyResults === 1 ? "" : "s"}
-                  {card.recovery.startedPct === null
-                    ? ""
-                    : `, launched at ${Math.round(card.recovery.startedPct)}%`}
-                  {card.effectivePct === null ||
-                  card.achievementPct === null ||
-                  card.effectivePct <= card.achievementPct
-                    ? ""
-                    : `. Displayed health ${percent(card.effectivePct)}, real ${percent(card.achievementPct)}`}
+                  {t("common.keyResult4", {
+                    keyResults: card.recovery.keyResults,
+                    keyResults2: card.recovery.keyResults === 1 ? "" : "s",
+                    startedPct:
+                      card.recovery.startedPct === null
+                        ? ""
+                        : `, launched at ${Math.round(card.recovery.startedPct)}%`,
+                    achievementPct:
+                      card.effectivePct === null ||
+                      card.achievementPct === null ||
+                      card.effectivePct <= card.achievementPct
+                        ? ""
+                        : `. Displayed health ${percent(card.effectivePct)}, real ${percent(card.achievementPct)}`,
+                  })}
                 </p>
                 {card.recovery.closeProposed && !card.recovery.closed ? (
                   <p className="text-xs font-semibold text-ok">

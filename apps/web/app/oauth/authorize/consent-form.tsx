@@ -81,7 +81,9 @@ export async function ConsentForm({
             ))}
           </select>
           <span className="text-ink-3">
-            {clientName} {t("oauth.authorize.consentForm.willReachThisOne")}
+            {t("oauth.authorize.consentForm.willReachThisOneAnd", {
+              clientName,
+            })}
           </span>
         </label>
       ) : (

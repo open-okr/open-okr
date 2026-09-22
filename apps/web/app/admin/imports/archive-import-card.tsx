@@ -106,9 +106,9 @@ export function ArchiveImportCard() {
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-sm text-ink-3">
-          {t("admin.imports.archiveImportCard.uploadAn")}{" "}
-          <code>{t("admin.imports.archiveImportCard.okr")}</code>{" "}
-          {t("admin.imports.archiveImportCard.archiveExportedFromAnother")}
+          {t("admin.imports.archiveImportCard.uploadAnArchiveExported", {
+            extension: ".okr",
+          })}
         </p>
 
         {/* Stage: idle or analyzing */}
@@ -166,15 +166,18 @@ export function ArchiveImportCard() {
             {Object.keys(preview.difference.created).length > 0 && (
               <details className="text-xs text-ink-3">
                 <summary className="cursor-pointer font-semibold">
-                  {t("admin.imports.archiveImportCard.tables")}
-                  {Object.keys(preview.difference.created).length})
+                  {t("admin.imports.archiveImportCard.tables", {
+                    length: Object.keys(preview.difference.created).length,
+                  })}
                 </summary>
                 <ul className="mt-1 flex flex-col gap-0.5 pl-3">
                   {Object.entries(preview.difference.created).map(
                     ([table, count]) => (
                       <li key={table}>
-                        {table}: {count}{" "}
-                        {t("admin.imports.archiveImportCard.rowS")}
+                        {t("admin.imports.archiveImportCard.rowS", {
+                          table,
+                          count,
+                        })}
                       </li>
                     ),
                   )}
@@ -186,8 +189,9 @@ export function ArchiveImportCard() {
             {preview.difference.merged.length > 0 && (
               <div className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2">
                 <p className="text-xs font-semibold text-warn">
-                  {preview.difference.merged.length}{" "}
-                  {t("admin.imports.archiveImportCard.memberSWillMerge")}
+                  {t("admin.imports.archiveImportCard.memberSWillMergeBy", {
+                    length: preview.difference.merged.length,
+                  })}
                 </p>
                 <ul className="mt-1 flex flex-col gap-0.5 text-xs text-ink-2">
                   {preview.difference.merged.map((m) => (
@@ -224,12 +228,14 @@ export function ArchiveImportCard() {
                 {t("admin.imports.archiveImportCard.imported")}
               </Chip>
               <span className="text-sm text-ink">
-                {totalCreated(result.difference)}{" "}
-                {t("admin.imports.archiveImportCard.rowsCreated")}{" "}
-                {totalSkipped(result.difference)} {t("admin.imports.skipped")}
-                {result.difference.merged.length > 0
-                  ? `, ${result.difference.merged.length} member(s) merged`
-                  : ""}
+                {t("admin.imports.archiveImportCard.rowsCreatedSkipped", {
+                  difference: totalCreated(result.difference),
+                  difference2: totalSkipped(result.difference),
+                  merged:
+                    result.difference.merged.length > 0
+                      ? `, ${result.difference.merged.length} member(s) merged`
+                      : "",
+                })}
               </span>
             </div>
             <Button variant="ghost" onClick={handleReset}>

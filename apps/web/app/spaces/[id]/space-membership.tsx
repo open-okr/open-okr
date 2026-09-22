@@ -97,10 +97,13 @@ export async function SpaceMembership({
     <form action={leave} className="flex items-center gap-3">
       <input type="hidden" name="spaceId" value={spaceId} />
       <p className="text-sm text-ink-3">
-        {t("spaces.detail.spaceMembership.youAreInThis")} {ownRole}.
-        {ownRole === "manager"
-          ? " Appoint another manager before you leave."
-          : ""}
+        {t("spaces.detail.spaceMembership.youAreInThisSpace", {
+          ownRole,
+          leave:
+            ownRole === "manager"
+              ? " Appoint another manager before you leave."
+              : "",
+        })}
       </p>
       <Button type="submit" variant="ghost">
         {t("spaces.detail.spaceMembership.leave")}

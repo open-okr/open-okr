@@ -1,4 +1,4 @@
-import { CATALOGUES, translate } from "@openokr/ui";
+import { CATALOGUES, type MessageValues, translate } from "@openokr/ui";
 import { resolveLocale } from "./locale";
 
 /**
@@ -24,9 +24,15 @@ import { resolveLocale } from "./locale";
  * screen no longer has to add to the debt.
  */
 export async function getTranslations(): Promise<{
-  readonly t: (key: string) => string;
+  readonly t: (key: string, values?: MessageValues) => string;
 }> {
   const locale = await resolveLocale();
   const catalogue = CATALOGUES[locale];
-  return { t: (key: string) => translate(catalogue, key) };
+  // **`values` fills the message's named holes** (P6-G22d). A sentence with
+  // a number in the middle of it is one entry with a hole rather than two
+  // entries a translator cannot reassemble.
+  return {
+    t: (key: string, values?: MessageValues) =>
+      translate(catalogue, key, values),
+  };
 }

@@ -57,7 +57,7 @@ export async function VotePanel({
         <ActionForm action={castVote} className="flex items-center gap-1.5">
           <input type="hidden" name="keyResultId" value={vote.keyResultId} />
           <label className="sr-only" htmlFor={`vote-${vote.keyResultId}`}>
-            {t("checkIn.votePanel.yourConfidenceIn")} {vote.title}
+            {t("checkIn.votePanel.yourConfidenceIn", { title: vote.title })}
           </label>
           <input
             id={`vote-${vote.keyResultId}`}

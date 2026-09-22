@@ -71,8 +71,9 @@ export function InviteForm({
           </span>
           {state.link.email ? (
             <span>
-              {t("admin.invitations.inviteForm.only")} {state.link.email}{" "}
-              {t("admin.invitations.inviteForm.mayUseItOnce")}
+              {t("admin.invitations.inviteForm.onlyMayUseItOnce", {
+                email: state.link.email,
+              })}
             </span>
           ) : (
             <span>{t("admin.invitations.inviteForm.anyoneHoldingItMay")}</span>

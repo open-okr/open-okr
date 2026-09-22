@@ -136,7 +136,9 @@ export default async function AccountChannelsPage() {
 
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1 text-xs font-semibold text-ink-2">
-                {t("account.channels.quietHoursIn")} {settings.timezone}
+                {t("account.channels.quietHoursIn", {
+                  timezone: settings.timezone,
+                })}
               </legend>
               <p className="text-xs text-ink-3">
                 {t("account.channels.aReminderDueInside")}

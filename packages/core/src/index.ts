@@ -164,6 +164,7 @@ export {
   type ResolveAICredentialInput,
   type ResolvedAICredential,
   type ResolvedDeploymentAI,
+  resolveAgentRunCostCap,
   resolveAICredential,
   resolveDeploymentAISettings,
 } from "./ai/resolve.ts";
@@ -414,6 +415,10 @@ export {
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export {
+  syncAllSamlProviders,
+  syncSamlProvider,
+} from "./auth/saml-sync.ts";
+export {
   ENROLMENT_PATH,
   heldForEnrolment,
   identityProviderManaged,
@@ -432,11 +437,20 @@ export {
 } from "./auth/session-hashing.ts";
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
+  type CreateSSOConnectionInput,
+  createSSOConnection,
+  derivedProviderId,
   listSSOProviders,
   loadSSOConnections,
+  normaliseCertificate,
   providerIdFromCallback,
+  type SamlServiceProviderUrls,
+  type SSOConnectionProblem,
+  SSOConnectionRejected,
   type SSOProviderConfig,
   type SSOProviderInfo,
+  samlServiceProviderUrls,
+  validateSSOConnectionInput,
 } from "./auth/sso.ts";
 export {
   type EnforcingConnection,
@@ -605,6 +619,14 @@ export {
   GROUNDING_LIMIT,
   streamAnswer,
 } from "./copilot/answer.ts";
+export {
+  type CopilotRunDeps,
+  type CopilotRunJob,
+  type CopilotRunOutcome,
+  copilotThreadChannel,
+  parseCopilotRunJob,
+  runCopilotAnswer,
+} from "./copilot/background.ts";
 export {
   citationLabel,
   type ResolvedCitation,

@@ -40,7 +40,7 @@ export default function HomeError({
           </Button>
           {error.digest ? (
             <p className="text-xs text-ink-4">
-              {t("common.reference")} {error.digest}
+              {t("common.reference", { digest: error.digest })}
             </p>
           ) : null}
         </CardBody>

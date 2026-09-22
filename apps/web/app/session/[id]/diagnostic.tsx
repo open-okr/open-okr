@@ -176,11 +176,10 @@ export function DiagnosticPanel({
         ) : diagnostic.readable ? (
           <>
             <p className="text-sm text-ink-2">
-              {t("session.detail.diagnostic.bothNumbersAreIn")}{" "}
-              {diagnostic.cycleScore?.toFixed(2)}{" "}
-              {t("session.detail.diagnostic.andARhythmOf")}{" "}
-              {diagnostic.rhythmScore?.toFixed(1)}{" "}
-              {t("session.detail.diagnostic.of52")}
+              {t("session.detail.diagnostic.bothNumbersAreInA", {
+                cycleScore: diagnostic.cycleScore?.toFixed(2) ?? "",
+                rhythmScore: diagnostic.rhythmScore?.toFixed(1) ?? "",
+              })}
             </p>
             {canRead ? (
               <span>

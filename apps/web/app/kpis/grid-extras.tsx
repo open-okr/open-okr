@@ -119,31 +119,31 @@ export async function CategorySubtotal({
       data-testid="category-subtotal"
     >
       <span className="text-ink-3">
-        {states.length} {t("common.count")}
+        {t("common.kpis", { length: states.length })}
       </span>
       {counted.healthy > 0 ? (
         <Chip tone="ok">
-          {counted.healthy} {t("kpi.state.healthy")}
+          {t("kpi.state.healthy", { healthy: counted.healthy })}
         </Chip>
       ) : null}
       {counted.watch > 0 ? (
         <Chip tone="warn">
-          {counted.watch} {t("kpi.state.watch")}
+          {t("kpi.state.watch", { watch: counted.watch })}
         </Chip>
       ) : null}
       {counted.unhealthy > 0 ? (
         <Chip tone="bad">
-          {counted.unhealthy} {t("kpi.state.unhealthy")}
+          {t("kpi.state.unhealthy", { unhealthy: counted.unhealthy })}
         </Chip>
       ) : null}
       {counted.recovering > 0 ? (
         <Chip tone="info">
-          {counted.recovering} {t("kpi.state.recovering")}
+          {t("kpi.state.recovering", { recovering: counted.recovering })}
         </Chip>
       ) : null}
       {counted.noData > 0 ? (
         <Chip tone="neutral">
-          {counted.noData} {t("kpi.state.noData")}
+          {t("kpi.state.noData", { noData: counted.noData })}
         </Chip>
       ) : null}
     </span>

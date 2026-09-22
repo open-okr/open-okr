@@ -323,14 +323,19 @@ export default async function CyclePage({
           <CardHeader className="justify-between">
             <div className="flex flex-col">
               <h1 className="text-base font-bold text-ink">
-                {t("common.phase")} {viewing} · {PHASE_TITLES[viewing]}
+                {t("common.phase", {
+                  viewing,
+                  viewing2: PHASE_TITLES[viewing] ?? "",
+                })}
               </h1>
               <p className="text-xs text-ink-3">
-                {workflow.name} {t("cycle.completionIsComputedNever")}
+                {t("cycle.completionIsComputedNeverSelf", {
+                  name: workflow.name,
+                })}
               </p>
             </div>
             <Chip tone={workflow.mode === "annual" ? "brand" : "neutral"}>
-              {workflow.mode} {t("common.mode")}
+              {t("common.mode3", { mode: workflow.mode })}
             </Chip>
           </CardHeader>
           {work.allowed ? null : (
@@ -354,9 +359,7 @@ export default async function CyclePage({
             <CardBody className="border-line border-t">
               <ul className="flex flex-col gap-0.5 text-xs text-ink-3">
                 {phase.blocked.map((reason) => (
-                  <li key={reason}>
-                    {t("cycle.notYetCheckable")} {reason}
-                  </li>
+                  <li key={reason}>{t("cycle.notYetCheckable", { reason })}</li>
                 ))}
               </ul>
             </CardBody>

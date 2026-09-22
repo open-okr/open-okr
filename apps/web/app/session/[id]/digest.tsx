@@ -83,7 +83,9 @@ export function Digest({
     <Card>
       <CardHeader className="justify-between">
         <span>
-          {t("session.detail.digest.digestWeekOf")} {digest.weekStart}
+          {t("session.detail.digest.digestWeekOf", {
+            weekStart: digest.weekStart,
+          })}
         </span>
         {assistAvailable ? (
           <Button variant="ai" disabled={busy} onClick={() => void narrate()}>

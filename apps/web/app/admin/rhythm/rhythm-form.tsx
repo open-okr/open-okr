@@ -118,7 +118,7 @@ function Parameter({
         <span className="font-medium text-ink">{entry.label}</span>
         <span className="flex items-center gap-2">
           <Chip tone="neutral">
-            {t("admin.rhythm.rhythmForm.method")} {entry.section}
+            {t("admin.rhythm.rhythmForm.method", { section: entry.section })}
           </Chip>
           {override === undefined ? null : (
             <Chip tone="brand">{t("common.changed")}</Chip>
@@ -139,8 +139,9 @@ function Parameter({
             className="w-28 rounded-md border border-line bg-bg px-2 py-1 tabular"
           />
           <span className="text-ink-3">
-            {t("admin.rhythm.rhythmForm.inForce")} {String(resolved)}
-            {t("admin.rhythm.rhythmForm.leaveBlankForThe")}
+            {t("admin.rhythm.rhythmForm.inForceLeaveBlankFor", {
+              resolved: String(resolved),
+            })}
           </span>
         </label>
       ) : parts ? (
@@ -174,7 +175,9 @@ function Parameter({
         </div>
       ) : (
         <p className="tabular text-sm text-ink-3">
-          {t("admin.rhythm.rhythmForm.inForce")} {JSON.stringify(resolved)}
+          {t("admin.rhythm.rhythmForm.inForce", {
+            resolved: JSON.stringify(resolved),
+          })}
           <span className="ml-1.5 text-ink-4">
             {t("admin.rhythm.rhythmForm.shownAsItStands")}
           </span>

@@ -9,20 +9,43 @@ revoke one.
 
 ## Single sign-on
 
-Admin, then **Single sign-on**. OpenOKR speaks OIDC. SAML works through a
-SAML-to-OIDC bridge such as Keycloak, Auth0, Okta or Entra ID.
+Admin, then **Single sign-on**. OpenOKR speaks OIDC and SAML 2.0 directly.
+Neither needs a bridge. Pick the protocol first: the form then asks for that
+protocol's fields and nothing else.
+
+Both protocols:
 
 | Field | What it is for |
 |---|---|
 | Provider id and display name | The button somebody sees on the sign-in page |
-| Discovery URL | The usual way. The endpoints are read from it |
-| Explicit endpoints | For a provider with no discovery document |
-| Client id and secret | The secret is envelope-encrypted and never shown again |
 | Email domains | Which addresses this provider is for |
 | Enforce | Whether those addresses may **only** sign in this way |
 
-**A new provider takes effect on the next restart.** The OAuth client is built
-once when the process starts.
+OIDC:
+
+| Field | What it is for |
+|---|---|
+| Discovery URL | The usual way. The endpoints are read from it |
+| Explicit endpoints | For a provider with no discovery document |
+| Client id and secret | The secret is envelope-encrypted and never shown again |
+
+SAML 2.0:
+
+| Field | What it is for |
+|---|---|
+| Sign-on URL | Where the browser is sent. Your provider may call it the SSO URL or the login URL |
+| Issuer | What the provider calls itself in the assertions it signs. An assertion from anybody else is refused |
+| Signing certificate | The provider's public certificate, with or without its BEGIN CERTIFICATE header |
+| Audience | Optional. Empty means this instance's URL, which is what most providers expect |
+
+**A SAML provider needs three things from this instance**, and the connection
+prints them once it is saved: the entity ID, the assertion consumer service
+(your provider may call it the reply URL or the ACS), and the address of a
+metadata document that states both. Hand your identity provider the metadata
+document, or the two addresses if it prefers them typed in.
+
+**A new provider takes effect on the next restart**, and so does its metadata
+document. The client is built once when the process starts.
 
 **Enforcing refuses the local factors for the domains you list**: a password, a
 password reset and a passkey are all refused, and the person is told which

@@ -26,6 +26,22 @@ DB_ENV="$SECRETS_DIR/db.env"
 log() { echo "openokr: $1"; }
 fail() { echo "openokr: $1" >&2; exit 1; }
 
+# Paths inside a container are not paths on this host, and one shell disagrees.
+#
+# Git Bash on Windows rewrites an argument that looks like an absolute path
+# before handing it to a native program, so `docker exec app node /app/...`
+# arrives as `/app/C:/Program Files/Git/app/...` and the command fails on a
+# module that was never missing. `rotate-key` failed that way the first time
+# this script was run on Windows with Docker Desktop, on 20 September 2026, and
+# the smoke test reported only "rotate-key failed" because it hides the output.
+#
+# Both variables are read by that shell alone. Every other system, including
+# the Linux hosts this script is written for and continuous integration, has
+# no use for them and ignores them.
+MSYS_NO_PATHCONV=1
+MSYS2_ARG_CONV_EXCL='*'
+export MSYS_NO_PATHCONV MSYS2_ARG_CONV_EXCL
+
 compose() {
   if docker compose version >/dev/null 2>&1; then
     docker compose "$@"

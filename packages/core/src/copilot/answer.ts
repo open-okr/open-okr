@@ -94,7 +94,7 @@ const sourceFor = (hit: RetrievalHit): GroundingSource => ({
  * retrieved for this member. An index outside the list is a model miscounting,
  * and the citation it would have produced does not exist.
  */
-const citationsFrom = (
+export const citationsFrom = (
   hits: readonly RetrievalHit[],
   indexes: readonly number[],
 ) =>
@@ -106,7 +106,7 @@ const citationsFrom = (
     .filter((hit): hit is RetrievalHit => hit !== undefined)
     .map((hit) => ({ entityType: hit.entityType, entityId: hit.entityId }));
 
-interface Prepared {
+export interface Prepared {
   readonly threadId: string;
   readonly questionMessageId: string;
   readonly hits: readonly RetrievalHit[];
@@ -128,14 +128,48 @@ async function prepare(
   input: AnswerQuestionInput,
   wants: (drafter: AgentDrafter) => boolean,
 ): Promise<Prepared> {
-  const pool: Pool = context.pool;
-
   const asked = await callAction(context, "copilot.ask", {
     threadId: input.threadId,
     subjectType: input.subjectType,
     subjectId: input.subjectId,
     question: input.question,
+    // Inline. This path is the fallback for an instance draining no queue.
+    background: false,
   });
+  return groundQuestion(
+    context,
+    {
+      threadId: asked.threadId,
+      questionMessageId: asked.messageId,
+      question: input.question,
+    },
+    wants,
+  );
+}
+
+/** A question already written down, and what it takes to answer it. */
+export interface GroundedAsk {
+  readonly threadId: string;
+  readonly questionMessageId: string;
+  readonly question: string;
+}
+
+/**
+ * Retrieves, and decides whether anything can answer.
+ *
+ * **Split out of `prepare` at P4-T14b-b**, which needs everything here and
+ * none of the recording above it: a background run's question was written when
+ * the member asked, in the same transaction that created the empty answer and
+ * enqueued the job, and recording it a second time would put the question in
+ * the thread twice.
+ */
+export async function groundQuestion(
+  context: ActionCallContext,
+  asked: GroundedAsk,
+  wants: (drafter: AgentDrafter) => boolean,
+): Promise<Prepared> {
+  const pool: Pool = context.pool;
+  const input = { question: asked.question, workspaceId: context.workspaceId };
   const memberId = await askingMemberId(context);
 
   // Retrieval runs whether or not there is a model: with no provider this is
@@ -156,7 +190,7 @@ async function prepare(
 
   const nothing = (reason: string): Prepared => ({
     threadId: asked.threadId,
-    questionMessageId: asked.messageId,
+    questionMessageId: asked.questionMessageId,
     hits,
     sources,
     ask: null,
@@ -185,12 +219,16 @@ async function prepare(
 
   return {
     threadId: asked.threadId,
-    questionMessageId: asked.messageId,
+    questionMessageId: asked.questionMessageId,
     hits,
     sources,
     ask: {
       question: input.question,
-      history: await recentTurns(context, asked.threadId, asked.messageId),
+      history: await recentTurns(
+        context,
+        asked.threadId,
+        asked.questionMessageId,
+      ),
       sources: hits.map(sourceFor),
     },
     unavailableReason: null,

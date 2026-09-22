@@ -9,7 +9,8 @@
         "e2e/repair-standalone-links.ts",
         "deploy/docker/migrate.ts",
         "playwright.dev.config.ts"
-      ]
+      ],
+      "ignoreBinaries": ["openssl"]
     },
     "apps/web": {
       "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]

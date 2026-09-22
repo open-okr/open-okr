@@ -31,6 +31,8 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import type { AgentDrafter } from "../agents/drafter.ts";
+import { parseCopilotRunJob, runCopilotAnswer } from "../copilot/background.ts";
 
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
@@ -123,6 +125,17 @@ export interface OutboxHandlerDeps {
    * skipped rather than failed, the same as mail.
    */
   readonly putFile?: PutFile;
+  /**
+   * The workspace's AI drafter (P4-T14b-b).
+   *
+   * A function rather than the provider itself, for the reason every other
+   * dependency here is one: the provider lives in `packages/adapters`. Absent,
+   * or answering null, means this workspace has no provider configured and a
+   * copilot run halts saying so rather than failing.
+   */
+  readonly drafterFor?: (
+    workspaceId: string,
+  ) => Promise<AgentDrafter | null | undefined>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /** Where a skipped delivery is reported. */
@@ -587,6 +600,43 @@ const buildExport: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Produces one copilot answer, outside the request that asked for it
+ * (P4-T14b-b).
+ *
+ * **Safe to run twice** by the message it answers: `copilot.completeRun`
+ * refuses one that has already completed, so a redelivered row costs one
+ * retrieval and one refused write rather than a second answer charged to the
+ * workspace.
+ *
+ * The run acts as the member who asked, so the audit row names a person rather
+ * than a queue. Nothing about the answer is decided here: which workspace,
+ * which thread and who asked are all on the row, put there by the transaction
+ * that recorded the question.
+ */
+const runCopilot: OutboxHandler = async (delivery, deps) => {
+  const job = parseCopilotRunJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a copilot run, so nothing can answer it.`,
+    );
+  }
+  const drafter = await deps.drafterFor?.(job.workspaceId);
+  const outcome = await runCopilotAnswer(
+    {
+      pool: deps.pool,
+      workspaceId: job.workspaceId,
+      actor: { kind: "human", userId: job.userId },
+      ...(drafter ? { drafter } : {}),
+    },
+    job,
+    ...(deps.publish ? [{ publish: deps.publish }] : []),
+  );
+  if (outcome.haltedReason) {
+    deps.onSkipped?.(delivery, outcome.haltedReason);
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -623,6 +673,10 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // the list as the member who asked, writes the file to storage and marks the
   // run ready. It acknowledged and did nothing between P5-T13 and P5-T15.
   [EXPORT_TOPIC]: buildExport,
+  // The copilot's answer, produced outside the request that asked for it
+  // (P4-T14b-b). Before this, an answer existed only inside one HTTP response
+  // and closing the tab took the run with it.
+  "copilot.run": runCopilot,
   "workspace.renamed": acknowledge,
 };
 

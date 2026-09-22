@@ -204,3 +204,105 @@ Said plainly, so the clean sections above are not read as wider than they are.
 3. Fix finding 2.
 4. Add the seven missing plan headings.
 5. Decide `P8-T07c-b`, `P6-G22d` and `P4-T14b-b`.
+
+---
+
+## What was done about it, 18 September 2026
+
+Appended rather than folded into the findings above, so they still read as they
+were found.
+
+### Findings 1 and 2 are fixed, and the tests fail against the old code
+
+`createSSOConnection` moved into `packages/core/src/auth/sso.ts` and takes the
+workspace as an argument, inside `withWorkspace`. That is the shape
+`createSCIMToken` has had since P8-T08a, which is the sibling that worked. The
+route passes the workspace `requireAccessLevel` was already returning and
+discarding.
+
+`resolveAgentRunCostCap` moved into `packages/core/src/ai/resolve.ts` for two
+reasons: it has to run inside the tenant setting, and `apps/web` has no Drizzle
+and should not be writing SQL. The web app calls it.
+
+`packages/core/test/tenant-scoped-writes.test.ts` holds six tests. Two of them
+fail against the code as it was, with
+`unrecognized configuration parameter "app.workspace_id"`; the cap tests
+returned 2 instead of what was stored. Zero is covered too, because a falsy
+check would read "may not spend" as "not set" and hand back the default, which
+is the opposite instruction.
+
+### The rule that stops the eighth
+
+`unscoped-read-of-guarded-table`, in the boundary gate. It refuses a
+`pool.query` naming a policy-guarded table outside a tenant wrapper.
+
+**The table set is derived from the migrations by the gate**, not written down.
+A table added tomorrow is covered tomorrow, and there is no second list to
+drift. The gate refuses to run at all if it finds no guarded tables, because a
+rule that checks nothing must not report success: that exact failure has hit
+this repository twice before, in the migration lint and the soft-delete gate.
+
+It found one thing on its first run, and it was a true positive that wanted
+documenting rather than fixing: `audit/verify.ts` reads `workspaces` on a bare
+pool on purpose, and refuses with a clear error when the role cannot see past
+the floor. It carries `openokr:allow-unscoped-read` with that reason now, which
+is the point of the escape being a written sentence rather than a silence.
+
+Seven tests in `packages/config/test/boundaries.test.ts` hold it in both
+directions: it catches a read and a write, it stays quiet inside a wrapper, on
+an unguarded table, in the command line, and behind a marker, and it has no
+opinion when the caller supplies no tables.
+
+### Finding 4 was two gaps and five false positives
+
+**The scan that produced it looked for `###` and the plan writes some parts as
+`####`.** P7-T01a, P7-T01b, P7-T02a, P7-T03a and P7-T03b each had a full
+heading all along, with deliverables and an acceptance line, one level further
+down. Only P6-G27a and P6-G27b were genuinely described by bullets under their
+parent and nowhere else.
+
+That is worth recording rather than quietly fixing, because it is the audit
+making the mistake the audit is about: a check that answers a narrower question
+than the one it is read as answering. The finding said "no heading" and what it
+could see was "no `###`".
+
+Both halves are closed now. P6-G27a and P6-G27b have headings in the shape
+every other lettered part uses, written from what the tracker records they
+turned out to be. The five `####` headings are `###`, which is the level every
+other split part in the document uses, so the inconsistency that made the scan
+wrong is gone rather than documented around.
+
+All 254 tracker rows now resolve to a heading. Nine headings still have no row
+and all nine are split parents, which is the convention.
+
+### Nothing is still open
+
+All three rows finding 3 named were closed on 20 September 2026, so the
+sentence that opened this audit, that the plan is not fully built, stopped
+being true five days after it was written. What each one turned out to hold:
+
+| Row | What closing it found |
+|---|---|
+| `P8-T07c-b` | A fourth occurrence of this audit's own pattern: `syncAllSamlProviders` was built, tested and called by nothing in the application, so the table the SAML plugin reads was empty on every instance |
+| `P6-G22d` | 213 keys rendered beside a value, not the 187 estimated, which made it two rows. The gate landed first and the 319 sites followed |
+| `P4-T14b-b` | Not blocked, and had not been since 27 August. The row said so and nobody had read it |
+
+The seven rows named in finding 4 are closed too: two headings written, five
+already present a level down.
+
+**One row was cut in two and one estimate was wrong by a third**, both because
+the count was made by reading rather than by parsing. That is the same mistake
+finding 4 made in this document, in the same week, and it is worth naming
+twice: a number obtained by eye is a guess wearing a number's clothes.
+
+**Both protocols can be configured now.** Finding 1 unblocked OIDC on
+18 September and P8-T07c-b unblocked SAML on 20 September, which was the
+sentence this audit most wanted to be able to write: neither could be
+configured on a running instance on the day it was written.
+
+**The eighth occurrence was found by hand, not by the new rule.**
+`unscoped-read-of-guarded-table` refuses a read that runs without a tenant
+setting, and `syncAllSamlProviders` was not that. It was a correct function
+with no caller: built, tested, green, and wired to nothing. Same symptom,
+different cause, and no gate this repository has can see it. What found it was
+asking, of each thing P8-T07c-a said it built, which running process calls it.

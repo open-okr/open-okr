@@ -87,10 +87,31 @@ pnpm check:changeset origin/main HEAD
 
 **A gate you did not run is not a gate that passed.** When this machine cannot
 run one, say which, why, and what would run it, in the `STATUS.md` row and in
-the summary you give Agung. `helm` and Docker are absent here, so
-`deploy/helm/check.sh`, `deploy/helm/cluster-test.sh` and
-`deploy/docker/smoke-test.sh` cannot run locally and are the ones to name.
-Never write "all gates pass" when you ran nine of eleven.
+the summary you give Agung. Never write "all gates pass" when you ran nine of
+eleven.
+
+**Docker, helm, kind and kubectl are installed here, since 20 September 2026.**
+All three deployment scripts run on this machine, and thirty `STATUS.md` rows
+written before that date say they could not. Those rows are a record of what
+was true when they were written and are left alone; a row written now has no
+excuse:
+
+```
+OPENOKR_IMAGE=openokr:test sh deploy/docker/smoke-test.sh
+sh deploy/helm/check.sh
+kind create cluster --name openokr
+kind load docker-image openokr:test --name openokr
+OPENOKR_IMAGE_TAG=test sh deploy/helm/cluster-test.sh
+```
+
+**Two things about this machine that the scripts do not say.** Git Bash
+rewrites an argument shaped like an absolute path before handing it to a native
+program, which is why `deploy/docker/openokr` exports `MSYS_NO_PATHCONV`; a
+`docker exec` you add elsewhere needs the same, or it fails on a container path
+with `C:/Program Files/Git` spliced into it. And Kubernetes 1.32 and later
+refuse a host on cgroup v1, so `%USERPROFILE%.wslconfig` puts the WSL virtual
+machine on the unified hierarchy; without it kubeadm times out waiting for a
+control plane that never starts and says nothing about cgroups.
 
 **`pnpm check:signoff` runs in CI on pull requests only**, so a branch can look
 green for days and fail the moment one opens. Run it yourself, and commit with

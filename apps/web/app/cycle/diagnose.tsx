@@ -53,15 +53,16 @@ export async function Diagnose({
           {t("cycle.diagnose.strategicIssues")}
         </h2>
         <Chip tone={issues.length >= minimum ? "ok" : "warn"}>
-          {issues.length} {t("cycle.diagnose.ranked")} {minimum}{" "}
-          {t("cycle.diagnose.askedFor")}
+          {t("cycle.diagnose.rankedAskedFor", {
+            length: issues.length,
+            minimum,
+          })}
         </Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
         {issues.length === 0 ? (
           <p className="text-sm text-ink-3">
-            {t("cycle.diagnose.nothingIsOnThe")} {minimum}{" "}
-            {t("cycle.diagnose.rankedIssuesBeforeThe")}
+            {t("cycle.diagnose.nothingIsOnTheList", { minimum })}
           </p>
         ) : (
           <ol className="flex flex-col divide-y divide-line">
@@ -87,7 +88,7 @@ export async function Diagnose({
                     <input type="hidden" name="cycleId" value={cycleId} />
                     <input type="hidden" name="issueId" value={issue.id} />
                     <label className="sr-only" htmlFor={`impact-${issue.id}`}>
-                      {t("cycle.diagnose.impactFor")} {issue.text}
+                      {t("cycle.diagnose.impactFor", { text: issue.text })}
                     </label>
                     <select
                       id={`impact-${issue.id}`}
@@ -97,7 +98,7 @@ export async function Diagnose({
                     >
                       {[1, 2, 3, 4, 5].map((value) => (
                         <option key={value} value={value}>
-                          {t("common.impact")} {value}
+                          {t("common.impact2", { value })}
                         </option>
                       ))}
                     </select>
@@ -111,7 +112,7 @@ export async function Diagnose({
                   </ActionForm>
                 ) : (
                   <Chip tone="neutral">
-                    {t("common.impact")} {issue.impact}
+                    {t("common.impact3", { impact: issue.impact })}
                   </Chip>
                 )}
               </li>
@@ -145,7 +146,7 @@ export async function Diagnose({
               >
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
-                    {t("common.impact")} {value}
+                    {t("common.impact4", { value })}
                   </option>
                 ))}
               </select>

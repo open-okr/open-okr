@@ -221,9 +221,12 @@ export default async function GoalPage({
             <div className="flex min-w-0 flex-col">
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
-                {goal.level} · {goal.champion.name} {t("common.championsIt")}{" "}
-                {goal.reviewer.name} {t("goals.detail.reviewsItWeight")}{" "}
-                {goal.weight}
+                {t("common.championsItReviewsItWeight", {
+                  level: goal.level,
+                  name: goal.champion.name,
+                  name2: goal.reviewer.name,
+                  weight: goal.weight,
+                })}
               </p>
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
@@ -242,10 +245,13 @@ export default async function GoalPage({
             </div>
             {goal.nextCheckInOn ? (
               <p className="text-xs text-ink-3">
-                {t("goals.detail.nextCheckInDue")} {goal.nextCheckInOn}
-                {goal.daysPastDue !== null && goal.daysPastDue > 0
-                  ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
-                  : ""}
+                {t("goals.detail.nextCheckInDue", {
+                  nextCheckInOn: goal.nextCheckInOn,
+                  overdue:
+                    goal.daysPastDue !== null && goal.daysPastDue > 0
+                      ? ` · ${goal.daysPastDue} day${goal.daysPastDue === 1 ? "" : "s"} overdue`
+                      : "",
+                })}
               </p>
             ) : (
               <p className="text-xs text-ink-3">
@@ -280,8 +286,9 @@ export default async function GoalPage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("goals.detail.keyResults")}
-              {goal.keyResults.length})
+              {t("goals.detail.keyResults", {
+                length: goal.keyResults.length,
+              })}
             </h2>
           </CardHeader>
           <CardBody className="flex flex-col gap-2.5">
@@ -309,11 +316,14 @@ export default async function GoalPage({
                         {keyResult.title}
                       </span>
                       <span className="text-xs text-ink-3">
-                        {keyResult.direction} · {keyResult.indicatorType} ·{" "}
-                        {keyResult.baselineValue} {t("common.to")}{" "}
-                        {keyResult.targetValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""}{" "}
-                        {t("common.weight")} {keyResult.weight}
+                        {t("common.toWeight2", {
+                          direction: keyResult.direction,
+                          indicatorType: keyResult.indicatorType,
+                          baselineValue: keyResult.baselineValue,
+                          targetValue: keyResult.targetValue,
+                          unit: keyResult.unit ? ` ${keyResult.unit}` : "",
+                          weight: keyResult.weight,
+                        })}
                       </span>
                       <Sparkline
                         history={histories.get(keyResult.id) ?? []}
@@ -346,7 +356,9 @@ export default async function GoalPage({
                             className="sr-only"
                             htmlFor={`value-${keyResult.id}`}
                           >
-                            {t("common.newValueFor")} {keyResult.title}
+                            {t("common.newValueFor4", {
+                              title: keyResult.title,
+                            })}
                           </label>
                           <input
                             id={`value-${keyResult.id}`}
@@ -360,7 +372,9 @@ export default async function GoalPage({
                             className="sr-only"
                             htmlFor={`confidence-${keyResult.id}`}
                           >
-                            {t("goals.detail.confidenceFor")} {keyResult.title}
+                            {t("goals.detail.confidenceFor", {
+                              title: keyResult.title,
+                            })}
                           </label>
                           <input
                             id={`confidence-${keyResult.id}`}

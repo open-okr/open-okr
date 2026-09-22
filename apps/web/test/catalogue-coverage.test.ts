@@ -4,9 +4,13 @@ import { fileURLToPath } from "node:url";
 import { CATALOGUES, missingKeys } from "@openokr/ui";
 import { describe, expect, test } from "vitest";
 import {
+  beginsMidSentence,
+  findFragmentedIn,
+  findFragmentedMessages,
   findUnlocalisedIn,
   findUnlocalisedStrings,
 } from "./catalogue-coverage.ts";
+import { FRAGMENTED_MESSAGES } from "./fragmented-messages.ts";
 import { UNLOCALISED_FILES } from "./unlocalised-files.ts";
 
 /**
@@ -218,5 +222,129 @@ describe("the catalogue itself", () => {
     // so a key added here without a stub fails in the change that added it
     // rather than in somebody else's.
     expect(missingKeys("ms")).toEqual([]);
+  });
+});
+
+/**
+ * A message is a whole sentence, or it is on the list (P6-G22d-a).
+ *
+ * **The pile is 213 keys and the rule is that it only shrinks.** Every one is
+ * rendered beside an interpolation, which fixes it in English word order and
+ * leaves a translator with a piece and no way to place it. `translate` takes
+ * named holes now, so the fix is to make the sentence whole again; doing that
+ * for 319 places in 85 files is P6-G22d-b.
+ *
+ * Two rules, and each catches what the other cannot. The first is the defect
+ * itself and needs the syntax tree: a catalogue key rendered next to a value.
+ * The second is about the string and catches a fragment nothing renders beside
+ * a value today but which is still unplaceable, like ". It will get a token".
+ *
+ * **A lowercase entry on its own is not a fragment.** "pending" and "linked"
+ * are labels and translate perfectly well. The plan asked for a check on
+ * "an entry whose English begins mid-sentence", which flags all of those and
+ * misses "Held back, because"; the reasoning is written out beside
+ * `findFragmentedMessages`.
+ */
+describe("the fragment detector, on sources of its own", () => {
+  test("sees a message rendered on either side of a value", () => {
+    const source = `
+      export const A = () => (
+        <p>
+          {t("admin.nudges.theLast")} {days} {t("admin.nudges.days")}
+        </p>
+      );
+    `;
+    expect(
+      findFragmentedMessages(source)
+        .map((one) => one.key)
+        .sort(),
+    ).toEqual(["admin.nudges.days", "admin.nudges.theLast"]);
+  });
+
+  test("is not fooled by the space the formatter inserts", () => {
+    // {" "} is how JSX keeps a space it would otherwise eat. It sits between
+    // a message and a value without separating them.
+    const source = `
+      export const A = () => (
+        <p>{t("account.security.signedInAs")}{" "}{email}</p>
+      );
+    `;
+    expect(findFragmentedMessages(source).map((one) => one.key)).toEqual([
+      "account.security.signedInAs",
+    ]);
+  });
+
+  test("passes a whole message with a hole in it, which is the fix", () => {
+    const source = `
+      export const A = () => <p>{t("admin.nudges.window", { days })}</p>;
+    `;
+    expect(findFragmentedMessages(source)).toEqual([]);
+  });
+
+  test("passes two messages side by side, and two values side by side", () => {
+    const source = `
+      export const A = () => (
+        <p>
+          {t("common.save")} {t("common.cancel")}
+          <span>{count}{total}</span>
+        </p>
+      );
+    `;
+    expect(findFragmentedMessages(source)).toEqual([]);
+  });
+
+  test("knows which punctuation no sentence starts with", () => {
+    expect(beginsMidSentence("· expires")).toBe(true);
+    expect(beginsMidSentence(". It will get a token")).toBe(true);
+    expect(beginsMidSentence(", and")).toBe(true);
+    // A label, whatever case it starts in. Flagging these was the plan's own
+    // wording for this check and it is what makes the rule unusable.
+    expect(beginsMidSentence("pending")).toBe(false);
+    expect(beginsMidSentence("linked")).toBe(false);
+    expect(beginsMidSentence("Held back, because")).toBe(false);
+  });
+});
+
+describe("a message a translator can place (P6-G22d-a)", () => {
+  const listed = new Set(FRAGMENTED_MESSAGES);
+
+  test("no unlisted key is rendered beside a value", () => {
+    const offences = everyTsx(appDir)
+      .flatMap((path) =>
+        findFragmentedIn(path).map((one) => ({ ...one, path })),
+      )
+      .filter((one) => !listed.has(one.key))
+      .map(
+        (one) =>
+          `${relative(one.path)}:${one.line} ${one.key} beside ${one.beside}`,
+      );
+
+    expect(offences).toEqual([]);
+  });
+
+  test("no unlisted value begins with punctuation no sentence starts with", () => {
+    const offences = Object.entries(EN_CATALOGUE)
+      .filter(([key, value]) => beginsMidSentence(value) && !listed.has(key))
+      .map(([key, value]) => `${key} = ${JSON.stringify(value)}`);
+
+    expect(offences).toEqual([]);
+  });
+
+  test("the list names nothing that has been fixed", () => {
+    // The half that makes the list shrink rather than sit there. A key fixed
+    // in P6-G22d-b and left on the list would keep its own exemption alive.
+    const stillFragmented = new Set([
+      ...everyTsx(appDir).flatMap((path) =>
+        findFragmentedIn(path).map((one) => one.key),
+      ),
+      ...Object.entries(EN_CATALOGUE)
+        .filter(([, value]) => beginsMidSentence(value))
+        .map(([key]) => key),
+    ]);
+
+    const stale = FRAGMENTED_MESSAGES.filter(
+      (key) => !stillFragmented.has(key),
+    );
+    expect(stale).toEqual([]);
   });
 });

@@ -202,8 +202,9 @@ export default async function MemberProfilePage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("people.detail.directReports")}
-              {directReports.length})
+              {t("people.detail.directReports", {
+                length: directReports.length,
+              })}
             </h2>
           </CardHeader>
           <CardBody>
@@ -231,8 +232,9 @@ export default async function MemberProfilePage({
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("people.detail.goalsChampioned")}
-              {championed.length})
+              {t("people.detail.goalsChampioned", {
+                length: championed.length,
+              })}
             </h2>
           </CardHeader>
           <CardBody>

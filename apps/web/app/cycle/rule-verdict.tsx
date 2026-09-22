@@ -246,15 +246,15 @@ export function StrengthMeter({
         />
       </div>
       <p className="text-xs text-ink-3">
-        {t("cycle.ruleVerdict.okrStrength")} {counts.pass}{" "}
-        {t("cycle.ruleVerdict.pass")} {counts.warn}{" "}
-        {t("cycle.ruleVerdict.warn")} {counts.fail}{" "}
-        {t("cycle.ruleVerdict.fail")} {counts.todo}{" "}
-        {t("cycle.ruleVerdict.toDo")}
+        {t("cycle.ruleVerdict.okrStrengthPassWarnFail", {
+          pass: counts.pass,
+          warn: counts.warn,
+          fail: counts.fail,
+          todo: counts.todo,
+        })}
       </p>
       <p className="text-xs text-ink-4">
-        {bands.green}
-        {t("cycle.ruleVerdict.andAboveIsGreen")}
+        {t("cycle.ruleVerdict.andAboveIsGreenA", { green: bands.green })}
       </p>
     </div>
   );

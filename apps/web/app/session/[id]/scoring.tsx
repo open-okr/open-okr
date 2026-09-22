@@ -131,7 +131,7 @@ function ScoreRow({
           // The weight is visible because it changes what the objective score
           // will be, and a room that cannot see it cannot argue with it.
           <Chip tone="neutral">
-            {t("session.detail.scoring.weight")} {keyResult.weight}
+            {t("session.detail.scoring.weight", { weight: keyResult.weight })}
           </Chip>
         )}
         {keyResult.score === null ? (
@@ -309,8 +309,10 @@ export function Scoring({
               <Chip
                 tone={objective.scored === objective.total ? "ok" : "neutral"}
               >
-                {objective.scored} {t("common.of")} {objective.total}{" "}
-                {t("session.detail.scoring.graded")}
+                {t("common.ofGraded", {
+                  scored: objective.scored,
+                  total: objective.total,
+                })}
               </Chip>
               {objective.revealed ? (
                 <Chip tone="info">{t("session.detail.scoring.revealed")}</Chip>
@@ -368,10 +370,11 @@ export function Scoring({
             </p>
           )}
           <p className="text-xs text-ink-4">
-            {status.complete
-              ? "Every key result is graded. The stage can end."
-              : "Every key result needs a grade and one line on why before the stage ends."}{" "}
-            {t("session.detail.scoring.gradesLandOnThe")}
+            {t("session.detail.scoring.gradesLandOnTheKey", {
+              ends: status.complete
+                ? "Every key result is graded. The stage can end."
+                : "Every key result needs a grade and one line on why before the stage ends.",
+            })}
           </p>
         </>
       )}

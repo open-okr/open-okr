@@ -105,8 +105,9 @@ export default async function MinutesPage({
         </span>
         {minutes.state === "closed" ? (
           <p className="text-xs text-ink-4">
-            {t("session.detail.minutes.held")}{" "}
-            {minutes.heldOn?.slice(0, 10) ?? "recently"}.
+            {t("session.detail.minutes.held", {
+              recently: minutes.heldOn?.slice(0, 10) ?? "recently",
+            })}
           </p>
         ) : (
           <p className="text-xs text-warn">
@@ -223,7 +224,7 @@ export default async function MinutesPage({
                 <li key={row.text} className="text-sm text-ink">
                   <span className="font-medium">{row.toName}</span>{" "}
                   <span className="text-xs text-ink-4">
-                    {t("common.namedBy")} {row.fromName}
+                    {t("common.namedBy", { fromName: row.fromName })}
                   </span>
                   <span className="block text-ink-2">{row.text}</span>
                 </li>

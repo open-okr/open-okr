@@ -163,8 +163,10 @@ export default async function KpiDetailPage({
                 : `${Math.round(kpi.achievementPct)}%`}
             </span>
             <span className="text-xs text-ink-4">
-              {t("common.healthyAt")} {Math.round(kpi.healthyPct)}
-              {t("kpis.detail.watchAt")} {Math.round(kpi.watchPct)}%
+              {t("common.healthyAtWatchAt", {
+                healthyPct: Math.round(kpi.healthyPct),
+                watchPct: Math.round(kpi.watchPct),
+              })}
             </span>
           </div>
           <WatchControl subjectType="kpi" subjectId={id} initial={watch} />
@@ -178,13 +180,16 @@ export default async function KpiDetailPage({
               {t("kpis.detail.recoveryObjective")}
             </Link>
             <span className="text-xs text-ink-3">
-              {t("kpis.detail.launchedAt")}{" "}
-              {kpi.recoveryStartedPct === null
-                ? "an unknown point"
-                : `${Math.round(kpi.recoveryStartedPct)}%`}
-              {kpi.effectivePct === null || kpi.achievementPct === null
-                ? ""
-                : `, displayed health ${Math.round(kpi.effectivePct)}% against a real ${Math.round(kpi.achievementPct)}%`}
+              {t("kpis.detail.launchedAt", {
+                recoveryStartedPct:
+                  kpi.recoveryStartedPct === null
+                    ? "an unknown point"
+                    : `${Math.round(kpi.recoveryStartedPct)}%`,
+                achievementPct:
+                  kpi.effectivePct === null || kpi.achievementPct === null
+                    ? ""
+                    : `, displayed health ${Math.round(kpi.effectivePct)}% against a real ${Math.round(kpi.achievementPct)}%`,
+              })}
             </span>
           </CardBody>
         ) : null}

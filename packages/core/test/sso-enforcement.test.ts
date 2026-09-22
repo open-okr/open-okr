@@ -94,6 +94,21 @@ beforeAll(async () => {
     [workspaceId, sealed.ciphertext, sealed.dataKey, sealed.keyId],
   );
 
+  // A third that enforces over SAML (P8-T07c-b). Enforcement read no
+  // protocol, so it could not tell the sign-in page which button to offer,
+  // and the backstop treated the SAML sign-in itself as a local factor. Both
+  // halves of that are below.
+  await wb.admin.query(
+    `insert into sso_connections
+       (workspace_id, kind, provider_id, display_name, client_id,
+        secret_ciphertext, secret_data_key, secret_key_id, enforce,
+        email_domains, saml_entry_point, saml_issuer, saml_certificate)
+     values ($1, 'saml', 'adfs', 'ADFS', '', $2, $3, $4, true,
+             'saml.example', 'https://adfs.example/sso',
+             'https://adfs.example/entity', 'a-certificate')`,
+    [workspaceId, sealed.ciphertext, sealed.dataKey, sealed.keyId],
+  );
+
   auth = createAuth({
     pool: wb.appPool,
     secret: SECRET,
@@ -111,7 +126,12 @@ afterAll(async () => {
 
 describe("which provider claims an address", () => {
   const connections = [
-    { providerId: "sso-okta-1", displayName: "Okta", domains: ["acme.com"] },
+    {
+      providerId: "sso-okta-1",
+      kind: "oidc" as const,
+      displayName: "Okta",
+      domains: ["acme.com"],
+    },
   ];
 
   it("claims the domain it names, whatever the case", () => {
@@ -131,7 +151,12 @@ describe("which provider claims an address", () => {
   it("claims nothing when the connection lists no domain", () => {
     expect(
       enforcingProviderFor("a@acme.com", [
-        { providerId: "sso-x-1", displayName: "X", domains: [] },
+        {
+          providerId: "sso-x-1",
+          kind: "oidc" as const,
+          displayName: "X",
+          domains: [],
+        },
       ]),
     ).toBeNull();
   });
@@ -175,6 +200,16 @@ describe("an address an enforcing provider claims", () => {
 
     expect(response.status).toBe(403);
     expect(await response.text()).toContain("Okta");
+  });
+
+  it("is refused by a SAML provider as readily as by an OIDC one", async () => {
+    // The point of the row this came from: enforcement knew about one
+    // protocol, so a workspace that had configured SAML and switched
+    // enforcement on watched password sign-in carry on working.
+    const response = await signUp("someone@saml.example");
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toContain("ADFS");
   });
 
   it("is refused on every domain the connection lists, not just the first", async () => {
@@ -228,6 +263,13 @@ describe("the backstop, for the factors that carry no address", () => {
   it("lets the identity provider's own sign-in through and nothing else", () => {
     expect(isProviderSignInPath("/callback/sso-okta-abc12345")).toBe(true);
     expect(isProviderSignInPath("/sign-in/social")).toBe(true);
+    // Both halves of SAML (P8-T07c-b). Without them the backstop refused the
+    // sign-in enforcement exists to insist on, so an enforced domain with a
+    // SAML provider could not get in by any route at all.
+    expect(isProviderSignInPath("/sign-in/sso")).toBe(true);
+    expect(isProviderSignInPath("/sso/saml2/sp/acs/sso-adfs-abc12345")).toBe(
+      true,
+    );
 
     expect(isProviderSignInPath("/sign-in/email")).toBe(false);
     expect(isProviderSignInPath("/passkey/verify-authentication")).toBe(false);
@@ -236,6 +278,7 @@ describe("the backstop, for the factors that carry no address", () => {
     expect(isProviderSignInPath(undefined)).toBe(false);
     // And a path that merely mentions the callback does not count as one.
     expect(isProviderSignInPath("/evil/callback/x")).toBe(false);
+    expect(isProviderSignInPath("/evil/sso/saml2/sp/acs/x")).toBe(false);
   });
 });
 

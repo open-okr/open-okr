@@ -160,9 +160,11 @@ export default async function ApiTokensPage() {
                   </code>
                 </span>
                 <span className="text-xs text-ink-3">
-                  {token.scopes.join(", ")} {t("account.apiTokens.expires")}{" "}
-                  {shortDate(token.expiresAt)} {t("account.apiTokens.lastUsed")}{" "}
-                  {shortDate(token.lastUsedAt)}
+                  {t("account.apiTokens.expiresLastUsed", {
+                    scopes: token.scopes.join(", "),
+                    expiresAt: shortDate(token.expiresAt),
+                    lastUsedAt: shortDate(token.lastUsedAt),
+                  })}
                 </span>
                 {token.revokedAt ? null : (
                   <TokenForm action={revokeToken}>

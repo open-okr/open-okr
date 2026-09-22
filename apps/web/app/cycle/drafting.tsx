@@ -117,8 +117,11 @@ export async function Drafting({
             <div className="flex min-w-0 flex-col">
               <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
               <p className="text-xs text-ink-3">
-                {goal.level} · {goal.champion.name} {t("common.championsIt")}{" "}
-                {goal.reviewer.name} {t("cycle.drafting.reviewsIt")}
+                {t("common.championsItReviewsIt", {
+                  level: goal.level,
+                  name: goal.champion.name,
+                  name2: goal.reviewer.name,
+                })}
               </p>
             </div>
             <span className="flex flex-none items-center gap-2">
@@ -185,7 +188,9 @@ export async function Drafting({
 
             {goal.contributionStatement ? (
               <p className="text-xs text-ink-3">
-                {t("cycle.drafting.contributes")} {goal.contributionStatement}
+                {t("cycle.drafting.contributes", {
+                  contributionStatement: goal.contributionStatement,
+                })}
               </p>
             ) : (
               <p className="text-xs text-warn">
@@ -210,11 +215,14 @@ export async function Drafting({
                           {keyResult.title}
                         </span>
                         <span className="text-xs text-ink-3">
-                          {keyResult.direction} · {keyResult.indicatorType} ·{" "}
-                          {keyResult.baselineValue} {t("common.to")}{" "}
-                          {keyResult.targetValue}
-                          {keyResult.unit ? ` ${keyResult.unit}` : ""}{" "}
-                          {t("common.weight")} {keyResult.weight}
+                          {t("common.toWeight", {
+                            direction: keyResult.direction,
+                            indicatorType: keyResult.indicatorType,
+                            baselineValue: keyResult.baselineValue,
+                            targetValue: keyResult.targetValue,
+                            unit: keyResult.unit ? ` ${keyResult.unit}` : "",
+                            weight: keyResult.weight,
+                          })}
                         </span>
                       </span>
                       <span className="flex-none text-sm font-bold text-ink">
@@ -232,7 +240,7 @@ export async function Drafting({
                           className="sr-only"
                           htmlFor={`value-${keyResult.id}`}
                         >
-                          {t("common.newValueFor")} {keyResult.title}
+                          {t("common.newValueFor3", { title: keyResult.title })}
                         </label>
                         <input
                           id={`value-${keyResult.id}`}
@@ -418,7 +426,7 @@ export async function Drafting({
                 >
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
-                      {t("cycle.drafting.champion2")} {member.name}
+                      {t("cycle.drafting.champion", { name: member.name })}
                     </option>
                   ))}
                 </select>
@@ -433,7 +441,7 @@ export async function Drafting({
                 >
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
-                      {t("cycle.drafting.reviewer2")} {member.name}
+                      {t("cycle.drafting.reviewer", { name: member.name })}
                     </option>
                   ))}
                 </select>
@@ -442,7 +450,7 @@ export async function Drafting({
                 </Button>
               </div>
               <p className="text-xs text-ink-3">
-                {t("cycle.drafting.methodMd25")}
+                {t("cycle.drafting.methodMd")}
               </p>
             </ActionForm>
           </CardBody>

@@ -56,7 +56,7 @@ export async function GuidanceRail({
         ) : null}
         <section className="flex flex-col gap-1.5">
           <h3 className="text-xs font-bold tracking-wide text-ink-3 uppercase">
-            {mode} {t("common.mode")}
+            {t("common.mode", { mode })}
           </h3>
           <p className="text-sm text-ink-2">{horizon.note}</p>
           <dl className="flex flex-col gap-1 text-xs text-ink-3">

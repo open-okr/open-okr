@@ -193,7 +193,7 @@ export default async function AgentsPage() {
             {t("common.recentRuns")}
           </h2>
           <Chip tone="neutral">
-            {runs.length} {t("admin.agents.shown")}
+            {t("admin.agents.shown", { length: runs.length })}
           </Chip>
         </CardHeader>
         <CardBody className="p-0">

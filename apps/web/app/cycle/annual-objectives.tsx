@@ -73,9 +73,10 @@ async function Objective({
           </Chip>
           {objective.sentForward > 0 ? (
             <Chip tone="ok">
-              {t("cycle.annualObjectives.in")} {objective.sentForward}{" "}
-              {t("cycle.annualObjectives.quarter")}
-              {objective.sentForward === 1 ? "" : "s"}
+              {t("cycle.annualObjectives.inQuarter", {
+                sentForward: objective.sentForward,
+                sentForward2: objective.sentForward === 1 ? "" : "s",
+              })}
             </Chip>
           ) : null}
         </span>

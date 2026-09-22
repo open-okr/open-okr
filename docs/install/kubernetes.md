@@ -15,6 +15,22 @@ up. This page is what surrounds it.
 | Certificates | Your ingress controller already does this. The Compose target bundles a proxy because a single server has nothing to delegate to |
 | A mail server | Optional everywhere. Point it at yours when you want delivery |
 
+## What the nodes have to be
+
+**Control-plane and worker nodes must be on cgroup v2.** Kubernetes 1.32 and
+later refuse to start on a host using cgroup v1, so this is a requirement of
+your cluster rather than of this chart, and it is worth checking before an
+install rather than during one. On a node:
+
+    stat -fc %T /sys/fs/cgroup
+
+`cgroup2fs` is what you want. `tmpfs` means cgroup v1, and the symptom is
+misleading: the API server refuses connections immediately, kubeadm reports a
+timeout waiting for the control plane, and nothing says the word cgroup unless
+you read the kubelet's own log. Every current distribution ships v2; the hosts
+that do not are older installs and some virtual machines, including the WSL2
+kernel a Windows workstation runs kind on.
+
 ## The shape of an install
 
 1. Have a PostgreSQL with the `pgvector` extension available, and a database
@@ -40,6 +56,14 @@ lands in a pod spec. `sh deploy/helm/cluster-test.sh` installs it into a kind
 cluster, registers a user and upgrades.
 
 Continuous integration runs the first on every change.
+
+**The upgrade is the one worth rehearsing.** `.github/workflows/upgrade.yml`
+installs the release an instance is actually running, upgrades it to the
+commit under test, and asserts the workspace survived. Pods of both releases
+serve together against the new schema for the length of a rolling upgrade, so
+a migration that drops a column the previous release still reads breaks every
+request those pods serve, and no other gate can see it. Run it against your
+own baseline before an upgrade you care about.
 
 ## Next
 

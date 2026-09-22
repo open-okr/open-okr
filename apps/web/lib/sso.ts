@@ -11,7 +11,11 @@
  */
 
 import type { KeyRing } from "@openokr/core";
-import { loadSSOConnections, type SSOProviderConfig } from "@openokr/core";
+import {
+  loadSSOConnections,
+  type SSOProviderConfig,
+  syncAllSamlProviders,
+} from "@openokr/core";
 import type { Pool } from "pg";
 
 const globals = globalThis as typeof globalThis & {
@@ -29,10 +33,23 @@ const globals = globalThis as typeof globalThis & {
 export async function resolveSSOProviders(
   pool: Pool,
   ring: KeyRing,
+  baseUrl: string,
 ): Promise<void> {
   try {
     const providers = await loadSSOConnections(pool, ring);
     globals.openokrSSOProviders = providers;
+
+    // **The derived table, brought in line before the plugin reads it**
+    // (P8-T07c-b). `syncAllSamlProviders` was built at P8-T07c-a and nothing
+    // in the application ever called it, so `sso_providers` stayed empty on
+    // every running instance and the SAML plugin had no provider to answer a
+    // sign-in with. A row written straight into `sso_connections`, or one
+    // whose authority was removed while this process was not running, is
+    // reconciled here rather than discovered by somebody failing to sign in.
+    const saml = await syncAllSamlProviders(pool, providers, baseUrl);
+    if (saml > 0) {
+      process.stdout.write(`sso: ${saml} SAML provider(s) in step\n`);
+    }
     if (providers.length > 0) {
       process.stdout.write(
         `sso: loaded ${providers.length} provider(s): ${providers.map((p) => p.providerId).join(", ")}\n`,

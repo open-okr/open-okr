@@ -517,6 +517,10 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "copilot.answered": z.object({
     threadId: z.string(),
     stopped: z.boolean(),
+    /** A background run ended early, and said why (P4-T14b-b). */
+    halted: z.boolean().optional(),
+    /** The relay delivered the same run twice and the second found it done. */
+    redelivered: z.boolean().optional(),
   }),
   // The action name travels; the payload does not. A proposal's content is the
   // member's own conversation, and the audit row already holds what an

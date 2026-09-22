@@ -151,8 +151,10 @@ export async function DependencyRegister({
                         {entry.keyResultTitle}
                       </Link>
                       <span className="text-xs text-ink-4">
-                        {entry.goalTitle} {t("cycle.dependencyRegister.needs")}{" "}
-                        {entry.provider}
+                        {t("cycle.dependencyRegister.needs", {
+                          goalTitle: entry.goalTitle,
+                          provider: entry.provider,
+                        })}
                       </span>
                     </div>
                     <Chip tone={state.tone}>{state.label}</Chip>
@@ -229,7 +231,7 @@ export async function DependencyRegister({
               {t("cycle.dependencyRegister.recordADependency")}
             </h3>
             <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("common.keyResult2")}
+              {t("common.keyResult")}
               <select
                 name="keyResultId"
                 required

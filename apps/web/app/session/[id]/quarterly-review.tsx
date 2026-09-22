@@ -156,8 +156,11 @@ export function QuarterlyReview({
       <div className="flex flex-wrap items-center gap-2.5">
         {current ? (
           <Chip tone="info">
-            {t("session.detail.quarterlyReview.stage")} {current.stage}{" "}
-            {t("common.of")} {stages.length} · {current.title}
+            {t("session.detail.quarterlyReview.stageOf", {
+              stage: current.stage,
+              length: stages.length,
+              title: current.title,
+            })}
           </Chip>
         ) : (
           <Chip tone="neutral">
@@ -169,7 +172,10 @@ export function QuarterlyReview({
             {/* Tabular, so the digits do not jump every second. */}
             <Chip tone={over ? "bad" : "neutral"}>
               <span className="tabular-nums">
-                {clock(spent)} {t("common.of")} {clock(budget)}
+                {t("common.of6", {
+                  spent: clock(spent),
+                  budget: clock(budget),
+                })}
               </span>
             </Chip>
             {isFacilitator ? (
@@ -373,17 +379,19 @@ export function QuarterlyReview({
               )}
               {Object.keys(elapsed).length > 0 ? (
                 <p className="text-xs text-ink-4">
-                  {t("session.detail.quarterlyReview.timeSpentSoFar")}{" "}
-                  {stages
-                    .map((stage, index) => ({
-                      stage,
-                      seconds: elapsed[stageKeys[index] ?? ""] ?? 0,
-                    }))
-                    .filter((entry) => entry.seconds > 0)
-                    .map(
-                      (entry) => `${entry.stage.title} ${clock(entry.seconds)}`,
-                    )
-                    .join(", ")}
+                  {t("session.detail.quarterlyReview.timeSpentSoFar", {
+                    seconds: stages
+                      .map((stage, index) => ({
+                        stage,
+                        seconds: elapsed[stageKeys[index] ?? ""] ?? 0,
+                      }))
+                      .filter((entry) => entry.seconds > 0)
+                      .map(
+                        (entry) =>
+                          `${entry.stage.title} ${clock(entry.seconds)}`,
+                      )
+                      .join(", "),
+                  })}
                 </p>
               ) : null}
             </CardBody>
