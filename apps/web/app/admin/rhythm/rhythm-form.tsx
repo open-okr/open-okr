@@ -89,6 +89,72 @@ function numericParts(
     : null;
 }
 
+/** A §11 word list as it is stored: named lists of terms. */
+type WordListMap = Readonly<Record<string, readonly string[]>>;
+
+/**
+ * The value, if it is a map of named word lists.
+ *
+ * Narrow on purpose. Anything else still falls through to the `JSON.stringify`
+ * line below, which is the right answer for a shape nobody has designed a
+ * control for yet.
+ */
+function wordLists(value: unknown): WordListMap | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length === 0) {
+    return null;
+  }
+  return entries.every(
+    ([, terms]) =>
+      Array.isArray(terms) && terms.every((one) => typeof one === "string"),
+  )
+    ? (value as WordListMap)
+    : null;
+}
+
+/**
+ * The six §11 quality word lists, read-only, as lists of words (P8-G08).
+ *
+ * **They were `JSON.stringify` of the whole map in one paragraph.** 148 terms
+ * across six lists, rendered as a single unbroken string of quotes, brackets
+ * and commas that ran past the right edge of the card. It was also styled
+ * `tabular`, which is the numeral variant and belongs to the figures on this
+ * screen rather than to prose.
+ *
+ * Still read-only, which is P6-G20's deliberate choice and not an omission:
+ * editing a word list is a different control from a number field, and the
+ * resolved value is shown so an admin can see what the Coach is matching on.
+ * What changes is that it can now be read.
+ */
+function WordLists({ lists }: { readonly lists: WordListMap }) {
+  return (
+    <dl className="flex flex-col gap-1.5">
+      {Object.entries(lists).map(([name, terms]) => (
+        <div key={name} className="flex flex-col gap-0.5">
+          <dt className="text-xs font-semibold text-ink-2">
+            {/* The registry's own camelCase key, spaced out. Renaming these
+                would mean renaming them in `packages/method`, and they are
+                the canon's names rather than this screen's. */}
+            {name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()}
+            <span className="ml-1.5 font-normal text-ink-4">
+              {terms.length}
+            </span>
+          </dt>
+          {/* `wrap-break-word` because a single list is long and a term can be
+              two words: without it the row sets the card's width and the
+              whole page scrolls sideways. */}
+          <dd className="wrap-break-word text-xs text-ink-3">
+            {terms.join(", ")}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** One registry row: scalar, composite, or shown as it stands. */
 function Parameter({
   entry,
@@ -104,6 +170,7 @@ function Parameter({
   const { t } = useTranslations();
 
   const parts = numericParts(resolved);
+  const words = wordLists(resolved);
   // A list's fields carry a different prefix, so the save can put an array
   // back together as an array.
   const prefix = Array.isArray(resolved) ? "list" : "composite";
@@ -173,8 +240,10 @@ function Parameter({
             {t("admin.rhythm.rhythmForm.fillInEveryPart")}
           </span>
         </div>
+      ) : words ? (
+        <WordLists lists={words} />
       ) : (
-        <p className="tabular text-sm text-ink-3">
+        <p className="text-sm text-ink-3">
           {t("admin.rhythm.rhythmForm.inForce", {
             resolved: JSON.stringify(resolved),
           })}
