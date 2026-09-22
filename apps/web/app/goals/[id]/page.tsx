@@ -4,7 +4,15 @@ import {
   excerptRichText,
   OperationError,
 } from "@openokr/core";
-import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  formatMeasure,
+} from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
@@ -319,8 +327,8 @@ export default async function GoalPage({
                         {t("common.toWeight2", {
                           direction: keyResult.direction,
                           indicatorType: keyResult.indicatorType,
-                          baselineValue: keyResult.baselineValue,
-                          targetValue: keyResult.targetValue,
+                          baselineValue: formatMeasure(keyResult.baselineValue),
+                          targetValue: formatMeasure(keyResult.targetValue),
                           unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                           weight: keyResult.weight,
                         })}
@@ -335,8 +343,7 @@ export default async function GoalPage({
                     </span>
                     <span className="flex flex-none flex-col items-end gap-1">
                       <span className="text-sm font-bold text-ink">
-                        {keyResult.currentValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""}
+                        {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
                       {canEdit && !closed && keyResult.kpiId === null ? (
                         <ActionForm
@@ -366,7 +373,12 @@ export default async function GoalPage({
                             type="number"
                             step="any"
                             defaultValue={keyResult.currentValue}
-                            className="w-20 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
+                            // `w-20` held five digits. A key result measuring
+                            // rupiah or impressions runs to nine, and a person
+                            // cannot check what they typed if the field hides
+                            // half of it. No `max`: the ceiling on a measure is
+                            // the unit's, not the product's.
+                            className="w-32 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
                           />
                           <label
                             className="sr-only"

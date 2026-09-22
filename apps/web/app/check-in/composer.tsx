@@ -1,4 +1,11 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  formatMeasure,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { publishCheckIn } from "./actions.ts";
@@ -121,8 +128,8 @@ export async function Composer({
                       <span className="text-xs text-ink-3">
                         {t("common.toNow", {
                           direction: keyResult.direction,
-                          baselineValue: keyResult.baselineValue,
-                          targetValue: keyResult.targetValue,
+                          baselineValue: formatMeasure(keyResult.baselineValue),
+                          targetValue: formatMeasure(keyResult.targetValue),
                           unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                           progressPct: Math.round(keyResult.progressPct),
                         })}
@@ -131,7 +138,7 @@ export async function Composer({
                     <span className="flex flex-none items-center gap-1.5">
                       <span className="text-xs text-ink-4">
                         {t("checkIn.composer.was", {
-                          currentValue: keyResult.currentValue,
+                          currentValue: formatMeasure(keyResult.currentValue),
                         })}
                       </span>
                       {keyResult.kpiId ? (
@@ -152,7 +159,9 @@ export async function Composer({
                             type="number"
                             step="any"
                             defaultValue={keyResult.currentValue}
-                            className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                            // Nine digits fit. A measure in rupiah or
+                            // impressions reaches them and `w-24` hid half.
+                            className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
                           />
                         </>
                       )}

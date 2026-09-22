@@ -28,6 +28,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  formatMeasure,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -71,9 +72,11 @@ function evidence(keyResult: ScoringKeyResult): string {
   const bounds =
     keyResult.baseline === null || keyResult.target === null
       ? null
-      : `${keyResult.baseline} to ${keyResult.target}${unit}`;
+      : `${formatMeasure(keyResult.baseline)} to ${formatMeasure(keyResult.target)}${unit}`;
   const landed =
-    keyResult.current === null ? null : `landed ${keyResult.current}${unit}`;
+    keyResult.current === null
+      ? null
+      : `landed ${formatMeasure(keyResult.current)}${unit}`;
   return [bounds, landed].filter(Boolean).join(", ") || "No numbers recorded";
 }
 

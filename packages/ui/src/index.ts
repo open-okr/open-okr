@@ -16,6 +16,7 @@ export * from "./keyboard/registry.tsx";
 export * from "./keyboard/shortcut-overlay.tsx";
 export * from "./keyboard/use-keyboard-shortcut.ts";
 export * from "./lib/cn.ts";
+export * from "./lib/format-measure.ts";
 export * from "./query/query-provider.tsx";
 export * from "./rich-text/draft.ts";
 export * from "./rich-text/editor.tsx";
