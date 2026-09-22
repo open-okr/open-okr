@@ -32,8 +32,15 @@ jobs:
   sign-off:
     name: Developer certificate of origin
     runs-on: ubuntu-latest
-    # Bots do not sign off; their commits are covered by the maintainer who
-    # merges them. The same exemption `ci.yml` applies.
+    # **Skipped when a bot opened the pull request, and that is not the whole
+    # exemption.** `github.actor` is whoever pushed last, not who wrote each
+    # commit, so this alone stops working the moment a person pushes a fix on
+    # top of a bot's branch: the job runs, walks every commit including the
+    # bot's, and fails on one it was never meant to judge. That happened on
+    # dependabot pull request #80 on 22 September 2026, where a maintainer
+    # corrected the lockfile and inherited a red cross for the bot's own
+    # commit. The per-commit exemption below is the real one; this line only
+    # saves a runner when there is nothing for a person to answer for.
     if: ${{ !endsWith(github.actor, '[bot]') }}
     steps:
       - uses: actions/checkout@v7
@@ -57,6 +64,21 @@ jobs:
           # to somebody else.
           for sha in $(git rev-list --no-merges "${BASE}..HEAD"); do
             author="$(git show -s --format='%an <%ae>' "$sha")"
+
+            # **A bot's own commit is not a person's to certify.** The
+            # certificate is a statement that the author had the right to
+            # contribute the code; a dependency bump written by a machine is
+            # covered by whoever merges it, which is what this workflow's
+            # header already says. Dependabot does sign its commits, and signs
+            # them as `support@github.com` while authoring them as its
+            # numbered noreply address, so an exact author match can never
+            # hold for one. Matched on the author rather than on the sign-off
+            # so that a person cannot skip the check by writing a bot's name
+            # into a trailer.
+            case "$author" in
+              *"[bot]"*) continue ;;
+            esac
+
             if ! git show -s --format='%B' "$sha" \
               | grep -qiF "Signed-off-by: ${author}"; then
               missing="${missing}- \`$(git show -s --format='%h %s' "$sha")\`"$'\n'
