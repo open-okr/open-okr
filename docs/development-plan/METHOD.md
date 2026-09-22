@@ -148,13 +148,19 @@ Three different numbers. They are never mixed. Every numeric boundary in this se
 
 | Number | Range | Direction | Answers |
 |---|---|---|---|
-| Progress | 0 to 100% | Backward | How far has the value moved from baseline to target? |
+| Progress | 0 to the progress ceiling, 100% by default | Backward | How far has the value moved from baseline to target? |
 | Confidence | 0.0 to 1.0 | Forward | Do we believe this will land? |
 | Score | 0.0 to 1.0 | Backward, final | What did we actually achieve, judged at the close? |
 
 ### 3.1 Progress
 
-Direction-aware linear interpolation, clamped to 0 to 100%.
+Direction-aware linear interpolation, clamped to 0 and to the progress ceiling.
+
+The ceiling is 100% by default, so a key result that reached its target reads as done and no further. A workspace may raise it as far as 200%, which is the ceiling §6.4 already applies to KPI achievement. Raising it makes over-achievement visible where it was earned: a key result that reached 150 of a 100 target reads 150%.
+
+Two consequences of raising it, and both are the workspace's to accept. A goal's progress is the weighted average of its key results, so a goal holding one key result at 150% and one at 50% reads 100% and looks complete while half the work was missed. And a *maintain* key result is never above 100%, because its value is either inside the stated band or on its way back and there is no notion of exceeding a band.
+
+The ceiling does not touch scoring. A score is judged at the close by a person against the key result as written, on the 0.0 to 1.0 scale in §3.3, and a key result that overshot is still a key result whose target was set too low.
 
 | Direction | Formula |
 |---|---|
@@ -759,6 +765,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Portfolio verdict boundaries | 0.85, 0.60, 0.40 |
 | Close sandbagging threshold | Scores clustering above 0.85 |
 | Root-cause threshold | Scores below 0.7 require a cause |
+| Progress ceiling | 100%, raisable to 200% |
 | Progress signal pass | 75% |
 | Progress signal fail | 50% |
 

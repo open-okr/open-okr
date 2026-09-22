@@ -326,6 +326,19 @@ export const THRESHOLDS = {
     default: 0.7,
     schema: unit,
   }),
+  "scoring.progressCeilingPct": param({
+    group: "scoring",
+    label: "Progress ceiling",
+    section: "§3.1",
+    why: "100 by default, so a key result that hit its target reads as done and no further. A workspace that wants over-achievement on the page raises it, as far as the 200 §6.4 already allows a KPI.",
+    default: 100,
+    // Floored at 100, not at 0. A ceiling below 100 would make a key result
+    // that reached its target read as more than achieved, which is not a
+    // stricter setting but a broken one. Capped at 200 so the key result and
+    // the KPI it may be linked to agree on what the most that can be measured
+    // is, and so `Bar` always has a width it can draw.
+    schema: z.number().min(100).max(200),
+  }),
   "scoring.progressSignalPass": param({
     group: "scoring",
     label: "Progress signal pass",

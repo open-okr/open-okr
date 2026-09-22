@@ -2,8 +2,22 @@ import type { HTMLAttributes } from "react";
 import { cn } from "../lib/cn.ts";
 
 export interface BarProps extends HTMLAttributes<HTMLDivElement> {
-  /** 0 to 100. Out-of-range values clamp rather than overflow the track. */
+  /** 0 to `max`. Out-of-range values clamp rather than overflow the track. */
   readonly value: number;
+  /**
+   * The full track, 100 by default.
+   *
+   * A workspace may raise METHOD.md §11's `scoring.progressCeilingPct` as far
+   * as 200, and a caller showing progress under a raised ceiling passes the
+   * resolved ceiling here. Without it a goal at 150% would fill the track at
+   * 100 and `aria-valuemax` would tell a screen reader that 100 was the most
+   * there is, which is a different claim from the one on the page beside it.
+   *
+   * 100 here is this component's own axis rather than a second home for the
+   * threshold: a caller that shows an ordinary 0-to-100 percentage passes
+   * nothing, and the one screen that shows progress passes what it resolved.
+   */
+  readonly max?: number;
   /**
    * What this bar is the progress of, for anybody who cannot see it.
    *
@@ -42,11 +56,15 @@ export interface BarProps extends HTMLAttributes<HTMLDivElement> {
 export function Bar({
   value,
   label,
+  max = 100,
   animateOnMount = false,
   className,
   ...props
 }: BarProps) {
-  const clamped = Math.min(100, Math.max(0, value));
+  // A max of zero or less has no track to divide by, so it reads as the
+  // ordinary axis rather than producing a width of Infinity.
+  const ceiling = max > 0 ? max : 100;
+  const clamped = Math.min(ceiling, Math.max(0, value));
   return (
     <div
       role="progressbar"
@@ -56,7 +74,7 @@ export function Bar({
       // anyway. The default is here so the name is never absent.
       aria-label={label ?? "Progress"}
       aria-valuemin={0}
-      aria-valuemax={100}
+      aria-valuemax={ceiling}
       aria-valuenow={Math.round(clamped)}
       className={cn(
         "h-1.5 flex-none overflow-hidden rounded-full bg-track",
@@ -69,7 +87,7 @@ export function Bar({
           "block h-full rounded-full bg-brand-strong",
           animateOnMount && "animate-grow-bar",
         )}
-        style={{ width: `${clamped}%` }}
+        style={{ width: `${(clamped / ceiling) * 100}%` }}
       />
     </div>
   );

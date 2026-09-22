@@ -257,9 +257,16 @@ async function recomputeScoring<
       );
     for (const row of linked) {
       if (row.achievementPct !== null) {
+        // The ceiling is §11's `scoring.progressCeilingPct`, not a constant.
+        // This line read `Math.min(100, ...)` until P8-G03, which threw away
+        // everything §6.4 measured above 100 and made a KPI at 180 and one at
+        // exactly 100 indistinguishable on the key result that linked to it.
         kpiAchievementById.set(
           row.id,
-          Math.min(100, Math.max(0, Number(row.achievementPct))),
+          Math.min(
+            thresholds["scoring.progressCeilingPct"],
+            Math.max(0, Number(row.achievementPct)),
+          ),
         );
       }
     }
@@ -276,7 +283,7 @@ async function recomputeScoring<
     // recorded is unmeasured, not failing.
     const progress = row.kpiId
       ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
-      : keyResultProgress({ direction, baseline, target, current });
+      : keyResultProgress({ direction, baseline, target, current }, thresholds);
     keyResultProgressById.set(row.id, progress);
 
     const points = pointsByKeyResult.get(row.id) ?? [];
@@ -323,7 +330,7 @@ async function recomputeScoring<
     })),
   ];
 
-  const cascade = cascadeProgress(cascadeInput);
+  const cascade = cascadeProgress(cascadeInput, thresholds);
   const graceDays = thresholds["cadence.stalenessGraceDays"];
   // Staleness is counted in the workspace's calendar, not in absolute hours: a
   // goal due at 23:59 local is one day overdue at any hour of the next day.

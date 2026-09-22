@@ -37,8 +37,13 @@ export function round2(value: number): number {
   return rounded / 100;
 }
 
-const clampPercent = (value: number): number =>
-  Math.min(100, Math.max(0, value));
+/**
+ * §3.1's clamp. The ceiling is the §11 `scoring.progressCeilingPct` parameter,
+ * 100 by default, and it is passed in rather than defaulted here: a threshold
+ * with two homes is a threshold that can disagree with itself.
+ */
+const clampPercent = (value: number, ceilingPct: number): number =>
+  Math.min(ceilingPct, Math.max(0, value));
 
 export interface KeyResultProgressInput {
   readonly direction: KeyResultDirection;
@@ -62,20 +67,27 @@ export interface KeyResultProgressInput {
  * Equal endpoints score 0 everywhere except `maintain`, where they describe a
  * band one point wide.
  */
-export function keyResultProgress(input: KeyResultProgressInput): number {
+export function keyResultProgress(
+  input: KeyResultProgressInput,
+  thresholds: ResolvedThresholds,
+): number {
   const { direction, baseline, target, current } = input;
+  const ceiling = thresholds["scoring.progressCeilingPct"];
 
   if (
     input.kpiAchievementPct !== undefined &&
     input.kpiAchievementPct !== null
   ) {
-    return round2(clampPercent(input.kpiAchievementPct));
+    return round2(clampPercent(input.kpiAchievementPct, ceiling));
   }
 
   if (direction === "maintain") {
     const low = Math.min(baseline, target);
     const high = Math.max(baseline, target);
     if (current >= low && current <= high) {
+      // 100 rather than the ceiling, whatever the ceiling is. A maintain key
+      // result asks whether the value stayed inside a stated band, and there is
+      // no sense in which a value inside a band exceeded it.
       return 100;
     }
     const width = high - low;
@@ -84,7 +96,10 @@ export function keyResultProgress(input: KeyResultProgressInput): number {
       return 0;
     }
     const distance = current < low ? low - current : current - high;
-    return round2(clampPercent(100 * (1 - distance / width)));
+    // Clamped at 100 rather than at the ceiling, for the same reason: this
+    // branch measures the distance back to the band, and the band's own value
+    // is 100.
+    return round2(clampPercent(100 * (1 - distance / width), 100));
   }
 
   const span = direction === "reduce" ? baseline - target : target - baseline;
@@ -95,7 +110,7 @@ export function keyResultProgress(input: KeyResultProgressInput): number {
   }
   const travelled =
     direction === "reduce" ? baseline - current : current - baseline;
-  return round2(clampPercent((travelled / span) * 100));
+  return round2(clampPercent((travelled / span) * 100, ceiling));
 }
 
 /** One weighted item in a goal's average: a key result or an aligned child. */
@@ -111,7 +126,10 @@ export interface WeightedItem {
  * means "tracked, does not count", so an item carrying it stays visible and stays
  * out of the arithmetic.
  */
-export function weightedProgress(items: readonly WeightedItem[]): number {
+export function weightedProgress(
+  items: readonly WeightedItem[],
+  thresholds: ResolvedThresholds,
+): number {
   // Weights are clamped here as well as on write. The write path is where a
   // person's typo is caught; this is where an imported row carrying 150 is, and a
   // pure function that trusted its input would let one team's bad data dominate a
@@ -127,7 +145,9 @@ export function weightedProgress(items: readonly WeightedItem[]): number {
     (sum, item) => sum + weightOf(item) * item.progressPct,
     0,
   );
-  return round2(clampPercent(weighted / total));
+  return round2(
+    clampPercent(weighted / total, thresholds["scoring.progressCeilingPct"]),
+  );
 }
 
 /** One node of the parent graph, as the cascade needs to see it. */
@@ -178,7 +198,10 @@ export interface CascadeResult {
  * that key result's own measured progress alone (decision D-2). A measured 40%
  * key result must not display 80% because another team did well.
  */
-export function cascadeProgress(goals: readonly CascadeGoal[]): CascadeResult {
+export function cascadeProgress(
+  goals: readonly CascadeGoal[],
+  thresholds: ResolvedThresholds,
+): CascadeResult {
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
   const keyResultOwner = new Map<string, string>();
   for (const goal of goals) {
@@ -288,7 +311,16 @@ export function cascadeProgress(goals: readonly CascadeGoal[]): CascadeResult {
     if (goal.settledProgressPct !== undefined) {
       // A boundary of a partial load: its answer came in with it, and the
       // subtree that produced it was never loaded.
-      progress.set(frame.id, clampPercent(goal.settledProgressPct));
+      // Clamped on the way in rather than trusted: the stored number was
+      // written under whatever ceiling was in force then, and a workspace that
+      // has since lowered its ceiling must not see the old value stand.
+      progress.set(
+        frame.id,
+        clampPercent(
+          goal.settledProgressPct,
+          thresholds["scoring.progressCeilingPct"],
+        ),
+      );
       continue;
     }
 
@@ -309,7 +341,7 @@ export function cascadeProgress(goals: readonly CascadeGoal[]): CascadeResult {
       });
     }
 
-    progress.set(frame.id, weightedProgress(items));
+    progress.set(frame.id, weightedProgress(items, thresholds));
   }
 
   return { goals: progress, diagnostics };

@@ -80,12 +80,15 @@ describe("key result progress", () => {
   for (const row of table("scoring.kr-progress").rows) {
     it(`${row.case}`, () => {
       expect(
-        keyResultProgress({
-          direction: row.direction as KeyResultDirection,
-          baseline: num(row, "baseline"),
-          target: num(row, "target"),
-          current: num(row, "current"),
-        }),
+        keyResultProgress(
+          {
+            direction: row.direction as KeyResultDirection,
+            baseline: num(row, "baseline"),
+            target: num(row, "target"),
+            current: num(row, "current"),
+          },
+          thresholds,
+        ),
       ).toBe(num(row, "expected_pct"));
     });
   }
@@ -94,19 +97,22 @@ describe("key result progress", () => {
     it(`${row.case}`, () => {
       const achievement = row.achievement_pct?.trim();
       expect(
-        keyResultProgress({
-          direction: "increase",
-          baseline: 0,
-          target: 100,
-          current: 0,
-          // An empty cell is "no achievement yet", which is a different fact from
-          // an achievement of zero. Both answer 0 here, and only one of them is
-          // allowed to bypass the direction formula.
-          kpiAchievementPct:
-            achievement === undefined || achievement === ""
-              ? null
-              : Number(achievement),
-        }),
+        keyResultProgress(
+          {
+            direction: "increase",
+            baseline: 0,
+            target: 100,
+            current: 0,
+            // An empty cell is "no achievement yet", which is a different fact from
+            // an achievement of zero. Both answer 0 here, and only one of them is
+            // allowed to bypass the direction formula.
+            kpiAchievementPct:
+              achievement === undefined || achievement === ""
+                ? null
+                : Number(achievement),
+          },
+          thresholds,
+        ),
       ).toBe(num(row, "expected_pct"));
     });
   }
@@ -147,7 +153,7 @@ describe("goal progress", () => {
       const tree = json<TreeNode>(row, "tree");
       const nodes: CascadeGoal[] = [];
       flatten(tree, "root", null, nodes);
-      const result = cascadeProgress(nodes);
+      const result = cascadeProgress(nodes, thresholds);
       expect(result.goals.get("root")).toBe(num(row, "expected_pct"));
       expect(result.diagnostics).toEqual([]);
     });
@@ -158,10 +164,13 @@ describe("goal progress", () => {
     // which is 100 and 0 weighted 100 to 1. The clamp happens on write (P3-T04),
     // so the arithmetic here is handed the clamped value.
     expect(
-      weightedProgress([
-        { weight: 100, progressPct: 100 },
-        { weight: 1, progressPct: 0 },
-      ]),
+      weightedProgress(
+        [
+          { weight: 100, progressPct: 100 },
+          { weight: 1, progressPct: 0 },
+        ],
+        thresholds,
+      ),
     ).toBe(99.01);
   });
 });
@@ -199,7 +208,7 @@ describe("the upward cascade", () => {
         };
       });
 
-      const result = cascadeProgress(goals);
+      const result = cascadeProgress(goals, thresholds);
       const expected = json<Record<string, number>>(row, "expected");
       for (const [id, value] of Object.entries(expected)) {
         const fromGoals = result.goals.get(id);
@@ -234,7 +243,7 @@ describe("the upward cascade", () => {
     }));
 
     const started = performance.now();
-    const result = cascadeProgress(goals);
+    const result = cascadeProgress(goals, thresholds);
     const elapsed = performance.now() - started;
 
     expect(result.goals.size).toBe(1000);

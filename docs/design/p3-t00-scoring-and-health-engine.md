@@ -29,8 +29,26 @@ recomputeGoal(graph, change, thresholds) -> { goals: GoalDerived[], keyResults: 
 | Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure |
 
 Three numbers stay separate everywhere and are never averaged together
-(METHOD.md §3): progress is backward-looking 0 to 100%, confidence is
-forward-looking 0.0 to 1.0, score is the final backward judgement 0.0 to 1.0.
+(METHOD.md §3): progress is backward-looking 0 to the progress ceiling,
+confidence is forward-looking 0.0 to 1.0, score is the final backward judgement
+0.0 to 1.0.
+
+**The ceiling was a constant 100 until P8-G03 on 22 September 2026**, and it is
+METHOD.md §11's `scoring.progressCeilingPct` now: default 100, raisable by a
+workspace as far as 200, which is the ceiling §6.4 already applies to KPI
+achievement. Every golden table below is read with the canon defaults, so every
+expected value in this document is the ceiling at 100 and the tables are
+unchanged by the parameter. The raised ceiling is covered by
+`packages/method/test/progress-ceiling.test.ts`, which the golden-table reader
+cannot express because a matrix column cannot carry a threshold.
+
+Two readings that belong here rather than in the code. A `maintain` key result
+is never above 100 whatever the ceiling, because its value is inside a stated
+band or on its way back and there is no sense in which a value inside a band
+exceeded it. And the ceiling reaches the goal rollup, which was Agung's decision
+on 22 September 2026 against the recommendation: a goal holding one key result
+at 150% and one at 50% then reads 100% and looks complete while half the work
+was missed.
 
 ## 2. Key result progress
 
@@ -53,8 +71,11 @@ Equal baseline and target score 0 for every direction except `maintain`, where
 they describe a band of one point.
 
 A key result with `kpi_id` set ignores all four formulas and takes the KPI's
-real `achievement_pct`, clamped to 0 to 100 (decision D-4). A KPI at 130% of
-target gives the key result 100%.
+real `achievement_pct`, clamped to 0 and to the progress ceiling (decision D-4).
+At the default ceiling a KPI at 130% of target gives the key result 100%. With
+the ceiling raised to 200 it gives 130, and the second clamp stops discarding
+what §6.4 measured: before P8-G03 a KPI at 180 and one at exactly 100 were
+indistinguishable on the key result that linked to them.
 
 <!-- golden: scoring.kr-progress -->
 
