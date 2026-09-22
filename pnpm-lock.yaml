@@ -168,7 +168,7 @@ importers:
         specifier: 2.11.2
         version: 2.11.2
       vitest:
-        specifier: 5.0.1
+        specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.6.2)(jsdom@30.1.0(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@26.6.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/web:
@@ -4957,7 +4957,7 @@ snapshots:
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
       '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/remapping@2.3.5':
