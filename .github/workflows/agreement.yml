@@ -57,6 +57,16 @@ jobs:
           # to somebody else.
           for sha in $(git rev-list --no-merges "${BASE}..HEAD"); do
             author="$(git show -s --format='%an <%ae>' "$sha")"
+            # The job-level `if` above exempts a bot that pushes. This exempts
+            # a bot that authored, which is not the same thing. A person who
+            # fixes a bot's branch pushes the bot's commit along with their
+            # own, so the job runs, and Dependabot's sign-off names
+            # support@github.com while its author line names a noreply
+            # address, so the two can never match. Same rule, applied per
+            # commit, which is where it had to be all along.
+            case "$(git show -s --format='%an' "$sha")" in
+              *'[bot]') continue ;;
+            esac
             if ! git show -s --format='%B' "$sha" \
               | grep -qiF "Signed-off-by: ${author}"; then
               missing="${missing}- \`$(git show -s --format='%h %s' "$sha")\`"$'\n'
