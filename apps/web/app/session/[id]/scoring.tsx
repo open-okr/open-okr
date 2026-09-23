@@ -105,7 +105,7 @@ function ScoreRow({
     onProblem(null);
     if (reason.trim().length === 0) {
       onProblem(
-        "§8.3 asks for one line on why. A score with no reason is refused.",
+        "One line on why is asked for. A score with no reason is refused.",
       );
       return;
     }

@@ -78,7 +78,7 @@ function ObjectiveRow({
     }
     if (why.trim().length === 0) {
       onProblem(
-        "§8.8 asks for one line on why. A decision nobody explained is the carry-over it exists to stop.",
+        "One line on why is asked for. A decision nobody explained is the carry-over it exists to stop.",
       );
       return;
     }

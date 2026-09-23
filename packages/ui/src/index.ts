@@ -10,6 +10,7 @@ export * from "./components/card.tsx";
 export * from "./components/chip.tsx";
 export * from "./components/kbd.tsx";
 export * from "./components/verdict-dot.tsx";
+export * from "./feedback/toast.tsx";
 export * from "./forms/unsaved-changes.tsx";
 export * from "./forms/use-form-dirty.ts";
 export * from "./forms/use-submit-shortcut.ts";

@@ -25,6 +25,13 @@
  * button" is no longer a thing that exists on this page, and a page-level
  * `getByRole("button", { name: "Save" })` matches eight elements and fails
  * Playwright's strict mode rather than picking one.
+ *
+ * **The outcome is a toast since P8-G11a, and that is the point of it.** The
+ * sentence used to render at the top of the card, which on a card 1,700px tall
+ * with a sticky Save meant pressing the button at the bottom of twenty
+ * parameters and seeing nothing at all. A refusal now also names its parameter
+ * under that parameter's own field, and this file asserts both, because the
+ * toast alone would not prove the reader is taken to the box that was refused.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -48,7 +55,19 @@ const LADDER_OWNER = "input[name='composite:cadence.blockerLadderHours:owner']";
 const cadenceCard = (page: Page) => page.getByTestId("rhythm-card-cadence");
 const save = (page: Page) =>
   cadenceCard(page).getByRole("button", { name: "Save" });
-const outcome = (page: Page) => cadenceCard(page).getByTestId("rhythm-save");
+
+/**
+ * The toast, which is where a save says what happened.
+ *
+ * **Named by tone rather than just by test id.** A confirmation runs for six
+ * seconds, so a test that saves and a test that is refused a moment later can
+ * have both on screen at once, and an unscoped `getByTestId("toast")` then
+ * matches two and fails strict mode. Saying which one is expected is also a
+ * sharper assertion: it is the difference between "something was said" and
+ * "it was refused".
+ */
+const outcome = (page: Page, tone: "ok" | "bad") =>
+  page.locator(`[data-testid="toast"][data-tone="${tone}"]`);
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
@@ -66,36 +85,55 @@ test("the card renders the registry, not a fixed list of fields", async () => {
     page.getByRole("heading", { name: "Rhythm and thresholds" }),
   ).toBeVisible();
 
-  // A scalar, a composite and the section the canon defines it in.
+  // A scalar and a composite. **The METHOD §x chip used to be asserted here
+  // and is gone since P8-G11b**: 53 of them on this one screen, which Agung
+  // asked to be rid of. The sentence under each label stays.
   await expect(page.locator(GRACE)).toBeVisible();
   await expect(page.locator(LADDER_OWNER)).toBeVisible();
-  await expect(page.getByText("METHOD §11").first()).toBeVisible();
+  await expect(page.getByText("METHOD §")).toHaveCount(0);
 });
 
 test("an impossible value is refused in words", async () => {
   await page.locator(GRACE).fill("99999");
   await save(page).click();
 
-  const refusal = outcome(page);
+  const refusal = outcome(page, "bad");
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("cadence.stalenessGraceDays");
 
-  // Refused means nothing was written: the field still holds what was typed
-  // and the card does not claim a save.
+  // **Refused means nothing was written, and nothing was taken away either.**
+  // React resets a form with an `action` once that action resolves, so until
+  // P8-G11a the typed value was gone the moment it was refused: you were told
+  // 500 was too big while the box had already gone back to 200. This line is
+  // the one the comment here used to claim and never checked.
+  await expect(page.locator(GRACE)).toHaveValue("99999");
   await expect(refusal).not.toContainText("Saved.");
+
+  // **The half a toast cannot carry.** The method named a parameter, so the
+  // sentence is under that parameter's own field and the field says it is the
+  // invalid one. Without this you are told something was refused and left to
+  // find which of twenty boxes it was.
+  await expect(page.locator(GRACE)).toHaveAttribute("aria-invalid", "true");
+  // The method's own words, minus the key that the toast already carries.
+  // Asserted as non-empty rather than by wording, because the sentence comes
+  // from the §11 schema's bound, and changing that bound is a method decision
+  // this spec has no business pinning.
+  const fieldError = cadenceCard(page).getByTestId("rhythm-field-error");
+  await expect(fieldError).toBeVisible();
+  await expect(fieldError).not.toBeEmpty();
 });
 
 test("a grace this workspace asked for is written, and nothing else moves", async () => {
   await page.locator(GRACE).fill("5");
   await save(page).click();
-  await expect(outcome(page)).toContainText("Saved.", {
+  await expect(outcome(page, "ok")).toContainText("Saved.", {
     timeout: 15_000,
   });
 
   await goTo(page, "/admin/rhythm");
   await expect(page.locator(GRACE)).toHaveValue("5");
-  // The ladder beside it was not touched, so it still shows the canon's value
-  // as a placeholder rather than a stored one.
+  // The ladder beside it was not touched, so it still shows the method's own
+  // value as a placeholder rather than a stored one.
   await expect(page.locator(LADDER_OWNER)).toHaveValue("");
 });
 
@@ -108,7 +146,7 @@ test("a ladder can be moved, which it could not before", async () => {
     .locator("input[name='composite:cadence.blockerLadderHours:sponsor']")
     .fill("60");
   await save(page).click();
-  await expect(outcome(page)).toContainText("Saved.", {
+  await expect(outcome(page, "ok")).toContainText("Saved.", {
     timeout: 15_000,
   });
 
@@ -122,24 +160,69 @@ test("a half-written set is refused rather than stored", async () => {
     .fill("");
   await save(page).click();
 
-  const refusal = outcome(page);
+  const refusal = outcome(page, "bad");
   await expect(refusal).toBeVisible({ timeout: 15_000 });
   await expect(refusal).toContainText("every part");
 });
 
-test("reset puts the whole card back to the canon", async () => {
+test("reset puts the whole card back to its defaults", async () => {
   await goTo(page, "/admin/rhythm");
   page.once("dialog", (dialog) => {
     void dialog.accept();
   });
   await cadenceCard(page)
-    .getByRole("button", { name: "Reset to the canon" })
+    .getByRole("button", { name: "Reset to defaults" })
     .click();
 
-  await expect(page.getByText("Returned")).toBeVisible({ timeout: 15_000 });
+  await expect(outcome(page, "ok")).toContainText("Returned", {
+    timeout: 15_000,
+  });
 
   await goTo(page, "/admin/rhythm");
-  // Blank means "no opinion", and the placeholder is the canon's own number.
+  // Blank means "no opinion", and the placeholder is the method's number.
   await expect(page.locator(GRACE)).toHaveValue("");
   await expect(page.locator(LADDER_OWNER)).toHaveValue("");
+});
+
+test("a word list takes this workspace's own terms, and keeps the method's", async () => {
+  // **Adding is all the method allows, and that is the finding rather than a
+  // limitation of this screen.** §11 words the parameter as "a workspace may
+  // add terms; the canon terms remain", and `resolveThresholds` merges rather
+  // than replaces, because replacing would let a workspace switch a quality
+  // rule off by storing an empty list.
+  await goTo(page, "/admin/rhythm");
+  const field = page.locator(
+    "input[name='words:quality.wordLists:outputVerbs']",
+  );
+  await expect(field).toBeVisible();
+
+  const before = await page
+    .getByText(/^launch, build, ship/)
+    .first()
+    .textContent();
+  expect(before).toContain("launch");
+
+  await field.fill("luncurkan, terbitkan");
+  await page
+    .getByTestId("rhythm-card-quality")
+    .getByRole("button", { name: "Save" })
+    .click();
+  await expect(outcome(page, "ok")).toContainText("Saved.", {
+    timeout: 15_000,
+  });
+
+  await goTo(page, "/admin/rhythm");
+  await expect(field).toHaveValue("luncurkan, terbitkan");
+  // The method's own terms are still there, and still not editable.
+  await expect(page.getByText(/^launch, build, ship/).first()).toBeVisible();
+
+  // Put it back, so no later spec inherits this workspace's vocabulary.
+  await field.fill("");
+  await page
+    .getByTestId("rhythm-card-quality")
+    .getByRole("button", { name: "Save" })
+    .click();
+  await expect(outcome(page, "ok")).toContainText("Saved.", {
+    timeout: 15_000,
+  });
 });

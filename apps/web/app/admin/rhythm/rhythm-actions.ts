@@ -99,6 +99,8 @@ export async function saveRhythm(
 ): Promise<RhythmState> {
   const overrides: Record<string, unknown> = {};
   const labels: Record<string, { singular: string; plural: string }> = {};
+  /** This workspace's own word list terms, per list (P8-G11b). */
+  const words = new Map<string, Record<string, readonly string[]>>();
   let sawThreshold = false;
   let sawLabel = false;
 
@@ -108,6 +110,32 @@ export async function saveRhythm(
     if (field.startsWith("threshold:")) {
       overrides[field.slice("threshold:".length)] = numberOrNull(value);
       sawThreshold = true;
+      continue;
+    }
+    // `words:<key>:<list>`, a comma-separated line of this workspace's own
+    // terms. **Added to the method's, never instead of them**: §11 words the
+    // parameter as "a workspace may add terms; the canon terms remain", and
+    // `resolveThresholds` merges for that reason, so an empty box here means
+    // "this workspace adds nothing to that list" rather than "empty that
+    // list". A workspace cannot switch a quality rule off from this screen,
+    // and that is the method's decision rather than this form's.
+    if (field.startsWith("words:")) {
+      const rest = field.slice("words:".length);
+      const split = rest.lastIndexOf(":");
+      if (split !== -1) {
+        const key = rest.slice(0, split);
+        const list = rest.slice(split + 1);
+        const terms = value
+          .split(",")
+          .map((term) => term.trim().toLowerCase())
+          .filter((term) => term !== "");
+        const held = words.get(key) ?? {};
+        // Deduplicated, because "ship, Ship" is one term typed twice and
+        // storing both would show the reader a list that repeats itself.
+        held[list] = [...new Set(terms)];
+        words.set(key, held);
+        sawThreshold = true;
+      }
       continue;
     }
     if (field.startsWith("label:")) {
@@ -133,7 +161,7 @@ export async function saveRhythm(
     }
     if (values.some((part) => part === null)) {
       return {
-        error: `${key}: fill in every part or leave them all blank. A half-written set is worse than the canon's.`,
+        error: `${key}: fill in every part or leave them all blank. A half-written set is worse than the default.`,
         saved: null,
       };
     }
@@ -143,6 +171,15 @@ export async function saveRhythm(
           .sort((left, right) => left - right)
           .map((index) => parts[String(index)])
       : parts;
+  }
+
+  for (const [key, lists] of words) {
+    // Every list empty means this workspace adds nothing, which is the same
+    // thing as having no opinion, so the whole parameter goes back rather
+    // than being stored as a map of empty arrays.
+    overrides[key] = Object.values(lists).some((terms) => terms.length > 0)
+      ? lists
+      : null;
   }
 
   // Only a rename with both forms filled in. A partial one is refused by the
@@ -207,8 +244,8 @@ export async function saveRhythm(
     error: null,
     saved:
       changed === 0
-        ? "Saved. Every threshold on this card is the canon's."
-        : `Saved. ${changed} threshold${changed === 1 ? "" : "s"} on this card differ${changed === 1 ? "s" : ""} from the canon.`,
+        ? "Saved. Every threshold on this card is at its default."
+        : `Saved. ${changed} threshold${changed === 1 ? "" : "s"} on this card differ${changed === 1 ? "s" : ""} from the default.`,
   };
 }
 
@@ -248,6 +285,6 @@ export async function resetGroup(
   revalidatePath("/admin/rhythm");
   return {
     ...NOTHING_SAVED,
-    saved: `Returned ${wanted.length} threshold${wanted.length === 1 ? "" : "s"} to the canon.`,
+    saved: `Returned ${wanted.length} threshold${wanted.length === 1 ? "" : "s"} to their defaults.`,
   };
 }

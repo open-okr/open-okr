@@ -35,10 +35,10 @@ const ALL: readonly QualityCheck[] = [
 ];
 
 const GROUP_LABEL: Record<QualityCheck["group"], string> = {
-  objective: "Objective check (METHOD.md §4.1)",
-  key_result: "Key result check (METHOD.md §4.2)",
-  alignment: "Alignment check (METHOD.md §4.3)",
-  cycle: "Cycle check (METHOD.md §4.4)",
+  objective: "Objective check",
+  key_result: "Key result check",
+  alignment: "Alignment check",
+  cycle: "Cycle check",
 };
 
 const TONE = {

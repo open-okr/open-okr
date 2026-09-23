@@ -146,7 +146,7 @@ export default async function InitiativesPage({
             <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
               {filtered
                 ? "Clear a filter to see the rest."
-                : "METHOD.md §5.5 asks a facilitator to record the main initiatives that will move each key result. This is where they go."}
+                : "A facilitator records the main initiatives that will move each key result. This is where they go."}
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-line">

@@ -73,14 +73,30 @@ describe("the rhythm and thresholds card", () => {
     // This is the whole of what the previous save did with an OperationError:
     // `return;`. An impossible value and a successful save looked identical.
     expect(actions).toContain("return { error: error.message, saved: null }");
-    expect(form).toContain('role="alert"');
+  });
+
+  test("the refusal comes to the reader, and names its own field", () => {
+    // **It used to render at the top of the card and be invisible.** A card
+    // runs to 1,700px with its Save in a header that stays on screen, so a
+    // refusal raised from the bottom of twenty parameters was off the top of
+    // the window with nothing to suggest it existed. Agung reported it.
+    expect(form).toContain("useToast");
+    expect(form).toContain('tone: "bad"');
+    // And the sentence lands under the parameter the method named, with the
+    // field brought into view and marked invalid.
+    expect(form).toContain("refusedParameter");
+    expect(form).toContain("focusRefused");
+    expect(form).toContain("aria-invalid={refusal !== null}");
+    // The card no longer carries a status strip of its own, because two
+    // places saying the same thing is how one of them goes stale.
+    expect(form).not.toContain('data-testid="rhythm-save"');
   });
 
   test("reset sends nulls, not the canon's current numbers", () => {
     // Storing today's default is not the same as having no opinion: the
     // stored copy keeps winning after the canon itself moves.
     expect(actions).toContain("wanted.map((key) => [key, null])");
-    expect(form).toContain("Reset to the canon");
+    expect(form).toContain("Reset to defaults");
   });
 
   test("each card is its own form, so the save is beside what it saves", () => {

@@ -153,7 +153,7 @@ export async function AnnualFrame({
                   [
                     "notDoing",
                     "Not doing this year",
-                    "The list that makes the rest credible. §2.1 asks for it by name.",
+                    "The list that makes the rest credible. The method asks for it by name.",
                   ],
                 ] as const
               ).map(([name, label, hint]) => (

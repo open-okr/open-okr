@@ -150,7 +150,7 @@ function LadderEditor({
             )
           }
         >
-          {filled.length === 0 ? "Use §11's" : "Save the ladder"}
+          {filled.length === 0 ? "Use the default" : "Save the ladder"}
         </Button>
       </div>
       {partial ? (

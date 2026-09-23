@@ -231,7 +231,7 @@ async function CheckInForGoal({
           <CardBody className="flex flex-col gap-1.5">
             <p className="text-sm text-ink-3">
               {stillDue
-                ? "You can read this goal's check-ins but not post one. The champion posts them (METHOD.md §2.5)."
+                ? "You can read this goal's check-ins but not post one. The champion posts them."
                 : `This goal is not due. Its next check-in is ${goal.nextCheckInOn ?? "not scheduled"}, and the card below is what was reported.`}
             </p>
             {nextGoalId ? (
