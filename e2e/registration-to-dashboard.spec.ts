@@ -192,7 +192,9 @@ test("an administrator can run an agent, and the page says whether it can draft"
   // The run log stops saying it is empty, which is the whole point of the
   // button: a run happened because somebody asked for one.
   await expect(page.getByText(/No run yet/)).toBeHidden({ timeout: 15_000 });
-  await expect(page.getByText("schedule.quality")).toBeVisible();
+  // The run names its schedule rather than printing `schedule.quality`, since
+  // P8-G11d took the product's own identifiers off the screens.
+  await expect(page.getByText("The nightly quality sweep")).toBeVisible();
 });
 
 test("an agent's write policy can be moved, and the workspace cannot be bound", async () => {

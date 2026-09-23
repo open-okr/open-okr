@@ -9,6 +9,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import { TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { setNudgeRuleAction, setQuietModeAction } from "./rule-actions";
 
 /**
@@ -103,6 +104,11 @@ function LadderEditor({
 
   const filled = ladder.rungs.filter((rung) => draft[rung]?.trim() !== "");
   const partial = filled.length > 0 && filled.length < ladder.rungs.length;
+  // The rule's name, for the screen-reader label on each rung. A rung labelled
+  // "sponsor for" followed by a dotted key, read aloud, is the same defect as
+  // the key on screen, in a place nobody looks at to find it.
+  const named = TRIGGER_NAME_KEYS[rule.key];
+  const label = named === undefined ? rule.key : t(named);
 
   return (
     <div
@@ -111,7 +117,15 @@ function LadderEditor({
     >
       <span className="text-xs text-ink-3">
         {t("admin.nudges.ruleCards.thisRuleOwns11Apos", {
-          governs: ladder.governs.join(", "),
+          // Named, not keyed. This sentence lists what one ladder reaches,
+          // and listing it as dotted keys is the same defect the row above it
+          // had.
+          governs: ladder.governs
+            .map((one) => {
+              const key = TRIGGER_NAME_KEYS[one];
+              return key === undefined ? one : t(key);
+            })
+            .join(", "),
         })}
       </span>
       <div className="flex flex-wrap items-end gap-2.5">
@@ -127,7 +141,7 @@ function LadderEditor({
               value={draft[rung] ?? ""}
               disabled={pending}
               placeholder={String(ladder.canon[rung] ?? "")}
-              aria-label={`${rung} for ${rule.key}`}
+              aria-label={`${rung} for ${label}`}
               onChange={(event) =>
                 setDraft((held) => ({ ...held, [rung]: event.target.value }))
               }
@@ -182,12 +196,25 @@ function Rule({
     });
   };
 
+  // Falls back to the key rather than to nothing, so a name this map has not
+  // got still leaves a legible row. The coverage test fails the build in that
+  // case, so the fallback is a safety net rather than a supported state.
+  const name = TRIGGER_NAME_KEYS[rule.key];
+  const label = name === undefined ? rule.key : t(name);
+
   return (
     <div className="flex flex-col gap-1.5 border-line border-b py-2.5 last:border-0 last:pb-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5">
         <span className="flex min-w-0 flex-col">
           <span className="flex flex-wrap items-center gap-2">
-            <code className="text-sm text-ink">{rule.key}</code>
+            {/*
+             * The rule's name, not its key (P8-G11d). The key is still what
+             * the nudge row, the audit row and every message carry; it is
+             * simply not what a reader is shown. `TRIGGER_NAME_KEYS` is
+             * covered by a test, so a trigger added to the method cannot reach
+             * a screen without a name.
+             */}
+            <span className="text-sm font-medium text-ink">{label}</span>
             {rule.configured ? (
               <Chip tone="brand">{t("common.changed")}</Chip>
             ) : null}
@@ -231,7 +258,7 @@ function Rule({
           <select
             value={rule.channelOverride ?? ""}
             disabled={pending}
-            aria-label={`Channel for ${rule.key}`}
+            aria-label={`Channel for ${label}`}
             onChange={(event) =>
               change({
                 ruleKey: rule.key,

@@ -10,6 +10,10 @@ import {
   MODEL_TIERS,
 } from "@openokr/db";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  ASSIST_NAME_KEYS,
+  PROMPT_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
 import { getTranslations } from "../../../lib/translations";
 import {
   removeBudget,
@@ -60,6 +64,17 @@ const FEATURE_KEYS: readonly string[] = [
   ...Object.values(REVIEW_ASSIST_KEYS),
   ...Object.values(RHYTHM_ASSIST_KEYS),
 ];
+
+/**
+ * A stored prompt's name, or its key when it has none (P8-G11d).
+ *
+ * A prompt is a row a workspace stores rather than a fixed list, so an unknown
+ * key is normal here and falls back to itself rather than failing a test.
+ */
+function promptName(promptKey: string, t: (key: string) => string): string {
+  const named = PROMPT_NAME_KEYS[promptKey];
+  return named === undefined ? promptKey : t(named);
+}
 
 export interface FeatureSetting {
   readonly featureKey: string;
@@ -313,6 +328,7 @@ export async function FeaturesCard({
       <CardBody className="flex flex-col gap-1.5">
         {FEATURE_KEYS.map((featureKey) => {
           const setting = features.find((one) => one.featureKey === featureKey);
+          const named = ASSIST_NAME_KEYS[featureKey];
           return (
             <AIForm
               key={featureKey}
@@ -327,7 +343,14 @@ export async function FeaturesCard({
                   defaultChecked={setting?.enabled ?? true}
                   className="size-4"
                 />
-                <code className="font-mono text-xs">{featureKey}</code>
+                {/*
+                 * The assist's name, not its key (P8-G11d). The key is still
+                 * the hidden field this form posts, so nothing about what is
+                 * stored or authorised changed.
+                 */}
+                <span className="text-sm">
+                  {named === undefined ? featureKey : t(named)}
+                </span>
               </label>
               <label className="flex items-center gap-1.5 text-xs text-ink-3">
                 {t("admin.ai.governance.tier")}
@@ -383,7 +406,13 @@ export async function PromptsCard({
             className="flex flex-col gap-1.5 border-t border-line pt-3 first:border-0 first:pt-0"
           >
             <span className="flex items-center gap-2 text-sm text-ink">
-              <code className="font-mono text-xs">{prompt.promptKey}</code>
+              {/*
+               * A prompt is a row a workspace stores rather than a fixed list,
+               * so an unknown key is normal here and falls back to itself.
+               */}
+              <span className="font-medium">
+                {promptName(prompt.promptKey, t)}
+              </span>
               {prompt.isDefault ? (
                 <Chip tone="neutral">{t("admin.ai.governance.builtIn")}</Chip>
               ) : (

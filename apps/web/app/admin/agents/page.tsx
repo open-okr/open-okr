@@ -3,6 +3,7 @@ import { AGENT_AUTONOMIES } from "@openokr/db";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { SCHEDULE_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { AgentPolicy } from "./agent-policy.tsx";
@@ -37,6 +38,18 @@ const STATUS_TONE: Record<string, "ok" | "neutral" | "warn" | "bad"> = {
   cancelled: "warn",
   failed: "bad",
 };
+
+/**
+ * The name of the schedule a run was started by (P8-G11d).
+ *
+ * Falls back to the trigger itself, so a cadence added to the core without a
+ * name here leaves a legible row; the coverage test fails the build in that
+ * case, so the fallback is a safety net rather than a supported state.
+ */
+function scheduleName(trigger: string, t: (key: string) => string): string {
+  const named = SCHEDULE_NAME_KEYS[trigger];
+  return named === undefined ? trigger : t(named);
+}
 
 const SCHEDULE_LABEL: Record<string, string> = {
   manual: "Only when asked",
@@ -214,7 +227,7 @@ export default async function AgentsPage() {
                         {run.agentName}
                       </span>
                       <span className="font-mono text-xs text-ink-3">
-                        {run.trigger}
+                        {scheduleName(run.trigger, t)}
                       </span>
                     </span>
                     <span className="flex items-center gap-2">

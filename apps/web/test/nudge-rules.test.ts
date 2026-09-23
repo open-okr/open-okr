@@ -104,9 +104,12 @@ describe("the nudge rule cards", () => {
     expect(cards).toContain("placeholder={String(ladder.canon[rung]");
     expect(cards).toContain("Use the default");
 
-    // The card names what one ladder reaches, because a change here is not
-    // scoped to the rule it is set on.
-    expect(cards).toContain("ladder.governs.join");
+    // The card says what one ladder reaches, because a change here is not
+    // scoped to the rule it is set on. It says so by name since P8-G11d, so
+    // this checks the list is built and joined rather than the exact call it
+    // used to be.
+    expect(cards).toContain("ladder.governs");
+    expect(cards).toContain('.join(", ")');
 
     expect(actions).toContain(
       "escalationLadder?: Record<string, number> | null",
