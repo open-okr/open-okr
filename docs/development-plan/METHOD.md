@@ -144,7 +144,7 @@ Every objective carries 2 to 5 key results. A unit may contribute to another uni
 
 ## 3. Scoring, confidence and health
 
-Three different numbers. They are never mixed. Every numeric boundary in this section is a parameter in the §11 registry; the values shown are the canon defaults.
+Three different numbers. They are never mixed. Every numeric boundary in this section is a parameter in the §11 registry; the values shown are the defaults.
 
 | Number | Range | Direction | Answers |
 |---|---|---|---|
@@ -729,7 +729,7 @@ The coach never guesses at the situation. Every one of the twenty maps to a rule
 
 The structure of the practice is canon and cannot be changed: which checks exist and how they judge, the six publish gates and their conditions, the blocker and root-cause taxonomies, the session agendas and their stage order, the process-health statements, the management-retro questions, the health precedence, the diagnostic verdicts and the feed-forward mapping. A workspace that needs a different structure is practising a different method, not configuring this one.
 
-Every numeric value the product enforces, computes with or fires on is a parameter in this registry; the §2.4 planning timelines are guidance for humans, not machine thresholds. Each parameter ships as data in `packages/method` with the canon default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
+Every numeric value the product enforces, computes with or fires on is a parameter in this registry; the §2.4 planning timelines are guidance for humans, not machine thresholds. Each parameter ships as data in `packages/method` with the default shown here, and may be overridden per workspace in the rhythm settings. Nothing numeric is hardcoded anywhere else, and a value not in this registry is not a setting.
 
 **Cadence and escalation**
 
@@ -784,7 +784,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Annual strategy bounds | 2 to 5 |
 | Carry-forward issue impact | 4 |
 | Input pack lead time | 3 working days before session one |
-| Quality word lists | The §4 lists. A workspace may add terms; the canon terms remain |
+| Quality word lists | The §4 lists. A workspace may add terms; the built-in terms remain |
 
 **Alignment**
 
@@ -817,6 +817,6 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Diagnostic cycle-score threshold | 0.7 |
 | Diagnostic rhythm-score threshold | 3.5 |
 
-The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the canon default. The conformance suite compares the defaults against this document.
+The registry's keys, types, valid ranges and defaults are data in `packages/method`. The workspace rhythm settings store only deviations, validated against that schema; an unset key reads the default. The conformance suite compares the defaults against this document.
 
 Every parameter has a default, so a workspace practises the full method correctly from the moment it is created. Tuning is an option, never a prerequisite.
