@@ -16,7 +16,6 @@
       "entry": ["instrumentation.node.ts", "test/**/*.test.ts"]
     },
     "packages/core": {
-      "ignore": ["src/embeddings/service.ts"],
       "ignoreBinaries": ["openssl"]
     },
     "packages/test-support": {
