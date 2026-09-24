@@ -78,6 +78,7 @@ Written for the person holding the pager, not for a reader.
 | [The plan set](development-plan/) | Requirements, architecture, schema, interface, and the task list |
 | [Governance](../GOVERNANCE.md) | Who decides what |
 | [Contributing](../CONTRIBUTING.md) | Getting a development instance running |
+| [Acceptance test workbook](testing/OpenOKR-UAT.xlsx) | The manual test a person runs through the whole UI, module by module. [How to refresh it](testing/PROMPT-UAT.md) |
 
 ## How this stays true
 

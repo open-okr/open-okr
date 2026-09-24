@@ -8,7 +8,8 @@
         "e2e/prepare-database.ts",
         "e2e/repair-standalone-links.ts",
         "deploy/docker/migrate.ts",
-        "playwright.dev.config.ts"
+        "playwright.dev.config.ts",
+        "docs/testing/build-uat.mjs"
       ],
       "ignoreBinaries": ["openssl"]
     },
