@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { progressCeiling } from "../../../lib/ceilings.ts";
 import { GOAL_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -83,6 +84,7 @@ export default async function StudioPage({
         score={alignment.score}
         healthy={alignment.healthy}
         threshold={alignment.threshold}
+        progressMax={await progressCeiling()}
         canEdit={canEdit}
       />
     </div>

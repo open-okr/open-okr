@@ -74,7 +74,11 @@ describe("the nudge rule cards", () => {
   });
 
   test("say why quiet mode does not silence an escalation", () => {
-    expect(cards).toContain("§6.3 puts an");
+    // The sentence lost its clause number at P8-G11c, which took them out of
+    // every string a reader sees. What the test is for is unchanged: the card
+    // has to say why an escalation is not silenced, not merely that it is not.
+    expect(cards).toContain("An escalation goes through");
+    expect(cards).toContain("quiet mode is not for");
     expect(cards).toContain("Speaks through quiet mode");
   });
 
@@ -92,15 +96,20 @@ describe("the nudge rule cards", () => {
     expect(cards).toContain("escalationLadder: ladder");
     expect(cards).toContain("A ladder is one value");
 
-    // Empty means the canon, and the canon is the placeholder. Pre-filling
-    // §11's numbers would make a workspace that chose nothing look like one
-    // that chose the default, and store a copy that survives a change to §11.
+    // Empty means the default, and the default is the placeholder. Pre-filling
+    // the method's numbers would make a workspace that chose nothing look like
+    // one that chose the default, and store a copy that survives a change to
+    // the method. The button's wording moved at P8-G11c, which took the clause
+    // numbers out of every sentence a reader sees.
     expect(cards).toContain("placeholder={String(ladder.canon[rung]");
-    expect(cards).toContain("Use §11's");
+    expect(cards).toContain("Use the default");
 
-    // The card names what one ladder reaches, because a change here is not
-    // scoped to the rule it is set on.
-    expect(cards).toContain("ladder.governs.join");
+    // The card says what one ladder reaches, because a change here is not
+    // scoped to the rule it is set on. It says so by name since P8-G11d, so
+    // this checks the list is built and joined rather than the exact call it
+    // used to be.
+    expect(cards).toContain("ladder.governs");
+    expect(cards).toContain('.join(", ")');
 
     expect(actions).toContain(
       "escalationLadder?: Record<string, number> | null",

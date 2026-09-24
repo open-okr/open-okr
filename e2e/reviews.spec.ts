@@ -483,10 +483,15 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   const before = await ungraded.count();
   expect(before).toBeGreaterThan(0);
 
-  // A grade with no reason is refused before it reaches the action. Section 8.3
-  // asks for one line on why, and a score nobody explained is refusable.
+  // A grade with no reason is refused before it reaches the action: one line
+  // on why is asked for, and a score nobody explained is refusable. **The
+  // wording moved at P8-G11c**, which took the clause numbers out of every
+  // sentence a reader sees, so this matches the refusal rather than the
+  // citation that used to open it.
   await page.getByRole("button", { name: "Save the grade" }).first().click();
-  await expect(page.getByText(/asks for one line on why/)).toBeVisible();
+  await expect(
+    page.getByText(/One line on why is asked for/),
+  ).toBeVisible();
 
   // **Two locators fixed here, and the pair of them hid a defect for a task.**
   //
@@ -929,7 +934,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await firstObjective
     .getByRole("button", { name: "Close it deliberately" })
     .click();
-  await expect(reset).toContainText("asks for one line on why");
+  await expect(reset).toContainText("One line on why is asked for");
 
   await firstObjective
     .getByLabel("One line on why")

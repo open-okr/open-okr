@@ -4,6 +4,7 @@ import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access.ts";
 import { getPool } from "../../lib/auth";
+import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -255,10 +256,19 @@ async function NotificationRow({
   // (see `draftFor` in packages/core/src/nudges/deliver.ts), so this is where
   // the reader finds out what actually fired.
   const rule = row.ruleKey ? trigger(row.ruleKey) : undefined;
+  // The rule's name for the chip, which carried the key (P8-G11d). Falls back
+  // to the key, so a trigger with no name still labels the row.
+  const named = row.ruleKey ? TRIGGER_NAME_KEYS[row.ruleKey] : undefined;
+  const ruleName =
+    row.ruleKey === null || row.ruleKey === undefined
+      ? null
+      : named === undefined
+        ? row.ruleKey
+        : t(named);
   const line =
     row.rendered ??
     (rule ? rule.fires : null) ??
-    (row.ruleKey ? `Reminder: ${row.ruleKey}` : "Something happened here.");
+    (ruleName === null ? "Something happened here." : `Reminder: ${ruleName}`);
 
   return (
     <div className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
@@ -278,7 +288,7 @@ async function NotificationRow({
           {row.readAt === null ? (
             <span className="sr-only">{t("inbox.unread")}</span>
           ) : null}
-          {row.ruleKey ? <Chip tone="agent">{row.ruleKey}</Chip> : null}
+          {ruleName === null ? null : <Chip tone="agent">{ruleName}</Chip>}
           <span className="text-xs text-ink-3">
             {new Date(row.createdAt)
               .toISOString()

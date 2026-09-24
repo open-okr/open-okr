@@ -2759,6 +2759,21 @@
       "example": {}
     },
     {
+      "name": "settings.readForMember",
+      "description": "The workspace settings any member may read, for their own screens.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "settings.updateWorkspaceGeneral",
       "description": "Change the workspace's timezone, language, trusted email domains or second-factor policy.",
       "inputSchema": {
@@ -2864,6 +2879,21 @@
     {
       "name": "ai.readProviderConfig",
       "description": "Every provider's admin configuration, with a masked hint for its workspace key.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "ai.readAvailability",
+      "description": "Whether any AI provider is enabled and holds a workspace key, as one boolean.",
       "inputSchema": {
         "type": "object",
         "properties": {}

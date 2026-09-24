@@ -48,7 +48,9 @@ export async function QuickCheckIn({
           type="number"
           step="any"
           defaultValue={currentValue}
-          className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+          // Nine digits fit. A measure in rupiah or impressions reaches them
+          // and `w-24` hid half of what was being typed.
+          className="w-32 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
         />
         <Button type="submit" variant="primary" size="sm">
           {t("common.save")}

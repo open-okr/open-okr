@@ -2760,11 +2760,226 @@ Deliverables: a root cause for each, named; a fix, or a quarantine entry with th
 Test plan: ten consecutive end-to-end runs with neither spec failing. The flakiness report is the record.
 Acceptance: Given the end-to-end suite run ten times, when the reports are merged, then neither spec appears in the flakiness report.
 
+### P8-G02: A large key result value is unreadable on screen [S]
+Depends on: -
+Goal: a measure that runs to nine digits can be read and typed.
+
+**Recorded on 22 September 2026, when Agung asked whether a key result value could reach a hundred million.** It can, and always could: the column is unbounded `numeric`, the action schemas carry no `.max()`, and no input carries a `max` attribute. What the audit found instead was that nothing renders such a value legibly. Every key result value is printed raw, so `100000000` and `10000000` are one glance apart, and the value inputs are `w-20` and `w-24`, which hold five digits of the nine somebody is typing.
+
+Deliverables: one shared formatter that groups the integer digits and leaves the fraction untouched; it applied at every key result value, baseline and target on screen; the value inputs widened to hold nine digits.
+Test plan: unit tests over the formatter, including a decimal that rounding would corrupt and an input it cannot parse.
+Acceptance: Given a key result whose current value is 100000000, when its goal is opened, then the screen reads `100,000,000` and the value input shows every digit.
+
+### P8-G03: A workspace may let progress pass 100% [M]
+Depends on: P8-G02
+Goal: over-achievement is expressible, and capped at 100% until a workspace says otherwise.
+
+**Agung's decision, 22 September 2026.** METHOD.md §3.1 clamps progress to 0 to 100%, so a key result that reached 150 of a 100 target reads the same as one that reached exactly 100. The over-achievement survives only in the raw value and in the §3.6 forecast, which is deliberately unclamped. The ceiling becomes a §11 registry parameter rather than a constant, default 100, and a workspace may raise it as far as 200, which is the ceiling §6.4 already applies to KPI achievement. **Agung chose that the ceiling applies to the goal rollup as well as to the key result**, against the recommendation on this row: a goal holding one key result at 150% and one at 50% then averages 100% and reads as complete while half the work was missed. Recorded because the reading matters more than the code.
+
+Deliverables: `scoring.progressCeilingPct` in the §11 registry with the §3 and §3.1 wording that defines it; the five clamp sites in `packages/method/src/scoring.ts` taking the resolved ceiling; `Bar` able to carry a maximum above 100 without lying in `aria-valuemax`; the conformance suite covering the new parameter; the golden masters extended with an over-achieving case.
+Test plan: unit tests at the ceiling's default and raised, over both directions, the maintain band, the KPI-linked path and the rollup; `pnpm method:check`; the golden-master matrix.
+Acceptance: Given a workspace whose progress ceiling is 100, when a key result reaches 150 of a 100 target, then its progress reads 100%. Given the same workspace with the ceiling raised to 200, then the same key result reads 150% and its goal's rollup carries that value at its weight.
+
+### P8-G04: Every progress and achievement bar carries its own maximum [S]
+Depends on: P8-G03
+Goal: a bar drawn beside a number above 100 agrees with that number.
+
+**Two things, and only one of them was introduced by P8-G03.** `Bar` takes a `max` since that row and no caller passes one, so a goal at 150% under a raised ceiling shows a full track and tells a screen reader that 100 is the most there is, while the figure printed beside it reads 150%. Deliberately left uniform rather than wired on one screen: a product where the goal detail reports 150 and the check-in list reports 100 is harder to trust than one that understates everywhere.
+
+**The KPI bars were already wrong before any of this.** §6.4 has allowed achievement 0 to 200 since P5, and `kpis/[id]`, `kpis/trees` and `kpis/recovery` all draw it on a 0-to-100 track. A KPI at 180 and one at exactly 100 have always drawn the same bar. That is the older half of this row and the reason it covers both thresholds rather than just the new one.
+
+Deliverables: the progress ceiling resolved once per screen and passed to every goal and key result bar (the goal detail, the check-in list, the drafting board, the Work Map's canvas and panel, the studio); the KPI ceiling passed to every achievement bar; the scorecard's score bars left alone, because a score is 0.0 to 1.0 by §3.3 and has no ceiling parameter.
+Test plan: unit tests per screen asserting `aria-valuemax`, plus the existing accessibility scan.
+Acceptance: Given a workspace with the ceiling raised to 200 and a goal at 150%, when any screen showing that goal is opened, then the bar is drawn three-quarters full and announces a maximum of 200.
+
+### P8-G05: Every member who did not create the workspace is locked out of eight screens [S]
+Depends on: -
+Goal: an ordinary member can open their own Overview.
+
+**Found on 22 September 2026 by signing in as a demo persona**, which is the first time anybody had used this product as somebody other than the founder. `settings.readWorkspaceSettings` is declared `full` and that is correct: it returns the whole stored settings map and its own summary says it is for the admin cards. `settings-actions.test.ts` even asserts it refuses a member holding `edit`. Nobody checked who calls it. Eight screens that are not admin screens do, six of them for `timezone` alone and two for `onboardingDone`: the Overview, the activity feed, a goal, the KPI list, a KPI, a person, a space and the welcome screen.
+
+Provisioning binds `workspace_standard` at `edit` for every member and reserves `full` for the founder's own member group, so on every instance ever created, a colleague who was invited rather than one who signed up meets "We could not load..." on all eight.
+
+**The reason no suite saw it is the finding.** Every unit test and every end-to-end spec acts as the founding member, who holds `full`. This is the second defect of exactly that shape in this repository; the first was in Phase 2.
+
+**A sweep found a second one, and only one.** Every non-admin screen was checked against all 99 `full`-declared actions: the goal detail also called `ai.readProviderConfig`, whose own summary says it returns every provider configuration with a masked key hint, to answer whether the draft assist could offer anything. Eight other hits are write actions inside `actions.ts` files, behind controls a member without full access never sees, and those are correct.
+
+Deliverables: a second settings read declared `view` returning a named allow-list of member-visible keys, never a filter over the stored map; `ai.readAvailability`, one boolean with no provider, key, hint or status in it; the nine call sites moved; both admin reads left at `full`; tests that act as a member holding `edit` and nothing more.
+Test plan: unit tests against a member with an `edit` binding on the workspace and no other, including one asserting that a setting written by an admin does not appear in the member read.
+Acceptance: Given a member who holds `edit` on the workspace and did not create it, when they open the Overview, a goal, a KPI, a person and a space, then every one renders.
+
+### P8-G05a: The front door and the setup screen redirect to each other for ever [S]
+Depends on: P8-G05
+Goal: an ordinary member lands on the dashboard rather than bouncing.
+
+**Created by P8-G05 and found from a browser minutes later**, which is why it is its own row rather than a line in that one. The front door redirects to S-34 when `onboardingDone` is false. S-34 refuses anybody below `full` and redirects back. Both were true at once for an ordinary member on a workspace still marked pending, so the two screens threw the browser between them with no way out.
+
+**It was invisible before P8-G05.** The front door read the flag through an action declared `full`, so for an ordinary member the read threw and the redirect below it was never reached: the screen was broken and static. Fixing the read reached that line for the first time and turned a broken screen into a loop, which is the worse of the two failures.
+
+**Curl cannot see it.** The App Router delivers `redirect()` as a payload the client router executes, so both pages answer 200 with no `Location` header. The evidence is `NEXT_REDIRECT;replace;/welcome;307` in one body and `NEXT_REDIRECT;replace;/;307` in the other.
+
+Deliverables: the front door redirecting only when the reader holds the level S-34 requires, with the level resolved before the redirect decides; a test asserting both halves of that condition and their order.
+Test plan: fetch both pages with an ordinary member's session and grep the bodies for the redirect payload.
+Acceptance: Given a member below `full` on a workspace whose onboarding is unfinished, when they open the front door, then the dashboard renders and no redirect is emitted.
+
+### P8-G06: A self-hosted instance on any port but 80 refuses every sign-in [S]
+Depends on: -
+Goal: the address written into the instance is the address a browser uses.
+
+**Found the same day, on an instance published on 8088.** `public_url()` in `deploy/docker/openokr` ignores `OPENOKR_HTTP_PORT` and returns a bare `http://localhost`. That value is written into `BETTER_AUTH_URL`, and Better Auth then refuses every sign-in with `Invalid origin`, because the Origin header a browser sends carries the port. `reconcile_public_url` runs on every `up`, so an operator who edits `app.env` by hand has it overwritten on their next start.
+
+**`smoke-test.sh` runs on 8088 and has always passed**, because it drives the instance with curl and curl sends no Origin header. So the check has to be the written value rather than a request that worked: anything driving the instance with curl will keep agreeing with whatever is written there.
+
+Deliverables: `public_url()` including the port when it is not 80 and a domain still winning, since a domain means automatic HTTPS on 443; two smoke-test checks, one on the written value and one proving a second `up` does not rewrite it.
+Test plan: the four branches of `public_url` (domain, non-default port, port 80, unset), then the smoke test.
+Acceptance: Given an instance started with `OPENOKR_HTTP_PORT=8088`, when somebody signs in from a browser, then they are signed in, and a second `up` leaves the address unchanged.
+
+### P8-G07: Every write from the interface fails on any port but 80 [S]
+Depends on: -
+Goal: a form submitted from a browser reaches the server.
+
+**Found by pressing sign out**, an hour after P8-G06 was found on the same instance and for the same underlying reason: the port is dropped. `deploy/docker/Caddyfile` sets `header_up X-Forwarded-Host {host}`, and Caddy's `{host}` is the hostname with the port stripped. Next.js compares `x-forwarded-host` against `origin` on every forwarded Server Action and aborts when they disagree, so on an instance published on 8088 the application received `localhost` while the browser sent `localhost:8088`.
+
+**This is not a sign-out defect.** Every Server Action is refused, which is every form and every write the interface makes. Sign out is simply the first control somebody presses that is a form rather than a link. The log says it plainly and had been saying it all along: `"x-forwarded-host header with value localhost does not match origin header with value localhost:8088"`.
+
+**Nothing caught it** for the same reason as P8-G06: `smoke-test.sh` drives the instance with curl, and a Server Action is a browser mechanism. A curl POST to an API route is not a Server Action and never trips the check.
+
+Deliverables: `{hostport}` in place of `{host}`, which carries the Host header as the browser sent it and is unchanged on port 80; a check that submits a real Server Action rather than asserting the configuration.
+Test plan: sign out from a browser against an instance on a non-default port.
+Acceptance: Given an instance published on 8088, when somebody submits any form in the interface, then the action runs.
+
+### P8-G08: Two admin cards that were never drawn [S]
+Depends on: -
+Goal: the branding card looks like a card, and the word lists can be read.
+
+**`/admin/branding` was still P2-T08 scaffolding.** `<p><label><br><input>` and two browser-default submit buttons in two sibling forms. Tailwind's reset strips an input's border, so the one setting on the screen rendered as grey placeholder text with no visible field, and the two buttons rendered as two lines of plain text. `general-settings-form.tsx` carried the identical defect, was rebuilt, and says so in its own docstring; this card is the copy that pass missed.
+
+**`/admin/rhythm` printed the §11 word lists as `JSON.stringify` of the whole map**: 148 terms across six lists in one paragraph of quotes and commas, running past the right edge of the card, and styled `tabular`, which is the numeral variant and belongs to the figures on that screen rather than to prose. The lists stay read-only, which is P6-G20's deliberate choice; what changes is that they can be read.
+
+Deliverables: the branding card rebuilt to the pattern the general card already uses, with a swatch of the colour in force and the input's `pattern` matching the settings schema exactly; the word lists rendered as named lists with their term counts, wrapping rather than overflowing.
+Test plan: measured in a real browser at 1280 and 375, both screens, for horizontal overflow and for the computed border, height and font of every control.
+Acceptance: Given either screen at 375, when it is opened, then nothing overflows horizontally and every control has a visible boundary.
+
+### P8-G09: The suite has never signed in as anybody but the founder [M]
+Depends on: P8-G05
+Goal: an end-to-end spec that is an ordinary member.
+
+**Agung's decision on 22 September 2026**, taken after five defects in one evening that no test could see. Every unit test and all 325 end-to-end specs act as the founding member, who holds `full` on the workspace context; provisioning gives everybody else `edit`. So a screen reaching for an admin-only read passes every gate and fails for every colleague, which is what P8-G05 was, and what the Phase 2 access gap was before it.
+
+Deliverables: one spec that invites a member through the product's own invitation flow, signs in as them, and opens the screens P8-G05 unlocked; an assertion that the member holds `edit` and not `full`, so the file cannot quietly stop testing anything if provisioning changes; the workspace's onboarding flag set false by the spec itself, because the P8-G05a loop exists only while the workspace is unfinished and a test that did not set it would pass without reaching its own condition.
+Test plan: the spec, in the full suite. It cannot run alone, because the instance must already be claimed by `registration-to-dashboard.spec.ts`.
+Acceptance: Given a member invited into an existing workspace, when they open the front door, a goal, a KPI, a person and a space, then every one renders and the Admin section is absent.
+
+### P8-G10: Every form control is 16px below the mobile breakpoint [S]
+Depends on: -
+Goal: tapping a field does not move the page.
+
+**Agung's decision the same day**, from the UI audit's proportions reference: never below 16px under the 768 breakpoint, because Safari on iOS zooms the page when a smaller control takes focus and does not zoom back out. Every input in this product is `text-sm` (13px) or `text-xs` (12px).
+
+**One rule rather than several hundred edits**, and that is the finding rather than a shortcut. There is no shared input class here: the field styling is written inline at every call site in a dozen variants, 68 of one and 30 of another. Editing them one at a time would leave the ones nobody found still zooming and would put one decision in several hundred places.
+
+Deliverables: a single media query in `packages/ui/src/styles/tokens.css`, the file that already owns what a control looks like, excluding the three control types that carry no text.
+Test plan: measured in a browser at 375 and above the breakpoint, so desktop is shown to be untouched.
+Acceptance: Given any screen below 768, when a text field takes focus, then the page does not zoom.
+
+### P8-G11: A settings card saves itself, and unsaved work is not thrown away silently [M]
+Depends on: -
+Goal: the control that commits an edit is on screen while you make it.
+
+**Agung reported it on 22 September 2026**, naming `/admin/rhythm`: the Save is at the bottom, so editing a value near the top means scrolling past everything to commit it.
+
+**Measured across the product before deciding the scope.** The rule applied was that a submit button must not sit more than one viewport (814px here) from a field it governs. Thirty routes were measured at desktop width, including the detail screens. Exactly one fails it:
+
+| Screen | Worst field-to-button distance | Fields in that form |
+|---|---|---|
+| `/admin/rhythm` | 7,785px, which is 9.6 viewports | 123 |
+| `/admin/sso` | 572px | 12 |
+| `/account/channels` | 486px | 10 |
+| `/admin/ai`, 6.7 viewports tall | 126px | 14 |
+| `/cycle`, 4.6 viewports tall | 225px | 4 |
+| 25 other routes | ≤267px | ≤5 |
+
+So a long settings page is not the problem, and this is not a new pattern to invent. `/admin/ai` holds 35 forms and `/admin/nudges` saves per rule card; both are taller than most of the product and neither is hard to use. `/admin/rhythm` was the one screen that put 123 fields under one button.
+
+**Nothing about the saving had to change.** `rhythm.update` already declares every field optional and merges `overrides` rather than replacing them, which `resetGroup` has relied on since P6-G20. The action had to stop reading three cadence settings at fixed names, because a card that does not hold them would otherwise send null for all three.
+
+**Two gaps found while measuring, and both are product-wide rather than about this screen.** Nothing in `apps/web` warned about unsaved edits: a grep for `beforeunload` returned one comment and no implementation, so 123 edited thresholds left with a click on the sidebar and said nothing. And UIUX-PLAN.md §4 lists `⌘⏎ save` among the keyboard patterns, which no form in this product bound.
+
+Deliverables: three primitives in `packages/ui` (`useFormDirty`, which compares against a snapshot rather than flagging the first keystroke, so typing a value back is not reported as unsaved; `UnsavedChangesProvider` with `useUnsavedGuard`, covering both the document unload and the App Router navigation that `beforeunload` never sees; `useSubmitShortcut`); the provider mounted once in the shell so a form added tomorrow is guarded without anybody remembering; `/admin/rhythm` split into eight forms, one per card, each with its own Save, Reset and status line; a sticky card header, because per-card forms alone left four cards still over one viewport.
+Test plan: 13 tests in `packages/ui/test/forms.test.tsx`; three source assertions in `apps/web/test/rhythm-card.test.ts`; `e2e/s36c-rhythm.spec.ts` rescoped to one card, since "the Save button" no longer names one element; measured in a browser on the Docker instance.
+Acceptance: Given any field on this screen, when it is centred in the viewport, then the button that saves it is on screen without scrolling.
+
+### P8-G11a: A refusal that nobody sees, and a value it throws away [M]
+Depends on: P8-G11
+Goal: the message reaches the reader, names the field, and does not cost them what they typed.
+
+**Agung reported it the next morning**, with the sentence the method had produced: `scoring.progressCeilingPct: Too big: expected number to be <=200`. P8-G11 had left the outcome in a strip below the card header, and only the header is sticky, so a refusal raised from the bottom of a 1,700px card rendered off the top of the window. Pressing Save and seeing nothing at all is worse than the problem P8-G11 fixed.
+
+**A second defect, found while verifying the first, and worse than it.** React resets a form with an `action` once that action resolves. So the refused value was gone before the refusal could be read: measured on 23 September 2026, 500 typed, refused with "expected number to be <=200", and the box back to 200 within 500ms. The sentence then describes a number no longer on screen. This dates from P6-G20, not from P8-G11, and `e2e/s36c-rhythm.spec.ts` carried a comment claiming "the field still holds what was typed" beside no assertion that it did.
+
+**Toasts were specified and had never been built.** UIUX-PLAN.md §1 principle 7 gives reversible destruction an undo toast rather than a confirmation, §4 rolls an optimistic update back with one, §4 sets the undo window at six seconds, and §7 lists toasts first among the surfaces needing a live region. `packages/ui` held none. So this is a specified component arriving late rather than a new pattern, and undo and optimistic rollback now have somewhere to go.
+
+**No new dependency.** Agung named SweetAlert2 and chose the built version when told it would be a new runtime dependency against the licence gate, the air-gap check and the Dependency review job, and that a centre-screen modal is heavier than a toast for confirming a save.
+
+Deliverables: `ToastProvider` and `useToast` in `packages/ui`, with two live regions present from first paint (`polite` for a confirmation, `assertive` for a refusal), a `source` so one card never stacks two toasts, and self-clearing at §4's six seconds for a confirmation and fifteen for a refusal; the provider mounted once in the shell; the rhythm card raising both outcomes through it; the refused parameter read back out of the method's own sentence, so its field is scrolled into view, focused, marked `aria-invalid` and given the message under it; the submitted values restored after React's reset.
+Test plan: 10 tests in `packages/ui/test/toast.test.tsx`; source assertions in `apps/web/test/rhythm-card.test.ts`; `e2e/s36c-rhythm.spec.ts` asserting the toast, the marked field and, for the first time, that the typed value survives the refusal; reproduced in a browser with Agung's own value of 500.
+Acceptance: Given a value the method refuses, when it is saved from the bottom of a card, then the reason is on screen, the field it is about is on screen and marked, and the value that was typed is still in it.
+
+### P8-G11b: The rhythm screen reads like documentation, and one parameter could not be edited [M]
+Depends on: P8-G11a
+Goal: the screen reads as settings, and the one list a workspace may extend can be extended.
+
+**Agung audited the screen on 23 September 2026** and raised three things. Two are copy; the third turned out to be a real gap with a real boundary.
+
+**53 METHOD §x chips on one page.** Measured, against 65 section references in the page's text on 13,560 characters. Agung's decision was to drop the chip and keep the sentence under each label. The cost is stated rather than hidden: a parameter no longer carries a visible pointer back to the clause it comes from, and `packages/method` still holds the section for whoever wants it.
+
+**"canon" is not a word a reader knows.** Four catalogue keys, two strings in the form, four server messages and one `why` in `packages/method` now say "default". METHOD.md keeps its own word, because CLAUDE.md makes changing it a human decision, so the document and the product name the same thing differently until somebody decides otherwise.
+
+**"apa value itu bisa di ganti?" has two answers.** Agung asked whether the §4 word lists could be edited. They can be added to and cannot be replaced, and that is METHOD.md's decision rather than this screen's: §11 words the parameter as "a workspace may add terms; the canon terms remain", and `resolveThresholds` merges for the reason its own comment gives, which is that replacing would let a workspace switch a quality rule off by storing an empty list. So the built-in terms are shown and cannot be edited, and each of the six lists gets a box for this workspace's own. Agung was given the choice of changing METHOD.md instead and chose the additions.
+
+Deliverables: the `METHOD §x` chip removed from every parameter; "canon" replaced by "default" in every string a reader sees; `WordLists` rebuilt to show the built-in terms beside a comma-separated box per list, with a count that reads "26 + 2"; `words:<key>:<list>` parsed in the save, lower-cased, deduplicated and stored as the parameter's override, with every box empty meaning the parameter goes back rather than being stored as empty arrays.
+Test plan: `apps/web/test/rhythm-card.test.ts`; `e2e/s36c-rhythm.spec.ts` asserting no chip remains and that a term survives a round trip while the built-in list is untouched; `pnpm method:check`, because the `why` text lives in `packages/method`; measured in a browser on the Docker instance.
+Acceptance: Given a workspace that adds two verbs to a §4 list, when the card is saved and reopened, then both are stored, the method's own terms are still there, and the Coach matches on all of them.
+
+### P8-G11c: The product cites clauses at people who cannot read them [S]
+Depends on: P8-G11b
+Goal: no screen quotes a document section at its reader.
+
+**Agung raised it while the word list boxes were being verified**, pointing at "The §4 lists" still sitting under the label after the METHOD chips had come off. The audit found 48 more, and one separate defect beside them.
+
+**48 strings across nine screens.** Eleven `why` lines in `packages/method`, 27 catalogue entries and ten written straight into a screen, reaching cycle, KPIs, nudges, sessions, spaces, goals, initiatives, check-in and the rule detail screen. Measured on screen before and after: 25 symbols visible, then none.
+
+**The rule detail screen is included, against my recommendation and on Agung's explicit instruction.** That screen exists to explain one rule and say where it comes from, and it is where a coaching message's rule key resolves to; it now explains the rule without naming the clause. Recorded here rather than argued twice.
+
+**Four strings rendered an HTML entity as text.** `each member&apos;s own channel` appeared in a dropdown, which Agung found. JSX decodes an entity written in its own text, which is where the spelling came from, but a catalogue value is a JavaScript string and React prints the characters it holds. Three of the four were rewritten by the section pass anyway; all four are gone.
+
+Deliverables: every section reference rewritten so the sentence reads without it, rather than having the symbol deleted, because "(§1 principle 4)" with the symbol stripped reads as "(1 principle 4)"; the four HTML entities replaced with the characters they stood for; the Malay catalogue kept in step, still holding the English wording for these keys, because inventing a translation is a separate job and not one to do silently.
+Test plan: the catalogue coverage gate, which refuses a hardcoded string and an unused key; `pnpm method:check`, because eleven of the strings live in `packages/method`; a browser sweep of 23 routes counting the symbol before and after.
+Acceptance: Given any screen in the product, when its text is read, then no document section number and no HTML entity appears in it.
+
+### P8-G11d: The interface shows the reader its own identifiers [M]
+Depends on: P8-G11c
+Goal: a rule, an assist, a schedule and a channel are named, not keyed.
+
+**Agung asked whether `assists.draftObjective` was a missing translation.** It was not: the AI console renders each assist key in a `<code>` element, and the comment beside it says why, which is that the list is enumerated from the key maps so an assist added next month appears without anybody remembering it exists. A deliberate trade, and still wrong for the reader. **Agung's decision: what is technical, code or plan does not belong in the interface.**
+
+**67 identifiers on four screens, measured in a browser.** 45 trigger keys on the nudge page, 14 assist keys and two prompt keys on the AI console, five run schedules, one setting name in a sentence. The sweep then found three more places nobody had asked about: the review provenance card, the inbox chip and the ladder note, each printing a rule key at somebody who has no use for it.
+
+**Three are not identifiers and stay.** `llama3.1` and `llama3.2` are what the models are called. `phone_number_id` sits inside a URL an operator pastes into Meta's console, where the exact spelling is the instruction.
+
+**The keys are unchanged and still do their job.** CLAUDE.md requires every proactive message to carry a rule key resolving to a rule in `packages/method`, and the conformance suite still fails a build on a message citing a key the package does not define. What changed is what is printed. The cost is named rather than hidden: an admin reading METHOD.md §6.4 now matches a row by its name rather than by its key.
+
+**A map rather than a prettifier**, because mechanical de-dotting turns `ack.owed` into "Ack owed" and `streak.at_risk` into "Streak at risk" for rows that mean "somebody owes an acknowledgement" and "this week would break the streak". The map's values are catalogue keys written out in full, because the catalogue gate looks for each key as a literal string and a key assembled at runtime reads as having no consumer.
+
+Deliverables: `apps/web/lib/identifier-names.ts` with five maps; 71 names in both catalogues, the Malay carrying the English until somebody writes it; the nudge cards, the nudge volume list, the ladder note, the AI console's assists and prompts, the agents page, the inbox chip and the review provenance card all reading a name; the screen-reader labels on each ladder rung too, because a rung announced as "sponsor for" and a dotted key is the same defect where nobody looks; the mail notice rewritten so it names the setting in words and stays actionable.
+Test plan: `apps/web/test/identifier-names.test.ts`, four checks in both directions, so a trigger added to the method without a name fails the build and a name for an identifier that no longer exists fails it too; the catalogue gate, which refuses an unused key; a browser sweep of 27 routes.
+Acceptance: Given any screen, when its text is read, then the only dotted words in it are ones a person types or a vendor named.
+
 ---
 
 ## Appendix A: index
 
-Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 (32: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all). **166 tasks.**
+Phase 1: P1-T01 to T10 (10). Phase 2: P2-T01 to T17 (17). Phase 3: P3-T00 to T17 (18). Phase 4: P4-T00 to T15 (16). Phase 5: P5-T00 to T16 (35: P5-T01 cut into T01a, T01b-a and T01b-b, plus T01c for the session entry point; P5-T02 cut into a and b, plus T02c for the settings surface; P5-T03 cut into a and b; P5-T04 cut into a and b, and T04b again into b-a and b-b; P5-T06 cut into a, b and c; P5-T07 cut into a, b and c, and T07c again into c-a and c-b; P5-T08 cut into a, b and c; P5-T09 cut into a, b and c; P5-T10 cut into a and b; P5-T14 cut out of P5-T11; P5-T15 cut out of P5-T13, and re-sized from [S] to [M] while doing it; P5-T16 cut after the phase was otherwise complete, for a gap in the read builder that every later phase would widen. The count here read 35 while the phase held 34 rows, and the total read 126 while the plan held 125; P5-T16 is the row that makes both numbers true, not a correction of them). Phase 6: P6-T01 to T07 (17: P6-T01 cut into a and b before any code, because the mechanism and the screen that helps somebody describe their own columns fail differently, and P6-T01b cut again into b-a and b-b once the engine move showed the screen was a session of its own; P6-T03 cut into a, b, c and d before any code on 4 September 2026, because nine mapper groups, a formula parser and a reconciliation report are four sessions and they fail differently: identity resolution, a graph, history, a parser; P6-T04 cut into a, b and c before any code on the same day, for the same reason: four mappers, an HTML converter with a two-phase reference rewrite, a blob path, the consolidated report and a selective flag are more than one session; cut again into a, b, c and d later the same day, once the converter was built and measured and the blob path turned out to need the storage port and a source of bytes MySQL does not hold, so they fail as a graph, a content converter, a byte path and an orchestration; P6-T05 cut into a, b and c before any code on the same day, because a policy list over 129 tables, an identity remap and an admin card fail differently: a secret in the file, two people merged into one, and a screen). Phase 7: P7-T01 to T09 (21: P7-T01 cut into a and b; P7-T02 plus T02a, which took the audit chain off the write path; P7-T03 cut into a and b; P7-T06 cut into a, b and c; P7-T07 plus T07a and T07b, one for each finding its own audit raised and Agung ruled on; P7-T08 cut into a, b, c and d; P7-T09 cut into a, b and c. The line read 9 until 14 September 2026, when P7-T07b was added and nobody had updated it through the previous eleven cuts). Phase 8: P8-T01 to T15 plus P8-G01 to G11 (47: P8-T01 cut into a and b on 14 September 2026, because two of its five design documents block P8-T02 and the other three block nothing until P8-T03; P8-T04 cut into a and b, because the session is a security boundary and its screen stands on it; P8-T03 cut into a, b and c the same day as well, because a new principal reaching past the tenant floor is a security boundary that the two screens stand on; P8-T02 cut into a, b and c the same day, because a migration with its policy, a public route touching Better Auth, and a path that erases stored user data fail in three different ways and none is reviewable inside the others; P8-T15 added on 3 September 2026 for two specs that turned out to be flaky when the end-to-end suite was run eleven times in a day; P8-G01 added on 15 September 2026, when Agung reported the component preview page waiting with nothing on screen and the cause turned out to be a rule rather than an omission; P8-T06 cut into a, b, c and d the same day, before any code, because its five deliverables are four kinds of work and the design gate covers only one of them; P8-T07a, P8-T07b and P8-T08a added on 17 September 2026; P8-T13 cut into a, b and c on 18 September 2026, before any code, because a cast that can sign in, a finished quarter the demo has never held, and a public deployment that rebuilds itself fail in three ways and are tested with two databases and a container; P8-T11 cut into a and b on 18 September 2026, before any writing, because an administrator installing an instance and a practitioner running the practice are two audiences written from two sets of facts and only the first is what the acceptance criterion tests, when a review of the two tasks as shipped found the tenant floor answering three pre-tenant reads with nothing, so neither feature could ever have worked, and the P8-T08 acceptance criterion had no code path at all; P8-G02 and P8-G03 added on 22 September 2026, after Agung asked whether a key result value could pass 100% and reach a hundred million, which turned out to be two questions with two different answers; P8-G04 added the same day, out of P8-G03, for every bar that draws a number it may now be too small to hold, including three KPI bars that had been drawing a 0-to-200 achievement on a 0-to-100 track since Phase 5; P8-G05 and P8-G06 added the same day, both found by signing in to a Docker instance as somebody other than the founder for the first time, which is a thing no suite in this repository does; P8-G05a, P8-G07 and P8-G08 the same day again, the first for a redirect loop P8-G05 itself created, the second for a dropped port in the proxy, the third for two admin cards nobody had ever opened; P8-G11 the same day again, after Agung reported the save button at the bottom of the rhythm screen, which a product-wide measurement showed was the only screen with that shape; P8-G11a on 23 September 2026, after Agung reported that the refusal P8-G11 left in the card was off the top of the window, and a second defect turned up while verifying it: React resets a form with an action, so the refused value was gone before its refusal could be read; P8-G11b the same day, from Agung's own audit of the screen, which asked whether the §4 word lists could be edited and turned up a boundary rather than a yes or a no; P8-G11c the same morning, when the clause references the chips had been hiding turned out to be in the prose of nine screens as well; P8-G11d the same morning, after Agung asked whether a raw assist key was a missing translation and it turned out to be deliberate, which made it a decision to take rather than a bug to fix). **181 tasks.**
 
 Design gates requiring human approval: P3-T00, P4-T00, P5-T00, P8-T01a, P8-T01b. Spikes with a recorded decision: P1-T03, plus the golden-master matrices at P3-T00 and the rule corpus at P4-T00.
 

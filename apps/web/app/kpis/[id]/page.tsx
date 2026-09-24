@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -103,11 +104,7 @@ export default async function KpiDetailPage({
     }
     throw error;
   }
-  const settings = await callAction(
-    context,
-    "settings.readWorkspaceSettings",
-    {},
-  );
+  const settings = await callAction(context, "settings.readForMember", {});
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());
@@ -394,7 +391,7 @@ export default async function KpiDetailPage({
                 </ul>
               </div>
             ) : null}
-            <Bar value={kpi.achievementPct ?? 0} />
+            <Bar value={kpi.achievementPct ?? 0} max={KPI_ACHIEVEMENT_MAX} />
           </CardBody>
         </Card>
       </div>

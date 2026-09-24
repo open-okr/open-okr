@@ -52,6 +52,7 @@ export function Studio({
   score,
   healthy,
   threshold,
+  progressMax,
   canEdit,
 }: {
   readonly nodes: readonly StudioNode[];
@@ -60,6 +61,12 @@ export function Studio({
   readonly score: number | null;
   readonly healthy: boolean | null;
   readonly threshold: number;
+  /**
+   * The workspace's progress ceiling (P8-G04). A prop rather than a read,
+   * because this is a client component and the ceiling is a server fact; the
+   * page resolves it once and hands it down.
+   */
+  readonly progressMax: number;
   readonly canEdit: boolean;
 }) {
   const { t } = useTranslations();
@@ -177,6 +184,7 @@ export function Studio({
                   <span className="flex items-center gap-2">
                     <Bar
                       value={selected.progressPct}
+                      max={progressMax}
                       className="h-1.5 flex-1"
                     />
                     <span className="text-xs font-semibold text-ink-3">

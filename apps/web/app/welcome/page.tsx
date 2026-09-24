@@ -41,7 +41,7 @@ export default async function WelcomePage() {
     redirect("/");
   }
 
-  const read = await callAction(context, "settings.readWorkspaceSettings", {});
+  const read = await callAction(context, "settings.readForMember", {});
   if (read.settings.onboardingDone !== false) {
     redirect("/");
   }

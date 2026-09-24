@@ -76,6 +76,32 @@ describe("Bar", () => {
       "100",
     );
   });
+
+  test("a raised maximum is announced as well as drawn (P8-G03)", () => {
+    // A workspace may raise METHOD.md §11's progress ceiling to 200. Without
+    // the maximum reaching `aria-valuemax`, a screen reader would be told 100
+    // is the most there is while the page beside it reads 150%.
+    render(<Bar value={150} max={200} />);
+    const bar = screen.getByRole("progressbar");
+    expect(bar.getAttribute("aria-valuemax")).toBe("200");
+    expect(bar.getAttribute("aria-valuenow")).toBe("150");
+    expect((bar.firstElementChild as HTMLElement).style.width).toBe("75%");
+  });
+
+  test("clamps to the raised maximum rather than to 100", () => {
+    render(<Bar value={400} max={200} />);
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "200",
+    );
+  });
+
+  test("a maximum of zero falls back to the ordinary axis", () => {
+    // Otherwise the width divides by zero and the fill is `Infinity%`.
+    render(<Bar value={50} max={0} />);
+    const bar = screen.getByRole("progressbar");
+    expect(bar.getAttribute("aria-valuemax")).toBe("100");
+    expect((bar.firstElementChild as HTMLElement).style.width).toBe("50%");
+  });
 });
 
 describe("VerdictDot", () => {

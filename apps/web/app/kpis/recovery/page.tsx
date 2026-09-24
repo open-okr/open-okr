@@ -3,6 +3,7 @@ import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
 import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -33,6 +34,7 @@ const percent = (value: number | null) =>
 
 export default async function RecoveryBoardPage() {
   const { t } = await getTranslations();
+  const ceiling = await progressCeiling();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -109,7 +111,10 @@ export default async function RecoveryBoardPage() {
             </div>
           </CardHeader>
           <CardBody className="flex flex-col gap-2">
-            <Bar value={card.achievementPct ?? 0} />
+            {/* §6.4 measures achievement 0 to 200, and this drew it on a
+                0-to-100 track, so a KPI at 180 and one at exactly 100 filled
+                the same bar (P8-G04). */}
+            <Bar value={card.achievementPct ?? 0} max={KPI_ACHIEVEMENT_MAX} />
 
             {card.recovery ? (
               <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
@@ -124,7 +129,7 @@ export default async function RecoveryBoardPage() {
                     {Math.round(card.recovery.progressPct)}%
                   </span>
                 </div>
-                <Bar value={card.recovery.progressPct} />
+                <Bar value={card.recovery.progressPct} max={ceiling} />
                 <p className="text-xs text-ink-3">
                   {t("common.keyResult4", {
                     keyResults: card.recovery.keyResults,

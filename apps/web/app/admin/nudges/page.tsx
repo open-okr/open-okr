@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NudgeRuleCards } from "./rule-cards.tsx";
@@ -48,6 +49,17 @@ const NUDGE_CHANNELS = [
   { value: "whatsapp", label: "WhatsApp" },
   { value: "telegram", label: "Telegram" },
 ];
+
+/**
+ * The rule's name for the volume list, which linked its key (P8-G11d).
+ *
+ * Falls back to the key, so a trigger with no name still links somewhere
+ * legible; the coverage test fails the build in that case.
+ */
+function ruleName(ruleKey: string, t: (key: string) => string): string {
+  const named = TRIGGER_NAME_KEYS[ruleKey];
+  return named === undefined ? ruleKey : t(named);
+}
 
 export default async function NudgeVolumePage() {
   const { t } = await getTranslations();
@@ -125,9 +137,9 @@ export default async function NudgeVolumePage() {
                 >
                   <a
                     href={`/method/${rule.ruleKey}`}
-                    className="font-mono text-xs text-brand-text hover:underline"
+                    className="text-sm text-brand-text hover:underline"
                   >
-                    {rule.ruleKey}
+                    {ruleName(rule.ruleKey, t)}
                   </a>
                   <span className="flex items-center gap-2 text-xs tabular-nums">
                     <span className="text-ink">

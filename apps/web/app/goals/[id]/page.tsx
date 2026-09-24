@@ -4,10 +4,19 @@ import {
   excerptRichText,
   OperationError,
 } from "@openokr/core";
-import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  formatMeasure,
+} from "@openokr/ui";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { progressCeiling } from "../../../lib/ceilings.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -72,7 +81,7 @@ export default async function GoalPage({
       ...(feedCursor ? { cursor: feedCursor } : {}),
     }),
     callAction(context, "people.directory", {}),
-    callAction(context, "settings.readWorkspaceSettings", {}),
+    callAction(context, "settings.readForMember", {}),
   ]);
   const feedNames = new Map(
     feedDirectory.map((member) => [member.id, member.name]),
@@ -138,9 +147,14 @@ export default async function GoalPage({
   // Whether the assist can offer anything, asked of the stored configuration
   // rather than assumed. With no provider the strip still shows every failing
   // rule and says the suggestion is what needs one.
-  const providers = await callAction(context, "ai.readProviderConfig", {});
-  const drafting = providers.some(
-    (entry) => entry.enabled && entry.hasWorkspaceCredential,
+  // One boolean rather than the provider table (P8-G05). This asked
+  // `ai.readProviderConfig`, which is declared `full` because it carries every
+  // provider's admin configuration and a masked key hint, so the whole screen
+  // failed for any member who did not create the workspace.
+  const { available: drafting } = await callAction(
+    context,
+    "ai.readAvailability",
+    {},
   );
 
   for (const keyResult of goal.keyResults) {
@@ -238,7 +252,11 @@ export default async function GoalPage({
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
-              <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+              <Bar
+                value={goal.progressPct}
+                max={await progressCeiling()}
+                className="h-1.5 flex-1"
+              />
               <span className="text-xs font-semibold text-ink-3">
                 {Math.round(goal.progressPct)}%
               </span>
@@ -319,8 +337,8 @@ export default async function GoalPage({
                         {t("common.toWeight2", {
                           direction: keyResult.direction,
                           indicatorType: keyResult.indicatorType,
-                          baselineValue: keyResult.baselineValue,
-                          targetValue: keyResult.targetValue,
+                          baselineValue: formatMeasure(keyResult.baselineValue),
+                          targetValue: formatMeasure(keyResult.targetValue),
                           unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                           weight: keyResult.weight,
                         })}
@@ -335,8 +353,7 @@ export default async function GoalPage({
                     </span>
                     <span className="flex flex-none flex-col items-end gap-1">
                       <span className="text-sm font-bold text-ink">
-                        {keyResult.currentValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""}
+                        {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
                       {canEdit && !closed && keyResult.kpiId === null ? (
                         <ActionForm
@@ -366,7 +383,12 @@ export default async function GoalPage({
                             type="number"
                             step="any"
                             defaultValue={keyResult.currentValue}
-                            className="w-20 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
+                            // `w-20` held five digits. A key result measuring
+                            // rupiah or impressions runs to nine, and a person
+                            // cannot check what they typed if the field hides
+                            // half of it. No `max`: the ceiling on a measure is
+                            // the unit's, not the product's.
+                            className="w-32 rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
                           />
                           <label
                             className="sr-only"

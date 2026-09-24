@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { progressCeiling } from "../../lib/ceilings.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
@@ -29,6 +30,9 @@ export default async function CheckInPage({
   searchParams: Promise<{ goal?: string }>;
 }) {
   const { t } = await getTranslations();
+  // P8-G04. Resolved once here rather than inside the loop below, because
+  // a bar on a 0-to-100 track under a raised ceiling fills early.
+  const ceiling = await progressCeiling();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -117,7 +121,11 @@ export default async function CheckInPage({
                       {/* No tone on the fill. Rule 2 of the colour system: progress is
                           not health, and a goal can be at 90 percent and still
                           be off track. The health word sits beside it instead. */}
-                      <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+                      <Bar
+                        value={goal.progressPct}
+                        max={ceiling}
+                        className="h-1.5 flex-1"
+                      />
                       <span className="text-xs font-semibold text-ink-3">
                         {Math.round(goal.progressPct)}%
                       </span>
@@ -223,7 +231,7 @@ async function CheckInForGoal({
           <CardBody className="flex flex-col gap-1.5">
             <p className="text-sm text-ink-3">
               {stillDue
-                ? "You can read this goal's check-ins but not post one. The champion posts them (METHOD.md §2.5)."
+                ? "You can read this goal's check-ins but not post one. The champion posts them."
                 : `This goal is not due. Its next check-in is ${goal.nextCheckInOn ?? "not scheduled"}, and the card below is what was reported.`}
             </p>
             {nextGoalId ? (

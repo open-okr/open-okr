@@ -1,5 +1,13 @@
 import type { ResolvedThresholds } from "@openokr/method";
-import { Bar, Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  formatMeasure,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
@@ -180,7 +188,11 @@ export async function Drafting({
             />
 
             <div className="flex items-center gap-2.5">
-              <Bar value={goal.progressPct} className="h-1.5 flex-1" />
+              <Bar
+                value={goal.progressPct}
+                max={thresholds["scoring.progressCeilingPct"]}
+                className="h-1.5 flex-1"
+              />
               <span className="text-xs font-semibold text-ink-3">
                 {Math.round(goal.progressPct)}%
               </span>
@@ -218,16 +230,17 @@ export async function Drafting({
                           {t("common.toWeight", {
                             direction: keyResult.direction,
                             indicatorType: keyResult.indicatorType,
-                            baselineValue: keyResult.baselineValue,
-                            targetValue: keyResult.targetValue,
+                            baselineValue: formatMeasure(
+                              keyResult.baselineValue,
+                            ),
+                            targetValue: formatMeasure(keyResult.targetValue),
                             unit: keyResult.unit ? ` ${keyResult.unit}` : "",
                             weight: keyResult.weight,
                           })}
                         </span>
                       </span>
                       <span className="flex-none text-sm font-bold text-ink">
-                        {keyResult.currentValue}
-                        {keyResult.unit ? ` ${keyResult.unit}` : ""}
+                        {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
                     </div>
                     {canEdit && !keyResult.kpiId ? (
@@ -328,7 +341,10 @@ export async function Drafting({
                     step="any"
                     required
                     placeholder={t("cycle.drafting.baseline")}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    // `w-24` held five digits, and a measure in rupiah or
+                    // impressions runs to nine. No `max`: the ceiling on a
+                    // measure is the unit's, not the product's.
+                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
                   <label className="sr-only" htmlFor={`kr-target-${goal.id}`}>
                     {t("common.target")}
@@ -340,7 +356,7 @@ export async function Drafting({
                     step="any"
                     required
                     placeholder={t("common.target")}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
                   />
                   <label className="sr-only" htmlFor={`kr-unit-${goal.id}`}>
                     {t("cycle.drafting.unit")}

@@ -83,11 +83,7 @@ export default async function KpisPage({
   ].sort((left, right) => left[1].localeCompare(right[1]));
   // Today in the workspace calendar, resolved on the server. The grid needs it to
   // draw a column for the current period, and the browser clock is the wrong one.
-  const settings = await callAction(
-    context,
-    "settings.readWorkspaceSettings",
-    {},
-  );
+  const settings = await callAction(context, "settings.readForMember", {});
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());

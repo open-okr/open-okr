@@ -28,6 +28,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  formatMeasure,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -71,9 +72,11 @@ function evidence(keyResult: ScoringKeyResult): string {
   const bounds =
     keyResult.baseline === null || keyResult.target === null
       ? null
-      : `${keyResult.baseline} to ${keyResult.target}${unit}`;
+      : `${formatMeasure(keyResult.baseline)} to ${formatMeasure(keyResult.target)}${unit}`;
   const landed =
-    keyResult.current === null ? null : `landed ${keyResult.current}${unit}`;
+    keyResult.current === null
+      ? null
+      : `landed ${formatMeasure(keyResult.current)}${unit}`;
   return [bounds, landed].filter(Boolean).join(", ") || "No numbers recorded";
 }
 
@@ -102,7 +105,7 @@ function ScoreRow({
     onProblem(null);
     if (reason.trim().length === 0) {
       onProblem(
-        "§8.3 asks for one line on why. A score with no reason is refused.",
+        "One line on why is asked for. A score with no reason is refused.",
       );
       return;
     }
