@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1068" height="948" viewBox="0 0 1068 948">
+<defs>
+<marker id="tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#7f8fa6"/></marker>
+<marker id="big" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#1f3864"/></marker>
+<style>
+text { font-family: Arial, Helvetica, sans-serif; }
+.title { font-size: 20px; font-weight: bold; fill: #1f3864; }
+.sub { font-size: 12px; fill: #595959; }
+.phase { font-size: 14px; font-weight: bold; fill: #1f3864; }
+.code { font-size: 13px; font-weight: bold; fill: #1f3864; }
+.name { font-size: 13px; fill: #1a1a1a; }
+.needs { font-size: 11px; fill: #6b6b6b; }
+.lane { fill: #eef4fb; stroke: #c5d6ea; }
+.lane-opt { fill: #f6f6f6; stroke: #bfbfbf; stroke-dasharray: 6 4; }
+.box { fill: #ffffff; stroke: #8eaadb; }
+.box-opt { fill: #ffffff; stroke: #a6a6a6; stroke-dasharray: 4 3; }
+.arrow { stroke: #7f8fa6; stroke-width: 1.5; }
+.flow { stroke: #1f3864; stroke-width: 2.5; fill: none; }
+</style>
+</defs>
+<rect width="1068" height="948" fill="#ffffff"/>
+<text x="28" y="34" class="title">OpenOKR UAT: the order to test in</text>
+<text x="28" y="52" class="sub">Phases 1 to 5 run top to bottom inside a column and left to right across. Integrations can start once the module under "needs" is done.</text>
+<rect x="28" y="58" width="300" height="290" rx="10" class="lane"/>
+<text x="42" y="80" class="phase">1. Set up</text>
+<rect x="38" y="92" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="113" class="code">M01</text>
+<text x="90" y="113" class="name">Install and first account</text>
+<text x="90" y="130" class="needs">start here</text>
+<rect x="38" y="154" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="175" class="code">M02</text>
+<text x="90" y="175" class="name">Welcome wizard</text>
+<text x="90" y="192" class="needs">needs M01</text>
+<path d="M64 143 L64 153" class="arrow" marker-end="url(#tip)"/>
+<rect x="38" y="216" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="237" class="code">M03</text>
+<text x="90" y="237" class="name">Workspace settings</text>
+<text x="90" y="254" class="needs">needs M02</text>
+<path d="M64 205 L64 215" class="arrow" marker-end="url(#tip)"/>
+<rect x="384" y="58" width="300" height="290" rx="10" class="lane"/>
+<text x="398" y="80" class="phase">2. Build the team</text>
+<rect x="394" y="92" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="113" class="code">M04</text>
+<text x="446" y="113" class="name">Invitations and building the team</text>
+<text x="446" y="130" class="needs">needs M02</text>
+<rect x="394" y="154" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="175" class="code">M05</text>
+<text x="446" y="175" class="name">Sign-in and account security</text>
+<text x="446" y="192" class="needs">needs M04</text>
+<path d="M420 143 L420 153" class="arrow" marker-end="url(#tip)"/>
+<rect x="394" y="216" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="237" class="code">M06</text>
+<text x="446" y="237" class="name">People and org chart</text>
+<text x="446" y="254" class="needs">needs M04</text>
+<path d="M420 205 L420 215" class="arrow" marker-end="url(#tip)"/>
+<rect x="394" y="278" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="299" class="code">M07</text>
+<text x="446" y="299" class="name">Spaces</text>
+<text x="446" y="316" class="needs">needs M06</text>
+<path d="M420 267 L420 277" class="arrow" marker-end="url(#tip)"/>
+<rect x="740" y="58" width="300" height="290" rx="10" class="lane"/>
+<text x="754" y="80" class="phase">3. Plan the cycle</text>
+<rect x="750" y="92" width="280" height="50" rx="6" class="box"/>
+<text x="762" y="113" class="code">M08</text>
+<text x="802" y="113" class="name">Cycle: prepare, diagnose, direction</text>
+<text x="802" y="130" class="needs">needs M07</text>
+<rect x="750" y="154" width="280" height="50" rx="6" class="box"/>
+<text x="762" y="175" class="code">M09</text>
+<text x="802" y="175" class="name">Drafting OKRs and quality checks</text>
+<text x="802" y="192" class="needs">needs M08</text>
+<path d="M776 143 L776 153" class="arrow" marker-end="url(#tip)"/>
+<rect x="750" y="216" width="280" height="50" rx="6" class="box"/>
+<text x="762" y="237" class="code">M10</text>
+<text x="802" y="237" class="name">Goal page and documents</text>
+<text x="802" y="254" class="needs">needs M09</text>
+<path d="M776 205 L776 215" class="arrow" marker-end="url(#tip)"/>
+<rect x="750" y="278" width="280" height="50" rx="6" class="box"/>
+<text x="762" y="299" class="code">M11</text>
+<text x="802" y="299" class="name">Alignment and publishing</text>
+<text x="802" y="316" class="needs">needs M10</text>
+<path d="M776 267 L776 277" class="arrow" marker-end="url(#tip)"/>
+<rect x="28" y="418" width="300" height="476" rx="10" class="lane"/>
+<text x="42" y="440" class="phase">4. Run the cycle</text>
+<rect x="38" y="452" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="473" class="code">M12</text>
+<text x="90" y="473" class="name">KPIs and recovery</text>
+<text x="90" y="490" class="needs">needs M11</text>
+<rect x="38" y="514" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="535" class="code">M13</text>
+<text x="90" y="535" class="name">Initiatives, board and tasks</text>
+<text x="90" y="552" class="needs">needs M11</text>
+<path d="M64 503 L64 513" class="arrow" marker-end="url(#tip)"/>
+<rect x="38" y="576" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="597" class="code">M14</text>
+<text x="90" y="597" class="name">Check-in, review and inbox</text>
+<text x="90" y="614" class="needs">needs M11</text>
+<path d="M64 565 L64 575" class="arrow" marker-end="url(#tip)"/>
+<rect x="38" y="638" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="659" class="code">M15</text>
+<text x="90" y="659" class="name">Weekly session</text>
+<text x="90" y="676" class="needs">needs M14</text>
+<path d="M64 627 L64 637" class="arrow" marker-end="url(#tip)"/>
+<rect x="38" y="700" width="280" height="50" rx="6" class="box"/>
+<text x="50" y="721" class="code">M16</text>
+<text x="90" y="721" class="name">Agents and nudges</text>
+<text x="90" y="738" class="needs">needs M14</text>
+<path d="M64 689 L64 699" class="arrow" marker-end="url(#tip)"/>
+<rect x="384" y="418" width="300" height="476" rx="10" class="lane"/>
+<text x="398" y="440" class="phase">5. Close and check</text>
+<rect x="394" y="452" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="473" class="code">M17</text>
+<text x="446" y="473" class="name">Work map, search and activity</text>
+<text x="446" y="490" class="needs">needs M15</text>
+<rect x="394" y="514" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="535" class="code">M18</text>
+<text x="446" y="535" class="name">Closing the cycle and scorecard</text>
+<text x="446" y="552" class="needs">needs M15</text>
+<path d="M420 503 L420 513" class="arrow" marker-end="url(#tip)"/>
+<rect x="394" y="576" width="280" height="50" rx="6" class="box"/>
+<text x="406" y="597" class="code">M19</text>
+<text x="446" y="597" class="name">Access and permissions</text>
+<text x="446" y="614" class="needs">needs M11</text>
+<path d="M420 565 L420 575" class="arrow" marker-end="url(#tip)"/>
+<rect x="740" y="418" width="300" height="476" rx="10" class="lane-opt"/>
+<text x="754" y="440" class="phase">6. Integrations</text>
+<rect x="750" y="452" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="473" class="code">M20</text>
+<text x="802" y="473" class="name">AI provider and copilot</text>
+<text x="802" y="490" class="needs">needs M11</text>
+<rect x="750" y="514" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="535" class="code">M21</text>
+<text x="802" y="535" class="name">Chat channels and email</text>
+<text x="802" y="552" class="needs">needs M16</text>
+<rect x="750" y="576" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="597" class="code">M22</text>
+<text x="802" y="597" class="name">Single sign-on and directory sync</text>
+<text x="802" y="614" class="needs">needs M04</text>
+<rect x="750" y="638" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="659" class="code">M23</text>
+<text x="802" y="659" class="name">Import and export</text>
+<text x="802" y="676" class="needs">needs M07</text>
+<rect x="750" y="700" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="721" class="code">M24</text>
+<text x="802" y="721" class="name">API tokens, CLI and external agents</text>
+<text x="802" y="738" class="needs">needs M11</text>
+<rect x="750" y="762" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="783" class="code">M25</text>
+<text x="802" y="783" class="name">Audit trail and workspace state</text>
+<text x="802" y="800" class="needs">needs M11</text>
+<rect x="750" y="824" width="280" height="50" rx="6" class="box-opt"/>
+<text x="762" y="845" class="code">M26</text>
+<text x="802" y="845" class="name">Cloud operator console</text>
+<text x="802" y="862" class="needs">needs M04</text>
+<path d="M332 78 L378 78" class="flow" marker-end="url(#big)"/>
+<path d="M688 78 L734 78" class="flow" marker-end="url(#big)"/>
+<path d="M890 352 L890 383 L178 383 L178 412" class="flow" fill="none" marker-end="url(#big)"/>
+<path d="M332 438 L378 438" class="flow" marker-end="url(#big)"/>
+<text x="28" y="934" class="sub">Solid boxes: the core product, tested with AI off. Dashed: needs an outside account or server access, mark N/A if you have none.</text>
+</svg>

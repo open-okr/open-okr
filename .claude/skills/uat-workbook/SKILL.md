@@ -9,7 +9,9 @@ The manual acceptance test for OpenOKR is data plus a builder:
 
 | File | Role |
 |---|---|
-| `docs/testing/uat-cases.mjs` | Modules, personas and every test case. Edit this |
+| `docs/testing/uat-cases.mjs` | Modules, personas and every test case |
+| `docs/testing/uat-guide.mjs` | Each module's purpose, workflow, needs and output. Feeds the Module Guide sheet, the module bands and the diagram |
+| `docs/testing/build-diagram.mjs` | Draws `workflow.png` with Playwright's Chromium |
 | `docs/testing/build-uat.mjs` | Writes the `.xlsx` with Node built-ins only |
 | `docs/testing/PROMPT-UAT.md` | The full refresh procedure, as a prompt |
 
@@ -21,7 +23,9 @@ conditions. Do not restate or loosen them here.
 
 ## Checks before you report
 
-1. `node docs/testing/build-uat.mjs` prints the case count with no error.
+1. `node docs/testing/build-diagram.mjs` then `node docs/testing/build-uat.mjs`
+   print with no error. Look at `workflow.png`: every box readable, nothing
+   touching an edge.
 2. Open the workbook in Excel if it is installed (PowerShell `Excel.Application`
    COM) and set a Status to Pass: the Summary sheet row for that module must
    count it. A formula error there means a module name in a case does not

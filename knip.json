@@ -9,7 +9,8 @@
         "e2e/repair-standalone-links.ts",
         "deploy/docker/migrate.ts",
         "playwright.dev.config.ts",
-        "docs/testing/build-uat.mjs"
+        "docs/testing/build-uat.mjs",
+        "docs/testing/build-diagram.mjs"
       ],
       "ignoreBinaries": ["openssl"]
     },

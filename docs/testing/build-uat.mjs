@@ -6,14 +6,16 @@
 // needs no package at all. A dependency for a test document would be the one
 // thing CLAUDE.md asks us not to add without asking.
 
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateRawSync } from "node:zlib";
 import { CASES, MODULES, PERSONAS } from "./uat-cases.mjs";
+import { GUIDE, PHASES } from "./uat-guide.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const OUT = join(here, "OpenOKR-UAT.xlsx");
+// UAT_OUT writes elsewhere, for when the workbook is open in Excel and locked.
+const OUT = process.env.UAT_OUT ?? join(here, "OpenOKR-UAT.xlsx");
 
 const STATUSES = ["Not Run", "Pass", "Fail", "Error", "Blocked", "N/A"];
 const PRIORITIES = ["High", "Medium", "Low"];
@@ -35,6 +37,7 @@ const S = {
   text: 9,
   subtitle: 10,
   example: 11,
+  boldTop: 12,
 };
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -60,7 +63,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="12">
+<cellXfs count="13">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
@@ -73,6 +76,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="5" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 </cellXfs>
 <dxfs count="5">
 <dxf><font><b/><color rgb="FF006100"/></font><fill><patternFill><bgColor rgb="FFC6EFCE"/></patternFill></fill></dxf>
@@ -116,7 +120,8 @@ const cellXml = (ref, value, style) => {
 /**
  * One worksheet. `rows` is an array of { cells: [[value, style]...], height }.
  * Options: widths, freeze {row, col}, filter "A1:N9", validations
- * [{ sqref, list }], conditional [{ sqref, rules: [[text, dxf]] }], merges.
+ * [{ sqref, list }], conditional [{ sqref, rules: [[text, dxf]] }], merges,
+ * drawing (true when the sheet carries the picture in rId1).
  */
 const sheetXml = (rows, opt = {}) => {
   const parts = [
@@ -187,6 +192,7 @@ const sheetXml = (rows, opt = {}) => {
   }
   parts.push(`<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>`);
   parts.push(`<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>`);
+  if (opt.drawing) parts.push(`<drawing r:id="rId1"/>`);
   parts.push("</worksheet>");
   return parts.join("");
 };
@@ -198,6 +204,76 @@ const moduleLabel = (code) => {
   if (!found) throw new Error(`Unknown module ${code}`);
   return `${found[0]} ${found[1]}`;
 };
+
+/** The line on each module band: what the module is for and what it needs. */
+const bandText = (code) => {
+  const g = GUIDE[code];
+  if (!g) throw new Error(`No guide entry for ${code}`);
+  const needs = g.needs.length ? ` Needs ${g.needs.join(", ")} first.` : "";
+  return `${moduleLabel(code)}: ${g.purpose}.${needs} About ${g.minutes} min. Full workflow on the Module Guide sheet.`;
+};
+
+// Module Guide
+const phaseName = Object.fromEntries(PHASES);
+const GUIDE_HEAD = [
+  "Module", "Phase", "What it proves", "Screens", "Who signs in",
+  "Workflow", "Needs first", "Leaves ready for later", "Setup needed",
+  "Time (min)",
+];
+const guideRows = [
+  { cells: [["Module guide", S.title]], height: 26 },
+  { cells: [["What each module is for and how it flows, in the order to test it. The Test Cases sheet has the detailed steps; this sheet is the map.", S.subtitle]] },
+  { cells: [] },
+  { cells: GUIDE_HEAD.map((h) => [h, S.header]), height: 30 },
+];
+const firstGuide = guideRows.length + 1;
+const GUIDE_WIDTHS = [22, 16, 34, 30, 20, 50, 12, 34, 30, 9];
+/**
+ * Excel does not grow a row to fit wrapped text it did not measure itself, so
+ * the height is set from the longest cell: its lines, each wrapped at roughly
+ * one character per unit of column width.
+ */
+const fitHeight = (values) => {
+  const lines = values.map((v, i) =>
+    String(v ?? "")
+      .split("\n")
+      .reduce((n, line) => n + Math.max(1, Math.ceil(line.length / (GUIDE_WIDTHS[i] * 1.05))), 0),
+  );
+  return Math.max(...lines) * 13 + 6;
+};
+for (const [code] of MODULES) {
+  const g = GUIDE[code];
+  if (!g) throw new Error(`No guide entry for ${code}`);
+  guideRows.push({
+    cells: [
+      [moduleLabel(code), S.boldTop],
+      [phaseName[g.phase], S.body],
+      [g.purpose, S.body],
+      [g.screens, S.body],
+      [g.who, S.body],
+      [g.flow.map((step, i) => `${i + 1}. ${step}`).join("\n"), S.body],
+      [g.needs.length ? g.needs.join(", ") : "Nothing. Start here", S.body],
+      [g.gives, S.body],
+      [g.setup || "Nothing extra", S.body],
+      [g.minutes, S.body],
+    ],
+  });
+  const row = guideRows[guideRows.length - 1];
+  row.height = fitHeight(row.cells.map(([v]) => v));
+}
+const lastGuide = guideRows.length;
+guideRows.push({
+  cells: [
+    ["Total time", S.bold],
+    ...Array.from({ length: 8 }, () => [null, S.bold]),
+    [{ f: `SUM(J${firstGuide}:J${lastGuide})` }, S.bold],
+  ],
+});
+const guideSheet = sheetXml(guideRows, {
+  widths: GUIDE_WIDTHS,
+  freeze: { row: 4, col: 1 },
+  merges: ["A2:J2"],
+});
 
 // Test Cases
 const TC_HEAD = [
@@ -211,7 +287,7 @@ let lastModule = null;
 for (const tc of CASES) {
   if (tc.module !== lastModule) {
     tcRows.push({
-      cells: [[moduleLabel(tc.module), S.band], ...Array.from({ length: 13 }, () => [null, S.band])],
+      cells: [[bandText(tc.module), S.band], ...Array.from({ length: 13 }, () => [null, S.band])],
     });
     lastModule = tc.module;
   }
@@ -357,11 +433,24 @@ const bugSheet = sheetXml(bugRows, {
 });
 
 // Read Me
+// The diagram from build-diagram.mjs, drawn at 2x, shown at IMAGE_WIDTH px.
+const IMAGE = join(here, "workflow.png");
+if (!existsSync(IMAGE)) throw new Error("workflow.png is missing. Run node docs/testing/build-diagram.mjs first");
+const png = readFileSync(IMAGE);
+const IMAGE_WIDTH = 880;
+const IMAGE_HEIGHT = Math.round((IMAGE_WIDTH * png.readUInt32BE(20)) / png.readUInt32BE(16));
+// A default row is 17px tall; leave room for the picture plus a margin.
+const IMAGE_ROWS = Math.ceil(IMAGE_HEIGHT / 17) + 1;
+// Zero-based row the picture is anchored on: after title, intro, blank, header.
+const IMAGE_ANCHOR_ROW = 4;
 const para = (text, style = S.text, height) => ({ cells: [[text, style]], height });
 const two = (a, b, sa = S.body, sb = S.body) => ({ cells: [[a, sa], [b, sb]] });
 const readRows = [
   para("OpenOKR user acceptance test", S.title, 28),
   para("A step-by-step test of the whole product through its screens, done by a person. It follows the order the product is used in: install, invite the team, plan the cycle, draft and publish OKRs, run the week, close the quarter, then the integrations.", S.subtitle, 42),
+  para(""),
+  { cells: [["The workflow at a glance", S.header], [null, S.header]] },
+  ...Array.from({ length: IMAGE_ROWS }, () => ({ cells: [] })),
   para(""),
   { cells: [["How to use this workbook", S.header], [null, S.header]] },
   two(1, "Start a fresh instance with an empty database (docs/install/compose.md). Note the URL."),
@@ -395,7 +484,7 @@ const readRows = [
   two("Chat test", "\"Send me a test\" on Admin, Channels sends an email, not a chat message."),
   two("2FA", "There is no button to turn one-time codes off. Use the throwaway persona Amara."),
   para(""),
-  para(`Generated from docs/testing/uat-cases.mjs. ${CASES.length} test cases across ${MODULES.length} modules.`, S.subtitle),
+  para(`Generated from docs/testing/uat-cases.mjs and uat-guide.mjs. ${CASES.length} test cases across ${MODULES.length} modules.`, S.subtitle),
 ];
 // Paragraphs and section headers span both columns.
 const readMerges = [];
@@ -407,12 +496,13 @@ readRows.forEach((row, i) => {
     if (single) row.cells.push([null, row.cells[0][1]]);
   }
 });
-const readMeSheet = sheetXml(readRows, { widths: [16, 110], merges: readMerges });
+const readMeSheet = sheetXml(readRows, { widths: [16, 110], merges: readMerges, drawing: true });
 
 // ---------------------------------------------------------------- package
 
 const SHEETS = [
   ["Read Me", readMeSheet],
+  ["Module Guide", guideSheet],
   ["Summary", summarySheet],
   ["Personas", personasSheet],
   ["Test Cases", testCasesSheet],
@@ -431,6 +521,8 @@ const files = {
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
+<Default Extension="png" ContentType="image/png"/>
+<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
 <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 ${SHEETS.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("\n")}
@@ -459,6 +551,28 @@ ${SHEETS.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.open
 <Relationship Id="rId${SHEETS.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`,
   "xl/styles.xml": STYLES,
+  "xl/worksheets/_rels/sheet1.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>`,
+  "xl/drawings/_rels/drawing1.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>
+</Relationships>`,
+  "xl/drawings/drawing1.xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<xdr:oneCellAnchor>
+<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${IMAGE_ANCHOR_ROW}</xdr:row><xdr:rowOff>76200</xdr:rowOff></xdr:from>
+<xdr:ext cx="${IMAGE_WIDTH * 9525}" cy="${IMAGE_HEIGHT * 9525}"/>
+<xdr:pic>
+<xdr:nvPicPr><xdr:cNvPr id="2" name="Workflow" descr="The order to test the modules in, from set up to integrations"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>
+<xdr:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>
+<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${IMAGE_WIDTH * 9525}" cy="${IMAGE_HEIGHT * 9525}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>
+</xdr:pic>
+<xdr:clientData/>
+</xdr:oneCellAnchor>
+</xdr:wsDr>`,
+  "xl/media/image1.png": png,
 };
 SHEETS.forEach(([, xml], i) => {
   files[`xl/worksheets/sheet${i + 1}.xml`] = xml;
@@ -474,7 +588,7 @@ const zip = (entries) => {
   const date = ((2026 - 1980) << 9) | (1 << 5) | 1;
   for (const [name, text] of Object.entries(entries)) {
     const nameBuf = Buffer.from(name, "utf8");
-    const raw = Buffer.from(text, "utf8");
+    const raw = Buffer.isBuffer(text) ? text : Buffer.from(text, "utf8");
     const data = deflateRawSync(raw, { level: 9 });
     const crc = crc32(raw);
     const local = Buffer.alloc(30);

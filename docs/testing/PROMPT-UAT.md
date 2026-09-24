@@ -19,10 +19,15 @@ Repository: OpenOKR, an OKR platform (Next.js in apps/web, UI strings in
 packages/ui/src/i18n/messages/en.json, the OKR rules in packages/method).
 
 The UAT workbook lives in docs/testing/:
-- uat-cases.mjs     the test cases as data. The only file you edit for content
-- build-uat.mjs     turns the data into OpenOKR-UAT.xlsx. No dependencies
-- OpenOKR-UAT.xlsx  the output. Sheets: Read Me, Summary, Personas,
-                    Test Cases, Bug Log
+- uat-cases.mjs      the modules, personas and test cases, as data
+- uat-guide.mjs      each module's purpose, screens, workflow, what it needs
+                     first and what it leaves ready. One entry per module
+- build-diagram.mjs  draws workflow.png from uat-guide.mjs (uses Playwright's
+                     Chromium, already installed for the e2e suite)
+- build-uat.mjs      turns the data and the picture into OpenOKR-UAT.xlsx.
+                     No dependencies
+- OpenOKR-UAT.xlsx   the output. Sheets: Read Me (with the diagram), Module
+                     Guide, Summary, Personas, Test Cases, Bug Log
 
 Decisions already made. Do not reopen them:
 - Tested by a person, through the full UI, on a fresh instance with an empty
@@ -49,11 +54,15 @@ Decisions already made. Do not reopen them:
    and copy the string exactly. If you cannot find it, describe the element
    in plain words instead of quoting.
 4. Edit uat-cases.mjs. Add new cases at the end of their module so existing
-   IDs (M09-03 and so on) keep their meaning for testers mid-run.
+   IDs (M09-03 and so on) keep their meaning for testers mid-run. When a
+   module's flow, screens or dependencies change, update its entry in
+   uat-guide.mjs too. A new module needs an entry in both files.
 5. When code reading shows a flow cannot be finished from the UI, keep the
    case, state the expected behaviour from REQUIREMENTS.md, and put the risk
    in the hint so the tester knows to mark Fail or Blocked.
-6. Run: node docs/testing/build-uat.mjs
+6. Run: node docs/testing/build-diagram.mjs, then node docs/testing/build-uat.mjs.
+   If Excel has the workbook open the write fails with EBUSY; ask the human
+   to close it rather than closing Excel yourself.
 7. Update the "Known risks" rows in build-uat.mjs if a risk was fixed or a new
    one was found.
 </task>
