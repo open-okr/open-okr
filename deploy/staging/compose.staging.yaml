@@ -1,4 +1,5 @@
-# The staging instance the manual acceptance test runs on (docs/testing).
+# The staging instance the manual acceptance test runs on
+# (docs/install/staging.md).
 #
 # An overlay on deploy/docker/compose.yaml, like the demo's, and smaller: it
 # publishes Postgres on the loopback address so `seed.sh` beside it can reach

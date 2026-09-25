@@ -15,3 +15,8 @@ The command refuses a workspace that has anybody in it besides its founder and
 these seven, and a second run changes nothing. `deploy/staging/seed.sh` runs it
 against a Docker Compose stack started with the new `compose.staging.yaml`
 overlay, which publishes Postgres on the loopback address only.
+
+`./openokr up` no longer refuses a second stack on the same host. Its check
+for "a database volume but no secrets" looked for the default project's
+volume whatever `COMPOSE_PROJECT_NAME` said, so a demo or staging stack beside
+a normal install was refused over a volume that belonged to the other one.

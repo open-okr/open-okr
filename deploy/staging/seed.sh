@@ -1,5 +1,6 @@
 #!/bin/sh
 # Adds the seven UAT persona accounts to a running staging instance.
+# The whole procedure is docs/install/staging.md.
 #
 # Run it on the staging host, from a checkout of this repository, after the
 # first account has finished the setup wizard (UAT modules M01 and M02):

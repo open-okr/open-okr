@@ -466,7 +466,7 @@ const readRows = [
   ...Array.from({ length: IMAGE_ROWS }, () => ({ cells: [] })),
   para(""),
   { cells: [["How to use this workbook", S.header], [null, S.header]] },
-  two(1, "Start a fresh instance with an empty database and the staging overlay (docs/testing/staging.md). Note the URL."),
+  two(1, "Start a fresh instance with an empty database and the staging overlay (docs/install/staging.md). Note the URL."),
   two(2, "Type the shared inbox on the Personas sheet. The seven persona addresses fill themselves in."),
   two(3, "Work down the Test Cases sheet in order. Each module builds on the one before it."),
   two(4, "Sign in as the person in \"Login as\". Check the Pre-condition, follow the Steps, compare with Expected result."),

@@ -31,7 +31,7 @@ The UAT workbook lives in docs/testing/:
 
 Decisions already made. Do not reopen them:
 - Tested by a person, through the full UI, on a fresh instance with an empty
-  database (docs/testing/staging.md). After the setup wizard, one command
+  database (docs/install/staging.md). After the setup wizard, one command
   (pnpm uat:personas, case M02-04) creates the seven persona accounts and
   nothing else; titles, managers, spaces and all content are built by hand.
 - Personas are the demo cast in packages/core/src/demo/cast.ts. Only the first
