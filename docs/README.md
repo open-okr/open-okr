@@ -22,6 +22,7 @@ Start where you are.
 | [The managed cloud](install/cloud.md) | Signing up, and what the vendor operates |
 | [The first run](install/first-run.md) | The wizard, the owner account, and the five things to do next |
 | [A public demonstration instance](install/demo.md) | The seeded, self-resetting instance anybody can sign into |
+| [A staging instance for acceptance testing](install/staging.md) | An empty instance plus the seven test accounts, for the manual test workbook |
 | [Running with no internet](runbooks/air-gap.md) | What works air-gapped, and how to validate it |
 
 ## Administering an instance
@@ -78,6 +79,7 @@ Written for the person holding the pager, not for a reader.
 | [The plan set](development-plan/) | Requirements, architecture, schema, interface, and the task list |
 | [Governance](../GOVERNANCE.md) | Who decides what |
 | [Contributing](../CONTRIBUTING.md) | Getting a development instance running |
+| [Acceptance test workbook](testing/OpenOKR-UAT.xlsx) | The manual test a person runs through the whole UI, module by module. [How to refresh it](testing/PROMPT-UAT.md), [the staging instance it runs on](install/staging.md) |
 
 ## How this stays true
 

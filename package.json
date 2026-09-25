@@ -24,6 +24,7 @@
     "import:flowyteam": "pnpm --filter @openokr/importer import:flowyteam",
     "db:seed": "pnpm --filter @openokr/core seed",
     "demo:prepare": "pnpm --filter @openokr/core demo:prepare",
+    "uat:personas": "pnpm --filter @openokr/core uat:personas",
     "db:seed:large": "pnpm --filter @openokr/core seed:large",
     "perf:budgets": "pnpm --filter @openokr/core perf:budgets",
     "perf:load": "pnpm --filter @openokr/core perf:load",

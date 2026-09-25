@@ -86,7 +86,12 @@ generate_secrets() {
   #
   # Worse, OPENOKR_ENCRYPTION_KEY would also be new, and every stored
   # credential sealed with the old one would be unreadable. So this refuses.
-  if docker volume inspect openokr_db-data >/dev/null 2>&1; then
+  #
+  # The volume is named after the Compose project, so it is this project's
+  # volume that counts. Checking the default name alone refused every second
+  # stack on a host that runs a normal install, the demo reset and the UAT
+  # staging stack included, over a volume that belongs to somebody else.
+  if docker volume inspect "${COMPOSE_PROJECT_NAME:-openokr}_db-data" >/dev/null 2>&1; then
     echo "openokr: there is an existing database volume but no $APP_ENV." >&2
     echo "openokr: generating new secrets now would leave an instance that" >&2
     echo "openokr: cannot sign in and cannot read its stored credentials." >&2
