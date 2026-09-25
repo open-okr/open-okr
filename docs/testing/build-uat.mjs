@@ -10,7 +10,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateRawSync } from "node:zlib";
-import { CASES, MODULES, PERSONAS } from "./uat-cases.mjs";
+import { CASES, MODULES, PERSONA_PASSWORD, PERSONAS } from "./uat-cases.mjs";
 import { GUIDE, PHASES } from "./uat-guide.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -381,25 +381,38 @@ const summarySheet = sheetXml(sumRows, {
 });
 
 // Personas
+// Row 4 holds the one inbox the tester types. Every persona's address is a
+// formula over it, the same plus-address `pnpm uat:personas` creates, so the
+// sheet and the accounts cannot disagree.
+const INBOX_CELL = "$B$4";
 const perRows = [
   { cells: [["Personas", S.title]], height: 26 },
-  { cells: [["The Northwind Labs cast from the product's own demo story. Every test case names who to sign in as. Fill the yellow email column before M04: plus-addresses on one inbox work, for example qa.okr+priya@yourdomain.com", S.subtitle]], height: 30 },
+  { cells: [["The Northwind Labs cast from the product's own demo story. Every test case names who to sign in as. Type the shared inbox in the yellow cell below: the seven addresses fill themselves in, and sh deploy/staging/seed.sh --inbox <that inbox> creates exactly those accounts (M02-04).", S.subtitle]], height: 30 },
   { cells: [] },
-  { cells: ["Persona", "Full name", "Title", "Reports to", "Sign-in email (fill in)", "Password (fill in)", "Access and role in the test", "Used in"].map((h) => [h, S.header]), height: 22 },
+  { cells: [["Shared inbox", S.bold], [null, S.input], ["For example qa.okr@gmail.com. No plus sign: each persona adds its own.", S.subtitle]] },
+  { cells: [["Shared password", S.bold], [PERSONA_PASSWORD, S.input], ["The seed command's default. Change it here if the command was run with --password.", S.subtitle]] },
+  { cells: [] },
+  { cells: ["Persona", "Full name", "Title", "Reports to", "Sign-in email", "Password", "Access and role in the test", "Used in"].map((h) => [h, S.header]), height: 22 },
 ];
-for (const [key, name, title, boss, access, used] of PERSONAS) {
+for (const [key, name, title, boss, access, used, plus] of PERSONAS) {
+  const email = plus
+    ? { f: `IF(${INBOX_CELL}="","",LOWER(SUBSTITUTE(${INBOX_CELL},"@","+${plus}@")))` }
+    : null;
   perRows.push({
     cells: [
       [key, S.bold], [name, S.body], [title, S.body], [boss, S.body],
-      [null, S.input], [null, S.input], [access, S.body], [used, S.body],
+      // The Admin is whoever ran the setup wizard, so theirs is typed in.
+      [email, plus ? S.body : S.input],
+      [plus ? { f: "$B$5" } : null, plus ? S.body : S.input],
+      [access, S.body], [used, S.body],
     ],
   });
 }
 perRows.push({ cells: [] });
-perRows.push({ cells: [["Use one browser profile per persona (Chrome profiles, Firefox containers or separate browsers). It saves signing in and out, and it lets two people act at once in M13 and M15.", S.subtitle]], height: 30 });
+perRows.push({ cells: [["Spare addresses for M04 and M19 use the same inbox: +leaver, +wrong, +other, +guest1, +guest2. Use one browser profile per persona (Chrome profiles, Firefox containers or separate browsers); it lets two people act at once in M13 and M15.", S.subtitle]], height: 30 });
 const personasSheet = sheetXml(perRows, {
-  widths: [11, 18, 26, 12, 30, 18, 52, 30],
-  merges: ["A2:H2", `A${perRows.length}:H${perRows.length}`],
+  widths: [15, 30, 26, 12, 34, 20, 52, 30],
+  merges: ["A2:H2", "C4:H4", "C5:H5", `A${perRows.length}:H${perRows.length}`],
 });
 
 // Bug Log
@@ -453,8 +466,8 @@ const readRows = [
   ...Array.from({ length: IMAGE_ROWS }, () => ({ cells: [] })),
   para(""),
   { cells: [["How to use this workbook", S.header], [null, S.header]] },
-  two(1, "Start a fresh instance with an empty database (docs/install/compose.md). Note the URL."),
-  two(2, "Fill the yellow email and password cells on the Personas sheet."),
+  two(1, "Start a fresh instance with an empty database and the staging overlay (docs/testing/staging.md). Note the URL."),
+  two(2, "Type the shared inbox on the Personas sheet. The seven persona addresses fill themselves in."),
   two(3, "Work down the Test Cases sheet in order. Each module builds on the one before it."),
   two(4, "Sign in as the person in \"Login as\". Check the Pre-condition, follow the Steps, compare with Expected result."),
   two(5, "Pick a Status from the dropdown. For anything other than Pass, write what you saw in \"Actual result / notes\"."),
@@ -471,11 +484,12 @@ const readRows = [
   para(""),
   { cells: [["Before you start", S.header], [null, S.header]] },
   two("Browsers", "One browser profile per persona. Two screens help for M13 and M15, where two people act at once."),
-  two("Email", "Without SMTP the instance prints every mail to its log. Invitation links are also shown once on Admin, Invitations. For reset links either read the server log or run Mailpit (SMTP on localhost port 1025, inbox at http://localhost:8025)."),
+  two("Personas", "The seven accounts are created by a command after the setup wizard (M02-04), not by hand. They join through a real invitation, and titles, managers and spaces stay empty for M06 and M07."),
+  two("Email", "Every persona address is a plus-address on one inbox, so reset mails reach it once SMTP is set up. Without SMTP the instance prints every mail to its log, and invitation links are also shown once on Admin, Invitations. Mailpit is the quick fix (SMTP on port 1025, inbox at http://localhost:8025)."),
   two("Server access", "A few cases need someone who can read logs, restart the instance or run a pnpm command. They say so in the hint."),
   two("AI", "AI is off by default and everything before M20 is tested with it off. M20 needs a provider key with a spending limit."),
   two("Integrations", "M21 to M26 need outside accounts (Slack, Teams, WhatsApp, Telegram, an identity provider, an MCP client). Mark N/A for any you do not have."),
-  two("Never", "Paste an API key, token or password into this workbook. Write where it is kept instead."),
+  two("Never", "Paste an API key, a token or a real person's password into this workbook. The one shared password on Personas belongs to test accounts on the staging instance only."),
   para(""),
   { cells: [["Known risks found while writing this", S.header], [null, S.header]] },
   two("Publishing", "Code review suggests gates 2 and 5 have no field in the UI. M11-05 tests it. If they cannot turn green, publish with the override in M11-07."),

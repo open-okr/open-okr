@@ -41,17 +41,17 @@ text { font-family: Arial, Helvetica, sans-serif; }
 <text x="398" y="80" class="phase">2. Build the team</text>
 <rect x="394" y="92" width="280" height="50" rx="6" class="box"/>
 <text x="406" y="113" class="code">M04</text>
-<text x="446" y="113" class="name">Invitations and building the team</text>
+<text x="446" y="113" class="name">Invitations</text>
 <text x="446" y="130" class="needs">needs M02</text>
 <rect x="394" y="154" width="280" height="50" rx="6" class="box"/>
 <text x="406" y="175" class="code">M05</text>
 <text x="446" y="175" class="name">Sign-in and account security</text>
-<text x="446" y="192" class="needs">needs M04</text>
+<text x="446" y="192" class="needs">needs M02</text>
 <path d="M420 143 L420 153" class="arrow" marker-end="url(#tip)"/>
 <rect x="394" y="216" width="280" height="50" rx="6" class="box"/>
 <text x="406" y="237" class="code">M06</text>
 <text x="446" y="237" class="name">People and org chart</text>
-<text x="446" y="254" class="needs">needs M04</text>
+<text x="446" y="254" class="needs">needs M02</text>
 <path d="M420 205 L420 215" class="arrow" marker-end="url(#tip)"/>
 <rect x="394" y="278" width="280" height="50" rx="6" class="box"/>
 <text x="406" y="299" class="code">M07</text>

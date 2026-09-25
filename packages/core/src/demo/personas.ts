@@ -264,7 +264,7 @@ async function userIdByEmail(
  * this order and this is the same pair of calls, so a persona's account is
  * indistinguishable from one somebody set a password on themselves.
  */
-async function accountFor(
+export async function accountFor(
   input: PrepareDemoPersonasInput,
   name: string,
   email: string,

@@ -12,7 +12,7 @@ export const MODULES = [
   ["M01", "Install and first account"],
   ["M02", "Welcome wizard"],
   ["M03", "Workspace settings"],
-  ["M04", "Invitations and building the team"],
+  ["M04", "Invitations"],
   ["M05", "Sign-in and account security"],
   ["M06", "People and org chart"],
   ["M07", "Spaces"],
@@ -37,17 +37,24 @@ export const MODULES = [
   ["M26", "Cloud operator console"],
 ];
 
-/** The Northwind Labs cast, from packages/core/src/demo/cast.ts. */
+/**
+ * The Northwind Labs cast, from packages/core/src/demo/cast.ts. The last field
+ * is the plus-address key `pnpm uat:personas` gives each persona; the Personas
+ * sheet turns it into an address from the one inbox the tester types in.
+ */
 export const PERSONAS = [
-  ["Admin", "(your own name)", "Chief Executive", "Nobody", "Full access. The first account. The only one who can open Admin screens", "All"],
-  ["Priya", "Priya Raman", "Chief Product Officer", "Admin", "Member (edit). Manager of the Product space. Reviewer of Sara's goal", "M04, M06, M07, M11, M14, M15"],
-  ["Daniel", "Daniel Osei", "VP Sales", "Admin", "Member (edit). Manager of the Sales space. Champion of the sales objective", "M04, M06, M07, M09"],
-  ["Tomas", "Tomás Herrera", "Head of Customer Success", "Admin", "Member (edit). Manager of the Customer Success space. Used for suspend and restore", "M04, M06, M07, M09"],
-  ["Mei", "Mei Lin", "Head of Engineering", "Priya", "Member (edit). Owns initiatives. Used as the wrong reviewer", "M04, M06, M13, M14"],
-  ["Sara", "Sara Nasser", "Product Manager, Onboarding", "Priya", "Member (edit). Champion of the onboarding objective. Does the check-ins", "M04, M09, M14, M15"],
-  ["Jonas", "Jonas Weber", "Account Executive", "Daniel", "Member (edit). Used for the 'cannot do this' checks", "M04, M06, M07, M14, M19"],
-  ["Amara", "Amara Diallo", "Data Analyst", "Admin", "Member (edit). Throwaway account for 2FA, guest and erase tests", "M04, M05, M19"],
+  ["Admin", "(your own name)", "Chief Executive", "Nobody", "Full access. The first account. The only one who can open Admin screens", "All", null],
+  ["Priya", "Priya Raman", "Chief Product Officer", "Admin", "Member (edit). Manager of the Product space. Reviewer of Sara's goal", "M02, M06, M07, M11, M14, M15", "priya"],
+  ["Daniel", "Daniel Osei", "VP Sales", "Admin", "Member (edit). Manager of the Sales space. Champion of the sales objective", "M06, M07, M09", "daniel"],
+  ["Tomas", "Tomás Herrera", "Head of Customer Success", "Admin", "Member (edit). Manager of the Customer Success space. Used for suspend and restore", "M06, M07, M09", "tomas"],
+  ["Mei", "Mei Lin", "Head of Engineering", "Priya", "Member (edit). Owns initiatives. Used as the wrong reviewer", "M05, M06, M13, M14", "mei"],
+  ["Sara", "Sara Nasser", "Product Manager, Onboarding", "Priya", "Member (edit). Champion of the onboarding objective. Does the check-ins", "M09, M14, M15", "sara"],
+  ["Jonas", "Jonas Weber", "Account Executive", "Daniel", "Member (edit). Used for the 'cannot do this' checks", "M05, M06, M07, M14, M19", "jonas"],
+  ["Amara", "Amara Diallo", "Data Analyst", "Admin", "Member (edit). Throwaway account for 2FA and guest tests", "M05, M19", "amara"],
 ];
+
+/** The password `pnpm uat:personas` gives all seven unless told otherwise. */
+export const PERSONA_PASSWORD = "northwind-uat-2026";
 
 const c = (module, title, who, pre, steps, expected, priority, hint = "") => ({
   module, title, who, pre, steps, expected, priority, hint,
@@ -92,6 +99,16 @@ export const CASES = [
     ["Sign out and sign in again", "Open /welcome directly"],
     "Sign-in lands on the work map. /welcome redirects to /",
     "Medium"),
+  c("M02", "Create the seven persona accounts", "Admin (server access)",
+    "M02-01 done. The stack runs with deploy/staging/compose.staging.yaml",
+    ["On the staging host run: sh deploy/staging/seed.sh --inbox <the inbox on Personas>", "Read the list it prints", "Open People", "Open Admin, Invitations"],
+    "The command prints seven addresses and the password. People lists all seven with no title and no manager. Invitations shows one workspace link, 7 uses, status \"Revoked\"",
+    "High", "Run it once. A second run changes nothing. It refuses a workspace that already has other people in it"),
+  c("M02", "A persona can sign in", "Priya",
+    "M02-04 done. A private window",
+    ["Sign in with Priya's address from Personas and the shared password"],
+    "Priya lands on the work map of Northwind Labs, not on the welcome wizard",
+    "High"),
 
   // M03 Workspace settings
   c("M03", "Save and reload general settings", "Admin",
@@ -126,26 +143,28 @@ export const CASES = [
     "Low"),
 
   // M04 Invitations and building the team
+  // The seven personas already exist (M02-04). These cases invite spare
+  // people instead, so the invitation path is still tested end to end.
   c("M04", "Send a personal invitation", "Admin",
-    "Personas sheet has an email for every persona",
-    ["Open Admin, Invitations", "In \"Invite one person\" type Priya's email", "Keep \"Expires in days\" at 14", "Click \"Create the invitation\""],
+    "M02-04 done. Spare address: the inbox from Personas with +leaver",
+    ["Open Admin, Invitations", "In \"Invite one person\" type the +leaver address", "Keep \"Expires in days\" at 14", "Click \"Create the invitation\""],
     "A box says \"Copy this now. It is not shown again.\" and shows the link. The \"Issued\" card lists the row with status \"Open\"",
-    "High", "Copy the link into a notepad. Without SMTP this box is the only place the link appears, apart from the server log"),
-  c("M04", "Accept an invitation as a new person", "Priya",
-    "M04-01 done. Use a second browser or a private window",
-    ["Open the invitation link", "Click \"Create an account\"", "Sign up with Priya's email, name Priya Raman, and a 12+ character password"],
-    "The join page says \"You have been invited to Northwind Labs\". After sign-up Priya is inside the workspace. On Admin, Invitations the row now shows \"Used up\"",
-    "High"),
-  c("M04", "An invitation refuses a different email address", "Daniel",
-    "Admin created a personal invitation for Daniel's email",
-    ["Open Daniel's link in a private window", "Click \"Create an account\"", "Sign up with a different email address"],
+    "High", "Copy the link into a notepad. With SMTP set up the mail also arrives in the shared inbox"),
+  c("M04", "Accept an invitation as a new person", "Test Leaver (spare)",
+    "M04-01 done. Use a private window",
+    ["Open the invitation link", "Click \"Create an account\"", "Sign up with the +leaver address, name Test Leaver, and a 12+ character password"],
+    "The join page says \"You have been invited to Northwind Labs\". After sign-up Test Leaver is inside the workspace. On Admin, Invitations the row now shows \"Used up\"",
+    "High", "Keep this account. M19-05 erases it"),
+  c("M04", "An invitation refuses a different email address", "Nobody (signed out)",
+    "Admin created a personal invitation for the +wrong address",
+    ["Open that link in a private window", "Click \"Create an account\"", "Sign up with the +other address instead"],
     "The page warns \"This invitation was issued to a different address, so it will be refused\" and joining is refused",
     "High"),
-  c("M04", "Invite the rest of the team with a shared link", "Admin",
+  c("M04", "Invite people with a shared link", "Admin",
     "Signed in",
-    ["In \"Create a link to share\" set \"Maximum uses\" to 6 and \"Allowed domains\" to your test email domain", "Click \"Create the link\"", "Open the link once per persona (Daniel, Tomas, Mei, Sara, Jonas, Amara) in a separate private window and sign up"],
-    "Each persona joins. The row shows 6 uses and then \"Used up\"",
-    "High", "Use one browser profile per persona for the rest of the test. It saves signing in and out"),
+    ["In \"Create a link to share\" set \"Maximum uses\" to 2 and \"Allowed domains\" to the inbox's domain", "Click \"Create the link\"", "Open the link twice in separate private windows and sign up as +guest1 and +guest2"],
+    "Both join. The row shows 2 uses and then \"Used up\"",
+    "High", "The seven personas were not invited this way, so their sign-in is tested in M05, not here"),
   c("M04", "A shared link refuses a domain outside the list", "Nobody (signed out)",
     "M04-04 link still has uses left, or create a new one",
     ["Open the link", "Sign up with an email from another domain"],
@@ -174,10 +193,10 @@ export const CASES = [
     "Sign-in lands on the work map. Sign-out returns to the sign-in page. Pressing Back does not show workspace data",
     "High"),
   c("M05", "Reset a forgotten password", "Mei",
-    "Signed out. Access to Mei's inbox, Mailpit or the server log",
+    "Signed out. SMTP or Mailpit set up, and access to the shared inbox",
     ["Click \"Forgot your password?\"", "Type Mei's email and click \"Send reset link\"", "Open the reset link from the mail", "Type a new password in \"New password\" and click \"Set password\"", "Sign in with the new password"],
     "\"Check your email\" appears. The link opens \"Choose a new password\". Sign-in works with the new password and not with the old one",
-    "High", "Without SMTP the reset link is only in the server log (docker logs of the web container)"),
+    "High", "The mail goes to the +mei plus-address, so it lands in the shared inbox. Without SMTP it is only in the server log"),
   c("M05", "A used reset link cannot be used again", "Mei",
     "M05-03 done",
     ["Open the same reset link again", "Try to set a password"],
@@ -827,7 +846,7 @@ export const CASES = [
     "Amara shows the badge \"Guest\" and sees less than before. Write down what Amara can still see",
     "Medium"),
   c("M19", "Erase a member", "Admin",
-    "A spare member (invite one extra test account first)",
+    "Test Leaver from M04-02",
     ["On their profile click \"Erase this member\"", "Type their name to confirm", "Click \"Download the erasure export\""],
     "The member is erased and the export downloads",
     "Medium", "Irreversible. Never use one of the seven personas"),

@@ -37,6 +37,11 @@ conditions. Do not restate or loosen them here.
 
 - Sessions cannot be created in the UI. The weekly session comes from the
   "OKR starter cycle" template in the welcome wizard, so M02 must pick it.
+- The seven personas come from `pnpm uat:personas` (M02-04), not from
+  invitations, so M04 invites spare +leaver, +guest1 and +guest2 addresses
+  instead. Persona emails on the Personas sheet are formulas over one inbox
+  cell and must stay identical to `personaAddress` in
+  `packages/core/src/demo/uat-personas.ts`.
 - Only the first account has full access. Any case needing admin rights logs
   in as Admin.
 - Without SMTP, invitation links show once on Admin, Invitations, and reset

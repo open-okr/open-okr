@@ -1,0 +1,18 @@
+# The staging instance the manual acceptance test runs on (docs/testing).
+#
+# An overlay on deploy/docker/compose.yaml, like the demo's, and smaller: it
+# publishes Postgres on the loopback address so `seed.sh` beside it can reach
+# the database from a checkout on the same host. Nothing else changes. In
+# particular OPENOKR_DEMO stays off, so the sign-in page does not advertise
+# the persona accounts to whoever finds the staging URL.
+#
+#     cd deploy/docker
+#     COMPOSE_FILE="compose.yaml:../staging/compose.staging.yaml" ./openokr up
+#
+# Loopback only, and not 5432 or the demo's 55433, so it cannot collide with a
+# Postgres the host already runs.
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:${OPENOKR_STAGING_DB_PORT:-55434}:5432"
