@@ -8,7 +8,10 @@ one command that creates the seven test accounts after the setup wizard.
 Budget about an hour the first time, most of it the image build. Every step
 below was run end to end on Docker on 25 September 2026: build, start with the
 overlay, both wizards in a browser, the seeder, a second seeder run, a persona
-signing in, and a new round from nothing.
+signing in, and a new round from nothing. The one-command script was run the
+same way on 27 September 2026: a first deploy, `--inbox` before and after the
+wizard, a redeploy of a new commit that kept every account, `run status`, and
+`run destroy`.
 
 ## What the seeder does, and what it does not
 
@@ -41,6 +44,50 @@ finds them already there tests nothing.
 **The checkout and the image must be the same version.** The seeder is code
 from the checkout talking to the database the image migrated. Build the image
 from the checkout you seed from, as below, and they cannot disagree.
+
+## The short way: one script
+
+[`deploy/staging/deploy-staging.sh`](../../deploy/staging/deploy-staging.sh)
+runs steps 1, 3 and 5 below for you. From a clone of the repository on the
+staging host:
+
+```sh
+git clone https://github.com/open-okr/open-okr.git
+cd open-okr
+corepack enable
+
+# Build and start. Prints the address, then tells you to run the wizards.
+OPENOKR_DOMAIN=staging.example.com sh deploy/staging/deploy-staging.sh --ref main
+
+# After M01 and M02 in the browser: the same command plus the inbox.
+OPENOKR_DOMAIN=staging.example.com sh deploy/staging/deploy-staging.sh --inbox qa@example.com
+```
+
+| Option or setting | What it does |
+|---|---|
+| `--ref <branch or tag>` | Fetches and checks it out first, fast-forward only. Refused on a checkout with uncommitted changes. Leave it out to deploy whatever is checked out |
+| `--inbox <address>` | Creates the seven persona accounts, once a workspace exists. Before the wizard has run it says so and stops without seeding |
+| `--password <value>` | Passed to the seeder. Default `northwind-uat-2026` |
+| `OPENOKR_DOMAIN`, `OPENOKR_HTTP_PORT`, `OPENOKR_HTTPS_PORT` | As for [`./openokr up`](compose.md) |
+| `COMPOSE_PROJECT_NAME` | Only on a host that already runs another OpenOKR stack. See step 3 |
+
+**Run it again to deploy new commits.** It rebuilds the image from the
+checkout and restarts the stack; the data stays, the image runs any new
+migrations when it boots, and a second `--inbox` changes nothing.
+
+**For everything else, go through the script's `run` form**, so the overlay is
+never dropped by accident:
+
+```sh
+sh deploy/staging/deploy-staging.sh run status
+sh deploy/staging/deploy-staging.sh run logs
+sh deploy/staging/deploy-staging.sh run down
+sh deploy/staging/deploy-staging.sh run destroy
+```
+
+Mail (step 2) is still set by hand, once. The rest of this page is the same
+procedure step by step, for when something needs doing differently or goes
+wrong.
 
 ## 1. Get the code and build the image
 
@@ -170,6 +217,9 @@ cd deploy/docker
 rm -rf secrets           # otherwise the old database password is reused
 ./openokr up
 ```
+
+With the script, the same round is `sh deploy/staging/deploy-staging.sh run destroy`,
+then `rm -rf deploy/docker/secrets`, then the script again.
 
 Then repeat from step 4. Deleting `secrets` matters: PostgreSQL sets its
 password only when it initialises an empty volume, and new secrets with an old
