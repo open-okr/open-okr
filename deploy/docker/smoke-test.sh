@@ -314,4 +314,37 @@ curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the instance stopped working after rotation"
 pass "the instance still works after rotation"
 
+# --- the restore drill (completeness review H-19) --------------------------
+# REQUIREMENTS §7 and P6-T06 ask for a restore drill in continuous
+# integration, and none ran: the old restore-drill.sh needed host
+# Postgres tools and swallowed its own seeding errors. This one uses the
+# shipped path on the instance this script just built: back up, prove the
+# backup would restore, change something, restore, and find the backup's
+# state again with the instance still serving.
+./openokr backup >/dev/null 2>&1 || fail "the backup failed"
+drill="$(ls -1dt ./backups/*/ | head -1)"
+pass "a backup was taken ($drill)"
+
+./openokr verify-backup "$drill" >/dev/null 2>&1 \
+  || fail "verify-backup refused the backup it had just taken"
+pass "the backup verified without touching the live database"
+
+rows_before="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
+name_before="$(db_query "select name from workspaces order by created_at limit 1")"
+db_query "update workspaces set name = 'Changed after the backup'" >/dev/null
+
+./openokr restore "$drill" >/dev/null 2>&1 || fail "the restore failed"
+pass "the backup restored"
+
+rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (select count(*) from workspace_members) || ',' || (select count(*) from audit_events)")"
+[ "$rows_after" = "$rows_before" ] \
+  || fail "the restored rows differ (before $rows_before, after $rows_after)"
+[ "$(db_query "select name from workspaces order by created_at limit 1")" = "$name_before" ] \
+  || fail "the change made after the backup survived the restore"
+pass "the restore brought back the backup's state and nothing after it"
+
+curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
+  || fail "the instance does not serve its admin after the restore"
+pass "the instance serves its admin after the restore"
+
 echo "openokr: all checks passed in ${elapsed}s"

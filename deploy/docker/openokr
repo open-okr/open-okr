@@ -587,6 +587,15 @@ MANIFEST
     verify_checksum "$backup_dir" || fail "checksum verification failed"
     decrypt_dump "$backup_dir" || fail "decryption failed"
 
+    # **The application stops first** (completeness review H-19). Postgres
+    # refuses to drop a database somebody is connected to, and the running
+    # server holds a pool of connections, so the restore failed on the live
+    # instance it exists for. The container is kept, only stopped: the files
+    # are copied into it, and starting it runs the migrations as it always
+    # does.
+    log "stopping the application for the restore..."
+    compose stop app
+
     # Restore database.
     log "restoring database..."
     compose exec -T db dropdb -U openokr --if-exists openokr
@@ -600,9 +609,13 @@ MANIFEST
       openssl enc -d -aes-256-cbc -pbkdf2 \
         -pass "pass:$encryption_key" \
         -in "$backup_dir/blobs.tar.enc" | \
-        docker cp - "$(compose ps -q app | head -1):/app/storage"
+        docker cp - "$(compose ps -aq app | head -1):/app/storage"
       log "blobs restored"
     fi
+
+    log "starting the application..."
+    compose start app
+    wait_for_health
 
     # Run migrations in case the backup is from an older schema.
     log "running migrations..."

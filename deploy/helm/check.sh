@@ -339,6 +339,41 @@ else
   fail "the verify Job does not mount the backup PVC read-only"
 fi
 
+# --- the backup jobs read the Secrets the chart creates (H-19) --------------
+# `check.sh` passed while every backup failed with `secret "okr-openokr" not
+# found`: it rendered the CronJob and never asked whether the Secret it names
+# is one the chart renders. This asks, for the CronJob and the verify Job.
+backups=$(render --set backup.enabled=true --set backup.existingClaim=my-backups)
+rendered_secrets=$(echo "$backups" | awk '/^kind: Secret/{s=1} s&&/^  name:/{print $2; s=0}' | sort -u)
+for job in backup-cronjob.yaml backup-verify-job.yaml; do
+  named=$(render_one "$job" --set backup.enabled=true --set backup.existingClaim=my-backups \
+    | grep -A1 "secretKeyRef:" | awk '/name:/{print $2}' | sort -u)
+  missing=""
+  for secret in $named; do
+    echo "$rendered_secrets" | grep -qx "$secret" || missing="$missing $secret"
+  done
+  if [ -z "$named" ]; then
+    fail "$job names no Secret at all"
+  elif [ -n "$missing" ]; then
+    fail "$job names Secrets the chart does not create:$missing"
+  else
+    pass "$job reads only Secrets the chart creates"
+  fi
+done
+
+# And the files: on the chart's own volume they are backed up with the database.
+if render_one backup-cronjob.yaml --set backup.enabled=true | grep -q "blobs.tar.enc"; then
+  pass "the backup takes the uploaded files from the chart's volume"
+else
+  fail "the backup leaves the uploaded files behind"
+fi
+if render_one backup-cronjob.yaml --set backup.enabled=true --set storage.s3.bucket=files \
+  | grep -q "tar -C /storage"; then
+  fail "the backup tries to archive files that live in object storage"
+else
+  pass "the backup leaves object storage to the bucket"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2
