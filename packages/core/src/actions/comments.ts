@@ -25,6 +25,7 @@ import {
   deleteComment,
   listComments,
   listReactions,
+  notifyCommentInTx,
   previewNotify,
   removeReaction,
   updateComment,
@@ -32,6 +33,7 @@ import {
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
+import { extractMentionIds } from "../rich-text/extract.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -231,12 +233,20 @@ export const createCommentAction = defineWriteAction({
   access: ACCESS_LEVELS.comment,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      const authorMemberId = requireMemberId(actor.memberId);
       const result = await createComment(tx, {
         workspaceId,
         subjectType: input.subjectType,
         subjectId: input.subjectId,
-        authorMemberId: requireMemberId(actor.memberId),
+        authorMemberId,
         body: input.body,
+      });
+      await notifyCommentInTx(tx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        authorMemberId,
+        mentionIds: result.subscribedMemberIds,
       });
       return {
         result: { id: result.id },
@@ -507,6 +517,8 @@ export const updateCommentAction = defineWriteAction({
         .select({
           authorMemberId: comments.authorMemberId,
           subjectType: comments.subjectType,
+          subjectId: comments.subjectId,
+          body: comments.body,
         })
         .from(comments)
         .where(
@@ -528,6 +540,23 @@ export const updateCommentAction = defineWriteAction({
         commentId: input.commentId,
         body: input.body,
       });
+      // Somebody mentioned in the edit is told, once; everybody else already
+      // heard about this comment when it was posted (H-13). `updateComment`
+      // has subscribed them.
+      const had = new Set(extractMentionIds(comment.body));
+      const added = extractMentionIds(input.body).filter(
+        (memberId) => !had.has(memberId),
+      );
+      if (added.length > 0) {
+        await notifyCommentInTx(tx, {
+          workspaceId,
+          subjectType: comment.subjectType,
+          subjectId: comment.subjectId,
+          authorMemberId: comment.authorMemberId,
+          mentionIds: added,
+          onlyMentions: true,
+        });
+      }
       return {
         result: {},
         activity: {

@@ -1519,6 +1519,8 @@ export const closeGoal = defineWriteAction({
             successStatus: input.successStatus,
             closeDecision: input.closeDecision,
           },
+          // The goal's watchers hear it closed (completeness review H-13).
+          notify: true,
         },
         audit: {
           action: "goals.close",

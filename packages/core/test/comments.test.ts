@@ -187,6 +187,98 @@ describe("comments", () => {
   });
 });
 
+/**
+ * Who hears about a comment (completeness review H-13). A mention subscribed
+ * the person and told them nothing, and a new comment told no one.
+ */
+describe("who a comment tells", () => {
+  const mentioning = (memberId: string, text: string) => ({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "mention", attrs: { id: memberId, label: "Somebody" } },
+          { type: "text", text: ` ${text}` },
+        ],
+      },
+    ],
+  });
+
+  const notified = async (memberId: string) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      reason: string;
+      subject_type: string;
+    }>(
+      `select reason, subject_type from notifications
+        where workspace_id = $1 and recipient_member_id = $2
+        order by created_at`,
+      [workspaceId, memberId],
+    );
+    return rows;
+  };
+
+  it("tells a mentioned member, as a mention, and never the author", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+    await callAction({ pool: wb.appPool, ...context() }, "comments.create", {
+      subjectType: "goal",
+      subjectId: goalId,
+      body: mentioning(secondMemberId, "can you take the pricing page?"),
+    });
+    expect(await notified(secondMemberId)).toEqual([
+      { reason: "mentioned", subject_type: "goal" },
+    ]);
+    expect(await notified(ownerMemberId)).toEqual([]);
+  });
+
+  it("tells the people already in the conversation about the next comment", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+    // Posting subscribes the author, so the second member is now a watcher.
+    await callAction(
+      { pool: wb.appPool, ...context(SECOND) },
+      "comments.create",
+      { subjectType: "goal", subjectId: goalId, body: richText("First") },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "comments.create", {
+      subjectType: "goal",
+      subjectId: goalId,
+      body: richText("And a reply"),
+    });
+    expect((await notified(secondMemberId)).map((row) => row.reason)).toEqual([
+      "joined",
+    ]);
+  });
+
+  it("tells somebody an edit newly mentions, and nobody else a second time", async () => {
+    const wb = await workerDb();
+    const goalId = await createGoal();
+    const created = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "comments.create",
+      { subjectType: "goal", subjectId: goalId, body: richText("Draft") },
+    )) as { id: string };
+    expect(await notified(secondMemberId)).toEqual([]);
+
+    await callAction({ pool: wb.appPool, ...context() }, "comments.update", {
+      commentId: created.id,
+      body: mentioning(secondMemberId, "this one is yours"),
+    });
+    expect(await notified(secondMemberId)).toEqual([
+      { reason: "mentioned", subject_type: "goal" },
+    ]);
+
+    // The same mention, edited again, is not news.
+    await callAction({ pool: wb.appPool, ...context() }, "comments.update", {
+      commentId: created.id,
+      body: mentioning(secondMemberId, "this one is yours, by Friday"),
+    });
+    expect(await notified(secondMemberId)).toHaveLength(1);
+  });
+});
+
 describe("reactions", () => {
   it("adds a reaction and lists it grouped", async () => {
     const wb = await workerDb();
