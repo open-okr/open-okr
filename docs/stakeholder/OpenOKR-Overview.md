@@ -15,8 +15,8 @@ Most organisations do not fail at OKRs because their software was bad. They fail
 | **Deployment** | Self-hosted (Docker Compose or Helm) and managed cloud, from one release |
 | **AI** | Bring your own provider. Every rule, nudge, gate and diagnostic still works with AI switched off |
 | **Reach** | Browser, email, Slack, Microsoft Teams, WhatsApp, Telegram, and any external AI agent |
-| **Status** | Design and specification complete. Eight delivery phases, 104 scoped tasks |
-| **Document date** | August 2026 |
+| **Status** | Built. Eight delivery phases, 200 scoped tasks, all delivered. No version tagged yet |
+| **Document date** | August 2026, status updated September 2026 |
 
 ```{=openxml}
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
@@ -36,7 +36,7 @@ Most organisations do not fail at OKRs because their software was bad. They fail
 | **8. How it is built** | Architecture principles and the security posture, in brief |
 | **9. How it runs** | Self-hosted and managed cloud, from one release |
 | **10. Open source and licensing** | AGPL-3.0, the contributor agreement, and our position on methodology rights |
-| **11. Status and roadmap** | Eight phases, 104 tasks, and the principal risk we are managing |
+| **11. Status and roadmap** | Eight phases, 200 tasks, and the principal risk we are managing |
 | **12. Working with us** | Three tracks: methodology partner, investor, design partner |
 | **Appendix** | The twenty-six quality checks in full |
 
@@ -399,9 +399,11 @@ The application code is **AGPL-3.0** with a lightweight contributor licence agre
 
 # 11. Status and roadmap
 
-The product is fully specified and not yet built. The specification set covers requirements, architecture, the method canon, the technical design including the complete database schema, the AI and agent design, forty screen specifications, and an implementation plan of **104 scoped tasks across eight phases**, each with acceptance criteria and a test plan.
+The specification set covers requirements, architecture, the method canon, the technical design including the complete database schema, the AI and agent design, forty screen specifications, and an implementation plan of **200 scoped tasks across eight phases**, each with acceptance criteria and a test plan.
 
-| Phase | What lands |
+**Every one of those tasks is delivered.** All eight phases below are built, tested and behind the full gate set. What has not happened is a release: no version is tagged, nothing is published to a container registry, and no organisation outside the build has run a quarter on it. Treat the product as feature complete and unproven in the field.
+
+| Phase | What it delivered |
 |---|---|
 | **1. Foundation** | Monorepo, continuous integration, database with the tenant floor, adapter ports and the transactional outbox, authentication, workspaces and members, the single write pipeline and audit spine, the Compose and Helm targets |
 | **2. Platform and agent spine** | The access model, people and organisation, notifications, the activity feed, the design system and rich text editor, and the AI foundation: provider port, bring-your-own-key, model catalogue, metering with hard caps, and the agent runtime with sandbox and proposal envelopes |
@@ -412,7 +414,7 @@ The product is fully specified and not yet built. The specification set covers r
 | **7. Hardening** | Performance at scale, load and soak testing, the security review, the accessibility audit, and observability |
 | **8. Cloud, enterprise and launch** | Tenant provisioning and the operator console, plans behind a flag, single sign-on and directory sync, audit export, the air-gap guide, documentation, the template gallery and the hosted demo |
 
-The order is deliberate. The AI and agent foundation lands in phase two, with the platform, so the coaching layer can ship in phase four alongside the OKR core. An OKR tool where the coach arrives last is just another tracker.
+The order was deliberate. The AI and agent foundation lands in phase two, with the platform, so the coaching layer can ship in phase four alongside the OKR core. An OKR tool where the coach arrives last is just another tracker.
 
 **Principal risk we are managing.** A coaching engine that produces false positives is worse than no coaching at all, because people learn to dismiss it. The warn-versus-fail line on every check will be tuned against a corpus of real, anonymised OKRs before launch, and assembling that corpus is a named deliverable of the coaching phase's design gate. This is the single place where a methodology partner would add the most value.
 

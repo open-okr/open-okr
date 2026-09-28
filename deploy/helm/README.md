@@ -1,5 +1,31 @@
 # OpenOKR on Kubernetes
 
+> **No version has been tagged yet.** The chart and the image are both
+> published by `.github/workflows/release.yml` on a `v*.*.*` tag, so
+> `oci://ghcr.io/open-okr/charts/openokr` and
+> `ghcr.io/open-okr/open-okr` do not exist today. Until the first release,
+> install the chart from a checkout and point it at an image you built
+> yourself:
+>
+> ```sh
+> git clone https://github.com/open-okr/open-okr.git && cd open-okr
+> docker build -f deploy/docker/Dockerfile -t registry.example.com/openokr:local .
+> docker push registry.example.com/openokr:local
+>
+> helm install openokr ./deploy/helm \
+>   --namespace openokr --create-namespace \
+>   --set image.repository=registry.example.com/openokr \
+>   --set image.tag=local \
+>   --set database.existingSecret=openokr-database \
+>   --set ingress.enabled=true \
+>   --set ingress.hosts[0].host=okr.example.com \
+>   --set ingress.hosts[0].paths[0].path=/ \
+>   --set ingress.hosts[0].paths[0].pathType=Prefix
+> ```
+>
+> Everything below this box is the shape an install takes once a release
+> exists, and every value in it applies to the command above too.
+
 ```sh
 helm install openokr oci://ghcr.io/open-okr/charts/openokr \
   --namespace openokr --create-namespace \
@@ -36,7 +62,7 @@ kubectl -n openokr get secret openokr-secrets -o yaml > openokr-secrets-backup.y
 The chart keeps this Secret across upgrades and across `helm uninstall`, and
 an upgrade never rotates it. But it cannot recover it. Lose it and mail
 passwords, channel credentials and provider keys become unreadable, while
-everything else keeps working — which is the worst way to discover the loss.
+everything else keeps working. That is the worst way to discover the loss.
 
 Operators with their own secret management should set `secrets.existingSecret`
 and skip generation entirely.

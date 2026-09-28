@@ -4,9 +4,11 @@ Thank you for considering a contribution. This page explains how to set up the p
 
 ## Project state
 
-OpenOKR is being built plan-first. The complete plan lives in `docs/development-plan/`, and work proceeds one task at a time from `IMPLEMENTATION-PLAN.md` with progress tracked in `STATUS.md`. Read `README.md` for what the product is.
+OpenOKR was built plan-first. The complete plan lives in `docs/development-plan/`, work proceeded one task at a time from `IMPLEMENTATION-PLAN.md`, and `STATUS.md` records all 200 of them, each now done. Read `README.md` for what the product is.
 
-While the plan is being executed, large unsolicited pull requests are hard to land. Open an issue first and we will find a task-shaped piece of work together.
+**All eight phases are built, and no version has been tagged.** Nothing is published to a container registry, and nobody outside this repository has run it in anger. The most useful contribution right now is installing it somewhere that is not ours and reporting what broke, with what you ran and what it printed.
+
+Large unsolicited pull requests are still hard to land, because a change has to keep the plan set, the method canon and the generated contract in step with the code. Open an issue first and we will find a task-shaped piece of work together. [Good first issues](docs/runbooks/good-first-issues.md) says what makes one.
 
 ## Setup
 

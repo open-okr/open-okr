@@ -8,6 +8,8 @@ It runs two ways from day one: self-hosted on your own servers, or in our manage
 
 The plan is executed by Claude Code under human supervision, one task at a time.
 
+**Where this stands.** All eight phases are built and every row in [STATUS.md](STATUS.md) reads done. No version has been tagged, so nothing is published and nobody outside this repository has run it. These documents stay as the authority they always were: a change to the product still starts here.
+
 ## The documents
 
 Read in this order the first time.
@@ -20,7 +22,7 @@ Read in this order the first time.
 | 4 | [TECHNICAL-PLAN.md](TECHNICAL-PLAN.md) | Target design: the identity and access model, the full schema by domain, adapter ports and the transactional outbox, the engines, importers, security, testing, performance budgets and the one-contract API | Technical design |
 | 5 | [AI-NATIVE-PLAN.md](AI-NATIVE-PLAN.md) | The AI and agent layer: providers and bring-your-own-key, governance, chat channels, the Coach and the Champion with the full trigger and escalation catalogue, the copilot, retrieval, and the external agent surface | The AI domain |
 | 6 | [UIUX-PLAN.md](UIUX-PLAN.md) | Design system, navigation, interaction patterns, forty screen specifications, accessibility and quality gates | The user interface |
-| 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 105 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
+| 7 | [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) | The work: eight phases, 200 tasks with dependencies, test plans and acceptance criteria, plus the Definition of Ready | What gets built, in what order |
 | 8 | [EXECUTION-GUIDE.md](EXECUTION-GUIDE.md) | The protocol between the human engineer and the agent | Process |
 | 9 | [CI-GATES.md](CI-GATES.md) | Every gate that refuses the work, the command that runs it locally, and what each catches | Process |
 | 10 | [reference/](reference/) | Source-system knowledge bases, the ground truth for the importers | Facts about the sources |
@@ -34,10 +36,11 @@ Also here:
 - [START-PROMPT.md](START-PROMPT.md): the one prompt that starts every development session.
 - [PROMPT.md](PROMPT.md): copy-and-paste prompts for the other situations: bootstrap, rework, spikes, phase exits, conformance.
 - [STATUS.md](STATUS.md): task tracking. The agent updates rows; only a human sets `done`.
+- [PHASE-2-BREAKDOWN.md](PHASE-2-BREAKDOWN.md) and [PHASE-4-SPLIT.md](PHASE-4-SPLIT.md): the working papers from cutting those two phases into session-sized tasks. History, not authority.
 - [GAP-AUDIT.md](GAP-AUDIT.md): a per page and per module audit of what is missing from work already built, with the fixes as a checklist. Dated, static reading only, and superseded by whatever lands against it. Not authority.
 - [Reference mockups](../stakeholder/mockups/README.md): eleven screens from UIUX-PLAN.md §6 drawn as HTML and rendered to PNG. Look at the mockup before starting a UI task. Reference, not authority: UIUX-PLAN.md §10 has the rule.
 
-`docs/design/` exists only once execution starts: detailed designs written by the agent at each phase's design gate.
+[`docs/design/`](../design/) holds the detailed designs the agent wrote at each phase's design gate, plus the phase exit checklists and the audits.
 
 ## How the pieces fit
 
@@ -51,7 +54,7 @@ AI-NATIVE-PLAN.md    providers, governance, channels, the Coach and the Champion
 UIUX-PLAN.md         how it looks and behaves (screens S-01 to S-40, plus the cloud operator screens S-45 to S-49)
       |              ...eleven of which are drawn in ../stakeholder/mockups/
       |
-IMPLEMENTATION-PLAN.md   105 ordered tasks in eight phases: P1-* to P8-*
+IMPLEMENTATION-PLAN.md   200 ordered tasks in eight phases: P1-* to P8-*
       |
 EXECUTION-GUIDE.md   human picks a task, agent builds, human reviews, merge
       |
@@ -74,6 +77,10 @@ Two documents deserve special attention.
 The other files in `reference/` are background knowledge about systems in this space. They inform nothing in the design and constrain nothing in the schema.
 
 ## Quick start
+
+**Building on it now.** Every task is delivered, so there is nothing to bootstrap. Read [STATUS.md](STATUS.md) for where a thing was built and why it was built that way, [CI-GATES.md](CI-GATES.md) before a first push, and [CONTRIBUTING.md](../../CONTRIBUTING.md) to get an instance running locally.
+
+**Starting the plan again from nothing**, which is what the steps below are for:
 
 1. Run the bootstrap prompt in [PROMPT.md](PROMPT.md) §1.
 2. Read the agent's reply and fix any contradiction it surfaces.

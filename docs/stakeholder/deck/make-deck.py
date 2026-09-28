@@ -657,7 +657,7 @@ chrome(s)
 
 s = new(BG)
 y = heading(s, 'Fully specified, and sequenced so the coach is not last', 'Status',
-            'Eight phases, 104 scoped tasks, each with acceptance criteria and a test plan.')
+            'Eight phases, 200 scoped tasks, each with acceptance criteria and a test plan. All delivered.')
 phases = [('1', 'Foundation', 'Monorepo, database with the tenant floor, adapter ports and the outbox, authentication, the single write pipeline, Compose and Helm'),
           ('2', 'Platform and agent spine', 'Access model, people, notifications, design system, and the AI foundation: provider port, keys, metering, the agent runtime'),
           ('3', 'The OKR core', 'Cycles and the guided workflow, goals and key results, scoring, cadence, check-ins, alignment, KPIs with recovery, the Work Map'),
@@ -754,7 +754,7 @@ s.text(M, 312, 720, 80,
              'who initiate.', 15, '9FA8DA', line=134)])
 s.text(M, 440, 720, 40,
        [para('The full planning set behind this deck is available on request: requirements, '
-             'architecture, the method canon, the schema, forty screen specifications and 104 tasks.',
+             'architecture, the method canon, the schema, forty screen specifications and 200 tasks.',
              11.5, '7986CB', line=130)])
 
 pptx.write(deck, os.path.join(HERE, os.pardir, 'OpenOKR-Deck.pptx'),
