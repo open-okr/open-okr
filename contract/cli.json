@@ -7701,7 +7701,7 @@
       "method": "POST",
       "path": "/sessions/create",
       "scope": "write",
-      "summary": "Creates a scheduled session for a space.",
+      "summary": "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
       "flags": [
         {
           "name": "space-id",
@@ -7736,6 +7736,47 @@
         {
           "name": "scheduled-for",
           "field": "scheduledFor",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "facilitator-id",
+          "field": "facilitatorId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions bookCycle",
+      "action": "sessions.bookCycle",
+      "method": "POST",
+      "path": "/sessions/bookCycle",
+      "scope": "write",
+      "summary": "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+      "flags": [
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "weekday",
+          "field": "weekday",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "time",
+          "field": "time",
           "type": "string",
           "required": true
         },

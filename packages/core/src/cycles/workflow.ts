@@ -48,6 +48,8 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { loadCycleCadence } from "../sessions/booking.ts";
+import { workspaceTimeZone } from "./service.ts";
 
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
@@ -62,11 +64,10 @@ export interface WorkflowSnapshot {
 /**
  * Everything the workflow reads, in one pass over the cycle's children.
  *
- * The quality engine, sessions and the cycle retrospective are left `undefined`
- * rather than defaulted, because `packages/method` treats "no rows" and "no such
- * table yet" as different facts and only one of them lets a gate pass. Each
- * becomes a real field as its task lands: P4-T01, P4-T04 and P4-T08. Goals
- * stopped being one of them at P3-T04.
+ * The quality engine and the cycle retrospective are left `undefined` rather
+ * than defaulted, because `packages/method` treats "no rows" and "not read" as
+ * different facts and only one of them lets a gate pass. Goals stopped being
+ * one of them at P3-T04, and the booked cadence at H-08.
  */
 export async function loadWorkflowInput<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -237,6 +238,14 @@ export async function loadWorkflowInput<
     frame,
     goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
     initiatives: await loadInitiativeSnapshots(tx, workspaceId, cycleId),
+    // Phase 6: the §7.1 rhythm booked for the whole cycle, and at least one
+    // decision recorded (completeness review H-08).
+    cadence: await loadCycleCadence(
+      tx,
+      workspaceId,
+      { id: cycleId, startsOn: cycle.startsOn, endsOn: cycle.endsOn },
+      await workspaceTimeZone(tx, workspaceId),
+    ),
   };
 }
 

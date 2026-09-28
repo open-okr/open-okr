@@ -185,10 +185,15 @@ export interface CycleWorkflowInput {
   readonly initiatives?: readonly InitiativeSnapshot[];
   /** Undefined until P4-T01 ships the quality engine. */
   readonly qualityChecksPass?: boolean;
-  /** Undefined until P4-T04 ships sessions and the decision log. */
+  /**
+   * The §7.1 rhythm as booked, and the decision log. Undefined means nobody
+   * read them, which keeps phase 6 unanswered rather than failed.
+   */
   readonly cadence?: {
     readonly bookedForWholeCycle: boolean;
     readonly decisionCount: number;
+    /** What is not booked, per space, as `cadenceCoverage` words it. */
+    readonly gaps?: readonly string[];
   };
   /** Undefined until P3-T04 ships key result scores. */
   readonly allKeyResultsScored?: boolean;
@@ -601,7 +606,13 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
   }
   const missing: string[] = [];
   if (!input.cadence.bookedForWholeCycle) {
-    missing.push("The cadence is not booked for the whole cycle");
+    // One entry, because it is one condition. The gaps say where to look.
+    const gaps = input.cadence.gaps ?? [];
+    missing.push(
+      gaps.length > 0
+        ? `The cadence is not booked for the whole cycle. ${gaps.join(". ")}`
+        : "The cadence is not booked for the whole cycle",
+    );
   }
   if (input.cadence.decisionCount === 0) {
     missing.push("No decision has been recorded");

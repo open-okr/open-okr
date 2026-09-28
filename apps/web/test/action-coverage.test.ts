@@ -103,8 +103,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "a read the goal page does not need: it shows the decision log from `decisions.forGoal`, which carries the same answer with its author and its session",
   "goals.removeDependency":
     "the alignment studio owns dependencies and removes them through its own canvas write",
-  "sessions.create":
-    "the sessions screen creates through `sessions.schedule`, which is the one a person uses",
   "sessions.votes":
     "a read the session screen does not need: the stage panels carry their own tallies",
   // **A fifth reason, and the first of its kind: the caller is real and this

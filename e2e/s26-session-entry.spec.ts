@@ -12,98 +12,59 @@
  * navigation below is a click on something a person can see; nothing here
  * types a URL except the first `goto("/")`, which is opening the product.
  */
-import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import pg from "pg";
-import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
-
-const CONNECTION = process.env.DATABASE_URL
-  ? { connectionString: process.env.DATABASE_URL }
-  : connectionOptions(
-      process.env.E2E_DATABASE ?? "openokr_e2e",
-      testDbEnv.superuser,
-    );
+import { goTo, signIn } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
-let pool: pg.Pool;
 let spaceName: string;
 
 test.beforeAll(async ({ browser }) => {
-  pool = new pg.Pool(CONNECTION);
   context = await browser.newContext();
   page = await context.newPage();
 });
 
 test.afterAll(async () => {
-  await pool?.end();
   await context?.close();
 });
 
 test("sign in, and schedule a session the way a coordinator would", async () => {
   await signIn(page);
+  await goTo(page, "/sessions");
 
-  // Written straight to the database, because there is no create-session
-  // control yet: P5-T01c is the door, not the scheduler. What the spec proves
-  // is that a scheduled session is reachable, which is the half that was
-  // missing.
-  const user = (
-    await pool.query<{ id: string }>("select id from users where email = $1", [
-      INSTANCE_ACCOUNT.email,
-    ])
-  ).rows[0];
-  if (!user) {
-    throw new Error(`User ${INSTANCE_ACCOUNT.email} not found.`);
-  }
-  const member = (
-    await pool.query<{ id: string; workspace_id: string }>(
-      "select id, workspace_id from workspace_members where user_id = $1 and deleted_at is null limit 1",
-      [user.id],
-    )
-  ).rows[0];
-  if (!member) {
-    throw new Error("Member not found.");
-  }
-  const space = (
-    await pool.query<{ id: string; name: string }>(
-      "select id, name from spaces where workspace_id = $1 and deleted_at is null limit 1",
-      [member.workspace_id],
-    )
-  ).rows[0];
-  if (!space) {
-    throw new Error("Space not found.");
-  }
-  spaceName = space.name;
+  // Through the form on the sessions screen (completeness review H-08). This
+  // spec used to write the row with SQL "because there is no create-session
+  // control yet", which proved a scheduled session was reachable and hid that
+  // nobody could schedule one.
+  const form = page.locator("section", {
+    has: page.getByRole("heading", { name: "Schedule one session" }),
+  });
+  await expect(form).toBeVisible({ timeout: 10_000 });
+  spaceName =
+    (await form.getByLabel("Space").locator("option:checked").textContent()) ??
+    "";
+  expect(spaceName).not.toBe("");
 
-  const client = await pool.connect();
-  try {
-    await client.query("begin");
-    await client.query(`set local app.workspace_id = '${member.workspace_id}'`);
-    // **Only if it is not already there.** This file is a serial group, and a
-    // retry re-runs it from this test, so a plain insert adds a second
-    // identical session. The next test then finds two "Entry point weekly"
-    // rows and fails on strict mode, which reports a duplicate rather than the
-    // navigation problem that caused the retry. Happened on CI once.
-    await client.query(
-      `insert into okr_sessions
-         (id, workspace_id, space_id, kind, title, scheduled_for, facilitator_id, state)
-       select gen_random_uuid(), $1, $2, 'weekly', 'Entry point weekly',
-              now() + interval '2 hours', $3, 'scheduled'
-        where not exists (
-          select 1 from okr_sessions
-           where workspace_id = $1
-             and title = 'Entry point weekly'
-             and deleted_at is null
-        )`,
-      [member.workspace_id, space.id, member.id],
-    );
-    await client.query("commit");
-  } finally {
-    client.release();
+  // **Only if it is not already there.** This file is a serial group, and a
+  // retry re-runs it from this test, so a second submission adds a second
+  // identical session. The next test then finds two "Entry point weekly"
+  // rows and fails on strict mode, which reports a duplicate rather than the
+  // navigation problem that caused the retry. Happened on CI once.
+  if ((await page.getByText("Entry point weekly").count()) > 0) {
+    return;
   }
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  await form.getByLabel("Ritual").selectOption("weekly");
+  await form.getByLabel("Title").fill("Entry point weekly");
+  await form.getByLabel("Date and time").fill(`${tomorrow}T10:00`);
+  await form.getByRole("button", { name: "Schedule", exact: true }).click();
+  await expect(form.getByRole("status")).toHaveText("Scheduled.", {
+    timeout: 10_000,
+  });
+  await expect(page.getByText("Entry point weekly")).toBeVisible();
 });
 
 test("the navigation offers Sessions at all, which is what was missing", async () => {
@@ -173,4 +134,35 @@ test("a member facilitating shows as such, and the finished filter is reachable"
   await expect(
     page.getByRole("link", { name: "Hide finished" }),
   ).toBeVisible();
+});
+
+test("the space page books the whole cycle, and a second press books nothing", async () => {
+  // METHOD.md §7.1: "Book all of them for the whole cycle before the cycle
+  // starts." One press on the team's own page.
+  await page.goto("/spaces");
+  await page.getByRole("link", { name: spaceName }).first().click();
+  const form = page.locator("section", {
+    has: page.getByRole("heading", { name: "Book the whole cycle" }),
+  });
+  await expect(form).toBeVisible({ timeout: 10_000 });
+  // A select inside its own label is named by the label and its choice
+  // ("Day Monday"), so neither of these is an exact match.
+  await form.getByLabel("Day").selectOption("2");
+  await form.getByLabel("Time").fill("10:30");
+  await form.getByRole("button", { name: "Book the cycle" }).click();
+  // A cycle already under way still has weeks ahead of it, unless it ends
+  // this week; either answer is a booking the screen reports in words.
+  await expect(form.getByRole("status")).toContainText(
+    /Booked \d+ session\(s\)\.|already booked/,
+    { timeout: 10_000 },
+  );
+
+  await form.getByRole("button", { name: "Book the cycle" }).click();
+  await expect(form.getByRole("status")).toContainText(
+    "Everything this cycle needs was already booked",
+    { timeout: 10_000 },
+  );
+  await expect(page.locator("ul[aria-label='Sessions']")).toContainText(
+    /Weekly check-in|Monthly review|Quarterly review/,
+  );
 });

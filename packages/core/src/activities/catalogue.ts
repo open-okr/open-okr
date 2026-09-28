@@ -414,6 +414,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   // Sessions (P4-T07a)
   "session.created": z.object({ kind: z.string(), title: z.string() }),
+  // A whole cycle's rituals booked in one write (completeness review H-08).
+  "session.cycleBooked": z.object({
+    cycleId: z.string(),
+    booked: z.number().int(),
+  }),
   "session.opened": z.object({ kind: z.string() }),
   "session.stageAdvanced": z.object({
     from: z.string().nullable(),

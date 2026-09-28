@@ -10488,7 +10488,7 @@
     },
     {
       "name": "sessions.create",
-      "description": "Creates a scheduled session for a space.",
+      "description": "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10517,7 +10517,8 @@
             "maxLength": 200
           },
           "scheduledFor": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d))|(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?)$"
           },
           "facilitatorId": {
             "type": "string",
@@ -10544,6 +10545,57 @@
         "kind": "planning",
         "title": "…",
         "scheduledFor": "…",
+        "facilitatorId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
+      "name": "sessions.bookCycle",
+      "description": "Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "weekday": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "time": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+          },
+          "facilitatorId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "spaceId",
+          "weekday",
+          "time",
+          "facilitatorId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "spaceId": "00000000-0000-4000-8000-000000000000",
+        "weekday": 0,
+        "time": "…",
         "facilitatorId": "00000000-0000-4000-8000-000000000000"
       }
     },

@@ -364,6 +364,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // Sessions (P4-T07a)
   "session.created": (p) =>
     `Created a ${asString(p.kind)} session: ${asString(p.title)}`,
+  "session.cycleBooked": (p) =>
+    `Booked ${Number(p.booked ?? 0)} session(s) for the whole cycle`,
   "session.opened": (p) => `Opened the ${asString(p.kind)} session`,
   "session.stageAdvanced": (p) =>
     `Advanced to the ${asString(p.to, "next")} stage`,

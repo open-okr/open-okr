@@ -71,6 +71,8 @@ export type WeeklyStageKey = (typeof WEEKLY_STAGE_KEYS)[number];
 
 export interface Ritual {
   readonly kind: RitualKind;
+  /** §7.1's name for it, which is also the title a booked session carries. */
+  readonly name: string;
   /** §7.1's own wording, because a range is not a number. */
   readonly length: string;
   readonly frequency: string;
@@ -81,6 +83,7 @@ export interface Ritual {
 export const RITUALS: readonly Ritual[] = [
   {
     kind: "weekly",
+    name: "Weekly check-in",
     length: "15 to 30 minutes",
     frequency: "Weekly",
     purpose:
@@ -88,6 +91,7 @@ export const RITUALS: readonly Ritual[] = [
   },
   {
     kind: "monthly",
+    name: "Monthly review",
     length: "30 to 60 minutes",
     frequency: "Monthly",
     purpose:
@@ -95,6 +99,7 @@ export const RITUALS: readonly Ritual[] = [
   },
   {
     kind: "quarterly",
+    name: "Quarterly review",
     length: "60 minutes",
     frequency: "At cycle close",
     purpose:

@@ -423,6 +423,7 @@ compare(
 // §7.1. Length, frequency and purpose are what a facilitator books a calendar
 // from, so all three are compared rather than the name alone.
 const ritualRows = section(method, "### 7.1 The three rituals", "### 7.2");
+compare("the rituals: name", tableColumn(ritualRows, 0), RITUALS.map((r) => r.name), 3);
 compare("the rituals: length", tableColumn(ritualRows, 1), RITUALS.map((r) => r.length), 3);
 compare("the rituals: frequency", tableColumn(ritualRows, 2), RITUALS.map((r) => r.frequency), 3);
 compare("the rituals: purpose", tableColumn(ritualRows, 3), RITUALS.map((r) => r.purpose), 3);

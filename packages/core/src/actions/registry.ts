@@ -327,6 +327,7 @@ import {
   addReviewAction,
   addStageMinute,
   advanceStage,
+  bookCycleSessions,
   captureLearning,
   carriedCommitments,
   castRetroVote,
@@ -723,6 +724,7 @@ export const ACTION_MAP = {
   "reactions.remove": removeReactionAction,
   // Sessions (P4-T07a)
   "sessions.create": createSession,
+  "sessions.bookCycle": bookCycleSessions,
   "sessions.open": openSession,
   "sessions.advanceStage": advanceStage,
   "sessions.skip": skipSession,

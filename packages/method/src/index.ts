@@ -22,6 +22,15 @@ export {
   rankBlockers,
 } from "./blocker-board.ts";
 export {
+  type BookedRitual,
+  type CadenceCoverage,
+  type CadencePlanOptions,
+  type CadenceWindow,
+  cadenceCoverage,
+  planCycleCadence,
+  type RitualWeekday,
+} from "./cadence-booking.ts";
+export {
   cycleClosingDue,
   cycleStartsDue,
   planningOpensDue,
