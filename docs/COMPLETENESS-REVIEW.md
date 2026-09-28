@@ -1,0 +1,495 @@
+# OpenOKR completeness review
+
+**Date:** 28 September 2026
+**Commit reviewed:** `main` at `7bbf31e` (the tree is identical to `agung` at `be1bf49`)
+**Question asked:** Development is believed complete. Is it?
+
+> **Since the review.** `main` moved to `c529177` with PR #85, which changed documentation and a deck script only. No application, package, deployment or test code changed, so every code finding below still applies. PR #85 fixed the stale README (L-05). It also made H-22 more serious, because the install guides now tell self-hosters to build the image themselves.
+
+---
+
+## 1. The short answer
+
+**No. The engineering is in very good shape, but the product is not complete against REQUIREMENTS.md.**
+
+Every row in `STATUS.md` says `done` (270 rows, 200 tasks). Every gate is green, locally and in CI. Yet a person using the product in a browser cannot do several things REQUIREMENTS.md promises for v1. There are also security defects that only show up on a running deployment.
+
+| | Count |
+|---|---|
+| High findings (security, data safety, or a P0 promise a user cannot reach) | 24 |
+| Medium findings (a capability partly present, or deviating from the spec) | 32 |
+| Low findings (polish, docs, test hygiene) | 20 |
+
+### What is genuinely strong
+
+- **Every gate is green.** All ten static gates pass: types, lint, dead code, migrations, boundaries, air gap, docs, licences, contract, method conformance. So do 4,525 unit and integration tests and 339 end-to-end tests. CI on `main` is green on every job.
+- **The method canon is faithfully encoded.** `pnpm method:check` agrees with METHOD.md on 45 trigger keys, 26 checks, 56 thresholds, 148 word-list terms and 19 enumerations.
+- **The database design holds the tenant floor.** All 139 tables have row-level security enabled, forced, and with a policy in the same migration, or a written exemption.
+- **One contract, many surfaces, in sync.** 348 actions, 348 CLI commands and 350 MCP tools.
+- **The code is clean.** No TODO or FIXME markers, no `@ts-ignore`, nine `any`s (each justified), an empty test quarantine, and no skipped tests beyond environment guards.
+- **Deployment mostly works.** The Compose stack reaches healthy in 18 seconds. The Helm chart installs into a real Kubernetes cluster, serves two replicas, registers a user and upgrades cleanly. A nightly job proves the upgrade path.
+
+### What is not there yet
+
+The highest-impact gaps:
+
+1. **The default self-hosted install turns the tenant floor off.** The app connects to Postgres as a superuser, which bypasses row-level security. Fixing that naively breaks the scheduler, so the agents would stop (H-01, H-02).
+2. **Sessions cannot be scheduled from the browser.** After the one weekly session onboarding creates, nobody can hold a weekly, monthly or quarterly session (H-08).
+3. **The guided cycle cannot complete from the browser.** Phases 4, 6 and 7 never compute. Gate 2 never evaluates. The product's own starter template fails its own quality check (H-09).
+4. **The coach is quieter than promised.** 12 of 45 proactive triggers never fire. Nudges carry no goal name and no link. Blockers never reach their owner's inbox (H-10, H-11, H-12).
+5. **Visible defects on a running instance.** Every server-rendered progress bar draws full. The phone view hides most of the product. The first screen says chat channels and AI are "not in this build" (H-15, H-16, H-24).
+6. **Nothing has ever been released.** There are no tags, every package is at version 0.0.0, and 47 changesets are waiting. The launch task's acceptance checks were never run (H-23).
+
+**Recommendation:** treat this as a release candidate that needs one more focused phase. Section 10 gives an order of work, and section 8 lists the decisions that belong to a human.
+
+---
+
+## 2. How the review was done
+
+| Track | What was done |
+|---|---|
+| Status and plan | Parsed all 270 `STATUS.md` rows and matched them against the 280 task headings in IMPLEMENTATION-PLAN.md. Every plan task has a row. The 23 without a direct row are parents that were split into lettered parts. |
+| Gates | Ran every gate in the order CI-GATES.md gives, on this machine, and read the output rather than the exit codes. |
+| Deployment | Built the Docker image. Ran the Compose smoke test. Booted an instance by hand and inspected its database role. Ran the Helm chart checks. Installed the chart into a kind cluster (Kubernetes running inside Docker) and enabled backups there. Ran the S3 driver against an S3-compatible server. |
+| Browser | Walked a fresh Docker instance as a new self-hoster: the setup wizard, onboarding, sessions, the cycle phases, phone width and the Malay language. |
+| Code | Six parallel read-only audits, one per requirements area. The High claims were then re-checked by hand. |
+
+**How far to trust each finding.** Every finding carries one of three marks:
+
+| Mark | Meaning |
+|---|---|
+| **Run** | Reproduced on a running instance during this review |
+| **Code** | Confirmed by reading the code during this review |
+| **Audit** | Found by a review agent reading the code, and plausible on a spot check, but not reproduced. Treat these as strong leads |
+
+---
+
+## 3. Results of running everything
+
+### 3.1 The gates
+
+| Gate | Result | Notes |
+|---|---|---|
+| `pnpm typecheck` | Pass | 11 of 11 tasks, 12 minutes under load |
+| `pnpm lint` | Pass | 0 errors, 6 warnings, 1 info. All cosmetic (L-07) |
+| `pnpm dead-code` | Pass | |
+| `pnpm db:lint` | Pass | 99 migration files; 109 soft-deletable tables across 569 files |
+| `pnpm check:boundaries` | Pass | 964 files |
+| `pnpm check:air-gap` | Pass | 6 checks, matching the guide |
+| `pnpm check:docs` | Pass | 31 pages |
+| `pnpm check:licences` | Pass | 15 allowed licences |
+| `pnpm check:contract` | Pass | 348 actions, 348 commands, 350 MCP tools |
+| `pnpm method:check` | Pass | 45 triggers, 26 checks, 56 thresholds, 148 terms, 19 enumerations |
+| `pnpm test:ci` (whole repository as one suite, 4 workers) | Pass | 313 files, 4,525 tests passed, 5 skipped, 0 retried. MySQL suites ran |
+| The 5 skipped S3 tests | Pass | Run against S3Mock, an S3-compatible server. 9 of 9 pass. CI has never run these |
+| `pnpm build` | Pass | Host build |
+| `pnpm test:e2e` | Pass | 339 of 339. See H-02 for what the server log said while it ran |
+| CI on `main` (`7bbf31e`) | Pass | Every job green, including Compose, Helm, both test shards and end-to-end |
+| CodeQL, Dependency review | Not run locally | Not runnable locally. CodeQL was green on the `main` push |
+
+### 3.2 Deployment, run for real
+
+| Check | Result | Finding |
+|---|---|---|
+| `docker build` with the stock Dockerfile | **Fail** | Out of memory in Next's type check on Docker Desktop's default 7.6 GB VM (H-22) |
+| `docker build` with a 4 GB build heap | Pass, 84 seconds | Runtime stage unchanged |
+| `deploy/docker/smoke-test.sh` | **Fail** at the last step | A timing race after `rotate-key`, not a product failure: rerun by hand, the instance was serving one second later (L-01). Every earlier check passed: healthy in 18 seconds, wizard, security headers, first account, upgrade, idempotent migrations |
+| Database role of the running app | **Superuser with BYPASSRLS** | H-01 |
+| `deploy/helm/check.sh` | Pass | Renders templates only |
+| `deploy/helm/cluster-test.sh` on kind | Pass | Installs, migrates by hook, 2 replicas, registers a user, upgrades, keeps the key |
+| Helm with `backup.enabled=true` on kind | **Fail** | `secret "okr-openokr" not found` (H-19) |
+
+### 3.3 What a new self-hoster sees
+
+Walked on a fresh Compose instance at `http://localhost:8088`:
+
+| Step | What happened |
+|---|---|
+| Setup wizard | Database, mail and storage show green. **Chat channels and AI provider say "Not in this build. Arrives in Phase 5 / Phase 6"** (H-24) |
+| Onboarding | Five skippable steps, sensible defaults. The page says "Four questions" above a "1 / 5" counter (L-08) |
+| Starter template | Creates one objective, three key results, a KPI and one weekly session. **The objective fails KR-3 in red, and "publish gate 3 is red"** (H-09) |
+| `/sessions`, `/cycle`, `/spaces`, space home | **No control anywhere to schedule a session** (H-08) |
+| `/cycle?phase=4` to `7` | **"Not yet checkable: ... arrives at P4-T03", "P4-T04", "P3-T04", "P4-T08"**, and on phase 5 "Gate 2 cannot be evaluated: no thresholds were resolved" (H-09) |
+| Strength meter and key result bar | **A bar at 0% draws full width. So does 79%.** The console shows a CSP violation on every page (H-15) |
+| Phone, 375 px | **Only Overview, Inbox, Review and Cycle are reachable** (H-16) |
+| Language set to `ms` | **Only the search placeholder changes ("Cari...")**. Everything else stays English (M-15) |
+| Theme and density | Light, dark, system, comfortable and compact all present in the account menu. An old gap, now closed |
+
+---
+
+## 4. Why every row says `done` while these gaps exist
+
+This section matters more than any single finding, because the same patterns will keep producing gaps until they change.
+
+1. **Coverage tests carry exemptions with false reasons.**
+   - [apps/web/test/action-coverage.test.ts:106](../apps/web/test/action-coverage.test.ts#L106) excuses `sessions.create` because "the sessions screen creates through `sessions.schedule`". That action does not exist.
+   - Other entries say an action is "offered on the KPI detail" or "offered through the phase assists" when no screen calls it.
+   - The gate is only as good as the list of excuses it accepts.
+2. **Tests assert the placeholder instead of the product.** [e2e/first-run-wizard.spec.ts:58](../e2e/first-run-wizard.spec.ts#L58) asserts "Chat channels: Not in this build". Fixing the copy would turn CI red.
+3. **Tests build state that the UI cannot build.**
+   - [e2e/s26-session-entry.spec.ts:49](../e2e/s26-session-entry.spec.ts#L49) inserts sessions with SQL, "because there is no create-session control yet".
+   - The review-inbox test inserts a blocker's `goal_id` by hand, which the real write never sets.
+   - The workflow unit test passes `qualityChecksPass: true`, which the real loader never supplies.
+4. **Rows closed with their acceptance unverified.** P8-T14 (Launch) is `done`, while its own note says the acceptance criterion could not be checked on that machine.
+5. **Work that fell between tasks.** P4-T07a built the session record, and no task owned the screen that creates one.
+6. **Both test environments differ from production, in opposite directions.**
+   - The end-to-end suite uses a restricted database role, so the tenant floor holds but the scheduler never starts.
+   - The Compose install uses a superuser, so the scheduler runs but the tenant floor is off.
+   - Neither is the product as designed, and no gate compares them.
+7. **Static gates cannot see runtime configuration.** None of these fail a gate:
+   - the database role
+   - a production-only CSP
+   - a Secret name in a Helm template that is only rendered, never run
+
+   Every High finding in this review coexisted with a fully green CI.
+
+**Suggestion:** for each `done` row, require the acceptance criterion to be shown on a running instance, and review every exemption list line by line. Section 10 lists the rows worth reopening.
+
+---
+
+## 5. Findings
+
+### 5.1 High: security and data safety
+
+**H-01. The Compose install runs the app as a Postgres superuser, so row-level security is off.** `Run`
+- **Evidence.**
+  - [deploy/docker/openokr:115](../deploy/docker/openokr#L115) sets `POSTGRES_USER=openokr`, and [:126](../deploy/docker/openokr#L126) points `DATABASE_URL` at that role. The Postgres image makes it a superuser.
+  - On the running instance: `rolsuper = t`, `rolbypassrls = t`. With no tenant set, `select count(*) from goals` returned rows, although `goals` has security forced.
+  - [packages/db/src/roles.ts:33](../packages/db/src/roles.ts#L33) creates the restricted roles, and its comment says the setup wizard would use it. Only the test harness does ([db-harness.ts:192](../packages/test-support/src/db-harness.ts#L192)).
+- **Why it matters.** The database-enforced tenant floor is the foundation of the security model: "application code cannot leak across tenants even if it is wrong". `can()` still applies, so this removes the second line of defence rather than opening a door. But any query that forgets its filter now leaks. The demo and staging instances run on Compose.
+- **Fix.** Make the migrator create an owner role and a `nosuperuser nobypassrls` application role, and run the app as the application role. Refuse to start, or warn loudly on `/admin`, when the app's role can bypass row-level security. Fix together with H-02.
+
+**H-02. The job scheduler fails silently under a restricted role.** `Run`
+- **Evidence.**
+  - The end-to-end server logged `scheduler: could not start: permission denied for database openokr_e2e` on both servers.
+  - pg-boss creates its own schema when it starts ([pg-boss.ts:28](../packages/adapters/src/drivers/jobs/pg-boss.ts#L28)), which a least-privilege role cannot do.
+  - [apps/web/lib/scheduler.ts:533](../apps/web/lib/scheduler.ts#L533) only logs the failure, and [the health route](../apps/web/app/api/health/route.ts) does not report the scheduler at all.
+- **Why it matters.** The agents, digests, the staleness sweep, audit chaining and the orphan reap all stop, while the instance still reports healthy. Fixing H-01 on its own would cause exactly this in production. The end-to-end suite has never run with a live scheduler.
+- **Fix.** Create the `pgboss` schema in a migration as the owner and grant the application role usage. Report the scheduler's state in `/api/health` and on `/admin`.
+
+**H-03. The public `/api/sso-providers` route lists every workspace's single sign-on setup.** `Code`
+- **Evidence.**
+  - [The route](../apps/web/app/api/sso-providers/route.ts) has no authentication and no filter, and [apps/web/proxy.ts:114](../apps/web/proxy.ts#L114) marks it public.
+  - [packages/core/src/auth/sso.ts:232](../packages/core/src/auth/sso.ts#L232) returns the workspace id, display name, email domains and enforce flag of every enabled connection.
+- **Why it matters.** On the managed cloud, anyone can list the customers and their identity providers.
+- **Fix.** Take an email address and return only the matching provider, with no workspace ids.
+
+**H-04. The Coach and the Champion run with full workspace authority, and ignore sandbox and propose.** `Code`
+- **Evidence.**
+  - Scheduled runs act as `{ kind: "system" }` ([scheduler.ts:381](../apps/web/lib/scheduler.ts#L381)), which resolves to full access.
+  - The only code that reads an agent's `autonomy` is [run-executor.ts:248](../packages/agents/src/run-executor.ts#L248), and nothing in production calls it. So a sandboxed agent still writes nudges and proposals, flips goal health and queues messages.
+  - The public demo puts both agents in sandbox and relies on it ([demo/personas.ts:384](../packages/core/src/demo/personas.ts#L384)).
+- **Why it matters.** It breaks three CLAUDE.md hard rules: least privilege, no service account with ambient authority, and "sandbox mode commits nothing at all". It also fails P2-T17's own test plan.
+- **Fix.** Run each agent as its own principal, filtered by its bindings. Branch on `autonomy` inside the Champion and Coach runs.
+
+**H-05. Some session writes skip object authorisation.** `Code`
+- **Evidence.**
+  - `sessions.resolveBlocker` ([sessions.ts:2063](../packages/core/src/actions/sessions.ts#L2063)), `sessions.reassignBlocker` ([:2128](../packages/core/src/actions/sessions.ts#L2128)) and `sessions.closeCommitments` ([:2352](../packages/core/src/actions/sessions.ts#L2352)) check only workspace-level `edit`, then act on a bare id.
+  - `sessions.read` joins space membership by hand instead of using the access getter ([:1190](../packages/core/src/actions/sessions.ts#L1190)).
+- **Why it matters.** A member with edit rights anywhere can resolve blockers and close commitments in spaces they cannot see, given an id. It breaks the "one `can()`" rule.
+- **Fix.** Load each row's space and authorise through the access getter. Add session, cycle and KPI-tree resolvers.
+
+**H-06. Slack form submissions read tenant tables with no tenant set.** `Code`
+- **Evidence.** [slack/route.ts:238](../apps/web/app/api/channels/slack/route.ts#L238) runs a raw pool query on `channel_identities`, which has row-level security forced.
+- **Why it matters.** Today it works only because of H-01. Under a correct role, every Slack form check-in is dropped with no reply. Every Slack slash command opens this form, so this is the main Slack path. No test covers the route.
+- **Fix.** Read inside the workspace wrapper, or reuse the inbound identity resolution. Add a route test run under the restricted role.
+
+**H-07. The AI base URL setting lets a cloud admin reach internal addresses (server-side request forgery).** `Audit`
+- **Evidence.** [packages/core/src/actions/ai.ts:203](../packages/core/src/actions/ai.ts#L203) accepts any URL, and the drivers fetch it directly rather than through `outboundFetch`. TECHNICAL-PLAN §8.2 names AI base URLs explicitly.
+- **Fix.** Route them through `outboundFetch` when cloud mode is on. Keep private addresses allowed on self-host, for local models.
+
+### 5.2 High: P0 promises a user cannot reach
+
+**H-08. Sessions cannot be scheduled from the browser.** `Run`
+- **Evidence.**
+  - On a fresh instance, no screen has a control to create a session. The only code that creates one is the onboarding template ([templates/apply.ts:208](../packages/core/src/templates/apply.ts#L208)) and the demo builder.
+  - The false exemption and the SQL-built spec are described in section 4.
+- **Why it matters.** After week one, nobody can hold a weekly session, a monthly review or a quarterly review. REQUIREMENTS §3.6 and §3.7 cannot be met, and neither can METHOD's "book every check-in and review for the whole cycle" (CY-8).
+- **Fix.** Add a schedule control on `/sessions` and the space home, plus "book the whole cycle".
+
+**H-09. The guided cycle cannot complete from the browser.** `Run` `Code`
+- **Phases 4, 6 and 7 never compute.** [cycles/workflow.ts:215](../packages/core/src/cycles/workflow.ts#L215) never supplies `qualityChecksPass`, `allKeyResultsScored` or `retrospectiveWritten`. Nothing outside `packages/method` names them.
+- **Gate 2 can never evaluate inside phase completion.** `phaseCompletion` calls `publishGates(input)` without the thresholds it was given ([method/src/workflow.ts:875](../packages/method/src/workflow.ts#L875)). The running instance shows exactly that message on phase 5.
+- **The screens show users stale task IDs.** For example "arrives at P4-T03" and "P4-T04" (section 3.3).
+- **KR-3 fails on every key result drafted in the browser.** The browser cannot set a key result's owner or due date ([cycle/goal-actions.ts](../apps/web/app/cycle/goal-actions.ts)). The product's own starter template fails KR-3 on a fresh instance.
+- **Phases 1 to 3 and gate 5 cannot go green.** Sponsor, facilitator, session dates, baseline health, capacity notes and annual focus key results have no browser control.
+- **Drafting in a blocked Phase 4 is not refused.** It only shows a banner, against the §3.1 acceptance criterion.
+- **Why it matters.** §3.1 is the spine of the product, and in practice every publish from the browser needs the override.
+- **Fix.** Supply the four inputs, pass the thresholds, add the missing controls, and remove the stale text.
+
+**H-10. Blockers never reach their owner's review inbox, and escalation at 0.3 does not exist.** `Code`
+- **Evidence.**
+  - Every blocker, whether raised in a session or from a chat command, is created by `sessions.createBlocker`, which never sets `goal_id` ([sessions.ts:2022](../packages/core/src/actions/sessions.ts#L2022)).
+  - The inbox skips any blocker without a goal ([review.ts:438](../packages/core/src/actions/review.ts#L438)).
+  - Nothing writes `escalated_to_id`, and `confidence.critical` has no producer.
+- **Why it matters.** Two promises never happen: §3.5 "blockers they own", and Pillar B "escalation at 0.3 and below".
+- **Fix.** Derive `goal_id` from the key result on insert, stamp the escalation, and add the producer.
+
+**H-11. 12 of the 45 proactive triggers never fire.** `Code`
+- **The twelve:** `confidence.critical`, `digest.weekly`, `commitment.due`, `streak.at_risk`, `cycle.phase_blocked`, `quality.no_not_doing`, `quality.too_many_objectives`, `quality.sandbagging_draft`, `quality.sandbagging_close`, `quality.no_cuts`, `quality.trending_off` and `quality.process_health_low`.
+- **Evidence.** Their only reference outside `packages/method` is a display-name map ([apps/web/lib/identifier-names.ts:45](../apps/web/lib/identifier-names.ts#L45)). `pnpm method:check` passes because it compares the document with the package, not with the code that sends messages.
+- **Why it matters.** REQUIREMENTS §3.8 and Pillar B name several of these: the weekly digest, commitments due, a streak at risk, and sandbagging at draft and at close.
+- **Fix.** Build the emitters, or have a human strike the triggers from AI-NATIVE-PLAN §6.4. Add a gate that fails when a catalogue key has neither an emitter nor a written exemption.
+
+**H-12. Nudges say nothing specific and carry no link.** `Code`
+- **Evidence.** Every nudge other than a blocker, on email, Slack, Teams or Telegram, reads "You have a reminder waiting in OpenOKR. Rule: checkin.due" ([nudges/deliver.ts:56](../packages/core/src/nudges/deliver.ts#L56)). It carries no goal name, no link and no button.
+- **Why it matters.** It fails two requirements: the §3.8 acceptance criterion ("a one-tap check-in") and Pillar E ("one-click check-in links" in email).
+- **Fix.** Per-rule wording from METHOD.md, the goal title, a signed deep link, and a check-in button.
+
+**H-13. Comments and mentions notify nobody.** `Code`
+- **Evidence.** The operation fans out notifications only when an activity sets `notify`, and no action does: searching `packages/core/src` for `notify: true` finds nothing. A mention subscribes the person and never tells them ([comments/service.ts:101](../packages/core/src/comments/service.ts#L101)).
+- **Why it matters.** Pillar F P0: "comments, reactions, mentions, subscriptions, notifications ... everywhere".
+
+**H-14. Only the founder can ever be an administrator.** `Code`
+- **Evidence.** No action changes a member's workspace access level, and invitations grant `edit` at most ([actions/invitations.ts](../packages/core/src/actions/invitations.ts)). The profile page tells a sole admin to "hand over first", and there is no way to hand over.
+- **Why it matters.** If that one person leaves, the workspace has no administrator.
+- **Fix.** Add an action that sets the access level, protected by the existing last-owner check.
+
+**H-15. Every server-rendered progress bar draws full.** `Run`
+- **Evidence.**
+  - The production CSP is `style-src 'self' 'nonce-...'` ([apps/web/proxy.ts:200](../apps/web/proxy.ts#L200)), which blocks inline `style` attributes.
+  - On the running instance, a bar declared `width:0%` rendered 1,038 px wide, the whole track. The 79% strength bar also rendered full.
+  - Development mode allows `unsafe-inline`, which is why nobody saw it.
+- **Why it matters.** Users read progress that is not there.
+- **Fix.** Either allow `style-src-attr 'unsafe-inline'` or set widths on the client. Add an end-to-end assertion on a bar's rendered width.
+
+**H-16. Most of the product is unreachable on a phone.** `Run`
+- **Evidence.** At 375 px the tab bar shows four items ([app-shell.tsx:249](../apps/web/lib/app-shell.tsx#L249)). KPIs, Spaces, Board, Initiatives, Search and Admin have no link and no drawer.
+- **Why it matters.** REQUIREMENTS §9 says the responsive web app covers mobile in v1.
+
+**H-17. Method thresholds are hardcoded in nine places.** `Code` `Audit`
+- **Why it matters.** Each one means a workspace override silently does nothing, which breaks a CLAUDE.md hard rule.
+
+| Where | Hardcoded | Should read |
+|---|---|---|
+| [schema/kpis.ts:152](../packages/db/src/schema/kpis.ts#L152) | KPI corridor 90 / 70 | `kpi.healthyThreshold`, `kpi.watchThreshold`. **Both are editable on `/admin/rhythm` and nothing reads them** |
+| [confidence-dial.tsx:13](../apps/web/app/session/[id]/confidence-dial.tsx#L13) | 0.3 / 0.4 / 0.7, and "Low (0.4)" lands in Medium | Confidence thresholds |
+| [coach-strip.tsx](../apps/web/app/goals/[id]/coach-strip.tsx) | Strength bands 75 / 45 | `quality.strengthScoreBands` |
+| [sessions.ts:2016](../packages/core/src/actions/sessions.ts#L2016), [method/src/digest.ts](../packages/method/src/digest.ts) | Blocker clock 24 hours | `cadence.blockerClockHours` |
+| [cycles/archive.ts](../packages/core/src/cycles/archive.ts) | Carry-forward impact 4 | `quality.carryForwardIssueImpact` |
+| [method/src/workflow.ts](../packages/method/src/workflow.ts) | Annual strategy bounds 2 to 5 | `quality.annualStrategyBounds` |
+| [flowyteam/mappers/check-ins.ts](../packages/importer/src/flowyteam/mappers/check-ins.ts) | Status cutoffs 0.7 / 0.4 | Resolved confidence thresholds |
+
+**H-18. Moving a workspace between instances loses people and files.** `Audit`
+- **Evidence.**
+  - The archive carries no email for registered members, and import clears `user_id` ([portability/export.ts](../packages/core/src/portability/export.ts), [portability/import.ts](../packages/core/src/portability/import.ts)). Everyone arrives as an account nobody can claim.
+  - Import never passes storage, so files arrive as rows with no bytes ([actions/portability.ts](../packages/core/src/actions/portability.ts)).
+  - Reading an archive needs the source instance's root key ([archive.ts](../packages/core/src/portability/archive.ts)). Moving from the cloud to self-host would mean handing over the cloud's key.
+- **Why it matters.** REQUIREMENTS §4 Pillar F promises moves "self-host and cloud in both directions", and [docs/install/cloud.md](install/cloud.md) promises "every uploaded file".
+
+**H-19. Helm backups cannot run, and no restore drill runs in CI.** `Run` `Audit`
+- **Evidence.**
+  - With backups enabled on kind, the backup job failed with `secret "okr-openokr" not found`. The chart creates `okr-openokr-secrets` and `okr-openokr-database`, but [backup-cronjob.yaml:77](../deploy/helm/templates/backup-cronjob.yaml#L77) and the verify job read `okr-openokr`. `check.sh` passes because it only renders.
+  - No workflow runs [restore-drill.sh](../deploy/docker/restore-drill.sh).
+- **Why it matters.** It fails REQUIREMENTS §7 and P6-T06 ("a restore drill in continuous integration").
+
+**H-20. A calculated KPI can be blanked by a finer-frequency source.** `Audit`, not reproduced
+- **Evidence.** `kpis.record` passes the source's period start to the cascade ([actions/kpis.ts](../packages/core/src/actions/kpis.ts)). The dependent KPI's period is then recomputed as null ([kpis/formula.ts](../packages/core/src/kpis/formula.ts)).
+- **Why it matters.** Recording a daily value on any day but the 1st would clear a monthly total. That is silent data loss.
+- **Reproduce.** Create a daily source and a monthly `sum` formula KPI, then record a value on the 15th.
+
+**H-21. The cloud cannot be operated as designed.** `Audit`
+- **Evidence.**
+  - Nothing writes a tenant's plan or seats after creation ([tenancy/store.ts](../packages/core/src/tenancy/store.ts)), so seat limits can never apply.
+  - The first operator can only be created with hand-written SQL, and the UAT guide says so.
+  - Screen S-49 has no seat list and no upgrade control.
+
+### 5.3 High: build, release and first impression
+
+**H-22. The Docker image does not build on a default Docker Desktop, or on the server size the install guide recommends.** `Run`
+- **Evidence.** The stock Dockerfile fails with "JavaScript heap out of memory" during Next's type check, at about 2 GB. Node sizes its heap from total memory: Docker Desktop's default VM has 7.6 GB, while CI runners have more.
+- **Why it matters.** With no released image (H-23), building from source is the only way to self-host. Since PR #85, the [README](../README.md) and [docs/install/compose.md](install/compose.md) tell people to run `docker build` on a server of "2 CPU cores, 4 GB memory". A 4 GB machine gives Node a smaller heap than the 7.6 GB one where the build already failed, so the documented install path fails at its first step. That last point is inferred from how Node sizes its heap, not tested on a 4 GB machine.
+- **Fix.** Either set `NODE_OPTIONS=--max-old-space-size=4096` in the build stage (tested: it builds in 84 seconds with the runtime stage unchanged), or skip Next's type check, since `pnpm typecheck` already gates it.
+
+**H-23. Nothing has ever been released, and the launch task's acceptance was never run.** `Code`
+- **Evidence.** There are no git tags, all 11 packages are at `0.0.0`, and 47 changesets are pending. P8-T14 (Launch) is `done`, but its note says the acceptance checks were not verifiable at the time: a clean-machine install, an upgrade from the previous release, and a chart install.
+- **What this review covered.** It ran two of those three, a clean install and a chart install, and both work apart from the defects above. An upgrade from a previous release cannot be tested until a first release exists. The nightly Upgrade workflow covers upgrading from a pinned 11 September commit (81 migrations to 97), and it is green.
+
+**H-24. The first screen tells self-hosters that channels and AI are "not in this build".** `Run`
+- **Evidence.**
+  - [apps/web/app/setup/page.tsx:61](../apps/web/app/setup/page.tsx#L61) still calls `notInThisBuild("channel", "Phase 5")` and `notInThisBuild("ai", "Phase 6")`. That text was written at P1-T09 on 6 August, and the helper's own comment says a later task would replace it.
+  - The end-to-end spec asserts the stale text (section 4).
+  - "Phase 6" was never right: AI providers arrived in Phase 2.
+  - The same kind of stale wording is visible on cycle phases 4 to 7, on `/scorecard` ("arrives at P6-G16") and on `/account/channels` ("until P6-G08").
+- **Fix.** Real probes for the configured channel and AI drivers. Remove every task ID from user-facing copy, and add a test that fails on the pattern `P[0-9]-[TG][0-9]` in rendered text.
+
+### 5.4 Medium
+
+| ID | Finding | Evidence | Mark |
+|---|---|---|---|
+| M-01 | Documents attach only from goals, files only to initiatives and documents, comments only on goals. Documents have no comments or reactions | `SubjectDocuments` used once; `Attachments` accepts two subject types | Audit |
+| M-02 | The board has no live presence (a P5-T11 deliverable), exists only per space rather than per initiative or key result, and reordering within a column needs a mouse | `board/page.tsx`, `board.tsx` | Audit |
+| M-03 | Step 1 of the weekly session breaks when team voting is off. Revealed votes and the team average are never shown | `confidence-round.tsx`, `sessions.ts:1513` | Audit |
+| M-04 | Closing a monthly or quarterly session adds a 0.0 point to the weekly trend and extends the streak. A week with no session never breaks the streak. Dates use UTC rather than the workspace timezone | `sessions.ts` close path | Audit |
+| M-05 | Feed-forward and the scorecard snapshot are buttons, not automatic at close. The lowest process-health statement becomes a Phase 2 issue, not a Phase 3 priority: a practice change nobody approved | `cycles/archive.ts` | Audit |
+| M-06 | Annual cycles cannot be opened or created in the browser, and mid-cycle calibration has no UI | `cycle/page.tsx`, `cycle/admin-actions.ts` | Audit |
+| M-07 | KPI-backed key results cannot be created in the browser, and recording a KPI never recomputes the goals that read it | `cycle/goal-actions.ts`, `actions/kpis.ts` | Audit |
+| M-08 | A review-inbox proposal links to `/admin/agents`, which a non-admin cannot open. A champion cannot apply their own drafted check-in | `review.ts`, `agents.ts` | Audit |
+| M-09 | Six assists are built but have no browser caller. "Summarise a thread" and "decompose a key result" are not built. The copilot can propose only `goals.create` | `copilot/proposals.ts` | Audit |
+| M-10 | AI egress controls are missing. The Privacy card is static text | [governance.tsx](../apps/web/app/admin/ai/governance.tsx) | Audit |
+| M-11 | Custom agents cannot run: `agents.startRun` enqueues nothing and no handler continues a run | [actions/agents.ts](../packages/core/src/actions/agents.ts) | Audit |
+| M-12 | MCP has no scoped-token path for local agents, and no rate limit on `/api/mcp`, `/api/mcp/register`, `/api/mcp/token` or `/api/scim/v2` | route handlers | Audit |
+| M-13 | No undo, and no restore for deleted goals, initiatives, tasks or documents. The delete control promises "an administrator can bring it back" | [delete-control.tsx](../apps/web/lib/delete-control.tsx) | Audit |
+| M-14 | Terminology labels and the brand colour are saved and never applied. The branding card says the colour "is in force" | `admin/branding` | Audit |
+| M-15 | Bahasa Melayu (P1) is a stub: 1,494 of 1,578 strings are identical to English. The language setting is a free-text box expecting `ms` | [ms.json](../packages/ui/src/i18n/messages/ms.json) | Run |
+| M-16 | The FlowyTeam importer checks about ten source tables exist and then neither reads nor reports them, including `performance_settings`, `indicator_accesses`, `keyresult_indicator`, `key_result_files` and `scores`. CLAUDE.md forbids silent drops | [introspect.ts](../packages/importer/src/flowyteam/introspect.ts), [report.ts](../packages/importer/src/flowyteam/report.ts) | Audit |
+| M-17 | The spreadsheet importer has no template downloads (REQUIREMENTS §6) | no route found | Audit |
+| M-18 | Personal data export exists only inside erasure. Erasure writes the erased name into a new activity, and the `users` row keeps name and email | `people.ts` | Audit |
+| M-19 | The outbox keeps raw invitation tokens and email addresses forever, with no purge | `invitations.ts` | Audit |
+| M-20 | The accessibility scan excludes 26 detail routes (goal, KPI, space, session, task, person, initiative) | [s43-accessibility.spec.ts](../e2e/s43-accessibility.spec.ts) | Audit |
+| M-21 | Command palette entity jump works for KPIs only. There are no palette actions, and semantic search is never called | `search/palette.tsx` | Audit |
+| M-22 | The space home has no goals or KPI trees. Avatar and bio cannot be edited. Guests can only be made by converting a member | `spaces/[id]/page.tsx` | Audit |
+| M-23 | Teams has no check-in form. No channel posts to a space. A per-rule channel override skips the reachability check and has no email fallback | `routing.ts` | Audit |
+| M-24 | File previews, thumbnails, image re-encoding and the scan hook are still scaffolding. P2-T05 asked for a dependency decision that was never taken | `blobs/provisioning.ts` | Audit |
+| M-25 | Seven settings in the registry are missing from the TECHNICAL-PLAN §4.14 map, and nothing compares the two | settings registry | Audit |
+| M-26 | Initiatives feed neither the key result's linked work nor its forecast (REQUIREMENTS §4 Pillar C), which conflicts with TECHNICAL-PLAN §4.9 | `tasks/service.ts` | Audit |
+| M-27 | OBJ-1 checks its rows in a different order from METHOD.md's "first match wins", so some objectives pass that should warn | `method/src/quality.ts` | Audit |
+| M-28 | Aligning under a parent key result skips both the loop check and the access check | `actions/goals.ts` | Audit |
+| M-29 | KPI recovery misfires: a KPI with only a standing target never gets its proposal, workspace-owned KPIs get no nudges, and "recovered" cannot fire | `nudges/sweep.ts`, `kpis/service.ts` | Audit |
+| M-30 | The coverage tests accept false exemptions (section 4), and the route-coverage test counts `/initiatives/[id]` as visited whenever `/initiatives` is | [action-coverage.test.ts](../apps/web/test/action-coverage.test.ts), [route-coverage.test.ts](../apps/web/test/route-coverage.test.ts) | Code |
+| M-31 | Search is empty after an archive import, because nothing reindexes | `portability/import.ts` | Audit |
+| M-32 | The review badge is not live, although TECHNICAL-PLAN makes the review inbox live | `lib/review-badge.ts` | Audit |
+
+### 5.5 Low
+
+| ID | Finding | Mark |
+|---|---|---|
+| L-01 | The smoke test checks the app straight after `rotate-key`, which returns before the recreated container is serving. Locally, the check failed; the app answered one second later | Run |
+| L-02 | `smoke-test.sh` leaves `deploy/docker/backups/` behind | Run |
+| L-03 | One full test run fills 95% of Docker Desktop's default Postgres tmpfs (162 databases, 2.7 GB) before the next run sweeps them. A slightly larger suite would fail with "no space left" | Run |
+| L-04 | The end-to-end server log holds 1,076 "The destination stream closed early" errors. The noise hides real errors such as H-02 | Run |
+| L-05 | The README said Phase 1 was "in progress", counted 104 tasks, and showed an "in development" badge. **Fixed on `main` by PR #85.** Its new badge says "feature complete", which this review does not support | Code |
+| L-06 | GAP-AUDIT.md's checkboxes were never updated as tasks closed them. Stale comments remain in [notifications/create.ts:10](../packages/core/src/notifications/create.ts#L10), [e2e/reviews.spec.ts:325](../e2e/reviews.spec.ts#L325) and the session page header | Code |
+| L-07 | `biome.json` names schema 2.5.7 against CLI 2.5.14, and there are six lint warnings in two test files | Run |
+| L-08 | Onboarding says "Four questions" over a "1 / 5" counter. It has no tour and cannot be resumed from admin | Run |
+| L-09 | `/favicon.ico` returns 404 on every page | Run |
+| L-10 | Channel webhooks answer 200 for an unknown tenant and 401 for a bad signature, which tells a caller which tenants are installed | Audit |
+| L-11 | Identity-provider OAuth tokens are stored in plain text in `accounts` | Audit |
+| L-12 | The default console mail driver logs full message bodies, including invitation links | Audit |
+| L-13 | `./openokr restore` does not re-run migrations, and the restore runbook names a CronJob that does not exist | Audit |
+| L-14 | 41 tables are not named in the TECHNICAL-PLAN §7.2 importer mapping, and no gate checks it | Audit |
+| L-15 | A new OIDC connection takes effect only after a restart | Audit |
+| L-16 | Rule-key safety is a runtime throw. Nothing checks statically that the keys the code emits exist | Audit |
+| L-17 | No end-to-end path publishes a cycle, overrides a gate, publishes or acknowledges a check-in, or casts a vote. No cloud screen has one | Audit |
+| L-18 | The Caddyfile is unformatted and sets two headers Caddy already forwards | Run |
+| L-19 | The admin audit log can be verified and exported but not browsed | Audit |
+| L-20 | A Helm `values.yaml` comment says local disk is the only storage driver. S3 exists | Audit |
+
+---
+
+## 6. Requirements coverage, by area
+
+| Area | Verdict | Works | Missing or partial |
+|---|---|---|---|
+| Guided cycle (§3.1) | Partial | Phase rail, input pack, missing-item list, gates engine, override with reason | Completion for phases 1 to 7, drafting refusal, owner and due date, annual cycles (H-09, M-06) |
+| Quality at writing (§3.2) | Mostly | 26 live checks, strength score, six hard gates | An OBJ-1 failure does not block publishing (section 8); hardcoded bands in the interface (H-17) |
+| Cadence and staleness (§3.3) | Mostly | Next-due arithmetic, timezone, the scheduled `outdated` sweep, awaiting acknowledgement | Depends on the scheduler running (H-02) |
+| Check-ins (§3.4) | Built in core | Narrative, snapshot, draft then publish, private voting | No end-to-end publish (L-17) |
+| Review inbox (§3.5) | Partial | All seven sources, overdue-first ranking | Blockers never appear (H-10); proposals dead-end (M-08); badge not live (M-32) |
+| Weekly session (§3.6) | Partial | Four-step rail, digest, streak, trend, blocker board | Cannot be scheduled (H-08); voting-off defect (M-03); no escalation at 0.3 (H-10) |
+| Quarterly review (§3.7) | Built, not reachable | Eleven timed stages, reveal, retro, diagnostic, minutes export | Cannot be scheduled (H-08); feed-forward is manual (M-05) |
+| Agents (§3.8) | Partial | Scheduler, check-in escalation ladder, deduplication, quiet hours, snooze | 12 silent triggers (H-11); generic messages (H-12); authority and sandbox (H-04) |
+| Work Map (§3.9) | Partial | Goals and key results with health, progress and confidence | No initiatives or KPIs as nodes; not virtualised |
+| OKR core (Pillar A) | Partial | Goals, key results, alignment score, dependency register, KPI grid and trees, recovery board | KPI-backed key results (M-07); calculated KPI defect (H-20); corridors (H-17) |
+| Rhythm (Pillar B) | Partial | Blockers, commitments, monthly record, daily digest | Weekly digest (H-11); calibration UI (M-06) |
+| Work (Pillar C) | Partial | Initiatives, tasks, board with drag and concurrency-safe ordering, documents with versions and diff | Presence (M-02); documents and files on most surfaces (M-01); previews and scan (M-24) |
+| Coaching and AI (Pillar D) | Mostly | Draft Coach, copilot with access-filtered citations, background runs, six providers, caps, metering, OAuth 2.1 with PKCE, 350 MCP tools | Egress (M-10); assists (M-09); custom agents (M-11); local MCP path (M-12) |
+| Channels (Pillar E) | Partial | Five drivers behind one port, signature verification, member resolution through `can()`, per-member preference and quiet hours | Generic nudges (H-12); Slack form path (H-06); Teams form and space posts (M-23) |
+| Platform (Pillar F) | Partial | Spaces, people, org chart, invitations, trusted domains, SSO, SCIM, feed at four scopes, search, audit chain, freeze, theme and density | Notifications (H-13); second admin (H-14); undo (M-13); phone (H-16); terminology and branding (M-14) |
+| Deployment (§5) | Partial | Compose in 18 seconds, Helm install and upgrade, nightly upgrade test | Database role (H-01); image build (H-22); Helm backups (H-19) |
+| Managed cloud (§5) | Partial | Tenancy, admission limits, support sessions visible to the customer | Plans and seats, first operator (H-21); SSO listing (H-03); SSRF (H-07) |
+| Importers (§6) | Mostly | Spreadsheet wizard with AI mapping, dry run, per-row report; FlowyTeam read-only and idempotent | Template downloads (M-17); silent table skips (M-16) |
+| Portability (§4 F, §7) | Partial | Encrypted, checksummed archive covering every table | Cross-instance moves (H-18); restore drill in CI (H-19) |
+| Languages (§6) | English complete; Malay a stub | | M-15 |
+| Accessibility (§6) | Mostly | Axe scan on every list screen, keyboard flows | 26 detail routes unscanned (M-20) |
+| Air gap (§6) | Mostly | Six checks pass; AI off by default; assets self-hosted | The Helm backup job installs `openssl` at run time |
+
+---
+
+## 7. Release readiness
+
+| Item | State |
+|---|---|
+| A tagged release | None. No git tags |
+| Package versions | All `0.0.0` |
+| Pending changesets | 47 (24 minor, 23 patch) |
+| Release workflow | Present: verify, build, sign, publish, SBOM, chart. Never exercised by a real tag |
+| P8-T14 acceptance | Clean install and chart install run in this review, and both work apart from the defects above. Upgrade from a previous release cannot run until one exists |
+| Published image | None, so self-hosters must build from source (H-22). Since PR #85 the install guides say so plainly |
+| README | Corrected by PR #85, apart from the "feature complete" badge (L-05) |
+| Open GitHub issues | None at the time of the review |
+| Open pull requests | None at the time of the review |
+
+---
+
+## 8. Decisions that belong to a human
+
+CLAUDE.md puts these on the "ask the human" list. None should be settled by a developer.
+
+| # | Decision | Why it needs a human |
+|---|---|---|
+| 1 | Should a failing OBJ-1 block publishing? REQUIREMENTS §3.2's acceptance criterion says yes; METHOD.md §4.5's gate 2 judges key result checks only | A REQUIREMENTS versus METHOD conflict, and a practice change |
+| 2 | The lowest process-health statement is fed forward as a Phase 2 issue, not a Phase 3 priority | Practice changed in code without approval (M-05) |
+| 3 | Build the 12 silent triggers, or strike them from AI-NATIVE-PLAN §6.4 | Adding or removing a proactive message kind (H-11) |
+| 4 | Should initiatives feed the key result forecast? REQUIREMENTS §4 Pillar C says yes; TECHNICAL-PLAN §4.9 limits it | Document conflict (M-26) |
+| 5 | Which library re-encodes images and scans files | A new runtime dependency (M-24) |
+| 6 | The database role model for Compose, and whether Helm should require a restricted role | A deployment change (H-01, H-02) |
+| 7 | How an archive is keyed for cross-instance moves: a passphrase, or a recipient key | A security design choice (H-18) |
+| 8 | Whether an external accessibility audit is needed before launch | Open question in REQUIREMENTS §10 |
+| 9 | Which `done` rows to reopen (section 10) | Only a human sets `done`, so only a human should unset it |
+
+---
+
+## 9. What this review did not verify
+
+- **Real providers.** Slack, Teams, WhatsApp and Telegram apps; SMTP delivery; real Anthropic, OpenAI, Google and Ollama endpoints; a real MCP client such as Claude Desktop; a real identity provider. The repository tests all of these against fakes or fixtures.
+- **Performance and load.** The 100,000-goal budgets and the load and soak runs were not repeated.
+- **CodeQL and Dependency review.** Neither is runnable locally.
+- **A screen reader.** The accessibility procedure in `docs/design/p7-t05-accessibility.md` is a person's job.
+- **The managed cloud deployment itself.**
+- **Every finding marked `Audit`.** Each was read from code and spot-checked, not reproduced. Section 5 gives reproduction steps where they are short.
+
+---
+
+## 10. Suggested order of work
+
+1. **Security, as one change.** H-01 and H-02 together, then H-03, H-05, H-06, H-07, H-04.
+2. **Make the rhythm usable.** H-08 (schedule sessions, book the cycle), H-10, H-12, the rhythm half of H-11 (`confidence.critical`, `digest.weekly`, `commitment.due`, `streak.at_risk`), H-13.
+3. **Make the cycle completable.** H-09, H-17, H-15.
+4. **Admin and mobile.** H-14, H-16.
+5. **Data safety.** H-18, H-19, H-20, M-16.
+6. **First impression and release.** H-22, H-24, and the README badge (L-05). Then cut the first tag by [the release runbook](runbooks/release.md) and run P8-T14's three checks for real.
+7. **Close the loopholes that let these ship.** Rewrite the false exemptions (M-30). Add a gate for trigger emitters (H-11), a check for task IDs in rendered text (H-24), and an end-to-end run with a live scheduler under the restricted role (H-02).
+8. **The Medium table**, in the order a user would notice it: M-01, M-13, M-03, M-07, M-08, then the rest.
+
+**Rows worth reopening in STATUS.md**, because their own plan text promises what is missing:
+
+| Row | What its plan text promises that is not there |
+|---|---|
+| P1-T09 | The setup wizard's real probes and role setup (H-01, H-24) |
+| P2-T05 | Images re-encoded, and the scan hook (M-24) |
+| P2-T17 | "A sandbox run commits nothing" (H-04) |
+| P5-T11 | Live presence on the board (M-02) |
+| P6-T05a, P6-T05b | Moves between instances (H-18) |
+| P6-T06 | A restore drill in continuous integration (H-19) |
+| P8-T14 | Its acceptance criterion (H-23) |
+
+---
+
+## Appendix: commands run
+
+```
+pnpm typecheck && pnpm lint && pnpm dead-code && pnpm db:lint
+pnpm check:boundaries && pnpm check:air-gap && pnpm check:docs
+pnpm check:licences && pnpm check:contract && pnpm method:check
+pnpm test:ci --maxWorkers=4          # against the running test stack
+pnpm build && pnpm test:e2e
+docker build -f deploy/docker/Dockerfile -t openokr:test .
+OPENOKR_IMAGE=openokr:test sh deploy/docker/smoke-test.sh
+sh deploy/helm/check.sh
+kind create cluster --name openokr
+kind load docker-image openokr:test --name openokr
+OPENOKR_IMAGE_TAG=test sh deploy/helm/cluster-test.sh
+```
+
+The S3 tests were run against `adobe/s3mock` with `TEST_S3_ENDPOINT`, `TEST_S3_BUCKET`, `TEST_S3_ACCESS_KEY_ID` and `TEST_S3_SECRET_ACCESS_KEY` set. Every stack, cluster and container this review started was removed afterwards. The test database stack that was already running was left as it was.
