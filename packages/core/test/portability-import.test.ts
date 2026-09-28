@@ -377,3 +377,45 @@ describe("what a move keeps", () => {
     expect(rows.map((row) => row.storage_key)).toEqual([key]);
   });
 });
+
+describe("search after a move (completeness review M-31)", () => {
+  it("queues the imported rows for the search index, and a dry run queues nothing", async () => {
+    const wb = await workerDb();
+    const kpi = (await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId: sourceWorkspaceId,
+        actor: { kind: "human", userId: OWNER_A },
+      },
+      "kpis.create",
+      {
+        title: "Weekly active teams",
+        ownerKind: "workspace",
+        frequency: "monthly",
+        direction: "higher_better",
+        indicatorType: "lagging",
+        tier: "output",
+        aggregate: "sum",
+      },
+    )) as { id: string };
+    const exported = await exportSource();
+
+    const queued = async () =>
+      (
+        await wb.admin.query<{ entity_type: string }>(
+          `select payload->>'entityType' as entity_type from outbox
+            where topic = 'content.index' and payload->>'workspaceId' = $1`,
+          [targetWorkspaceId],
+        )
+      ).rows.map((row) => row.entity_type);
+
+    await importIntoTarget(exported.bytes, true);
+    expect(await queued()).toEqual([]);
+
+    await importIntoTarget(exported.bytes, false);
+    // The KPI arrives under a new id, so the job is found by type: before
+    // this, nothing was queued at all and search came back empty.
+    expect(await queued()).toContain("kpi");
+    expect(kpi.id).toBeTruthy();
+  });
+});
