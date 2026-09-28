@@ -262,3 +262,53 @@ describe("a key result's owner and due date", () => {
     expect(rows[0]).toMatchObject({ owner_id: ownerMemberId, due_on: null });
   });
 });
+
+/**
+ * REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason"
+ * (completeness review H-09). The cycle screen's drafting is guided; a goal
+ * added anywhere else does not wait on the planning phases.
+ */
+describe("drafting in a blocked phase 4", () => {
+  const objective = {
+    title: "Make onboarding the reason new customers stay",
+    level: "company",
+    ownerKind: "workspace",
+    weight: 1,
+  };
+
+  it("refuses a guided draft and names what the earlier phases still need", async () => {
+    await expect(
+      call("goals.create", {
+        ...objective,
+        cycleId: quarterId,
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        guided: true,
+      }),
+    ).rejects.toThrow(
+      /^Drafting waits until the earlier phases are complete\. .*Phase 1: No sponsor named/,
+    );
+  });
+
+  it("refuses a guided key result on a goal in that cycle, and lets an unguided one through", async () => {
+    const goal = (await call("goals.create", {
+      ...objective,
+      cycleId: quarterId,
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+    })) as { id: string };
+    const keyResult = {
+      goalId: goal.id,
+      title: "Raise activation from 41% to 60%",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 41,
+      targetValue: 60,
+      weight: 1,
+    };
+    await expect(
+      call("goals.addKeyResult", { ...keyResult, guided: true }),
+    ).rejects.toThrow(/Drafting waits/);
+    await expect(call("goals.addKeyResult", keyResult)).resolves.toBeTruthy();
+  });
+});

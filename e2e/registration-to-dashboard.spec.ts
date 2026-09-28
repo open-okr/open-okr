@@ -336,8 +336,88 @@ test("opening phase 4 names what is blocking drafting", async () => {
   await expect(
     page.getByText(/Input pack item 7 is missing: Open risks/),
   ).toBeVisible();
+  // REQUIREMENTS §3.1: "drafting in Phase 4 is refused with the reason"
+  // (completeness review H-09). The form gives way to the reason, and the
+  // server refuses a guided draft regardless.
+  await expect(
+    page.getByText("Drafting opens once the earlier phases are complete"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add objective" })).toHaveCount(
+    0,
+  );
   await page.getByRole("link", { name: "Go and gather what is missing" }).click();
   await expect(page).toHaveURL("/cycle?phase=1");
+});
+
+/**
+ * Phases 1 to 3 completed from the browser (completeness review H-09).
+ *
+ * The sponsor, the facilitator, the planning dates, baseline health and the
+ * quarterly revalidation had no control on any screen, so none of these phases
+ * could turn green and drafting was never allowed. Every step below is a
+ * control a facilitator uses.
+ */
+test("the planning phases complete from the browser, and drafting opens", async () => {
+  await page.goto("/cycle?phase=1");
+
+  // The rest of the input pack.
+  const ungathered = page.getByRole("button", { name: /^Mark ".*" as gathered$/ });
+  for (let left = await ungathered.count(); left > 0; left -= 1) {
+    await ungathered.first().click();
+    await expect(ungathered).toHaveCount(left - 1);
+  }
+
+  // Roles, the first planning session two weeks out, and a first cycle.
+  const setup = page.locator("form", { has: page.getByLabel("Sponsor") });
+  await setup.getByLabel("Sponsor").selectOption({ index: 1 });
+  await setup.getByLabel("Facilitator").selectOption({ index: 1 });
+  const inTwoWeeks = new Date(Date.now() + 14 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  await setup.getByLabel("Diagnosis session").fill(inTwoWeeks);
+  await setup.getByLabel(/This is our first OKR cycle/).check();
+  await setup.getByRole("button", { name: "Save" }).click();
+  await expect(setup.getByLabel("Diagnosis session")).toHaveValue(inTwoWeeks);
+
+  await page.getByRole("button", { name: "Confirm distribution" }).click();
+  await expect(page.getByText("Distributed", { exact: true })).toBeVisible();
+
+  // Phase 2: baseline health and three ranked issues.
+  await page.goto("/cycle?phase=2");
+  const baseline = page.locator("form", { has: page.getByLabel("Stable") });
+  await baseline.getByLabel("Stable").fill("Churn holds at 2% a month");
+  await baseline.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Recorded", { exact: true })).toBeVisible();
+  for (const issue of [
+    "Trials stall before the first project",
+    "Support answers take a day",
+    "Mobile sign-ups do not activate",
+  ]) {
+    await page.getByRole("textbox", { name: "The issue" }).fill(issue);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    // First, because the issue's own impact control is labelled with it too.
+    await expect(page.getByText(issue, { exact: true }).first()).toBeVisible();
+  }
+
+  // Phase 3, quarterly: the frame holds, and the quarter names its focus.
+  await page.goto("/cycle?phase=3");
+  const revalidation = page.locator("form", {
+    has: page.getByLabel("Focus areas for this quarter"),
+  });
+  await revalidation.getByLabel("The annual frame").selectOption("holds");
+  await revalidation
+    .getByLabel("Focus areas for this quarter")
+    .fill("Mobile activation");
+  await revalidation.getByRole("button", { name: "Save" }).click();
+  await expect(
+    revalidation.getByLabel("Focus areas for this quarter"),
+  ).toHaveValue("Mobile activation");
+
+  await page.goto("/cycle?phase=4");
+  await expect(
+    page.getByText("This phase is blocked by earlier work"),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add objective" })).toBeVisible();
 });
 
 /**
@@ -388,10 +468,13 @@ test("drafting a goal with key results persists at zero percent and pending", as
   // The progress bar carries the number as an accessible value, which is a
   // single element where the rendered "0%" is not.
   await expect(page.getByText("pending")).toBeVisible();
-  await expect(page.getByRole("progressbar").first()).toHaveAttribute(
-    "aria-valuenow",
-    "0",
-  );
+  // By name, because the phase rail draws its own bars and phases 1 to 3 are
+  // complete by now.
+  await expect(
+    page.getByRole("progressbar", {
+      name: "Progress of Make mobile the way our customers prefer to reach us",
+    }),
+  ).toHaveAttribute("aria-valuenow", "0");
 });
 
 /**
@@ -482,7 +565,22 @@ test("the quality panel groups every issue and links at the field", async () => 
     }),
   ).toBeVisible();
 
-  // KR-3 fires on both key results: neither carries a date or an owner.
+  // The form now gives each key result an owner and a date (H-09), so KR-3
+  // passes as drafted. Clearing one owner with the inline control is what
+  // makes it fire, and proves the control writes.
+  await page
+    .getByRole("combobox", {
+      name: "Owner of Raise mobile activation from 41% to 60%",
+    })
+    .selectOption("");
+  await page
+    .locator("form", {
+      has: page.getByRole("combobox", {
+        name: "Owner of Raise mobile activation from 41% to 60%",
+      }),
+    })
+    .getByRole("button", { name: "Save" })
+    .click();
   const issue = panel.getByRole("link", { name: /KR-3/ }).first();
   await expect(issue).toBeVisible();
   const href = await issue.getAttribute("href");
@@ -502,9 +600,9 @@ test("the quality panel groups every issue and links at the field", async () => 
  * feature look identical from the outside, and a writer who cannot tell the
  * difference assumes the rules stopped applying too.
  *
- * The goal is the one the drafting test made, whose two key results both fail
- * KR-3 for carrying no date and no owner. Stored flags, written by P4-T02a in
- * the transaction that created them, not a fresh evaluation on this page.
+ * The goal is the one the drafting test made, where the quality panel test
+ * cleared one key result's owner, so KR-3 fails on it. Stored flags, written
+ * by P4-T02a in the transaction that changed it, not a fresh evaluation here.
  */
 test("the goal page shows the stored verdicts and explains the missing assist", async () => {
   await page.goto("/cycle?phase=4");

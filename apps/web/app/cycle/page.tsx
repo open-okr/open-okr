@@ -508,6 +508,7 @@ export default async function CyclePage({
           <Drafting
             cycleId={workflow.cycleId}
             endsOn={workflow.endsOn}
+            draftingAllowed={work.allowed}
             goals={draft.goals}
             members={draft.members}
             canEdit={canEdit}

@@ -64,6 +64,9 @@ export async function createGoal(
       reviewerId,
       weight: 1,
       ...(contributionStatement === "" ? {} : { contributionStatement }),
+      // Phase 4 of the guided cycle: refused, with the reason, while an
+      // earlier phase is incomplete (REQUIREMENTS §3.1, H-09).
+      guided: true,
     }),
   );
 }
@@ -100,6 +103,7 @@ export async function addKeyResult(
       // neither, so every key result drafted here failed it (H-09).
       ...(ownerId === "" ? {} : { ownerId }),
       ...(dueOn === "" ? {} : { dueOn }),
+      guided: true,
       direction: String(formData.get("direction") ?? "increase") as
         | "increase"
         | "reduce"

@@ -5567,6 +5567,12 @@
           "field": "legacy",
           "type": "object",
           "required": false
+        },
+        {
+          "name": "guided",
+          "field": "guided",
+          "type": "boolean",
+          "required": false
         }
       ],
       "pages": false
@@ -5910,6 +5916,12 @@
           "name": "legacy",
           "field": "legacy",
           "type": "object",
+          "required": false
+        },
+        {
+          "name": "guided",
+          "field": "guided",
+          "type": "boolean",
           "required": false
         }
       ],

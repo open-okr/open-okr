@@ -7665,6 +7665,9 @@
               "type",
               "id"
             ]
+          },
+          "guided": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -8090,6 +8093,9 @@
               "type",
               "id"
             ]
+          },
+          "guided": {
+            "type": "boolean"
           }
         },
         "required": [

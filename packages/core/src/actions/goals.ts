@@ -60,6 +60,7 @@ import {
 } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { draftingRefusal } from "../cycles/workflow.ts";
 import {
   asNumber,
   clampWeight,
@@ -101,6 +102,23 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
  * end of the list: the cursor still advances, and the caller asks again.
  */
 const GOAL_PAGE = 200;
+
+/** Refuses guided drafting while an earlier phase is incomplete (H-09). */
+async function refuseUnreadyDrafting(
+  tx: OperationTx,
+  workspaceId: string,
+  cycleId: string,
+): Promise<void> {
+  const refusal = await draftingRefusal(
+    tx,
+    workspaceId,
+    cycleId,
+    resolveRhythm(await readRhythmRow(tx, workspaceId)).thresholds,
+  );
+  if (refusal) {
+    throw new OperationError("forbidden", refusal);
+  }
+}
 
 /** A key result's due date: a local calendar date, never a free string. */
 const localDate = z
@@ -1012,6 +1030,13 @@ export const createGoal = defineWriteAction({
        * the importer updates the row it finds instead.
        */
       legacy: legacyKey.optional(),
+      /**
+       * Drafted in the guided cycle's phase 4 (REQUIREMENTS §3.1). Refused,
+       * with the reason, while an earlier phase is incomplete. The cycle
+       * screen sets it; a goal added anywhere else does not wait on the
+       * planning phases (completeness review H-09).
+       */
+      guided: z.boolean().optional(),
     })
     // OBJ-3 as a boundary check, so the refusal is a sentence rather than a
     // constraint violation. The database enforces the same thing underneath.
@@ -1033,6 +1058,9 @@ export const createGoal = defineWriteAction({
       );
 
       await assertLegacyKeyFree(tx, workspaceId, goals, input.legacy, "goal");
+      if (input.guided && input.cycleId) {
+        await refuseUnreadyDrafting(tx, workspaceId, input.cycleId);
+      }
 
       // A parent has to be one this writer can actually see, resolved through
       // the getter so an invisible parent reads as not found (§4.2).
@@ -1764,6 +1792,8 @@ export const createKeyResult = defineWriteAction({
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
     /** The source-system identity, when an import is creating this (P6-T01a). */
     legacy: legacyKey.optional(),
+    /** Drafted in the guided cycle's phase 4, as on `goals.create`. */
+    guided: z.boolean().optional(),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1781,6 +1811,16 @@ export const createKeyResult = defineWriteAction({
         input.goalId,
         ACCESS_LEVELS.edit,
       );
+      if (input.guided) {
+        const [goal] = await tx
+          .select({ cycleId: goals.cycleId })
+          .from(goals)
+          .where(activeOnly(goals, eq(goals.id, input.goalId)))
+          .limit(1);
+        if (goal?.cycleId) {
+          await refuseUnreadyDrafting(tx, workspaceId, goal.cycleId);
+        }
+      }
 
       await assertLegacyKeyFree(
         tx,

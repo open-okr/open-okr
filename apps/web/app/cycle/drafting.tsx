@@ -77,6 +77,7 @@ const HEALTH_TONE: Readonly<
 export async function Drafting({
   cycleId,
   endsOn,
+  draftingAllowed,
   goals,
   members,
   canEdit,
@@ -88,6 +89,13 @@ export async function Drafting({
   readonly cycleId: string;
   /** The cycle's last day, which a new key result is due on unless changed. */
   readonly endsOn: string;
+  /**
+   * False while an earlier phase is incomplete. The add forms give way to the
+   * reason, which the banner above names, and the server refuses a guided
+   * draft regardless (REQUIREMENTS §3.1, H-09). What is already drafted stays
+   * editable: finishing a draft is not starting one.
+   */
+  readonly draftingAllowed: boolean;
   readonly goals: readonly DraftGoal[];
   readonly members: readonly { readonly id: string; readonly name: string }[];
   readonly canEdit: boolean;
@@ -110,10 +118,21 @@ export async function Drafting({
   readonly assistsAvailable: boolean;
 }) {
   const { t } = await getTranslations();
+  const canDraft = canEdit && draftingAllowed;
 
   return (
     <div className="flex flex-col gap-4.5">
-      {assistsAvailable && canEdit ? (
+      {canEdit && !draftingAllowed ? (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-2">
+              {t("cycle.drafting.waitsForEarlierPhases")}
+            </p>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {assistsAvailable && canDraft ? (
         <DraftFromAmbition cycleId={cycleId} memberId={memberId} />
       ) : null}
 
@@ -199,6 +218,7 @@ export async function Drafting({
               <Bar
                 value={goal.progressPct}
                 max={thresholds["scoring.progressCeilingPct"]}
+                label={t("cycle.drafting.progressOf", { title: goal.title })}
                 className="h-1.5 flex-1"
               />
               <span className="text-xs font-semibold text-ink-3">
@@ -346,7 +366,7 @@ export async function Drafting({
               </ul>
             )}
 
-            {canEdit ? (
+            {canDraft ? (
               <ActionForm
                 action={addKeyResult}
                 className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
@@ -463,14 +483,14 @@ export async function Drafting({
               </ActionForm>
             ) : null}
 
-            {assistsAvailable && canEdit ? (
+            {assistsAvailable && canDraft ? (
               <SuggestMeasure goalId={goal.id} />
             ) : null}
           </CardBody>
         </Card>
       ))}
 
-      {canEdit ? (
+      {canDraft ? (
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
