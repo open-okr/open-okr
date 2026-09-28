@@ -10,13 +10,10 @@ import { getPool } from "./auth";
  * obligation: a badge that includes next week never reaches zero, and a badge
  * that never reaches zero stops being read.
  *
- * **"Live" today means recomputed on navigation and after the writes that move
- * it**, not pushed. The realtime port has no host running in the application yet
- * (P3-T07 recorded the same gap for the vote reveal), so the honest description
- * of what ships here is server-rendered on every request, with
- * `revalidatePath` from publication, acknowledgement and deletion. When the
- * relay lands, this becomes the initial value for a subscription rather than the
- * only value.
+ * **Live since completeness review M-32.** This is the value the page renders
+ * with; `ReviewBadgeLive` keeps it current by listening to the workspace's feed
+ * stream and asking `/api/review/badge`, which calls this function, whenever
+ * the feed moves. It used to be recomputed only on navigation.
  *
  * A failure returns null and draws no badge. The sidebar is chrome on every
  * authenticated page, and a workspace whose inbox read fails should still be

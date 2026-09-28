@@ -31,6 +31,7 @@ import { navBlocks } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
+import { ReviewBadgeLive } from "./review-badge-live.tsx";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
@@ -310,6 +311,12 @@ export async function AppShellLayout({
            * screen without each one remembering to render it (P5-T13).
            */}
           <CommandPalette />
+          {/* The Review count, kept current by the workspace's own feed
+           * stream (completeness review M-32). Only for somebody who can
+           * read the workspace, which is who the badge is drawn for. */}
+          {level >= ACCESS_LEVELS.view ? (
+            <ReviewBadgeLive count={reviewBadge} />
+          ) : null}
           <ShortcutOverlay />
           <StaleDeploymentWatcher buildId={loadEnv().APP_BUILD_ID} />
         </ToastProvider>
