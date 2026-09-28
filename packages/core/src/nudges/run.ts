@@ -38,6 +38,18 @@ import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { deliverDueNudges, unreachableRecipients } from "./deliver.ts";
 import { resolveRhythmWithLadders } from "./ladders.ts";
 import { dueQualityNudges } from "./quality.ts";
+import {
+  dueCycleQualityNudges,
+  dueObjectiveQualityNudges,
+  dueProcessHealthNudges,
+} from "./quality-triggers.ts";
+import {
+  dueCommitmentNudges,
+  dueCriticalConfidenceNudges,
+  duePhaseBlockedNudges,
+  dueStreakNudges,
+  dueWeeklyDigestNudges,
+} from "./rhythm-triggers.ts";
 import { dueCycleNudges, dueSessionNudges } from "./rituals.ts";
 import {
   activeMemberIds,
@@ -215,6 +227,20 @@ export async function runDueNudgesInTx(
         thresholds,
         ...scoped,
       })),
+      // The two that react to an event, looking back one deduplication
+      // window (completeness review H-11).
+      ...(await dueCriticalConfidenceNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueWeeklyDigestNudges(tx, {
+        workspaceId,
+        now: at,
+        thresholds,
+        ...scoped,
+      })),
     );
   }
 
@@ -247,6 +273,18 @@ export async function runDueNudgesInTx(
         workspaceId,
         now: at,
         workspaceTimeZone: timeZone,
+      })),
+      ...(await dueCommitmentNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        ...scoped,
+      })),
+      ...(await dueStreakNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        ...scoped,
       })),
     );
   }
@@ -290,12 +328,35 @@ export async function runDueNudgesInTx(
     }
     due.push(
       ...(await dueQualityNudges(tx, { workspaceId, thresholds, ...scoped })),
+      ...(await dueObjectiveQualityNudges(tx, {
+        workspaceId,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueCycleQualityNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+        ...scoped,
+      })),
+      ...(await dueProcessHealthNudges(tx, {
+        workspaceId,
+        now: at,
+        ...scoped,
+      })),
     );
   }
 
   if (cadence === "cycle") {
     due.push(
       ...(await dueCycleNudges(tx, {
+        workspaceId,
+        now: at,
+        timeZone,
+        thresholds,
+      })),
+      ...(await duePhaseBlockedNudges(tx, {
         workspaceId,
         now: at,
         timeZone,

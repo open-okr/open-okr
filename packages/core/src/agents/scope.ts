@@ -25,7 +25,7 @@
  * and the cycle nudges they drive go to the people who run the calendar.
  */
 import { blockers, checkIns, goals, kpis, okrSessions } from "@openokr/db";
-import { type SQL, sql } from "drizzle-orm";
+import { type Column, type SQL, sql } from "drizzle-orm";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 
 /** The agent a run reads as. */
@@ -127,4 +127,12 @@ export function agentSeesBlocker(scope: AgentScope): SQL {
 /** A session: through its space. */
 export function agentSeesSession(scope: AgentScope): SQL {
   return boundThroughAny(scope, [["space", sql`${okrSessions.spaceId}`]]);
+}
+
+/**
+ * Anything that belongs to a space by a `space_id` column of its own, such as
+ * a commitment or a streak (completeness review H-11): through that space.
+ */
+export function agentSeesSpaceId(scope: AgentScope, spaceId: Column): SQL {
+  return boundThroughAny(scope, [["space", sql`${spaceId}`]]);
 }

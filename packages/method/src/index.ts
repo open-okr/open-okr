@@ -269,6 +269,15 @@ export {
   validateOverrides,
 } from "./thresholds.ts";
 export {
+  closeIsSandbagged,
+  commitmentDueToday,
+  confidenceIsCritical,
+  draftIsSandbagged,
+  objectivesOverCap,
+  phasesClosingToday,
+  streakAtRisk,
+} from "./trigger-conditions.ts";
+export {
   deterministicTriggers,
   isTriggerKey,
   TRIGGER_CATALOGUE,
