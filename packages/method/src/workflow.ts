@@ -174,6 +174,13 @@ export interface CycleWorkflowInput {
     readonly focusNote: string | null;
   } | null;
   readonly focusKeyResultCount: number;
+  /**
+   * How many key results the year this quarter sits in holds, which decides
+   * whether phase 3's focus is a choice among them or a written note. Read on
+   * its own because a year can hold key results before anybody writes the
+   * frame. Falls back to the frame's count when a caller does not supply it.
+   */
+  readonly annualKeyResultCount?: number;
   readonly hasCapacityNotes: boolean;
   readonly frame: FrameSnapshot | null;
   /** The cycle's goals and key results. Undefined when not read. */
@@ -516,7 +523,8 @@ function phaseThree(
 
   // "Focus areas chosen": the focus key results, or a written note where the
   // frame has no annual key results to point at.
-  const frameHasAnnualKeyResults = (input.frame?.annualKeyResultCount ?? 0) > 0;
+  const frameHasAnnualKeyResults =
+    (input.annualKeyResultCount ?? input.frame?.annualKeyResultCount ?? 0) > 0;
   if (input.focusKeyResultCount === 0) {
     if (frameHasAnnualKeyResults) {
       missing.push("No focus key results chosen for this quarter");

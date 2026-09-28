@@ -229,6 +229,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "cycle.revalidated": z.object({ holds: z.boolean(), changed: z.boolean() }),
   "cycle.baseline_health_set": z.object({}),
   "cycle.capacity_recorded": z.object({}),
+  "cycle.focus_set": z.object({ count: z.number().int() }),
   "cycle.calibrated": z.object({}),
   "cycle.published": z.object({
     name: z.string(),

@@ -72,12 +72,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, string>> = {
     "no screen yet, and it is P7's own row for personal keys",
   "ai.updateCustomModel":
     "no screen yet, and it is P7's own row for the model catalogue",
-  "workflow.setRevalidation":
-    "it is an AI draft, offered through the phase assists",
-  "workflow.setBaselineHealth":
-    "it is an AI draft, offered through the phase assists",
-  "workflow.setCapacityNotes":
-    "it is an AI draft, offered through the phase assists",
   "workflow.calibrate": "it is an AI draft, offered through the phase assists",
   "kpis.recoveryDraft":
     "it is an AI draft, offered on the recovery board beside the corridor it is recovering from",

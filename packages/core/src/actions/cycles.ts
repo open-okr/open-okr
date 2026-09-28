@@ -27,7 +27,7 @@ import {
   THRESHOLD_KEYS,
   THRESHOLDS,
 } from "@openokr/method";
-import { asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -104,6 +104,39 @@ async function actingMember(
     throw new OperationError("not_found", "No such workspace.");
   }
   return member.id;
+}
+
+/**
+ * A sponsor or facilitator a cycle may name: an active person in this
+ * workspace (completeness review H-09). The foreign key alone accepts a
+ * suspended member, an agent, or a member of another workspace, because a key
+ * check does not see row-level security.
+ */
+async function requireCycleRole(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  role: "sponsor" | "facilitator",
+): Promise<void> {
+  const [member] = await tx
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        eq(workspaceMembers.workspaceId, workspaceId),
+        eq(workspaceMembers.id, memberId),
+        eq(workspaceMembers.status, "active"),
+        inArray(workspaceMembers.kind, ["human", "guest"]),
+      ),
+    )
+    .limit(1);
+  if (!member) {
+    throw new OperationError(
+      "forbidden",
+      `The ${role} must be an active person in this workspace.`,
+    );
+  }
 }
 
 const toCycleOutput = (row: {
@@ -414,13 +447,30 @@ export const updateCycle = defineWriteAction({
     contributingUnits: z.string().max(2000).nullable().optional(),
     firstCycle: z.boolean().optional(),
     sessionDates: z
-      .array(z.object({ key: z.string().min(1), on: z.string() }))
+      .array(
+        z.object({
+          key: z.string().min(1).max(60),
+          on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        }),
+      )
+      .max(20)
       .optional(),
   }),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
+      if (input.sponsorId) {
+        await requireCycleRole(tx, workspaceId, input.sponsorId, "sponsor");
+      }
+      if (input.facilitatorId) {
+        await requireCycleRole(
+          tx,
+          workspaceId,
+          input.facilitatorId,
+          "facilitator",
+        );
+      }
       const [existing] = await tx
         .select(CYCLE_COLUMNS)
         .from(cycles)

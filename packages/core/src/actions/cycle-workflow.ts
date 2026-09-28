@@ -16,6 +16,7 @@ import {
   cycleBaselineHealth,
   cycleCalibrations,
   cycleCapacityNotes,
+  cycleFocusKeyResults,
   cycleIssues,
   cyclePackItems,
   cyclePriorities,
@@ -27,7 +28,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { INPUT_PACK_ITEMS } from "@openokr/method";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -39,11 +40,16 @@ import {
   ensurePackItemsInTx,
   evaluateWorkflow,
   loadCycleForWorkflow,
+  loadFocusCandidates,
   readPackItems,
   recomputeGateState,
 } from "../cycles/workflow.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
+import { plainTextLines } from "../rich-text/excerpt.ts";
+import {
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+} from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { recomputeForCycle } from "../scoring/recompute.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -103,6 +109,19 @@ async function withGateRecompute(
   );
   await recomputeGateState(tx, workspaceId, cycleId, snapshot.gates);
   return { cycle, snapshot };
+}
+
+/**
+ * A stored editor document as the plain text a form field shows, or null.
+ * Paragraphs come back separated by a blank line, which is how
+ * `richTextFromPlainText` splits them, so a save round-trips.
+ */
+function plainOf(value: unknown): string | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const text = plainTextLines(value as RichTextDocument).join("\n\n");
+  return text === "" ? null : text;
 }
 
 /** Resolves the acting member, refusing the way every other read does. */
@@ -245,6 +264,34 @@ export const readWorkflow = defineReadAction({
         position: z.number().int(),
       }),
     ),
+    /**
+     * What the phase 1, 2, 3 and 5 forms show as already saved (completeness
+     * review H-09). Each had a write and no screen, so none was ever read
+     * back either.
+     */
+    sessionDates: z.array(z.object({ key: z.string(), on: z.string() })),
+    baselineHealth: z
+      .object({
+        stable: z.string().nullable(),
+        declining: z.string().nullable(),
+        businessAsUsual: z.string().nullable(),
+      })
+      .nullable(),
+    revalidation: z
+      .object({
+        holds: z.boolean(),
+        changed: z.boolean(),
+        changeNote: z.string().nullable(),
+        focusNote: z.string().nullable(),
+      })
+      .nullable(),
+    focus: z.object({
+      chosen: z.array(z.uuid()),
+      candidates: z.array(
+        z.object({ id: z.uuid(), title: z.string(), goalTitle: z.string() }),
+      ),
+    }),
+    capacityCuts: z.string().nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -324,6 +371,68 @@ export const readWorkflow = defineReadAction({
           )
           .orderBy(asc(cyclePriorities.position));
 
+        const [baseline] = await tx
+          .select({
+            stable: cycleBaselineHealth.stable,
+            declining: cycleBaselineHealth.declining,
+            businessAsUsual: cycleBaselineHealth.businessAsUsual,
+          })
+          .from(cycleBaselineHealth)
+          .where(
+            activeOnly(
+              cycleBaselineHealth,
+              eq(cycleBaselineHealth.workspaceId, context.workspaceId),
+              eq(cycleBaselineHealth.cycleId, input.cycleId),
+            ),
+          )
+          .limit(1);
+        const [revalidation] = await tx
+          .select({
+            holds: cycleRevalidations.holds,
+            changed: cycleRevalidations.changed,
+            changeNote: cycleRevalidations.changeNote,
+            focusNote: cycleRevalidations.focusNote,
+          })
+          .from(cycleRevalidations)
+          .where(
+            activeOnly(
+              cycleRevalidations,
+              eq(cycleRevalidations.workspaceId, context.workspaceId),
+              eq(cycleRevalidations.cycleId, input.cycleId),
+            ),
+          )
+          .limit(1);
+        const [capacity] = await tx
+          .select({ cuts: cycleCapacityNotes.cuts })
+          .from(cycleCapacityNotes)
+          .where(
+            activeOnly(
+              cycleCapacityNotes,
+              eq(cycleCapacityNotes.workspaceId, context.workspaceId),
+              eq(cycleCapacityNotes.cycleId, input.cycleId),
+            ),
+          )
+          .limit(1);
+        const chosen = await tx
+          .select({ id: cycleFocusKeyResults.annualKeyResultId })
+          .from(cycleFocusKeyResults)
+          .where(
+            activeOnly(
+              cycleFocusKeyResults,
+              eq(cycleFocusKeyResults.workspaceId, context.workspaceId),
+              eq(cycleFocusKeyResults.cycleId, input.cycleId),
+            ),
+          );
+        const sessionDates = (
+          Array.isArray(cycle.sessionDates) ? cycle.sessionDates : []
+        )
+          .map((entry) => entry as { key?: unknown; on?: unknown })
+          .filter(
+            (entry): entry is { key: string; on: string } =>
+              typeof entry.key === "string" && typeof entry.on === "string",
+          )
+          .map((entry) => ({ key: entry.key, on: entry.on }));
+
         return {
           cycleId: cycle.id,
           name: cycle.name,
@@ -377,6 +486,23 @@ export const readWorkflow = defineReadAction({
           packItems,
           issues,
           priorities,
+          sessionDates,
+          baselineHealth: baseline
+            ? {
+                stable: plainOf(baseline.stable),
+                declining: plainOf(baseline.declining),
+                businessAsUsual: plainOf(baseline.businessAsUsual),
+              }
+            : null,
+          revalidation: revalidation ?? null,
+          focus: {
+            chosen: chosen.map((row) => row.id),
+            candidates:
+              cycle.mode === "quarterly"
+                ? await loadFocusCandidates(tx, context.workspaceId, cycle)
+                : [],
+          },
+          capacityCuts: plainOf(capacity?.cuts),
         };
       },
     );
@@ -881,6 +1007,109 @@ export const setCapacityNotes = defineWriteAction({
           targetType: "cycle",
           targetId: input.cycleId,
           payload: {},
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * A quarter's focus key results (METHOD.md §2.3 phase 3: "focus areas
+ * chosen"; completeness review H-09). The table existed and the phase read it,
+ * and nothing wrote it, so a quarter under a frame with annual key results
+ * could never finish phase 3.
+ *
+ * Replaces the whole choice, because a checklist is saved as what is ticked.
+ * Only the year's own key results may be chosen: a quarter focuses inside
+ * the frame, never beside it.
+ */
+export const setFocusKeyResults = defineWriteAction({
+  name: "workflow.setFocusKeyResults",
+  summary:
+    "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+  input: z.object({
+    cycleId: z.uuid(),
+    keyResultIds: z.array(z.uuid()).max(50),
+  }),
+  output: z.object({ cycleId: z.uuid(), count: z.number().int() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const cycle = await loadCycleForWorkflow(tx, workspaceId, input.cycleId);
+      if (!cycle) {
+        throw new OperationError("not_found", "No such cycle.");
+      }
+      if (cycle.mode !== "quarterly") {
+        throw new OperationError(
+          "forbidden",
+          "An annual cycle sets the year's key results. A quarter chooses its focus from them.",
+        );
+      }
+      const candidates = new Set(
+        (await loadFocusCandidates(tx, workspaceId, cycle)).map(
+          (row) => row.id,
+        ),
+      );
+      const wanted = [...new Set(input.keyResultIds)];
+      if (wanted.some((id) => !candidates.has(id))) {
+        throw new OperationError(
+          "forbidden",
+          "Only the year's own key results can be a quarter's focus.",
+        );
+      }
+
+      const existing = await tx
+        .select({
+          id: cycleFocusKeyResults.id,
+          keyResultId: cycleFocusKeyResults.annualKeyResultId,
+        })
+        .from(cycleFocusKeyResults)
+        .where(
+          activeOnly(
+            cycleFocusKeyResults,
+            eq(cycleFocusKeyResults.workspaceId, workspaceId),
+            eq(cycleFocusKeyResults.cycleId, input.cycleId),
+          ),
+        );
+      const dropped = existing
+        .filter((row) => !wanted.includes(row.keyResultId))
+        .map((row) => row.id);
+      if (dropped.length > 0) {
+        await tx
+          .update(cycleFocusKeyResults)
+          .set({ deletedAt: new Date() })
+          .where(
+            activeOnly(
+              cycleFocusKeyResults,
+              inArray(cycleFocusKeyResults.id, dropped),
+            ),
+          );
+      }
+      const kept = new Set(existing.map((row) => row.keyResultId));
+      for (const keyResultId of wanted.filter((id) => !kept.has(id))) {
+        await tx.insert(cycleFocusKeyResults).values({
+          id: newId(),
+          workspaceId,
+          cycleId: input.cycleId,
+          annualKeyResultId: keyResultId,
+        });
+      }
+
+      await withGateRecompute(tx, workspaceId, input.cycleId);
+
+      return {
+        result: { cycleId: input.cycleId, count: wanted.length },
+        activity: {
+          kind: "cycle.focus_set",
+          subjectType: "cycle",
+          subjectId: input.cycleId,
+          payload: { count: wanted.length },
+        },
+        audit: {
+          action: "workflow.setFocusKeyResults",
+          targetType: "cycle",
+          targetId: input.cycleId,
+          payload: { keyResultIds: wanted },
         },
       };
     },

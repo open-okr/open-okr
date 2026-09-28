@@ -212,7 +212,7 @@ export async function loadWorkflowInput<
     )
     .limit(1);
 
-  const frame = await loadFrameSnapshot(tx, workspaceId, cycle.frameId);
+  const frame = await loadFrameSnapshot(tx, workspaceId, cycle);
 
   // The earliest booked session, which is what the §2.6 pack lead is measured
   // against. `session_dates` is a jsonb array rather than a table because
@@ -247,6 +247,8 @@ export async function loadWorkflowInput<
     priorities,
     revalidation: revalidation ?? null,
     focusKeyResultCount: focusRows.length,
+    annualKeyResultCount: (await loadFocusCandidates(tx, workspaceId, cycle))
+      .length,
     hasCapacityNotes: Boolean(capacity?.cuts),
     frame,
     goals: await loadGoalSnapshots(tx, workspaceId, cycleId),
@@ -524,7 +526,12 @@ async function loadGoalSnapshots<
 
 async function loadFrameSnapshot<
   TSchema extends Record<string, unknown> = Record<string, never>,
->(tx: AnyTx<TSchema>, workspaceId: string, frameId: string | null) {
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  cycle: Pick<Cycle, "frameId" | "startsOn" | "endsOn">,
+) {
+  const frameId = cycle.frameId;
   const [frame] = await tx
     .select({
       id: annualFrames.id,
@@ -560,23 +567,11 @@ async function loadFrameSnapshot<
       ),
     );
 
-  // The key results of the annual cycles that sit under this frame. §2.3's
-  // quarterly phase 3 reads this to decide whether "focus areas chosen" means
-  // picking annual key results or writing a focus note: with nothing to point at,
-  // a note is the only honest answer (P3-T04).
-  const annualKeyResults = await tx
-    .select({ id: keyResults.id })
-    .from(keyResults)
-    .innerJoin(goals, eq(goals.id, keyResults.goalId))
-    .innerJoin(cycles, eq(cycles.id, goals.cycleId))
-    .where(
-      and(
-        activeOnly(keyResults, eq(keyResults.workspaceId, workspaceId)),
-        isNull(goals.deletedAt),
-        eq(cycles.frameId, frame.id),
-        eq(cycles.mode, "annual"),
-      ),
-    );
+  // The key results of the year this cycle sits in. §2.3's quarterly phase 3
+  // reads this to decide whether "focus areas chosen" means picking annual key
+  // results or writing a focus note: with nothing to point at, a note is the
+  // only honest answer (P3-T04, read by the calendar since H-09).
+  const annualKeyResults = await loadFocusCandidates(tx, workspaceId, cycle);
 
   return {
     hasMission: Boolean(frame.mission),
@@ -586,6 +581,46 @@ async function loadFrameSnapshot<
     agreed: frame.agreed,
     annualKeyResultCount: annualKeyResults.length,
   };
+}
+
+/**
+ * The year's key results a quarter may choose its focus from (METHOD.md §2.3
+ * phase 3: "focus areas chosen"; completeness review H-09): every key result
+ * of an annual cycle that overlaps the quarter.
+ *
+ * **By the calendar, not by `cycles.frame_id`.** Nothing has ever written that
+ * column, so reading the year through it found no key results on any
+ * workspace, and phase 3 accepted a focus note from a quarter whose year had
+ * key results to point at. `frame.annualObjectives` reads the year the same
+ * way: an annual objective is one in an annual cycle.
+ */
+export async function loadFocusCandidates<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  workspaceId: string,
+  quarter: { readonly startsOn: string; readonly endsOn: string },
+) {
+  return tx
+    .select({
+      id: keyResults.id,
+      title: keyResults.title,
+      goalTitle: goals.title,
+    })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .innerJoin(cycles, eq(cycles.id, goals.cycleId))
+    .where(
+      and(
+        activeOnly(keyResults, eq(keyResults.workspaceId, workspaceId)),
+        isNull(goals.deletedAt),
+        isNull(cycles.deletedAt),
+        eq(cycles.mode, "annual"),
+        lte(cycles.startsOn, quarter.endsOn),
+        gte(cycles.endsOn, quarter.startsOn),
+      ),
+    )
+    .orderBy(asc(goals.title), asc(keyResults.title));
 }
 
 /** The cycle row the loader needs, by id. */

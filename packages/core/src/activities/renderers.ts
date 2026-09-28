@@ -208,6 +208,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : "The annual frame was revalidated and holds",
   "cycle.baseline_health_set": () => "Baseline health was recorded",
   "cycle.capacity_recorded": () => "What was cut was recorded",
+  "cycle.focus_set": (p) =>
+    `Chose ${Number(p.count ?? 0)} of the year's key results to focus on`,
   "cycle.calibrated": () => "The cycle was calibrated mid-flight",
   "cycle.published": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was published`,

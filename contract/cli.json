@@ -3969,6 +3969,29 @@
       "pages": false
     },
     {
+      "name": "workflow setFocusKeyResults",
+      "action": "workflow.setFocusKeyResults",
+      "method": "POST",
+      "path": "/workflow/setFocusKeyResults",
+      "scope": "write",
+      "summary": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "key-result-ids",
+          "field": "keyResultIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "workflow calibrate",
       "action": "workflow.calibrate",
       "method": "POST",
