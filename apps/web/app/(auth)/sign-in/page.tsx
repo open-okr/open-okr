@@ -45,8 +45,15 @@ export default function SignInPage() {
 
   // Load SSO providers for buttons. Non-blocking: the password form renders
   // immediately and the buttons appear when the fetch completes.
-  useEffect(() => {
-    fetch("/api/sso-providers")
+  //
+  // **Asked again once an address is typed** (completeness review H-03). On
+  // the managed cloud the instance lists nothing to a visitor who has said
+  // nothing, because every customer shares this page; given an address it
+  // answers with the provider for that domain. A self-hosted instance lists
+  // its own providers either way.
+  const loadProviders = (email?: string) => {
+    const query = email ? `?email=${encodeURIComponent(email)}` : "";
+    fetch(`/api/sso-providers${query}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data?.providers)) {
@@ -56,6 +63,10 @@ export default function SignInPage() {
       .catch(() => {
         // SSO buttons simply do not appear if the fetch fails.
       });
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the first load only; a typed address reloads through the field's blur.
+  useEffect(() => {
+    loadProviders();
   }, []);
 
   /**
@@ -222,6 +233,12 @@ export default function SignInPage() {
           type="email"
           autoComplete="username webauthn"
           required
+          onBlur={(event) => {
+            const address = event.currentTarget.value.trim();
+            if (address.includes("@")) {
+              loadProviders(address);
+            }
+          }}
         />
         <Field
           label="Password"
