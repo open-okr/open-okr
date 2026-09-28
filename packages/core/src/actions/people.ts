@@ -33,7 +33,7 @@ import {
 } from "../access/reads.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
-import { sweepPersonalData } from "../people/erasure.ts";
+import { eraseAccountIfAlone, sweepPersonalData } from "../people/erasure.ts";
 import { buildPersonalExport } from "../people/export.ts";
 import {
   type ErasureExport,
@@ -587,6 +587,94 @@ export const convertToGuest = defineWriteAction({
   }),
 });
 
+/**
+ * Everything the manifest marks as a member's own, as handed to them (P7-T08b).
+ *
+ * Rows are `unknown` on purpose: this is forty-odd tables wide and a schema
+ * naming every column would be a second copy of the database schema, drifting
+ * from the first. Shared by erasure, which hands it over before anonymising,
+ * and by `people.exportMine`, which hands it over on request.
+ */
+const personalExportSchema = z.object({
+  memberId: z.uuid(),
+  takenAt: z.string(),
+  tables: z
+    .array(
+      z.object({
+        table: z.string(),
+        label: z.string(),
+        // Records rather than `unknown`: a row is a row, and the looser type
+        // made this schema disagree with `PersonalExport` at the one call site
+        // that consumes both.
+        rows: z.array(z.record(z.string(), z.unknown())).readonly(),
+      }),
+    )
+    .readonly(),
+  omitted: z
+    .array(
+      z.object({
+        table: z.string(),
+        reason: z.enum([
+          "structural",
+          "access",
+          "derived",
+          "credential",
+          "workspace_record",
+        ]),
+        because: z.string(),
+      }),
+    )
+    .readonly(),
+});
+
+/**
+ * A member's own data, whenever they ask (completeness review M-18).
+ *
+ * The export existed only inside erasure, so the one way to see what the
+ * instance held about you was to be deleted. The same manifest and builder,
+ * for the caller's own member only: there is no id in the input, so nobody can
+ * ask for anybody else's.
+ */
+export const exportMine = defineReadAction({
+  name: "people.exportMine",
+  summary:
+    "Everything this workspace holds about the signed-in member, as one document.",
+  input: z.object({}),
+  output: personalExportSchema,
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such member.");
+    }
+    const db = drizzle(context.pool);
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (tx) => {
+        const [member] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.userId, userId),
+            ),
+          )
+          .limit(1);
+        if (!member) {
+          throw new OperationError("not_found", "No such member.");
+        }
+        return buildPersonalExport(tx, {
+          workspaceId: context.workspaceId,
+          memberId: member.id,
+        });
+      },
+    );
+  },
+});
+
 export const eraseMember = defineWriteAction({
   name: "people.erase",
   summary:
@@ -621,37 +709,7 @@ export const eraseMember = defineWriteAction({
        * schema naming every column would be a second copy of the database
        * schema, drifting from the first.
        */
-      data: z.object({
-        memberId: z.uuid(),
-        takenAt: z.string(),
-        tables: z
-          .array(
-            z.object({
-              table: z.string(),
-              label: z.string(),
-              // Records rather than `unknown`: a row is a row, and the
-              // looser type made this schema disagree with `PersonalExport`
-              // at the one call site that consumes both.
-              rows: z.array(z.record(z.string(), z.unknown())).readonly(),
-            }),
-          )
-          .readonly(),
-        omitted: z
-          .array(
-            z.object({
-              table: z.string(),
-              reason: z.enum([
-                "structural",
-                "access",
-                "derived",
-                "credential",
-                "workspace_record",
-              ]),
-              because: z.string(),
-            }),
-          )
-          .readonly(),
-      }),
+      data: personalExportSchema,
       removed: z.object({
         channelIdentities: z.number(),
         channelLinkCodes: z.number(),
@@ -665,10 +723,11 @@ export const eraseMember = defineWriteAction({
     }),
   }),
   access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     async load({ tx, workspaceId }) {
       const [before] = await tx
         .select({
+          userId: workspaceMembers.userId,
           name: workspaceMembers.name,
           title: workspaceMembers.title,
           bio: workspaceMembers.bio,
@@ -741,6 +800,28 @@ export const eraseMember = defineWriteAction({
         memberId: input.memberId,
       });
 
+      // The sign-in account, when this was the person's only workspace
+      // (completeness review M-18).
+      const account = loaded.userId
+        ? await eraseAccountIfAlone(tx, context.pool, {
+            workspaceId,
+            userId: loaded.userId,
+          })
+        : null;
+
+      // Earlier feed entries about this member carried their name in the
+      // payload, which is where the feed reads it from. They keep the event
+      // and lose the name (completeness review M-18).
+      // openokr:allow-mutation: this Operation's own transaction.
+      await tx.execute(sql`
+        update activities
+           set payload = jsonb_set(payload, '{name}', '"Erased member"'::jsonb)
+         where workspace_id = ${workspaceId}
+           and subject_type = 'workspace_member'
+           and subject_id = ${updated.id}
+           and payload ? 'name'
+      `);
+
       const exported: ErasureExport = {
         memberId: updated.id,
         erasedAt: erasedAt.toISOString(),
@@ -760,9 +841,11 @@ export const eraseMember = defineWriteAction({
           kind: "member.erased",
           subjectType: "workspace_member",
           subjectId: updated.id,
-          // The name from before erasure: the whole point of erasure is
-          // that the row no longer carries it, so the feed entry has to.
-          payload: { name: loaded.name },
+          // No name (completeness review M-18). This carried the name from
+          // before erasure "because the row no longer does", which wrote the
+          // one thing erasure removes into a new row the whole workspace can
+          // read.
+          payload: {},
         },
         audit: {
           action: "people.erase",
@@ -771,7 +854,19 @@ export const eraseMember = defineWriteAction({
           // What the sweep removed, so the trail records what the erasure
           // did and not only that it ran. No identifier is in here: these
           // are counts.
-          payload: { removed },
+          payload: {
+            removed,
+            ...(account
+              ? {
+                  account: {
+                    anonymised: account.anonymised,
+                    otherWorkspaces: account.otherWorkspaces,
+                    sessionsRevoked: account.sessionsRevoked,
+                    credentialsRemoved: account.credentialsRemoved,
+                  },
+                }
+              : {}),
+          },
         },
       };
     },

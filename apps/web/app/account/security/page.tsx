@@ -1,6 +1,7 @@
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { requireSession } from "../../../lib/session";
 import { getTranslations } from "../../../lib/translations";
+import { DataExport } from "./data-export";
 import { SecuritySettings } from "./security-settings";
 import { Sessions } from "./sessions";
 
@@ -36,6 +37,7 @@ export default async function SecurityPage() {
         twoFactorEnabled={session.user.twoFactorEnabled === true}
       />
       <Sessions userId={session.user.id} />
+      <DataExport />
     </div>
   );
 }

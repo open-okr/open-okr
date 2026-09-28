@@ -196,6 +196,16 @@
       "pages": false
     },
     {
+      "name": "people exportMine",
+      "action": "people.exportMine",
+      "method": "GET",
+      "path": "/people/exportMine",
+      "scope": "read",
+      "summary": "Everything this workspace holds about the signed-in member, as one document.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "people importMember",
       "action": "people.importMember",
       "method": "POST",

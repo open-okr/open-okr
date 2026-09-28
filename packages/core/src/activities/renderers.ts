@@ -55,7 +55,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `${asString(p.name, "A member")} is no longer an administrator`,
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
-  "member.erased": (p) => `${asString(p.name, "A member")}'s data was erased`,
+  "member.erased": () => "A member's data was erased",
   "member.imported": (p) =>
     p.matched === undefined
       ? `${asString(p.name, "A member")} was imported`

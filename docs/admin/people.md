@@ -46,6 +46,16 @@ somebody else first.
 authorship is preserved, personal data is not. It exists for a legal request,
 not for offboarding.
 
+| What erasure does | Detail |
+|---|---|
+| The member | Renamed "Erased member", profile cleared, suspended, unlinked from their account |
+| The feed | No entry names them any more, including entries written before the erasure |
+| Their sign-in account | Anonymised, signed out everywhere and its password, passkeys and second factor removed, **but only when this was their only workspace**. If they belong to another workspace the account is left for it, and the audit entry says how many other workspaces there are |
+| Their data | Handed to you as one document before anything is removed |
+
+Anybody can take the same document about themselves at any time from **Account,
+Security, Your data**. Nobody is asked or told.
+
 ## Guests
 
 A guest is a member of a narrower kind, used for the cloud support session: the

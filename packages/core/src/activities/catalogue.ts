@@ -85,7 +85,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     administrator: z.boolean(),
   }),
   "member.converted_to_guest": z.object({ name: z.string() }),
-  "member.erased": z.object({ name: z.string() }),
+  // No name since completeness review M-18: the event is that somebody was
+  // erased, and writing who into a row every member can read undid it.
+  "member.erased": z.object({}),
   /**
    * A member an import created or claimed (P6-T03a).
    *

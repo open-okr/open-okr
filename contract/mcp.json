@@ -312,6 +312,21 @@
       "example": {}
     },
     {
+      "name": "people.exportMine",
+      "description": "Everything this workspace holds about the signed-in member, as one document.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "people.importMember",
       "description": "Creates a placeholder member for somebody an import found, with the address to claim it by.",
       "inputSchema": {
