@@ -29,6 +29,7 @@ import {
   kpiRecords,
   kpis,
   notificationSettings,
+  nudges,
   spaceMembers,
   type WorkspaceTx,
   workspaceMembers,
@@ -42,10 +43,9 @@ import {
   kpiState,
   type ResolvedThresholds,
   shouldProposeRecovery,
-  shouldProposeRecoveryClose,
   trigger,
 } from "@openokr/method";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, isNull } from "drizzle-orm";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import {
   type AgentScope,
@@ -54,6 +54,7 @@ import {
 } from "../agents/scope.ts";
 import { DEFAULT_DAILY_SUMMARY_TIME } from "../notifications/settings.ts";
 import { OperationError } from "../operations/errors.ts";
+import { workspaceAdministratorIds } from "../people/lifecycle.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import {
   type DueNudge,
@@ -73,30 +74,37 @@ const RULE_FOR_STATE: Partial<Record<KpiState, string>> = {
  *
  * A member-owned KPI has its owner on the row. A space-owned one resolves to
  * the space's coordinator, falling back to the manager through §4.2's one rule
- * rather than a second copy of it here. A workspace-owned KPI has no owner and
- * gets no nudge: escalating a metric to everybody is escalating it to nobody,
- * and §6.4 names the recipient as "KPI owner" rather than "the workspace".
+ * rather than a second copy of it here.
+ *
+ * **A workspace-owned KPI goes to the workspace's administrators**
+ * (completeness review M-29). It went to nobody: the reasoning was that
+ * escalating a metric to everybody is escalating it to nobody, which is true,
+ * and the administrators are not everybody. They are who owns what the whole
+ * workspace owns, and a company-level KPI leaving its corridor in silence was
+ * the worse outcome.
  */
-async function kpiOwner(
+async function kpiOwners(
   tx: WorkspaceTx,
+  workspaceId: string,
   kpi: {
     readonly ownerKind: string;
     readonly memberId: string | null;
     readonly spaceId: string | null;
   },
-): Promise<string | null> {
+): Promise<readonly string[]> {
   if (kpi.ownerKind === "member") {
-    return kpi.memberId;
+    return kpi.memberId ? [kpi.memberId] : [];
   }
-  if (kpi.ownerKind !== "space" || !kpi.spaceId) {
-    return null;
+  if (kpi.ownerKind === "space" && kpi.spaceId) {
+    const holders = await tx
+      .select({ memberId: spaceMembers.memberId, role: spaceMembers.role })
+      .from(spaceMembers)
+      .where(activeOnly(spaceMembers, eq(spaceMembers.spaceId, kpi.spaceId)))
+      .orderBy(asc(spaceMembers.createdAt));
+    const coordinator = resolveCoordinator(holders);
+    return coordinator ? [coordinator] : [];
   }
-  const holders = await tx
-    .select({ memberId: spaceMembers.memberId, role: spaceMembers.role })
-    .from(spaceMembers)
-    .where(activeOnly(spaceMembers, eq(spaceMembers.spaceId, kpi.spaceId)))
-    .orderBy(asc(spaceMembers.createdAt));
-  return resolveCoordinator(holders) ?? null;
+  return workspaceAdministratorIds(tx, workspaceId);
 }
 
 /**
@@ -212,6 +220,7 @@ export async function dueKpiCorridorNudges(
       spaceId: kpis.spaceId,
       recoveryGoalId: kpis.recoveryGoalId,
       recoveryCloseProposedAt: kpis.recoveryCloseProposedAt,
+      targetDefault: kpis.targetDefault,
     })
     .from(kpis)
     .where(
@@ -226,8 +235,8 @@ export async function dueKpiCorridorNudges(
   const due: DueNudge[] = [];
 
   for (const kpi of rows) {
-    const owner = await kpiOwner(tx, kpi);
-    if (!owner) {
+    const owners = await kpiOwners(tx, input.workspaceId, kpi);
+    if (owners.length === 0) {
       continue;
     }
 
@@ -236,10 +245,10 @@ export async function dueKpiCorridorNudges(
     // one already has an objective attached, and one nobody has recorded is
     // unmeasured rather than failing.
     const corridorRule = RULE_FOR_STATE[kpi.state];
-    if (corridorRule) {
+    for (const owner of corridorRule ? owners : []) {
       due.push(
         nudge({
-          ruleKey: corridorRule,
+          ruleKey: corridorRule ?? "",
           subjectType: "kpi",
           subjectId: kpi.id,
           recipientMemberId: owner,
@@ -248,7 +257,7 @@ export async function dueKpiCorridorNudges(
           // has no target and the message stays with the owner. It repeats for
           // as long as the metric is out of its corridor, so the ceiling is
           // what bounds it: see `urgentFor`.
-          urgent: urgentFor(corridorRule, true),
+          urgent: urgentFor(corridorRule ?? "", true),
         }),
       );
     }
@@ -264,6 +273,10 @@ export async function dueKpiCorridorNudges(
       // column holds today's state and this question is about a run of them.
       const periods = await periodStatesFor(tx, input.workspaceId, kpi);
       if (shouldProposeRecovery(periods, delay)) {
+        // One proposal, to the first owner. A proposal is a decision somebody
+        // applies, and a workspace KPI's three administrators each holding a
+        // copy would be three decisions about one metric.
+        const owner = owners[0] as string;
         // A better sentence than the template, when a model can write one.
         // Null is the ordinary answer and not a failure: §6.5's template is
         // what P3-T14 golden-master tested and what the deterministic path has
@@ -311,17 +324,22 @@ export async function dueKpiCorridorNudges(
       continue;
     }
 
-    if (
-      shouldProposeRecoveryClose({
-        // Real achievement, never the effective figure. Closing on the
-        // projection would close a recovery because the recovery was going
-        // well, which is circular. §6.5, and P3-T14 made the same call.
-        achievementPct: achievement,
-        recovery,
-        alreadyProposed: kpi.recoveryCloseProposedAt !== null,
-        healthyPct: Number(kpi.healthyPct),
-      })
-    ) {
+    // **Told once, after the recompute decided** (completeness review M-29).
+    // This asked `shouldProposeRecoveryClose` with `alreadyProposed` taken
+    // from the stamp, and the recompute that writes a record is what sets the
+    // stamp, always first. So by the time the sweep asked, the answer was
+    // always "already proposed" and `kpi.recovered` never fired. The stamp is
+    // the decision; this is the message about it, sent once per stamp.
+    const recovered =
+      recovery === "open" &&
+      kpi.recoveryCloseProposedAt !== null &&
+      !(await recoveredAlreadySent(
+        tx,
+        input.workspaceId,
+        kpi.id,
+        kpi.recoveryCloseProposedAt,
+      ));
+    for (const owner of recovered ? owners : []) {
       due.push(
         nudge({
           ruleKey: "kpi.recovered",
@@ -365,6 +383,29 @@ async function refinedRecoveryTitle(
   }
 }
 
+/** Whether `kpi.recovered` has been recorded since this closure stamp. */
+async function recoveredAlreadySent(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  kpiId: string,
+  since: Date,
+): Promise<boolean> {
+  const [row] = await tx
+    .select({ id: nudges.id })
+    .from(nudges)
+    .where(
+      activeOnly(
+        nudges,
+        eq(nudges.workspaceId, workspaceId),
+        eq(nudges.ruleKey, "kpi.recovered"),
+        eq(nudges.subjectId, kpiId),
+        gte(nudges.createdAt, since),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
 /** Whether a linked recovery goal is open, closed, or absent (METHOD.md §6.4). */
 async function recoveryLinkFor(
   tx: WorkspaceTx,
@@ -406,6 +447,7 @@ async function periodStatesFor(
     readonly direction: KpiDirection;
     readonly healthyPct: string;
     readonly watchPct: string;
+    readonly targetDefault: string | null;
   },
 ): Promise<readonly KpiState[]> {
   const rows = await tx
@@ -433,10 +475,16 @@ async function periodStatesFor(
     // them into a percentage. Reading a stored column here would need a column
     // that does not exist, and computing the ratio a second way would give the
     // sweep its own opinion about a number the grid already shows.
+    //
+    // A period with no target of its own is measured against the KPI's
+    // standing one, exactly as `recomputeKpi` does (completeness review
+    // M-29). Without the fallback a KPI that only ever had a standing target
+    // read as "no data" in every period and never earned its proposal.
+    const target = row.targetValue ?? kpi.targetDefault;
     const { pct } = kpiAchievement(
       kpi.direction,
       row.actualValue === null ? null : Number(row.actualValue),
-      row.targetValue === null ? null : Number(row.targetValue),
+      target === null ? null : Number(target),
     );
     // "none" rather than the KPI's real recovery link: this asks what each
     // period looked like on its own terms, and a recovery opened last month
