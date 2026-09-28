@@ -224,6 +224,12 @@ export {
   type WeeklyStep,
 } from "./sessions.ts";
 export {
+  afterWeeklyCheckIn,
+  currentStreakOn,
+  type StreakState,
+  weekStartOf,
+} from "./streak.ts";
+export {
   deferralFor,
   insideQuietHours,
   type SuppressionInput,

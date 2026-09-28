@@ -1032,6 +1032,95 @@ describe("sessions.close digest and streak (P4-T08)", () => {
   });
 });
 
+describe("the streak counts weeks of check-ins (completeness review M-04)", () => {
+  async function holdWeeklyCheckIn(): Promise<void> {
+    const wb = await workerDb();
+    const sessionId = await openSessionAtConfidence();
+    await advanceToCommitments(sessionId, 0.7);
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCommitments",
+      {
+        sessionId,
+        items: [
+          { text: "A", ownerId: facilitatorMemberId },
+          { text: "B", ownerId: memberMemberId },
+        ],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId },
+    );
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: sessionId,
+    });
+  }
+
+  const readStreak = async () => {
+    const wb = await workerDb();
+    return (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.readStreak",
+      { spaceId },
+    )) as { currentWeeks: number; longestWeeks: number };
+  };
+
+  const trend = async () => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.confidenceTrend",
+      { spaceId, weeks: 12 },
+    );
+  };
+
+  it("counts two check-ins in one week as one week and one trend point", async () => {
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    expect(await trend()).toHaveLength(1);
+  });
+
+  it("adds neither a week nor a trend point for a monthly review", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    const monthly = (await createSession({
+      kind: "monthly",
+      title: "Monthly review",
+    })) as { id: string };
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.open", {
+      id: monthly.id,
+    });
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.close", {
+      id: monthly.id,
+    });
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // The monthly close used to add a point at 0.0, a collapse nobody saw.
+    const points = await trend();
+    expect(points).toHaveLength(1);
+    expect(points[0]?.average).toBe(0.7);
+  });
+
+  it("reads as broken once a whole week passes with nothing held", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    await holdWeeklyCheckIn();
+    expect((await readStreak()).currentWeeks).toBe(1);
+    // As if the last check-in were three weeks ago and nobody pressed skip.
+    await wb.admin.query(
+      "update streaks set last_session_week = (current_date - 21) where space_id = $1",
+      [spaceId],
+    );
+    const streak = await readStreak();
+    expect(streak.currentWeeks).toBe(0);
+    expect(streak.longestWeeks).toBe(1);
+  });
+});
+
 describe("the commitment gate reads §11, not a copy of it (P6-G19a)", () => {
   it("names this workspace's own lower bound when it is refused", async () => {
     const wb = await workerDb();
